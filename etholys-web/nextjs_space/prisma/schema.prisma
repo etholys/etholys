@@ -1,0 +1,1188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  PROJECT_MANAGER
+  TECHNICIAN
+  COLLABORATOR
+}
+
+enum ProjectStatus {
+  DRAFT
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String    @default("")
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(COLLABORATOR)
+  avatar        String?
+  phone         String?
+  locale        String    @default("es")
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  companyUsers  CompanyUser[]
+  departmentUsers DepartmentUser[]
+  assignedTasks Task[]      @relation("TaskAssignee")
+  createdTasks  Task[]      @relation("TaskCreator")
+  comments      Comment[]
+  timeEntries   TimeEntry[]
+  projectMembers ProjectMember[]
+  activities    Activity[]
+  invitations   Invitation[]
+  taskTemplates TaskTemplate[] @relation("TemplateCreator")
+  notifications Notification[]
+  employeeContracts EmployeeContract[]
+  chatChannelMembers ChatChannelMember[]
+  chatMessages       ChatMessage[]
+  museSuggestions     MuseSuggestion[]
+  labInvitesSent      LabInvite[]      @relation("LabInviteSender")
+  labInvitesReceived  LabInvite[]      @relation("LabInviteUser")
+  taxFilings          TaxFiling[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  shortName   String
+  description String?
+  logo        String?
+  color       String   @default("#0D9488")
+  currency    String   @default("USD")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Tax / legal fields
+  ein               String?  // Employer Identification Number
+  incorporationDate DateTime?
+  incorporationCountry String?
+  taxAddress        String?  // Registered address for tax purposes
+  businessActivityCode String?
+  businessActivity  String?
+  entityType        String?  // LLC, C-Corp, S-Corp, etc.
+
+  companyUsers CompanyUser[]
+  departments  Department[]
+  customRoles  CustomRole[]
+  projects     Project[]
+  transactions Transaction[]
+  invitations    Invitation[]
+  taskTemplates  TaskTemplate[]
+  invoices       Invoice[]
+  suppliers      Supplier[]
+  products       Product[]
+  clients        Client[]
+  stakeholders   Stakeholder[]
+  documents      Document[]
+  purchaseOrders    PurchaseOrder[]
+  leaveRequests          LeaveRequest[]
+  employeeContracts      EmployeeContract[]
+  transactionCategories  TransactionCategory[]
+  chatChannels           ChatChannel[]
+  museSuggestions         MuseSuggestion[]
+  taxFilings             TaxFiling[]
+  companyBudgetLines     CompanyBudgetLine[]
+  companyBudgetItems     CompanyBudgetItem[]
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  code      String?
+  headId    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users     DepartmentUser[]
+  tasks     Task[]
+}
+
+model CompanyUser {
+  id        String   @id @default(cuid())
+  userId    String
+  companyId String
+  role      UserRole @default(COLLABORATOR)
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+}
+
+model DepartmentUser {
+  id           String   @id @default(cuid())
+  userId       String
+  departmentId String
+  role         String   @default("member")
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, departmentId])
+}
+
+model CustomRole {
+  id          String   @id @default(cuid())
+  companyId   String?
+  name        String   @unique
+  description String   @default("")
+  code        String   @default("")
+  level       Int      @default(0)
+  permissions String?
+  color       String   @default("#6b7280")
+  isSystem    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model Objective {
+  id          String   @id @default(cuid())
+  projectId   String
+  parentId    String?
+  type        String   @default("objective")
+  code        String?
+  title       String
+  description String?
+  indicator   String?
+  indicatorType String?
+  unitOfMeasure String?
+  dataSource  String?
+  disaggregation String?
+  reportingFreq String?
+  responsibility String?
+  dataLimitations String?
+  baseline    String?
+  target      String?
+  actual      String?
+  status      String   @default("not_started")
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project      Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent       Objective?            @relation("ObjectiveTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children     Objective[]           @relation("ObjectiveTree")
+  measurements IndicatorMeasurement[]
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  code        String?
+  description String?
+  goal        String?
+  companyId   String
+  donorName   String?
+  donorContact String?
+  status      ProjectStatus @default(DRAFT)
+  priority    Priority      @default(MEDIUM)
+  startDate   DateTime?
+  endDate     DateTime?
+  budget      Float         @default(0)
+  spent       Float         @default(0)
+  progress    Int           @default(0)
+  country     String?
+  region      String?
+  currency    String        @default("USD")
+  color       String        @default("#60B5FF")
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  company      Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tasks        Task[]
+  milestones   Milestone[]
+  members      ProjectMember[]
+  risks        Risk[]
+  transactions Transaction[]
+  objectives   Objective[]
+  activities   Activity[]
+  museSuggestions MuseSuggestion[]
+  sowSections     SOWSection[]
+  budgetLines     BudgetLine[]
+  meReports       MEReport[]
+  indicatorMeasurements IndicatorMeasurement[]
+  companyBudgetItems    CompanyBudgetItem[]
+  budgetItemFundings    BudgetItemFunding[]
+}
+
+model ProjectMember {
+  id             String   @id @default(cuid())
+  projectId      String
+  userId         String
+  role           String   @default("member")
+  dedicationPct  Float    @default(100)  // % of work-time dedicated to this project
+  monthlyCost    Float?   // override: if set, used instead of HR salary × dedicationPct
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  projectId   String?
+  companyId   String?
+  assigneeId  String?
+  creatorId   String
+  parentId    String?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  startDate   DateTime?
+  dueDate     DateTime?
+  completedAt DateTime?
+  estimatedHours Float?  
+  order       Int        @default(0)
+  tags        String?
+  isActive    Boolean    @default(true)
+  isRecurring     Boolean  @default(false)
+  recurrenceMonths Int?
+  recurrenceGroup String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  departmentId String?
+
+  project    Project?    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  assignee   User?       @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creator    User        @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  parent     Task?       @relation("SubTasks", fields: [parentId], references: [id], onDelete: SetNull)
+  subtasks      Task[]           @relation("SubTasks")
+  comments      Comment[]
+  checklist     ChecklistItem[]
+  timeEntries   TimeEntry[]
+  attachments   Attachment[]
+  dependsOn     TaskDependency[] @relation("DependentTask")
+  dependedBy    TaskDependency[] @relation("DependencyTask")
+}
+
+model TaskDependency {
+  id              String   @id @default(cuid())
+  taskId          String   // the dependent task (blocked)
+  dependsOnTaskId String   // the task it depends on (blocker)
+  type            String   @default("finish_to_start") // finish_to_start, start_to_start, finish_to_finish, start_to_finish
+  lagDays         Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  task      Task @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn Task @relation("DependencyTask", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnTaskId])
+}
+
+model TaskTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  companyId   String?
+  category    String?
+  tasks       Json     // Array of { title, description, priority, estimatedHours, order, dependencies, checklist }
+  createdBy   String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  creator User     @relation("TemplateCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+}
+
+model ChecklistItem {
+  id        String   @id @default(cuid())
+  taskId    String
+  text      String
+  completed Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Attachment {
+  id               String   @id @default(cuid())
+  taskId           String
+  fileName         String
+  fileSize         Int
+  fileType         String
+  cloudStoragePath String
+  isPublic         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model TimeEntry {
+  id          String   @id @default(cuid())
+  taskId      String
+  userId      String
+  hours       Float
+  description String?
+  date        DateTime
+  createdAt   DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Milestone {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  dueDate     DateTime?
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Risk {
+  id          String    @id @default(cuid())
+  projectId   String
+  title       String
+  description String?
+  level       RiskLevel @default(MEDIUM)
+  impact      String?
+  mitigation  String?
+  status      String    @default("open")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id              String          @id @default(cuid())
+  companyId       String
+  projectId       String?
+  type            TransactionType
+  amount          Float
+  currency        String          @default("USD")
+  title           String?
+  description     String?
+  category        String?
+  date            DateTime        @default(now())
+  accrualDate     DateTime?
+  isRecurring     Boolean         @default(false)
+  recurrenceMonths Int?
+  executionStatus String          @default("FORECAST")
+  executedDate    DateTime?
+  createdAt       DateTime        @default(now())
+
+  budgetLineId    String?
+  scope           String          @default("SHARED")
+  companyAmount   Float?
+  note            String?
+  origin          String?         // INTERNAL | PROJECT (for ATLAS classification)
+  companyBudgetItemId String?
+  receiptUrl      String?         // Link to receipt/proof (Google Drive, OneDrive, etc.)
+
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  project    Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  budgetLine BudgetLine? @relation(fields: [budgetLineId], references: [id], onDelete: SetNull)
+  companyBudgetItem CompanyBudgetItem? @relation(fields: [companyBudgetItemId], references: [id], onDelete: SetNull)
+
+  @@index([budgetLineId])
+  @@index([scope])
+  @@index([companyBudgetItemId])
+}
+
+model TransactionCategory {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  color     String   @default("#6B7280")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, name])
+}
+
+// ── Company-level Budget Planning (ATLAS) ──────────────────────
+model CompanyBudgetLine {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String   // e.g. "Personal / Personnel"
+  nameEs      String?  // Spanish label
+  namePt      String?  // Portuguese label
+  icon        String?  // lucide icon name
+  color       String   @default("#6B7280")
+  order       Int      @default(0)
+  isSystem    Boolean  @default(false) // true = predefined, false = user-created
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company       Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  subcategories CompanyBudgetSubcategory[]
+  items         CompanyBudgetItem[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model CompanyBudgetSubcategory {
+  id            String   @id @default(cuid())
+  budgetLineId  String
+  name          String
+  nameEs        String?
+  namePt        String?
+  isSystem      Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  budgetLine CompanyBudgetLine  @relation(fields: [budgetLineId], references: [id], onDelete: Cascade)
+  items      CompanyBudgetItem[]
+
+  @@unique([budgetLineId, name])
+  @@index([budgetLineId])
+}
+
+model CompanyBudgetItem {
+  id              String   @id @default(cuid())
+  companyId       String
+  budgetLineId    String
+  subcategoryId   String?
+  description     String
+  unit            String   @default("month") // month, flight, trip, unit, lump_sum, day, hour
+  quantity        Float    @default(1)
+  unitCost        Float    @default(0)
+  total           Float    @default(0)       // auto: quantity * unitCost
+  currency        String   @default("USD")
+  /// EXPENSE = planned cost; INCOME = planned revenue / billing
+  budgetFlow      String   @default("EXPENSE")
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  note            String?
+  // Allocation: INTERNAL, PROJECT, or SPLIT
+  origin          String   @default("INTERNAL") // INTERNAL | PROJECT
+  projectId       String?
+  allocationPct   Float    @default(100)  // % assigned to project (rest is internal)
+  order           Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company       Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  budgetLine    CompanyBudgetLine        @relation(fields: [budgetLineId], references: [id], onDelete: Cascade)
+  subcategory   CompanyBudgetSubcategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
+  project       Project?                 @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  transactions  Transaction[]
+  fundingSplits BudgetItemFunding[]
+
+  @@index([companyId])
+  @@index([budgetLineId])
+  @@index([projectId])
+}
+
+// Multi-project time-based funding allocation for budget items
+model BudgetItemFunding {
+  id              String   @id @default(cuid())
+  budgetItemId    String
+  projectId       String?  // null = internal/company funds
+  percentage      Float    @default(100) // % of budget item funded by this source
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  budgetItem CompanyBudgetItem @relation(fields: [budgetItemId], references: [id], onDelete: Cascade)
+  project    Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([budgetItemId])
+  @@index([projectId])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String?
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // task_assigned, task_due, comment_added, project_update, invitation, system
+  title     String
+  message   String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ===== ATLAS ERP: Invoicing & Accounts =====
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum InvoiceType {
+  RECEIVABLE   // factura a cobrar (venta)
+  PAYABLE      // factura a pagar (compra)
+  CREDIT_NOTE  // nota de crédito
+  DEBIT_NOTE   // nota de débito
+}
+
+model Invoice {
+  id           String        @id @default(cuid())
+  companyId    String
+  supplierId   String?
+  projectId    String?
+  type         InvoiceType
+  status       InvoiceStatus @default(DRAFT)
+  number       String        // INV-001
+  description  String?
+  contactName  String?       // client or supplier name
+  contactEmail String?
+  currency     String        @default("USD")
+  subtotal     Float         @default(0)
+  taxRate      Float         @default(0) // percentage
+  taxAmount    Float         @default(0)
+  total        Float         @default(0)
+  issueDate    DateTime      @default(now())
+  dueDate      DateTime?
+  paidDate     DateTime?
+  notes        String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  relatedInvoiceId String?   // for credit/debit notes referencing original invoice
+
+  company        Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplier       Supplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  relatedInvoice Invoice?   @relation("InvoiceNotes", fields: [relatedInvoiceId], references: [id], onDelete: SetNull)
+  creditDebitNotes Invoice[] @relation("InvoiceNotes")
+  items          InvoiceItem[]
+}
+
+model InvoiceItem {
+  id          String @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Float  @default(1)
+  unitPrice   Float  @default(0)
+  total       Float  @default(0)
+  order       Int    @default(0)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+// ===== ATLAS ERP: Suppliers / Procurement =====
+
+model Supplier {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  tradeName   String?
+  taxId       String?  // RUT, CNPJ, etc
+  email       String?
+  phone       String?
+  address     String?
+  city        String?
+  country     String?
+  category    String?  // Materiales, Servicios, Tecnología, etc
+  rating      Int?     // 1-5
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company        Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices       Invoice[]
+  purchaseOrders PurchaseOrder[]
+  evaluations    SupplierEvaluation[]
+}
+
+model SupplierEvaluation {
+  id              String   @id @default(cuid())
+  supplierId      String
+  quality         Int      @default(3)  // 1-5
+  delivery        Int      @default(3)  // 1-5
+  price           Int      @default(3)  // 1-5
+  communication   Int      @default(3)  // 1-5
+  compliance      Int      @default(3)  // 1-5
+  comment         String?
+  evaluationDate  DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+}
+
+// ===== ATLAS ERP: HR Employee Contracts =====
+
+model EmployeeContract {
+  id           String   @id @default(cuid())
+  companyId    String
+  userId       String
+  contractType String   @default("full_time") // full_time, part_time, contractor, intern
+  position     String
+  department   String?
+  salary       Float?
+  currency     String   @default("USD")
+  startDate    DateTime
+  endDate      DateTime?
+  workHours    Float?   @default(40) // weekly
+  socialSecurity Float? @default(0)
+  healthInsurance Float? @default(0)
+  otherDeductions Float? @default(0)
+  bonuses      Float?   @default(0)
+  notes        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Invitation {
+  id          String   @id @default(cuid())
+  companyId   String
+  email       String
+  role        UserRole @default(COLLABORATOR)
+  code        String   @unique @default(cuid())
+  invitedBy   String
+  status      String   @default("pending") // pending, accepted, revoked, expired
+  expiresAt   DateTime?
+  acceptedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  inviter User    @relation(fields: [invitedBy], references: [id], onDelete: Cascade)
+}
+
+// ===== ATLAS ERP: Inventory / Products =====
+
+model Product {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  sku         String?
+  description String?
+  category    String?
+  unit        String   @default("unidad")
+  costPrice   Float?
+  salePrice   Float?
+  currency    String   @default("USD")
+  stockQty    Float    @default(0)
+  minStock    Float?
+  location    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company        Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stockMovements StockMovement[]
+}
+
+// ===== ATLAS ERP: CRM / Clients =====
+
+model Client {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  address     String?
+  city        String?
+  country     String?
+  taxId       String?
+  type        String   @default("company")
+  segment     String?
+  rating      Int?
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company      Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  interactions ClientInteraction[]
+}
+
+// ===== ATLAS ERP: Stakeholders / Alianzas =====
+
+model Stakeholder {
+  id             String   @id @default(cuid())
+  companyId      String
+  name           String
+  contactName    String?
+  email          String?
+  phone          String?
+  address        String?
+  city           String?
+  country        String?
+  taxId          String?
+  type           String   @default("ong")       // ong, gobierno, cooperacion, academia, empresa, otro
+  allianceType   String?                        // convenio, acuerdo, memorandum, carta_intencion, socio, financiador
+  status         String   @default("active")    // active, inactive, prospecting, suspended
+  startDate      DateTime?
+  endDate        DateTime?
+  website        String?
+  sector         String?                        // agro, salud, educacion, tecnologia, medioambiente, social, otro
+  description    String?
+  notes          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  interactions StakeholderInteraction[]
+}
+
+model StakeholderInteraction {
+  id            String   @id @default(cuid())
+  stakeholderId String
+  type          String   // meeting, email, call, visit, agreement, report
+  subject       String
+  description   String?
+  contactName   String?
+  date          DateTime @default(now())
+  performedBy   String?
+  createdAt     DateTime @default(now())
+
+  stakeholder Stakeholder @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
+}
+
+// ===== ATLAS ERP: Document Repository =====
+
+model Document {
+  id               String   @id @default(cuid())
+  companyId        String
+  name             String
+  description      String?
+  category         String   @default("general")  // general, contrato, informe, politica, procedimiento, acta, legal, financiero, tecnico, otro
+  tags             String?                        // comma-separated tags
+  fileName         String
+  fileSize         Int
+  fileType         String
+  cloudStoragePath String
+  isPublic         Boolean  @default(false)
+  version          Int      @default(1)
+  uploadedBy       String?
+  projectId        String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+// ===== ATLAS ERP: Stock Movements =====
+
+model StockMovement {
+  id          String   @id @default(cuid())
+  productId   String
+  companyId   String
+  type        String   // IN, OUT, ADJUSTMENT
+  quantity    Float
+  reference   String?  // PO number, invoice number, etc
+  reason      String?  // purchase, sale, return, damage, correction
+  notes       String?
+  performedBy String?  // userId
+  createdAt   DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+// ===== ATLAS ERP: Client Interactions =====
+
+model ClientInteraction {
+  id          String   @id @default(cuid())
+  clientId    String
+  type        String   // call, email, meeting, note, visit
+  subject     String
+  description String?
+  contactName String?
+  date        DateTime @default(now())
+  performedBy String?  // userId
+  createdAt   DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+// ===== ATLAS ERP: Leave Requests =====
+
+model LeaveRequest {
+  id          String   @id @default(cuid())
+  companyId   String
+  userId      String
+  type        String   // vacation, sick, personal, maternity, other
+  status      String   @default("pending") // pending, approved, rejected
+  startDate   DateTime
+  endDate     DateTime
+  days        Float
+  reason      String?
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+// ===== ATLAS ERP: Purchase Orders =====
+
+model PurchaseOrder {
+  id          String   @id @default(cuid())
+  companyId   String
+  supplierId  String
+  number      String
+  status      String   @default("draft") // draft, sent, confirmed, received, cancelled
+  currency    String   @default("USD")
+  subtotal    Float    @default(0)
+  taxRate     Float    @default(0)
+  taxAmount   Float    @default(0)
+  total       Float    @default(0)
+  orderDate   DateTime @default(now())
+  expectedDate DateTime?
+  receivedDate DateTime?
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplier Supplier          @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  items    PurchaseOrderItem[]
+}
+
+model PurchaseOrderItem {
+  id              String @id @default(cuid())
+  purchaseOrderId String
+  description     String
+  quantity        Float  @default(1)
+  unitPrice       Float  @default(0)
+  total           Float  @default(0)
+  order           Int    @default(0)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+}
+
+
+// ─── Chat Interno ───────────────────────────────
+
+model ChatChannel {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  description String?
+  type        String   @default("public") // public, private, direct
+  createdBy   String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company  Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  members  ChatChannelMember[]
+  messages ChatMessage[]
+}
+
+model ChatChannelMember {
+  id        String   @id @default(cuid())
+  channelId String
+  userId    String
+  lastRead  DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  channelId String
+  userId    String
+  content   String
+  mentions  String?  // comma-separated user IDs
+  fileName  String?
+  fileUrl   String?
+  fileSize  Int?
+  fileType  String?
+  isEdited  Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+model MuseSuggestion {
+  id          String   @id @default(cuid())
+  title       String
+  category    String   // system, improvement, hardware, methodology, process, integration
+  description String   @db.Text
+  rationale   String?  @db.Text
+  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  status      String   @default("NEW")    // NEW, REVIEWING, ACCEPTED, IMPLEMENTING, DONE, DISMISSED
+  source      String?  // auto (MUSE generated) or manual
+  createdById String?
+  companyId   String?
+  projectId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+}
+
+model LabInvite {
+  id          String   @id @default(cuid())
+  email       String
+  code        String   @unique
+  status      String   @default("PENDING") // PENDING, ACCEPTED, REVOKED
+  invitedById String
+  userId      String?  // set when the invite is accepted
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  invitedBy   User     @relation("LabInviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
+  user        User?    @relation("LabInviteUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([code])
+}
+
+model SOWSection {
+  id          String   @id @default(cuid())
+  projectId   String
+  sectionKey  String   // background, objectives, methodology, deliverables, scope, target, partners, assumptions
+  title       String
+  content     String   @default("")
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, sectionKey])
+  @@index([projectId])
+}
+
+model BudgetLine {
+  id          String   @id @default(cuid())
+  projectId   String
+  category    String   // personnel, fringe, travel, equipment, supplies, contractual, other_direct, indirect
+  description String
+  unit        String?  // e.g. "months", "trips", "units"
+  quantity    Float    @default(1)
+  unitCost    Float    @default(0)
+  total       Float    @default(0)
+  narrative   String   @default("") // justification text
+  fundSource  String   @default("federal") // federal, cost_share
+  periodStart DateTime?
+  periodEnd   DateTime?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([projectId])
+  @@index([projectId, category])
+}
+
+model IndicatorMeasurement {
+  id          String   @id @default(cuid())
+  projectId   String
+  objectiveId String
+  period      String   // e.g. "2025-Q1", "2025-03", "Y1"
+  value       String   // actual measured value
+  notes       String?  // observation / methodology notes
+  source      String?  // data source / evidence
+  collectedAt DateTime @default(now())
+  collectedBy String?  // user who collected
+  status      String   @default("reported") // reported, verified, rejected
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  objective Objective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([objectiveId])
+  @@index([projectId, period])
+}
+
+model MEReport {
+  id          String   @id @default(cuid())
+  projectId   String
+  title       String
+  type        String   @default("progress") // progress, midterm, final, evaluation, lessons_learned
+  period      String?  // e.g. "2025-Q1", "Jan-Mar 2025"
+  content     String   @default("")
+  findings    String?  // key findings / hallazgos
+  recommendations String? // recommendations
+  status      String   @default("draft") // draft, submitted, approved
+  reportDate  DateTime @default(now())
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([projectId, type])
+}
+
+model TaxFiling {
+  id          String   @id @default(cuid())
+  companyId   String
+  formType    String   // "1120", "5472", etc.
+  taxYear     Int
+  status      String   @default("draft") // draft, in_progress, review, completed, filed
+  formData    Json     @default("{}") // All form field values as JSON
+  autoData    Json     @default("{}") // Data auto-populated from system
+  notes       String?  @db.Text
+  filedDate   DateTime?
+  isActive    Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, formType, taxYear])
+  @@index([companyId])
+}

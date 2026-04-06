@@ -1,0 +1,39 @@
+ETHOLYS — mapa desta pasta (consolidação em 2026)
+==================================================
+
+Produto principal (ATLAS + SIEP + Core + Lab), alinhado a ETHOLYS_Arquitectura_v2.md:
+  etholys-web/nextjs_space/
+    Next.js, Prisma, módulos dashboard (ATLAS), /siep (SIEP), /lab, autenticação, chat, etc.
+
+Backend Python complementar (API rápida, chat IA → Postgres, futuros serviços):
+  backend/
+    FastAPI, Dockerfile, hot-reload quando usado com Docker Compose.
+
+Infraestrutura local:
+  infra/docker-compose.yml
+    Postgres (host 5433) + api (FastAPI 8000) + web (Next.js frontend 3000).
+
+Base de dados:
+  db/migrations/
+    SQL inicial + tabelas de chat IA.
+  packages/database/prisma/
+    schema.prisma espelhando o modelo (referência / Prisma).
+
+Scripts Windows:
+  SETUP.bat — só Postgres + aplica 001_initial.sql
+  DEV-DOCKER.bat — Postgres + API + frontend Next (rebuild)
+
+URLs: http://localhost:3000 (Hub / login) | http://localhost:8000 (API /docs)
+
+Documentação de produto/arquitetura (já existentes na raiz):
+  ETHOLYS_Arquitectura_v2.md / .pdf
+  ETHOLYS_Arquitectura_Productos.md / .pdf
+  Estado do ecossistema (prioridades micro vs grande): ver Google Drive "Estado del Ecosistema ETHOLYS 02_04.docx"
+
+Nota: a interface "completa" do ecossistema é o Next.js acima; :8000 é apenas o backend auxiliar.
+
+Se ainda existir uma pasta extra "etholys\" duplicada na raiz, pare Docker/Cursor e apague-a manualmente.
+
+Backup Abacus (snapshot JSON .tar): descodificado em db/abacus_dump + db/abacus_snapshot.tar.
+Restauração: dados do dump oficial foram aplicados na base "etholys" do Docker (substituiu o schema public anterior).
+O .env do Next aponta DATABASE_URL para localhost:5433 (dev no host); no compose Docker continua @postgres:5432.

@@ -1,0 +1,48 @@
+
+# 2026-04-06 17:54:04.160450
++y
+
+# 2026-04-06 17:54:16.345657
++n
+
+# 2026-04-06 17:57:03.453146
++aider --model gemini/gemini-1.5-pro-latest
+
+# 2026-04-06 17:57:48.985757
++aider --model gemini/gemini-1.5-pro --gemini-api-key AIzaSyBWmAIftsMMeu5f7kXgJuHx2qQm8DGxcZA
+
+# 2026-04-06 17:59:14.562040
++aider --model google_ai_studio/gemini-1.5-pro
+
+# 2026-04-06 18:00:09.277249
++aider --model gemini/gemini-1.5-pro --set-env GEMINI_API_KEY=AIzaSyBWmAIftsMMeu5f7kXgJuHx2qQm8DGxcZA
+
+# 2026-04-06 18:00:43.996393
++aider --model google/gemini-1.5-pro-latest
+
+# 2026-04-06 18:01:31.493975
++$env:GEMINI_API_KEY=$null; $env:GOOGLE_API_KEY="AIzaSyBWmAIftsMMeu5f7kXgJuHx2qQm8DGxcZA"
+
+# 2026-04-06 18:02:21.692569
++aider --model gemini/gemini-1.5-pro --set-env LITELLM_FORCE_MODEL_RENAME=True --set-env GOOGLE_API_KEY=AIzaSyBWmAIftsMMeu5f7kXgJuHx2qQm8DGxcZA
+
+# 2026-04-06 18:03:13.464929
++aider --model gemini/google_ai_studio/gemini-1.5-pro --set-env GOOGLE_API_KEY=AIzaSyBWmAIftsMMeu5f7kXgJuHx2qQm8DGxcZA
+
+# 2026-04-06 18:03:22.242712
++aider --model gemini/gemini-1.5-flash --set-env GOOGLE_API_KEY=AIzaSyBWmAIftsMMeu5f7kXgJuHx2qQm8DGxcZA
+
+# 2026-04-06 18:04:07.926045
++pip uninstall litellm aider-chat -y
+
+# 2026-04-06 18:05:11.456376
++n
+
+# 2026-04-06 18:06:38.676276
++/add .
+
+# 2026-04-06 18:07:34.827182
++n
+
+# 2026-04-06 18:08:30.980458
++/ls
