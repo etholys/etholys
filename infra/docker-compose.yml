@@ -71,13 +71,16 @@ services:
       NODE_ENV: development
       # Gemini: GEMINI_API_KEY, GEMINI_MODEL, GEMINI_MAX_OUTPUT_TOKENS no env_file (.env)
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      # Forzamos a Next.js a escuchar en todas las interfaces y en el puerto 3000
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
     volumes:
       - ../etholys-web/nextjs_space:/app
       - etholys_web_node_modules:/app/node_modules
     # Apaga o client Prisma gerado antigo (volume node_modules) antes de gerar de novo — evita "Unknown argument budgetFlow".
     # Agregamos npx prisma db push para asegurar que las tablas existan en la BD antes de arrancar.
     command: >
-      sh -c "npm install --legacy-peer-deps && rm -rf node_modules/.prisma && npx prisma generate && npx prisma db push && npm run dev -- -H 0.0.0.0 -p 3000"
+      sh -c "npm install --legacy-peer-deps && rm -rf node_modules/.prisma && npx prisma generate && npx prisma db push && npm run dev"
     depends_on:
       postgres:
         condition: service_healthy
