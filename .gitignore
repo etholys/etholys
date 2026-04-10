@@ -1,12 +1,14 @@
 .aider*
-.env
-.env
-.env
-.env
-.env
-.env
-.env
-.env
-.env
+
+# Backups locais da base (podem ser grandes e conter dados sensíveis)
+backups/
+
+# Pasta local de ficheiros antigos / uploads (não versionar)
+old_version_temp/
+test_write.txt
+
+# VS Code/Cursor local
+.vscode/
+
 .env
 .env

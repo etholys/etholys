@@ -1,0 +1,16 @@
+# Dependencies & build
+node_modules/
+.next/
+out/
+
+# Ambiente — nunca commitar segredos
+.env
+.env.local
+.env.*.local
+
+# Logs / OS
+npm-debug.log*
+.DS_Store
+
+# Exportações locais de dados (podem conter PII)
+exports/

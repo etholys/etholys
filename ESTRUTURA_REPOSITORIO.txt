@@ -2,7 +2,7 @@ ETHOLYS — mapa desta pasta (consolidação em 2026)
 ==================================================
 
 Produto principal (ATLAS + SIEP + Core + Lab), alinhado a ETHOLYS_Arquitectura_v2.md:
-  etholys-web/nextjs_space/
+  apps/web/
     Next.js, Prisma, módulos dashboard (ATLAS), /siep (SIEP), /lab, autenticação, chat, etc.
 
 Backend Python complementar (API rápida, chat IA → Postgres, futuros serviços):

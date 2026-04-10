@@ -169,6 +169,7 @@ model Company {
   taxFilings             TaxFiling[]
   companyBudgetLines     CompanyBudgetLine[]
   companyBudgetItems     CompanyBudgetItem[]
+  funds                  Fund[]
 }
 
 model Department {
@@ -566,6 +567,8 @@ model CompanyBudgetItem {
   unitCost        Float    @default(0)
   total           Float    @default(0)       // auto: quantity * unitCost
   currency        String   @default("USD")
+  /// EXPENSE = planned cost; INCOME = planned revenue / billing
+  budgetFlow      String   @default("EXPENSE")
   periodStart     DateTime?
   periodEnd       DateTime?
   note            String?
@@ -1031,8 +1034,16 @@ model ChatMessage {
   fileName  String?
   fileUrl   String?
   fileSize  Int?
+  fileType  String?
+  isEdited  Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
 
-// ─── FundHub: Fundos e Oportunidades ─────────
+  channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── FundHub: Fundos y Oportunidades ─────────
 
 model Fund {
   id                    String   @id @default(cuid())
@@ -1095,15 +1106,9 @@ model ConversationThread {
 
   fund Fund @relation(fields: [fundId], references: [id], onDelete: Cascade)
 }
-  fileType  String?
-  isEdited  Boolean  @default(false)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
+// ─── MuseSuggestion ────────────────────────────
+
 model MuseSuggestion {
   id          String   @id @default(cuid())
   title       String
