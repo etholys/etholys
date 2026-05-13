@@ -183,3 +183,17 @@ Exemplo resposta `usage/summary`:
 - Criacao de chave adicional acima do limite do plano retorna `409`.
 - Requisicoes autenticadas recebem `X-Request-ID` para rastreio em suporte e auditoria.
 - Chave pode ser limitada por escopos e data de expiracao (`expires_at`).
+
+## 6) Kit de integracao para terceiros
+
+Artefatos prontos para consumo por outros sistemas:
+
+- Contrato OpenAPI: `backend/integrations/openapi/etholys-openapi.json`
+- Guia de integracao: `backend/INTEGRATION_GUIDE.md`
+- Exemplos executaveis: `backend/integrations/examples/`
+
+Atualizacao do contrato OpenAPI:
+
+```bash
+python export_openapi.py
+```

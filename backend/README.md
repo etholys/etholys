@@ -227,3 +227,23 @@ Publicacao de imagem versionada (GHCR):
 ## 12) Operacao e Incidentes
 
 Runbook unificado: `backend/RUNBOOK.md`.
+
+## 13) Integracao com outros sistemas
+
+Para integrar em ERPs, CRMs, orquestradores, bots e frontends externos, use estes artefatos:
+
+- Guia: `backend/INTEGRATION_GUIDE.md`
+- Exemplos de cliente: `backend/integrations/examples/`
+- Contrato OpenAPI exportado: `backend/integrations/openapi/etholys-openapi.json`
+
+Gerar/atualizar OpenAPI localmente:
+
+```bash
+python export_openapi.py
+```
+
+Para frontend browser em dominio externo:
+
+- Configure `CORS_ALLOW_ORIGINS` com lista explicita (sem `*`), por exemplo:
+  `https://app.cliente.com,https://painel.parceiro.com`
+- Ative `CORS_ALLOW_CREDENTIALS=true` somente quando necessario.

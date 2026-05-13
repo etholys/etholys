@@ -58,10 +58,13 @@ allowed_origins = [o.strip() for o in settings.cors_allow_origins.split(",") if 
 if not allowed_origins:
     allowed_origins = ["*"]
 
+has_wildcard_origin = "*" in allowed_origins
+allow_credentials = settings.cors_allow_credentials and not has_wildcard_origin
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

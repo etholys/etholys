@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     cors_allow_origins: str = "*"
+    cors_allow_credentials: bool = False
     db_connect_max_retries: int = 20
     db_connect_retry_delay_seconds: float = 1.5
 
