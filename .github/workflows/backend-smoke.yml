@@ -1,0 +1,57 @@
+name: Backend Smoke
+
+on:
+  push:
+    paths:
+      - backend/**
+      - .github/workflows/backend-smoke.yml
+  pull_request:
+    paths:
+      - backend/**
+      - .github/workflows/backend-smoke.yml
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create .env
+        run: |
+          cp .env.example .env
+          sed -i 's|^API_ADMIN_TOKEN=.*|API_ADMIN_TOKEN=ci-admin-token|' .env
+          sed -i 's|^AI_PROVIDER=.*|AI_PROVIDER=ollama|' .env
+
+      - name: Build and start stack
+        run: docker compose up -d --build
+
+      - name: Wait API health
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API did not become healthy"
+          docker compose logs
+          exit 1
+
+      - name: Run smoke test
+        run: python smoke_test.py
+        env:
+          ETHOLYS_API_URL: http://127.0.0.1:8000
+          API_ADMIN_TOKEN: ci-admin-token
+
+      - name: Print logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Teardown
+        if: always()
+        run: docker compose down -v
