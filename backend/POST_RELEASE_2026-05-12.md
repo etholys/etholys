@@ -24,6 +24,20 @@
 - Observabilidade (/metrics e /trend): PASS apos ajuste de casts SQL para filtros opcionais.
 - Enforcement de limites: PASS com evidencias 200/429 e 200/402 na validacao anterior.
 
+## Revalidacao local adicional
+
+- Data/hora: 2026-05-12.
+- Smoke inicial sem token no ambiente: PASS parcial (saude OK, fluxo comercial pulado).
+- Smoke com API_ADMIN_TOKEN carregado de `.env`: PASS completo.
+- Endpoints comerciais/observabilidade revalidados no smoke:
+	- `/api-product/clients`
+	- `/api-product/me`
+	- `/api-product/usage/current`
+	- `/api-product/clients/{id}/usage-alerts/metrics`
+	- `/api-product/usage-alerts/metrics`
+	- `/api-product/usage-alerts/trend`
+- Rotacao/revogacao de chave: PASS (criar chave adicional, autenticar, revogar, bloquear chave revogada).
+
 ## Monitoramento recomendado (primeiras 24h)
 
 - Acompanhar taxa de webhook com status failed/pending.
