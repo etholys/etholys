@@ -74,3 +74,17 @@ See examples in:
 - `backend/integrations/examples/curl.sh`
 - `backend/integrations/examples/python_client.py`
 - `backend/integrations/examples/node_client.mjs`
+
+## 8) Lightweight SDKs
+
+Official lightweight clients included in this repository:
+
+- Python: `backend/integrations/sdk/python/`
+- TypeScript: `backend/integrations/sdk/typescript/`
+
+Both SDKs include:
+
+- API key authentication via `X-API-Key`
+- Timeout support
+- Error normalization (`detail` from API responses)
+- Helper methods for `chat`, `me`, `usage/current`, and conversation queries
