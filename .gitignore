@@ -1,5 +1,20 @@
 .aider*
 
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+
+# Node dependencies and build cache
+node_modules/
+*.tsbuildinfo
+
+# Local temporary artifacts
+*.bundle
+*.bak
+*.code-workspace
+.continue/
+_docx_extract/
+
 # Backups locais da base (podem ser grandes e conter dados sensíveis)
 backups/
 
