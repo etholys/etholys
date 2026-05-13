@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: etholys-api-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: etholys
+      POSTGRES_PASSWORD: etholys_dev_change_me
+      POSTGRES_DB: etholys
+    ports:
+      - "5433:5432"
+    volumes:
+      - etholys_api_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U etholys -d etholys"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: etholys-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://etholys:etholys_dev_change_me@postgres:5432/etholys
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  etholys_api_pgdata:

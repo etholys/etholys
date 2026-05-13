@@ -23,5 +23,24 @@ class Settings(BaseSettings):
         "Answer concisely in the same language as the user."
     )
 
+    # Productization / API sales
+    api_admin_token: str | None = None
+    api_default_rpm_limit: int = 60
+    api_request_log_retention_days: int = 90
+    api_key_expiry_warning_days: int = 14
+    api_usage_alert_thresholds: str = "80,90,100"
+    api_usage_webhook_timeout_seconds: float = 3.0
+    api_usage_webhook_retry_base_minutes: int = 1
+    api_usage_webhook_max_retries: int = 5
+    api_usage_webhook_auto_retry_per_request: int = 2
+    api_usage_webhook_slo_threshold_ms: int = 2000
+
+    # Runtime / portability
+    app_host: str = "0.0.0.0"
+    app_port: int = 8000
+    cors_allow_origins: str = "*"
+    db_connect_max_retries: int = 20
+    db_connect_retry_delay_seconds: float = 1.5
+
 
 settings = Settings()

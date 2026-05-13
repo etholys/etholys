@@ -1,15 +1,16 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 import psycopg
 
 from config import settings
 from db import get_dsn
+from security import ApiClientContext, get_current_usage_snapshot, require_api_client, require_scopes
 from services.llm import LLMError, complete_chat
 
-router = APIRouter(prefix="/ai", tags=["IA"])
+router = APIRouter(prefix="/ai", tags=["IA"], dependencies=[Depends(require_api_client)])
 
 
 class ChatIn(BaseModel):
@@ -39,6 +40,16 @@ class MessageOut(BaseModel):
     created_at: datetime
 
 
+class UsageOut(BaseModel):
+    rpm_limit: int
+    current_minute_requests: int
+    remaining_this_minute: int
+    monthly_request_limit: int | None
+    current_month_requests: int
+    remaining_this_month: int | None
+    window_resets_at: str
+
+
 def _touch_conversation(cur, cid: uuid.UUID) -> None:
     cur.execute(
         """
@@ -51,7 +62,7 @@ def _touch_conversation(cur, cid: uuid.UUID) -> None:
 
 
 @router.post("/chat", response_model=ChatOut)
-async def chat(body: ChatIn):
+async def chat(body: ChatIn, _scopes: None = Depends(require_scopes("ai:write"))):
     """Envia mensagem à IA, grava pergunta e resposta no PostgreSQL."""
     dsn = get_dsn()
     user_text = body.message.strip()
@@ -135,7 +146,7 @@ async def chat(body: ChatIn):
 
 
 @router.get("/conversations", response_model=list[ConversationOut])
-def list_conversations(limit: int = 50):
+def list_conversations(limit: int = 50, _scopes: None = Depends(require_scopes("ai:read"))):
     limit = max(1, min(limit, 200))
     dsn = get_dsn()
     with psycopg.connect(dsn) as conn:
@@ -157,7 +168,7 @@ def list_conversations(limit: int = 50):
 
 
 @router.get("/conversations/{conversation_id}/messages", response_model=list[MessageOut])
-def get_messages(conversation_id: uuid.UUID):
+def get_messages(conversation_id: uuid.UUID, _scopes: None = Depends(require_scopes("ai:read"))):
     dsn = get_dsn()
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
@@ -181,3 +192,10 @@ def get_messages(conversation_id: uuid.UUID):
         MessageOut(id=r[0], role=r[1], content=r[2], model=r[3], created_at=r[4])
         for r in rows
     ]
+
+
+@router.get("/usage/current", response_model=UsageOut)
+def get_current_usage(request: Request, _scopes: None = Depends(require_scopes("usage:read"))):
+    client = request.state.api_client
+    snapshot = get_current_usage_snapshot(client.id)
+    return UsageOut(**snapshot)

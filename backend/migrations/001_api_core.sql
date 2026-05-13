@@ -1,6 +1,5 @@
-"""DDL das tabelas de chat IA — aplicado na subida da API se ainda não existirem."""
+-- Etholys API core schema
 
-AI_TABLES_SQL = """
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS ai_conversation (
@@ -48,10 +47,3 @@ CREATE TABLE IF NOT EXISTS api_usage_minute (
 
 CREATE INDEX IF NOT EXISTS api_usage_minute_bucket_idx
   ON api_usage_minute (bucket_minute DESC);
-"""
-
-
-def ensure_ai_tables(conn) -> None:
-    with conn.cursor() as cur:
-        cur.execute(AI_TABLES_SQL)
-    conn.commit()
