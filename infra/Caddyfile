@@ -1,0 +1,13 @@
+# Substitua o domínio em APP_DOMAIN no .env da pasta infra/
+# Com Cloudflare proxy (nuvem laranja): use SSL/TLS "Full" no painel Cloudflare.
+# Caddy obtém certificado Let's Encrypt no servidor (portas 80 e 443 abertas no Hetzner).
+
+{$APP_DOMAIN} {
+	reverse_proxy web:3000
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}

@@ -1,0 +1,17 @@
+{
+  "name": "La Expedición — FORGE",
+  "short_name": "Expedición",
+  "description": "Curso en vivo, mapa A2 y tablero colectivo",
+  "start_url": "/expedicion",
+  "display": "standalone",
+  "background_color": "#ecfdf5",
+  "theme_color": "#047857",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

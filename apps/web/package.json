@@ -2,19 +2,25 @@
   "name": "etholys-web",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0",
-    "dev:clean": "node scripts/clean-next.cjs && next dev",
+    "dev": "prisma generate && next dev -H 0.0.0.0",
+    "dev:clean": "node scripts/clean-next.cjs && prisma generate && next dev -H 0.0.0.0",
+    "verify:forge-prisma": "node scripts/verify-forge-prisma.mjs",
+    "postinstall": "prisma generate",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "diagnose:db": "tsx --require dotenv/config scripts/diagnose-db.ts",
-    "export:system": "tsx --require dotenv/config scripts/export-system-data.ts"
+    "export:system": "tsx --require dotenv/config scripts/export-system-data.ts",
+    "test:unit": "tsx --test tests/forge/libro-ocr.test.ts tests/forge/invite-token.test.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:forge": "playwright test e2e/forge-invite.spec.ts e2e/forge-multi-org.spec.ts"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/safe-seed.ts"
   },
   "devDependencies": {
     "@next/swc-wasm-nodejs": "13.5.1",
+    "@playwright/test": "^1.60.0",
     "@types/node": "20.6.2",
     "@types/react": "18.2.22",
     "@types/react-dom": "18.2.7",
@@ -116,6 +122,7 @@
     "react-select": "5.8.0",
     "react-use": "17.6.0",
     "recharts": "2.15.3",
+    "server-only": "^0.0.1",
     "sonner": "1.5.0",
     "swr": "2.2.4",
     "tailwind-scrollbar-hide": "1.1.7",

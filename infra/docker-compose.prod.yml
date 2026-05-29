@@ -1,0 +1,70 @@
+# Produção — Hetzner + Cloudflare
+# Uso: copiar apps/web/.env.production.example → apps/web/.env e preencher
+#      docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: etholys-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-etholys}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:-etholys}
+    volumes:
+      - etholys_pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-etholys} -d ${POSTGRES_DB:-etholys}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - etholys
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    container_name: etholys-web-prod
+    restart: unless-stopped
+    env_file:
+      - ../apps/web/.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-etholys}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-etholys}
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - etholys
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: etholys-caddy-prod
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Defina APP_DOMAIN em infra/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+    networks:
+      - etholys
+
+volumes:
+  etholys_pgdata_prod:
+  caddy_data:
+  caddy_config:
+
+networks:
+  etholys:
+    driver: bridge

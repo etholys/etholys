@@ -4,6 +4,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { findEnrollmentByMagicToken } from '@/lib/forge/invite-auth';
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -18,14 +19,32 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        forgeMagicToken: { label: 'Forge Magic', type: 'text' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
         try {
+          const magic = (credentials as { forgeMagicToken?: string })?.forgeMagicToken?.trim();
+          if (magic) {
+            const enrollment = await findEnrollmentByMagicToken(magic);
+            const user = enrollment?.user;
+            if (!user?.isActive || !user.email) return null;
+            if (credentials?.email && user.email.toLowerCase() !== credentials.email.trim().toLowerCase()) {
+              return null;
+            }
+            return {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role,
+              locale: user.locale,
+              image: user.avatar || user.image,
+            } as any;
+          }
+
+          if (!credentials?.email || !credentials?.password) return null;
           const user = await prisma.user.findUnique({
             where: { email: credentials.email.trim() },
           });
-          // Sem utilizador, inativo, ou só OAuth (password vazio): mesmo sintoma no cliente ("credenciais inválidas").
           if (!user || !user.isActive || !user.password) return null;
           const isValid = await bcrypt.compare(credentials.password, user.password);
           if (!isValid) return null;

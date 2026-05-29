@@ -14,3 +14,12 @@ npm-debug.log*
 
 # Exportações locais de dados (podem conter PII)
 exports/
+
+# PDFs del libro FORGE (subidos en local)
+public/uploads/forge-libros/*.pdf
+!public/uploads/forge-libros/.gitkeep
+
+# Playwright E2E seed state
+e2e/.seed-state.json
+test-results/
+playwright-report/

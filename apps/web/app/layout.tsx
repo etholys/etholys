@@ -1,6 +1,11 @@
 import './globals.css';
 import Providers from './providers';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
 
 /** Sem force-dynamic no root: login e vitrine respondem mais depressa. Rotas que precisam de dados dinâmicos marcam-se a nível de segmento. */
 

@@ -5,6 +5,14 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Rejeita IDs corrompidos (cuid/uuid-like) antes de chamar APIs. */
+export function isLikelyDbId(id: unknown): boolean {
+  if (id == null) return false;
+  const s = String(id).trim();
+  if (!s) return false;
+  return s.length >= 12 && s.length <= 64 && /^[a-z0-9_-]+$/i.test(s);
+}
+
 export function formatCurrency(amount: number | null | undefined, currency: string = 'USD'): string {
   const val = amount ?? 0;
   return new Intl.NumberFormat('es-US', { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);

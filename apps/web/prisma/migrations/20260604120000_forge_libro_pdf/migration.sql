@@ -1,0 +1,2 @@
+ALTER TABLE "ForgeCourse" ADD COLUMN IF NOT EXISTS "libroPdfPath" TEXT;
+ALTER TABLE "ForgeCourse" ADD COLUMN IF NOT EXISTS "libroPdfName" TEXT;

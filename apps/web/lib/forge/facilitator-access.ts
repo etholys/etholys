@@ -1,0 +1,50 @@
+import { prisma } from '@/lib/prisma';
+import type { UserRole } from '@prisma/client';
+
+/** Facilitador: admin org, creador del curso, o asignado en ForgeCourseFacilitator. */
+export async function getForgeCourseAccess(
+  userId: string,
+  courseCompanyId: string,
+  courseId?: string,
+  createdById?: string | null
+): Promise<{
+  canFacilitate: boolean;
+  isOrgAdmin: boolean;
+  role: UserRole | null;
+}> {
+  const link = await prisma.companyUser.findUnique({
+    where: { userId_companyId: { userId, companyId: courseCompanyId } },
+    select: { role: true },
+  });
+
+  if (courseId) {
+    const assigned = await prisma.forgeCourseFacilitator.findUnique({
+      where: { courseId_userId: { courseId, userId } },
+    });
+    if (assigned) {
+      return {
+        canFacilitate: true,
+        isOrgAdmin: link?.role === 'ADMIN',
+        role: link?.role ?? null,
+      };
+    }
+  }
+
+  if (createdById === userId && link) {
+    return { canFacilitate: true, isOrgAdmin: link.role === 'ADMIN', role: link.role };
+  }
+
+  if (!link) {
+    return { canFacilitate: false, isOrgAdmin: false, role: null };
+  }
+
+  return {
+    canFacilitate: link.role === 'ADMIN' || link.role === 'PROJECT_MANAGER',
+    isOrgAdmin: link.role === 'ADMIN',
+    role: link.role,
+  };
+}
+
+export function isExternalLearnerOnly(canFacilitate: boolean, hasEnrollment: boolean): boolean {
+  return hasEnrollment && !canFacilitate;
+}

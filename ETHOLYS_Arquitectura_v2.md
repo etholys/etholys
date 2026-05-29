@@ -208,23 +208,37 @@ El Hub y la UI se arman dinámicamente según los sistemas contratados.
 ---
 
 ### SISTEMA 5: FORGE — Ambiente Educacional y de Conexiones
-**Plataforma EAD + Rodadas de Negocio + Knowledge Hub**
+**Plataforma EAD unificada + juegos con IA + gamificación transversal + conexiones**
 
 **Problema que resuelve**: Los emprendedores no acceden a formación de calidad, las plataformas EAD son complejas, no existen espacios digitales de networking adaptados.
+
+> **Especificación técnica (fuente de verdad para implementación):**  
+> [`docs/architecture/forge-ead.md`](docs/architecture/forge-ead.md)  
+> **Entrada para agentes de IA:** [`AGENTS.md`](AGENTS.md)
+
+#### Principio de arquitectura (v1.0 — mayo 2026)
+
+1. **Una sola espina dorsal**: Programa → Curso → Módulo → **Actividad** (unidad atómica de progreso).
+2. **Cursos tradicionales y juegos** son tipos de actividad (`lesson`, `media`, `quiz`, `game`, …), no productos separados.
+3. **Juegos**: la IA genera `GameSpec` (JSON validado); **motores fijos** (`board`, `quiz_race`, `cards`, `branching`) ejecutan la dinámica.
+4. **Gamificación** es transversal (XP, badges, rankings) — escucha `activity.completed`, no es un silo aparte del LMS.
 
 #### Módulos
 
 | # | Módulo | Descripción | Tipo | Estado |
 |---|--------|-------------|------|--------|
-| 5.1 | Plataforma EAD Completa | Cursos, trilhas, evaluaciones, certificados, foros | Core | 🔲 Por construir |
-| 5.2 | Gestión Académica | Profesores, alumnos, turmas, frecuencia, reportes | Core | 🔲 Por construir |
+| 5.1 | Plataforma EAD unificada | Cursos, trilhas, actividades polimórficas, trilhas híbridas (teoría + jogo) | Core | 🔲 Spec ✅ — ver `forge-ead.md` |
+| 5.1b | Motores de juego + GameSpec | Tabuleiro, quiz competitivo, cartas, simulação; gerador IA desde metodología | Core | 🔲 Spec ✅ |
+| 5.2 | Gestión Académica | Profesores, alumnos, turmas, matrículas, progreso | Core | 🔲 Por construir |
 | 5.3 | Webinars y Lives | Transmisiones, grabaciones, reportes de participación | Core | 🔲 Por construir |
 | 5.4 | Rodadas de Negocios Virtuales | Matchmaking, agendas, salas de pitch, reuniones B2B | Add-on | 🔲 Por construir |
 | 5.5 | Knowledge Hub | Biblioteca de metodologías, estudios y buenas prácticas | Add-on | 🔲 Por construir |
 | 5.6 | Marketplace Educacional | Mentorías, servicios y cursos pagos de terceros | Add-on | 🔲 Por construir |
-| 5.7 | Gamificación y Learning Analytics | Rankings, badges, niveles, reportes de impacto | Add-on | 🔲 Por construir |
+| 5.7 | Gamificación y Learning Analytics | Regras XP/badges/rankings + painel (camada transversal, não silo) | Core transversal | 🔲 Spec ✅ |
 | 5.8 | Integración WhatsApp/Jitsi | Acceso vía WhatsApp, videollamadas integradas | Add-on Premium | 🔲 Por construir |
-| 5.9 | Certificación Verificable | Autenticación de certificados | Add-on | 🔲 Por construir |
+| 5.9 | Certificación Verificable | Autenticación de certificados (critérios mistos curso+jogo) | Add-on | 🔲 Por construir |
+
+**UI actual (mockup):** `apps/web/app/hub/forge/page.tsx` — **Ledger MVP:** `apps/web/app/api/company-memory/forge-ledger/route.ts`
 
 **Público**: Instituciones, universidades, programas de formación, emprendedores.
 

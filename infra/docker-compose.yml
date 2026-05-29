@@ -54,7 +54,8 @@ services:
         condition: service_healthy
 
   web:
-    image: node:20-bookworm-slim
+    # bookworm (não slim): Prisma precisa de OpenSSL no contentor.
+    image: node:20-bookworm
     container_name: etholys-nextjs
     working_dir: /app
     ports:
@@ -74,17 +75,37 @@ services:
       # Forzamos a Next.js a escuchar en todas las interfaces y en el puerto 3000
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
+      ETHOLYS_WEB_ROOT: /app
+      IN_DOCKER: "1"
     volumes:
       - ../apps/web:/app
       - etholys_web_node_modules:/app/node_modules
       # .next fora do bind mount (evita OneDrive/Windows a partirem ficheiros a meio → ENOENT em react-loadable-manifest.json e 500).
       - etholys_next_cache:/app/.next
-    # Apaga o client Prisma gerado antigo (volume node_modules) antes de gerar de novo — evita "Unknown argument budgetFlow".
-    # prisma db push garante tabelas antes de arrancar.
-    # Não apagar .next em cada start: apagar aqui + pedidos cedo = manifest em falta e "Internal Server Error" em todas as rotas.
-    # Limpar cache Next no Docker: docker volume rm <projeto>_etholys_next_cache (ou docker compose down -v com cuidado).
-    command: >
-      sh -c "npm install --legacy-peer-deps && rm -rf node_modules/.prisma && npx prisma generate && npx prisma db push && npm run dev"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/forge/health | grep -q '\"ok\":true'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        cd /app
+        npm install --legacy-peer-deps
+        rm -rf node_modules/.prisma
+        npx prisma generate
+        if ! node scripts/verify-forge-prisma.mjs 2>/dev/null; then
+          echo "[docker-web] Prisma FORGE em falta — reinstalar @prisma/client..."
+          rm -rf node_modules/.prisma node_modules/@prisma/client
+          npm install @prisma/client@6.7.0 prisma@6.7.0 --legacy-peer-deps
+          npx prisma generate
+          node scripts/verify-forge-prisma.mjs
+        fi
+        npx prisma migrate deploy
+        exec npx next dev -H 0.0.0.0
     depends_on:
       postgres:
         condition: service_healthy

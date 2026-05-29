@@ -11,29 +11,41 @@ if not exist "%INFRA%\docker-compose.yml" (
   exit /b 1
 )
 
+set "DOCKER=docker"
 where docker >nul 2>&1
 if errorlevel 1 (
-  echo [Erro] Docker nao esta no PATH. Abra o Docker Desktop e tente de novo.
-  pause
-  exit /b 1
+  if exist "%ProgramFiles%\Docker\Docker\resources\bin\docker.exe" (
+    set "DOCKER=%ProgramFiles%\Docker\Docker\resources\bin\docker.exe"
+  ) else (
+    echo [Erro] Docker nao esta no PATH. Instale o Docker Desktop.
+    pause
+    exit /b 1
+  )
 )
 
 cd /d "%INFRA%"
 
+call "%ROOT%scripts\wait-docker-daemon.bat" "%DOCKER%"
+if errorlevel 1 (
+  pause
+  exit /b 1
+)
+
 echo === A subir Postgres, API e Next.js (docker compose up -d) ===
 echo A PRIMEIRA VEZ pode demorar varios minutos (npm install dentro do contentor).
 echo.
-docker compose up -d
+"%DOCKER%" compose up -d
 if errorlevel 1 (
   echo.
   echo [Erro] docker compose falhou. Veja a mensagem acima.
+  echo Se so precisa de desenvolver FORGE/Next: experimente open-etholys-dev-local.bat
   pause
   exit /b 1
 )
 
 echo.
 echo === Estado dos contentores ===
-docker compose ps
+"%DOCKER%" compose ps
 echo.
 
 echo A aguardar a porta 3000 ficar disponivel (ate ~3 min)...

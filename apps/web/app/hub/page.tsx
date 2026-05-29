@@ -1,17 +1,60 @@
 'use client';
 
+import type { ComponentType } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '@/app/providers';
 import type { Locale } from '@/lib/i18n';
 import Link from 'next/link';
 import {
-  Layers, BarChart3, Sprout, HandCoins, GraduationCap, Cpu, Target,
-  LogOut, Globe, ArrowRight, Lock, ExternalLink
+  Layers, BarChart3, Sprout, HandCoins, GraduationCap, Cpu, Target, LayoutGrid, Scale,
+  LogOut, Globe, ArrowRight, Lock, ExternalLink, BrainCircuit,
 } from 'lucide-react';
+import {
+  deriveModuleHints,
+  isContextSetupMeaningful,
+  type CompanyContextSetup,
+  type ModuleHintCode,
+} from '@/lib/company-context-setup';
+import { isLikelyDbId } from '@/lib/utils';
+import { StateLoading } from '@/components/ui/StateBlocks';
 
-const systems = [
+const systems: Array<{
+  id: string;
+  name: string;
+  tagline: { es: string; pt: string; en: string };
+  description: { es: string; pt: string; en: string };
+  icon: ComponentType<{ className?: string }>;
+  color: string;
+  borderColor: string;
+  bgHover: string;
+  href: string;
+  active: boolean;
+  /** Cartão de produto reforçado (Advisor = transversal) */
+  productTier?: 'advisor' | 'default';
+}> = [
+  {
+    id: 'advisor',
+    name: 'Etholys AI Advisor',
+    tagline: {
+      es: 'Asesor transversal e alertas',
+      pt: 'Assessor transversal e alertas',
+      en: 'Cross-system advisor & alerts',
+    },
+    description: {
+      es: 'Lectura de datos de ATLAS, SIEP, FUNDHUB y m\u00e1s. Alertas, res\u00famenes y prioridades. El chat de trabajo (esquina inferior derecha) es otro producto: di\u00e1logo y canales.',
+      pt: 'Leitura de dados de ATLAS, SIEP, FUNDHUB, etc. Alertas, resumos e prioridades. O chat de trabalho (canto inferior direito) \u00e9 outro: di\u00e1logo e canais.',
+      en: 'Reads data across ATLAS, SIEP, FUNDHUB, and more. Alerts, digests, and priorities. The work chat (bottom right) is separate: dialogue and channels.',
+    },
+    icon: BrainCircuit,
+    color: 'from-violet-600 to-fuchsia-700',
+    borderColor: 'border-violet-300',
+    bgHover: 'hover:border-violet-400 hover:shadow-violet-100',
+    href: '/hub/advisor',
+    active: true,
+    productTier: 'advisor',
+  },
   {
     id: 'atlas',
     name: 'ATLAS',
@@ -71,10 +114,10 @@ const systems = [
     },
     icon: GraduationCap,
     color: 'from-blue-500 to-indigo-600',
-    borderColor: 'border-gray-200',
+    borderColor: 'border-blue-200',
     bgHover: 'hover:border-blue-300',
-    href: '#',
-    active: false,
+    href: '/hub/nexus',
+    active: true,
   },
   {
     id: 'forge',
@@ -87,10 +130,10 @@ const systems = [
     },
     icon: Cpu,
     color: 'from-violet-500 to-purple-600',
-    borderColor: 'border-gray-200',
+    borderColor: 'border-violet-200',
     bgHover: 'hover:border-violet-300',
-    href: '#',
-    active: false,
+    href: '/hub/forge',
+    active: true,
   },
   {
     id: 'prism',
@@ -103,10 +146,30 @@ const systems = [
     },
     icon: Target,
     color: 'from-rose-500 to-pink-600',
-    borderColor: 'border-gray-200',
+    borderColor: 'border-rose-200',
     bgHover: 'hover:border-rose-300',
-    href: '#',
-    active: false,
+    href: '/hub/prism',
+    active: true,
+  },
+  {
+    id: 'carta',
+    name: 'CARTA',
+    tagline: {
+      es: 'Gobernanza y aprobaciones',
+      pt: 'Governan\u00e7a e aprova\u00e7\u00f5es',
+      en: 'Governance & approvals',
+    },
+    description: {
+      es: 'Capa transversal: trazabilidad m\u00ednima de aprobaciones (v0) \u2014 pr\u00f3ximas iteraciones multi-m\u00f3dulo.',
+      pt: 'Camada transversal: rasto m\u00ednimo de aprova\u00e7\u00f5es (v0) \u2014 itera\u00e7\u00f5es multi-m\u00f3dulo a seguir.',
+      en: 'Cross-cutting layer: minimal approval trail (v0) \u2014 multi-module flows in later iterations.',
+    },
+    icon: Scale,
+    color: 'from-slate-600 to-slate-800',
+    borderColor: 'border-slate-300',
+    bgHover: 'hover:border-slate-500 hover:shadow-slate-100/80',
+    href: '/hub/carta',
+    active: true,
   },
 ];
 
@@ -117,7 +180,67 @@ function pickLocalized<T extends Record<Locale, string>>(row: T, locale: Locale)
 export default function HubPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { locale, setLocale } = useApp();
+  const { locale, setLocale, activeCompanyId } = useApp();
+  const [moduleHints, setModuleHints] = useState<ModuleHintCode[]>([]);
+  const [hasMeaningfulSetup, setHasMeaningfulSetup] = useState(false);
+  const [setupNudge, setSetupNudge] = useState<null | 'missing' | 'currency-mismatch'>(null);
+
+  const companyId = activeCompanyId && isLikelyDbId(activeCompanyId) ? activeCompanyId : '';
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadContextFlags() {
+      if (!companyId) {
+        if (!cancelled) {
+          setModuleHints([]);
+          setHasMeaningfulSetup(false);
+          setSetupNudge(null);
+        }
+        return;
+      }
+      try {
+        const r = await fetch(`/api/companies/setup?companyId=${encodeURIComponent(companyId)}`);
+        if (!r.ok) return;
+        const d = (await r.json()) as {
+          company?: { contextSetupJson?: unknown; contextSetupAt?: string | null; currency?: string | null };
+        };
+        const raw = d.company?.contextSetupJson;
+        if (!raw || typeof raw !== 'object') {
+          if (!cancelled) {
+            setModuleHints([]);
+            setHasMeaningfulSetup(false);
+            setSetupNudge('missing');
+          }
+          return;
+        }
+
+        const ctx = raw as CompanyContextSetup;
+        const meaningful = isContextSetupMeaningful(ctx);
+        const hints = deriveModuleHints(ctx);
+        const currencyOp = String(ctx.currencyOp || '').trim().toUpperCase();
+        const companyCurrency = String(d.company?.currency || '').trim().toUpperCase();
+
+        let nudge: null | 'missing' | 'currency-mismatch' = null;
+        if (!d.company?.contextSetupAt || !meaningful) {
+          nudge = 'missing';
+        } else if (currencyOp && companyCurrency && currencyOp !== companyCurrency) {
+          nudge = 'currency-mismatch';
+        }
+
+        if (!cancelled) {
+          setHasMeaningfulSetup(meaningful);
+          setModuleHints(hints);
+          setSetupNudge(nudge);
+        }
+      } catch {
+        // Do not block Hub if setup endpoint is temporarily unavailable.
+      }
+    }
+    void loadContextFlags();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/login');
@@ -125,13 +248,20 @@ export default function HubPage() {
 
   if (status === 'loading' || status === 'unauthenticated') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-8 h-8 border-3 border-teal-600/30 border-t-teal-600 rounded-full animate-spin" />
+      <div className="min-h-screen bg-slate-50 px-4">
+        <StateLoading className="h-full" />
       </div>
     );
   }
 
   const firstName = session?.user?.name?.split(' ')?.[0] || '';
+  const hintSet = new Set(moduleHints);
+  const visibleSystems = systems.filter((sys) => {
+    if (sys.id === 'advisor') return true;
+    if (!hasMeaningfulSetup || moduleHints.length === 0) return true;
+    const code = sys.id.toUpperCase() as ModuleHintCode;
+    return hintSet.has(code);
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -182,29 +312,125 @@ export default function HubPage() {
           </p>
         </div>
 
+        <Link
+          href="/hub/workspace"
+          className="mb-8 flex items-start gap-4 rounded-2xl border-2 border-slate-200 bg-gradient-to-r from-slate-50 to-white p-5 shadow-sm transition hover:border-teal-300 hover:shadow-md"
+        >
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 text-white">
+            <LayoutGrid className="h-6 w-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-bold text-slate-900">
+              {locale === 'pt' ? 'Centro integrado' : locale === 'es' ? 'Centro integrado' : 'Integrated workspace'}
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {locale === 'pt'
+                ? 'Uma única vista para tarefas, resumo financeiro, projetos e atalhos — o administrador escolhe quem tem acesso. Não duplica o ATLAS: alterações refletem nos sistemas.'
+                : locale === 'es'
+                  ? 'Una sola vista para tareas, resumen, proyectos y atajos. El admin elige quién accede. Los cambios se reflejan en cada sistema.'
+                  : 'One place for tasks, financial snapshot, projects, and deep links. Your admin controls access. Changes stay in each system.'}
+            </p>
+            <span className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-teal-700">
+              {locale === 'pt' ? 'Abrir' : locale === 'es' ? 'Abrir' : 'Open'} <ArrowRight className="h-4 w-4" />
+            </span>
+          </div>
+        </Link>
+
+        <div className="mb-8 text-center">
+          <Link
+            href="/hub/setup"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-teal-700"
+          >
+            {locale === 'pt'
+              ? 'Assistente de contexto da organização (sector, comércio, prioridades)'
+              : locale === 'es'
+                ? 'Asistente de contexto de la organización (sector, comercio, prioridades)'
+                : 'Organization context setup (sector, trade, priorities)'}
+          </Link>
+          {hasMeaningfulSetup && moduleHints.length > 0 && (
+            <p className="mt-2 text-xs text-slate-500">
+              {locale === 'pt'
+                ? `Módulos filtrados por contexto (${moduleHints.join(', ')}). Reabra o assistente para ajustar.`
+                : locale === 'es'
+                  ? `Módulos filtrados por contexto (${moduleHints.join(', ')}). Reabra el asistente para ajustar.`
+                  : `Modules filtered by org context (${moduleHints.join(', ')}). Re-open setup to adjust.`}
+            </p>
+          )}
+          {setupNudge && (
+            <div className="mx-auto mt-3 max-w-2xl rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-left text-xs text-amber-900">
+              <p className="font-semibold">
+                {locale === 'pt'
+                  ? 'Revisar contexto da organização recomendado'
+                  : locale === 'es'
+                    ? 'Se recomienda revisar el contexto de la organización'
+                    : 'Organization context review recommended'}
+              </p>
+              <p className="mt-0.5">
+                {setupNudge === 'currency-mismatch'
+                  ? locale === 'pt'
+                    ? 'A moeda operacional no setup difere da moeda atual da empresa. Atualize o assistente para evitar sugestões inconsistentes.'
+                    : locale === 'es'
+                      ? 'La moneda operativa del setup difiere de la moneda actual de la empresa. Actualice el asistente para evitar sugerencias inconsistentes.'
+                      : 'Setup operating currency differs from current company currency. Re-run setup to avoid inconsistent guidance.'
+                  : locale === 'pt'
+                    ? 'Ainda não há contexto suficiente (ou atualizado) para personalizar módulos e sugestões.'
+                    : locale === 'es'
+                      ? 'Aún no hay contexto suficiente (o actualizado) para personalizar módulos y sugerencias.'
+                      : 'There is not enough (or updated) context yet to personalize modules and guidance.'}
+              </p>
+              <div className="mt-1.5">
+                <Link href="/hub/setup" className="font-semibold text-amber-900 underline decoration-amber-400 hover:decoration-amber-700">
+                  {locale === 'pt' ? 'Abrir assistente agora' : locale === 'es' ? 'Abrir asistente ahora' : 'Open setup now'}
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* System Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {systems.map((sys) => {
+          {visibleSystems.map((sys) => {
             const Icon = sys.icon;
+            const isAdvisor = sys.productTier === 'advisor';
             return sys.active ? (
               <Link
                 key={sys.id}
                 href={sys.href}
-                className={`group relative bg-white rounded-2xl border-2 ${sys.borderColor} ${sys.bgHover} p-6 transition-all duration-200 hover:shadow-lg`}
+                className={`group relative bg-white rounded-2xl border-2 p-6 transition-all duration-200 hover:shadow-lg ${
+                  isAdvisor
+                    ? 'border-violet-300 ring-2 ring-violet-200/80 shadow-md shadow-violet-100/50 ' + sys.bgHover
+                    : `${sys.borderColor} ${sys.bgHover}`
+                } `}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${sys.color} flex items-center justify-center shadow-sm`}>
                     <Icon className="w-6 h-6 text-white" />
                   </div>
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-medium">
-                    <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-                    {locale === 'es' ? 'Activo' : locale === 'pt' ? 'Ativo' : 'Active'}
-                  </div>
+                  {isAdvisor ? (
+                    <div className="flex max-w-[10rem] flex-col items-end gap-0.5">
+                      <div className="flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800">
+                        <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+                        {locale === 'es' ? 'Transversal' : locale === 'pt' ? 'Transversal' : 'Transversal'}
+                      </div>
+                      <span className="text-right text-[10px] text-violet-600/90">
+                        {locale === 'es' ? 'También: botón flotante' : locale === 'pt' ? 'Também: botão flutuante' : 'Also: floating button'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-medium">
+                      <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                      {locale === 'es' ? 'Activo' : locale === 'pt' ? 'Ativo' : 'Active'}
+                    </div>
+                  )}
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-1">{sys.name}</h3>
                 <p className="text-sm font-medium text-slate-500 mb-3">{pickLocalized(sys.tagline, locale)}</p>
                 <p className="text-sm text-slate-400 leading-relaxed mb-4">{pickLocalized(sys.description, locale)}</p>
-                <div className="flex items-center gap-1 text-teal-600 text-sm font-medium group-hover:gap-2 transition-all">
+                <div
+                  className={`flex items-center gap-1 text-sm font-medium group-hover:gap-2 transition-all ${
+                    isAdvisor ? 'text-violet-700' : 'text-teal-600'
+                  }`}
+                >
                   {locale === 'es' ? 'Acceder' : locale === 'pt' ? 'Acessar' : 'Access'}
                   <ArrowRight className="w-4 h-4" />
                 </div>
@@ -231,7 +457,25 @@ export default function HubPage() {
           })}
         </div>
 
-
+        <p className="mt-4 text-center text-sm text-slate-500">
+          {locale === 'pt' ? (
+            <>
+              <strong className="text-violet-800">Dica:</strong> em qualquer ecrã autenticado, o{' '}
+              <strong>botão roxo</strong> (canto inferior esquerdo) abre o mesmo assessor: alertas rápidos. O <strong>chat teal</strong>{' '}
+              (canto direito) é diálogo e canais de trabalho — outro propósito.
+            </>
+          ) : locale === 'es' ? (
+            <>
+              <strong className="text-violet-800">Tip:</strong> en cualquier pantalla, el <strong>botón morado</strong> (abajo a la
+              izquierda) = Advisor. El <strong>chat teal</strong> (derecha) = diálogo y equipos.
+            </>
+          ) : (
+            <>
+              <strong className="text-violet-800">Tip:</strong> on any screen, the <strong>purple button</strong> (bottom left) = Advisor
+              digests. The <strong>teal chat</strong> (right) = work dialogue — different purpose.
+            </>
+          )}
+        </p>
 
         {/* ETHOLYS Core banner */}
         <div className="mt-10 bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-6 sm:p-8 text-white">
