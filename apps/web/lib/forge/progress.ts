@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { getForgeDb } from '@/lib/forge/db';
 import { awardActivityCompletion } from '@/lib/forge/gamification';
 import { issueForgeCertificate } from '@/lib/forge/certificates';
@@ -14,6 +15,8 @@ export async function completeForgeActivity(opts: {
   courseId: string;
   companyId: string;
   gamification: { xpGained: number; level: number; totalXp: number };
+  certificateId: string | null;
+  courseCompleted: boolean;
 }> {
   const activity = await getForgeDb().forgeLearningActivity.findUnique({
     where: { id: opts.activityId },
@@ -33,13 +36,13 @@ export async function completeForgeActivity(opts: {
       userId: opts.userId,
       status: 'completed',
       score: opts.score ?? null,
-      payload: opts.payload ?? undefined,
+      payload: (opts.payload ?? undefined) as Prisma.InputJsonValue | undefined,
       completedAt: now,
     },
     update: {
       status: 'completed',
       score: opts.score ?? undefined,
-      payload: opts.payload ?? undefined,
+      payload: (opts.payload ?? undefined) as Prisma.InputJsonValue | undefined,
       completedAt: now,
     },
   });

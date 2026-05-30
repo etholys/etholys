@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { getForgeDb } from '@/lib/forge/db';
 import { isForgeActivityType } from '@/lib/forge/types';
 import { requireForgeTenant } from '@/lib/forge/tenant';
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         type,
         title: title.slice(0, 300),
         sortOrder: typeof body.sortOrder === 'number' ? body.sortOrder : count,
-        config: body.config ?? {},
+        config: (body.config ?? {}) as Prisma.InputJsonValue,
         gameSpecId: type === 'game' ? body.gameSpecId ?? null : null,
         xpWeight: typeof body.xpWeight === 'number' ? body.xpWeight : 1,
       },

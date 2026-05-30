@@ -41,7 +41,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       select: { name: true },
     });
 
-    const results = [];
+    const results: Awaited<ReturnType<typeof inviteOneLearner>>[] = [];
     for (const row of rows) {
       results.push(
         await inviteOneLearner({

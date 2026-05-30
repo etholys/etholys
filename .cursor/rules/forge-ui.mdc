@@ -1,0 +1,36 @@
+---
+description: FORGE UI — modos de curso (e-learning, jogo, híbrido) e curso de referência
+globs: apps/web/app/hub/forge/**,apps/web/components/forge/**,docs/architecture/forge*.md
+alwaysApply: false
+---
+
+# FORGE — UI e curso de referência
+
+## Curso de referência (primeiro jogo real)
+
+- **Título:** `La Expedición Sostenible`
+- **Seed:** `lib/forge/seed-expedicion-sostenible.ts` · API `POST /api/forge/seed-expedicion`
+- **Estrutura:** 5 estaciones (Raíces, Tierra, Alquimia, Mercado, Futuro) + bienvenida + taller tablero (20 casillas)
+- **Materiais fonte:** `G:\My Drive\...\2. V2 - La expedición sostenible\` (6 docx)
+- **Constante:** `EXPEDICION_COURSE_TITLE` em `seed-expedicion-sostenible.ts`
+
+Usar este curso como benchmark para testes visuais e funcionais.
+
+## Três modos que a interface DEVE suportar
+
+1. **Só e-learning** — aulas (`lesson`/`media`), quizzes; área principal = vídeo/leitura; rail = módulos/atividades.
+2. **Só jogos** — atividades `game` + `GameSpec`; área principal = canvas do motor (board, cards, etc.); rail = progresso por desafio/estación.
+3. **Híbrido** — mesmo curso, mesma trilha, mesma barra lateral; o player troca layout conforme `activity.type` (`lesson` | `quiz` | `game`), sem menus separados “Cursos vs Jogos”.
+
+## Princípios de UI (mockup Rural Commerce)
+
+- Banner superior escuro + faixa de perfil/contexto do curso
+- **Coluna principal:** conteúdo ativo (vídeo, texto, quiz ou jogo)
+- **Coluna direita:** lista de módulos/atividades com estado (concluído, atual, bloqueado)
+- Cards arredondados, sombra suave; badges por tipo de atividade
+- Ver `docs/architecture/forge-ui-vision.md`
+
+## Não fazer
+
+- Dois botões ou rotas paralelas para “jogos” vs “cursos”
+- Gerar apps/jogos ad hoc fora de `GameSpec` + motores em `lib/forge/engines/`

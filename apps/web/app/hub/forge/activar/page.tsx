@@ -90,7 +90,7 @@ function ActivarContent() {
       email: preview.loginEmail,
       password: 'forge-magic',
       forgeMagicToken: token,
-    } as Record<string, string>);
+    } as Parameters<typeof signIn>[1]);
     setBusy(false);
     if (login?.error) {
       setError(ft('forge.invite.magicFailed'));

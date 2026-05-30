@@ -421,7 +421,7 @@ export function ForgeActivityPlayer({
           <ForgeGameBoard
             sessionId={gameSessionId ?? undefined}
             roomId={sharedRoomId ?? undefined}
-            syncMode={syncMode === 'pending' ? 'solo' : syncMode}
+            syncMode={syncMode}
             spec={gameSpec}
             initialState={gameState}
             roomVersion={roomVersion}
@@ -452,7 +452,7 @@ export function ForgeActivityPlayer({
     if (gameSpec.engine === 'quiz_race') {
       return (
         <ForgeQuizRace
-          sessionId={gameSessionId}
+          sessionId={gameSessionId!}
           spec={gameSpec}
           initialState={gameState}
           onComplete={() => onDone?.()}
@@ -462,7 +462,7 @@ export function ForgeActivityPlayer({
     if (gameSpec.engine === 'cards') {
       return (
         <ForgeGameCards
-          sessionId={gameSessionId}
+          sessionId={gameSessionId!}
           spec={gameSpec}
           initialState={gameState as { hand?: string[]; played?: string[] }}
           onComplete={() => onDone?.()}
@@ -472,7 +472,7 @@ export function ForgeActivityPlayer({
     if (gameSpec.engine === 'branching') {
       return (
         <ForgeGameBranching
-          sessionId={gameSessionId}
+          sessionId={gameSessionId!}
           spec={gameSpec}
           initialState={gameState as { nodeId?: string }}
           onComplete={() => onDone?.()}

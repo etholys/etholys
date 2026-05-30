@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { getForgeDb } from '@/lib/forge/db';
 import { EXPEDICION_LIBRO_FULL, getFullLibroMarkdown } from '@/lib/forge/expedicion-libro-full';
 import { assertExpedicionOwnerCompany } from '@/lib/forge/expedicion-owner';
@@ -423,7 +424,22 @@ export async function seedExpedicionSostenibleCourse(
     data: buildExpedicionGameSpec(companyId),
   });
 
-  const modulesData = MODULES.map((mod, mi) => ({
+  type ModuleSeed = {
+    title: string;
+    sortOrder: number;
+    activities: {
+      create: {
+        type: string;
+        title: string;
+        sortOrder: number;
+        xpWeight: number;
+        config: Prisma.InputJsonValue;
+        gameSpecId?: string;
+      }[];
+    };
+  };
+
+  const modulesData: ModuleSeed[] = MODULES.map((mod, mi) => ({
     title: mod.title,
     sortOrder: mi,
     activities: {
@@ -436,14 +452,14 @@ export async function seedExpedicionSostenibleCourse(
           config: {
             body: enrichLessonBody(mod.title, mod.lesson.body),
             durationMinutes: mod.lesson.durationMinutes,
-          },
+          } as Prisma.InputJsonValue,
         },
         {
           type: 'quiz',
           title: mod.quiz.title,
           sortOrder: 1,
           xpWeight: 1.2,
-          config: { questions: mod.quiz.questions },
+          config: { questions: mod.quiz.questions } as Prisma.InputJsonValue,
         },
       ],
     },
@@ -477,7 +493,7 @@ A continuación jugáis la **pista digital** con las cartas de este motor FORGE.
 
 **Materiales de apoyo (V2, 2026):** Resumen Ejecutivo, Libro Didáctico, Manual operativo, Instrumentos del juego y Guion de presentación.`
             ),
-          },
+          } as Prisma.InputJsonValue,
         },
         {
           type: 'game',
@@ -485,7 +501,9 @@ A continuación jugáis la **pista digital** con las cartas de este motor FORGE.
           sortOrder: 1,
           xpWeight: 2.5,
           gameSpecId: gameSpec.id,
-          config: { stationLabels: ['Raíces', 'Tierra', 'Alquimia', 'Mercado', 'Futuro'] },
+          config: {
+            stationLabels: ['Raíces', 'Tierra', 'Alquimia', 'Mercado', 'Futuro'],
+          } as Prisma.InputJsonValue,
         },
       ],
     },
@@ -521,7 +539,7 @@ A continuación jugáis la **pista digital** con las cartas de este motor FORGE.
       liveConfig,
       coverEmoji: '🌱',
       estimatedHours: 12,
-      modules: { create: modulesData },
+      modules: { create: modulesData as Prisma.ForgeModuleCreateWithoutCourseInput[] },
     },
   });
 

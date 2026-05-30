@@ -37,7 +37,19 @@ export async function findEnrollmentByMagicToken(token: string) {
       ],
     },
     include: {
-      user: { select: { id: true, email: true, name: true, isActive: true, password: true } },
+      user: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          isActive: true,
+          password: true,
+          role: true,
+          locale: true,
+          image: true,
+          avatar: true,
+        },
+      },
       course: { select: { id: true, title: true } },
     },
   });

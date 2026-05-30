@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { getForgeDb } from '@/lib/forge/db';
 import {
   applySharedGameAction,
@@ -91,8 +92,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     const updated = await getForgeDb().forgeSharedGameRoom.update({
       where: { id: roomId },
       data: {
-        state,
-        lastEvents: events,
+        state: state as Prisma.InputJsonValue,
+        lastEvents: events as Prisma.InputJsonValue,
         version: { increment: 1 },
         status: done ? 'closed' : 'open',
       },

@@ -56,7 +56,7 @@ export function ForgeLiveStudio({
   const [gameState, setGameState] = useState<Record<string, unknown>>({});
   const [sharedRoomId, setSharedRoomId] = useState<string | null>(null);
   const [roomVersion, setRoomVersion] = useState(0);
-  const [syncMode, setSyncMode] = useState<ForgeGameSyncMode>('pending');
+  const [syncMode, setSyncMode] = useState<ForgeGameSyncMode | 'pending'>('pending');
   const [boardBusy, setBoardBusy] = useState(false);
 
   const learnerUrl = useMemo(
@@ -197,12 +197,11 @@ export function ForgeLiveStudio({
             {gameSpec && syncMode !== 'pending' ? (
               <ForgeGameBoard
                 spec={gameSpec}
-                state={gameState}
+                initialState={gameState}
                 syncMode={syncMode}
-                roomId={sharedRoomId}
+                roomId={sharedRoomId ?? undefined}
                 roomVersion={roomVersion}
-                onStateChange={setGameState}
-                onVersionChange={setRoomVersion}
+                onRoomState={(s) => setGameState(s as Record<string, unknown>)}
               />
             ) : gameActivityId ? (
               <button
@@ -280,12 +279,11 @@ export function ForgeLiveStudio({
           {gameSpec && syncMode !== 'pending' && (
             <ForgeGameBoard
               spec={gameSpec}
-              state={gameState}
+              initialState={gameState}
               syncMode={syncMode}
-              roomId={sharedRoomId}
+              roomId={sharedRoomId ?? undefined}
               roomVersion={roomVersion}
-              onStateChange={setGameState}
-              onVersionChange={setRoomVersion}
+              onRoomState={(s) => setGameState(s as Record<string, unknown>)}
             />
           )}
           {!gameActivityId && (

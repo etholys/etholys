@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { getForgeDb } from '@/lib/forge/db';
 import { isForgeActivityType } from '@/lib/forge/types';
 import { getForgeCourseAccess } from '@/lib/forge/facilitator-access';
@@ -111,7 +112,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 
     const updated = await getForgeDb().forgeLearningActivity.update({
       where: { id },
-      data,
+      data: data as Prisma.ForgeLearningActivityUpdateInput,
       include: { gameSpec: true },
     });
 

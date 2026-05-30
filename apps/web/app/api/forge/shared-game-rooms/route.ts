@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { getForgeDb } from '@/lib/forge/db';
 import { parseGameSpecV1 } from '@/lib/forge/schemas/game-spec-v1';
 import { getForgeEngine, validateAndPrepareSpec } from '@/lib/forge/engines';
@@ -87,10 +88,10 @@ export async function POST(req: NextRequest) {
         courseId: course.id,
         liveSessionId,
         facilitatorUserId: tenant.userId,
-        state,
+        state: state as Prisma.InputJsonValue,
         status: 'open',
         version: 1,
-        lastEvents: [{ type: 'room_opened', message: 'Partida compartida iniciada.' }],
+        lastEvents: [{ type: 'room_opened', message: 'Partida compartida iniciada.' }] as Prisma.InputJsonValue,
       },
     });
 

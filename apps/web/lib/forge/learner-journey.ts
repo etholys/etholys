@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { Prisma } from '@prisma/client';
 import { getForgeDb } from '@/lib/forge/db';
 import type {
   JourneyMapState,
@@ -98,7 +99,10 @@ export async function appendJourneyEvent(
   const mapState = await rebuildJourneyMapState(courseId, userId);
   await getForgeDb().forgeLearnerJourney.update({
     where: { id: journey.id },
-    data: { timeline: timeline.slice(0, 200), mapState },
+    data: {
+      timeline: timeline.slice(0, 200) as Prisma.InputJsonValue,
+      mapState: mapState as Prisma.InputJsonValue,
+    },
   });
 }
 
@@ -116,7 +120,7 @@ export async function addJourneyMaterial(
   });
   await getForgeDb().forgeLearnerJourney.update({
     where: { id: journey.id },
-    data: { materials: materials.slice(0, 100) },
+    data: { materials: materials.slice(0, 100) as Prisma.InputJsonValue },
   });
 }
 
@@ -205,7 +209,7 @@ export async function syncJourneyAfterActivityComplete(opts: {
   const mapState = await rebuildJourneyMapState(opts.courseId, opts.userId);
   await getForgeDb().forgeLearnerJourney.update({
     where: { courseId_userId: { courseId: opts.courseId, userId: opts.userId } },
-    data: { mapState },
+    data: { mapState: mapState as Prisma.InputJsonValue },
   });
 }
 
@@ -237,7 +241,7 @@ export async function getLearnerJourneyBundle(courseId: string, userId: string) 
 
   await getForgeDb().forgeLearnerJourney.update({
     where: { id: journey.id },
-    data: { mapState },
+    data: { mapState: mapState as Prisma.InputJsonValue },
   });
 
   return {

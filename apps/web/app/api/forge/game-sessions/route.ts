@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { getForgeDb } from '@/lib/forge/db';
 import { parseGameSpecV1 } from '@/lib/forge/schemas/game-spec-v1';
 import { getForgeEngine, validateAndPrepareSpec } from '@/lib/forge/engines';
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
         data: {
           activityId,
           userId: tenant.userId,
-          state,
+          state: state as Prisma.InputJsonValue,
           status: 'in_progress',
         },
       }));
@@ -95,7 +96,7 @@ export async function PATCH(req: NextRequest) {
     const updated = await getForgeDb().forgeGameSession.update({
       where: { id: sessionId },
       data: {
-        state,
+        state: state as Prisma.InputJsonValue,
         score,
         status: done ? 'completed' : 'in_progress',
         insights: body.action.type === 'record_insight' && body.action.payload?.text

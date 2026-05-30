@@ -14,13 +14,13 @@ async function main() {
     process.exit(1);
   }
 
-  let userId = args[1];
+  let userId: string | undefined = args[1];
   if (!userId) {
     const link = await getForgeDb().companyUser.findFirst({
       where: { companyId },
       orderBy: { createdAt: 'asc' },
     });
-    userId = link?.userId;
+    userId = link?.userId ?? undefined;
   }
   if (!userId) {
     console.error('Nenhum utilizador na empresa', companyId);

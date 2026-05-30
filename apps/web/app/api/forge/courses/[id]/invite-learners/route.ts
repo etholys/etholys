@@ -84,7 +84,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
 
 
-    const results = [];
+    const results: Awaited<ReturnType<typeof inviteOneLearner>>[] = [];
 
     for (const email of emails) {
 

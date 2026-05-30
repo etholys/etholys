@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { getForgeDb } from '@/lib/forge/db';
 import { geminiCompleteJsonText } from '@/lib/gemini-client';
 import { parseGameSpecV1, safeParseGameSpecV1 } from '@/lib/forge/schemas/game-spec-v1';
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
         companyId,
         engine: withMeta.engine,
         title: withMeta.title,
-        definition: withMeta,
+        definition: withMeta as Prisma.InputJsonValue,
         status: body.publish ? 'published' : 'draft',
       },
     });

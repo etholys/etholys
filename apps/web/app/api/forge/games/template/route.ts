@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { getForgeDb } from '@/lib/forge/db';
 import { FORGE_GAME_TEMPLATES } from '@/lib/forge/templates';
 import { validateAndPrepareSpec } from '@/lib/forge/engines';
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
         companyId,
         engine: spec.engine,
         title: spec.title,
-        definition: spec,
+        definition: spec as Prisma.InputJsonValue,
         status: 'published',
       },
     });
