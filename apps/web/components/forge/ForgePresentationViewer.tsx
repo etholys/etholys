@@ -10,11 +10,22 @@ type Props = {
   pdfUrl?: string | null;
   embedUrl?: string | null;
   compact?: boolean;
+  slideIndex?: number;
+  onSlideIndexChange?: (index: number) => void;
 };
 
-export function ForgePresentationViewer({ slides, pdfUrl, embedUrl, compact }: Props) {
+export function ForgePresentationViewer({
+  slides,
+  pdfUrl,
+  embedUrl,
+  compact,
+  slideIndex: controlledIdx,
+  onSlideIndexChange,
+}: Props) {
   const ft = useForgeT();
-  const [idx, setIdx] = useState(0);
+  const [internalIdx, setInternalIdx] = useState(0);
+  const idx = controlledIdx ?? internalIdx;
+  const setIdx = onSlideIndexChange ?? setInternalIdx;
   const [mode, setMode] = useState<'slides' | 'pdf' | 'embed'>(
     slides.length > 0 ? 'slides' : pdfUrl ? 'pdf' : embedUrl ? 'embed' : 'slides'
   );
@@ -100,7 +111,7 @@ export function ForgePresentationViewer({ slides, pdfUrl, embedUrl, compact }: P
           <button
             type="button"
             disabled={idx <= 0}
-            onClick={() => setIdx((i) => i - 1)}
+            onClick={() => setIdx(idx - 1)}
             className="rounded-lg p-2 hover:bg-slate-100 disabled:opacity-40"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -111,7 +122,7 @@ export function ForgePresentationViewer({ slides, pdfUrl, embedUrl, compact }: P
           <button
             type="button"
             disabled={idx >= slides.length - 1}
-            onClick={() => setIdx((i) => i + 1)}
+            onClick={() => setIdx(idx + 1)}
             className="rounded-lg p-2 hover:bg-slate-100 disabled:opacity-40"
           >
             <ChevronRight className="h-4 w-4" />

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { getForgeDb } from '@/lib/forge/db';
 import { findEnrollmentByMagicToken } from '@/lib/forge/invite-auth';
+import { forgeCourseEntryPath } from '@/lib/forge/course-entry-path';
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as { token?: string; password?: string };
@@ -37,6 +38,6 @@ export async function POST(req: NextRequest) {
     ok: true,
     email: enrollment.user.email,
     courseId: enrollment.courseId,
-    redirect: `/hub/forge/cursos/${enrollment.courseId}`,
+    redirect: forgeCourseEntryPath(enrollment.courseId, enrollment.course.deliveryMode),
   });
 }

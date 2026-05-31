@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { parseDeliveryMode, parseLiveConfig } from '@/lib/forge/delivery';
+import { getJitsiBaseUrl } from '@/lib/forge/jitsi-config';
 import { parseGamePlayMode } from '@/lib/forge/game-play-mode';
 
 type CourseWithTree = Prisma.ForgeCourseGetPayload<{
@@ -27,6 +28,7 @@ export function serializeForgeCourse(
     gamePlayMode: parseGamePlayMode(course.gamePlayMode),
     cohortMode: course.cohortMode === 'open' ? 'open' : 'invite_only',
     liveConfig: parseLiveConfig(course.liveConfig),
+    jitsiBaseUrl: getJitsiBaseUrl(),
     coverEmoji: course.coverEmoji,
     hasLibro: Boolean(course.libroPdfPath),
     libroPdfName: course.libroPdfName,

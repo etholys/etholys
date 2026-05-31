@@ -25,6 +25,8 @@ import {
   isPathAllowedForCourseOnly,
 } from '@/lib/forge/access-context-shared';
 import { isPublicForgePath } from '@/lib/forge/public-paths';
+import { forgeCourseEntryPath, isForgeSalaPath } from '@/lib/forge/course-entry-path';
+import { showsLiveFeatures } from '@/lib/forge/delivery';
 import { useForgeT } from '@/lib/forge/use-forge-t';
 import { ForgeLocaleSwitcher } from '@/components/forge/ForgeLocaleSwitcher';
 
@@ -59,6 +61,7 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
 
   const isCourseOnly = accessCtx?.mode === 'course_only';
   const isPublicForge = pathname ? isPublicForgePath(pathname) : false;
+  const isSalaImmersive = pathname ? isForgeSalaPath(pathname) : false;
 
   useEffect(() => {
     if (status === 'unauthenticated' && !isPublicForge) router.replace('/login');
@@ -149,6 +152,14 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
     );
   }
 
+  if (isSalaImmersive) {
+    return <div className="min-h-dvh bg-slate-950">{children}</div>;
+  }
+
+  const singleLiveCourse =
+    accessCtx?.courses.length === 1 &&
+    showsLiveFeatures(accessCtx.courses[0].deliveryMode ?? 'async');
+
   const learnerNav = [
     {
       href: '/hub/forge/mis-cursos',
@@ -163,9 +174,11 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
     ...(accessCtx?.courses.length === 1
       ? [
           {
-            href: `/hub/forge/cursos/${accessCtx.courses[0].id}/mi-mapa`,
+            href: singleLiveCourse
+              ? forgeCourseEntryPath(accessCtx.courses[0].id, accessCtx.courses[0].deliveryMode)
+              : `/hub/forge/cursos/${accessCtx.courses[0].id}/mi-mapa`,
             icon: Map,
-            label: ft('forge.nav.myMap'),
+            label: singleLiveCourse ? ft('forge.nav.liveRoom') : ft('forge.nav.myMap'),
           },
         ]
       : []),

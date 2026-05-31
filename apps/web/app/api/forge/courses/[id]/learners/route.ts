@@ -37,6 +37,16 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       orderBy: { enrolledAt: 'desc' },
     });
 
+    const facilitatorIds = new Set(
+      (
+        await getForgeDb().forgeCourseFacilitator.findMany({
+          where: { courseId },
+          select: { userId: true },
+        })
+      ).map((f) => f.userId)
+    );
+    if (course.createdById) facilitatorIds.add(course.createdById);
+
     const rows = await Promise.all(
       enrollments.map(async (e) => {
         const progressPercent = await getCourseProgressPercent(courseId, e.userId);
@@ -49,6 +59,8 @@ export async function GET(req: NextRequest, ctx: Ctx) {
           name: e.user.name,
           email: e.user.email,
           image: e.user.image,
+          isSelf: e.userId === tenant.userId,
+          isFacilitator: facilitatorIds.has(e.userId),
           status: e.status,
           enrolledAt: e.enrolledAt.toISOString(),
           completedAt: e.completedAt?.toISOString() ?? null,

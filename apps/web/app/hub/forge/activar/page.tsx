@@ -6,6 +6,7 @@ import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { KeyRound, Zap } from 'lucide-react';
 import { mapForgeInviteError } from '@/lib/forge/i18n';
+import { forgeCourseEntryPath } from '@/lib/forge/course-entry-path';
 import { useForgeLocale, useForgeT } from '@/lib/forge/use-forge-t';
 
 function ActivarContent() {
@@ -19,6 +20,7 @@ function ActivarContent() {
     emailHint: string | null;
     loginEmail: string | null;
     courseId: string;
+    deliveryMode?: string | null;
   } | null>(null);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -39,6 +41,7 @@ function ActivarContent() {
           emailHint: d.emailHint,
           loginEmail: d.loginEmail ?? null,
           courseId: d.courseId,
+          deliveryMode: d.deliveryMode,
         });
       })
       .catch((e) =>
@@ -101,7 +104,7 @@ function ActivarContent() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
     }).catch(() => {});
-    router.replace(`/hub/forge/cursos/${preview.courseId}`);
+    router.replace(forgeCourseEntryPath(preview.courseId, preview.deliveryMode));
   }
 
   if (error && !preview) {

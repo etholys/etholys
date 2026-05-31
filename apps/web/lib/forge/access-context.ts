@@ -3,6 +3,7 @@ import 'server-only';
 import { getForgeDb } from '@/lib/forge/db';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { getCourseProgressPercent } from '@/lib/forge/progress';
+import { parseDeliveryMode } from '@/lib/forge/delivery';
 import type { ForgeAccessContext, ForgeAccessCourse } from '@/lib/forge/access-context-shared';
 
 export type {
@@ -24,7 +25,9 @@ export async function getForgeAccessContext(): Promise<ForgeAccessContext | null
   const enrollments = await getForgeDb().forgeEnrollment.findMany({
     where: { userId: tenant.userId, status: { in: ['active', 'completed'] } },
     include: {
-      course: { select: { id: true, title: true, coverEmoji: true, status: true } },
+      course: {
+        select: { id: true, title: true, coverEmoji: true, status: true, deliveryMode: true },
+      },
     },
     orderBy: { enrolledAt: 'desc' },
   });
@@ -44,6 +47,7 @@ export async function getForgeAccessContext(): Promise<ForgeAccessContext | null
       title: e.course.title,
       coverEmoji: e.course.coverEmoji,
       status: e.course.status,
+      deliveryMode: parseDeliveryMode(e.course.deliveryMode),
       progressPercent: await getCourseProgressPercent(e.course.id, tenant.userId),
     }))
   );

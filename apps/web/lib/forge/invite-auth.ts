@@ -50,7 +50,7 @@ export async function findEnrollmentByMagicToken(token: string) {
           avatar: true,
         },
       },
-      course: { select: { id: true, title: true } },
+      course: { select: { id: true, title: true, deliveryMode: true } },
     },
   });
 }

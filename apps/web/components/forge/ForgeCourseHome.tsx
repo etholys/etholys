@@ -126,16 +126,16 @@ export function ForgeCourseHome({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {enrolled && deliveryMode === 'live' ? (
-              <a
-                href="#forge-live-panel"
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 px-6 py-3 text-sm font-bold text-white shadow-lg hover:from-sky-700"
+            {enrolled && showsLiveFeatures(deliveryMode) ? (
+              <Link
+                href={`/hub/forge/cursos/${courseId}/sala`}
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 px-6 py-3 text-sm font-bold text-white shadow-lg hover:from-emerald-700"
               >
                 <Rocket className="h-5 w-5" />
-                {ft('forge.live.join')}
-              </a>
+                {ft('forge.room.enter')}
+              </Link>
             ) : null}
-            {nextActivityId && enrolled ? (
+            {nextActivityId && enrolled && !showsLiveFeatures(deliveryMode) ? (
               <button
                 type="button"
                 onClick={() => router.push(`/hub/forge/cursos/${courseId}/atividade/${nextActivityId}`)}
@@ -153,12 +153,14 @@ export function ForgeCourseHome({
                 {ft('forge.course.enroll')}
               </button>
             ) : null}
-            <Link
-              href={`/hub/forge/cursos/${courseId}/mi-mapa`}
-              className="flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
-            >
-              {ft('forge.course.myMap')}
-            </Link>
+            {!showsLiveFeatures(deliveryMode) ? (
+              <Link
+                href={`/hub/forge/cursos/${courseId}/mi-mapa`}
+                className="flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
+              >
+                {ft('forge.course.myMap')}
+              </Link>
+            ) : null}
             {canFacilitate && (
               <Link
                 href={`/hub/forge/cursos/${courseId}/alumnos`}
@@ -207,13 +209,26 @@ export function ForgeCourseHome({
         <ForgeLibroPanel courseTitle={title} courseId={courseId} hasPdf={hasLibro} />
       </div>
 
+      {showsLiveFeatures(deliveryMode) && enrolled ? (
+        <div className="mx-4 mt-6 rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-6 md:mx-8">
+          <p className="text-sm font-bold text-emerald-900">{ft('forge.room.brand')}</p>
+          <p className="mt-2 text-sm text-emerald-800">{ft('forge.course.home.liveTrail')}</p>
+          <Link
+            href={`/hub/forge/cursos/${courseId}/sala`}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white"
+          >
+            <Rocket className="h-4 w-4" />
+            {ft('forge.room.enter')}
+          </Link>
+        </div>
+      ) : null}
+
+      {!showsLiveFeatures(deliveryMode) ? (
       <div className="mx-4 mt-6 grid gap-6 lg:grid-cols-[1fr_340px] md:mx-8">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-bold text-slate-900">Tu trilha de aprendizaje</h2>
           <p className="mt-1 text-sm text-slate-500">
-            {showsAsyncFeatures(deliveryMode)
-              ? 'Aulas, quizzes y el taller gamificado en un solo recorrido. Completa cada módulo en orden.'
-              : ft('forge.course.home.liveTrail')}
+            Aulas, quizzes y el taller gamificado en un solo recorrido. Completa cada módulo en orden.
           </p>
           <div className="mt-6 space-y-6">
             {modules.map((mod, mi) => (
@@ -294,6 +309,7 @@ export function ForgeCourseHome({
           </div>
         </aside>
       </div>
+      ) : null}
     </div>
   );
 }

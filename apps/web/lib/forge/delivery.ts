@@ -1,5 +1,7 @@
 /** Modo de entrega do curso FORGE (público externo). */
 
+import { getJitsiBaseUrl } from '@/lib/forge/jitsi-config';
+
 export type ForgeDeliveryMode = 'async' | 'live' | 'blended';
 
 export type ForgeLivePlatform = 'jitsi' | 'meet' | 'zoom' | 'teams' | 'custom';
@@ -72,7 +74,8 @@ export function resolveMeetingUrl(
   config: ForgeLiveConfig,
   courseId?: string,
   role: ForgeMeetingRole = 'learner',
-  sessionOverrideUrl?: string | null
+  sessionOverrideUrl?: string | null,
+  jitsiBaseUrl?: string
 ): string | null {
   if (sessionOverrideUrl) return sessionOverrideUrl;
   if (role === 'facilitator' && config.facilitatorMeetingUrl) return config.facilitatorMeetingUrl;
@@ -88,7 +91,8 @@ export function resolveMeetingUrl(
         (courseId ? `etholys-forge-fac-${courseId.slice(-8)}` : 'etholys-forge-facilitador')
       : config.roomName ||
         (courseId ? `etholys-forge-${courseId.slice(-8)}` : 'etholys-forge-room');
-  return `https://meet.jit.si/${encodeURIComponent(room)}`;
+  const base = (jitsiBaseUrl?.replace(/\/$/, '') || getJitsiBaseUrl()).replace(/\/$/, '');
+  return `${base}/${encodeURIComponent(room)}`;
 }
 
 export function isJitsiEmbeddable(url: string): boolean {

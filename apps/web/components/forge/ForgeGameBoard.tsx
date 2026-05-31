@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameSpecV1 } from '@/lib/forge/schemas/game-spec-v1';
 import { Coins, MapPin, Radio, Sparkles, Target, Users } from 'lucide-react';
+import { ForgeBoardTrack } from '@/components/forge/ForgeBoardTrack';
 
 type SessionState = {
   position?: number;
@@ -16,21 +17,6 @@ type SessionState = {
 };
 
 export type ForgeGameSyncMode = 'solo' | 'host' | 'viewer';
-
-const STATIONS = [
-  { name: 'Raíces', color: 'bg-emerald-500' },
-  { name: 'Acción', color: 'bg-amber-400' },
-  { name: 'Tierra', color: 'bg-amber-700' },
-  { name: 'Desafío', color: 'bg-red-500' },
-  { name: 'Alquimia', color: 'bg-orange-500' },
-  { name: 'Mercado', color: 'bg-sky-500' },
-  { name: 'Futuro', color: 'bg-violet-600' },
-];
-
-function stationForSpace(i: number) {
-  const pattern = [0, 1, 2, 3, 4, 1, 5, 3, 4, 1, 2, 3, 0, 1, 4, 3, 5, 1, 6, 3];
-  return STATIONS[pattern[i % pattern.length]] ?? STATIONS[0];
-}
 
 export function ForgeGameBoard({
   sessionId,
@@ -207,30 +193,14 @@ export function ForgeGameBoard({
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-        <p className="text-xs font-bold uppercase text-slate-500 mb-2">Pista — 20 casillas</p>
-        <div className="flex flex-wrap gap-1">
-          {Array.from({ length: spaces }, (_, i) => {
-            const st = stationForSpace(i);
-            const active = i === pos;
-            return (
-              <div
-                key={i}
-                title={`${i}: ${st.name}`}
-                className={`flex h-8 w-8 items-center justify-center rounded-md text-[10px] font-bold text-white ${st.color} ${
-                  active ? 'ring-2 ring-offset-2 ring-blue-600 scale-110' : 'opacity-70'
-                }`}
-              >
-                {i}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <ForgeBoardTrack spaces={spaces} position={pos} />
 
       {state.currentCard && (
         <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase text-amber-800">Carta actual</p>
+          <p className="text-xs font-bold uppercase text-amber-800">
+            Carta actual {state.currentCard.id ? `· ${state.currentCard.id}` : ''}
+            {state.currentCard.type ? ` · ${state.currentCard.type}` : ''}
+          </p>
           <p className="mt-2 text-base font-semibold text-slate-900">{state.currentCard.prompt}</p>
           {state.currentCard.reflection && (
             <p className="mt-2 text-sm text-amber-900/80">💡 {state.currentCard.reflection}</p>

@@ -10,6 +10,7 @@ import {
   jitsiEmbedUrl,
   showsLiveFeatures,
 } from '@/lib/forge/delivery';
+import { canEmbedJitsiInIframe } from '@/lib/forge/jitsi-config';
 import {
   formatSessionWhen,
   pickFeaturedSession,
@@ -29,6 +30,7 @@ type Props = {
   showFacilitatorRoom?: boolean;
   compact?: boolean;
   currentActivityId?: string;
+  jitsiBaseUrl?: string;
 };
 
 export function ForgeLivePanel({
@@ -39,6 +41,7 @@ export function ForgeLivePanel({
   showFacilitatorRoom = false,
   compact = false,
   currentActivityId,
+  jitsiBaseUrl,
 }: Props) {
   const ft = useForgeT();
   const { locale } = useApp();
@@ -64,18 +67,19 @@ export function ForgeLivePanel({
   const sessionOverride = featured?.meetingUrl ?? null;
 
   const learnerUrl = useMemo(
-    () => resolveMeetingUrl(liveConfig, courseId, 'learner', sessionOverride),
-    [liveConfig, courseId, sessionOverride]
+    () => resolveMeetingUrl(liveConfig, courseId, 'learner', sessionOverride, jitsiBaseUrl),
+    [liveConfig, courseId, sessionOverride, jitsiBaseUrl]
   );
   const facilitatorUrl = useMemo(
-    () => resolveMeetingUrl(liveConfig, courseId, 'facilitator', sessionOverride),
-    [liveConfig, courseId, sessionOverride]
+    () => resolveMeetingUrl(liveConfig, courseId, 'facilitator', sessionOverride, jitsiBaseUrl),
+    [liveConfig, courseId, sessionOverride, jitsiBaseUrl]
   );
 
   if (!showsLiveFeatures(deliveryMode) || !learnerUrl) return null;
 
   const embed = isJitsiEmbeddable(learnerUrl);
-  const iframeSrc = embed && !learnerUrl.includes('localhost') ? jitsiEmbedUrl(learnerUrl) : null;
+  const iframeSrc =
+    embed && canEmbedJitsiInIframe(learnerUrl) ? jitsiEmbedUrl(learnerUrl) : null;
   const upcoming = sessions.filter((s) => s.status === 'upcoming').slice(0, 5);
   const recordings = sessions.filter((s) => s.recordingUrl && s.status === 'past').slice(0, 6);
 

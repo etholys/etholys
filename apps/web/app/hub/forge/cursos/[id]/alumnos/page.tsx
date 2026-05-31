@@ -19,6 +19,8 @@ type LearnerRow = {
   level: number;
   stationsCompleted: number;
   stationTotal: number;
+  isFacilitator?: boolean;
+  isSelf?: boolean;
   board?: { position?: number; ecoCredits?: number; insightsCount?: number };
 };
 
@@ -77,6 +79,17 @@ export default function ForgeAlumnosPage() {
         }}
       />
       <ForgeAssignFacilitator courseId={courseId} />
+
+      <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+        {ft('forge.alumnos.rolesHint')}{' '}
+        <Link href={`/hub/forge/cursos/${courseId}?preview=learner`} className="font-bold underline">
+          {ft('forge.facilitator.preview')}
+        </Link>
+        {' · '}
+        <Link href={`/hub/forge/cursos/${courseId}/sala`} className="font-bold underline">
+          {ft('forge.room.enter')}
+        </Link>
+      </div>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -140,9 +153,19 @@ export default function ForgeAlumnosPage() {
               {learners.map((l) => (
                 <tr key={l.userId} className="border-t border-slate-100">
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-slate-900 flex items-center gap-2">
+                    <p className="font-semibold text-slate-900 flex items-center gap-2 flex-wrap">
                       <User className="h-4 w-4 text-slate-400" />
                       {l.name ?? ft('forge.alumnos.noName')}
+                      {l.isFacilitator && (
+                        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-800">
+                          {ft('forge.alumnos.badgeFacilitator')}
+                        </span>
+                      )}
+                      {l.isSelf && (
+                        <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800">
+                          {ft('forge.alumnos.badgeSelf')}
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs text-slate-500">{l.email}</p>
                   </td>

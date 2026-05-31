@@ -77,7 +77,7 @@ function ExpediciónContent() {
         <ol className="list-decimal list-inside space-y-1">
           <li>Abre el enlace del WhatsApp o email.</li>
           <li>Crea contraseña o usa enlace mágico.</li>
-          <li>En el curso verás videollamada (Jitsi) y tu mapa A2.</li>
+          <li>Tras activar, entras directo a la <strong>sala de juego</strong>: videollamada, tablero y mapa A2 juntos.</li>
           <li>Opcional: menú del navegador → Añadir a pantalla de inicio.</li>
         </ol>
       </div>

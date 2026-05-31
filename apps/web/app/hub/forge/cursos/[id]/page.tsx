@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useApp } from '@/app/providers';
 import { ForgeCourseEditor } from '@/components/forge/ForgeCourseEditor';
 import { ForgeCourseHome } from '@/components/forge/ForgeCourseHome';
@@ -11,9 +11,13 @@ import { useForgeT } from '@/lib/forge/use-forge-t';
 import { ForgeDeliverySettings } from '@/components/forge/ForgeDeliverySettings';
 import { ForgeLiveSessionsManager } from '@/components/forge/ForgeLiveSessionsManager';
 import { ForgeProgramPicker } from '@/components/forge/ForgeProgramPicker';
-import { showsLiveFeatures } from '@/lib/forge/delivery';
+import {
+  showsLiveFeatures,
+  type ForgeDeliveryMode,
+  type ForgeLiveConfig,
+} from '@/lib/forge/delivery';
+import { forgeCourseEntryPath } from '@/lib/forge/course-entry-path';
 import { ForgeLivePanel } from '@/components/forge/ForgeLivePanel';
-import { type ForgeDeliveryMode, type ForgeLiveConfig } from '@/lib/forge/delivery';
 import { ArrowLeft } from 'lucide-react';
 
 type Activity = { id: string; type: string; title: string; sortOrder: number };
@@ -47,6 +51,7 @@ type CourseDetail = {
 export default function ForgeCursoDetailPage() {
   const ft = useForgeT();
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { activeCompanyId } = useApp();
   const wantEdit = searchParams.get('edit') === '1';
@@ -93,6 +98,15 @@ export default function ForgeCursoDetailPage() {
   useEffect(() => {
     if (wantEdit) setEditMode(true);
   }, [wantEdit]);
+
+  useEffect(() => {
+    if (!id || !course || previewLearner || editMode || wantEdit) return;
+    const mode = (course.deliveryMode ?? 'async') as ForgeDeliveryMode;
+    if (!showsLiveFeatures(mode)) return;
+    if (course.canFacilitate || enrolled) {
+      router.replace(forgeCourseEntryPath(id, mode));
+    }
+  }, [id, course, enrolled, previewLearner, editMode, wantEdit, router]);
 
   useEffect(() => {
     if (!id || enrolled || !course) return;

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { showsLiveFeatures, parseDeliveryMode } from '@/lib/forge/delivery';
+import { forgeCourseEntryPath } from '@/lib/forge/course-entry-path';
 import { ForgePersonalMap } from '@/components/forge/ForgePersonalMap';
 import type { JourneyMapState, JourneyMaterial, JourneyTimelineEntry } from '@/lib/forge/learner-journey-types';
 import { useForgeT } from '@/lib/forge/use-forge-t';
@@ -10,12 +12,25 @@ import { ArrowLeft } from 'lucide-react';
 
 export default function ForgeMiMapaPage() {
   const ft = useForgeT();
+  const router = useRouter();
   const { id: courseId } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('');
   const [mapState, setMapState] = useState<JourneyMapState | null>(null);
   const [materials, setMaterials] = useState<JourneyMaterial[]>([]);
   const [timeline, setTimeline] = useState<JourneyTimelineEntry[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/forge/courses/${courseId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const mode = parseDeliveryMode(d.course?.deliveryMode);
+        if (showsLiveFeatures(mode)) {
+          router.replace(forgeCourseEntryPath(courseId, mode));
+        }
+      })
+      .catch(() => {});
+  }, [courseId, router]);
 
   useEffect(() => {
     fetch(`/api/forge/courses/${courseId}/my-journey`)

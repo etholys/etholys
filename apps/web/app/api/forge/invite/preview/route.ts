@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       ],
     },
     include: {
-      course: { select: { id: true, title: true, coverEmoji: true, status: true } },
+      course: { select: { id: true, title: true, coverEmoji: true, status: true, deliveryMode: true } },
       user: { select: { email: true } },
     },
   });
@@ -39,5 +39,6 @@ export async function GET(req: NextRequest) {
     emailHint: enrollment.user.email ? maskEmail(enrollment.user.email) : null,
     /** Solo con token válido — para login mágico en /activar */
     loginEmail: enrollment.user.email ?? null,
+    deliveryMode: enrollment.course.deliveryMode,
   });
 }

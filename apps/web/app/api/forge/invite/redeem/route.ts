@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { getForgeDb } from '@/lib/forge/db';
 import { ensureLearnerJourney } from '@/lib/forge/learner-journey';
+import { forgeCourseEntryPath } from '@/lib/forge/course-entry-path';
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
 
   const enrollment = await getForgeDb().forgeEnrollment.findFirst({
     where: { inviteToken: token },
-    include: { course: { select: { id: true, title: true } } },
+    include: { course: { select: { id: true, title: true, deliveryMode: true } } },
   });
 
   if (!enrollment) {
@@ -55,6 +56,6 @@ export async function POST(req: NextRequest) {
     ok: true,
     courseId: enrollment.course.id,
     courseTitle: enrollment.course.title,
-    redirect: `/hub/forge/cursos/${enrollment.course.id}`,
+    redirect: forgeCourseEntryPath(enrollment.course.id, enrollment.course.deliveryMode),
   });
 }
