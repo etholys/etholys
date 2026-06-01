@@ -491,6 +491,27 @@ const forge: Record<Locale, Record<string, string>> = {
     'forge.tutorLobby.groupName': 'Nombre del grupo o empresa',
     'forge.tutorLobby.createGroup': 'Crear grupo',
     'forge.tutorLobby.createCoaching': 'Coaching 1:1',
+    'forge.tutorLobby.createCompany': 'Crear empresa / grupo',
+    'forge.tutorLobby.groupsPrimary': 'aquí creas las salas de juego',
+    'forge.tutorLobby.groupsExplain':
+      'Cada empresa = un enlace único. Varios emprendedores entran con el mismo link, juegan UN solo peón en el tablero (equipo) y cada uno edita su mapa A2 personal.',
+    'forge.tutorLobby.noSessionLink': 'Sin sesión del calendario',
+    'forge.tutorLobby.sessionsExplain':
+      'Son fechas del calendario del curso (módulos). No son empresas. Crea primero un grupo arriba y opcionalmente vincúlalo a una sesión.',
+    'forge.tutorLobby.sessionHint': 'Vincula al crear grupo',
+    'forge.tutorLobby.teamPlayHint':
+      'En la sala: tablero compartido (un peón por empresa). En «Mi mapa A2»: cada persona su negocio.',
+    'forge.tutorLobby.mapHelpTitle': 'Mapas personales A2',
+    'forge.tutorLobby.mapHelp':
+      'Cada emprendedor abre «Mi mapa A2» desde la sala o el curso. Ahí pega fichas, materiales y responde cartas. Tú los ves en Alumnos.',
+    'forge.tutorLobby.seeLearners': 'Ver progreso individual',
+    'forge.groupJoin.title': 'Unirse al equipo',
+    'forge.groupJoin.subtitle': 'Misma empresa, mismo tablero. Tu mapa A2 es personal.',
+    'forge.groupJoin.name': 'Tu nombre',
+    'forge.groupJoin.email': 'Tu email',
+    'forge.groupJoin.enter': 'Entrar al curso',
+    'forge.groupJoin.invalidLink': 'Enlace inválido o expirado.',
+    'forge.groupJoin.loginFailed': 'No se pudo iniciar sesión. Intenta de nuevo.',
     'forge.tutorLobby.inviteLink': 'Enlace de invitación (comparte con el equipo)',
     'forge.tutorLobby.members': 'miembros',
     'forge.tutorLobby.coaching': 'Coaching individual',

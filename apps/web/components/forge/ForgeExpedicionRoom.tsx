@@ -150,6 +150,8 @@ export function ForgeExpedicionRoom({
       const cur = multi ? currentPlayer(multi) : null;
       if (isFac) {
         setSyncMode(facEmergency ? 'host' : 'facilitator');
+      } else if (multi?.teamPlay && myUserId && multi.teamMemberIds?.includes(myUserId)) {
+        setSyncMode('player');
       } else if (multi && cur && myUserId && cur.userId === myUserId) {
         setSyncMode('player');
       } else {
@@ -369,6 +371,12 @@ export function ForgeExpedicionRoom({
             {isFac && ` ${slideIdx + 1}/${presentationSlides.length}`}
           </button>
         )}
+        <Link
+          href={`/hub/forge/cursos/${courseId}/mi-mapa`}
+          className="rounded-lg border border-amber-600/60 px-2 py-1 text-[10px] font-bold text-amber-200 hover:bg-amber-950"
+        >
+          {ft('forge.room.myMap')}
+        </Link>
         <Link
           href={`/hub/forge/cursos/${courseId}/turmas`}
           className="rounded-lg border border-slate-700 px-2 py-1 text-[10px] font-bold hover:bg-slate-800"

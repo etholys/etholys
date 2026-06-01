@@ -85,11 +85,13 @@ export async function POST(req: NextRequest) {
       });
       if (!ls) return NextResponse.json({ error: 'Sesión en vivo inválida' }, { status: 400 });
     }
+    let playGroup: { id: string; name: string; mode: string } | null = null;
     if (playGroupId) {
-      const pg = await getForgeDb().forgePlayGroup.findFirst({
+      playGroup = await getForgeDb().forgePlayGroup.findFirst({
         where: { id: playGroupId, courseId: course.id },
+        select: { id: true, name: true, mode: true },
       });
-      if (!pg) return NextResponse.json({ error: 'Grupo inválido' }, { status: 400 });
+      if (!playGroup) return NextResponse.json({ error: 'Grupo inválido' }, { status: 400 });
     }
 
     await getForgeDb().forgeSharedGameRoom.updateMany({
@@ -116,7 +118,16 @@ export async function POST(req: NextRequest) {
       take: 24,
     });
     let state: Record<string, unknown>;
-    if (enrollments.length >= 2) {
+    const memberIds = enrollments.map((e) => e.userId);
+    if (playGroup?.mode === 'live_team' && memberIds.length >= 1) {
+      const { createTeamPlayInitialState } = await import('@/lib/forge/expedicion-board-multi');
+      state = createTeamPlayInitialState(
+        playGroup.name,
+        playGroup.id,
+        memberIds,
+        spec
+      ) as unknown as Record<string, unknown>;
+    } else if (enrollments.length >= 2) {
       const { createMultiplayerInitialState, rosterFromEnrollments } = await import(
         '@/lib/forge/expedicion-board-multi'
       );

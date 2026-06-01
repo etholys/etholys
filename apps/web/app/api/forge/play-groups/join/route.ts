@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getForgeDb } from '@/lib/forge/db';
 import { ensureLearnerJourney } from '@/lib/forge/learner-journey';
-import { forgeCourseEntryPath } from '@/lib/forge/course-entry-path';
 import { generateMagicLoginToken, magicLoginExpiresAt } from '@/lib/forge/invite-auth';
 
 /** Unirse a un grupo/empresa con el enlace compartido (varios jugadores, un tablero). */
@@ -71,8 +70,8 @@ export async function POST(req: NextRequest) {
 
   await ensureLearnerJourney(group.courseId, user.id);
 
-  const sala = forgeCourseEntryPath(group.courseId, group.course.deliveryMode);
   const qs = new URLSearchParams({ group: group.id });
+  const sala = `/hub/forge/cursos/${group.courseId}/sala`;
   if (group.liveSessionId) qs.set('session', group.liveSessionId);
 
   return NextResponse.json({

@@ -20,6 +20,9 @@ export type BoardGuide = {
 
 export type MultiBoardState = {
   multiplayer: true;
+  /** Empresa inteira = um peão; todos do grupo podem jogar juntos. */
+  teamPlay?: boolean;
+  teamMemberIds?: string[];
   players: BoardPlayer[];
   currentPlayerIndex: number;
   turn: number;
@@ -55,6 +58,37 @@ export function rosterFromEnrollments(
     impactPoints: 0,
     insights: [],
   }));
+}
+
+/** Um único peão com o nome da empresa; vários userIds jogam em conjunto. */
+export function createTeamPlayInitialState(
+  teamName: string,
+  playGroupId: string,
+  memberUserIds: string[],
+  spec: GameSpecV1
+): MultiBoardState {
+  const roster: BoardPlayer[] = [
+    {
+      userId: `team:${playGroupId}`,
+      name: teamName,
+      color: PLAYER_PAWN_COLORS[0],
+      position: spec.board?.startSpace ?? 0,
+      ecoCredits: 500,
+      impactPoints: 0,
+      insights: [],
+    },
+  ];
+  const base = createMultiplayerInitialState(roster, spec);
+  return {
+    ...base,
+    teamPlay: true,
+    teamMemberIds: memberUserIds,
+    guide: {
+      message: `Equipa «${teamName}»: um peão para todos. Decidam juntos e movam o tabuleiro.`,
+      type: 'system',
+      at: Date.now(),
+    },
+  };
 }
 
 export function createMultiplayerInitialState(
@@ -114,6 +148,9 @@ export function canPlayerAct(
 ): boolean {
   if (s.finished) return false;
   if (isFacilitator && useOverride) return true;
+  if (s.teamPlay && Array.isArray(s.teamMemberIds)) {
+    return s.teamMemberIds.includes(userId);
+  }
   const cur = currentPlayer(s);
   return cur?.userId === userId;
 }
@@ -170,6 +207,8 @@ export function parseMulti(raw: Record<string, unknown>): MultiBoardState | null
     guide: (raw.guide as BoardGuide | null) ?? null,
     knowledgeCard: (raw.knowledgeCard as MultiBoardState['knowledgeCard']) ?? null,
     facilitatorOverride: Boolean(raw.facilitatorOverride),
+    teamPlay: Boolean(raw.teamPlay),
+    teamMemberIds: Array.isArray(raw.teamMemberIds) ? (raw.teamMemberIds as string[]) : undefined,
     position: typeof raw.position === 'number' ? raw.position : players[0]?.position,
     ecoCredits: typeof raw.ecoCredits === 'number' ? raw.ecoCredits : players[0]?.ecoCredits,
     impactPoints: typeof raw.impactPoints === 'number' ? raw.impactPoints : 0,
