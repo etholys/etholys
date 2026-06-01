@@ -28,3 +28,6 @@ test_write.txt
 .env
 .env
 infra/.env
+
+# Config local do deploy Windows (SSH, etc.)
+scripts/deploy-forge.config.ps1
