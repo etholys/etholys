@@ -8,6 +8,7 @@ import {
   canFacilitateSharedGame,
   serializeSharedGameRoom,
 } from '@/lib/forge/shared-game-room';
+import { canPlayerAct, parseMulti } from '@/lib/forge/expedicion-board-multi';
 import { loadSharedGameRoomForForgeAccess, requireForgeTenant } from '@/lib/forge/tenant';
 
 type Ctx = { params: Promise<{ roomId: string }> };
@@ -63,8 +64,24 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       return NextResponse.json({ error: 'action.type obrigatório' }, { status: 400 });
     }
 
-    if (room.facilitatorUserId !== tenant.userId) {
-      if (!canFacilitateSharedGame(tenant, room.activity.module.course.companyId, room.facilitatorUserId)) {
+    const prev = (room.state ?? {}) as Record<string, unknown>;
+    const multi = parseMulti(prev);
+    const isFac = canFacilitateSharedGame(
+      tenant,
+      room.activity.module.course.companyId,
+      room.facilitatorUserId
+    );
+    const override = body.action.payload?.facilitatorOverride === true;
+
+    if (multi) {
+      if (!canPlayerAct(multi, tenant.userId, isFac, override)) {
+        return NextResponse.json(
+          { error: 'No es tu turno. Espera o pide al facilitador modo emergencia.' },
+          { status: 403 }
+        );
+      }
+    } else if (room.facilitatorUserId !== tenant.userId) {
+      if (!isFac) {
         return NextResponse.json(
           { error: 'Solo el facilitador mueve el tablero en vivo' },
           { status: 403 }
@@ -82,7 +99,6 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       );
     }
 
-    const prev = (room.state ?? {}) as Record<string, unknown>;
     const { state, events, done } = applySharedGameAction(
       room.activity.gameSpec.definition,
       prev,

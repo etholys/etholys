@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameSpecV1 } from '@/lib/forge/schemas/game-spec-v1';
-import { Coins, MapPin, Radio, Sparkles, Target, Users } from 'lucide-react';
+import { Coins, MapPin, Sparkles, Target } from 'lucide-react';
 import { ForgeBoardTrack } from '@/components/forge/ForgeBoardTrack';
+import { ForgeVirtualDice } from '@/components/forge/ForgeVirtualDice';
+import { ForgeInfoTip } from '@/components/forge/ForgeInfoTip';
+import { parseMulti, currentPlayer, type BoardGuide } from '@/lib/forge/expedicion-board-multi';
+import { useForgeT } from '@/lib/forge/use-forge-t';
 
 type SessionState = {
   position?: number;
@@ -16,7 +20,7 @@ type SessionState = {
   currentCard?: { id: string; prompt: string; reflection?: string; type?: string } | null;
 };
 
-export type ForgeGameSyncMode = 'solo' | 'host' | 'viewer';
+export type ForgeGameSyncMode = 'solo' | 'host' | 'viewer' | 'player' | 'facilitator';
 
 export function ForgeGameBoard({
   sessionId,
@@ -25,6 +29,10 @@ export function ForgeGameBoard({
   spec,
   initialState,
   roomVersion = 0,
+  myUserId,
+  isFacilitator = false,
+  facilitatorEmergency = false,
+  onGuideChange,
   onComplete,
   onRoomState,
 }: {
@@ -34,28 +42,42 @@ export function ForgeGameBoard({
   spec: GameSpecV1;
   initialState: SessionState;
   roomVersion?: number;
+  myUserId?: string;
+  isFacilitator?: boolean;
+  facilitatorEmergency?: boolean;
+  onGuideChange?: (guide: BoardGuide | null, knowledge: { title: string; body: string } | null) => void;
   onComplete?: () => void;
   onRoomState?: (state: SessionState, finished: boolean) => void;
 }) {
+  const ft = useForgeT();
   const [state, setState] = useState<SessionState>(initialState);
   const [events, setEvents] = useState<string[]>([]);
   const [answer, setAnswer] = useState('');
   const [loading, setLoading] = useState(false);
+  const [diceRolling, setDiceRolling] = useState(false);
+  const [pendingRoll, setPendingRoll] = useState<number | undefined>();
   const versionRef = useRef(roomVersion);
 
-  const readOnly = syncMode === 'viewer';
-  const isLive = syncMode === 'host' || syncMode === 'viewer';
-
+  const multi = parseMulti(initialState as Record<string, unknown>);
+  const readOnly =
+    syncMode === 'viewer' || (syncMode === 'facilitator' && !facilitatorEmergency);
+  const canAct =
+    syncMode === 'solo' ||
+    syncMode === 'host' ||
+    syncMode === 'player' ||
+    (syncMode === 'facilitator' && facilitatorEmergency);
   useEffect(() => {
     setState(initialState);
-  }, [initialState, roomVersion]);
+    const m = parseMulti(initialState as Record<string, unknown>);
+    if (m?.guide) onGuideChange?.(m.guide, m.knowledgeCard ?? null);
+  }, [initialState, roomVersion, onGuideChange]);
 
   useEffect(() => {
     versionRef.current = roomVersion;
   }, [roomVersion]);
 
   const pollRoom = useCallback(async () => {
-    if (!roomId || syncMode !== 'viewer') return;
+    if (!roomId || syncMode === 'solo' || syncMode === 'host') return;
     const res = await fetch(`/api/forge/shared-game-rooms/${roomId}`);
     const data = await res.json();
     if (!res.ok || !data.room) return;
@@ -73,21 +95,28 @@ export function ForgeGameBoard({
   }, [roomId, syncMode, onComplete, onRoomState]);
 
   useEffect(() => {
-    if (syncMode !== 'viewer' || !roomId) return;
+    if (!roomId || syncMode === 'solo' || syncMode === 'host') return;
     pollRoom();
     const t = setInterval(pollRoom, 2000);
     return () => clearInterval(t);
   }, [syncMode, roomId, pollRoom]);
 
   async function sendAction(action: { type: string; payload?: Record<string, unknown> }) {
-    if (readOnly) return;
+    if (!canAct) return;
     setLoading(true);
+    const payload = {
+      ...action.payload,
+      ...(facilitatorEmergency && isFacilitator ? { facilitatorOverride: true } : {}),
+    };
     try {
-      if (syncMode === 'host' && roomId) {
+      if ((syncMode === 'host' || syncMode === 'player' || syncMode === 'facilitator') && roomId) {
         const res = await fetch(`/api/forge/shared-game-rooms/${roomId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, expectedVersion: versionRef.current }),
+          body: JSON.stringify({
+            action: { ...action, payload },
+            expectedVersion: versionRef.current,
+          }),
         });
         const data = await res.json();
         if (res.status === 409 && data.room) {
@@ -100,8 +129,13 @@ export function ForgeGameBoard({
         const next = (data.room?.state ?? {}) as SessionState;
         setState(next);
         versionRef.current = data.room?.version ?? versionRef.current;
+        const m = parseMulti(next as Record<string, unknown>);
+        if (m?.guide) onGuideChange?.(m.guide, m.knowledgeCard ?? null);
         const msgs = (data.events ?? []).map((e: { message?: string }) => e.message).filter(Boolean);
         if (msgs.length) setEvents((prev) => [...msgs, ...prev].slice(0, 12));
+        if (action.type === 'roll_dice' && m?.lastRoll) {
+          setPendingRoll(m.lastRoll);
+        }
         if (data.done || data.room?.status === 'closed') {
           onRoomState?.(next, true);
           onComplete?.();
@@ -131,46 +165,48 @@ export function ForgeGameBoard({
   const minInsights = spec.rules?.minInsights ?? 8;
   const pos = state.position ?? 0;
   const insights = state.insights ?? [];
+  const players = multi?.players ?? [];
+  const turnPlayer = multi ? currentPlayer(multi) : null;
+  const isMyTurn = Boolean(
+    myUserId && turnPlayer && turnPlayer.userId === myUserId && syncMode === 'player'
+  );
+  const displayEco = turnPlayer?.ecoCredits ?? state.ecoCredits ?? 500;
+
+  async function rollWithAnimation() {
+    setDiceRolling(true);
+    setPendingRoll(undefined);
+    await sendAction({ type: 'roll_dice' });
+    setDiceRolling(false);
+  }
 
   return (
     <div className="space-y-5">
-      {isLive && (
-        <div
-          className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
-            syncMode === 'host'
-              ? 'border-violet-300 bg-violet-50'
-              : 'border-sky-300 bg-sky-50'
-          }`}
-        >
-          {syncMode === 'host' ? (
-            <>
-              <Radio className="h-5 w-5 text-violet-600 animate-pulse" />
-              <div>
-                <p className="text-sm font-bold text-violet-900">Tú controlas el tablero en vivo</p>
-                <p className="text-xs text-violet-700">
-                  Los alumnos ven los mismos movimientos en tiempo real (actualización cada 2 s).
-                </p>
-              </div>
-            </>
-          ) : (
-            <>
-              <Users className="h-5 w-5 text-sky-600" />
-              <div>
-                <p className="text-sm font-bold text-sky-900">Modo espectador — tablero sincronizado</p>
-                <p className="text-xs text-sky-700">
-                  El facilitador mueve el juego. Sigue la videollamada y observa el tablero aquí.
-                </p>
-              </div>
-            </>
+      {multi && turnPlayer && (
+        <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 px-3 py-2 flex flex-wrap items-center gap-2">
+          <p className="text-sm font-bold text-emerald-100">
+            {isMyTurn ? ft('forge.room.yourTurn') : ft('forge.room.turnOf', { name: turnPlayer.name })}
+          </p>
+          {myUserId && (
+            <div className="flex gap-1 ml-auto">
+              {players.map((p) => (
+                <span
+                  key={p.userId}
+                  title={`${p.name} · casilla ${p.position}`}
+                  className={`h-3 w-3 rounded-full border-2 ${
+                    p.userId === turnPlayer.userId ? 'border-white scale-125' : 'border-transparent opacity-70'
+                  }`}
+                  style={{ backgroundColor: p.color }}
+                />
+              ))}
+            </div>
           )}
         </div>
       )}
-
       <div className="grid gap-3 sm:grid-cols-4">
         <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-center">
           <Coins className="mx-auto h-5 w-5 text-amber-700" />
           <p className="text-[10px] font-bold uppercase text-amber-800 mt-1">Eco-Créditos</p>
-          <p className="text-2xl font-black text-amber-900">{state.ecoCredits ?? 500}</p>
+          <p className="text-2xl font-black text-amber-900">{displayEco}</p>
         </div>
         <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-center">
           <Sparkles className="mx-auto h-5 w-5 text-emerald-700" />
@@ -193,19 +229,20 @@ export function ForgeGameBoard({
         </div>
       </div>
 
-      <ForgeBoardTrack spaces={spaces} position={pos} />
+      <ForgeBoardTrack spaces={spaces} position={pos} players={players} />
 
       {state.currentCard && (
         <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase text-amber-800">
+          <p className="text-xs font-bold uppercase text-amber-800 flex items-center gap-1">
             Carta actual {state.currentCard.id ? `· ${state.currentCard.id}` : ''}
             {state.currentCard.type ? ` · ${state.currentCard.type}` : ''}
+            <ForgeInfoTip text={state.currentCard.reflection || state.currentCard.prompt} />
           </p>
           <p className="mt-2 text-base font-semibold text-slate-900">{state.currentCard.prompt}</p>
           {state.currentCard.reflection && (
             <p className="mt-2 text-sm text-amber-900/80">💡 {state.currentCard.reflection}</p>
           )}
-          {!readOnly && (
+          {canAct && (
             <>
               <textarea
                 value={answer}
@@ -238,32 +275,47 @@ export function ForgeGameBoard({
               </div>
             </>
           )}
-          {readOnly && (
+          {!canAct && (
             <p className="mt-3 text-sm text-amber-800 italic">
-              El facilitador valida las fichas en la sesión en vivo.
+              {syncMode === 'facilitator'
+                ? ft('forge.room.facilitatorWatch')
+                : ft('forge.room.waitYourTurn')}
             </p>
           )}
         </div>
       )}
 
-      {!state.currentCard && !state.finished && !readOnly && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => sendAction({ type: 'roll_dice' })}
-            className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
-          >
-            🎲 Lanzar dado y avanzar
-          </button>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => sendAction({ type: 'draw_card' })}
-            className="rounded-lg border-2 border-amber-400 bg-amber-100 px-5 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-200 disabled:opacity-50"
-          >
-            🃏 Robar carta de estación
-          </button>
+      {!state.currentCard && !state.finished && canAct && (
+        <div className="flex flex-wrap items-center gap-3">
+          <ForgeVirtualDice rolling={diceRolling} value={pendingRoll ?? state.lastRoll} />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={loading || diceRolling}
+              onClick={() => void rollWithAnimation()}
+              className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
+            >
+              {ft('forge.room.rollDice')}
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => sendAction({ type: 'draw_card' })}
+              className="rounded-lg border-2 border-amber-400 bg-amber-100 px-5 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-200 disabled:opacity-50"
+            >
+              {ft('forge.room.drawCard')}
+            </button>
+            {multi && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => sendAction({ type: 'end_turn' })}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+              >
+                {ft('forge.room.endTurn')}
+              </button>
+            )}
+          </div>
         </div>
       )}
 

@@ -104,10 +104,23 @@ export function isJitsiEmbeddable(url: string): boolean {
   }
 }
 
-export function jitsiEmbedUrl(meetingUrl: string): string {
+export function jitsiEmbedUrl(
+  meetingUrl: string,
+  opts?: { tileView?: boolean; filmstripOnly?: boolean }
+): string {
   const u = new URL(meetingUrl);
   u.searchParams.set('embed', 'true');
   u.searchParams.set('lang', 'es');
+  const config: string[] = [
+    'enableScreensharing=true',
+    'desktopSharingFrameRate.min=5',
+    'desktopSharingFrameRate.max=30',
+    'startWithAudioMuted=false',
+    'startWithVideoMuted=false',
+  ];
+  if (opts?.tileView) config.push('tileViewEnabled=true');
+  if (opts?.filmstripOnly) config.push('filmStripOnly=true');
+  u.hash = `config.${config.join('&config.')}`;
   return u.toString();
 }
 

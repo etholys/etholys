@@ -1765,9 +1765,31 @@ model ForgeCourse {
   certificates    ForgeCertificate[]
   liveSessions   ForgeLiveSession[]
   sharedGameRooms ForgeSharedGameRoom[]
+  playGroups     ForgePlayGroup[]
 
   @@index([companyId, status])
   @@index([programId])
+}
+
+/// Turma / empresa / instancia de coaching (varios jogadores, um link de convite)
+model ForgePlayGroup {
+  id              String                @id @default(cuid())
+  courseId        String
+  liveSessionId   String?
+  name            String
+  /** live_team = jogo colectivo; individual_coaching = pos-jogo 1:1 */
+  mode            String                @default("live_team")
+  inviteToken     String?               @unique
+  inviteExpiresAt DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  course          ForgeCourse           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  liveSession     ForgeLiveSession?     @relation(fields: [liveSessionId], references: [id], onDelete: SetNull)
+  enrollments     ForgeEnrollment[]
+  sharedGameRooms ForgeSharedGameRoom[]
+
+  @@index([courseId])
+  @@index([liveSessionId])
 }
 
 /// Sessão agendada ao vivo (calendário do curso)
@@ -1790,6 +1812,7 @@ model ForgeLiveSession {
   focusActivity      ForgeLearningActivity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
   sharedGameRooms    ForgeSharedGameRoom[]
   attendances        ForgeLiveAttendance[]
+  playGroups         ForgePlayGroup[]
 
   @@index([courseId, startsAt])
   @@index([activityId])
@@ -1862,6 +1885,7 @@ model ForgeSharedGameRoom {
   activityId        String
   courseId          String
   liveSessionId     String?
+  playGroupId       String?
   facilitatorUserId String
   state             Json                   @default("{}")
   lastEvents        Json?
@@ -1872,10 +1896,12 @@ model ForgeSharedGameRoom {
   activity          ForgeLearningActivity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
   course            ForgeCourse            @relation(fields: [courseId], references: [id], onDelete: Cascade)
   liveSession       ForgeLiveSession?      @relation(fields: [liveSessionId], references: [id], onDelete: SetNull)
+  playGroup         ForgePlayGroup?        @relation(fields: [playGroupId], references: [id], onDelete: SetNull)
   facilitator       User                   @relation("ForgeSharedGameFacilitator", fields: [facilitatorUserId], references: [id], onDelete: Cascade)
 
   @@index([activityId, status])
   @@index([courseId, status])
+  @@index([playGroupId, status])
 }
 
 model ForgeGameSpec {
@@ -1927,13 +1953,16 @@ model ForgeEnrollment {
   magicLoginToken       String?   @unique
   magicLoginExpiresAt   DateTime?
   passwordSetAt         DateTime?
+  playGroupId           String?
   course    ForgeCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  playGroup ForgePlayGroup? @relation(fields: [playGroupId], references: [id], onDelete: SetNull)
 
   @@unique([courseId, userId])
   @@index([userId])
   @@index([inviteToken])
   @@index([magicLoginToken])
+  @@index([playGroupId])
 }
 
 model ForgeActivityProgress {

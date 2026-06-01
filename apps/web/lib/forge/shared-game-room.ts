@@ -8,6 +8,7 @@ export type SerializedSharedGameRoom = {
   activityId: string;
   courseId: string;
   liveSessionId: string | null;
+  playGroupId: string | null;
   facilitatorUserId: string;
   state: Record<string, unknown>;
   status: string;
@@ -23,6 +24,7 @@ export function serializeSharedGameRoom(row: ForgeSharedGameRoom): SerializedSha
     activityId: row.activityId,
     courseId: row.courseId,
     liveSessionId: row.liveSessionId,
+    playGroupId: row.playGroupId ?? null,
     facilitatorUserId: row.facilitatorUserId,
     state: (row.state ?? {}) as Record<string, unknown>,
     status: row.status,

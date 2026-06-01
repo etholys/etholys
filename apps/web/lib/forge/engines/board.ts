@@ -1,5 +1,13 @@
 import type { GameSpecV1 } from '@/lib/forge/schemas/game-spec-v1';
 import type { ForgeEngine, GameAction, GameEvent, GameState } from '@/lib/forge/engines/types';
+import {
+  advanceTurn,
+  currentPlayer,
+  landedGuide,
+  parseMulti,
+  syncLegacyFields,
+  type MultiBoardState,
+} from '@/lib/forge/expedicion-board-multi';
 
 type CurrentCard = { id: string; prompt: string; reflection?: string; xp?: number; type?: string };
 
@@ -37,6 +45,130 @@ function checkWin(s: BoardState, spec: GameSpecV1): BoardState {
   return s;
 }
 
+function applyMultiAction(
+  multi: MultiBoardState,
+  action: GameAction,
+  spec: GameSpecV1
+): { state: GameState; events: GameEvent[] } {
+  let s = { ...multi, players: multi.players.map((p) => ({ ...p })) };
+  const events: GameEvent[] = [];
+  const goal = spec.board?.goalSpace ?? (spec.board?.spaces ?? 24) - 1;
+  const maxTurns = spec.rules?.maxTurns ?? 30;
+  const spaces = spec.board?.spaces ?? 20;
+  const cur = currentPlayer(s);
+  if (!cur) {
+    return { state: s, events: [{ type: 'error', message: 'Sin jugadores en la partida.' }] };
+  }
+  const idx = s.currentPlayerIndex;
+
+  if (s.finished) {
+    return { state: s, events: [{ type: 'already_finished', message: 'Partida ya concluida.' }] };
+  }
+
+  if (action.type === 'end_turn') {
+    s = advanceTurn(s, spec);
+    events.push({ type: 'turn', message: s.guide?.message ?? 'Siguiente turno.' });
+    return { state: syncLegacyFields(s), events };
+  }
+
+  if (action.type === 'roll_dice') {
+    if (s.currentCard) {
+      return {
+        state: syncLegacyFields(s),
+        events: [{ type: 'error', message: 'Completa la carta antes de lanzar el dado.' }],
+      };
+    }
+    const sides = spec.rules?.diceSides ?? 6;
+    const roll = Math.floor(Math.random() * sides) + 1;
+    s.lastRoll = roll;
+    s.turn = s.turn || 1;
+    let next = cur.position + roll;
+    if (spec.board?.loops && next > goal) next = next % spaces;
+    else next = Math.min(goal, next);
+    s.players[idx] = { ...cur, position: next };
+    s.guide = landedGuide(s.players[idx], next);
+    events.push({
+      type: 'rolled',
+      message: `${cur.name} sacó ${roll} y avanzó a casilla ${next}.`,
+    });
+    if (s.turn >= maxTurns) {
+      s.finished = true;
+      events.push({ type: 'max_turns', message: 'Turnos agotados.' });
+    }
+    return { state: syncLegacyFields(s), events };
+  }
+
+  if (action.type === 'draw_card') {
+    const cards = spec.cards ?? [];
+    const card = cards[Math.floor(Math.random() * cards.length)];
+    s.currentCard = {
+      id: card.id,
+      prompt: card.prompt,
+      reflection: card.reflection,
+      type: card.type,
+      forUserId: cur.userId,
+    };
+    s.guide = {
+      message: `${cur.name}: lee la carta y resuélvela en tu mapa A2. Luego valida o pasa turno.`,
+      type: 'card',
+      playerName: cur.name,
+      at: Date.now(),
+    };
+    const p = s.players[idx];
+    if (card.type === 'penalty' || card.prompt.toLowerCase().includes('pag')) {
+      s.players[idx] = { ...p, ecoCredits: Math.max(0, p.ecoCredits - 100) };
+      events.push({ type: 'penalty', message: `${cur.name}: -100 Eco-Créditos. ${card.prompt}` });
+    } else if (card.type === 'bonus') {
+      s.players[idx] = { ...p, ecoCredits: p.ecoCredits + (card.xp ?? 50) };
+      events.push({ type: 'bonus', message: `${cur.name}: bono +${card.xp ?? 50} Eco.` });
+    } else {
+      events.push({ type: 'card', message: card.prompt });
+    }
+    return { state: syncLegacyFields(s), events };
+  }
+
+  if (action.type === 'complete_card' || action.type === 'record_insight') {
+    const text = typeof action.payload?.text === 'string' ? action.payload.text.trim() : '';
+    if (!text || text.length < 8) {
+      return {
+        state: syncLegacyFields(s),
+        events: [{ type: 'error', message: 'Escribe al menos 8 caracteres.' }],
+      };
+    }
+    const p = s.players[idx];
+    s.players[idx] = {
+      ...p,
+      insights: [...p.insights, text.slice(0, 2000)],
+      impactPoints: p.impactPoints + 1,
+      ecoCredits: p.ecoCredits + 100,
+    };
+    s.currentCard = null;
+    s.guide = {
+      message: `¡Ficha validada para ${cur.name}! +100 Eco. Puedes pasar turno.`,
+      type: 'decision',
+      playerName: cur.name,
+      at: Date.now(),
+    };
+    events.push({ type: 'validated', message: `${cur.name}: +100 Eco · +1 Impacto` });
+    s = advanceTurn(s, spec);
+    return { state: syncLegacyFields(s), events };
+  }
+
+  if (action.type === 'skip_card') {
+    const p = s.players[idx];
+    s.players[idx] = { ...p, ecoCredits: Math.max(0, p.ecoCredits - 50) };
+    s.currentCard = null;
+    events.push({ type: 'skip', message: `${cur.name}: carta pendiente (-50 Eco).` });
+    s = advanceTurn(s, spec);
+    return { state: syncLegacyFields(s), events };
+  }
+
+  return {
+    state: syncLegacyFields(s),
+    events: [{ type: 'error', message: `Acción desconocida: ${action.type}` }],
+  };
+}
+
 export const boardEngine: ForgeEngine = {
   engine: 'board',
 
@@ -68,6 +200,12 @@ export const boardEngine: ForgeEngine = {
   },
 
   applyAction(state: GameState, action: GameAction, spec: GameSpecV1): { state: GameState; events: GameEvent[] } {
+    const multiRaw = state as Record<string, unknown>;
+    const multi = parseMulti(multiRaw);
+    if (multi) {
+      return applyMultiAction(multi, action, spec);
+    }
+
     let s = asBoardState(state);
     const events: GameEvent[] = [];
     const goal = spec.board?.goalSpace ?? (spec.board?.spaces ?? 24) - 1;

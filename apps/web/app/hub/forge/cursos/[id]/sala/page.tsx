@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ForgeExpedicionRoom } from '@/components/forge/ForgeExpedicionRoom';
 import { useForgeT } from '@/lib/forge/use-forge-t';
@@ -19,7 +19,7 @@ type CoursePayload = {
   modules: { activities: { id: string; type: string }[] }[];
 };
 
-export default function ForgeSalaPage() {
+function ForgeSalaContent() {
   const ft = useForgeT();
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
@@ -83,5 +83,19 @@ export default function ForgeSalaPage() {
       presentationEmbedUrl={course.presentationEmbedUrl}
       gameActivityId={gameActivityId}
     />
+  );
+}
+
+export default function ForgeSalaPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950">
+          <div className="h-12 w-12 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-500" />
+        </div>
+      }
+    >
+      <ForgeSalaContent />
+    </Suspense>
   );
 }

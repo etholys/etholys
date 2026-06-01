@@ -17,13 +17,20 @@ export async function GET(req: NextRequest) {
     if (!tenant) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
     const activityId = req.nextUrl.searchParams.get('activityId')?.trim() ?? '';
+    const liveSessionId = req.nextUrl.searchParams.get('liveSessionId')?.trim() || undefined;
+    const playGroupId = req.nextUrl.searchParams.get('playGroupId')?.trim() || undefined;
     if (!activityId) return NextResponse.json({ error: 'activityId obrigatório' }, { status: 400 });
 
     const activity = await loadActivityForForgeAccess(activityId, tenant);
     if (!activity) return NextResponse.json({ error: 'Atividade não encontrada' }, { status: 404 });
 
     const room = await getForgeDb().forgeSharedGameRoom.findFirst({
-      where: { activityId, status: 'open' },
+      where: {
+        activityId,
+        status: 'open',
+        ...(liveSessionId ? { liveSessionId } : {}),
+        ...(playGroupId ? { playGroupId } : {}),
+      },
       orderBy: { updatedAt: 'desc' },
     });
 
@@ -50,7 +57,11 @@ export async function POST(req: NextRequest) {
     const tenant = await requireForgeTenant();
     if (!tenant) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
-    const body = (await req.json()) as { activityId?: string; liveSessionId?: string };
+    const body = (await req.json()) as {
+      activityId?: string;
+      liveSessionId?: string;
+      playGroupId?: string;
+    };
     const activityId = typeof body.activityId === 'string' ? body.activityId : '';
     if (!activityId) return NextResponse.json({ error: 'activityId obrigatório' }, { status: 400 });
 
@@ -66,27 +77,67 @@ export async function POST(req: NextRequest) {
 
     const liveSessionId =
       typeof body.liveSessionId === 'string' && body.liveSessionId ? body.liveSessionId : null;
+    const playGroupId =
+      typeof body.playGroupId === 'string' && body.playGroupId ? body.playGroupId : null;
     if (liveSessionId) {
       const ls = await getForgeDb().forgeLiveSession.findFirst({
         where: { id: liveSessionId, courseId: course.id },
       });
       if (!ls) return NextResponse.json({ error: 'Sesión en vivo inválida' }, { status: 400 });
     }
+    if (playGroupId) {
+      const pg = await getForgeDb().forgePlayGroup.findFirst({
+        where: { id: playGroupId, courseId: course.id },
+      });
+      if (!pg) return NextResponse.json({ error: 'Grupo inválido' }, { status: 400 });
+    }
 
     await getForgeDb().forgeSharedGameRoom.updateMany({
-      where: { activityId, status: 'open' },
+      where: {
+        activityId,
+        status: 'open',
+        ...(playGroupId ? { playGroupId } : {}),
+        ...(liveSessionId ? { liveSessionId } : {}),
+      },
       data: { status: 'closed' },
     });
 
     const spec = validateAndPrepareSpec(parseGameSpecV1(activity.gameSpec.definition));
     const engine = getForgeEngine(spec.engine);
-    const state = engine.createInitialState(spec);
+
+    const rosterWhere = {
+      courseId: course.id,
+      status: 'active' as const,
+      ...(playGroupId ? { playGroupId } : {}),
+    };
+    const enrollments = await getForgeDb().forgeEnrollment.findMany({
+      where: rosterWhere,
+      include: { user: { select: { id: true, name: true, email: true } } },
+      take: 24,
+    });
+    let state: Record<string, unknown>;
+    if (enrollments.length >= 2) {
+      const { createMultiplayerInitialState, rosterFromEnrollments } = await import(
+        '@/lib/forge/expedicion-board-multi'
+      );
+      const roster = rosterFromEnrollments(
+        enrollments.map((e) => ({
+          userId: e.userId,
+          name: e.user.name,
+          email: e.user.email,
+        }))
+      );
+      state = createMultiplayerInitialState(roster, spec) as unknown as Record<string, unknown>;
+    } else {
+      state = engine.createInitialState(spec) as Record<string, unknown>;
+    }
 
     const room = await getForgeDb().forgeSharedGameRoom.create({
       data: {
         activityId,
         courseId: course.id,
         liveSessionId,
+        playGroupId,
         facilitatorUserId: tenant.userId,
         state: state as Prisma.InputJsonValue,
         status: 'open',

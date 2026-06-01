@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { X, Users, HelpCircle } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { X, Users, HelpCircle, ShieldAlert } from 'lucide-react';
 import { ForgeGameBoard, type ForgeGameSyncMode } from '@/components/forge/ForgeGameBoard';
 import { ForgePresentationViewer } from '@/components/forge/ForgePresentationViewer';
 import { ForgePersonalMapStrip } from '@/components/forge/ForgePersonalMapStrip';
@@ -20,6 +22,10 @@ import type { GameSpecV1 } from '@/lib/forge/schemas/game-spec-v1';
 import type { JourneyMapState } from '@/lib/forge/learner-journey-types';
 import { useForgeT } from '@/lib/forge/use-forge-t';
 import { cn } from '@/lib/utils';
+import { ForgeFloatingJitsi } from '@/components/forge/ForgeFloatingJitsi';
+import { ForgeFacilitatorScriptPanel } from '@/components/forge/ForgeFacilitatorScriptPanel';
+import { ForgeGameCoach } from '@/components/forge/ForgeGameCoach';
+import { parseMulti, currentPlayer, type BoardGuide } from '@/lib/forge/expedicion-board-multi';
 
 /** Diapositiva PPT → índice do módulo (quiz da cápsula). */
 const SLIDE_TO_MODULE: Record<number, number> = {
@@ -69,7 +75,14 @@ export function ForgeExpedicionRoom({
   gameActivityId,
 }: Props) {
   const ft = useForgeT();
+  const { data: session } = useSession();
+  const searchParams = useSearchParams();
+  const liveSessionId = searchParams.get('session')?.trim() || null;
+  const playGroupId = searchParams.get('group')?.trim() || null;
   const isFac = role === 'facilitator';
+  const myUserId = session?.user?.id;
+  const [facEmergency, setFacEmergency] = useState(false);
+  const [coachGuide, setCoachGuide] = useState<BoardGuide | null>(null);
   const [learners, setLearners] = useState<LearnerRow[]>([]);
   const [modules, setModules] = useState<ModuleRow[]>([]);
   const [myMap, setMyMap] = useState<JourneyMapState | null>(null);
@@ -91,8 +104,15 @@ export function ForgeExpedicionRoom({
   );
   const jitsiSrc =
     jitsiUrl && isJitsiEmbeddable(jitsiUrl) && canEmbedJitsiInIframe(jitsiUrl)
-      ? jitsiEmbedUrl(jitsiUrl)
+      ? jitsiEmbedUrl(jitsiUrl, { tileView: true })
       : null;
+
+  const roomQuery = useMemo(() => {
+    const p = new URLSearchParams({ activityId: gameActivityId ?? '' });
+    if (liveSessionId) p.set('liveSessionId', liveSessionId);
+    if (playGroupId) p.set('playGroupId', playGroupId);
+    return p.toString();
+  }, [gameActivityId, liveSessionId, playGroupId]);
 
   const currentSlide = presentationSlides[slideIdx];
   const capsuleModuleIdx = currentSlide ? SLIDE_TO_MODULE[currentSlide.n] : undefined;
@@ -110,21 +130,35 @@ export function ForgeExpedicionRoom({
     return (gs.gameSpec?.definition as GameSpecV1) ?? null;
   }, [gameActivityId]);
 
+  const setBoardSyncFromState = useCallback(
+    (rawState: Record<string, unknown>, isHost: boolean) => {
+      const multi = parseMulti(rawState);
+      const cur = multi ? currentPlayer(multi) : null;
+      if (isFac) {
+        setSyncMode(facEmergency ? 'host' : 'facilitator');
+      } else if (multi && cur && myUserId && cur.userId === myUserId) {
+        setSyncMode('player');
+      } else {
+        setSyncMode('viewer');
+      }
+      if (multi?.guide) setCoachGuide(multi.guide);
+    },
+    [isFac, myUserId, facEmergency]
+  );
+
   const loadBoard = useCallback(async () => {
     if (!gameActivityId) return;
     const spec = await loadSpec();
-    const res = await fetch(
-      `/api/forge/shared-game-rooms?activityId=${encodeURIComponent(gameActivityId)}`
-    );
+    const res = await fetch(`/api/forge/shared-game-rooms?${roomQuery}`);
     const d = await res.json();
     if (d.room && spec) {
       setSharedRoomId(d.room.id);
       setRoomVersion(d.room.version);
       setGameSpec(spec);
       setGameState(d.room.state);
-      setSyncMode(isFac ? (d.isHost ? 'host' : 'viewer') : 'viewer');
+      setBoardSyncFromState(d.room.state, d.isHost);
     }
-  }, [gameActivityId, loadSpec, isFac]);
+  }, [gameActivityId, loadSpec, roomQuery, setBoardSyncFromState]);
 
   const startBoard = useCallback(async () => {
     if (!gameActivityId || !isFac) return;
@@ -134,7 +168,11 @@ export function ForgeExpedicionRoom({
       const res = await fetch('/api/forge/shared-game-rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ activityId: gameActivityId }),
+        body: JSON.stringify({
+          activityId: gameActivityId,
+          liveSessionId,
+          playGroupId,
+        }),
       });
       const d = await res.json();
       if (!res.ok) {
@@ -145,11 +183,11 @@ export function ForgeExpedicionRoom({
       setRoomVersion(d.room.version);
       setGameSpec((d.spec as GameSpecV1) ?? spec);
       setGameState(d.room.state);
-      setSyncMode('host');
+      setBoardSyncFromState(d.room.state, true);
     } finally {
       setBoardBusy(false);
     }
-  }, [gameActivityId, isFac, loadSpec, ft]);
+  }, [gameActivityId, isFac, loadSpec, ft, liveSessionId, playGroupId, setBoardSyncFromState]);
 
   useEffect(() => {
     fetch(`/api/forge/courses/${courseId}`)
@@ -173,31 +211,40 @@ export function ForgeExpedicionRoom({
     if (!gameActivityId || booted.current) return;
     booted.current = true;
     (async () => {
-      const res = await fetch(
-        `/api/forge/shared-game-rooms?activityId=${encodeURIComponent(gameActivityId)}`
-      );
+      const res = await fetch(`/api/forge/shared-game-rooms?${roomQuery}`);
       const d = await res.json();
       if (d.room) await loadBoard();
       else if (isFac) await startBoard();
       else setSyncMode('viewer');
     })();
-  }, [gameActivityId, isFac, loadBoard, startBoard]);
+  }, [gameActivityId, isFac, loadBoard, startBoard, roomQuery]);
 
   useEffect(() => {
-    if (!sharedRoomId || isFac) return;
+    if (!sharedRoomId) return;
     const poll = async () => {
       const res = await fetch(`/api/forge/shared-game-rooms/${sharedRoomId}`);
       const d = await res.json();
       if (res.ok && d.room) {
         setGameState(d.room.state);
         setRoomVersion(d.room.version);
-        setSyncMode('viewer');
+        setBoardSyncFromState(d.room.state, isFac);
       }
     };
     poll();
     const t = setInterval(poll, 2000);
     return () => clearInterval(t);
-  }, [sharedRoomId, isFac]);
+  }, [sharedRoomId, isFac, setBoardSyncFromState]);
+
+  useEffect(() => {
+    if (!gameState) return;
+    const g = parseMulti(gameState)?.guide;
+    if (g) setCoachGuide(g);
+  }, [gameState]);
+
+  const knowledgeCard =
+    isFac && currentSlide?.tecnico
+      ? { title: currentSlide.title, body: currentSlide.tecnico }
+      : null;
 
   const card = (gameState as { currentCard?: { prompt?: string; reflection?: string; id?: string } })
     ?.currentCard;
@@ -225,6 +272,25 @@ export function ForgeExpedicionRoom({
         )}
         {isFac && (
           <>
+            <Link
+              href={`/hub/forge/cursos/${courseId}/turmas`}
+              className="rounded-lg border border-slate-700 px-2 py-1 text-[10px] font-bold hover:bg-slate-800"
+            >
+              {ft('forge.tutorLobby.short')}
+            </Link>
+            <button
+              type="button"
+              onClick={() => setFacEmergency((v) => !v)}
+              className={cn(
+                'rounded-lg border px-2 py-1 text-[10px] font-bold flex items-center gap-1',
+                facEmergency
+                  ? 'border-amber-400 bg-amber-900 text-amber-100'
+                  : 'border-slate-700 hover:bg-slate-800'
+              )}
+            >
+              <ShieldAlert className="h-3 w-3" />
+              {ft('forge.room.emergency')}
+            </button>
             <button
               type="button"
               onClick={() => setInviteOpen(true)}
@@ -243,36 +309,20 @@ export function ForgeExpedicionRoom({
         )}
       </header>
 
-      <div className="flex flex-1 min-h-0 flex-col lg:flex-row">
-        {/* Videollamada — sempre visível */}
-        <div className="flex flex-col lg:w-[58%] lg:shrink-0 border-b lg:border-b-0 lg:border-r border-slate-800 min-h-[40vh] lg:min-h-0">
-          <p className="px-3 py-1.5 text-[10px] font-bold uppercase text-sky-400 bg-sky-950/50">
-            {ft('forge.room.video')}
-          </p>
-          {jitsiSrc ? (
-            <iframe
-              title="Jitsi"
-              src={jitsiSrc}
-              className="flex-1 w-full min-h-[36vh] lg:min-h-0 bg-black"
-              allow="camera; microphone; fullscreen; display-capture"
-            />
-          ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6">
-              <a
-                href={jitsiUrl ?? '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold"
-              >
-                {ft('forge.live.join')}
-              </a>
-            </div>
-          )}
-        </div>
+      <ForgeFloatingJitsi embedSrc={jitsiSrc} fallbackUrl={jitsiUrl} />
+      {isFac && (
+        <ForgeFacilitatorScriptPanel
+          slide={currentSlide}
+          slideIndex={slideIdx}
+          total={presentationSlides.length}
+          onPrev={() => setSlideIdx((i) => Math.max(0, i - 1))}
+          onNext={() => setSlideIdx((i) => Math.min(presentationSlides.length - 1, i + 1))}
+        />
+      )}
+      <ForgeGameCoach guide={coachGuide} knowledge={knowledgeCard} />
 
-        {/* Jogo + guion — mesmo lugar */}
-        <div className="flex-1 overflow-y-auto min-h-0 bg-slate-900/80">
-          <div className="p-3 space-y-3 max-w-2xl lg:max-w-none mx-auto lg:mx-0">
+      <div className="flex-1 overflow-y-auto min-h-0 bg-slate-900/80">
+        <div className="p-3 space-y-3 max-w-4xl mx-auto">
             {presentationSlides.length > 0 && (
               <div className="rounded-xl border border-violet-500/30 overflow-hidden">
                 <ForgePresentationViewer
@@ -280,8 +330,9 @@ export function ForgeExpedicionRoom({
                   pdfUrl={presentationPdfUrl}
                   embedUrl={presentationEmbedUrl}
                   compact
+                  audienceMode={!isFac}
                   slideIndex={slideIdx}
-                  onSlideIndexChange={setSlideIdx}
+                  onSlideIndexChange={isFac ? setSlideIdx : undefined}
                 />
                 {capsuleQuiz && (
                   <div className="border-t border-violet-500/20 bg-violet-950/40 px-3 py-2 flex flex-wrap gap-2">
@@ -322,6 +373,10 @@ export function ForgeExpedicionRoom({
                   syncMode={syncMode}
                   roomId={sharedRoomId ?? undefined}
                   roomVersion={roomVersion}
+                  myUserId={myUserId}
+                  isFacilitator={isFac}
+                  facilitatorEmergency={facEmergency}
+                  onGuideChange={(g) => setCoachGuide(g)}
                   onRoomState={(s) => setGameState(s as Record<string, unknown>)}
                 />
               ) : (
@@ -365,7 +420,6 @@ export function ForgeExpedicionRoom({
                 </ul>
               </div>
             )}
-          </div>
         </div>
       </div>
 

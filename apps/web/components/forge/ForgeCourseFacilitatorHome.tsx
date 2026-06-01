@@ -62,11 +62,18 @@ export function ForgeCourseFacilitatorHome({
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <ActionCard
+          href={`/hub/forge/cursos/${courseId}/turmas`}
+          icon={Video}
+          title={ft('forge.tutorLobby.title')}
+          desc={ft('forge.tutorLobby.subtitle')}
+          color="sky"
+        />
+        <ActionCard
           href={`/hub/forge/cursos/${courseId}/sala`}
           icon={Video}
           title={ft('forge.facilitator.salon')}
           desc={ft('forge.facilitator.salonDesc')}
-          color="sky"
+          color="emerald"
         />
         <ActionCard
           href={`/hub/forge/cursos/${courseId}/alumnos`}
