@@ -197,15 +197,17 @@ try {
   Write-Host '[ERRO] Nao foi possivel ligar ao servidor ou o deploy falhou.' -ForegroundColor Red
   Write-Host $_.Exception.Message
   Write-Host ''
-  Write-Host 'Causas comuns:' -ForegroundColor Yellow
-  Write-Host '  - Servidor sobrecarregado (SSH timeout) -> consola web Hetzner'
-  Write-Host '  - Chave SSH nao configurada neste PC -> ssh root@178.105.80.131'
-  Write-Host '  - Firewall / rede bloqueia porta 22'
+  Write-Host 'SSH nao responde. Use a consola web Hetzner (nao depende do SSH do PC).' -ForegroundColor Yellow
   Write-Host ''
-  Write-Host 'Na consola Hetzner (https://console.hetzner.cloud), cole:' -ForegroundColor Yellow
-  Write-Host ('  ' + $remoteScript)
+  Write-Host '1) https://console.hetzner.cloud -> servidor -> Console' -ForegroundColor Yellow
+  Write-Host '2) Cole:' -ForegroundColor Yellow
+  Write-Host '     cd /opt/etholys && git fetch origin && git reset --hard origin/main'
+  Write-Host '     bash /opt/etholys/scripts/recuperar-servidor-ssh.sh'
+  Write-Host '3) Build completo (opcional):' -ForegroundColor Yellow
+  Write-Host ('     ' + $remoteScript)
   Write-Host ''
-  Write-Host 'Modo [2] Rapido: bash /opt/etholys/scripts/restore-forge-web.sh' -ForegroundColor DarkGray
+  Write-Host ('Guia: ' + (Join-Path $Root 'docs\FORGE-DEPLOY-SEM-SSH.md')) -ForegroundColor DarkGray
+  Write-Host 'Atalho: DEPLOY-FORGE-CONSOLE.bat' -ForegroundColor DarkGray
   exit 1
 }
 

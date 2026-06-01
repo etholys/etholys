@@ -10,9 +10,10 @@ A porta 22 pode estar **aberta**, mas o `sshd` no servidor nao responde a tempo 
 2. Servidor **178.105.80.131** → **Console** (terminal no browser)
 3. Login: `root`
 
-## Passo 2 — Recuperar e atualizar (copiar tudo)
+## Passo 2 — Atualizar codigo e recuperar
 
 ```bash
+cd /opt/etholys && git fetch origin && git reset --hard origin/main
 bash /opt/etholys/scripts/recuperar-servidor-ssh.sh
 ```
 
