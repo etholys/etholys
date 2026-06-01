@@ -8,6 +8,12 @@ import {
   syncLegacyFields,
   type MultiBoardState,
 } from '@/lib/forge/expedicion-board-multi';
+import {
+  clearCurrentCard,
+  pushBoardHistory,
+  restartBoardState,
+  undoBoardState,
+} from '@/lib/forge/board-history';
 
 type CurrentCard = { id: string; prompt: string; reflection?: string; xp?: number; type?: string };
 
@@ -45,12 +51,43 @@ function checkWin(s: BoardState, spec: GameSpecV1): BoardState {
   return s;
 }
 
+function applyFacilitatorAction(
+  raw: Record<string, unknown>,
+  action: GameAction,
+  spec: GameSpecV1
+): { state: GameState; events: GameEvent[] } | null {
+  if (action.type === 'undo_last') {
+    const { state, ok } = undoBoardState(raw);
+    if (!ok) return { state: raw, events: [{ type: 'error', message: 'No hay jugada para deshacer.' }] };
+    return { state, events: [{ type: 'undo', message: 'Última jugada deshecha.' }] };
+  }
+  if (action.type === 'restart_game') {
+    const fresh = restartBoardState(raw, spec);
+    return {
+      state: fresh,
+      events: [{ type: 'restart', message: 'Partida reiniciada. Mismos jugadores, tablero desde el inicio.' }],
+    };
+  }
+  if (action.type === 'clear_card') {
+    const next = clearCurrentCard(raw);
+    return { state: next, events: [{ type: 'clear_card', message: 'Carta actual retirada.' }] };
+  }
+  return null;
+}
+
 function applyMultiAction(
   multi: MultiBoardState,
   action: GameAction,
   spec: GameSpecV1
 ): { state: GameState; events: GameEvent[] } {
-  let s = { ...multi, players: multi.players.map((p) => ({ ...p })) };
+  const raw = syncLegacyFields({ ...multi, players: multi.players.map((p) => ({ ...p })) }) as Record<
+    string,
+    unknown
+  >;
+  const fac = applyFacilitatorAction(raw, action, spec);
+  if (fac) return fac;
+
+  let s = parseMulti(raw)!;
   const events: GameEvent[] = [];
   const goal = spec.board?.goalSpace ?? (spec.board?.spaces ?? 24) - 1;
   const maxTurns = spec.rules?.maxTurns ?? 30;
@@ -65,10 +102,13 @@ function applyMultiAction(
     return { state: s, events: [{ type: 'already_finished', message: 'Partida ya concluida.' }] };
   }
 
+  const withHistory = (next: MultiBoardState) =>
+    syncLegacyFields(pushBoardHistory(syncLegacyFields(next) as Record<string, unknown>) as MultiBoardState);
+
   if (action.type === 'end_turn') {
     s = advanceTurn(s, spec);
     events.push({ type: 'turn', message: s.guide?.message ?? 'Siguiente turno.' });
-    return { state: syncLegacyFields(s), events };
+    return { state: withHistory(s), events };
   }
 
   if (action.type === 'roll_dice') {
@@ -95,7 +135,7 @@ function applyMultiAction(
       s.finished = true;
       events.push({ type: 'max_turns', message: 'Turnos agotados.' });
     }
-    return { state: syncLegacyFields(s), events };
+    return { state: withHistory(s), events };
   }
 
   if (action.type === 'draw_card') {
@@ -124,7 +164,7 @@ function applyMultiAction(
     } else {
       events.push({ type: 'card', message: card.prompt });
     }
-    return { state: syncLegacyFields(s), events };
+    return { state: withHistory(s), events };
   }
 
   if (action.type === 'complete_card' || action.type === 'record_insight') {
@@ -151,7 +191,7 @@ function applyMultiAction(
     };
     events.push({ type: 'validated', message: `${cur.name}: +100 Eco · +1 Impacto` });
     s = advanceTurn(s, spec);
-    return { state: syncLegacyFields(s), events };
+    return { state: withHistory(s), events };
   }
 
   if (action.type === 'skip_card') {
@@ -160,7 +200,7 @@ function applyMultiAction(
     s.currentCard = null;
     events.push({ type: 'skip', message: `${cur.name}: carta pendiente (-50 Eco).` });
     s = advanceTurn(s, spec);
-    return { state: syncLegacyFields(s), events };
+    return { state: withHistory(s), events };
   }
 
   return {
@@ -206,6 +246,10 @@ export const boardEngine: ForgeEngine = {
       return applyMultiAction(multi, action, spec);
     }
 
+    const raw = state as Record<string, unknown>;
+    const fac = applyFacilitatorAction(raw, action, spec);
+    if (fac) return fac;
+
     let s = asBoardState(state);
     const events: GameEvent[] = [];
     const goal = spec.board?.goalSpace ?? (spec.board?.spaces ?? 24) - 1;
@@ -215,6 +259,8 @@ export const boardEngine: ForgeEngine = {
     if (s.finished) {
       return { state: s, events: [{ type: 'already_finished', message: 'Partida ya concluida.' }] };
     }
+
+    const save = (next: BoardState) => pushBoardHistory({ ...next }) as BoardState;
 
     if (action.type === 'roll_dice') {
       if (s.currentCard) {
@@ -238,7 +284,7 @@ export const boardEngine: ForgeEngine = {
         events.push({ type: 'max_turns', message: 'Turnos agotados.' });
       }
       s = checkWin(s, spec);
-      return { state: s, events };
+      return { state: save(s), events };
     }
 
     if (action.type === 'draw_card') {
@@ -261,7 +307,7 @@ export const boardEngine: ForgeEngine = {
       } else {
         events.push({ type: 'card', message: card.prompt, xp: card.xp });
       }
-      return { state: s, events };
+      return { state: save(s), events };
     }
 
     if (action.type === 'complete_card' || action.type === 'record_insight') {
@@ -283,14 +329,14 @@ export const boardEngine: ForgeEngine = {
       if (s.finished) {
         events.push({ type: 'win', message: '¡Expedición completada!' });
       }
-      return { state: s, events };
+      return { state: save(s), events };
     }
 
     if (action.type === 'skip_card') {
       s.ecoCredits = Math.max(0, s.ecoCredits - 50);
       s.currentCard = null;
       events.push({ type: 'skip', message: 'Carta corregida más tarde: -50 Eco-Créditos.' });
-      return { state: s, events };
+      return { state: save(s), events };
     }
 
     return { state: s, events: [{ type: 'error', message: `Acción desconocida: ${action.type}` }] };

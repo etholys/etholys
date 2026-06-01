@@ -72,8 +72,13 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       room.facilitatorUserId
     );
     const override = body.action.payload?.facilitatorOverride === true;
+    const facilitatorOnly = new Set(['undo_last', 'restart_game', 'clear_card']);
 
-    if (multi) {
+    if (facilitatorOnly.has(body.action.type)) {
+      if (!isFac) {
+        return NextResponse.json({ error: 'Solo el facilitador puede usar esta acción' }, { status: 403 });
+      }
+    } else if (multi) {
       if (!canPlayerAct(multi, tenant.userId, isFac, override)) {
         return NextResponse.json(
           { error: 'No es tu turno. Espera o pide al facilitador modo emergencia.' },
@@ -105,13 +110,14 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       body.action
     );
 
+    const reopen = body.action.type === 'restart_game';
     const updated = await getForgeDb().forgeSharedGameRoom.update({
       where: { id: roomId },
       data: {
         state: state as Prisma.InputJsonValue,
         lastEvents: events as Prisma.InputJsonValue,
         version: { increment: 1 },
-        status: done ? 'closed' : 'open',
+        status: reopen ? 'open' : done ? 'closed' : 'open',
       },
     });
 

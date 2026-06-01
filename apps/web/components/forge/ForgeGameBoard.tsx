@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameSpecV1 } from '@/lib/forge/schemas/game-spec-v1';
-import { Coins, MapPin, Sparkles, Target } from 'lucide-react';
+import { Coins, MapPin, RotateCcw, Sparkles, Target, Undo2, XCircle } from 'lucide-react';
+import { historyCount } from '@/lib/forge/board-history';
 import { ForgeBoardTrack } from '@/components/forge/ForgeBoardTrack';
 import { ForgeVirtualDice } from '@/components/forge/ForgeVirtualDice';
 import { ForgeInfoTip } from '@/components/forge/ForgeInfoTip';
@@ -102,14 +103,22 @@ export function ForgeGameBoard({
   }, [syncMode, roomId, pollRoom]);
 
   async function sendAction(action: { type: string; payload?: Record<string, unknown> }) {
-    if (!canAct) return;
+    const facOnly = new Set(['undo_last', 'restart_game', 'clear_card']);
+    const facAction = isFacilitator && facOnly.has(action.type);
+    if (!canAct && !facAction) return;
     setLoading(true);
     const payload = {
       ...action.payload,
       ...(facilitatorEmergency && isFacilitator ? { facilitatorOverride: true } : {}),
     };
     try {
-      if ((syncMode === 'host' || syncMode === 'player' || syncMode === 'facilitator') && roomId) {
+      if (
+        roomId &&
+        (syncMode === 'host' ||
+          syncMode === 'player' ||
+          syncMode === 'facilitator' ||
+          facAction)
+      ) {
         const res = await fetch(`/api/forge/shared-game-rooms/${roomId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -171,6 +180,7 @@ export function ForgeGameBoard({
     myUserId && turnPlayer && turnPlayer.userId === myUserId && syncMode === 'player'
   );
   const displayEco = turnPlayer?.ecoCredits ?? state.ecoCredits ?? 500;
+  const undoCount = historyCount(initialState as Record<string, unknown>);
 
   async function rollWithAnimation() {
     setDiceRolling(true);
@@ -181,6 +191,43 @@ export function ForgeGameBoard({
 
   return (
     <div className="space-y-5">
+      {isFacilitator && roomId && (
+        <div className="flex flex-wrap gap-2 rounded-xl border border-slate-600 bg-slate-800/80 p-2">
+          <button
+            type="button"
+            disabled={loading || undoCount === 0}
+            onClick={() => sendAction({ type: 'undo_last' })}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-500 px-3 py-1.5 text-xs font-bold text-slate-100 hover:bg-slate-700 disabled:opacity-40"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+            {ft('forge.room.undo')} ({undoCount})
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => {
+              if (window.confirm(ft('forge.room.restartConfirm'))) {
+                sendAction({ type: 'restart_game' });
+              }
+            }}
+            className="inline-flex items-center gap-1 rounded-lg border border-amber-500/50 bg-amber-950 px-3 py-1.5 text-xs font-bold text-amber-100 hover:bg-amber-900"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            {ft('forge.room.restart')}
+          </button>
+          {state.currentCard && (
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => sendAction({ type: 'clear_card' })}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-500 px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700"
+            >
+              <XCircle className="h-3.5 w-3.5" />
+              {ft('forge.room.clearCard')}
+            </button>
+          )}
+        </div>
+      )}
       {multi && turnPlayer && (
         <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 px-3 py-2 flex flex-wrap items-center gap-2">
           <p className="text-sm font-bold text-emerald-100">
