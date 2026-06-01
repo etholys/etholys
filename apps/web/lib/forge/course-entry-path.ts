@@ -7,7 +7,7 @@ export function forgeCourseEntryPath(
 ): string {
   const mode = parseDeliveryMode(deliveryMode);
   if (showsLiveFeatures(mode)) {
-    return `/hub/forge/cursos/${courseId}/sala`;
+    return `/hub/forge/cursos/${courseId}/turmas`;
   }
   return `/hub/forge/cursos/${courseId}`;
 }

@@ -16,7 +16,6 @@ import {
   type ForgeDeliveryMode,
   type ForgeLiveConfig,
 } from '@/lib/forge/delivery';
-import { forgeCourseEntryPath } from '@/lib/forge/course-entry-path';
 import { ForgeLivePanel } from '@/components/forge/ForgeLivePanel';
 import { ArrowLeft } from 'lucide-react';
 
@@ -98,15 +97,6 @@ export default function ForgeCursoDetailPage() {
   useEffect(() => {
     if (wantEdit) setEditMode(true);
   }, [wantEdit]);
-
-  useEffect(() => {
-    if (!id || !course || previewLearner || editMode || wantEdit) return;
-    const mode = (course.deliveryMode ?? 'async') as ForgeDeliveryMode;
-    if (!showsLiveFeatures(mode)) return;
-    if (course.canFacilitate || enrolled) {
-      router.replace(forgeCourseEntryPath(id, mode));
-    }
-  }, [id, course, enrolled, previewLearner, editMode, wantEdit, router]);
 
   useEffect(() => {
     if (!id || enrolled || !course) return;

@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ForgeExpedicionRoom } from '@/components/forge/ForgeExpedicionRoom';
 import { useForgeT } from '@/lib/forge/use-forge-t';
 import type { ExpedicionSlide } from '@/lib/forge/expedicion-presentacion-slides';
@@ -22,9 +22,12 @@ type CoursePayload = {
 function ForgeSalaContent() {
   const ft = useForgeT();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { id } = useParams<{ id: string }>();
   const [course, setCourse] = useState<CoursePayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const hasRoom =
+    Boolean(searchParams.get('session')?.trim()) || Boolean(searchParams.get('group')?.trim());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,6 +47,12 @@ function ForgeSalaContent() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!loading && !hasRoom && id) {
+      router.replace(`/hub/forge/cursos/${id}/turmas`);
+    }
+  }, [loading, hasRoom, id, router]);
+
   const gameActivityId = useMemo(() => {
     if (!course) return null;
     for (const mod of course.modules) {
@@ -53,7 +62,7 @@ function ForgeSalaContent() {
     return null;
   }, [course]);
 
-  if (loading) {
+  if (loading || !hasRoom) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950">
         <div className="h-12 w-12 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-500" />

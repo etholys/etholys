@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { X, Users, HelpCircle, ShieldAlert } from 'lucide-react';
+import { X, Users, HelpCircle, ShieldAlert, Presentation } from 'lucide-react';
 import { ForgeGameBoard, type ForgeGameSyncMode } from '@/components/forge/ForgeGameBoard';
 import { ForgePresentationViewer } from '@/components/forge/ForgePresentationViewer';
 import { ForgePersonalMapStrip } from '@/components/forge/ForgePersonalMapStrip';
@@ -23,9 +23,17 @@ import type { JourneyMapState } from '@/lib/forge/learner-journey-types';
 import { useForgeT } from '@/lib/forge/use-forge-t';
 import { cn } from '@/lib/utils';
 import { ForgeFloatingJitsi } from '@/components/forge/ForgeFloatingJitsi';
-import { ForgeFacilitatorScriptPanel } from '@/components/forge/ForgeFacilitatorScriptPanel';
 import { ForgeGameCoach } from '@/components/forge/ForgeGameCoach';
+import { ForgeGameManualButton, ForgeGameManualModal } from '@/components/forge/ForgeGameManual';
 import { parseMulti, currentPlayer, type BoardGuide } from '@/lib/forge/expedicion-board-multi';
+import { readPresentationSlideIndex } from '@/lib/forge/room-presentation';
+import {
+  cardsForStation,
+  stationSlugForSpace,
+  EXPEDICION_STATION_SLUGS,
+  type ExpedicionStationSlug,
+} from '@/lib/forge/expedicion-station-decks';
+import { ForgeInvestmentPanel } from '@/components/forge/ForgeInvestmentPanel';
 
 /** Diapositiva PPT → índice do módulo (quiz da cápsula). */
 const SLIDE_TO_MODULE: Record<number, number> = {
@@ -96,7 +104,13 @@ export function ForgeExpedicionRoom({
   const [quizOpen, setQuizOpen] = useState(false);
   const [showDeck, setShowDeck] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [groupMode, setGroupMode] = useState<'live_team' | 'individual_coaching'>('live_team');
+  const [investStation, setInvestStation] = useState<ExpedicionStationSlug | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [slidesOpen, setSlidesOpen] = useState(false);
   const booted = useRef(false);
+  const slideSyncRef = useRef(0);
+  const isCoaching = groupMode === 'individual_coaching';
 
   const jitsiUrl = useMemo(
     () => resolveMeetingUrl(liveConfig, courseId, 'learner', null, jitsiBaseUrl),
@@ -157,6 +171,9 @@ export function ForgeExpedicionRoom({
       setGameSpec(spec);
       setGameState(d.room.state);
       setBoardSyncFromState(d.room.state, d.isHost);
+      const idx = readPresentationSlideIndex(d.room.state as Record<string, unknown>);
+      slideSyncRef.current = idx;
+      setSlideIdx(idx);
     }
   }, [gameActivityId, loadSpec, roomQuery, setBoardSyncFromState]);
 
@@ -190,6 +207,43 @@ export function ForgeExpedicionRoom({
   }, [gameActivityId, isFac, loadSpec, ft, liveSessionId, playGroupId, setBoardSyncFromState]);
 
   useEffect(() => {
+    if (!playGroupId) {
+      setGroupMode('live_team');
+      return;
+    }
+    fetch(`/api/forge/play-groups/${playGroupId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.group?.mode === 'individual_coaching') setGroupMode('individual_coaching');
+        else setGroupMode('live_team');
+      })
+      .catch(() => setGroupMode('live_team'));
+  }, [playGroupId]);
+
+  const syncSlideToRoom = useCallback(
+    async (index: number) => {
+      if (!sharedRoomId || !isFac) return;
+      await fetch(`/api/forge/shared-game-rooms/${sharedRoomId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ presentationSlideIndex: index }),
+      });
+    },
+    [sharedRoomId, isFac]
+  );
+
+  const setSlideIdxSynced = useCallback(
+    (next: number | ((i: number) => number)) => {
+      setSlideIdx((prev) => {
+        const value = typeof next === 'function' ? next(prev) : next;
+        if (isFac && sharedRoomId) void syncSlideToRoom(value);
+        return value;
+      });
+    },
+    [isFac, sharedRoomId, syncSlideToRoom]
+  );
+
+  useEffect(() => {
     fetch(`/api/forge/courses/${courseId}`)
       .then((r) => r.json())
       .then((d) => setModules(d.course?.modules ?? []))
@@ -220,6 +274,24 @@ export function ForgeExpedicionRoom({
   }, [gameActivityId, isFac, loadBoard, startBoard, roomQuery]);
 
   useEffect(() => {
+    if (sharedRoomId || isFac || !gameActivityId) return;
+    const wait = setInterval(async () => {
+      const res = await fetch(`/api/forge/shared-game-rooms?${roomQuery}`);
+      const d = await res.json();
+      if (d.room?.id) {
+        setSharedRoomId(d.room.id);
+        setRoomVersion(d.room.version);
+        setGameState(d.room.state);
+        const idx = readPresentationSlideIndex(d.room.state as Record<string, unknown>);
+        slideSyncRef.current = idx;
+        setSlideIdx(idx);
+        if (!isCoaching) setBoardSyncFromState(d.room.state, false);
+      }
+    }, 3000);
+    return () => clearInterval(wait);
+  }, [sharedRoomId, isFac, gameActivityId, roomQuery, isCoaching, setBoardSyncFromState]);
+
+  useEffect(() => {
     if (!sharedRoomId) return;
     const poll = async () => {
       const res = await fetch(`/api/forge/shared-game-rooms/${sharedRoomId}`);
@@ -228,6 +300,11 @@ export function ForgeExpedicionRoom({
         setGameState(d.room.state);
         setRoomVersion(d.room.version);
         setBoardSyncFromState(d.room.state, isFac);
+        const remoteSlide = readPresentationSlideIndex(d.room.state as Record<string, unknown>);
+        if (!isFac && remoteSlide !== slideSyncRef.current) {
+          slideSyncRef.current = remoteSlide;
+          setSlideIdx(remoteSlide);
+        }
       }
     };
     poll();
@@ -241,13 +318,25 @@ export function ForgeExpedicionRoom({
     if (g) setCoachGuide(g);
   }, [gameState]);
 
-  const knowledgeCard =
-    isFac && currentSlide?.tecnico
-      ? { title: currentSlide.title, body: currentSlide.tecnico }
-      : null;
-
   const card = (gameState as { currentCard?: { prompt?: string; reflection?: string; id?: string } })
     ?.currentCard;
+
+  const multi = parseMulti(gameState);
+  const myPosition =
+    multi && myUserId
+      ? multi.players.find((p) => p.userId === myUserId)?.position
+      : typeof (gameState as { position?: number }).position === 'number'
+        ? (gameState as { position: number }).position
+        : undefined;
+  const stationSlug = typeof myPosition === 'number' ? stationSlugForSpace(myPosition) : null;
+
+  const deckByStation = useMemo(() => {
+    if (!gameSpec?.cards) return [];
+    return EXPEDICION_STATION_SLUGS.map((slug) => ({
+      slug,
+      cards: cardsForStation(gameSpec.cards!, slug),
+    })).filter((s) => s.cards.length > 0);
+  }, [gameSpec?.cards]);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-slate-100">
@@ -265,19 +354,29 @@ export function ForgeExpedicionRoom({
           </p>
           <h1 className="truncate text-sm font-black md:text-base">{courseTitle}</h1>
         </div>
-        {currentSlide && (
-          <p className="hidden sm:block text-xs text-slate-400 max-w-[200px] truncate">
-            {currentSlide.title}
-          </p>
+        <ForgeGameManualButton onOpen={() => setManualOpen(true)} />
+        {presentationSlides.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setSlidesOpen((v) => !v)}
+            className={cn(
+              'rounded-lg border px-2 py-1 text-[10px] font-bold flex items-center gap-1',
+              slidesOpen ? 'border-violet-400 bg-violet-900 text-violet-100' : 'border-slate-700 hover:bg-slate-800'
+            )}
+          >
+            <Presentation className="h-3 w-3" />
+            {ft('forge.room.slides')}
+            {isFac && ` ${slideIdx + 1}/${presentationSlides.length}`}
+          </button>
         )}
+        <Link
+          href={`/hub/forge/cursos/${courseId}/turmas`}
+          className="rounded-lg border border-slate-700 px-2 py-1 text-[10px] font-bold hover:bg-slate-800"
+        >
+          {ft('forge.tutorLobby.short')}
+        </Link>
         {isFac && (
           <>
-            <Link
-              href={`/hub/forge/cursos/${courseId}/turmas`}
-              className="rounded-lg border border-slate-700 px-2 py-1 text-[10px] font-bold hover:bg-slate-800"
-            >
-              {ft('forge.tutorLobby.short')}
-            </Link>
             <button
               type="button"
               onClick={() => setFacEmergency((v) => !v)}
@@ -305,122 +404,137 @@ export function ForgeExpedicionRoom({
             >
               {ft('forge.room.deck')}
             </button>
+            {stationSlug && (
+              <button
+                type="button"
+                onClick={() => setInvestStation(stationSlug)}
+                className="rounded-lg border border-emerald-600 px-2 py-1 text-[10px] font-bold text-emerald-300"
+              >
+                {ft('forge.room.investments')}
+              </button>
+            )}
           </>
         )}
       </header>
 
       <ForgeFloatingJitsi embedSrc={jitsiSrc} fallbackUrl={jitsiUrl} />
-      {isFac && (
-        <ForgeFacilitatorScriptPanel
-          slide={currentSlide}
-          slideIndex={slideIdx}
-          total={presentationSlides.length}
-          onPrev={() => setSlideIdx((i) => Math.max(0, i - 1))}
-          onNext={() => setSlideIdx((i) => Math.min(presentationSlides.length - 1, i + 1))}
-        />
-      )}
-      <ForgeGameCoach guide={coachGuide} knowledge={knowledgeCard} />
+      <ForgeGameCoach guide={coachGuide} knowledge={null} />
+      <ForgeGameManualModal open={manualOpen} onClose={() => setManualOpen(false)} />
 
-      <div className="flex-1 overflow-y-auto min-h-0 bg-slate-900/80">
-        <div className="p-3 space-y-3 max-w-4xl mx-auto">
-            {presentationSlides.length > 0 && (
-              <div className="rounded-xl border border-violet-500/30 overflow-hidden">
-                <ForgePresentationViewer
-                  slides={presentationSlides}
-                  pdfUrl={presentationPdfUrl}
-                  embedUrl={presentationEmbedUrl}
-                  compact
-                  audienceMode={!isFac}
-                  slideIndex={slideIdx}
-                  onSlideIndexChange={isFac ? setSlideIdx : undefined}
-                />
-                {capsuleQuiz && (
-                  <div className="border-t border-violet-500/20 bg-violet-950/40 px-3 py-2 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setQuizOpen(true)}
-                      className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold"
-                    >
-                      {isFac ? ft('forge.room.openQuiz') : ft('forge.room.doQuiz')} — {capsuleQuiz.title}
-                    </button>
-                  </div>
-                )}
-              </div>
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {slidesOpen && presentationSlides.length > 0 && (
+          <aside className="w-full max-w-sm shrink-0 border-r border-slate-800 bg-slate-900 overflow-y-auto z-10 flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 px-2 py-2">
+              {isFac && (
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setSlideIdxSynced((i) => Math.max(0, i - 1))}
+                    disabled={slideIdx <= 0}
+                    className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold disabled:opacity-40"
+                  >
+                    ←
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSlideIdxSynced((i) => Math.min(presentationSlides.length - 1, i + 1))}
+                    disabled={slideIdx >= presentationSlides.length - 1}
+                    className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold disabled:opacity-40"
+                  >
+                    →
+                  </button>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setSlidesOpen(false)}
+                className="ml-auto text-[10px] text-slate-400 hover:text-white"
+              >
+                {ft('forge.general.close')}
+              </button>
+            </div>
+            <ForgePresentationViewer
+              slides={presentationSlides}
+              pdfUrl={presentationPdfUrl}
+              embedUrl={presentationEmbedUrl}
+              compact
+              audienceMode
+              slideIndex={slideIdx}
+              onSlideIndexChange={isFac ? setSlideIdxSynced : undefined}
+            />
+            {capsuleQuiz && isFac && (
+              <button
+                type="button"
+                onClick={() => setQuizOpen(true)}
+                className="m-2 rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold"
+              >
+                {ft('forge.room.openQuiz')} — {capsuleQuiz.title}
+              </button>
             )}
+          </aside>
+        )}
 
-            {!isFac && myMap && <ForgePersonalMapStrip mapState={myMap} />}
+        <main className="flex-1 flex flex-col min-w-0 min-h-0 p-2 md:p-3 gap-2">
+          {isCoaching && (
+            <p className="text-center text-xs text-violet-300 shrink-0">{ft('forge.room.coachingHint')}</p>
+          )}
 
-            {card?.prompt && (
-              <div className="rounded-xl border-2 border-amber-400/60 bg-amber-950/50 p-4">
-                <p className="text-[10px] font-bold uppercase text-amber-300">
-                  {isFac ? ft('forge.room.cardFac') : ft('forge.room.cardLearner')}
-                </p>
-                <p className="mt-2 text-base font-semibold text-amber-50">{card.prompt}</p>
-                {card.reflection && (
-                  <p className="mt-2 text-sm text-amber-200/90">💡 {card.reflection}</p>
-                )}
-                {!isFac && (
-                  <p className="mt-3 text-xs text-amber-200/80">{ft('forge.room.cardHint')}</p>
-                )}
-              </div>
-            )}
+          {card?.prompt && (
+            <div className="shrink-0 rounded-lg border border-amber-400/50 bg-amber-950/60 px-3 py-2 max-h-24 overflow-y-auto">
+              <p className="text-[10px] font-bold uppercase text-amber-300">
+                {isFac ? ft('forge.room.cardFac') : ft('forge.room.cardLearner')}
+              </p>
+              <p className="text-sm font-semibold text-amber-50 line-clamp-2">{card.prompt}</p>
+            </div>
+          )}
 
-            <div className="rounded-xl border border-amber-500/40 bg-slate-900 p-2">
-              {gameSpec && syncMode !== 'pending' ? (
-                <ForgeGameBoard
-                  spec={gameSpec}
-                  initialState={gameState}
-                  syncMode={syncMode}
-                  roomId={sharedRoomId ?? undefined}
-                  roomVersion={roomVersion}
-                  myUserId={myUserId}
-                  isFacilitator={isFac}
-                  facilitatorEmergency={facEmergency}
-                  onGuideChange={(g) => setCoachGuide(g)}
-                  onRoomState={(s) => setGameState(s as Record<string, unknown>)}
-                />
+          <div className="flex-1 flex flex-col min-h-0 justify-center">
+            {!isCoaching ? (
+              gameSpec && syncMode !== 'pending' ? (
+                <div className="flex flex-col h-full min-h-0 [&_.rounded-xl]:bg-transparent">
+                  <ForgeGameBoard
+                    spec={gameSpec}
+                    initialState={gameState}
+                    syncMode={syncMode}
+                    roomId={sharedRoomId ?? undefined}
+                    roomVersion={roomVersion}
+                    myUserId={myUserId}
+                    isFacilitator={isFac}
+                    facilitatorEmergency={facEmergency}
+                    onGuideChange={(g) => setCoachGuide(g)}
+                    onRoomState={(s) => setGameState(s as Record<string, unknown>)}
+                  />
+                </div>
               ) : (
-                <p className="p-4 text-center text-sm text-amber-200">
+                <p className="text-center text-sm text-amber-200 py-12">
                   {boardBusy ? ft('forge.general.loading') : ft('forge.room.waitingBoard')}
                 </p>
-              )}
+              )
+            ) : (
+              myMap && <ForgePersonalMapStrip mapState={myMap} />
+            )}
+          </div>
+
+          {myMap && !isCoaching && (
+            <div className="shrink-0 max-h-28 overflow-hidden">
+              <ForgePersonalMapStrip mapState={myMap} />
             </div>
+          )}
 
-            {isFac && (
-              <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-3">
-                <p className="flex items-center gap-2 text-xs font-bold uppercase text-slate-400">
-                  <Users className="h-4 w-4" />
-                  {ft('forge.studio.mapsHint')} ({learners.length})
+          {investStation && (
+            <ForgeInvestmentPanel station={investStation} onClose={() => setInvestStation(null)} />
+          )}
+
+          {isFac && showDeck && gameSpec?.cards && (
+            <div className="shrink-0 rounded-lg border border-slate-600 bg-slate-900/90 p-2 max-h-32 overflow-y-auto text-xs">
+              {deckByStation.map(({ slug, cards }) => (
+                <p key={slug} className="text-slate-400">
+                  <span className="text-emerald-400 font-bold">{slug}</span>: {cards.length} cartas
                 </p>
-                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-                  {learners.map((l) => (
-                    <div
-                      key={l.userId}
-                      className="shrink-0 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 min-w-[120px]"
-                    >
-                      <p className="text-xs font-bold truncate">{l.name ?? l.email}</p>
-                      <p className="text-[10px] text-slate-400">
-                        {l.stationsCompleted}/{l.stationTotal} · {l.progressPercent}%
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {isFac && showDeck && gameSpec?.cards && (
-              <div className="rounded-xl border border-slate-600 bg-slate-900 p-3 max-h-48 overflow-y-auto">
-                <p className="text-xs font-bold text-slate-400 mb-2">{ft('forge.playbook.cardsTitle', { n: gameSpec.cards.length })}</p>
-                <ul className="space-y-2 text-xs">
-                  {gameSpec.cards.map((c) => (
-                    <li key={c.id} className="text-slate-300">
-                      <span className="text-slate-500">{c.id}</span> — {c.prompt}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-        </div>
+              ))}
+            </div>
+          )}
+        </main>
       </div>
 
       {quizOpen && capsuleQuiz && (

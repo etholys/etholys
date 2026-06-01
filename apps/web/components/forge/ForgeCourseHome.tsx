@@ -128,7 +128,7 @@ export function ForgeCourseHome({
           <div className="flex flex-wrap gap-2">
             {enrolled && showsLiveFeatures(deliveryMode) ? (
               <Link
-                href={`/hub/forge/cursos/${courseId}/sala`}
+                href={`/hub/forge/cursos/${courseId}/turmas`}
                 className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 px-6 py-3 text-sm font-bold text-white shadow-lg hover:from-emerald-700"
               >
                 <Rocket className="h-5 w-5" />
@@ -214,7 +214,7 @@ export function ForgeCourseHome({
           <p className="text-sm font-bold text-emerald-900">{ft('forge.room.brand')}</p>
           <p className="mt-2 text-sm text-emerald-800">{ft('forge.course.home.liveTrail')}</p>
           <Link
-            href={`/hub/forge/cursos/${courseId}/sala`}
+            href={`/hub/forge/cursos/${courseId}/turmas`}
             className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white"
           >
             <Rocket className="h-4 w-4" />

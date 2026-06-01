@@ -14,6 +14,7 @@ import {
   restartBoardState,
   undoBoardState,
 } from '@/lib/forge/board-history';
+import { drawCardForPosition } from '@/lib/forge/expedicion-station-decks';
 
 type CurrentCard = { id: string; prompt: string; reflection?: string; xp?: number; type?: string };
 
@@ -140,7 +141,10 @@ function applyMultiAction(
 
   if (action.type === 'draw_card') {
     const cards = spec.cards ?? [];
-    const card = cards[Math.floor(Math.random() * cards.length)];
+    const card = drawCardForPosition(cards, cur.position);
+    if (!card) {
+      return { state: syncLegacyFields(s), events: [{ type: 'error', message: 'Sin cartas en el mazo.' }] };
+    }
     s.currentCard = {
       id: card.id,
       prompt: card.prompt,
@@ -289,8 +293,10 @@ export const boardEngine: ForgeEngine = {
 
     if (action.type === 'draw_card') {
       const cards = spec.cards ?? [];
-      const idx = Math.floor(Math.random() * cards.length);
-      const card = cards[idx];
+      const card = drawCardForPosition(cards, s.position);
+      if (!card) {
+        return { state: s, events: [{ type: 'error', message: 'Sin cartas en el mazo.' }] };
+      }
       s.currentCard = {
         id: card.id,
         prompt: card.prompt,

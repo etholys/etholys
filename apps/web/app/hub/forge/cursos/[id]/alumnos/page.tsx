@@ -86,7 +86,7 @@ export default function ForgeAlumnosPage() {
           {ft('forge.facilitator.preview')}
         </Link>
         {' · '}
-        <Link href={`/hub/forge/cursos/${courseId}/sala`} className="font-bold underline">
+        <Link href={`/hub/forge/cursos/${courseId}/turmas`} className="font-bold underline">
           {ft('forge.room.enter')}
         </Link>
       </div>

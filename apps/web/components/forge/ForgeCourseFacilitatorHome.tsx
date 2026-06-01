@@ -69,13 +69,6 @@ export function ForgeCourseFacilitatorHome({
           color="sky"
         />
         <ActionCard
-          href={`/hub/forge/cursos/${courseId}/sala`}
-          icon={Video}
-          title={ft('forge.facilitator.salon')}
-          desc={ft('forge.facilitator.salonDesc')}
-          color="emerald"
-        />
-        <ActionCard
           href={`/hub/forge/cursos/${courseId}/alumnos`}
           icon={Users}
           title={ft('forge.facilitator.alumnos')}

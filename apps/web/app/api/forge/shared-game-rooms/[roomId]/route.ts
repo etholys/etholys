@@ -9,6 +9,7 @@ import {
   serializeSharedGameRoom,
 } from '@/lib/forge/shared-game-room';
 import { canPlayerAct, parseMulti } from '@/lib/forge/expedicion-board-multi';
+import { withPresentationSlideIndex } from '@/lib/forge/room-presentation';
 import { loadSharedGameRoomForForgeAccess, requireForgeTenant } from '@/lib/forge/tenant';
 
 type Ctx = { params: Promise<{ roomId: string }> };
@@ -47,7 +48,23 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       action?: { type: string; payload?: Record<string, unknown> };
       expectedVersion?: number;
       close?: boolean;
+      presentationSlideIndex?: number;
     };
+
+    if (typeof body.presentationSlideIndex === 'number') {
+      if (!canFacilitateSharedGame(tenant, room.activity.module.course.companyId, room.facilitatorUserId)) {
+        return NextResponse.json({ error: 'Solo el facilitador sincroniza diapositivas' }, { status: 403 });
+      }
+      const prev = (room.state ?? {}) as Record<string, unknown>;
+      const slideUpdated = await getForgeDb().forgeSharedGameRoom.update({
+        where: { id: roomId },
+        data: {
+          state: withPresentationSlideIndex(prev, body.presentationSlideIndex) as Prisma.InputJsonValue,
+          version: { increment: 1 },
+        },
+      });
+      return NextResponse.json({ room: serializeSharedGameRoom(slideUpdated) });
+    }
 
     if (body.close === true) {
       if (!canFacilitateSharedGame(tenant, room.activity.module.course.companyId, room.facilitatorUserId)) {

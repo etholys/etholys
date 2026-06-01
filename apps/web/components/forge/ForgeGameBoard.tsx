@@ -190,7 +190,7 @@ export function ForgeGameBoard({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col h-full min-h-0 gap-2">
       {isFacilitator && roomId && (
         <div className="flex flex-wrap gap-2 rounded-xl border border-slate-600 bg-slate-800/80 p-2">
           <button
@@ -249,34 +249,32 @@ export function ForgeGameBoard({
           )}
         </div>
       )}
-      <div className="grid gap-3 sm:grid-cols-4">
-        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-center">
-          <Coins className="mx-auto h-5 w-5 text-amber-700" />
-          <p className="text-[10px] font-bold uppercase text-amber-800 mt-1">Eco-Créditos</p>
-          <p className="text-2xl font-black text-amber-900">{displayEco}</p>
+      <div className="flex-1 min-h-0 flex items-center justify-center">
+        <ForgeBoardTrack spaces={spaces} position={pos} players={players} immersive className="w-full" />
+      </div>
+
+      <div className="grid grid-cols-4 gap-1 shrink-0">
+        <div className="rounded-lg bg-amber-950/80 border border-amber-600/40 p-1.5 text-center">
+          <p className="text-[8px] font-bold uppercase text-amber-300">Eco</p>
+          <p className="text-sm font-black text-amber-100">{displayEco}</p>
         </div>
-        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-center">
-          <Sparkles className="mx-auto h-5 w-5 text-emerald-700" />
-          <p className="text-[10px] font-bold uppercase text-emerald-800 mt-1">Impacto</p>
-          <p className="text-2xl font-black text-emerald-900">{state.impactPoints ?? 0}</p>
+        <div className="rounded-lg bg-emerald-950/80 border border-emerald-600/40 p-1.5 text-center">
+          <p className="text-[8px] font-bold uppercase text-emerald-300">Impacto</p>
+          <p className="text-sm font-black text-emerald-100">{state.impactPoints ?? 0}</p>
         </div>
-        <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-center">
-          <MapPin className="mx-auto h-5 w-5 text-blue-700" />
-          <p className="text-[10px] font-bold uppercase text-blue-800 mt-1">Casilla</p>
-          <p className="text-2xl font-black text-blue-900">
+        <div className="rounded-lg bg-blue-950/80 border border-blue-600/40 p-1.5 text-center">
+          <p className="text-[8px] font-bold uppercase text-blue-300">Casilla</p>
+          <p className="text-sm font-black text-blue-100">
             {pos}/{goal}
           </p>
         </div>
-        <div className="rounded-xl bg-violet-50 border border-violet-200 p-3 text-center">
-          <Target className="mx-auto h-5 w-5 text-violet-700" />
-          <p className="text-[10px] font-bold uppercase text-violet-800 mt-1">Fichas</p>
-          <p className="text-2xl font-black text-violet-900">
+        <div className="rounded-lg bg-violet-950/80 border border-violet-600/40 p-1.5 text-center">
+          <p className="text-[8px] font-bold uppercase text-violet-300">Fichas</p>
+          <p className="text-sm font-black text-violet-100">
             {insights.length}/{minInsights}
           </p>
         </div>
       </div>
-
-      <ForgeBoardTrack spaces={spaces} position={pos} players={players} />
 
       {state.currentCard && (
         <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 shadow-sm">

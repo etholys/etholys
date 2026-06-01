@@ -89,18 +89,6 @@ export function ForgePresentationViewer({
             </p>
           )}
           {slide.texto && <p className="mt-3 text-sm font-semibold text-slate-800">{slide.texto}</p>}
-          {!audienceMode && slide.guion && (
-            <div className="mt-3 rounded-lg bg-amber-50 border border-amber-100 p-3 text-sm text-amber-950">
-              <p className="text-[10px] font-bold uppercase text-amber-800">{ft('forge.presentation.guion')}</p>
-              <p className="mt-1">{slide.guion}</p>
-            </div>
-          )}
-          {!audienceMode && slide.tecnico && (
-            <div className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-              <p className="text-[10px] font-bold uppercase">{ft('forge.presentation.tecnico')}</p>
-              <p className="mt-1 whitespace-pre-wrap">{slide.tecnico}</p>
-            </div>
-          )}
           {slide.accion && (
             <p className="mt-2 text-sm text-emerald-800 font-medium">
               <span className="font-bold">{ft('forge.presentation.accion')}:</span> {slide.accion}
