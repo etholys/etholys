@@ -178,7 +178,7 @@ export function advanceTurn(s: MultiBoardState, spec: GameSpecV1): MultiBoardSta
 export function landedGuide(player: BoardPlayer, position: number): BoardGuide {
   const st = stationForSpace(position);
   return {
-    message: `${player.name} cayó en ${st.name} (casilla ${position}). ${st.desc} Roba carta o resuelve en tu mapa A2.`,
+    message: `${player.name} cayó en ${st.name} (casilla ${position}). ${st.desc} Roba carta o resuelve en tu mapa.`,
     type: 'landed',
     playerName: player.name,
     at: Date.now(),

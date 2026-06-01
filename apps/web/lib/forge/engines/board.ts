@@ -153,7 +153,7 @@ function applyMultiAction(
       forUserId: cur.userId,
     };
     s.guide = {
-      message: `${cur.name}: lee la carta y resuélvela en tu mapa A2. Luego valida o pasa turno.`,
+      message: `${cur.name}: lee la carta y resuélvela en tu mapa. Luego valida o pasa turno.`,
       type: 'card',
       playerName: cur.name,
       at: Date.now(),

@@ -12,7 +12,7 @@ export const EXPEDICION_GAME_MANUAL: ManualSection[] = [
     title: 'Objetivo del juego',
     icon: '🎯',
     body: [
-      'Sprint de ~3,5 h: avanzar en la pista colectiva, robar cartas por estación y pegar fichas en tu Mapa A2 personal.',
+      'Sprint de ~3,5 h: avanzar en la pista colectiva, robar cartas por estación y pegar fichas en tu Mapa personal.',
       'Ganáis Eco-Créditos y Puntos de Impacto. El facilitador valida respuestas (+100 Eco) y cierra el banco al final.',
     ],
   },
@@ -23,7 +23,7 @@ export const EXPEDICION_GAME_MANUAL: ManualSection[] = [
     body: [
       'La pista tiene 20 casillas en forma de circuito. Cada color es una estación: Raíces, Tierra, Alquimia, Mercado, Futuro, Acción o Desafío.',
       'Cada jugador tiene un peón. En tu turno: lanzás el dado → avanzás → si caes en estación, robás carta de ese mazo.',
-      'El tablero es compartido; tu mapa A2 es solo tuyo.',
+      'El tablero es compartido; tu mapa es solo tuyo.',
     ],
   },
   {
@@ -41,12 +41,12 @@ export const EXPEDICION_GAME_MANUAL: ManualSection[] = [
     icon: '🃏',
     body: [
       'Al robar, sale una carta del mazo de la estación donde caíste (no es aleatorio de todo el juego).',
-      'Leé la consigna en voz alta, resolvela en tu mapa A2 y escribí la respuesta en pantalla para validar.',
+      'Leé la consigna en voz alta, resolvela en tu mapa y escribí la respuesta en pantalla para validar.',
     ],
   },
   {
     id: 'mapa',
-    title: 'Mapa A2 personal',
+    title: 'Mapa personal',
     icon: '📋',
     body: [
       '5 estaciones en tu hoja física o digital: propósito, recursos, producto, mercado, finanzas.',

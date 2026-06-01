@@ -13,10 +13,10 @@ export const EXPEDICION_PRESENTATION_SLIDES: ExpedicionSlide[] = [
   {
     n: 1,
     title: 'Portada y Bienvenida',
-    visual: 'Logo del curso, Mapa A2 y Tablero colectivo.',
+    visual: 'Logo del curso, Mapa y Tablero colectivo.',
     texto: 'Hoy transformamos tu idea en un negocio de Triple Impacto.',
     guion:
-      'Bienvenidos. Hoy no venimos a una clase, venimos a jugar. Ustedes son expedicionarios. Tienen un mapa vacío (A2) y 500 Eco-Créditos. El tablero central es colectivo; su mapa es su modelo de negocio.',
+      'Bienvenidos. Hoy no venimos a una clase, venimos a jugar. Ustedes son expedicionarios. Tienen un mapa vacío y 500 Eco-Créditos. El tablero central es colectivo; su mapa es su modelo de negocio.',
     tecnico: '',
     accion: '',
   },
@@ -24,10 +24,10 @@ export const EXPEDICION_PRESENTATION_SLIDES: ExpedicionSlide[] = [
     n: 2,
     title: 'Reglas de Oro',
     visual: 'Dado, carta, ficha, Eco-Crédito.',
-    texto: 'Lanzar · Robar carta · Pegar en tu mapa A2 · Validar (+100 Eco-Créditos).',
+    texto: 'Lanzar · Robar carta · Pegar en tu mapa · Validar (+100 Eco-Créditos).',
     guion:
-      'En el tablero colectivo: si caes en estación, roba carta. Resuélvela en tu mapa A2. Si el facilitador valida, +100 Eco-Créditos.',
-    tecnico: 'Tablero = pista de 20 casillas (todos). Mapa A2 = ficha de negocio (cada uno).',
+      'En el tablero colectivo: si caes en estación, roba carta. Resuélvela en tu mapa. Si el facilitador valida, +100 Eco-Créditos.',
+    tecnico: 'Tablero = pista de 20 casillas (todos). Mapa = ficha de negocio (cada uno).',
     accion: '',
   },
   {
@@ -38,7 +38,7 @@ export const EXPEDICION_PRESENTATION_SLIDES: ExpedicionSlide[] = [
     guion: 'Los que caigan en Raíces: definan propósito y cliente ideal (LOHAS).',
     tecnico:
       '¿Qué vacío dejaría tu negocio? No vendes solo producto: vendes salud y tradición local. Propuesta = Producto + Beneficio + Diferenciador.',
-    accion: 'Pegar ficha de propósito en el hueco Raíces del mapa A2.',
+    accion: 'Pegar ficha de propósito en el hueco Raíces del mapa.',
   },
   {
     n: 4,
@@ -47,7 +47,7 @@ export const EXPEDICION_PRESENTATION_SLIDES: ExpedicionSlide[] = [
     texto: 'Ecoeficiencia = rentabilidad.',
     guion: 'Busquen en sus cartas cómo cerrar ciclos. ¿Qué residuo transforman hoy?',
     tecnico: 'Cada gota ahorrada es dinero. Residuos = oro negro (compost). Semáforo rojo/verde.',
-    accion: 'Semáforo de eficiencia en mapa A2.',
+    accion: 'Semáforo de eficiencia en mapa.',
   },
   {
     n: 5,
@@ -56,7 +56,7 @@ export const EXPEDICION_PRESENTATION_SLIDES: ExpedicionSlide[] = [
     texto: 'Transformar para ganar.',
     guion: 'Definan flujo de trabajo y mensaje de empaque.',
     tecnico: 'Inocuidad = seguro de vida. Etiqueta narrativa = vendedor silencioso.',
-    accion: 'Flujograma de valor (3 pasos) en mapa A2.',
+    accion: 'Flujograma de valor (3 pasos) en mapa.',
   },
   {
     n: 6,
@@ -65,16 +65,16 @@ export const EXPEDICION_PRESENTATION_SLIDES: ExpedicionSlide[] = [
     texto: 'Venta directa: del campo al celular.',
     guion: 'Preparen guion de ventas y catálogo digital.',
     tecnico: 'WhatsApp Business: catálogo y etiquetas. Storytelling del detrás de escena.',
-    accion: 'Canales híbridos + mensaje principal en mapa A2.',
+    accion: 'Canales híbridos + mensaje principal en mapa.',
   },
   {
     n: 7,
     title: 'Cápsula 5 — Futuro',
     visual: 'Punto de equilibrio.',
     texto: 'Si no hay ganancia, no hay impacto.',
-    guion: 'Saquen las cuentas en su mapa A2. ¿Es rentable su expedición?',
+    guion: 'Saquen las cuentas en su mapa. ¿Es rentable su expedición?',
     tecnico: 'Costo fijo, punto de equilibrio, hoja de ruta 12 meses.',
-    accion: 'Calcular equilibrio y 3 hitos en mapa A2.',
+    accion: 'Calcular equilibrio y 3 hitos en mapa.',
   },
   {
     n: 8,
@@ -83,7 +83,7 @@ export const EXPEDICION_PRESENTATION_SLIDES: ExpedicionSlide[] = [
     texto: '¡Feria de negocios! Pitch de impacto.',
     guion: 'Quienes tengan 3+ estaciones en el mapa participan. Mejor pitch: +300 Eco-Créditos.',
     tecnico: '',
-    accion: 'Pitch oral usando el mapa A2 como soporte.',
+    accion: 'Pitch oral usando el mapa como soporte.',
   },
   {
     n: 9,

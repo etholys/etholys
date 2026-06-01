@@ -10,8 +10,8 @@ export const FORGE_GAME_PLAY_MODES: { id: ForgeGamePlayMode; label: string; desc
   },
   {
     id: 'shared_live',
-    label: 'Tablero colectivo + mapa A2 personal',
-    desc: 'Un tablero central en la sesión en vivo; cada alumno monta su mapa A2 (modelo de negocio).',
+    label: 'Tablero colectivo + mapa personal',
+    desc: 'Un tablero central en la sesión en vivo; cada alumno monta su mapa (modelo de negocio).',
   },
 ];
 

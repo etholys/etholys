@@ -11,7 +11,7 @@ export type ExpedicionInvestment = {
 /** Menu de investimentos 5×5 (jogo físico): 5 estaciones × 5 fichas. */
 export const EXPEDICION_INVESTMENTS: Record<ExpedicionStationSlug, ExpedicionInvestment[]> = {
   raices: [
-    { id: 'r-i1', label: 'Propósito escrito', ecoCost: 80, impact: 2, hint: 'Pegar en mapa A2 — Raíces' },
+    { id: 'r-i1', label: 'Propósito escrito', ecoCost: 80, impact: 2, hint: 'Pegar en mapa — Raíces' },
     { id: 'r-i2', label: 'Cliente LOHAS', ecoCost: 100, impact: 2, hint: 'Avatar + dolor + deseo' },
     { id: 'r-i3', label: 'Alianza local', ecoCost: 120, impact: 3, hint: '1 socio de confianza' },
     { id: 'r-i4', label: 'Historia de marca', ecoCost: 90, impact: 2, hint: 'Pitch de 30 s' },

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import { getForgeDb } from '@/lib/forge/db';
 import { getForgeCourseAccess } from '@/lib/forge/facilitator-access';
+import { buildPlayGroupInviteUrl } from '@/lib/forge/play-group-invite';
 import { loadCourseForTenant, requireForgeTenant } from '@/lib/forge/tenant';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -35,6 +36,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
         startsAt: g.liveSession?.startsAt?.toISOString(),
         memberCount: g._count.enrollments,
         hasInvite: Boolean(g.inviteToken),
+        inviteUrl: g.inviteToken ? buildPlayGroupInviteUrl(g.inviteToken) : null,
       })),
     });
   } catch (e) {
@@ -94,11 +96,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       },
     });
 
-    const base =
-      process.env.NEXTAUTH_URL?.replace(/\/$/, '') ||
-      process.env.FORGE_PUBLIC_URL?.replace(/\/$/, '') ||
-      '';
-    const inviteUrl = `${base}/hub/forge/activar?token=${encodeURIComponent(inviteToken)}&group=${group.id}`;
+    const inviteUrl = buildPlayGroupInviteUrl(inviteToken);
 
     return NextResponse.json(
       {
