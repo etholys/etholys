@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       data: {
         email,
         name: name || email.split('@')[0],
-        role: 'user',
+        role: 'COLLABORATOR',
         isActive: true,
       },
     });
