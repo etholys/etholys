@@ -9,7 +9,9 @@ echo  1) https://console.hetzner.cloud
 echo  2) Servidor 178.105.80.131 -^> Console
 echo  3) Cole:
 echo.
-echo     bash /opt/etholys/scripts/recuperar-servidor-ssh.sh
+echo     bash /opt/etholys/scripts/recuperar-servidor-oom.sh
+echo.
+echo  Se a consola mostrar "Out of memory": Power -^> Reboot primeiro.
 echo.
 echo  Guia completo: docs\FORGE-DEPLOY-SEM-SSH.md
 echo.

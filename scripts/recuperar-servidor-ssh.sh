@@ -7,6 +7,10 @@ echo "=== $(date -u) recuperar SSH + forge ==="
 echo "load: $(cat /proc/loadavg)"
 free -h || true
 
+if [ -x /opt/etholys/scripts/recuperar-servidor-oom.sh ]; then
+  exec bash /opt/etholys/scripts/recuperar-servidor-oom.sh
+fi
+
 echo "=== Parar builds Docker (liberar RAM) ==="
 pkill -f docker-buildx 2>/dev/null || true
 pkill -f buildkit 2>/dev/null || true

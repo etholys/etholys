@@ -2,6 +2,28 @@
 
 Sintoma: `Connection timed out during banner exchange` na porta 22.
 
+Ou na consola Hetzner: **`Out of memory: Killed process`** (next-server, java, systemd).
+
+O VPS tem **4 GB RAM**. Builds Docker + Jitsi (Java) + Next.js esgotam a memoria e o sistema mata processos — SSH e o site deixam de responder.
+
+## Emergencia: consola a spammar OOM
+
+1. No painel Hetzner (sem usar a consola): separador **Power** → **Reboot** (ou OFF 15 s → ON).
+2. Apos reiniciar, abra de novo a consola `>_` e cole:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/etholys/etholys/main/scripts/recuperar-servidor-oom.sh -o /tmp/recuperar-oom.sh && bash /tmp/recuperar-oom.sh
+```
+
+Se o GitHub raw falhar, use o repo local:
+
+```bash
+cd /opt/etholys && git fetch origin && git reset --hard origin/main
+bash /opt/etholys/scripts/recuperar-servidor-oom.sh
+```
+
+**Nunca** corra `deploy-forge-web.sh` (build) neste CX23 4 GB sem swap — use so `restore-forge-web.sh` ou faca build noutra maquina.
+
 A porta 22 pode estar **aberta**, mas o `sshd` no servidor nao responde a tempo (RAM/CPU cheios, build Docker a correr, etc.).
 
 ## Passo 1 — Consola web Hetzner
