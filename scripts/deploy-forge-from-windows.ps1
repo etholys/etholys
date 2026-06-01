@@ -54,12 +54,27 @@ function Get-SshBaseArgs() {
   return $sshOpts
 }
 
+function Test-SshReachable() {
+  $target = $cfg.SshUser + '@' + $cfg.SshHost
+  Write-Host ('Teste SSH a ' + $target + ' (ate 30s)...') -ForegroundColor DarkGray
+  $pingArgs = @(Get-SshBaseArgs) + @('-o', 'ConnectTimeout=30') + $target, 'echo etholys-ssh-ok'
+  & ssh @pingArgs 2>&1 | Out-Host
+  return ($LASTEXITCODE -eq 0)
+}
+
 function Invoke-Remote([string]$RemoteCommand) {
   $target = $cfg.SshUser + '@' + $cfg.SshHost
+  if (-not (Test-SshReachable)) {
+    throw 'SSH inacessivel (timeout ou chave nao configurada).'
+  }
+  Write-Host ''
+  Write-Host ('A executar no servidor: ' + $RemoteCommand) -ForegroundColor Cyan
+  if ($RemoteCommand -match 'deploy-forge-web') {
+    Write-Host 'Deploy completo pode demorar 10-20 minutos. Nao feche esta janela.' -ForegroundColor DarkGray
+  }
   $sshArgs = @(Get-SshBaseArgs) + $target, $RemoteCommand
-  Write-Host ('ssh ' + $target + ' ...')
   & ssh @sshArgs
-  if ($LASTEXITCODE -ne 0) { throw ('SSH falhou (codigo ' + $LASTEXITCODE + ')') }
+  if ($LASTEXITCODE -ne 0) { throw ('Comando remoto falhou (codigo ' + $LASTEXITCODE + ')') }
 }
 
 function Get-PorcelainPath([string]$Line) {
@@ -182,10 +197,15 @@ try {
   Write-Host '[ERRO] Nao foi possivel ligar ao servidor ou o deploy falhou.' -ForegroundColor Red
   Write-Host $_.Exception.Message
   Write-Host ''
-  Write-Host 'Faca manualmente na consola Hetzner:' -ForegroundColor Yellow
+  Write-Host 'Causas comuns:' -ForegroundColor Yellow
+  Write-Host '  - Servidor sobrecarregado (SSH timeout) -> consola web Hetzner'
+  Write-Host '  - Chave SSH nao configurada neste PC -> ssh root@178.105.80.131'
+  Write-Host '  - Firewall / rede bloqueia porta 22'
+  Write-Host ''
+  Write-Host 'Na consola Hetzner (https://console.hetzner.cloud), cole:' -ForegroundColor Yellow
   Write-Host ('  ' + $remoteScript)
   Write-Host ''
-  Write-Host 'Ou tente modo [2] Rapido se o build esgotar a RAM.' -ForegroundColor Yellow
+  Write-Host 'Modo [2] Rapido: bash /opt/etholys/scripts/restore-forge-web.sh' -ForegroundColor DarkGray
   exit 1
 }
 
