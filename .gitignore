@@ -31,3 +31,6 @@ infra/.env
 
 # Config local do deploy Windows (SSH, etc.)
 scripts/deploy-forge.config.ps1
+*.lnk
+forge-deploy.tar
+forge-ui.tar
