@@ -2,7 +2,7 @@ import { EXPEDICION_LIBRO_CHAPTERS } from '@/lib/forge/libro-reference';
 
 /** Contenido extendido del libro (texto didáctico por capítulo). */
 export const EXPEDICION_LIBRO_FULL: Record<string, string> = {
-  intro: `La Expedición Sostenible transforma una MiPyME en un negocio de triple impacto mediante retos, fichas y un tablero de 20 casillas. Cada estación del mapa A2 representa una dimensión del negocio: estrategia, producción, transformación, mercado y finanzas.
+  intro: `La Expedición Sostenible transforma una MiPyME en un negocio de triple impacto mediante retos, fichas y un tablero de 20 casillas. Cada estación del mapa representa una dimensión del negocio: estrategia, producción, transformación, mercado y finanzas.
 
 Como expedicionario recibes 500 Eco-Créditos iniciales. Cada ficha validada por el facilitador suma +100 Eco-Créditos y +1 Punto de Impacto. El libro acompaña cada módulo digital en FORGE con lecturas, quizzes y el tablero personal.`,
   raices: `Capítulo Raíces — Estrategia y ADN

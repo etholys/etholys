@@ -67,7 +67,7 @@ export const EXPEDICION_GAME_MANUAL: ManualSection[] = [
     title: 'Inversiones 5×5',
     icon: '🧩',
     body: [
-      'En cada estación hay 5 fichas de inversión (menú en la sala). Elegís una, la pegáis en A2 y descontáis el coste en Eco.',
+      'En cada estación hay 5 fichas de inversión (menú en la sala). Elegís una, la pegáis en el Mapa y descontáis el coste en Eco.',
       'Son el equivalente digital de las fichas impresas del juego físico.',
     ],
   },

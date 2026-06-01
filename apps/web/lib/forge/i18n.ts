@@ -501,7 +501,7 @@ const forge: Record<Locale, Record<string, string>> = {
     'forge.tutorLobby.sessionHint': 'Vincula al crear grupo',
     'forge.tutorLobby.teamPlayHint':
       'En la sala: tablero compartido (un peón por empresa). En «Mi mapa»: cada persona su negocio.',
-    'forge.tutorLobby.mapHelpTitle': 'Mapas personales A2',
+    'forge.tutorLobby.mapHelpTitle': 'Mapas personales',
     'forge.tutorLobby.mapHelp':
       'Cada emprendedor abre «Mi mapa» desde la sala o el curso. Ahí pega fichas, materiales y responde cartas. Tú los ves en Alumnos.',
     'forge.tutorLobby.seeLearners': 'Ver progreso individual',

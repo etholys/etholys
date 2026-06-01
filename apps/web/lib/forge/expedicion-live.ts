@@ -23,7 +23,7 @@ export function buildExpedicionLiveConfig(opts: {
     roomName: slug,
     facilitatorRoomName: `${slug}-facilitador`,
     scheduledLabel: `Sesiones síncronas — ${opts.companyName} (videollamada, sin vídeos grabados)`,
-    facilitatorNotes: `Ambiente exclusivo ${opts.companyName}. Salón FORGE: tablero colectivo en vivo + mapa A2 personal por alumno; validar fichas +100 Eco-Créditos.`,
+    facilitatorNotes: `Ambiente exclusivo ${opts.companyName}. Salón FORGE: tablero colectivo en vivo + mapa personal por alumno; validar fichas +100 Eco-Créditos.`,
     meetingUrl: undefined,
   };
 }

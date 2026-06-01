@@ -12,7 +12,7 @@ export const EXPEDICION_LIBRO_CHAPTERS: LibroChapter[] = [
     id: 'intro',
     title: 'Introducción — El viaje del expedicionario',
     moduleHint: 'Bienvenida',
-    summary: 'Reglas del tablero, Eco-Créditos, las 5 estaciones y el mapa A2.',
+    summary: 'Reglas del tablero, Eco-Créditos, las 5 estaciones y el mapa.',
   },
   {
     id: 'raices',
