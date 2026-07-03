@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useApp } from '@/app/providers';
+import { isLikelyDbId } from '@/lib/utils';
 import {
   ArrowLeft,
   Plus,
@@ -51,6 +53,13 @@ interface ProposalIntake {
 
 export default function ProposalsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { activeCompanyId } = useApp();
+  const companyId = useMemo(() => {
+    const s = String(activeCompanyId ?? '').trim();
+    return isLikelyDbId(s) ? s : '';
+  }, [activeCompanyId]);
+  const [coalitionCount, setCoalitionCount] = useState(0);
   const [activeTab, setActiveTab] = useState<'drafts' | 'new'>('drafts');
   const [fund, setFund] = useState<FundSummary | null>(null);
   const [editalLink, setEditalLink] = useState('');
@@ -61,12 +70,30 @@ export default function ProposalsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const fundId = searchParams.get('fundId')?.trim();
+    if (fundId && companyId) {
+      fetch(`/api/funds/${encodeURIComponent(fundId)}?companyId=${encodeURIComponent(companyId)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          const f = d?.fund as FundSummary | undefined;
+          if (f?.id) {
+            setFund(f);
+            setActiveTab('new');
+            localStorage.setItem('selectedFund', JSON.stringify(f));
+          }
+        })
+        .catch(() => {});
+      return;
+    }
     const fundData = localStorage.getItem('selectedFund');
     if (fundData) {
-      const parsed = JSON.parse(fundData);
-      setFund(parsed);
+      try {
+        setFund(JSON.parse(fundData) as FundSummary);
+      } catch {
+        // ignore
+      }
     }
-  }, []);
+  }, [searchParams, companyId]);
 
   useEffect(() => {
     const stored = localStorage.getItem('proposalDrafts');
@@ -78,6 +105,14 @@ export default function ProposalsPage() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/fundhub/coalition?companyId=${encodeURIComponent(companyId)}`)
+      .then((r) => r.json())
+      .then((d) => setCoalitionCount(Array.isArray(d.members) ? d.members.length : 0))
+      .catch(() => {});
+  }, [companyId]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -294,6 +329,14 @@ export default function ProposalsPage() {
         {activeTab === 'new' && (
           <div className="grid gap-8 lg:grid-cols-3">
             <div className="lg:col-span-2">
+              {coalitionCount > 0 && (
+                <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                  Coalizão com <strong>{coalitionCount}</strong> organização(ões) — incluída no perfil institucional e notas.{' '}
+                  <Link href="/hub/fundhub/coalition" className="font-medium underline">
+                    Gerir
+                  </Link>
+                </div>
+              )}
               <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
                 <div className="mb-6">
                   <h2 className="text-2xl font-bold text-gray-900">Começar Nova Proposta</h2>

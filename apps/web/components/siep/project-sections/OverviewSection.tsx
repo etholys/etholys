@@ -10,6 +10,10 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 const PCOLORS = ['#4f46e5', '#f59e0b', '#94a3b8'];
 
 export default function OverviewSection({ project, tr }: SectionProps) {
+  const canViewProjectTotal = project?.siepPermissions?.canViewProjectTotal ?? true;
+  const canViewBudgetAmounts = project?.siepPermissions?.canViewBudgetAmounts ?? true;
+  const showFinancials = canViewProjectTotal || canViewBudgetAmounts;
+
   const taskStats = useMemo(() => ({
     total: project?.tasks?.length ?? 0,
     done: (project?.tasks ?? []).filter((t: any) => t?.status === 'DONE')?.length ?? 0,
@@ -30,15 +34,18 @@ export default function OverviewSection({ project, tr }: SectionProps) {
     const taskRate = taskStats.total > 0 ? Math.round((taskStats.done / taskStats.total) * 100) : 0;
     const risksOpen = (project?.risks ?? []).filter((r: any) => r?.status === 'open').length;
     const risksHigh = (project?.risks ?? []).filter((r: any) => (r?.level === 'HIGH' || r?.level === 'CRITICAL') && r?.status === 'open').length;
-    return [
+    const items = [
       { label: 'Ejecuci\u00f3n F\u00edsica', value: physExec, color: '#4f46e5', icon: TrendingUp, desc: 'Progreso general del proyecto' },
-      { label: 'Ejecuci\u00f3n Financiera', value: finExec, color: '#3b82f6', icon: DollarSign, desc: `${formatCurrency(totalExpense)} de ${formatCurrency(project?.budget)}` },
+      ...(showFinancials
+        ? [{ label: 'Ejecuci\u00f3n Financiera', value: finExec, color: '#3b82f6', icon: DollarSign, desc: canViewBudgetAmounts ? `${formatCurrency(totalExpense)} de ${formatCurrency(project?.budget)}` : 'Valores ocultos' }]
+        : []),
       { label: 'Hitos', value: msRate, color: '#8b5cf6', icon: Target, desc: `${msDone}/${msTotal} completados` },
       { label: 'Tareas', value: taskRate, color: '#0d9488', icon: CheckCircle2, desc: `${taskStats.done}/${taskStats.total} completadas` },
       { label: 'Riesgos Abiertos', value: risksOpen, color: risksHigh > 0 ? '#ef4444' : '#10b981', icon: AlertTriangle, desc: risksHigh > 0 ? `${risksHigh} alto/cr\u00edtico` : 'Controlado', isCount: true },
       { label: 'Equipo', value: project?.members?.length ?? 0, color: '#6366f1', icon: Users, desc: 'miembros activos', isCount: true },
     ];
-  }, [project, totalExpense, taskStats]);
+    return items;
+  }, [project, totalExpense, taskStats, showFinancials, canViewBudgetAmounts]);
 
   const finPieData = [
     { name: 'Ejecutado', value: totalExpense },
@@ -82,10 +89,12 @@ export default function OverviewSection({ project, tr }: SectionProps) {
               <p className="text-sm font-semibold text-gray-800 mt-0.5">{project.country}{project?.region ? ` \u00b7 ${project.region}` : ''}</p>
             </div>
           )}
+          {canViewProjectTotal && (
           <div className="p-3 bg-gray-50 rounded-lg">
             <p className="text-[10px] uppercase tracking-wide text-gray-500 font-medium flex items-center gap-1"><DollarSign className="w-3 h-3" />Presupuesto</p>
             <p className="text-sm font-semibold text-gray-800 mt-0.5">{formatCurrency(project?.budget)} {project?.currency}</p>
           </div>
+          )}
         </div>
       </div>
 
@@ -119,6 +128,7 @@ export default function OverviewSection({ project, tr }: SectionProps) {
 
       {/* Budget Snapshot + Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {showFinancials && (
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h4 className="text-sm font-semibold text-gray-700 mb-4">Resumen Financiero</h4>
           <div className="flex items-center gap-6">
@@ -141,6 +151,7 @@ export default function OverviewSection({ project, tr }: SectionProps) {
             </div>
           </div>
         </div>
+        )}
 
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h4 className="text-sm font-semibold text-gray-700 mb-4">&Uacute;ltimas Tareas</h4>

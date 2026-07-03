@@ -1,0 +1,296 @@
+[
+  {
+    "id": "mc-01",
+    "station": "tierra",
+    "prompt": "Tu factura de energía ha subido un 40% este semestre, aunque tu producción se mantiene estable. Al recorrer tu taller, notas que las máquinas viejas quedan encendidas en los tiempos de espera y que el local es muy oscuro, obligándote a usar luz artificial todo el día.",
+    "validationRubric": "Debe diagnosticar ineficiencia energética (equipos + iluminación). Acción: instalar temporizadores, mejorar iluminación natural o cambiar hábitos. Inversión: costo de timers/pintura/reparaciones. Métrica: % de reducción en la próxima factura."
+  },
+  {
+    "id": "mc-02",
+    "station": "tierra",
+    "prompt": "Cada semana, generas tres bolsas gigantes de residuos mezclados (restos de comida, cartón y plásticos) que van al vertedero municipal. Pagas por la recolección, pero pierdes materiales que podrían ser compostados o reciclados.",
+    "validationRubric": "Debe diagnosticar la mala gestión de residuos y falta de separación. Acción: implementar separación en origen (compostaje/reciclaje). Inversión: compra de tachos/compostera. Métrica: kg de basura reducida al vertedero."
+  },
+  {
+    "id": "mc-03",
+    "station": "tierra",
+    "prompt": "Tu proceso administrativo es 100% físico: imprimes cada factura, contrato y registro de ventas. Tu oficina acumula cajas de papel viejo y el gasto en tóner y hojas es un costo fijo alto que no aporta valor al negocio.",
+    "validationRubric": "Debe diagnosticar dependencia del papel. Acción: digitalizar procesos (factura electrónica). Inversión: tiempo de implementación o software simple. Métrica: resmas de papel ahorradas al mes."
+  },
+  {
+    "id": "mc-04",
+    "station": "tierra",
+    "prompt": "Tu logística de reparto es caótica. Los vehículos hacen rutas cruzadas, pierden tiempo en tráfico y el gasto en combustible es desmedido. Los clientes se quejan de que los pedidos llegan tarde.",
+    "validationRubric": "Debe diagnosticar ineficiencia logística. Acción: optimizar rutas (mapeo) o combinar envíos. Inversión: tiempo de planificación o app de rutas. Métrica: litros de combustible ahorrados o km totales reducidos."
+  },
+  {
+    "id": "mc-05",
+    "station": "tierra",
+    "prompt": "Al cerrar el negocio, todo queda conectado. Luces de señalización, monitores en modo reposo y máquinas pequeñas siguen consumiendo energía toda la noche (\"energía vampiro\").",
+    "validationRubric": "Debe diagnosticar derroche eléctrico nocturno. Acción: instalar zapatillas (regletas) con interruptor o checklist de apagado. Inversión: costo de las zapatillas. Métrica: ahorro estimado en kWh/mes."
+  },
+  {
+    "id": "mc-06",
+    "station": "tierra",
+    "prompt": "Produces residuos peligrosos (ej. aceites usados, restos de solventes o baterías) y los estás disponiendo junto con la basura común, lo cual es ilegal y contamina las napas de agua del barrio",
+    "validationRubric": "Debe reconocer el riesgo legal y ambiental. Acción: contratar gestor de residuos peligrosos o punto limpio. Inversión: costo del servicio de retiro. Métrica: litros/kg dispuestos de forma segura."
+  },
+  {
+    "id": "mc-07",
+    "station": "tierra",
+    "prompt": "Tu local es un galpón cerrado y caluroso. Para mantenerlo fresco, dependes de ventiladores industriales encendidos a máxima potencia durante toda la jornada, lo que consume mucha electricidad.",
+    "validationRubric": "Debe diagnosticar falta de ventilación natural. Acción: instalar extractores eólicos, tejas traslúcidas o mejorar la circulación del aire. Inversión: obra menor. Métrica: horas de uso de ventiladores reducidas"
+  },
+  {
+    "id": "mc-08",
+    "station": "tierra",
+    "prompt": "En tu almacén, los productos se dañan por humedad o por caducar antes de ser vendidos. No tienes un sistema de control, así que siempre se usa primero lo que queda más a mano y no lo que vence antes.",
+    "validationRubric": "Debe diagnosticar desorden en inventario (falta de sistema FIFO). Acción: organizar estantes por fecha de vencimiento. Inversión: tiempo de reorganización. Métrica: reducción de mermas/pérdida de producto en %."
+  },
+  {
+    "id": "mc-09",
+    "station": "tierra",
+    "prompt": "Limpias tus herramientas y pisos con mangueras de agua potable a chorro libre. No mides el tiempo y el agua corre sin control hacia el desagüe, aunque la tarea podría hacerse con baldes y escobas.",
+    "validationRubric": "Debe diagnosticar uso ineficiente del agua. Acción: cambiar método de limpieza a seco o por baldes. Inversión: costo de implementos (escobas/baldes). Métrica: litros de agua ahorrados por sesión."
+  },
+  {
+    "id": "mc-10",
+    "station": "tierra",
+    "prompt": "Los empleados se quejan porque no tienen un área de trabajo ordenada. Los materiales están tirados en el suelo, lo que causa accidentes, pérdidas de tiempo buscando herramientas y estrés laboral.",
+    "validationRubric": "Debe diagnosticar desorden operativo (falta de 5S). Acción: implementar sistema de orden y rotulado. Inversión: tiempo de capacitación/estanterías. Métrica: reducción del tiempo perdido en buscar herramientas."
+  },
+  {
+    "id": "mc-11",
+    "station": "futuro",
+    "prompt": "Las proyecciones climáticas para tu zona indican sequías extremas o tormentas frecuentes en los próximos 5 años. Tu materia prima depende del agua y hoy eres muy vulnerable.",
+    "validationRubric": "Diagnóstico: vulnerabilidad ante el cambio climático. Acción: diversificar proveedores o implementar sistemas de riego/acopio. Inversión: infraestructura de resiliencia. Métrica: índice de riesgo mitigado."
+  },
+  {
+    "id": "mc-12",
+    "station": "futuro",
+    "prompt": "Tu modelo de negocio funciona gracias a tu esfuerzo personal 24/7. Si te enfermas o quieres tomar vacaciones, el negocio se detiene. Esto no es sostenible.",
+    "validationRubric": "Diagnóstico: dependencia excesiva del fundador. Acción: documentar procesos y capacitar a un segundo al mando. Inversión: tiempo de delegación. Métrica: horas operativas sin presencia del fundador."
+  },
+  {
+    "id": "mc-13",
+    "station": "futuro",
+    "prompt": "Se filtra que el gobierno lanzará una ley el próximo año que prohibirá el uso de un insumo clave que tú utilizas hoy en toda tu línea de producción.",
+    "validationRubric": "Diagnóstico: riesgo regulatorio inminente. Acción: transitar hacia una alternativa legal y sostenible antes de la prohibición. Inversión: costo de cambio de materia prima. Métrica: meses de anticipación a la ley."
+  },
+  {
+    "id": "mc-14",
+    "station": "futuro",
+    "prompt": "Tienes un año de operaciones, pero no tienes datos reales de cuánto impacto ambiental has generado. Es imposible pedir financiamiento sin números.",
+    "validationRubric": "Diagnóstico: falta de sistema de medición (KPIs). Acción: implementar hoja de registro de impactos (desechos, energía, horas). Inversión: tiempo administrativo. Métrica: tener un reporte de impacto anual completo."
+  },
+  {
+    "id": "mc-15",
+    "station": "futuro",
+    "prompt": "Quieres expandirte y abrir una segunda sucursal. Tienes miedo de que la calidad y los valores de sostenibilidad se diluyan en el proceso",
+    "validationRubric": "Diagnóstico: riesgo de pérdida de estándares en la escala. Acción: crear un \"Manual de Cultura Sostenible\" y auditorías. Inversión: costo de estandarización. Métrica: cumplimiento del estándar en la nueva sucursal."
+  },
+  {
+    "id": "mc-16",
+    "station": "futuro",
+    "prompt": "La inflación y la crisis económica han hecho que tus costos de producción aumenten un 20%. Si subes los precios, pierdes clientes; si no, pierdes rentabilidad.",
+    "validationRubric": "Diagnóstico: presión sobre el margen financiero. Acción: eliminar desperdicios productivos para absorber el costo sin subir precios. Inversión: optimización de procesos. Métrica: margen de utilidad sostenido."
+  },
+  {
+    "id": "mc-17",
+    "station": "futuro",
+    "prompt": "Existe una nueva tecnología (ej. paneles solares o maquinaria automática) que reduciría tus costos de operación un 30% a largo plazo, pero requiere una inversión inicial muy alta.",
+    "validationRubric": "Diagnóstico: falta de capital para salto tecnológico. Acción: preparar plan de negocios para solicitar un crédito verde o inversor. Inversión: tiempo en preparar el pitch/plan. Métrica: aprobación de financiamiento obtenido."
+  },
+  {
+    "id": "mc-18",
+    "station": "futuro",
+    "prompt": "Aparece un competidor grande que ofrece un producto \"similar\" al tuyo a mitad de precio, usando materiales baratos y contaminantes. Tus clientes dudan.",
+    "validationRubric": "Diagnóstico: amenaza competitiva por precio. Acción: blindar la lealtad del cliente mediante la educación sobre el valor de tu marca (no precio). Inversión: campaña de valor. Métrica: tasa de retención de clientes."
+  },
+  {
+    "id": "mc-19",
+    "station": "futuro",
+    "prompt": "La nueva generación de consumidores no se siente identificada con tu estilo de venta tradicional. Sientes que estás perdiendo el mercado del futuro.",
+    "validationRubric": "Diagnóstico: desconexión generacional. Acción: adaptar el producto o comunicación (digital/circular) al nuevo segmento. Inversión: diseño de nueva línea o canal. Métrica: % de ventas en nuevos segmentos jóvenes."
+  },
+  {
+    "id": "mc-20",
+    "station": "futuro",
+    "prompt": "Tienes ganancias excedentes al final del año. No quieres solo guardarlas, quieres reinvertirlas para garantizar que el negocio sea mejor el próximo año.",
+    "validationRubric": "Diagnóstico: falta de plan estratégico de reinversión. Acción: definir el \"Proyecto Sostenible 2027\" (ej. nueva certificación, nuevo equipo). Inversión: presupuesto de utilidades. Métrica: meta de impacto alcanzada al año siguiente."
+  },
+  {
+    "id": "mc-21",
+    "station": "mercado",
+    "prompt": "Haces cambios sostenibles increíbles, pero no los cuentas. La gente sigue comprándote por precio y desconoce todo el valor social y ambiental que aportas.",
+    "validationRubric": "Diagnóstico: comunicación deficiente del valor. Acción: campaña de transparencia (storytelling). Inversión: inversión en diseño/social media. Métrica: alcance/engagement de la campaña."
+  },
+  {
+    "id": "mc-22",
+    "station": "mercado",
+    "prompt": "Tus clientes te reclaman porque el producto \"ecológico\" es más caro. No logras explicarles por qué el precio es diferente al de la competencia.",
+    "validationRubric": "Diagnóstico: incapacidad para comunicar valor. Acción: diseñar etiquetas o folletos explicativos. Inversión: materiales de comunicación. Métrica: reducción en la objeción por precio."
+  },
+  {
+    "id": "mc-23",
+    "station": "mercado",
+    "prompt": "Un influencer importante comentó en redes que tu marca hace \"Greenwashing\". Dice que tu cambio eco no es real y que solo buscas marketing.",
+    "validationRubric": "Diagnóstico: crisis de reputación por falta de transparencia. Acción: abrir datos y evidencias de mejora real. Inversión: tiempo de gestión de crisis. Métrica: recuperación de confianza (interacción positiva)."
+  },
+  {
+    "id": "mc-24",
+    "station": "mercado",
+    "prompt": "Quieres aumentar las ventas incentivando la economía circular. Tienes muchos clientes que quieren ser parte pero no saben cómo ayudarte.",
+    "validationRubric": "Diagnóstico: falta de involucramiento del cliente. Acción: implementar programa de recompensa por retorno de envases. Inversión: costo de descuentos/incentivos. Métrica: % de envases retornados."
+  },
+  {
+    "id": "mc-25",
+    "station": "mercado",
+    "prompt": "No sabes qué quieren tus clientes sobre sostenibilidad. Algunos se quejan de que el empaque es muy complejo de reciclar.",
+    "validationRubric": "Diagnóstico: falta de escucha activa. Acción: realizar encuesta de satisfacción sostenible. Inversión: tiempo de análisis. Métrica: # de mejoras implementadas a partir del feedback"
+  },
+  {
+    "id": "mc-26",
+    "station": "mercado",
+    "prompt": "Tu punto de venta (local) es gris, oscuro y se ve muy tradicional. La gente que busca sostenibilidad pasa de largo porque no se siente identificada.",
+    "validationRubric": "Diagnóstico: branding del local desconectado del valor. Acción: rediseñar el local con materiales recuperados. Inversión: adecuación del local. Métrica: aumento en el tráfico peatonal."
+  },
+  {
+    "id": "mc-27",
+    "station": "mercado",
+    "prompt": "El cliente compra el producto, pero no sabe cómo cuidarlo para que dure más o cómo desecharlo correctamente al final.",
+    "validationRubric": "Diagnóstico: falta de manual de uso sostenible. Acción: incluir un QR o guía de cuidado. Inversión: diseño de la guía. Métrica: aumento en la vida útil promedio del producto."
+  },
+  {
+    "id": "mc-28",
+    "station": "mercado",
+    "prompt": "Te ofrecen una alianza con una marca que es muy popular pero tiene pésima fama ambiental. Si te unes, podrías vender mucho, pero ensucias tu imagen.",
+    "validationRubric": "Diagnóstico: riesgo de asociación de marca. Acción: buscar alianza con marcas de valores alineados. Inversión: tiempo de búsqueda de alianzas. Métrica: índice de valor de marca."
+  },
+  {
+    "id": "mc-29",
+    "station": "mercado",
+    "prompt": "Tu equipo de ventas atiende mal a los clientes que preguntan por la sostenibilidad, porque piensan que \"es una moda\" y no conocen los beneficios.",
+    "validationRubric": "Diagnóstico: falta de alineación del equipo de ventas. Acción: taller de formación técnica en sostenibilidad. Inversión: tiempo de formación. Métrica: aumento en ventas asistidas."
+  },
+  {
+    "id": "mc-30",
+    "station": "alquimia",
+    "prompt": "El empaque de tu producto es 100% plástico virgen. Los clientes jóvenes te etiquetan en redes sociales criticando el exceso de basura que genera tu marca al abrirla.",
+    "validationRubric": "Diagnóstico: impacto negativo del packaging. Acción: cambiar a material reciclado, biodegradable o sistema de retorno. Inversión: costo del nuevo packaging. Métrica: # de plásticos evitados al mes."
+  },
+  {
+    "id": "mc-31",
+    "station": "alquimia",
+    "prompt": "Tus materias primas vienen de un proveedor a 2.000 km de distancia. La huella de carbono del transporte es altísima y el costo sube cada mes por el combustible.",
+    "validationRubric": "Diagnóstico: alta dependencia de logística externa. Acción: buscar proveedor regional o local. Inversión: tiempo de investigación/negociación. Métrica: kms de transporte reducidos."
+  },
+  {
+    "id": "mc-32",
+    "station": "alquimia",
+    "prompt": "Tu producto estrella no se puede reparar. Si una pieza pequeña falla, el cliente tira todo el aparato a la basura, lo cual contradice la filosofía de circularidad",
+    "validationRubric": "Diagnóstico: obsolescencia del producto. Acción: rediseñar para que sea modular o dar servicio de reparación. Inversión: diseño o capacitación técnica. Métrica: % de productos reparados vs. desechados."
+  },
+  {
+    "id": "mc-33",
+    "station": "alquimia",
+    "prompt": "Tu proceso de fabricación deja un sobrante (merma) grande de material (tela, madera, metal) que hoy terminas pagando para que alguien lo retire como basura.",
+    "validationRubric": "Diagnóstico: desaprovechamiento de residuos productivos. Acción: transformar el sobrante en un sub-producto. Inversión: horas de diseño/desarrollo. Métrica: ingreso generado por el sub-producto."
+  },
+  {
+    "id": "mc-34",
+    "station": "alquimia",
+    "prompt": "Usas barnices o pegamentos con solventes fuertes. El ambiente en tu taller huele a químico y te preocupa la salud de tu equipo a largo plazo.",
+    "validationRubric": "Diagnóstico: riesgos laborales por químicos tóxicos. Acción: cambiar a insumos base agua o naturales. Inversión: costo de nuevos insumos. Métrica: reducción de riesgos/mejor ambiente laboral."
+  },
+  {
+    "id": "mc-35",
+    "station": "alquimia",
+    "prompt": "Tu producto es igual al de la competencia, solo que un poco más caro. No tienes ningún atributo especial que justifique que alguien elija tu marca por sostenibilidad.",
+    "validationRubric": "Diagnóstico: falta de diferenciación competitiva. Acción: añadir atributo eco-diseñado o certificado. Inversión: mejora técnica. Métrica: incremento en preferencia de compra por valor eco."
+  },
+  {
+    "id": "mc-36",
+    "station": "alquimia",
+    "prompt": "Tus proveedores te envían los insumos dentro de cajas de cartón y mucho plástico que tú mismo debes gestionar como residuo al recibir la mercancía.",
+    "validationRubric": "Diagnóstico: basura externa generada por proveedores. Acción: negociar entregas a granel o cajas retornables. Inversión: tiempo de gestión con proveedores. Métrica: kg de basura entrante reducida."
+  },
+  {
+    "id": "mc-37",
+    "station": "alquimia",
+    "prompt": "Tienes maquinaria cara y eficiente que usas solo un par de horas a la semana. El resto del tiempo el activo está muerto y perdiendo valor.",
+    "validationRubric": "Diagnóstico: subutilización de activos. Acción: modelo de economía colaborativa (alquiler de máquina a otros). Inversión: logística de uso. Métrica: ingreso extra generado por el activo"
+  },
+  {
+    "id": "mc-38",
+    "station": "alquimia",
+    "prompt": "Vendes productos, pero el cliente se queja de que le ocupan mucho espacio en casa o no quiere ser \"dueño\" de algo que usa poco tiempo.",
+    "validationRubric": "Diagnóstico: el modelo de venta no se adapta al uso real. Acción: implementar modelo de servicio/suscripción. Inversión: sistema de gestión. Métrica: contratos de suscripción logrados."
+  },
+  {
+    "id": "mc-39",
+    "station": "alquimia",
+    "prompt": "Un material clave de tu producto es un recurso natural no renovable que está escaseando. Si se agota, tu negocio desaparece.",
+    "validationRubric": "Diagnóstico: dependencia crítica de recurso escaso. Acción: prototipar con material renovable/reciclado. Inversión: I+D (Investigación y Desarrollo). Métrica: % de material crítico reemplazado."
+  },
+  {
+    "id": "mc-40",
+    "station": "raices",
+    "prompt": "Tu negocio crece, pero sientes que pierdes el rumbo. Solo te enfocas en vender, y tu equipo no sabe por qué hacen lo que hacen más allá de ganar dinero.",
+    "validationRubric": "El jugador debe identificar la falta de identidad como causa de la desmotivación. La acción debe ser crear un manifiesto o taller de propósito. La métrica: aumento en el compromiso (ej. encuestas internas)."
+  },
+  {
+    "id": "mc-41",
+    "station": "raices",
+    "prompt": "Te das cuenta de que el 80% de tus insumos vienen de proveedores que maltratan a sus empleados y tú no habías verificado quiénes son.",
+    "validationRubric": "Debe reconocer que la falta de filtro en compras es un riesgo. La acción debe ser auditar o cambiar de proveedores. La métrica: % de proveedores certificados en sostenibilidad."
+  },
+  {
+    "id": "mc-42",
+    "station": "raices",
+    "prompt": "Vives en un barrio donde hay mucha gente desempleada, pero tú prefieres contratar a personas de fuera solo porque 'es más rápido'.",
+    "validationRubric": "Debe ver la oportunidad de generar valor local. La acción: plan de capacitación para vecinos. La métrica: número de empleados locales contratados."
+  },
+  {
+    "id": "mc-43",
+    "station": "raices",
+    "prompt": "La comunidad vecina te ve como un intruso que hace ruido y ensucia. Nunca te has presentado con ellos ni les has explicado qué haces.",
+    "validationRubric": "Debe reconocer el impacto negativo como un costo oculto. La acción: mesa de diálogo o mejora del impacto. La métrica: reducción de quejas recibidas."
+  },
+  {
+    "id": "mc-44",
+    "station": "raices",
+    "prompt": "Tu negocio es informal. No tienes registros, ni permisos, ni seguros. Si llega una inspección hoy, te cierran el local.",
+    "validationRubric": "Debe reconocer que la informalidad limita su crecimiento. La acción: iniciar registro/formalización. La métrica: obtención de número de registro o permiso oficial."
+  },
+  {
+    "id": "mc-45",
+    "station": "raices",
+    "prompt": "Tus empleados están desmotivados. Solo trabajan por el sueldo y sientes que el ambiente es frío y meramente transaccional.",
+    "validationRubric": "Debe reconocer que la informalidad limita su crecimiento. La acción: iniciar registro/formalización. La métrica: obtención de número de registro o permiso oficial."
+  },
+  {
+    "id": "mc-46",
+    "station": "raices",
+    "prompt": "Tienes un 'Propósito' escrito en un cartel, pero en la práctica, tus decisiones de compra diarias contradicen ese propósito todo el tiempo.",
+    "validationRubric": "De be admitir que sus compras diarias contradicen su visión. La acción: crear una \"Política de Compras Responsables\". La métrica: % de insumos que cumplen los nuevos estándares."
+  },
+  {
+    "id": "mc-47",
+    "station": "raices",
+    "prompt": "Un cliente importante te pregunta: '¿Por qué debería comprarte a ti y no a la competencia?'. Tu única respuesta es 'por el precio', y sabes que eso no es sostenible.",
+    "validationRubric": "Debe identificar que competir solo por precio es un error fatal. La acción: comunicar su valor diferencial (impacto). La métrica: aumento en el % de clientes que conocen el propósito."
+  },
+  {
+    "id": "mc-48",
+    "station": "raices",
+    "prompt": "Te diste cuenta de que estás ignorando las leyes locales de seguridad e higiene. No sabes si cumples o no porque nunca leíste la normativa.",
+    "validationRubric": "Debe reconocer la negligencia legal. La acción: investigar y adecuarse a la norma. La métrica: cumplimiento del 100% de la normativa en el próximo mes."
+  },
+  {
+    "id": "mc-49",
+    "station": "raices",
+    "prompt": "Quieres delegar tareas, pero no confías en nadie. Sientes que si no estás tú presente, todo el modelo sostenible que armaste se va a caer.",
+    "validationRubric": "Debe reconocer el cuello de botella que él mismo causa. La acción: documentar procesos y capacitar. La métrica: número de procesos que pueden ejecutarse sin su presencia directa."
+  }
+]

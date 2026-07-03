@@ -4,6 +4,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { generatePresignedUploadUrl, getFileUrl, deleteFile } from '@/lib/s3';
+import { isS3Configured, presignSiepUpload } from '@/lib/siep/file-storage';
 
 export async function GET(req: NextRequest) {
   try {
@@ -41,12 +42,25 @@ export async function POST(req: NextRequest) {
 
     // If action=presign, return presigned URL for upload
     if (body.action === 'presign') {
+      if (body.scope === 'siep') {
+        const result = await presignSiepUpload(
+          body.fileName,
+          body.contentType || 'application/octet-stream',
+        );
+        return NextResponse.json(result);
+      }
+      if (!isS3Configured()) {
+        return NextResponse.json(
+          { error: 'Almacenamiento S3 no configurado (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_BUCKET_NAME)' },
+          { status: 503 },
+        );
+      }
       const { uploadUrl, cloud_storage_path } = await generatePresignedUploadUrl(
         body.fileName,
         body.contentType || 'application/octet-stream',
-        body.isPublic || false
+        body.isPublic || false,
       );
-      return NextResponse.json({ uploadUrl, cloud_storage_path });
+      return NextResponse.json({ mode: 's3', uploadUrl, cloud_storage_path });
     }
 
     // Otherwise, create document record

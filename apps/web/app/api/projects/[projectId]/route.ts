@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
+import { permissionsToApi, resolveSiepPermissions } from '@/lib/siep/permissions';
 
 export async function GET(_req: Request, { params }: { params: { projectId: string } }) {
   try {
@@ -44,6 +45,11 @@ export async function GET(_req: Request, { params }: { params: { projectId: stri
     if (!tenant.companyIds.includes(project.companyId)) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
+
+    const perms = await resolveSiepPermissions(tenant.userId, project.companyId);
+    (project as { siepPermissions?: ReturnType<typeof permissionsToApi> }).siepPermissions =
+      permissionsToApi(perms);
+
     return NextResponse.json({ project });
   } catch (error: any) {
     console.error('Project detail error:', error);

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Target, ArrowLeft, BarChart3, FileText, ExternalLink, Plus } from 'lucide-react';
+import { Target, ArrowLeft, BarChart3, FileText, ExternalLink, Plus, Settings } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
 import { StateEmpty, StateError, StateLoading } from '@/components/ui/StateBlocks';
@@ -79,9 +79,18 @@ export default function PrismHubPage() {
             <ArrowLeft className="h-4 w-4" />
             {t('Voltar ao Hub', 'Volver al Hub', 'Back to Hub')}
           </Link>
-          <div className="flex items-center gap-2 text-rose-700">
-            <Target className="h-6 w-6" />
-            <span className="font-bold tracking-tight">PRISM</span>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/hub/prism/settings"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-medium text-rose-800 hover:bg-rose-50"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              {t('Definições', 'Ajustes', 'Settings')}
+            </Link>
+            <div className="flex items-center gap-2 text-rose-700">
+              <Target className="h-6 w-6" />
+              <span className="font-bold tracking-tight">PRISM</span>
+            </div>
           </div>
         </div>
       </header>

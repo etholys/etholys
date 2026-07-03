@@ -19,6 +19,8 @@ import {
 } from '@/lib/company-context-setup';
 import { isLikelyDbId } from '@/lib/utils';
 import { StateLoading } from '@/components/ui/StateBlocks';
+import { useLicensedSystems } from '@/hooks/useLicensedSystems';
+import { resolveHubCardAccess } from '@/lib/hub-system-license';
 
 const systems: Array<{
   id: string;
@@ -60,9 +62,9 @@ const systems: Array<{
     name: 'ATLAS',
     tagline: { es: 'ERP Integral', pt: 'ERP Integral', en: 'Comprehensive ERP' },
     description: {
-      es: 'Gesti\u00f3n integral de proyectos, finanzas, RRHH, inventario, facturaci\u00f3n y m\u00e1s.',
-      pt: 'Gest\u00e3o integral de projetos, finan\u00e7as, RH, estoque, fatura\u00e7\u00e3o e mais.',
-      en: 'Comprehensive management of projects, finances, HR, inventory, invoicing, and more.',
+      es: 'Gesti\u00f3n empresarial: finanzas, RRHH, inventario, facturaci\u00f3n y operaciones.',
+      pt: 'Gest\u00e3o empresarial: finan\u00e7as, RH, estoque, fatura\u00e7\u00e3o e opera\u00e7\u00f5es.',
+      en: 'Business management: finance, HR, inventory, invoicing, and operations.',
     },
     icon: BarChart3,
     color: 'from-teal-500 to-emerald-600',
@@ -90,11 +92,11 @@ const systems: Array<{
   {
     id: 'fundhub',
     name: 'FUNDHUB',
-    tagline: { es: 'Cooperaci\u00f3n y Fondos', pt: 'Coopera\u00e7\u00e3o e Fundos', en: 'Cooperation & Funds' },
+    tagline: { es: 'Captaci\u00f3n y red', pt: 'Capta\u00e7\u00e3o e rede', en: 'Funding & network' },
     description: {
-      es: 'Gesti\u00f3n de cooperaci\u00f3n internacional, fondos y alianzas estrat\u00e9gicas.',
-      pt: 'Gest\u00e3o de coopera\u00e7\u00e3o internacional, fundos e alian\u00e7as estrat\u00e9gicas.',
-      en: 'Management of international cooperation, funds, and strategic alliances.',
+      es: 'Oportunidades, propuestas, socios locales y cumplimiento \u2014 m\u00e1s que un buscador de fondos.',
+      pt: 'Oportunidades, propostas, parceiros locais e compliance \u2014 mais do que um buscador de fundos.',
+      en: 'Opportunities, proposals, local partners, and compliance \u2014 beyond a grant finder.',
     },
     icon: HandCoins,
     color: 'from-amber-500 to-orange-600',
@@ -106,11 +108,11 @@ const systems: Array<{
   {
     id: 'nexus',
     name: 'NEXUS',
-    tagline: { es: 'Educaci\u00f3n y Capacitaci\u00f3n', pt: 'Educa\u00e7\u00e3o e Capacita\u00e7\u00e3o', en: 'Education & Training' },
+    tagline: { es: 'Desarrollo de negocio', pt: 'Desenvolvimento de neg\u00f3cio', en: 'Business development' },
     description: {
-      es: 'Plataforma de formaci\u00f3n, capacitaci\u00f3n y gesti\u00f3n del conocimiento.',
-      pt: 'Plataforma de forma\u00e7\u00e3o, capacita\u00e7\u00e3o e gest\u00e3o do conhecimento.',
-      en: 'Training, capacity building, and knowledge management platform.',
+      es: 'Red de contactos, asistencia comercial y copiloto para crecer con datos del ecosistema.',
+      pt: 'Rede de contactos, assist\u00eancia comercial e copiloto para crescer com dados do ecossistema.',
+      en: 'Contact network, commercial assistance, and copilot powered by ecosystem data.',
     },
     icon: GraduationCap,
     color: 'from-blue-500 to-indigo-600',
@@ -122,11 +124,11 @@ const systems: Array<{
   {
     id: 'forge',
     name: 'FORGE',
-    tagline: { es: 'Innovaci\u00f3n y Hardware', pt: 'Inova\u00e7\u00e3o e Hardware', en: 'Innovation & Hardware' },
+    tagline: { es: 'Educaci\u00f3n y juegos', pt: 'Educa\u00e7\u00e3o e jogos', en: 'Education & games' },
     description: {
-      es: 'Dise\u00f1o, prototipado e innovaci\u00f3n tecnol\u00f3gica con enfoque territorial.',
-      pt: 'Design, prototipagem e inova\u00e7\u00e3o tecnol\u00f3gica com foco territorial.',
-      en: 'Design, prototyping, and technological innovation with territorial focus.',
+      es: 'Formaci\u00f3n, tableros did\u00e1cticos y aprendizaje tradicional con enfoque territorial.',
+      pt: 'Forma\u00e7\u00e3o, jogos de tabuleiro e aprendizagem tradicional com foco territorial.',
+      en: 'Training, board games, and traditional learning with a territorial focus.',
     },
     icon: Cpu,
     color: 'from-violet-500 to-purple-600',
@@ -138,11 +140,11 @@ const systems: Array<{
   {
     id: 'prism',
     name: 'PRISM',
-    tagline: { es: 'Monitoreo y Evaluaci\u00f3n', pt: 'Monitoramento e Avalia\u00e7\u00e3o', en: 'Monitoring & Evaluation' },
+    tagline: { es: 'ESG y est\u00e1ndares', pt: 'ESG e padr\u00f5es', en: 'ESG & standards' },
     description: {
-      es: 'Monitoreo, evaluaci\u00f3n de impacto e indicadores estrat\u00e9gicos.',
-      pt: 'Monitoramento, avalia\u00e7\u00e3o de impacto e indicadores estrat\u00e9gicos.',
-      en: 'Monitoring, impact evaluation, and strategic indicators.',
+      es: 'Datos ESG, marcos de referencia y lectura para financiadores \u2014 no duplica el M&E del SIEP.',
+      pt: 'Dados ESG, referenciais e leitura para financiadores \u2014 n\u00e3o duplica o M&E do SIEP.',
+      en: 'ESG data, frameworks, and funder-ready views \u2014 not a duplicate of SIEP M&E.',
     },
     icon: Target,
     color: 'from-rose-500 to-pink-600',
@@ -181,6 +183,7 @@ export default function HubPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { locale, setLocale, activeCompanyId } = useApp();
+  const { licensedSystems, showIntegratedWorkspace } = useLicensedSystems(activeCompanyId);
   const [moduleHints, setModuleHints] = useState<ModuleHintCode[]>([]);
   const [hasMeaningfulSetup, setHasMeaningfulSetup] = useState(false);
   const [setupNudge, setSetupNudge] = useState<null | 'missing' | 'currency-mismatch'>(null);
@@ -281,6 +284,9 @@ export default function HubPage() {
             <button onClick={() => setLocale(locale === 'es' ? 'pt' : locale === 'pt' ? 'en' : 'es')} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-100 transition text-slate-600">
               <Globe className="w-3.5 h-3.5" />{locale?.toUpperCase()}
             </button>
+            <Link href="/hub/admin" className="px-3 py-1.5 text-xs rounded-lg hover:bg-slate-100 transition text-slate-600 hidden sm:inline-flex">
+              {locale === 'es' ? 'Administración' : locale === 'pt' ? 'Administração' : 'Admin'}
+            </Link>
             <Link href="/" className="px-3 py-1.5 text-xs rounded-lg hover:bg-slate-100 transition text-slate-600 flex items-center gap-1">
               <ExternalLink className="w-3 h-3" />
               {locale === 'es' ? 'Vitrina' : locale === 'pt' ? 'Vitrine' : 'Showcase'}
@@ -312,6 +318,7 @@ export default function HubPage() {
           </p>
         </div>
 
+        {showIntegratedWorkspace && (
         <Link
           href="/hub/workspace"
           className="mb-8 flex items-start gap-4 rounded-2xl border-2 border-slate-200 bg-gradient-to-r from-slate-50 to-white p-5 shadow-sm transition hover:border-teal-300 hover:shadow-md"
@@ -335,6 +342,7 @@ export default function HubPage() {
             </span>
           </div>
         </Link>
+        )}
 
         <div className="mb-8 text-center">
           <Link
@@ -354,6 +362,15 @@ export default function HubPage() {
                 : locale === 'es'
                   ? `Módulos filtrados por contexto (${moduleHints.join(', ')}). Reabra el asistente para ajustar.`
                   : `Modules filtered by org context (${moduleHints.join(', ')}). Re-open setup to adjust.`}
+            </p>
+          )}
+          {licensedSystems && licensedSystems.length > 0 && (
+            <p className="mt-2 text-xs text-slate-500">
+              {locale === 'pt'
+                ? `Sistemas licenciados para si: ${licensedSystems.join(', ')}. Sem acesso? Peça ao administrador em /hub/admin.`
+                : locale === 'es'
+                  ? `Sistemas con licencia para usted: ${licensedSystems.join(', ')}. ¿Sin acceso? Pida al administrador en /hub/admin.`
+                  : `Licensed systems for you: ${licensedSystems.join(', ')}. No access? Ask your admin at /hub/admin.`}
             </p>
           )}
           {setupNudge && (
@@ -392,7 +409,38 @@ export default function HubPage() {
           {visibleSystems.map((sys) => {
             const Icon = sys.icon;
             const isAdvisor = sys.productTier === 'advisor';
-            return sys.active ? (
+            const cardAccess = resolveHubCardAccess(sys.id, sys.active, licensedSystems);
+            if (cardAccess === 'locked') {
+              return (
+                <div
+                  key={sys.id}
+                  className={`relative rounded-2xl border-2 border-dashed ${sys.borderColor} bg-white/80 p-6 opacity-75`}
+                >
+                  <div className="mb-4 flex items-start justify-between">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${sys.color} opacity-50 shadow-sm`}>
+                      <Icon className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+                      <Lock className="h-3 w-3" />
+                      {locale === 'es' ? 'Sin licencia' : locale === 'pt' ? 'Sem licença' : 'No license'}
+                    </div>
+                  </div>
+                  <h3 className="mb-1 text-xl font-bold text-slate-700">{sys.name}</h3>
+                  <p className="mb-3 text-sm font-medium text-slate-400">{pickLocalized(sys.tagline, locale)}</p>
+                  <p className="mb-4 text-sm leading-relaxed text-slate-400">
+                    {locale === 'pt'
+                      ? 'O administrador da empresa ainda não lhe atribuiu este sistema.'
+                      : locale === 'es'
+                        ? 'El administrador aún no le ha asignado este sistema.'
+                        : 'Your company admin has not assigned this system to you yet.'}
+                  </p>
+                  <Link href="/hub/admin" className="text-sm font-medium text-teal-700 hover:underline">
+                    {locale === 'pt' ? 'Administração Etholys' : locale === 'es' ? 'Administración Etholys' : 'Etholys administration'}
+                  </Link>
+                </div>
+              );
+            }
+            return cardAccess === 'open' ? (
               <Link
                 key={sys.id}
                 href={sys.href}
@@ -438,7 +486,7 @@ export default function HubPage() {
             ) : (
               <div
                 key={sys.id}
-                className={`relative bg-white/60 rounded-2xl border-2 ${sys.borderColor} p-6 opacity-60`}
+                className={`relative rounded-2xl border-2 bg-white/60 ${sys.borderColor} p-6 opacity-60`}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${sys.color} flex items-center justify-center shadow-sm opacity-50`}>

@@ -1,0 +1,81 @@
+{
+  "actions": [
+    {
+      "id": "action-1",
+      "kind": "action",
+      "title": "Implementas una ruta compartida con otros negocios",
+      "effect": "Reduce a la mitad el costo de tu ficha 'Inversión' en cualquier columna.",
+      "tag": "LOGÍSTICA \nVERDE"
+    },
+    {
+      "id": "action-2",
+      "kind": "action",
+      "title": "Tus vecinos te ayudan con un insumo local",
+      "effect": "Elimina la ficha 'Inversión' en la columna 'Tierra'",
+      "tag": "INNOVACIÓN \nLOCAL"
+    },
+    {
+      "id": "action-3",
+      "kind": "action",
+      "title": "Lanzas una campaña digital efectiva.",
+      "effect": "Multiplica por dos el valor de tu ficha 'Métrica' en la columna 'Mercado'.",
+      "tag": "DIGITALIZACIÓN"
+    },
+    {
+      "id": "action-4",
+      "kind": "action",
+      "title": "Reorganizas tu proceso de producción",
+      "effect": "Reduce en un 50% el costo de inversión en 'Alquimia'",
+      "tag": "EFICIENCIA"
+    },
+    {
+      "id": "action-5",
+      "kind": "action",
+      "title": "Te unes a una red de emprendedores",
+      "effect": "Gana un bono de 100 Eco-Créditos inmediato",
+      "tag": "ALIANZA CLAVE"
+    }
+  ],
+  "crises": [
+    {
+      "id": "crisis-1",
+      "kind": "crisis",
+      "title": "Una inundación afecta tu zona",
+      "effect": "Pierdes tu ficha de Acción en Tierra. Debes reescribirla o pagar 200 Eco-Créditos al banco.",
+      "tag": "CLIMA EXTREMO",
+      "fineEco": 200
+    },
+    {
+      "id": "crisis-2",
+      "kind": "crisis",
+      "title": "El gobierno prohíbe tu envase actual",
+      "effect": "Tu ficha de Acción en Alquimia queda obsoleta. Cambia el diseño o paga multa de 200 Eco-Créditos.",
+      "tag": "CAMBIO NORMATIVO",
+      "fineEco": 200
+    },
+    {
+      "id": "crisis-3",
+      "kind": "crisis",
+      "title": "Un comentario negativo se vuelve viral",
+      "effect": "Debes reescribir tu ficha de Acción en Mercado o pagar 150 Eco-Créditos.",
+      "tag": "CRISIS DE REPUTACIÓN",
+      "fineEco": 150
+    },
+    {
+      "id": "crisis-4",
+      "kind": "crisis",
+      "title": "Tus insumos suben de precio un 30%",
+      "effect": "Tu ficha de Inversión en Raíces es insuficiente. Paga 100 Eco-Créditos o pierdes puntos de impacto.",
+      "tag": "SUBIDA DE COSTOS",
+      "fineEco": 100
+    },
+    {
+      "id": "crisis-5",
+      "kind": "crisis",
+      "title": "Tu empleado clave se va a la competencia",
+      "effect": "Tu ficha de Acción en Futuro se pierde. Debes capacitar de nuevo (150 Eco-Créditos).",
+      "tag": "FUGA DE TALENTO",
+      "fineEco": 150
+    }
+  ]
+}

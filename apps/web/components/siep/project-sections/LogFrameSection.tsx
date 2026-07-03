@@ -3,8 +3,10 @@
 import { useState, useMemo } from 'react';
 import { SectionProps } from './types';
 import SectionTooltip from './SectionTooltip';
-import { Plus, X, Save, Link2 } from 'lucide-react';
+import { Plus, X, Save, Link2, GitBranch, LayoutGrid, Sparkles } from 'lucide-react';
+import { flattenObjectives, describeReparentError } from '@/lib/siep/objective-hierarchy';
 import DiamantLogico from './DiamantLogico';
+import HierarchyLinkPanel from './HierarchyLinkPanel';
 
 /* ================================================================
    ALL NODE TYPES
@@ -28,10 +30,13 @@ const ALL_TYPES: NodeType[] = [
 
 const getLabel = (type: string) => ALL_TYPES.find(t => t.value === type)?.label || type;
 
+type LogFrameView = 'diagram' | 'hierarchy' | 'fix';
+
 /* ================================================================
-   MAIN COMPONENT — Diamante L\u00f3gico only (tree view removed)
+   MAIN COMPONENT — Marco Lógico com sub-abas
    ================================================================ */
 export default function LogFrameSection({ project, onRefresh, tr }: SectionProps) {
+  const [activeView, setActiveView] = useState<LogFrameView>('diagram');
   const [showForm, setShowForm] = useState(false);
   const [parentId, setParentId] = useState<string | null>(null);
   const [formLane, setFormLane] = useState<string>('');
@@ -46,6 +51,17 @@ export default function LogFrameSection({ project, onRefresh, tr }: SectionProps
     const walk = (objs: any[]) => { (objs ?? []).forEach(o => { list.push(o); if (o.children?.length) walk(o.children); }); };
     walk(project?.objectives ?? []);
     return list.filter(o => o.type !== 'indicator');
+  }, [project?.objectives]);
+
+  const brokenLinks = useMemo(() => {
+    const flat = flattenObjectives(project?.objectives);
+    const byId = new Map(flat.map((n) => [n.id, n]));
+    return flat.filter((n) => {
+      if (!['outcome', 'objective', 'output', 'activity', 'indicator'].includes(n.type)) return false;
+      const parent = n.parentId ? byId.get(n.parentId) : null;
+      if (!parent && n.type !== 'outcome') return true;
+      return parent ? Boolean(describeReparentError(n, parent, flat)) : false;
+    }).length;
   }, [project?.objectives]);
 
   /* Linkable items */
@@ -103,6 +119,17 @@ export default function LogFrameSection({ project, onRefresh, tr }: SectionProps
     await fetch(`/api/objectives?id=${id}`, { method: 'DELETE' }); onRefresh();
   };
 
+  const handleReparent = async (childId: string, newParentId: string | null) => {
+    const res = await fetch('/api/objectives', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: childId, parentId: newParentId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || 'Erro ao actualizar vínculo');
+    onRefresh();
+  };
+
   const handleSwimEditSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editSwimObj) return;
@@ -117,24 +144,106 @@ export default function LogFrameSection({ project, onRefresh, tr }: SectionProps
 
   const objCount = flatObjs.length;
 
+  const viewHints: Record<LogFrameView, string> = {
+    diagram: 'Diagrama interactivo — zoom, pan e modo vincular para arrastar ou clicar nós.',
+    hierarchy: 'Tabela OE · R · OP · A — uma coluna por tipo, alinhada ao M&E.',
+    fix: 'Reorganizar vínculos com IA ou re-importar o ficheiro original do marco lógico.',
+  };
+
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-gray-900">Marco L&oacute;gico &mdash; Diamante L&oacute;gico</h3>
-            <SectionTooltip title="Diamante L&oacute;gico" content="Visualiza el flujo vertical del proyecto: desde problemas y necesidades, pasando por la cadena de ejecuci&oacute;n, hasta objetivos, resultados y metas. Supuestos y factores externos aparecen en el panel lateral." />
+            <h3 className="font-semibold text-gray-900">Marco L&oacute;gico</h3>
+            <SectionTooltip title="Marco L&oacute;gico" content="Visualiza e corrige a hierarquia do projecto. Use as sub-abas para alternar entre diagrama, tabela M&E e ferramentas de correcção." />
+            <span className="text-[10px] text-gray-400 hidden sm:inline">{objCount} n&oacute;s</span>
           </div>
         </div>
 
-        {/* Diamante L\u00f3gico */}
-        <DiamantLogico
-          objectives={project?.objectives ?? []}
-          onDelete={handleDelete}
-          onCreate={openCreate}
-          onInlineSave={handleInlineSave}
-        />
+        {/* Sub-abas */}
+        <div className="flex border-b border-gray-200 px-2 sm:px-4 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setActiveView('diagram')}
+            className={`flex-shrink-0 px-3 sm:px-4 py-3 text-sm font-medium transition whitespace-nowrap ${
+              activeView === 'diagram'
+                ? 'text-indigo-700 border-b-2 border-indigo-600 bg-indigo-50/50'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <GitBranch className="w-4 h-4 inline mr-1.5" />
+            Diamante L&oacute;gico
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveView('hierarchy')}
+            className={`flex-shrink-0 px-3 sm:px-4 py-3 text-sm font-medium transition whitespace-nowrap ${
+              activeView === 'hierarchy'
+                ? 'text-indigo-700 border-b-2 border-indigo-600 bg-indigo-50/50'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4 inline mr-1.5" />
+            V&iacute;nculos M&amp;E
+            {brokenLinks > 0 && (
+              <span className="ml-1.5 text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full">
+                {brokenLinks}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveView('fix')}
+            className={`flex-shrink-0 px-3 sm:px-4 py-3 text-sm font-medium transition whitespace-nowrap ${
+              activeView === 'fix'
+                ? 'text-indigo-700 border-b-2 border-indigo-600 bg-indigo-50/50'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 inline mr-1.5" />
+            Corrigir / IA
+          </button>
+        </div>
+
+        <p className="px-5 py-2 text-xs text-gray-500 border-b border-gray-100 bg-gray-50/60">
+          {viewHints[activeView]}
+        </p>
+
+        <div className="p-5">
+          {activeView === 'diagram' && (
+            <DiamantLogico
+              objectives={project?.objectives ?? []}
+              onDelete={handleDelete}
+              onCreate={openCreate}
+              onInlineSave={handleInlineSave}
+              onReparent={handleReparent}
+            />
+          )}
+
+          {activeView === 'hierarchy' && (
+            <HierarchyLinkPanel
+              embedded
+              panel="table"
+              projectId={project.id}
+              objectives={project?.objectives ?? []}
+              onReparent={handleReparent}
+              onRefresh={onRefresh}
+            />
+          )}
+
+          {activeView === 'fix' && (
+            <HierarchyLinkPanel
+              embedded
+              panel="tools"
+              projectId={project.id}
+              objectives={project?.objectives ?? []}
+              onReparent={handleReparent}
+              onRefresh={onRefresh}
+            />
+          )}
+        </div>
       </div>
 
       {/* ============ CREATE MODAL ============ */}

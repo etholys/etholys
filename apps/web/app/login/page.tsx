@@ -51,7 +51,12 @@ function LoginContent() {
       if (isLogin) {
         const res = await signIn('credentials', { redirect: false, email: form.email, password: form.password });
         if (res?.error) { setError(locale === 'es' ? 'Credenciales inv\u00e1lidas' : locale === 'pt' ? 'Credenciais inv\u00e1lidas' : 'Invalid credentials'); }
-        else { router.replace('/hub'); }
+        else {
+          const entry = await fetch('/api/workspace/entry-route', { cache: 'no-store' })
+            .then((r) => (r.ok ? r.json() : { href: '/hub' }))
+            .catch(() => ({ href: '/hub' }));
+          router.replace(typeof entry?.href === 'string' ? entry.href : '/hub');
+        }
       } else {
         const res = await fetch('/api/signup', {
           method: 'POST',
@@ -63,7 +68,12 @@ function LoginContent() {
           setError(data?.error || 'Error al registrar');
         } else {
           const signInRes = await signIn('credentials', { redirect: false, email: form.email, password: form.password });
-          if (!signInRes?.error) router.replace('/hub');
+          if (!signInRes?.error) {
+            const entry = await fetch('/api/workspace/entry-route', { cache: 'no-store' })
+              .then((r) => (r.ok ? r.json() : { href: '/hub' }))
+              .catch(() => ({ href: '/hub' }));
+            router.replace(typeof entry?.href === 'string' ? entry.href : '/hub');
+          }
         }
       }
     } catch (err: any) {

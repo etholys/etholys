@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
       email: r.user.email,
       name: r.user.name,
       role: r.role,
+      siepPermissions: Array.isArray(r.siepPermissions) ? r.siepPermissions : [],
     })),
   });
 }

@@ -1,0 +1,127 @@
+{
+  "pre": [
+    {
+      "id": "pre-1",
+      "text": "EN TUS PROPIAS PALABRAS, ¿QUÉ SIGNIFICA PARA TI QUE UN NEGOCIO SEA \"SOSTENIBLE\"?",
+      "type": "text"
+    },
+    {
+      "id": "pre-2",
+      "text": "¿CUÁL ES EL PRIMER PASO PARA INTEGRAR LA SOSTENIBILIDAD EN UN NEGOCIO?",
+      "type": "choice",
+      "options": [
+        "Cobrar más caro por los productos.",
+        "Identificar tu propósito y hacer un diagnóstico de tu situación actual.",
+        "Cambiar los colores de tu marca a tonos verdes."
+      ],
+      "correctIndex": 1
+    },
+    {
+      "id": "pre-3",
+      "text": "SI QUIERES REDUCIR EL IMPACTO AMBIENTAL DE TUS OPERACIONES, LO MEJOR ES:",
+      "type": "choice",
+      "options": [
+        "Comprar maquinaria nueva de inmediato.",
+        "Identificar y medir tus desperdicios y el uso de tus recursos naturales.",
+        "Hacer una campaña publicitaria sobre ecología."
+      ],
+      "correctIndex": 1
+    },
+    {
+      "id": "pre-4",
+      "text": "AL MOMENTO DE CREAR O TRANSFORMAR TU PRODUCTO/SERVICIO, UNA PRÁCTICA SOSTENIBLE ES:",
+      "type": "choice",
+      "options": [
+        "Diseñar procesos circulares (reducir, reutilizar, reciclar).",
+        "Producir la mayor cantidad posible sin importar las mermas.",
+        "Usar el material más barato posible, aunque sea de un solo uso."
+      ],
+      "correctIndex": 0
+    },
+    {
+      "id": "pre-5",
+      "text": "COMUNICAR TUS PRÁCTICAS SOSTENIBLES A LOS CLIENTES SIRVE PRINCIPALMENTE PARA:",
+      "type": "choice",
+      "options": [
+        "Ocultar si el producto tiene algún defecto de calidad.",
+        "Conectar con personas que valoran el impacto positivo y generar confianza.",
+        "Poder vender el producto siempre al doble de precio."
+      ],
+      "correctIndex": 1
+    },
+    {
+      "id": "pre-6",
+      "text": "¿CÓMO SABES SI TU ESFUERZO POR SER SOSTENIBLE ESTÁ FUNCIONANDO REALMENTE?",
+      "type": "choice",
+      "options": [
+        "Definiendo métricas claras y evaluando los resultados periódicamente.",
+        "Sabiendo que los competidores me están copiando.",
+        "Si a fin de mes me sobró algo de dinero en el banco."
+      ],
+      "correctIndex": 0
+    }
+  ],
+  "post": [
+    {
+      "id": "post-1",
+      "text": "¿CUÁL ES LA PRINCIPAL LECCIÓN QUE TE LLEVAS DE LA EXPEDICIÓN DE HOY Y CÓMO LA APLICARÁS EN TU NEGOCIO?",
+      "type": "text"
+    },
+    {
+      "id": "post-2",
+      "text": "SEGÚN EL MAPA QUE USASTE HOY, SU PRIMER PASO DEBERÍA SER:",
+      "type": "choice",
+      "options": [
+        "Gastar sus Eco-Créditos en publicidad.",
+        "Hacer un diagnóstico para saber qué tienen hoy y qué les falta.",
+        "Pedir un préstamo grande al banco."
+      ],
+      "correctIndex": 1
+    },
+    {
+      "id": "post-3",
+      "text": "SI QUIERES REDUCIR EL IMPACTO AMBIENTAL DE TUS OPERACIONES, LO MEJOR ES:",
+      "type": "choice",
+      "options": [
+        "Tirarlos a la basura porque ya no sirven.",
+        "Esconderlos para que el cliente no los vea.",
+        "Definir una Acción para aprovecharlos e Invertir recursos en solucionarlo."
+      ],
+      "correctIndex": 2
+    },
+    {
+      "id": "post-4",
+      "text": "CAMBIAR TU EMPAQUE ACTUAL DE PLÁSTICO POR UNO ECOLÓGICO REPRESENTA:",
+      "type": "choice",
+      "options": [
+        "Una Inversión necesaria a la que luego debes medirle su Resultado/Métrica.",
+        "Un gasto inútil que solo te hace perder Eco-Créditos.",
+        "Una acción que se hace sola, sin necesidad de planificar."
+      ],
+      "correctIndex": 0
+    },
+    {
+      "id": "post-5",
+      "text": "LA MEJOR FORMA DE LLEVAR AL MERCADO UN PRODUCTO DE TRIPLE IMPACTO ES:",
+      "type": "choice",
+      "options": [
+        "Comunicar de forma transparente tu impacto real para atraer a tu público ideal.",
+        "Venderlo sin explicar sus beneficios ambientales para no aburrir al cliente.",
+        "Exagerar sus beneficios ecológicos (Greenwashing) para vender más rápido."
+      ],
+      "correctIndex": 0
+    },
+    {
+      "id": "post-6",
+      "text": "PARA VALIDAR TU ESFUERZO DESPUÉS DE 30 DÍAS, TÚ DEBES:",
+      "type": "choice",
+      "options": [
+        "Suponer que todo está bien si nadie se queja.",
+        "Revisar las métricas de tu mapa para ver si funcionó.",
+        "Cambiar de acción inmediatamente para probar cosas nuevas."
+      ],
+      "correctIndex": 1
+    }
+  ],
+  "sourceChars": 3003
+}

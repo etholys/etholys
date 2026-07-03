@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useApp } from '@/app/providers';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -35,8 +35,10 @@ import {
   TeamSection,
   MonitoringSection,
   SOWSection,
+  ReportsSection,
 } from '@/components/siep/project-sections';
 import type { ProjectData } from '@/components/siep/project-sections';
+import { useSiepT } from '@/lib/siep/use-siep-t';
 
 type TabDef = {
   id: string;
@@ -48,38 +50,89 @@ type TabDef = {
 type ML = { es: string; pt: string; en: string };
 const ml = (en: string, es: string, pt: string): ML => ({ en, es, pt });
 
+const TAB_IDS = [
+  'overview',
+  'sow',
+  'marco',
+  'budget',
+  'activities',
+  'reports',
+  'risks',
+  'team',
+  'monitoring',
+] as const;
+
+type TabId = (typeof TAB_IDS)[number];
+
+function isTabId(value: string | null): value is TabId {
+  return TAB_IDS.includes(value as TabId);
+}
+
 export default function ProjectDetailPage() {
   const { projectId } = useParams() ?? {};
   const router = useRouter();
   const { tr, locale } = useApp();
+  const siepTr = useSiepT();
   const L = (m: ML) => m[locale] || m.en;
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [mountedTabs, setMountedTabs] = useState<Set<TabId>>(() => new Set(['overview']));
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [mounted, setMounted] = useState(false);
   const tabsRef = useRef<HTMLDivElement>(null);
+  const projectRef = useRef<any>(null);
+  projectRef.current = project;
 
   useEffect(() => { setMounted(true); }, []);
 
-  const fetchProject = async () => {
-    if (!projectId) return;
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/projects/${projectId}`);
-      const data = await response.json().catch(() => null);
-      setProject(data?.project);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (!mounted) return;
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (isTabId(tab)) {
+      setActiveTab(tab);
+      setMountedTabs((prev) => new Set(prev).add(tab));
     }
-  };
+  }, [mounted]);
+
+  const selectTab = useCallback((id: TabId) => {
+    setActiveTab(id);
+    setMountedTabs((prev) => new Set(prev).add(id));
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', id);
+    window.history.replaceState(null, '', `${url.pathname}${url.search}`);
+  }, []);
+
+  const fetchProject = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!projectId) return;
+    const silent = opts?.silent ?? Boolean(projectRef.current);
+    if (silent) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, { cache: 'no-store' });
+      const data = await response.json().catch(() => null);
+      if (data?.project) setProject(data.project);
+    } catch {
+      // ignore — mantém dados anteriores em refresh silencioso
+    } finally {
+      if (silent) setRefreshing(false);
+      else setLoading(false);
+    }
+  }, [projectId]);
+
+  const refreshProject = useCallback(() => fetchProject({ silent: true }), [fetchProject]);
+
+  const sectionProps = useMemo(
+    () => ({ project: project as ProjectData, onRefresh: refreshProject, tr }),
+    [project, refreshProject, tr],
+  );
 
   useEffect(() => {
-    if (projectId) fetchProject();
-  }, [projectId]);
+    if (projectId) fetchProject({ silent: false });
+  }, [projectId, fetchProject]);
 
   const handleSave = async () => {
     const data: any = { ...editForm };
@@ -92,7 +145,7 @@ export default function ProjectDetailPage() {
       body: JSON.stringify(data),
     });
     setEditing(false);
-    fetchProject();
+    await refreshProject();
   };
 
   const openEdit = () => {
@@ -114,13 +167,19 @@ export default function ProjectDetailPage() {
     setEditing(true);
   };
 
-  if (loading || !mounted) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-3 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin" /></div>;
+  if (!mounted || (loading && !project)) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-3 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
   if (!project) return <div className="text-center py-12 text-gray-400">{tr('general.noData')}</div>;
 
   const tabs: TabDef[] = [
-    { id: 'overview', label: 'Resumen', icon: Gauge },
-    { id: 'sow', label: 'SOW', icon: FileText },
-    { id: 'marco', label: 'Marco Lógico', icon: GitBranch, badge: (p: any) => {
+    { id: 'overview', label: siepTr('siep.project.tab.overview'), icon: Gauge },
+    { id: 'sow', label: siepTr('siep.project.tab.sow'), icon: FileText },
+    { id: 'marco', label: siepTr('siep.project.tab.logframe'), icon: GitBranch, badge: (p: any) => {
       const count = (p?.objectives ?? []).length;
       return count > 0 ? String(count) : null;
     } },
@@ -129,7 +188,7 @@ export default function ProjectDetailPage() {
       const pct = p?.budget > 0 ? Math.round((spent / p.budget) * 100) : 0;
       return pct > 0 ? `${pct}%` : null;
     } },
-    { id: 'activities', label: 'Actividades', icon: ListChecks, badge: (p: any) => {
+    { id: 'activities', label: siepTr('siep.project.tab.activities'), icon: ListChecks, badge: (p: any) => {
       const tasks = (p?.tasks ?? []).length;
       const milestones = (p?.milestones ?? []).length;
       const total = tasks + milestones;
@@ -137,7 +196,11 @@ export default function ProjectDetailPage() {
       const done = (p?.tasks ?? []).filter((t: any) => t?.status === 'DONE').length + (p?.milestones ?? []).filter((m: any) => m?.completed).length;
       return `${done}/${total}`;
     } },
-    { id: 'risks', label: 'Riesgos', icon: Shield, badge: (p: any) => {
+    { id: 'reports', label: siepTr('siep.project.tab.reports'), icon: FileText, badge: (p: any) => {
+      const reps = (p?.meReports ?? []).length;
+      return reps > 0 ? String(reps) : null;
+    } },
+    { id: 'risks', label: siepTr('siep.project.tab.risks'), icon: Shield, badge: (p: any) => {
       const open = (p?.risks ?? []).filter((r: any) => r?.status === 'open').length;
       return open > 0 ? String(open) : null;
     } },
@@ -145,11 +208,9 @@ export default function ProjectDetailPage() {
       const count = (p?.members ?? []).length;
       return count > 0 ? String(count) : null;
     } },
-    { id: 'monitoring', label: 'M&E', icon: BarChart3, badge: (p: any) => {
+    { id: 'monitoring', label: siepTr('siep.project.tab.monitoring'), icon: BarChart3, badge: (p: any) => {
       const meas = (p?.indicatorMeasurements ?? []).length;
-      const reps = (p?.meReports ?? []).length;
-      const total = meas + reps;
-      return total > 0 ? String(total) : null;
+      return meas > 0 ? String(meas) : null;
     } },
   ];
 
@@ -163,7 +224,14 @@ export default function ProjectDetailPage() {
   };
   const st = statusConfig[project?.status] ?? statusConfig.DRAFT;
 
-  const sectionProps = { project: project as ProjectData, onRefresh: fetchProject, tr };
+  const tabPanel = (id: TabId, node: ReactNode) => {
+    if (!mountedTabs.has(id)) return null;
+    return (
+      <div key={id} className={activeTab === id ? undefined : 'hidden'} aria-hidden={activeTab !== id}>
+        {node}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-0">
@@ -197,6 +265,9 @@ export default function ProjectDetailPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              {refreshing && (
+                <span className="hidden sm:inline text-[10px] text-indigo-500 animate-pulse">A actualizar…</span>
+              )}
               <Link href={`/siep/projects/${project?.id}/gantt`} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">
                 <GanttChart className="w-4 h-4" />
                 Gantt
@@ -229,7 +300,7 @@ export default function ProjectDetailPage() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => selectTab(tab.id as TabId)}
                   className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                     isActive
                       ? 'border-indigo-600 text-indigo-700'
@@ -250,15 +321,16 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      <div className="p-4 sm:p-6">
-        {activeTab === 'overview' && <OverviewSection {...sectionProps} />}
-        {activeTab === 'sow' && <SOWSection {...sectionProps} />}
-        {activeTab === 'marco' && <LogFrameSection {...sectionProps} />}
-        {activeTab === 'budget' && <BudgetSection {...sectionProps} />}
-        {activeTab === 'activities' && (<TasksSection {...sectionProps} />)}
-        {activeTab === 'risks' && <RisksSection {...sectionProps} />}
-        {activeTab === 'team' && <TeamSection {...sectionProps} />}
-        {activeTab === 'monitoring' && <MonitoringSection {...sectionProps} />}
+      <div className={`p-4 sm:p-6 transition-opacity ${refreshing ? 'opacity-95' : ''}`}>
+        {tabPanel('overview', <OverviewSection {...sectionProps} />)}
+        {tabPanel('sow', <SOWSection {...sectionProps} />)}
+        {tabPanel('marco', <LogFrameSection {...sectionProps} />)}
+        {tabPanel('budget', <BudgetSection {...sectionProps} />)}
+        {tabPanel('activities', <TasksSection {...sectionProps} />)}
+        {tabPanel('reports', <ReportsSection {...sectionProps} />)}
+        {tabPanel('risks', <RisksSection {...sectionProps} />)}
+        {tabPanel('team', <TeamSection {...sectionProps} />)}
+        {tabPanel('monitoring', <MonitoringSection {...sectionProps} />)}
       </div>
 
       {editing && (

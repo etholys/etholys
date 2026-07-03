@@ -97,6 +97,9 @@ model User {
   forgeCoursesCreated           ForgeCourse[]              @relation("ForgeCourseCreator")
   forgeCourseFacilitators       ForgeCourseFacilitator[]
   forgeLiveAttendances          ForgeLiveAttendance[]
+  activityReportsAuthored       TaskActivityReport[]         @relation("ActivityReportAuthor")
+  activityReportsReviewed       TaskActivityReport[]         @relation("ActivityReportReviewer")
+  reportGuidesUploaded          ProjectReportGuide[]         @relation("ReportGuideUploader")
 }
 
 model Account {
@@ -240,14 +243,16 @@ model Department {
 }
 
 model CompanyUser {
-  id        String   @id @default(cuid())
-  userId    String
-  companyId String
-  role      UserRole @default(COLLABORATOR)
-  isDefault Boolean  @default(false)
-  createdAt DateTime @default(now())
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String   @id @default(cuid())
+  userId          String
+  companyId       String
+  role            UserRole @default(COLLABORATOR)
+  isDefault       Boolean  @default(false)
+  /// Permissões SIEP granulares (array JSON de chaves — ver lib/siep/permissions.ts)
+  siepPermissions Json?
+  createdAt       DateTime @default(now())
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, companyId])
 }
@@ -329,6 +334,7 @@ model Project {
   country                    String?
   region                     String?
   currency                   String                 @default("USD")
+  contentLocale              String?                @default("es")
   color                      String                 @default("#60B5FF")
   isActive                   Boolean                @default(true)
   createdAt                  DateTime               @default(now())
@@ -339,6 +345,8 @@ model Project {
   companyBudgetItems         CompanyBudgetItem[]
   indicatorMeasurements      IndicatorMeasurement[]
   meReports                  MEReport[]
+  meReportPackages           MEReportPackage[]
+  meReportFiles              MEReportFile[]
   milestones                 Milestone[]
   museSuggestions            MuseSuggestion[]
   nexusNetworksAsContext     NexusNetwork[]         @relation("NexusNetworkSiepProject")
@@ -350,6 +358,32 @@ model Project {
   sowSections                SOWSection[]
   tasks                      Task[]
   transactions               Transaction[]
+  activityReports            TaskActivityReport[]
+  reportGuides               ProjectReportGuide[]
+}
+
+/// Manual / guía de reporte del financiador — referencia permanente para la IA.
+model ProjectReportGuide {
+  id               String   @id @default(cuid())
+  projectId        String
+  title            String
+  fileName         String
+  cloudStoragePath String
+  mimeType         String?
+  fileSizeBytes    Int      @default(0)
+  extractedText    String?  @db.Text
+  extractionStatus String   @default("pending")
+  /// general | me | budget — ámbito del manual para la IA
+  domain           String   @default("general")
+  uploadedById     String?
+  order            Int      @default(0)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy       User?    @relation("ReportGuideUploader", fields: [uploadedById], references: [id])
+
+  @@index([projectId])
 }
 
 model ProjectMember {
@@ -403,6 +437,7 @@ model Task {
   dependedBy       TaskDependency[] @relation("DependencyTask")
   dependsOn        TaskDependency[] @relation("DependentTask")
   timeEntries      TimeEntry[]
+  activityReports  TaskActivityReport[]
 }
 
 model TaskDependency {
@@ -533,6 +568,7 @@ model Transaction {
   companyBudgetItem   CompanyBudgetItem? @relation(fields: [companyBudgetItemId], references: [id])
   company             Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   project             Project?           @relation(fields: [projectId], references: [id])
+  activityReport      TaskActivityReport?
 
   @@index([budgetLineId])
   @@index([companyBudgetItemId])
@@ -1516,6 +1552,8 @@ model BudgetLine {
   category     String
   description  String
   unit         String?
+  /// fixed | percent_of_direct
+  unitType     String         @default("fixed")
   quantity     Float         @default(1)
   unitCost     Float         @default(0)
   total        Float         @default(0)
@@ -1527,11 +1565,70 @@ model BudgetLine {
   isActive     Boolean       @default(true)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
+  project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  transactions    Transaction[]
+  activityReports TaskActivityReport[]
 
   @@index([projectId])
   @@index([projectId, category])
+}
+
+/// Informe interno de avance por actividade (alimenta M&E / reportes externos).
+model TaskActivityReport {
+  id              String            @id @default(cuid())
+  projectId       String
+  taskId          String
+  authorId        String
+  reportDate      DateTime          @default(now())
+  narrative       String            @default("")
+  progressPct     Int?
+  status          String            @default("draft")
+  budgetLineId    String?
+  photoUrls       Json              @default("[]")
+  deliverableUrls Json              @default("[]")
+  includesTravel  Boolean           @default(false)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  reviewNotes     String?
+  transactionId   String?           @unique
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  project         Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task            Task              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author          User              @relation("ActivityReportAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  reviewer        User?             @relation("ActivityReportReviewer", fields: [reviewedById], references: [id])
+  budgetLine      BudgetLine?       @relation(fields: [budgetLineId], references: [id])
+  mileage         TaskMileageClaim?
+  transaction     Transaction?      @relation(fields: [transactionId], references: [id])
+
+  @@index([projectId, taskId])
+  @@index([authorId])
+  @@index([status])
+}
+
+/// Reembolso de combustível / visita de campo ligado a um informe.
+model TaskMileageClaim {
+  id                   String             @id @default(cuid())
+  reportId             String             @unique
+  odometerStart        Float
+  odometerEnd          Float
+  distanceKm           Float
+  fromPlace            String
+  toPlace              String
+  city                 String
+  country              String
+  odometerStartPhoto   String?
+  odometerEndPhoto     String?
+  receiptUrls          Json               @default("[]")
+  fuelPriceUsdPerLiter Float?
+  fuelLitersEstimated  Float?
+  reimbursementUsd     Float?
+  status               String             @default("pending")
+  aiEstimateNotes      String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  report               TaskActivityReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
 }
 
 model IndicatorMeasurement {
@@ -1556,23 +1653,98 @@ model IndicatorMeasurement {
 }
 
 model MEReport {
-  id              String   @id @default(cuid())
+  id              String            @id @default(cuid())
   projectId       String
   title           String
-  type            String   @default("progress")
+  type            String            @default("progress")
   period          String?
-  content         String   @default("")
+  content         String            @default("")
   findings        String?
   recommendations String?
-  status          String   @default("draft")
-  reportDate      DateTime @default(now())
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status          String            @default("draft")
+  reportDate      DateTime          @default(now())
+  /// monthly | quarterly | annual | adhoc
+  cadence         String?
+  /// narrative | me_indicators | financial | evidence_links | other
+  component       String?
+  /// usaid | bid | eu | generic
+  donorFormat     String?
+  packageId       String?
+  parentReportId  String?
+  /// Editor canvas (regions/cells mapped to template)
+  canvasState     Json?
+  canvasFormat    String?
+  aiSessionId     String?
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  project         Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  package         MEReportPackage?  @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  parentReport    MEReport?         @relation("MEReportRollup", fields: [parentReportId], references: [id], onDelete: SetNull)
+  childReports    MEReport[]        @relation("MEReportRollup")
 
   @@index([projectId])
   @@index([projectId, type])
+  @@index([packageId])
+  @@index([parentReportId])
+}
+
+model MEReportPackage {
+  id              String         @id @default(cuid())
+  projectId       String
+  title           String
+  /// monthly | quarterly | annual
+  cadence         String         @default("quarterly")
+  period          String?
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  status          String         @default("draft")
+  donorFormat     String         @default("generic")
+  /// me | budget — separa pacotes M&E de informes financieros
+  domain          String         @default("me")
+  notes           String?
+  /// Pacote trimestral alimentado por pacotes mensais
+  parentPackageId String?
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentPackage   MEReportPackage? @relation("MEReportPackageRollup", fields: [parentPackageId], references: [id], onDelete: SetNull)
+  childPackages   MEReportPackage[] @relation("MEReportPackageRollup")
+  files           MEReportFile[]
+  reports         MEReport[]
+
+  @@index([projectId])
+  @@index([projectId, cadence])
+  @@index([parentPackageId])
+}
+
+model MEReportFile {
+  id                  String          @id @default(cuid())
+  packageId           String
+  projectId           String
+  fileName            String
+  cloudStoragePath    String
+  mimeType            String?
+  fileSizeBytes       Int             @default(0)
+  /// narrative | me_indicators | financial | evidence_links | other
+  component           String          @default("other")
+  cadence             String?
+  aiDetectedComponent String?
+  aiDetectedCadence   String?
+  aiValidation        Json?
+  userConfirmed       Boolean         @default(false)
+  order               Int             @default(0)
+  isActive            Boolean         @default(true)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  package             MEReportPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  project             Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([packageId])
+  @@index([projectId])
 }
 
 model TaxFiling {
@@ -1599,6 +1771,7 @@ model TaxFiling {
 enum AiAdvisorSessionKind {
   WORKSPACE_ADVISOR
   NEXUS_COPILOT
+  SIEP_REPORT
 }
 
 model AiAdvisorSession {

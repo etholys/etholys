@@ -11,6 +11,8 @@ import {
   DollarSign, MessageCircle, PieChart, Handshake, Sprout, PanelLeftClose, PanelLeftOpen, Sparkles
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
+import { useSiepT } from '@/lib/siep/use-siep-t';
+import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
 
 type NavGroup = {
   key: string;
@@ -24,6 +26,7 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
   const router = useRouter();
   const pathname = usePathname();
   const { tr, locale, setLocale, activeCompanyId, setActiveCompanyId } = useApp();
+  const st = useSiepT();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
@@ -88,20 +91,20 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
   const navGroups: NavGroup[] = [
     {
       key: 'projects',
-      label: locale === 'es' ? 'Proyectos' : locale === 'pt' ? 'Projetos' : 'Projects',
+      label: st('siep.nav.projects'),
       icon: FolderKanban,
       items: [
         { href: '/siep/projects', icon: FolderKanban, label: tr('nav.projects') },
-        { href: '/siep/import', icon: Sparkles, label: locale === 'es' ? 'Importar' : locale === 'pt' ? 'Importar' : 'Import' },
-        { href: '/siep/portfolio', icon: PieChart, label: locale === 'es' ? 'Portafolio' : locale === 'pt' ? 'Portf\u00f3lio' : 'Portfolio' },
+        { href: '/siep/import', icon: Sparkles, label: st('siep.nav.import') },
+        { href: '/siep/portfolio', icon: PieChart, label: st('siep.nav.portfolio') },
       ],
     },
     {
       key: 'execution',
-      label: locale === 'es' ? 'Ejecuci\u00f3n' : locale === 'pt' ? 'Execu\u00e7\u00e3o' : 'Execution',
+      label: st('siep.nav.execution'),
       icon: Sprout,
       items: [
-        { href: '/siep/stakeholders', icon: Handshake, label: locale === 'es' ? 'Alianzas' : locale === 'pt' ? 'Alian\u00e7as' : 'Alliances' },
+        { href: '/siep/stakeholders', icon: Handshake, label: st('siep.nav.alliances') },
       ],
     },
   ];
@@ -109,7 +112,7 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
   const bottomItems = [
     { href: '/siep/chat', icon: MessageCircle, label: 'Chat', badge: chatUnread > 0 ? chatUnread : undefined },
     { href: '/siep/reports', icon: BarChart3, label: tr('nav.reports') },
-    { href: '/settings', icon: Settings, label: tr('nav.settings') },
+    { href: '/siep/settings', icon: Settings, label: tr('nav.settings') },
   ];
 
   const activeCompany = companies?.find((c: any) => c?.id === activeCompanyId);
@@ -347,7 +350,9 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
             </div>
           )}
         </div>
-        <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>
+        <main className="flex-1 p-4 md:p-6 overflow-auto">
+          <SystemLicenseGate system="SIEP">{children}</SystemLicenseGate>
+        </main>
       </div>
     </div>
   );

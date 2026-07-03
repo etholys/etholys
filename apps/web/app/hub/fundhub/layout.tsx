@@ -28,6 +28,7 @@ import {
   HandCoins,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
+import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
 
 type NavGroup = {
   key: string;
@@ -101,8 +102,8 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
   }, [status]);
 
   const groupRoutes: Record<string, string[]> = {
-    funds: ['/hub/fundhub/discover', '/hub/fundhub/my-funds'],
-    pipeline: ['/hub/fundhub/proposals', '/hub/fundhub/compliance', '/hub/fundhub/partners'],
+    funds: ['/hub/fundhub/passport', '/hub/fundhub/demand', '/hub/fundhub/discover', '/hub/fundhub/my-funds'],
+    pipeline: ['/hub/fundhub/proposals', '/hub/fundhub/compliance', '/hub/fundhub/coalition', '/hub/fundhub/partners'],
   };
 
   useEffect(() => {
@@ -135,18 +136,28 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
   const navGroups: NavGroup[] = [
     {
       key: 'funds',
-      label: locale === 'es' ? 'Fondos' : locale === 'pt' ? 'Fundos' : 'Funds',
+      label: locale === 'es' ? 'Captación' : locale === 'pt' ? 'Captação' : 'Funding',
       icon: HandCoins,
       items: [
         {
+          href: '/hub/fundhub/passport',
+          icon: ShieldCheck,
+          label: locale === 'es' ? 'Perfil institucional' : locale === 'pt' ? 'Perfil institucional' : 'Institutional profile',
+        },
+        {
+          href: '/hub/fundhub/demand',
+          icon: BarChart3,
+          label: locale === 'es' ? 'Demanda' : locale === 'pt' ? 'Procura' : 'Demand',
+        },
+        {
           href: '/hub/fundhub/discover',
           icon: Search,
-          label: locale === 'es' ? 'Descubrir' : locale === 'pt' ? 'Descobrir' : 'Discover',
+          label: locale === 'es' ? 'Varredura' : locale === 'pt' ? 'Varredura' : 'Scan',
         },
         {
           href: '/hub/fundhub/my-funds',
           icon: Heart,
-          label: locale === 'es' ? 'Mis fondos' : locale === 'pt' ? 'Meus fundos' : 'My funds',
+          label: locale === 'es' ? 'Oportunidades' : locale === 'pt' ? 'Oportunidades' : 'Opportunities',
         },
       ],
     },
@@ -166,8 +177,13 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
           label: 'Compliance',
         },
         {
-          href: '/hub/fundhub/partners',
+          href: '/hub/fundhub/coalition',
           icon: Users,
+          label: locale === 'es' ? 'Coalición' : locale === 'pt' ? 'Coalizão' : 'Coalition',
+        },
+        {
+          href: '/hub/fundhub/partners',
+          icon: HandCoins,
           label: locale === 'es' ? 'Socios' : locale === 'pt' ? 'Parceiros' : 'Partners',
         },
       ],
@@ -215,7 +231,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
               </div>
               {!collapsed && (
                 <span className="font-bold text-gray-900 truncate">
-                  FUND<span className={fh.activeText}>HUB</span>
+                  OPPORT<span className={fh.activeText}>UNITY</span>
                 </span>
               )}
             </Link>
@@ -595,7 +611,9 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
           )}
         </div>
 
-        <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>
+        <main className="flex-1 p-4 md:p-6 overflow-auto">
+          <SystemLicenseGate system="FUNDHUB">{children}</SystemLicenseGate>
+        </main>
       </div>
     </div>
   );

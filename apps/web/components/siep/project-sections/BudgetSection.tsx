@@ -4,7 +4,16 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { SectionProps } from './types';
 import SectionTooltip from './SectionTooltip';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { Plus, Trash2, X, DollarSign, Edit2, Save, ChevronDown, ChevronRight, FileText, AlertCircle, Calendar, CheckSquare, Square, ExternalLink, RefreshCw, ArrowRightLeft } from 'lucide-react';
+import { Plus, Trash2, X, DollarSign, Edit2, Save, ChevronDown, ChevronRight, FileText, AlertCircle, Calendar, CheckSquare, Square, ExternalLink, RefreshCw, ArrowRightLeft, BarChart3 } from 'lucide-react';
+import { SectionReimportBar } from '@/components/siep/SectionReimportBar';
+import { useSiepT } from '@/lib/siep/use-siep-t';
+import {
+  BUDGET_UNIT_TYPES,
+  BUDGET_UNITS,
+  computeLineTotal,
+  inferUnitTypeFromLine,
+  resolveUnitType,
+} from '@/lib/siep/budget-line-calc';
 
 interface TxItem { id: string; type: string; amount: number; description?: string; category?: string; date: string; budgetLineId?: string | null; executionStatus?: string; }
 
@@ -13,6 +22,7 @@ interface BudgetLineItem {
   category: string;
   description: string;
   unit: string | null;
+  unitType?: string | null;
   quantity: number;
   unitCost: number;
   total: number;
@@ -47,12 +57,21 @@ function formatRangeLabel(from: string, to: string) {
 }
 
 export default function BudgetSection({ project, onRefresh, tr }: SectionProps) {
+  const st = useSiepT();
+  const canViewProjectTotal = project?.siepPermissions?.canViewProjectTotal ?? true;
+  const canViewBudgetAmounts = project?.siepPermissions?.canViewBudgetAmounts ?? true;
+  const canViewTransactions = project?.siepPermissions?.canViewTransactions ?? true;
+  const canViewTxAmounts = project?.siepPermissions?.canViewTransactionAmounts ?? true;
+  const fmtAmt = (n: number) => (canViewBudgetAmounts ? formatCurrency(n) : '—');
+  const fmtTx = (n: number) => (canViewTxAmounts ? formatCurrency(n) : '—');
+
   const [lines, setLines] = useState<BudgetLineItem[]>([]);
   const [linesLoading, setLinesLoading] = useState(true);
   const [showLineForm, setShowLineForm] = useState(false);
   const [editLine, setEditLine] = useState<BudgetLineItem | null>(null);
   const [lineForm, setLineForm] = useState<any>({
-    category: 'personnel', description: '', unit: '', quantity: '1', unitCost: '0', narrative: '', fundSource: 'federal',
+    category: 'personnel', description: '', unit: 'month', unitType: 'fixed',
+    quantity: '1', unitCost: '0', narrative: '', fundSource: 'federal',
   });
   const [showNarrative, setShowNarrative] = useState<string | null>(null);
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
@@ -141,9 +160,39 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
     return { totalIncome: inc, totalExpense: exp, remaining: (project?.budget ?? 0) - exp, burnRate: project?.budget > 0 ? Math.round((exp / project.budget) * 100) : 0 };
   }, [filteredProjectTx, project?.budget]);
 
-  const budgetLinesTotal = useMemo(() => lines.reduce((s, l) => s + l.total, 0), [lines]);
-  const federalTotal = useMemo(() => lines.filter(l => l.fundSource === 'federal').reduce((s, l) => s + l.total, 0), [lines]);
-  const costShareTotal = useMemo(() => lines.filter(l => l.fundSource === 'cost_share').reduce((s, l) => s + l.total, 0), [lines]);
+  const lineCalcInputs = useMemo(
+    () => lines.map((l) => ({
+      id: l.id,
+      category: l.category,
+      quantity: l.quantity,
+      unitCost: l.unitCost,
+      unit: l.unit,
+      unitType: l.unitType || inferUnitTypeFromLine(l),
+    })),
+    [lines],
+  );
+
+  const displayTotalForLine = useCallback(
+    (line: BudgetLineItem) => {
+      const input = lineCalcInputs.find((i) => i.id === line.id);
+      if (!input) return line.total;
+      return computeLineTotal(input, lineCalcInputs);
+    },
+    [lineCalcInputs],
+  );
+
+  const budgetLinesTotal = useMemo(
+    () => lines.reduce((s, l) => s + displayTotalForLine(l), 0),
+    [lines, displayTotalForLine],
+  );
+  const directCostsBase = useMemo(
+    () => lineCalcInputs
+      .filter((l) => resolveUnitType(l) === 'fixed')
+      .reduce((s, l) => s + l.quantity * l.unitCost, 0),
+    [lineCalcInputs],
+  );
+  const federalTotal = useMemo(() => lines.filter(l => l.fundSource === 'federal').reduce((s, l) => s + displayTotalForLine(l), 0), [lines, displayTotalForLine]);
+  const costShareTotal = useMemo(() => lines.filter(l => l.fundSource === 'cost_share').reduce((s, l) => s + displayTotalForLine(l), 0), [lines, displayTotalForLine]);
 
   /* Group lines by category */
   const grouped = useMemo(() => {
@@ -151,15 +200,15 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
     BUDGET_CATEGORIES.forEach(c => map.set(c.value, { lines: [], total: 0 }));
     lines.forEach(l => {
       const g = map.get(l.category);
-      if (g) { g.lines.push(l); g.total += l.total; }
+      if (g) { g.lines.push(l); g.total += displayTotalForLine(l); }
       else {
         if (!map.has(l.category)) map.set(l.category, { lines: [], total: 0 });
         const ng = map.get(l.category)!;
-        ng.lines.push(l); ng.total += l.total;
+        ng.lines.push(l); ng.total += displayTotalForLine(l);
       }
     });
     return Array.from(map.entries()).filter(([_, v]) => v.lines.length > 0);
-  }, [lines]);
+  }, [lines, displayTotalForLine]);
 
   /* Executed per line (sum of linked transactions, filtered by period) */
   const executedByLine = useMemo(() => {
@@ -190,17 +239,31 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
     });
   };
 
+  const applyCategoryDefaults = (category: string, prev: any) => {
+    if (category === 'indirect') {
+      return { ...prev, category, unitType: 'percent_of_direct', unit: 'percent', unitCost: '0' };
+    }
+    return { ...prev, category };
+  };
+
   const openLineCreate = () => {
     setEditLine(null);
-    setLineForm({ category: 'personnel', description: '', unit: '', quantity: '1', unitCost: '0', narrative: '', fundSource: 'federal' });
+    setLineForm({
+      category: 'personnel', description: '', unit: 'month', unitType: 'fixed',
+      quantity: '1', unitCost: '0', narrative: '', fundSource: 'federal',
+    });
     setShowLineForm(true);
   };
 
   const openLineEdit = (l: BudgetLineItem) => {
+    const unitType = l.unitType || inferUnitTypeFromLine(l);
     setEditLine(l);
     setLineForm({
-      category: l.category, description: l.description, unit: l.unit || '',
-      quantity: String(l.quantity), unitCost: String(l.unitCost),
+      category: l.category, description: l.description,
+      unit: l.unit || (unitType === 'percent_of_direct' ? 'percent' : 'month'),
+      unitType,
+      quantity: String(l.quantity),
+      unitCost: String(unitType === 'percent_of_direct' ? 0 : l.unitCost),
       narrative: l.narrative, fundSource: l.fundSource,
     });
     setShowLineForm(true);
@@ -232,7 +295,7 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
     setTxSaveError(null);
     setTxForm({
       type: 'EXPENSE',
-      amount: String(line.total ?? ''),
+      amount: String(displayTotalForLine(line)),
       description: line.description || '',
       category: getCatLabel(line.category).split('/')[0].trim(),
       date: today,
@@ -350,20 +413,44 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
     return txs;
   }, [filteredProjectTx, txDateFrom, txDateTo, transactionSubTab]);
 
+  const isPercentLine = lineForm.unitType === 'percent_of_direct' || lineForm.category === 'indirect';
+
   const calcLineTotal = () => {
-    const q = parseFloat(lineForm.quantity) || 0;
-    const u = parseFloat(lineForm.unitCost) || 0;
-    return q * u;
+    const unitType = isPercentLine ? 'percent_of_direct' : 'fixed';
+    const qty = parseFloat(lineForm.quantity) || 0;
+    const uc = parseFloat(lineForm.unitCost) || 0;
+    const siblings = lineCalcInputs.filter((l) => l.id !== editLine?.id);
+    const draft = {
+      id: editLine?.id || 'new',
+      category: lineForm.category,
+      quantity: qty,
+      unitCost: uc,
+      unit: lineForm.unit,
+      unitType,
+    };
+    return computeLineTotal(draft, [...siblings, draft]);
   };
+
+  const formDirectBase = useMemo(() => {
+    const siblings = lineCalcInputs.filter((l) => l.id !== editLine?.id);
+    return siblings
+      .filter((l) => resolveUnitType(l) === 'fixed')
+      .reduce((s, l) => s + l.quantity * l.unitCost, 0);
+  }, [lineCalcInputs, editLine?.id]);
 
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
+      {(canViewProjectTotal || canViewBudgetAmounts) && (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {canViewProjectTotal && (
         <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
           <p className="text-[10px] uppercase tracking-wide text-gray-500 font-medium">Presupuesto Total</p>
           <p className="text-xl font-bold text-indigo-700 mt-1">{formatCurrency(project?.budget)}</p>
         </div>
+        )}
+        {canViewBudgetAmounts && (
+        <>
         <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
           <p className="text-[10px] uppercase tracking-wide text-gray-500 font-medium">Planificado (L&iacute;neas)</p>
           <p className="text-xl font-bold text-blue-600 mt-1">{formatCurrency(budgetLinesTotal)}</p>
@@ -377,7 +464,35 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
           <p className="text-[10px] uppercase tracking-wide text-gray-500 font-medium">Restante</p>
           <p className={`text-xl font-bold mt-1 ${remaining >= 0 ? 'text-gray-900' : 'text-red-600'}`}>{formatCurrency(remaining)}</p>
         </div>
+        </>
+        )}
       </div>
+      )}
+      {!canViewProjectTotal && !canViewBudgetAmounts && (
+        <p className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-xl p-4">
+          {st('siep.budget.amountsHidden')}
+        </p>
+      )}
+
+      <SectionReimportBar
+        section="budgetLines"
+        mode="project"
+        projectId={project.id}
+        context={lines.map((l) => ({
+          category: l.category,
+          description: l.description,
+          unit: l.unit,
+          quantity: l.quantity,
+          unitCost: l.unitCost,
+          total: l.total,
+          narrative: l.narrative,
+          fundSource: l.fundSource,
+        }))}
+        onApplied={() => {
+          fetchLines();
+          onRefresh();
+        }}
+      />
 
       {/* Date Range Filter */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -418,13 +533,13 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
       </div>
 
       {/* Fund Source Split */}
-      {lines.length > 0 && (federalTotal > 0 || costShareTotal > 0) && (
+      {canViewBudgetAmounts && lines.length > 0 && (federalTotal > 0 || costShareTotal > 0) && (
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="flex items-center gap-4">
             <div className="flex-1">
               <div className="flex justify-between text-xs mb-1">
                 <span className="text-gray-500">Fondos Federales</span>
-                <span className="font-medium text-indigo-600">{formatCurrency(federalTotal)}</span>
+                <span className="font-medium text-indigo-600">{fmtAmt(federalTotal)}</span>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${budgetLinesTotal > 0 ? (federalTotal / budgetLinesTotal) * 100 : 0}%` }} />
@@ -433,7 +548,7 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
             <div className="flex-1">
               <div className="flex justify-between text-xs mb-1">
                 <span className="text-gray-500">Contrapartida</span>
-                <span className="font-medium text-emerald-600">{formatCurrency(costShareTotal)}</span>
+                <span className="font-medium text-emerald-600">{fmtAmt(costShareTotal)}</span>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${budgetLinesTotal > 0 ? (costShareTotal / budgetLinesTotal) * 100 : 0}%` }} />
@@ -499,12 +614,14 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
               <button onClick={() => setBudgetTab('lines')} className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition ${budgetTab === 'lines' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                 <FileText className="w-3.5 h-3.5" />Líneas Presupuestarias
               </button>
+              {canViewTransactions && (
               <button onClick={() => setBudgetTab('transactions')} className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition ${budgetTab === 'transactions' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                 <DollarSign className="w-3.5 h-3.5" />Transacciones
                 {filteredProjectTx.length > 0 && <span className="ml-1 bg-indigo-100 text-indigo-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{filteredProjectTx.length}</span>}
               </button>
+              )}
             </div>
-            <SectionTooltip content="Líneas: presupuesto planificado por categoría. Transacciones: registro de ingresos y gastos del proyecto." />
+            <SectionTooltip content={st('siep.budget.tooltip')} />
           </div>
           <div className="flex items-center gap-2">
             {budgetTab === 'lines' && (
@@ -555,10 +672,12 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
                             </div>
                             <span className="text-[10px] font-medium text-gray-500 w-8 text-right">{catPct}%</span>
                           </div>
+                          {canViewBudgetAmounts && (
                           <div className="text-right">
-                            <span className="text-sm font-bold text-gray-900">{formatCurrency(total)}</span>
-                            {catExecuted > 0 && <span className="text-[10px] text-red-500 ml-2">-{formatCurrency(catExecuted)}</span>}
+                            <span className="text-sm font-bold text-gray-900">{fmtAmt(total)}</span>
+                            {catExecuted > 0 && <span className="text-[10px] text-red-500 ml-2">-{fmtAmt(catExecuted)}</span>}
                           </div>
+                          )}
                         </div>
                       </button>
                       {!isCollapsed && (
@@ -569,17 +688,30 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
                                 <th className="text-left px-4 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">&Iacute;tem</th>
                                 <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide w-24">Unidad</th>
                                 <th className="text-right px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide w-20">Cant.</th>
+                                {canViewBudgetAmounts && (
+                                <>
                                 <th className="text-right px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide w-28">Costo Unit.</th>
                                 <th className="text-right px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide w-28">Total</th>
                                 <th className="text-right px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide w-28">Ejecutado</th>
                                 <th className="text-right px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide w-16">%</th>
+                                </>
+                                )}
                                 <th className="w-24 px-2"></th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                               {catLines.map(line => {
                                 const lineExec = executedByLine.get(line.id) ?? 0;
-                                const linePct = line.total > 0 ? Math.round((lineExec / line.total) * 100) : 0;
+                                const lineTotal = displayTotalForLine(line);
+                                const lineIsPercent = resolveUnitType({
+                                  id: line.id,
+                                  category: line.category,
+                                  quantity: line.quantity,
+                                  unitCost: line.unitCost,
+                                  unit: line.unit,
+                                  unitType: line.unitType,
+                                }) === 'percent_of_direct';
+                                const linePct = lineTotal > 0 ? Math.round((lineExec / lineTotal) * 100) : 0;
                                 const lineTxs = filterTxByPeriod(line.transactions ?? []);
                                 return (
                                   <tr key={line.id} className="hover:bg-gray-50/50 transition group">
@@ -604,16 +736,26 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
                                         )}
                                       </div>
                                     </td>
-                                    <td className="px-3 py-2.5 text-xs text-gray-500">{line.unit || '\u2014'}</td>
-                                    <td className="px-3 py-2.5 text-xs text-gray-700 text-right font-medium">{line.quantity}</td>
-                                    <td className="px-3 py-2.5 text-xs text-gray-700 text-right">{formatCurrency(line.unitCost)}</td>
-                                    <td className="px-3 py-2.5 text-sm text-gray-900 text-right font-semibold">{formatCurrency(line.total)}</td>
-                                    <td className="px-3 py-2.5 text-sm text-right font-medium text-red-600">{lineExec > 0 ? formatCurrency(lineExec) : '\u2014'}</td>
+                                    <td className="px-3 py-2.5 text-xs text-gray-500">
+                                      {lineIsPercent ? '% indirectos' : (BUDGET_UNITS.find(u => u.value === line.unit)?.label || line.unit || '\u2014')}
+                                    </td>
+                                    <td className="px-3 py-2.5 text-xs text-gray-700 text-right font-medium">
+                                      {lineIsPercent ? `${line.quantity}%` : line.quantity}
+                                    </td>
+                                    {canViewBudgetAmounts && (
+                                    <>
+                                    <td className="px-3 py-2.5 text-xs text-gray-700 text-right">
+                                      {lineIsPercent ? '\u2014' : fmtAmt(line.unitCost)}
+                                    </td>
+                                    <td className="px-3 py-2.5 text-sm text-gray-900 text-right font-semibold">{fmtAmt(lineTotal)}</td>
+                                    <td className="px-3 py-2.5 text-sm text-right font-medium text-red-600">{lineExec > 0 ? fmtAmt(lineExec) : '\u2014'}</td>
                                     <td className="px-3 py-2.5 text-right">
                                       {linePct > 0 && (
                                         <span className={`text-[10px] font-bold ${linePct >= 100 ? 'text-red-600' : linePct >= 80 ? 'text-amber-600' : 'text-gray-500'}`}>{linePct}%</span>
                                       )}
                                     </td>
+                                    </>
+                                    )}
                                     <td className="px-2 py-2.5">
                                       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition justify-end">
                                         <button onClick={() => openTxFromLine(line)} className="p-1 rounded hover:bg-emerald-50 text-gray-400 hover:text-emerald-600" title="Registrar gasto"><DollarSign className="w-3.5 h-3.5" /></button>
@@ -631,10 +773,12 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
                     </div>
                   );
                 })}
+                {canViewBudgetAmounts && (
                 <div className="flex justify-between items-center px-4 py-3 bg-indigo-50 rounded-lg">
                   <span className="text-sm font-semibold text-indigo-700">Total Presupuesto Detallado</span>
-                  <span className="text-lg font-bold text-indigo-700">{formatCurrency(budgetLinesTotal)}</span>
+                  <span className="text-lg font-bold text-indigo-700">{fmtAmt(budgetLinesTotal)}</span>
                 </div>
+                )}
               </div>
             )}
           </>
@@ -724,7 +868,7 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
                               {t?.executionStatus === 'EXECUTED' ? 'Ejecutado' : 'Previsto'}
                             </span>
                           </td>
-                          <td className={`py-2 px-2 text-right text-xs font-medium ${t?.type === 'INCOME' ? 'text-emerald-600' : 'text-red-600'}`}>{t?.type === 'INCOME' ? '+' : '-'}{formatCurrency(t?.amount)}</td>
+                          <td className={`py-2 px-2 text-right text-xs font-medium ${t?.type === 'INCOME' ? 'text-emerald-600' : 'text-red-600'}`}>{canViewTxAmounts ? `${t?.type === 'INCOME' ? '+' : '-'}${fmtTx(t?.amount)}` : '—'}</td>
                           <td className="py-2 text-right flex items-center justify-end gap-0.5">
                             {t?.receiptUrl && <a href={t.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-600 p-1" title="Ver comprobante"><ExternalLink className="w-3 h-3" /></a>}
                             <button onClick={() => handleTxDelete(t?.id)} className="text-red-400 hover:text-red-600 p-1"><Trash2 className="w-3 h-3" /></button>
@@ -752,7 +896,12 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Categor&iacute;a OMB *</label>
-                  <select required value={lineForm.category} onChange={e => setLineForm({ ...lineForm, category: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm">
+                  <select
+                    required
+                    value={lineForm.category}
+                    onChange={e => setLineForm(applyCategoryDefaults(e.target.value, lineForm))}
+                    className="w-full px-3 py-2 rounded-lg border text-sm"
+                  >
                     {BUDGET_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                   </select>
                 </div>
@@ -768,20 +917,67 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
                 <label className="block text-xs font-medium text-gray-600 mb-1">&Iacute;tem / Descripci&oacute;n *</label>
                 <input required value={lineForm.description} onChange={e => setLineForm({ ...lineForm, description: e.target.value })} placeholder="ej: Director de Proyecto - salario 12 meses" className="w-full px-3 py-2 rounded-lg border text-sm" />
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Unidad</label>
-                  <input value={lineForm.unit} onChange={e => setLineForm({ ...lineForm, unit: e.target.value })} placeholder="meses, viajes..." className="w-full px-3 py-2 rounded-lg border text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
-                  <input type="number" step="any" min="0" value={lineForm.quantity} onChange={e => setLineForm({ ...lineForm, quantity: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Costo Unitario</label>
-                  <input type="number" step="0.01" min="0" value={lineForm.unitCost} onChange={e => setLineForm({ ...lineForm, unitCost: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm" />
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de c&aacute;lculo</label>
+                <select
+                  value={isPercentLine ? 'percent_of_direct' : 'fixed'}
+                  onChange={e => {
+                    const unitType = e.target.value;
+                    if (unitType === 'percent_of_direct') {
+                      setLineForm({ ...lineForm, unitType, unit: 'percent', unitCost: '0' });
+                    } else {
+                      setLineForm({ ...lineForm, unitType, unit: lineForm.unit === 'percent' ? 'month' : lineForm.unit });
+                    }
+                  }}
+                  className="w-full px-3 py-2 rounded-lg border text-sm"
+                >
+                  {BUDGET_UNIT_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
               </div>
+              <div className="grid grid-cols-3 gap-4">
+                {!isPercentLine && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Unidad</label>
+                    <select
+                      value={BUDGET_UNITS.some(u => u.value === lineForm.unit) ? lineForm.unit : 'unit'}
+                      onChange={e => setLineForm({ ...lineForm, unit: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border text-sm"
+                    >
+                      {BUDGET_UNITS.filter(u => u.value !== 'percent').map((u) => (
+                        <option key={u.value} value={u.value}>{u.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className={isPercentLine ? 'col-span-1' : ''}>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    {isPercentLine ? 'Porcentaje (%)' : 'Cantidad'}
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    max={isPercentLine ? '100' : undefined}
+                    value={lineForm.quantity}
+                    onChange={e => setLineForm({ ...lineForm, quantity: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border text-sm"
+                  />
+                </div>
+                {!isPercentLine && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Costo Unitario</label>
+                    <input type="number" step="0.01" min="0" value={lineForm.unitCost} onChange={e => setLineForm({ ...lineForm, unitCost: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm" />
+                  </div>
+                )}
+              </div>
+              {isPercentLine && canViewBudgetAmounts && (
+                <p className="text-xs text-gray-500">
+                  Base de costos directos: <span className="font-semibold text-gray-700">{formatCurrency(formDirectBase)}</span>
+                  {' '}(suma de todas las l&iacute;neas que no son % indirectos)
+                </p>
+              )}
               <div className="bg-indigo-50 rounded-lg px-4 py-2.5 flex justify-between items-center">
                 <span className="text-sm text-indigo-600 font-medium">Total calculado</span>
                 <span className="text-lg font-bold text-indigo-700">{formatCurrency(calcLineTotal())}</span>

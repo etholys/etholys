@@ -15,6 +15,8 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [includeInactive, setIncludeInactive] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -25,10 +27,23 @@ export default function ProjectsPage() {
     const params = new URLSearchParams();
     if (activeCompanyId) params.set('companyId', activeCompanyId);
     if (statusFilter) params.set('status', statusFilter);
-    fetch(`/api/projects?${params}`).then(r => r.json()).then(d => { setProjects(d?.projects ?? []); setLoading(false); }).catch(() => setLoading(false));
+    if (includeInactive) params.set('includeInactive', '1');
+    setFetchError(null);
+    fetch(`/api/projects?${params}`)
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) {
+          setFetchError(d?.error || `Erro ${r.status}`);
+          setProjects([]);
+          return;
+        }
+        setProjects(d?.projects ?? []);
+      })
+      .catch(() => setFetchError('Falha de rede ao carregar projetos.'))
+      .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchProjects(); }, [activeCompanyId, statusFilter]);
+  useEffect(() => { fetchProjects(); }, [activeCompanyId, statusFilter, includeInactive]);
   useEffect(() => {
     fetch('/api/companies').then(r => r.json()).then(d => setCompanies(d?.companies ?? [])).catch(() => {});
     fetch('/api/users').then(r => r.json()).then(d => setUsers(d?.users ?? [])).catch(() => {});
@@ -66,6 +81,15 @@ export default function ProjectsPage() {
 
   return (
     <div className="space-y-6">
+      {fetchError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {fetchError}
+          <span className="block mt-1 text-red-700/90">
+            {locale === 'pt' ? 'Os dados não foram apagados — é um erro de carregamento. Recarregue a página.' : locale === 'es' ? 'Los datos no se borraron — es un error de carga. Recargue la página.' : 'Data was not deleted — this is a load error. Reload the page.'}
+          </span>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{tr('nav.projects')}</h1>
@@ -90,6 +114,15 @@ export default function ProjectsPage() {
           <option value="">{tr('general.all')}</option>
           {statuses.map(s => <option key={s} value={s}>{tr(`status.${s.toLowerCase()}`)}</option>)}
         </select>
+        <label className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-700 whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={includeInactive}
+            onChange={(e) => setIncludeInactive(e.target.checked)}
+            className="rounded border-gray-300"
+          />
+          {locale === 'pt' ? 'Incluir arquivados' : locale === 'es' ? 'Incluir archivados' : 'Include archived'}
+        </label>
       </div>
 
       {loading ? <div className="flex justify-center py-12"><div className="w-8 h-8 border-3 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin" /></div> : (

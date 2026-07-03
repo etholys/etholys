@@ -5,6 +5,12 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { repairIndicatorActivities } from '@/lib/siep/repair-indicator-activities';
+import { repairIndicatorMetadata } from '@/lib/siep/repair-indicator-metadata';
+import { buildObjectiveImportData, extractIndicatorFields } from '@/lib/siep/indicator-fields';
+import { resolveStoredContentLocale } from '@/lib/siep/import-language';
+import type { ContentLocale } from '@/lib/siep/i18n';
+import type { Locale } from '@/lib/i18n';
 
 export async function POST(req: Request) {
   try {
@@ -15,7 +21,27 @@ export async function POST(req: Request) {
     const userId = (session?.user as any)?.id;
 
     const body = await req.json();
-    const { companyId, project: projData, sow, objectives, budgetLines, risks, milestones, diagnostics } = body;
+    const {
+      companyId,
+      project: projData,
+      sow,
+      objectives,
+      budgetLines,
+      risks,
+      milestones,
+      diagnostics,
+      sourceLanguage,
+      contentLocale: detectedLocale,
+    } = body;
+
+    const declaredLang = (['auto', 'es', 'pt', 'en'].includes(String(sourceLanguage || ''))
+      ? sourceLanguage
+      : 'auto') as ContentLocale;
+    const contentLocale = resolveStoredContentLocale(
+      declaredLang,
+      detectedLocale as string | null,
+      'es' as Locale,
+    );
 
     if (!companyId || !projData?.name) {
       return NextResponse.json({ error: 'companyId y nombre de proyecto son requeridos' }, { status: 400 });
@@ -46,6 +72,7 @@ export async function POST(req: Request) {
         priority: 'MEDIUM',
         startDate: projData.startDate ? new Date(projData.startDate) : null,
         endDate: projData.endDate ? new Date(projData.endDate) : null,
+        contentLocale,
       },
     });
 
@@ -80,58 +107,14 @@ export async function POST(req: Request) {
 
     const createObjectiveNode = async (o: any, parentId: string | null, order: number): Promise<number> => {
       let count = 0;
-      const objType = (o.type && VALID_TYPES.has(o.type)) ? o.type : 'objective';
 
       const created = await prisma.objective.create({
-        data: {
-          projectId,
-          parentId,
-          type: objType,
-          code: o.code || null,
-          title: o.title || 'Sin título',
-          description: o.description || null,
-          indicator: null,
-          indicatorType: null,
-          unitOfMeasure: null,
-          baseline: null,
-          target: null,
-          dataSource: null,
-          reportingFreq: null,
-          responsibility: null,
-          order,
-        },
+        data: buildObjectiveImportData(projectId, o, parentId, order),
       });
       count++;
 
-      // Create indicator children
-      if (o.indicators && Array.isArray(o.indicators) && o.indicators.length > 0) {
-        for (let j = 0; j < o.indicators.length; j++) {
-          const ind = o.indicators[j];
-          await prisma.objective.create({
-            data: {
-              projectId,
-              parentId: created.id,
-              type: 'indicator',
-              code: ind.code || null,
-              title: ind.name || 'Indicador',
-              description: null,
-              indicator: ind.name || null,
-              indicatorType: null,
-              unitOfMeasure: ind.unitOfMeasure || null,
-              baseline: String(ind.baseline ?? ''),
-              target: String(ind.target ?? ''),
-              dataSource: ind.dataSource || null,
-              reportingFreq: ind.reportingFreq || null,
-              responsibility: ind.responsibility || null,
-              order: j,
-            },
-          });
-          count++;
-        }
-      }
-
       // Collect activities/deliverables for Task creation
-      if (objType === 'activity' || objType === 'deliverable') {
+      if (created.type === 'activity' || created.type === 'deliverable') {
         activitiesForTasks.push({
           code: o.code || '',
           title: o.title || 'Actividad',
@@ -142,12 +125,47 @@ export async function POST(req: Request) {
         });
       }
 
-      // Recurse into children
+      // Recurse into children BEFORE attaching indicators (so activities exist as parents)
       if (o.children?.length > 0) {
         for (let i = 0; i < o.children.length; i++) {
           count += await createObjectiveNode(o.children[i], created.id, i);
         }
       }
+
+      // Indicators belong under an activity when one exists under this node
+      if (o.indicators && Array.isArray(o.indicators) && o.indicators.length > 0) {
+        const activityChildren = await prisma.objective.findMany({
+          where: { projectId, parentId: created.id, type: 'activity', isActive: true },
+          orderBy: { order: 'asc' },
+        });
+        const indicatorParentId = activityChildren[0]?.id ?? created.id;
+
+        for (let j = 0; j < o.indicators.length; j++) {
+          const ind = o.indicators[j];
+          const fields = extractIndicatorFields(ind);
+          await prisma.objective.create({
+            data: {
+              projectId,
+              parentId: indicatorParentId,
+              type: 'indicator',
+              code: fields.code,
+              title: fields.title,
+              description: null,
+              indicator: fields.indicator,
+              indicatorType: fields.indicatorType,
+              unitOfMeasure: fields.unitOfMeasure,
+              baseline: fields.baseline ?? '',
+              target: fields.target ?? '',
+              dataSource: fields.dataSource,
+              reportingFreq: fields.reportingFreq,
+              responsibility: fields.responsibility,
+              order: j,
+            },
+          });
+          count++;
+        }
+      }
+
       return count;
     };
 
@@ -272,6 +290,17 @@ export async function POST(req: Request) {
     }
 
     console.log(`[Import] Project created: ${project.id} "${project.name}" with:`, results);
+
+    if (results.objectives) {
+      try {
+        const linkRepair = await repairIndicatorActivities(project.id);
+        if (linkRepair.reparented > 0) results.indicatorLinks = linkRepair.reparented;
+        if (linkRepair.activitiesCreated > 0) results.activityNodes = linkRepair.activitiesCreated;
+        await repairIndicatorMetadata(project.id, { useAi: false });
+      } catch (linkErr) {
+        console.warn('[Import] Indicator activity link repair skipped:', linkErr);
+      }
+    }
 
     return NextResponse.json({ project, results });
   } catch (error: any) {

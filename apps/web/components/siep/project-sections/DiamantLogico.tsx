@@ -2,7 +2,12 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { Plus, Trash2, ZoomIn, ZoomOut, Maximize2, Minimize2, Info } from 'lucide-react';
+import { Plus, Trash2, ZoomIn, ZoomOut, Maximize2, Minimize2, Info, Link2, X } from 'lucide-react';
+import {
+  flattenObjectives,
+  describeReparentError,
+  type ObjectiveNode,
+} from '@/lib/siep/objective-hierarchy';
 
 /* ================================================================
    Types & Constants
@@ -187,12 +192,13 @@ function TooltipPortal({ children }: { children: React.ReactNode }) {
    Main component
    ================================================================ */
 export default function DiamantLogico({
-  objectives, onDelete, onCreate, onInlineSave,
+  objectives, onDelete, onCreate, onInlineSave, onReparent,
 }: {
   objectives: DNode[];
   onDelete: (id: string) => void;
   onCreate: (parentId: string | null, type: string, lane?: string) => void;
   onInlineSave: (id: string, data: any) => Promise<void>;
+  onReparent?: (childId: string, newParentId: string | null) => Promise<void>;
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -200,6 +206,12 @@ export default function DiamantLogico({
   const [editTitle, setEditTitle] = useState('');
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [linkMode, setLinkMode] = useState(false);
+  const [linkSourceId, setLinkSourceId] = useState<string | null>(null);
+  const [linkMessage, setLinkMessage] = useState<string | null>(null);
+  const [linkSaving, setLinkSaving] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -223,6 +235,143 @@ export default function DiamantLogico({
   }, [objectives]);
 
   const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
+
+  const flatTree = useMemo(
+    () => flattenObjectives(objectives as ObjectiveNode[]),
+    [objectives],
+  );
+  const flatById = useMemo(() => new Map(flatTree.map((n) => [n.id, n])), [flatTree]);
+
+  const findNodeAtScreen = useCallback(
+    (clientX: number, clientY: number): string | null => {
+      if (!svgRef.current) return null;
+      const pt = svgRef.current.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      const ctm = svgRef.current.getScreenCTM();
+      if (!ctm) return null;
+      const svgPt = pt.matrixTransform(ctm.inverse());
+      for (const n of nodes) {
+        if (svgPt.x >= n.x && svgPt.x <= n.x + n.w && svgPt.y >= n.y && svgPt.y <= n.y + n.h) {
+          return n.id;
+        }
+      }
+      return null;
+    },
+    [nodes],
+  );
+
+  const attemptReparent = useCallback(
+    async (childId: string, parentId: string) => {
+      if (!onReparent) return;
+      const child = flatById.get(childId);
+      const parent = flatById.get(parentId);
+      if (!child || !parent) return;
+      const err = describeReparentError(child, parent, flatTree);
+      if (err) {
+        setLinkMessage(err);
+        return;
+      }
+      setLinkSaving(true);
+      setLinkMessage(null);
+      try {
+        await onReparent(childId, parentId);
+        setLinkSourceId(null);
+        setLinkMessage('Vínculo actualizado — o M&E reflecte a nova hierarquia.');
+      } catch (e: unknown) {
+        setLinkMessage(e instanceof Error ? e.message : 'Erro ao vincular');
+      } finally {
+        setLinkSaving(false);
+      }
+    },
+    [flatById, flatTree, onReparent],
+  );
+
+  const handleLinkNodeClick = useCallback(
+    (nodeId: string) => {
+      if (!linkMode || linkSaving || !onReparent) return;
+      const node = flatById.get(nodeId);
+      if (!node) return;
+
+      if (!linkSourceId) {
+        setLinkSourceId(nodeId);
+        setLinkMessage(`Seleccionado: ${node.code || node.title}. Clique ou solte sobre o novo pai.`);
+        return;
+      }
+
+      if (linkSourceId === nodeId) {
+        setLinkSourceId(null);
+        setLinkMessage(null);
+        return;
+      }
+
+      void attemptReparent(linkSourceId, nodeId);
+    },
+    [attemptReparent, flatById, linkMode, linkSaving, linkSourceId, onReparent],
+  );
+
+  const handleNodeDragStart = useCallback(
+    (e: React.MouseEvent, nodeId: string) => {
+      if (!linkMode || linkSaving || !onReparent) return;
+      e.stopPropagation();
+      e.preventDefault();
+      setDraggingId(nodeId);
+      setLinkSourceId(nodeId);
+      const node = flatById.get(nodeId);
+      setLinkMessage(`A arrastar: ${node?.code || node?.title}. Solte sobre o novo pai.`);
+    },
+    [flatById, linkMode, linkSaving, onReparent],
+  );
+
+  const handleDragMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!draggingId) return;
+      const targetId = findNodeAtScreen(e.clientX, e.clientY);
+      if (targetId && targetId !== draggingId) {
+        const child = flatById.get(draggingId);
+        const parent = flatById.get(targetId);
+        if (child && parent && !describeReparentError(child, parent, flatTree)) {
+          setDropTargetId(targetId);
+          return;
+        }
+      }
+      setDropTargetId(null);
+    },
+    [draggingId, findNodeAtScreen, flatById, flatTree],
+  );
+
+  const handleDragEnd = useCallback(
+    (e: React.MouseEvent) => {
+      if (!draggingId) return;
+      const targetId = dropTargetId || findNodeAtScreen(e.clientX, e.clientY);
+      if (targetId && targetId !== draggingId) {
+        void attemptReparent(draggingId, targetId);
+      }
+      setDraggingId(null);
+      setDropTargetId(null);
+    },
+    [attemptReparent, draggingId, dropTargetId, findNodeAtScreen],
+  );
+
+  useEffect(() => {
+    if (!linkMode) {
+      setLinkSourceId(null);
+      setLinkMessage(null);
+      setDraggingId(null);
+      setDropTargetId(null);
+    }
+  }, [linkMode]);
+
+  const isValidDropTarget = useCallback(
+    (nodeId: string) => {
+      if (!linkSourceId || linkSourceId === nodeId) return false;
+      const child = flatById.get(linkSourceId);
+      const parent = flatById.get(nodeId);
+      if (!child || !parent) return false;
+      return !describeReparentError(child, parent, flatTree);
+    },
+    [flatById, flatTree, linkSourceId],
+  );
 
   const highlighted = useMemo(() => {
     if (!hoveredId) return null;
@@ -260,26 +409,31 @@ export default function DiamantLogico({
     setZoom(z => Math.min(Math.max(z + delta, 0.2), 2.5));
   }, []);
 
-  // Mouse pan
+  // Mouse pan (disabled in link mode)
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return; // left click only
-    // Don't pan if clicking on a node action button
+    if (linkMode || draggingId) return;
+    if (e.button !== 0) return;
     const target = e.target as SVGElement;
-    if (target.closest?.('[data-action]')) return;
+    if (target.closest?.('[data-action]') || target.closest?.('[data-node]')) return;
     setIsPanning(true);
     panStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
-  }, [pan]);
+  }, [draggingId, linkMode, pan]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (draggingId) {
+      handleDragMove(e);
+      return;
+    }
     if (!isPanning) return;
     const dx = e.clientX - panStart.current.x;
     const dy = e.clientY - panStart.current.y;
     setPan({ x: panStart.current.panX + dx, y: panStart.current.panY + dy });
-  }, [isPanning]);
+  }, [draggingId, handleDragMove, isPanning]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    if (draggingId) handleDragEnd(e);
     setIsPanning(false);
-  }, []);
+  }, [draggingId, handleDragEnd]);
 
   const CHILD_MAP: Record<string, string> = {
     goal: 'outcome', impact: 'outcome', outcome: 'objective',
@@ -322,8 +476,8 @@ export default function DiamantLogico({
   const canvasContent = (
     <>
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-gray-500">Zoom: {Math.round(zoom * 100)}%</span>
           <button onClick={handleZoomIn} className="p-1 rounded hover:bg-gray-100 text-gray-500"><ZoomIn className="w-4 h-4" /></button>
           <button onClick={handleZoomOut} className="p-1 rounded hover:bg-gray-100 text-gray-500"><ZoomOut className="w-4 h-4" /></button>
@@ -332,6 +486,20 @@ export default function DiamantLogico({
             className="p-1 rounded hover:bg-gray-100 text-gray-500" title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}>
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
+          {onReparent && (
+            <button
+              type="button"
+              onClick={() => setLinkMode((v) => !v)}
+              className={`ml-1 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition ${
+                linkMode
+                  ? 'bg-amber-50 border-amber-300 text-amber-900'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Link2 className="w-3.5 h-3.5" />
+              {linkMode ? 'Modo vincular activo' : 'Vincular / reorganizar'}
+            </button>
+          )}
         </div>
         {!isFullscreen && (
           <button onClick={() => onCreate(null, 'problem_statement')} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 transition">
@@ -340,11 +508,34 @@ export default function DiamantLogico({
         )}
       </div>
 
+      {linkMode && (
+        <div className="mb-3 flex items-start justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+          <div>
+            <p className="font-medium">Modo vincular</p>
+            <p className="mt-0.5 text-amber-900/90">
+              Clique num elemento (filho), depois clique no novo pai — ou arraste o nó até ao pai correcto.
+              As colunas OE / R / OP / A do M&amp;E actualizam-se automaticamente.
+            </p>
+            {linkMessage && <p className="mt-1 text-amber-800">{linkMessage}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={() => { setLinkMode(false); setLinkSourceId(null); setLinkMessage(null); }}
+            className="p-1 rounded hover:bg-amber-100 text-amber-700"
+            title="Sair do modo vincular"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex gap-3" style={{ height: isFullscreen ? 'calc(100vh - 80px)' : undefined }}>
         {/* SVG Canvas — pannable + zoomable */}
         <div
           ref={containerRef}
-          className={`flex-1 overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-b from-slate-50 to-white ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+          className={`flex-1 overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-b from-slate-50 to-white ${
+            linkMode ? 'cursor-crosshair' : isPanning ? 'cursor-grabbing' : 'cursor-grab'
+          }`}
           style={{ maxHeight: isFullscreen ? 'calc(100vh - 80px)' : '75vh' }}
           onWheel={handleWheel}
           onMouseDown={handleMouseDown}
@@ -410,22 +601,42 @@ export default function DiamantLogico({
               const isDim = highlighted && !isHl;
               const isEditing = editId === n.id;
               const displayCode = n.code || getAbbr(n.type);
+              const isLinkSource = linkSourceId === n.id;
+              const isDropTarget = dropTargetId === n.id || (linkMode && linkSourceId && isValidDropTarget(n.id) && hoveredId === n.id);
+              const nodeStroke = isLinkSource
+                ? '#f59e0b'
+                : isDropTarget
+                  ? '#10b981'
+                  : isHovered
+                    ? '#ffffff'
+                    : 'transparent';
+              const nodeStrokeWidth = isLinkSource || isDropTarget ? 4 : isHovered ? 3 : 0;
 
               return (
                 <g
                   key={n.id}
+                  data-node="true"
                   onMouseEnter={() => handleNodeHover(n.id)}
                   onMouseLeave={() => { setHoveredId(null); setTooltipPos(null); }}
+                  onMouseDown={(e) => {
+                    if (linkMode && !isEditing) handleNodeDragStart(e, n.id);
+                  }}
+                  onClick={(e) => {
+                    if (linkMode && !isEditing) {
+                      e.stopPropagation();
+                      handleLinkNodeClick(n.id);
+                    }
+                  }}
                   opacity={isDim ? 0.1 : 1}
                   style={{ transition: 'opacity 0.2s' }}
-                  className="cursor-pointer"
+                  className={linkMode ? 'cursor-crosshair' : 'cursor-pointer'}
                 >
                   <rect
                     x={n.x} y={n.y} width={n.w} height={n.h}
                     rx={n.h / 2}
                     fill={color}
-                    stroke={isHovered ? '#ffffff' : 'transparent'}
-                    strokeWidth={isHovered ? 3 : 0}
+                    stroke={nodeStroke}
+                    strokeWidth={nodeStrokeWidth}
                     filter="url(#cardShadow)"
                   />
 
@@ -456,8 +667,8 @@ export default function DiamantLogico({
                     </foreignObject>
                   )}
 
-                  {/* Hover actions — compact vertical stack */}
-                  {isHovered && !isEditing && (
+                  {/* Hover actions — hidden in link mode */}
+                  {isHovered && !isEditing && !linkMode && (
                     <g data-action="true">
                       <g onClick={e => { e.stopPropagation(); onCreate(n.id, CHILD_MAP[n.type] || 'activity'); }} className="cursor-pointer">
                         <circle cx={n.x + n.w - 8} cy={n.y + 14} r={7} fill="#10b981" stroke="#fff" strokeWidth={1} />

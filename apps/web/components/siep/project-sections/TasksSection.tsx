@@ -9,6 +9,7 @@ import {
   GanttChart, CheckCircle2, Circle, Milestone,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useSiepT } from '@/lib/siep/use-siep-t';
 
 const STATUSES = ['BACKLOG', 'TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE', 'CANCELLED'] as const;
 const STATUS_LABELS: Record<string, string> = {
@@ -22,7 +23,9 @@ const PRIORITY_LABELS: Record<string, string> = {
 
 const KANBAN_COLS = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'] as const;
 
+
 export function TasksSection({ project, onRefresh }: SectionProps) {
+  const st = useSiepT();
   const tasks = (project?.tasks ?? []).filter((t: any) => t?.isActive !== false);
   const members = project?.members ?? [];
   const total = tasks.length;
@@ -202,6 +205,8 @@ export function TasksSection({ project, onRefresh }: SectionProps) {
         </div>
       </div>
 
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+      <div className="p-5 space-y-5">
       {/* Summary Cards */}
       {viewMode !== 'milestones' && (
         <>
@@ -538,7 +543,9 @@ export function TasksSection({ project, onRefresh }: SectionProps) {
         </div>
       )}
 
-      {/* Milestone Form Modal (P3) */}
+      </div>
+      </div>
+
       {showMsForm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>

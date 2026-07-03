@@ -40,7 +40,10 @@ export default function Providers({
     const saved = localStorage.getItem('rc360_locale') as Locale;
     if (saved === 'es' || saved === 'pt' || saved === 'en') setLocale(saved);
     const savedCompany = localStorage.getItem('rc360_company');
-    if (savedCompany) setActiveCompanyId(savedCompany);
+    if (savedCompany) {
+      setActiveCompanyId(savedCompany);
+      document.cookie = `rc360_company=${encodeURIComponent(savedCompany)}; path=/; max-age=31536000; SameSite=Lax`;
+    }
   }, []);
 
   const handleSetLocale = (l: Locale) => {
@@ -50,8 +53,13 @@ export default function Providers({
 
   const handleSetCompany = (id: string | null) => {
     setActiveCompanyId(id);
-    if (id) localStorage.setItem('rc360_company', id);
-    else localStorage.removeItem('rc360_company');
+    if (id) {
+      localStorage.setItem('rc360_company', id);
+      document.cookie = `rc360_company=${encodeURIComponent(id)}; path=/; max-age=31536000; SameSite=Lax`;
+    } else {
+      localStorage.removeItem('rc360_company');
+      document.cookie = 'rc360_company=; path=/; max-age=0; SameSite=Lax';
+    }
   };
 
   const tr = (key: string) => t(key, locale);

@@ -18,6 +18,8 @@ exports/
 # PDFs del libro FORGE (subidos en local)
 public/uploads/forge-libros/*.pdf
 !public/uploads/forge-libros/.gitkeep
+public/uploads/siep/**/*
+!public/uploads/siep/.gitkeep
 
 # Playwright E2E seed state
 e2e/.seed-state.json

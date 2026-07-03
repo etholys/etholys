@@ -277,7 +277,7 @@ export async function GET(req: NextRequest) {
                     created: fundhubDiscoveryLatest.created,
                     updated: fundhubDiscoveryLatest.updated,
                     errorCount: fundhubDiscoveryLatest.errorCount,
-                    link: '/hub/fundhub/discovery-status',
+                    link: '/hub/fundhub/discover',
                   }
                 : null,
           }

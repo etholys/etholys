@@ -1,12 +1,12 @@
-/** Casillas del tablero La Expedición — textos para tooltips. */
+/** Casillas del tablero La Expedición V2 — paleta Rural Commerce */
 export const BOARD_STATION_META = [
-  { name: 'Raíces', color: 'bg-emerald-500', ring: 'ring-emerald-300', desc: 'Propósito, triple impacto y cliente ideal (LOHAS).' },
-  { name: 'Acción', color: 'bg-amber-400', ring: 'ring-amber-200', desc: 'Decisiones rápidas: lanza el dado y avanza el plan.' },
-  { name: 'Tierra', color: 'bg-amber-700', ring: 'ring-amber-400', desc: 'Recursos, suelo y cadena de valor local.' },
-  { name: 'Desafío', color: 'bg-red-500', ring: 'ring-red-300', desc: 'Obstáculo o coste: puede restar Eco-Créditos.' },
-  { name: 'Alquimia', color: 'bg-orange-500', ring: 'ring-orange-300', desc: 'Transformar materia prima en propuesta de valor.' },
-  { name: 'Mercado', color: 'bg-sky-500', ring: 'ring-sky-300', desc: 'Precio, canal y competencia.' },
-  { name: 'Futuro', color: 'bg-violet-600', ring: 'ring-violet-300', desc: 'Visión, escalabilidad e impacto a largo plazo.' },
+  { name: 'Raíces', color: 'bg-[#1B5E4B]', ring: 'ring-[#2E7D5A]', desc: 'Propósito, triple impacto y cliente ideal (LOHAS).' },
+  { name: 'Acción', color: 'bg-[#F4B942]', ring: 'ring-[#E5A82E]', desc: 'Decisiones rápidas: lanza el dado y avanza el plan.' },
+  { name: 'Tierra', color: 'bg-[#8B5A2B]', ring: 'ring-[#A67C52]', desc: 'Recursos, suelo y cadena de valor local.' },
+  { name: 'Desafío', color: 'bg-[#C62828]', ring: 'ring-[#B71C1C]', desc: 'Obstáculo o coste: puede restar Eco-Créditos.' },
+  { name: 'Alquimia', color: 'bg-[#C45C26]', ring: 'ring-[#D97340]', desc: 'Transformar materia prima en propuesta de valor.' },
+  { name: 'Mercado', color: 'bg-[#1E6B8C]', ring: 'ring-[#2980A8]', desc: 'Precio, canal y competencia.' },
+  { name: 'Futuro', color: 'bg-[#5B3E8C]', ring: 'ring-[#7B5BA8]', desc: 'Visión, escalabilidad e impacto a largo plazo.' },
 ] as const;
 
 const PATTERN = [0, 1, 2, 3, 4, 1, 5, 3, 4, 1, 2, 3, 0, 1, 4, 3, 5, 1, 6, 3];

@@ -17,6 +17,10 @@ export type ForgeLiveConfig = {
   /** Sala separada preparação / moderador */
   facilitatorRoomName?: string;
   facilitatorMeetingUrl?: string;
+  /** presencial = cada um no celular, sem vídeo; online = com Jitsi */
+  sessionFormat?: 'presencial' | 'online';
+  /** false em sessão presencial */
+  videoEnabled?: boolean;
 };
 
 export type ForgeMeetingRole = 'learner' | 'facilitator';
@@ -66,6 +70,8 @@ export function parseLiveConfig(raw: unknown): ForgeLiveConfig {
         : undefined,
     facilitatorMeetingUrl:
       typeof o.facilitatorMeetingUrl === 'string' ? o.facilitatorMeetingUrl.trim() : undefined,
+    sessionFormat: o.sessionFormat === 'presencial' ? 'presencial' : 'online',
+    videoEnabled: o.sessionFormat === 'presencial' ? false : o.videoEnabled !== false,
   };
 }
 

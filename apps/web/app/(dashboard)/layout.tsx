@@ -12,6 +12,7 @@ import {
   FolderOpen, MessageCircle, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
+import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
 
 type NavGroup = {
   key: string;
@@ -357,7 +358,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>
+        <main className="flex-1 p-4 md:p-6 overflow-auto">
+          <SystemLicenseGate system="ATLAS">{children}</SystemLicenseGate>
+        </main>
       </div>
     </div>
   );

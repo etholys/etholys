@@ -16,6 +16,7 @@ export interface ProjectData {
   country?: string;
   region?: string;
   currency: string;
+  contentLocale?: string;
   color?: string;
   company?: { id?: string; name: string; shortName?: string; color?: string };
   tasks?: any[];
@@ -24,6 +25,17 @@ export interface ProjectData {
   transactions?: any[];
   objectives?: any[];
   members?: any[];
+  budgetLines?: { id: string; description: string; category?: string; isActive?: boolean }[];
+  siepPermissions?: {
+    permissions: string[];
+    canViewBudgetAmounts: boolean;
+    canViewProjectTotal: boolean;
+    canViewTransactions: boolean;
+    canViewTransactionAmounts: boolean;
+    canReportActivities: boolean;
+    canApproveReports: boolean;
+    canViewAllReports: boolean;
+  };
 }
 
 export interface SectionProps {

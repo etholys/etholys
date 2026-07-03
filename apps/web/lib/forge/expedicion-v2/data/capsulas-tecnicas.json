@@ -1,0 +1,27 @@
+[
+  {
+    "station": "raices",
+    "title": "Cápsula Raíces",
+    "body": "El propósito no es un cartel: es el filtro de cada decisión. Diagnóstico = qué tienes y qué falta en identidad, equipo y alianzas. Sin propósito medible, el negocio compite solo por precio."
+  },
+  {
+    "station": "tierra",
+    "title": "Cápsula Tierra",
+    "body": "Operaciones sostenibles empiezan por medir: agua, energía, residuos. Acción sin medición es costo oculto. Invierte en eficiencia antes de marketing verde."
+  },
+  {
+    "station": "alquimia",
+    "title": "Cápsula Alquimia",
+    "body": "Diseño circular: reduce materiales, reutiliza subproductos, recicla. Cada cambio de empaque o proceso necesita inversión y una métrica de impacto verificable."
+  },
+  {
+    "station": "mercado",
+    "title": "Cápsula Mercado",
+    "body": "Comunicar impacto real genera confianza; el greenwashing destruye la marca. Tu métrica de mercado debe ser observable por el cliente (ventas, retención, NPS)."
+  },
+  {
+    "station": "futuro",
+    "title": "Cápsula Futuro",
+    "body": "Resiliencia financiera = saber punto de equilibrio, reservas y escenarios. Toda acción sostenible debe traducirse en números que sobrevivan 12 meses."
+  }
+]

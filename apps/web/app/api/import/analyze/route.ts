@@ -5,7 +5,11 @@ import { getUserCompanyIds } from '@/lib/tenant';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import { callImportLlm, getGeminiImportModel } from '@/lib/import-llm';
+import { getGeminiModelCandidates } from '@/lib/gemini-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
+import { collectActivitiesFromObjectives } from '@/lib/siep/import-activities';
+import { buildSourceLanguageInstruction } from '@/lib/siep/import-language';
+import type { ContentLocale } from '@/lib/siep/i18n';
 
 /** Shape of JSON returned by the import LLM; defaults are applied before the response. */
 type ImportExtractedProject = {
@@ -174,7 +178,8 @@ ESTRUCTURA REQUERIDA:
     "budgetLines": "high|medium|low",
     "risks": "high|medium|low",
     "milestones": "high|medium|low"
-  }
+  },
+  "contentLocale": "es|pt|en"
 }
 
 REGLAS CRÍTICAS:
@@ -253,7 +258,15 @@ REGLAS CRÍTICAS:
     - "project.description" debe sintetizar en 1-2 oraciones el contexto del proyecto (beneficiarios, región, problema) SOLO con texto presente en el documento (copia/adjunta frases cortas verbales del origen).
     - En "sow", la sección "background" debe reflejar el contexto inicial del documento; "methodology" el cómo; no dejes sow vacío si el documento tiene apartados equivalentes.
 
+15. IDIOMA ÚNICO EN LA SALIDA:
+    - Ver instrucción de idioma del mensaje del usuario (bloque IDIOMA DEL CONTENIDO).
+    - Incluye siempre "contentLocale" con el código del idioma usado en los textos extraídos.
+
 Responde SOLO el JSON, nada más.`;
+
+function buildExtractionPrompt(sourceLanguage: ContentLocale): string {
+  return `${EXTRACTION_PROMPT}\n\n${buildSourceLanguageInstruction(sourceLanguage)}`;
+}
 
 export async function POST(req: Request) {
   try {
@@ -262,6 +275,9 @@ export async function POST(req: Request) {
 
     const formData = await req.formData();
     const files = formData.getAll('files') as File[];
+    const rawLang = String(formData.get('sourceLanguage') || 'auto').trim();
+    const sourceLanguage: ContentLocale =
+      rawLang === 'es' || rawLang === 'pt' || rawLang === 'en' ? rawLang : 'auto';
 
     if (!files || files.length === 0) {
       return NextResponse.json({ error: 'No se recibieron archivos' }, { status: 400 });
@@ -340,7 +356,7 @@ ${hintParts.length ? `\nInstrucciones adicionales:\n- ${hintParts.join('\n- ')}`
 
     let rawContent: string;
     try {
-      rawContent = await callImportLlm(EXTRACTION_PROMPT, userContent);
+      rawContent = await callImportLlm(buildExtractionPrompt(sourceLanguage), userContent);
     } catch (llmErr: any) {
       console.error('[Import] LLM error:', llmErr);
       const detail = String(llmErr?.message || llmErr);
@@ -352,7 +368,8 @@ ${hintParts.length ? `\nInstrucciones adicionales:\n- ${hintParts.join('\n- ')}`
           detail,
           geminiModel,
           hint:
-            '1) Chave em https://aistudio.google.com/apikey 2) Modelos suportados: https://ai.google.dev/gemini-api/docs/models — defina GEMINI_MODEL (ex.: gemini-2.5-flash) se o predefinido falhar. 3) Reinicie o servidor ou o contentor Docker após alterar o .env.',
+            'Modelos obsoletos (gemini-1.5-*, gemini-2.0-*) já não funcionam. Use GEMINI_MODEL=gemini-2.5-flash ou gemini-2.5-flash-lite. A app tenta automaticamente gemini-3.5-flash e gemini-2.5-pro se houver 503. Reinicie o servidor após alterar o .env.',
+          modelsTried: getGeminiModelCandidates(),
         },
         { status: 502 }
       );
@@ -403,7 +420,12 @@ ${hintParts.length ? `\nInstrucciones adicionales:\n- ${hintParts.join('\n- ')}`
     if (!extracted.confidence) extracted.confidence = { project: 'low', sow: 'low', objectives: 'low', budgetLines: 'low', risks: 'low', milestones: 'low' };
     if (!extracted.diagnostics) extracted.diagnostics = [];
 
-    console.log(`[Import] Extraction complete. Project: "${extracted.project.name}", Objectives: ${extracted.objectives.length}, Diagnostics: ${extracted.diagnostics.length}, Budget lines: ${extracted.budgetLines.length}, Risks: ${extracted.risks.length}, Milestones: ${extracted.milestones.length}`);
+    const fromLogframe = collectActivitiesFromObjectives(extracted.objectives as never[]);
+    if (fromLogframe.length > 0) {
+      (extracted as ImportExtractedPayload & { activities?: unknown[] }).activities = fromLogframe;
+    }
+
+    console.log(`[Import] Extraction complete. Project: "${extracted.project.name}", Objectives: ${extracted.objectives.length}, Diagnostics: ${extracted.diagnostics.length}, Budget lines: ${extracted.budgetLines.length}, Risks: ${extracted.risks.length}, Milestones: ${extracted.milestones.length}, Activities: ${fromLogframe.length}`);
 
     return NextResponse.json({ extracted, filesProcessed: files.map(f => f.name) });
   } catch (error: any) {

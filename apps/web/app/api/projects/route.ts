@@ -11,7 +11,9 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const companyId = searchParams.get('companyId');
     const status = searchParams.get('status');
-    const where: any = { isActive: true };
+    const includeInactive = searchParams.get('includeInactive') === '1';
+    const where: any = {};
+    if (!includeInactive) where.isActive = true;
     // Tenant isolation: only projects from user's companies
     if (companyId && tenant.companyIds.includes(companyId)) {
       where.companyId = companyId;

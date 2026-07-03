@@ -17,6 +17,7 @@ import {
   Building2,
   UserCircle,
   Map,
+  Settings,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import type { ForgeAccessContext } from '@/lib/forge/access-context-shared';
@@ -29,6 +30,7 @@ import { forgeCourseEntryPath, isForgeSalaPath } from '@/lib/forge/course-entry-
 import { showsLiveFeatures } from '@/lib/forge/delivery';
 import { useForgeT } from '@/lib/forge/use-forge-t';
 import { ForgeLocaleSwitcher } from '@/components/forge/ForgeLocaleSwitcher';
+import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
 
 const fg = {
   grad: 'from-slate-900 via-blue-950 to-indigo-900',
@@ -48,6 +50,7 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
     { href: '/hub/forge/trilhas', icon: Route, label: ft('forge.nav.trails') },
     { href: '/hub/forge/gamificacao', icon: Trophy, label: ft('forge.nav.gamification') },
     { href: '/hub/forge/certificados', icon: Award, label: ft('forge.nav.certificates') },
+    { href: '/hub/forge/settings', icon: Settings, label: ft('forge.nav.settings') },
   ];
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -325,7 +328,9 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
         </div>
         <main className="flex-1 p-4 md:p-6">
           <div className="mx-auto max-w-7xl" data-forge-company-query={q}>
-            {children}
+            <SystemLicenseGate system="FORGE" isExemptPath={isPublicForgePath}>
+              {children}
+            </SystemLicenseGate>
           </div>
         </main>
       </div>

@@ -11,6 +11,20 @@ import {
   Calendar, ClipboardList, Eye, Check, Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SectionReimportBar } from '@/components/siep/SectionReimportBar';
+import {
+  mergeSectionIntoExtracted,
+  PREVIEW_TAB_TO_SECTION,
+  type ImportSectionKey,
+} from '@/lib/siep/import-section-prompts';
+import {
+  collectActivitiesFromObjectives,
+  countActivityViews,
+  mergeActivityViews,
+  normalizeMilestonesPartial,
+} from '@/lib/siep/import-activities';
+import { siepT, type ContentLocale } from '@/lib/siep/i18n';
+import type { Locale } from '@/lib/i18n';
 
 /* ─── types ─── */
 type Confidence = 'high' | 'medium' | 'low';
@@ -36,6 +50,7 @@ interface ExtractedData {
   milestones: MilestoneItem[];
   activities?: ActivityItem[];
   confidence: Record<string, Confidence>;
+  contentLocale?: 'es' | 'pt' | 'en';
 }
 interface ObjNode {
   type: string; code: string; title: string; description: string;
@@ -97,6 +112,7 @@ const ml = (en: string, es: string, pt: string): ML => ({ en, es, pt });
 export default function SmartImportPage() {
   const { locale } = useApp();
   const L = (m: ML) => m[locale] || m.en;
+  const st = (key: string) => siepT(key, locale as Locale);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -112,6 +128,9 @@ export default function SmartImportPage() {
   const [createdProject, setCreatedProject] = useState<any>(null);
   const [createdResults, setCreatedResults] = useState<Record<string, number>>({});
   const [confirming, setConfirming] = useState(false);
+  const [sourceLanguage, setSourceLanguage] = useState<ContentLocale>(
+    () => (locale === 'pt' || locale === 'en' ? locale : 'es'),
+  );
 
   // Fetch companies
   useEffect(() => {
@@ -166,6 +185,7 @@ export default function SmartImportPage() {
     try {
       const fd = new FormData();
       files.forEach(f => fd.append('files', f));
+      fd.append('sourceLanguage', sourceLanguage);
 
       const res = await fetch('/api/import/analyze', { method: 'POST', body: fd });
       clearInterval(interval);
@@ -179,7 +199,7 @@ export default function SmartImportPage() {
           err.geminiModel && `Modelo Gemini: ${err.geminiModel}`,
           err.hint && `Dica: ${err.hint}`,
         ].filter(Boolean);
-        throw new Error(lines.length ? lines.join('\n\n') : 'Erro ao analisar arquivos');
+        throw new Error(lines.length ? lines.join('\n\n') : L(ml('Could not analyze files', 'No se pudieron analizar los archivos', 'Não foi possível analisar os arquivos')));
       }
 
       const data = await res.json();
@@ -204,7 +224,12 @@ export default function SmartImportPage() {
       const res = await fetch('/api/import/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, ...extracted }),
+        body: JSON.stringify({
+          companyId,
+          sourceLanguage,
+          contentLocale: extracted.contentLocale,
+          ...extracted,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -260,19 +285,70 @@ export default function SmartImportPage() {
     setExtracted({ ...extracted, milestones: extracted.milestones.filter((_, i) => i !== idx) });
   };
 
+  const getSectionContext = (tabKey: string) => {
+    if (!extracted) return undefined;
+    const section = PREVIEW_TAB_TO_SECTION[tabKey];
+    if (!section) return undefined;
+    if (section === 'project') return { project: extracted.project };
+    if (section === 'budgetLines') return { budgetLines: extracted.budgetLines };
+    if (section === 'milestones') {
+      return {
+        milestones: extracted.milestones,
+        activities: extracted.activities,
+        objectivesActivities: collectActivitiesFromObjectives(extracted.objectives),
+      };
+    }
+    return { [section]: (extracted as any)[section] };
+  };
+
+  const handleSectionReimport = (partial: Record<string, unknown>, mode: 'replace' | 'append') => {
+    if (!extracted) return;
+    const section = PREVIEW_TAB_TO_SECTION[activeTab] as ImportSectionKey | undefined;
+    if (!section) return;
+    const merged = mergeSectionIntoExtracted(extracted as any, section, partial, mode) as unknown as ExtractedData;
+    setExtracted(merged);
+    setError('');
+    if (section === 'milestones') {
+      const norm = normalizeMilestonesPartial(partial);
+      const visible = mergeActivityViews(merged.activities, merged.objectives).length + (merged.milestones?.length ?? 0);
+      if (norm.activities.length === 0 && norm.milestones.length === 0 && visible === 0) {
+        setError(L(ml(
+          'No activities found in this file. Upload the Timeline/Schedule (Excel) or use the Logframe tab.',
+          'Ninguna actividad encontrada en este archivo. Confirme que subió el Cronograma (Excel) o use la pestaña Marco Lógico.',
+          'Nenhuma atividade encontrada neste ficheiro. Confirme que enviou o Cronograma (Excel) ou use o separador Marco Lógico.',
+        )));
+      }
+    }
+  };
+
   /* ═══ STEP: UPLOAD ═══ */
   const renderUpload = () => (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Company selector */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Organizaci&oacute;n</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{L(ml('Organization', 'Organización', 'Organização'))}</label>
         <select
           value={companyId}
           onChange={e => setCompanyId(e.target.value)}
           className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
         >
-          <option value="">Seleccionar organizaci&oacute;n...</option>
+          <option value="">{L(ml('Select organization…', 'Seleccionar organización…', 'Selecionar organização…'))}</option>
           {companies.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{st('siep.import.sourceLanguage')}</label>
+        <p className="text-xs text-gray-500 mb-2">{st('siep.import.sourceLanguageHint')}</p>
+        <select
+          value={sourceLanguage}
+          onChange={(e) => setSourceLanguage(e.target.value as ContentLocale)}
+          className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+        >
+          <option value="auto">{st('siep.import.source.auto')}</option>
+          <option value="es">{st('siep.import.source.es')}</option>
+          <option value="pt">{st('siep.import.source.pt')}</option>
+          <option value="en">{st('siep.import.source.en')}</option>
         </select>
       </div>
 
@@ -368,7 +444,9 @@ export default function SmartImportPage() {
   );
 
   /* ═══ STEP: PREVIEW / EDIT ═══ */
-  const actCount = (extracted?.activities?.length ?? 0) + (extracted?.milestones?.length ?? 0);
+  const actCount = extracted
+    ? countActivityViews(extracted.activities, extracted.objectives, extracted.milestones?.length ?? 0)
+    : 0;
   const diagCount = extracted?.diagnostics?.length ?? 0;
   const tabs = [
     { key: 'project', label: 'Proyecto', icon: Building2, count: null },
@@ -411,6 +489,17 @@ export default function SmartImportPage() {
 
         {/* Tab content */}
         <div className="bg-white rounded-xl border border-gray-100 p-5">
+          {PREVIEW_TAB_TO_SECTION[activeTab] && (
+            <SectionReimportBar
+              section={PREVIEW_TAB_TO_SECTION[activeTab]}
+              context={getSectionContext(activeTab)}
+              mode="preview"
+              onApplied={handleSectionReimport}
+              onError={(msg) => setError(msg)}
+              className="mb-5"
+            />
+          )}
+
           {/* CONFIDENCE BADGE */}
           {d.confidence && d.confidence[activeTab] && (
             <div className="mb-4">{confBadge(d.confidence[activeTab] as Confidence)}</div>
@@ -719,16 +808,40 @@ export default function SmartImportPage() {
   );
 
   /* ── activities tab (activities + milestones combined) ── */
-  const renderActivitiesTab = (d: ExtractedData) => (
+  const renderActivitiesTab = (d: ExtractedData) => {
+    const fromObjectives = collectActivitiesFromObjectives(d.objectives);
+    const fromTimeline = mergeActivityViews(d.activities, []);
+    const allActivities = mergeActivityViews(d.activities, d.objectives);
+
+    return (
     <div className="space-y-5">
-      {/* Activities from LogFrame */}
-      {(d.activities?.length ?? 0) > 0 && (
+      {fromObjectives.length > 0 && (
         <div>
-          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Actividades extra&iacute;das</h4>
+          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+            Actividades del marco l&oacute;gico ({fromObjectives.length})
+          </h4>
           <div className="space-y-2">
-            {d.activities!.map((a, i) => (
-              <div key={i} className="flex items-center gap-3 border border-gray-100 rounded-lg px-4 py-2.5">
-                <span className="text-xs font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded shrink-0">{a.code || `A${i + 1}`}</span>
+            {fromObjectives.map((a, i) => (
+              <div key={`obj-${i}`} className="flex items-center gap-3 border border-indigo-100 bg-indigo-50/30 rounded-lg px-4 py-2.5">
+                <span className="text-xs font-bold text-indigo-600 bg-white px-1.5 py-0.5 rounded shrink-0">{a.code || `A${i + 1}`}</span>
+                <span className="flex-1 text-sm text-gray-800">{a.title}</span>
+                {a.startDate && <span className="text-[10px] text-gray-400">{a.startDate}</span>}
+                {a.endDate && <span className="text-[10px] text-gray-400">&rarr; {a.endDate}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {fromTimeline.length > 0 && (
+        <div>
+          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+            Cronograma / timeline ({fromTimeline.length})
+          </h4>
+          <div className="space-y-2">
+            {fromTimeline.map((a, i) => (
+              <div key={`tl-${i}`} className="flex items-center gap-3 border border-amber-100 bg-amber-50/30 rounded-lg px-4 py-2.5">
+                <span className="text-xs font-bold text-amber-700 bg-white px-1.5 py-0.5 rounded shrink-0">{a.code || `T${i + 1}`}</span>
                 <span className="flex-1 text-sm text-gray-800">{a.title}</span>
                 {a.startDate && <span className="text-[10px] text-gray-400">{a.startDate}</span>}
                 {a.endDate && <span className="text-[10px] text-gray-400">&rarr; {a.endDate}</span>}
@@ -757,11 +870,14 @@ export default function SmartImportPage() {
         )}
       </div>
 
-      {(d.activities?.length ?? 0) === 0 && d.milestones.length === 0 && (
-        <p className="text-sm text-gray-400 italic text-center py-8">No se encontraron actividades ni hitos</p>
+      {allActivities.length === 0 && d.milestones.length === 0 && (
+        <p className="text-sm text-gray-400 italic text-center py-8">
+          No se encontraron actividades. Si ya aparecen en Marco L&oacute;gico, recargue esta pesta&ntilde;a o re-importe el archivo Timeline (.xlsx).
+        </p>
       )}
     </div>
-  );
+    );
+  };
 
   /* ═══ STEP: SUCCESS ═══ */
   const renderSuccess = () => (
@@ -774,10 +890,12 @@ export default function SmartImportPage() {
         <p className="text-sm text-gray-500 mt-2">{createdProject?.name}</p>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-md mx-auto">
-        {Object.entries(createdResults).map(([key, val]) => (
+        {Object.entries(createdResults)
+          .filter(([, val]) => typeof val === 'number')
+          .map(([key, val]) => (
           <div key={key} className="bg-gray-50 rounded-lg p-3 text-center">
-            <p className="text-lg font-bold text-indigo-600">{val as number}</p>
-            <p className="text-xs text-gray-500 capitalize">{key === 'sow' ? 'Secciones SOW' : key === 'objectives' ? 'Objetivos' : key === 'budgetLines' ? 'L\u00edneas presup.' : key === 'risks' ? 'Riesgos' : key === 'milestones' ? 'Hitos' : key === 'tasks' ? 'Tareas' : key === 'indicators' ? 'Indicadores' : key}</p>
+            <p className="text-lg font-bold text-indigo-600">{val}</p>
+            <p className="text-xs text-gray-500 capitalize">{key === 'sow' ? 'Secciones SOW' : key === 'objectives' ? 'Objetivos' : key === 'budgetLines' ? 'L\u00edneas presup.' : key === 'risks' ? 'Riesgos' : key === 'milestones' ? 'Hitos' : key === 'tasks' ? 'Tareas' : key === 'indicators' ? 'Indicadores' : key === 'indicatorLinks' ? 'Indicadores vinculados' : key === 'activityNodes' ? 'N\u00f3s actividad' : key === 'diagnostics' ? 'Diagn\u00f3stico' : key}</p>
           </div>
         ))}
       </div>

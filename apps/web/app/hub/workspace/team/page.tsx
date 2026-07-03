@@ -7,7 +7,9 @@ import { useApp } from '@/app/providers';
 import { WorkspaceTopBar } from '@/components/workspace/WorkspaceTopBar';
 import { useHubWorkspaceRoute } from '@/components/hub/HubWorkspaceShell';
 import { WORKSPACE_SYSTEM_KEYS, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
-import { Shield } from 'lucide-react';
+import { Shield, Lock } from 'lucide-react';
+import { getSiepPermissionGroups, type SiepPermissionKey } from '@/lib/siep/permissions';
+import type { Locale } from '@/lib/i18n';
 import { isLikelyDbId } from '@/lib/utils';
 import { StateEmpty, StateError, StateLoading } from '@/components/ui/StateBlocks';
 
@@ -34,6 +36,12 @@ export default function WorkspaceTeamPage() {
   const [loading, setLoading] = useState(true);
   const [targetUser, setTargetUser] = useState('');
   const [saving, setSaving] = useState(false);
+  const siepPermGroups = useMemo(() => getSiepPermissionGroups(locale as Locale), [locale]);
+  const [siepPerms, setSiepPerms] = useState<Record<SiepPermissionKey, boolean>>(
+    () => Object.fromEntries(siepPermGroups.flatMap((g) => g.permissions.map((p) => [p.key, false]))) as Record<SiepPermissionKey, boolean>,
+  );
+  const [siepSaving, setSiepSaving] = useState(false);
+  const [siepMsg, setSiepMsg] = useState<string | null>(null);
   const [sel, setSel] = useState<Record<WorkspaceSystemKey, boolean>>(
     () =>
       Object.fromEntries(WORKSPACE_SYSTEM_KEYS.map((k) => [k, k === 'ATLAS' || k === 'SIEP'])) as Record<
@@ -64,6 +72,49 @@ export default function WorkspaceTeamPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!companyId || !targetUser) return;
+    void (async () => {
+      const r = await fetch(
+        `/api/workspace/members/permissions?companyId=${encodeURIComponent(companyId)}&userId=${encodeURIComponent(targetUser)}`,
+      );
+      const d = await r.json();
+      const next = Object.fromEntries(
+        siepPermGroups.flatMap((g) => g.permissions.map((p) => [p.key, false])),
+      ) as Record<SiepPermissionKey, boolean>;
+      if (r.ok && Array.isArray(d.permissions)) {
+        for (const k of d.permissions as SiepPermissionKey[]) {
+          if (k in next) next[k] = true;
+        }
+      }
+      setSiepPerms(next);
+    })();
+  }, [companyId, targetUser, siepPermGroups]);
+
+  const saveSiepPermissions = async () => {
+    if (!targetUser) {
+      setSiepMsg(t('Escolha um utilizador.', 'Elija un usuario.', 'Choose a user.'));
+      return;
+    }
+    setSiepMsg(null);
+    setSiepSaving(true);
+    const permissions = (Object.entries(siepPerms) as [SiepPermissionKey, boolean][])
+      .filter(([, on]) => on)
+      .map(([k]) => k);
+    const r = await fetch('/api/workspace/members/permissions', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, userId: targetUser, permissions }),
+    });
+    const d = await r.json();
+    setSiepSaving(false);
+    if (!r.ok) {
+      setSiepMsg(d.error || 'Erro');
+      return;
+    }
+    setSiepMsg(t('Permissões SIEP guardadas.', 'Permisos SIEP guardados.', 'SIEP permissions saved.'));
+  };
 
   const save = async () => {
     if (!targetUser) {
@@ -272,6 +323,63 @@ export default function WorkspaceTeamPage() {
         </div>
 
         {msg && <p className="mt-3 text-sm text-slate-800">{msg}</p>}
+
+        <div className="mt-8 space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/30 p-4 shadow-sm">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+            <Lock className="h-4 w-4 text-indigo-600" />
+            {t('Permissões SIEP (casinhas)', 'Permisos SIEP (casillas)', 'SIEP permissions')}
+          </h2>
+          <p className="text-xs text-slate-600">
+            {t(
+              'Defina o que este utilizador vê no SIEP: valores do orçamento, extrato, reportes de campo, etc.',
+              'Defina qué ve este usuario en SIEP: montos, extracto, reportes de campo, etc.',
+              'Control what this user sees in SIEP: budget amounts, ledger, field reports, etc.',
+            )}
+          </p>
+          {!targetUser ? (
+            <p className="text-sm text-slate-500">{t('Selecione um utilizador acima.', 'Seleccione un usuario arriba.', 'Select a user above.')}</p>
+          ) : (
+            <div className="space-y-4">
+              {siepPermGroups.map((group) => (
+                <div key={group.id}>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-indigo-800">{group.label}</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {group.permissions.map((perm) => (
+                      <label
+                        key={perm.key}
+                        className="flex cursor-pointer items-start gap-2 rounded-lg border border-white bg-white/80 p-2.5 text-sm shadow-sm hover:border-indigo-200"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={siepPerms[perm.key]}
+                          onChange={(e) => setSiepPerms((s) => ({ ...s, [perm.key]: e.target.checked }))}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="font-medium text-slate-800">{perm.label}</span>
+                          {perm.description && (
+                            <span className="mt-0.5 block text-[11px] text-slate-500">{perm.description}</span>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                disabled={siepSaving}
+                onClick={() => void saveSiepPermissions()}
+                className="rounded-lg bg-indigo-700 px-4 py-2 text-sm text-white hover:bg-indigo-800 disabled:opacity-50"
+              >
+                {siepSaving
+                  ? t('A guardar…', 'Guardando…', 'Saving…')
+                  : t('Guardar permissões SIEP', 'Guardar permisos SIEP', 'Save SIEP permissions')}
+              </button>
+            </div>
+          )}
+          {siepMsg && <p className="text-sm text-slate-800">{siepMsg}</p>}
+        </div>
 
         <div className="mt-8">
           <h2 className="text-sm font-semibold text-slate-800">{t('Atribuídos', 'Asignados', 'Grants')}</h2>

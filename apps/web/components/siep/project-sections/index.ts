@@ -6,6 +6,7 @@ export { TasksSection } from './TasksSection';
 export { RisksSection } from './RisksSection';
 export { TeamSection } from './TeamSection';
 export { MonitoringSection } from './MonitoringSection';
+export { default as ReportsSection } from './ReportsSection';
 export { default as SOWSection } from './SOWSection';
 export { SectionTooltip } from './SectionTooltip';
 export type { ProjectData, SectionProps, SectionInfo } from './types';

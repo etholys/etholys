@@ -4,6 +4,11 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import {
+  canReparentTo,
+  describeReparentError,
+  wouldCreateCycle,
+} from '@/lib/siep/objective-hierarchy';
 
 export async function GET(req: Request) {
   try {
@@ -58,6 +63,42 @@ export async function PUT(req: Request) {
     const body = await req.json();
     const { id, ...data } = body;
     if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
+
+    if ('parentId' in data) {
+      const current = await prisma.objective.findUnique({
+        where: { id },
+        select: { id: true, type: true, projectId: true, parentId: true },
+      });
+      if (!current) return NextResponse.json({ error: 'Objetivo no encontrado' }, { status: 404 });
+
+      const newParentId = data.parentId || null;
+      if (newParentId) {
+        const parent = await prisma.objective.findFirst({
+          where: { id: newParentId, projectId: current.projectId, isActive: true },
+          select: { id: true, type: true, parentId: true },
+        });
+        if (!parent) {
+          return NextResponse.json({ error: 'Elemento pai no encontrado' }, { status: 400 });
+        }
+        const flat = await prisma.objective.findMany({
+          where: { projectId: current.projectId, isActive: true },
+          select: { id: true, parentId: true, type: true },
+        });
+        const err = describeReparentError(
+          { id: current.id, type: current.type, parentId: current.parentId },
+          { id: parent.id, type: parent.type, parentId: parent.parentId },
+          flat,
+        );
+        if (err) return NextResponse.json({ error: err }, { status: 400 });
+        if (wouldCreateCycle(flat, current.id, newParentId)) {
+          return NextResponse.json({ error: 'Esta ligação criaria um ciclo na árvore' }, { status: 400 });
+        }
+        if (!canReparentTo(current.type, parent.type)) {
+          return NextResponse.json({ error: 'Tipo de pai inválido para este elemento' }, { status: 400 });
+        }
+      }
+    }
+
     const obj = await prisma.objective.update({ where: { id }, data });
     return NextResponse.json({ objective: obj });
   } catch (error: any) {

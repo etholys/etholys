@@ -1,218 +1,254 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useState, useEffect, useCallback } from 'react';
+import { useApp } from '@/app/providers';
+import { isLikelyDbId } from '@/lib/utils';
+import { DeadlineAlertsPanel } from '@/components/opportunity/DeadlineAlertsPanel';
+import { StateEmpty, StateLoading } from '@/components/ui/StateBlocks';
 import {
   ArrowLeft,
-  Heart,
-  Filter,
-  Search,
-  ChevronRight,
   ChevronLeft,
-  Trash2,
+  ChevronRight,
+  FileText,
+  Radar,
+  Search,
 } from 'lucide-react';
 
-interface Fund {
+type Opportunity = {
   id: string;
   name: string;
   institution: string;
   type: string;
-  category: string;
-  amount: number;
+  category?: string | null;
+  amount?: number | null;
   currency: string;
-  deadline: string;
-  countries: string;
-  matchScore: number;
+  deadline?: string | null;
+  countries?: string | null;
+  matchScore?: number | null;
   status: string;
-}
+};
 
-export default function MyFundsPage() {
-  const { data: session } = useSession();
-  const router = useRouter();
+export default function OpportunitiesPage() {
+  const { locale, activeCompanyId } = useApp();
+  const companyId = useMemo(() => {
+    const s = String(activeCompanyId ?? '').trim();
+    return isLikelyDbId(s) ? s : '';
+  }, [activeCompanyId]);
 
-  const [funds, setFunds] = useState<Fund[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const t = (pt: string, es: string, en: string) =>
+    locale === 'pt' ? pt : locale === 'es' ? es : en;
+
+  const [items, setItems] = useState<Opportunity[]>([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
-  const fetchMyFunds = useCallback(async (pageNum: number = 1) => {
-    try {
+  const q = (path: string) =>
+    `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
+
+  const load = useCallback(
+    async (pageNum = 1) => {
+      if (!companyId) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
-      const response = await fetch(`/api/funds/my-funds?page=${pageNum}`);
-      if (!response.ok) throw new Error('Failed to fetch');
-      const data = await response.json();
-      setFunds(data.funds || []);
-      setTotal(data.pagination?.total || 0);
-      setPage(pageNum);
-    } catch (error) {
-      console.error('Error fetching my funds:', error);
-      setFunds([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      try {
+        const params = new URLSearchParams({ page: String(pageNum), limit: '12' });
+        if (search.trim()) params.set('search', search.trim());
+        const r = await fetch(q(`/api/opportunity/catalog?${params}`), { cache: 'no-store' });
+        const d = (await r.json()) as {
+          funds?: Opportunity[];
+          pagination?: { total: number; pages: number; current: number };
+        };
+        if (r.ok) {
+          setItems(d.funds ?? []);
+          setTotal(d.pagination?.total ?? 0);
+          setPages(d.pagination?.pages ?? 1);
+          setPage(d.pagination?.current ?? pageNum);
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [companyId, search],
+  );
 
   useEffect(() => {
-    fetchMyFunds();
-  }, [fetchMyFunds]);
+    void load(1);
+  }, [load]);
 
-  const handleRemoveFund = async (fundId: string) => {
-    try {
-      await fetch('/api/funds/status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fundId, status: '' }),
-      });
-      fetchMyFunds(page);
-    } catch (error) {
-      console.error('Error removing fund:', error);
-    }
-  };
+  if (!companyId) {
+    return (
+      <StateEmpty
+        title={t('Empresa não seleccionada', 'Empresa no seleccionada', 'No company selected')}
+        description={t('Escolha a empresa na barra lateral.', 'Elija la empresa.', 'Pick the active company.')}
+      />
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <Link href="/hub/fundhub" className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-2">
-                <ArrowLeft className="w-4 h-4" />
-                <span>Voltar ao FundHub</span>
-              </Link>
-              <h1 className="text-3xl font-bold text-gray-900">Meus Fundos Salvos</h1>
-              <p className="mt-1 text-gray-600">Gerenciar sua lista de oportunidades de financiamento</p>
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-amber-600">{total}</p>
-              <p className="text-sm text-gray-600">fundos salvos</p>
-            </div>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <Link href="/hub/fundhub" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
+            <ArrowLeft className="h-4 w-4" />
+            OPPORTUNITY
+          </Link>
+          <h1 className="mt-2 text-2xl font-bold text-gray-900 md:text-3xl">
+            {t('Oportunidades', 'Oportunidades', 'Opportunities')}
+          </h1>
+          <p className="mt-1 text-sm text-gray-600">
+            {t(
+              'Catálogo validado da sua organização.',
+              'Catálogo validado de su organización.',
+              'Your organization\'s validated catalog.',
+            )}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <DeadlineAlertsPanel variant="inline" />
+          <div className="text-right">
+            <p className="text-3xl font-bold text-amber-700">{total}</p>
+            <p className="text-xs text-gray-500">{t('no catálogo', 'en catálogo', 'in catalog')}</p>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-amber-600" />
-          </div>
-        ) : funds.length === 0 ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center">
-            <Heart className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-600 text-lg mb-4">Nenhum fundo salvo ainda</p>
-            <Link
-              href="/hub/fundhub/discover"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
-            >
-              <Search className="w-4 h-4" />
-              Explorar fundos
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {funds.map((fund) => (
-              <div
-                key={fund.id}
-                className="rounded-xl border border-gray-200 bg-white p-6 hover:shadow-md transition"
+      <div className="flex flex-wrap gap-2">
+        <div className="relative min-w-[200px] flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void load(1)}
+            placeholder={t('Pesquisar…', 'Buscar…', 'Search…')}
+            className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm"
+          />
+        </div>
+        <Link
+          href="/hub/fundhub/discover"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+        >
+          <Radar className="h-4 w-4" />
+          {t('Nova varredura', 'Nuevo barrido', 'New scan')}
+        </Link>
+      </div>
+
+      {loading ? (
+        <StateLoading className="min-h-[30vh]" />
+      ) : items.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
+          <Radar className="mx-auto h-12 w-12 text-gray-300" />
+          <h2 className="mt-4 text-lg font-semibold text-gray-900">
+            {t('Catálogo vazio', 'Catálogo vacío', 'Empty catalog')}
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-gray-600">
+            {t(
+              'Inicie uma varredura e guarde os candidatos que fazem sentido para a sua organização.',
+              'Inicie un barrido y guarde los candidatos relevantes.',
+              'Run a scan and save candidates that fit your organization.',
+            )}
+          </p>
+          <Link
+            href="/hub/fundhub/discover"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700"
+          >
+            <Radar className="h-4 w-4" />
+            {t('Ir para varredura', 'Ir al barrido', 'Go to scan')}
+          </Link>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-3">
+            {items.map((f) => (
+              <article
+                key={f.id}
+                className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-200"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
-                        fund.status === 'open'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}>
-                        {fund.status === 'open' ? 'Aberto' : 'Fechado'}
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap gap-2">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          f.status === 'open' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {f.status === 'open' ? t('Aberto', 'Abierto', 'Open') : f.status}
                       </span>
-                      <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
-                        {fund.type}
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                        {f.type}
                       </span>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{fund.name}</h3>
-                    <p className="text-sm text-gray-600 mb-4">{fund.institution}</p>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <p className="text-xs text-gray-500 uppercase mb-1">Valor</p>
-                        <p className="font-semibold text-gray-900">{fund.currency} {(fund.amount / 1000000).toFixed(1)}M</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 uppercase mb-1">Prazo</p>
-                        <p className="font-semibold text-gray-900">
-                          {fund.deadline ? new Date(fund.deadline).toLocaleDateString('pt-BR') : 'S/prazo'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 uppercase mb-1">Categoria</p>
-                        <p className="font-semibold text-gray-900">{fund.category}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 uppercase mb-1">Match</p>
-                        <p className={`font-semibold ${
-                          fund.matchScore >= 75
-                            ? 'text-emerald-600'
-                            : fund.matchScore >= 50
-                            ? 'text-amber-600'
-                            : 'text-gray-600'
-                        }`}>
-                          {Math.round(fund.matchScore)}%
-                        </p>
-                      </div>
-                    </div>
+                    <h3 className="mt-2 font-semibold text-gray-900">{f.name}</h3>
+                    <p className="text-sm text-gray-600">{f.institution}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {f.countries || '—'}
+                      {f.deadline
+                        ? ` · ${t('Prazo', 'Plazo', 'Deadline')}: ${new Date(f.deadline).toLocaleDateString()}`
+                        : ''}
+                    </p>
                   </div>
-
-                  <div className="flex flex-col gap-2">
-                    <Link
-                      href={`/hub/fundhub/discover/${fund.id}`}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
-                    >
-                      <span className="text-sm font-medium">Ver detalhes</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </Link>
-                    <button
-                      onClick={() => handleRemoveFund(fund.id)}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span className="text-sm font-medium">Remover</span>
-                    </button>
+                  <div className="flex flex-col items-end gap-2">
+                    {f.matchScore != null && (
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-bold text-amber-900">
+                        {Math.round(f.matchScore)}%
+                      </span>
+                    )}
+                    <div className="flex gap-2">
+                      <Link
+                        href={`/hub/fundhub/discover/${f.id}`}
+                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        {t('Detalhe', 'Detalle', 'Detail')}
+                      </Link>
+                      <Link
+                        href={`/hub/fundhub/proposals?fundId=${encodeURIComponent(f.id)}`}
+                        className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        {t('Proposta', 'Propuesta', 'Proposal')}
+                      </Link>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </article>
             ))}
+          </div>
 
-            {/* Pagination */}
-            <div className="flex items-center justify-between mt-8">
+          {pages > 1 && (
+            <div className="flex items-center justify-between">
               <p className="text-sm text-gray-600">
-                Mostrando {Math.min((page - 1) * 20 + 1, total)} a {Math.min(page * 20, total)} de {total} fundos
+                {total} {t('oportunidades', 'oportunidades', 'opportunities')}
               </p>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => fetchMyFunds(page - 1)}
-                  disabled={page === 1}
-                  className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => void load(page - 1)}
+                  className="rounded-lg border border-gray-200 p-2 disabled:opacity-40"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
-                <span className="px-4 py-2 text-sm font-medium text-gray-700">
-                  Página {page}
+                <span className="text-sm text-gray-600">
+                  {page} / {pages}
                 </span>
                 <button
-                  onClick={() => fetchMyFunds(page + 1)}
-                  disabled={page * 20 >= total}
-                  className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  type="button"
+                  disabled={page >= pages}
+                  onClick={() => void load(page + 1)}
+                  className="rounded-lg border border-gray-200 p-2 disabled:opacity-40"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             </div>
-          </div>
-        )}
-      </main>
+          )}
+        </>
+      )}
     </div>
   );
 }

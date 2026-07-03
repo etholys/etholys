@@ -36,6 +36,7 @@ import { cn, getInitials } from '@/lib/utils';
 import { NexusRunwayProvider } from '@/components/nexus/NexusRunwayContext';
 import { NexusRunwayBar, NexusRunwayContinueLink } from '@/components/nexus/NexusRunwayBar';
 import { NexusCopilotStrip } from '@/components/nexus/NexusCopilotStrip';
+import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
 
 type NavGroup = {
   key: string;
@@ -678,7 +679,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
           <div className="mx-auto max-w-6xl">
             <NexusRunwayBar />
             <NexusCopilotStrip />
-            {children}
+            <SystemLicenseGate system="NEXUS">{children}</SystemLicenseGate>
           </div>
         </main>
       </div>

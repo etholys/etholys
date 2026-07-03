@@ -34,6 +34,14 @@ import {
   type ExpedicionStationSlug,
 } from '@/lib/forge/expedicion-station-decks';
 import { ForgeInvestmentPanel } from '@/components/forge/ForgeInvestmentPanel';
+import { useExpedicionV2 } from '@/lib/forge/expedicion-v2/useExpedicionV2';
+import { ForgeMaturityQuizGate } from '@/components/forge/ForgeMaturityQuizGate';
+import { ForgeSustainabilityDashboard } from '@/components/forge/ForgeSustainabilityDashboard';
+import { ForgeExpedicionV2Workspace } from '@/components/forge/ForgeExpedicionV2Workspace';
+import { ForgeMicroCasoPanel } from '@/components/forge/ForgeMicroCasoPanel';
+import { drawRandomMicroCaso } from '@/lib/forge/expedicion-v2/content';
+import { EXPEDICION_V2_SHELL } from '@/lib/forge/expedicion-v2/theme';
+import type { MicroCaso } from '@/lib/forge/expedicion-v2/content';
 
 /** Diapositiva PPT → índice do módulo (quiz da cápsula). */
 const SLIDE_TO_MODULE: Record<number, number> = {
@@ -108,6 +116,9 @@ export function ForgeExpedicionRoom({
   const [investStation, setInvestStation] = useState<ExpedicionStationSlug | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [slidesOpen, setSlidesOpen] = useState(false);
+  const [v2MapOpen, setV2MapOpen] = useState(false);
+  const [activeMicroCaso, setActiveMicroCaso] = useState<MicroCaso | null>(null);
+  const { v2, videoEnabled, sessionFormat, patch: patchV2 } = useExpedicionV2(courseId);
   const booted = useRef(false);
   const slideSyncRef = useRef(0);
   const isCoaching = groupMode === 'individual_coaching';
@@ -117,7 +128,10 @@ export function ForgeExpedicionRoom({
     [liveConfig, courseId, jitsiBaseUrl]
   );
   const jitsiSrc =
-    jitsiUrl && isJitsiEmbeddable(jitsiUrl) && canEmbedJitsiInIframe(jitsiUrl)
+    videoEnabled &&
+    jitsiUrl &&
+    isJitsiEmbeddable(jitsiUrl) &&
+    canEmbedJitsiInIframe(jitsiUrl)
       ? jitsiEmbedUrl(jitsiUrl, { tileView: true })
       : null;
 
@@ -332,6 +346,14 @@ export function ForgeExpedicionRoom({
         : undefined;
   const stationSlug = typeof myPosition === 'number' ? stationSlugForSpace(myPosition) : null;
 
+  useEffect(() => {
+    if (!stationSlug || isFac) return;
+    const mc = drawRandomMicroCaso(stationSlug);
+    if (mc) setActiveMicroCaso(mc);
+  }, [stationSlug, isFac, myPosition]);
+
+  const boardBlocked = v2?.phase === 'pre_quiz' || v2?.phase === 'post_quiz' || v2?.phase === 'finished';
+
   const deckByStation = useMemo(() => {
     if (!gameSpec?.cards) return [];
     return EXPEDICION_STATION_SLUGS.map((slug) => ({
@@ -341,18 +363,37 @@ export function ForgeExpedicionRoom({
   }, [gameSpec?.cards]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-slate-100">
-      <header className="flex shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-900/95 px-3 py-2">
+    <div className={cn('fixed inset-0 z-50 flex flex-col text-slate-900', EXPEDICION_V2_SHELL)}>
+      {v2?.phase === 'pre_quiz' && (
+        <ForgeMaturityQuizGate
+          side="pre"
+          onComplete={async (answers) => {
+            await patchV2({ action: 'complete_pre_quiz', answers });
+          }}
+        />
+      )}
+      {v2?.phase === 'post_quiz' && (
+        <ForgeMaturityQuizGate
+          side="post"
+          onComplete={async (answers) => {
+            await patchV2({ action: 'complete_post_quiz', answers });
+          }}
+        />
+      )}
+      <header className="flex shrink-0 items-center gap-3 border-b border-[#1B5E4B]/20 bg-[#1B5E4B] px-3 py-2 text-white shadow-md">
         <Link
           href={`/hub/forge/cursos/${courseId}`}
-          className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700"
+          className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 hover:bg-white/20"
           title={ft('forge.room.exit')}
         >
           <X className="h-5 w-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#F4B942]">
             {ft('forge.room.brand')}
+            {sessionFormat === 'presencial' && (
+              <span className="ml-2 rounded bg-white/20 px-1.5 py-0.5 text-[9px]">Presencial</span>
+            )}
           </p>
           <h1 className="truncate text-sm font-black md:text-base">{courseTitle}</h1>
         </div>
@@ -371,9 +412,19 @@ export function ForgeExpedicionRoom({
             {isFac && ` ${slideIdx + 1}/${presentationSlides.length}`}
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setV2MapOpen((v) => !v)}
+          className={cn(
+            'rounded-lg border px-2 py-1 text-[10px] font-bold',
+            v2MapOpen ? 'border-[#F4B942] bg-[#F4B942]/20' : 'border-white/30 hover:bg-white/10'
+          )}
+        >
+          Mapa + Finanzas
+        </button>
         <Link
           href={`/hub/forge/cursos/${courseId}/mi-mapa`}
-          className="rounded-lg border border-amber-600/60 px-2 py-1 text-[10px] font-bold text-amber-200 hover:bg-amber-950"
+          className="rounded-lg border border-white/30 px-2 py-1 text-[10px] font-bold hover:bg-white/10"
         >
           {ft('forge.room.myMap')}
         </Link>
@@ -425,7 +476,7 @@ export function ForgeExpedicionRoom({
         )}
       </header>
 
-      <ForgeFloatingJitsi embedSrc={jitsiSrc} fallbackUrl={jitsiUrl} />
+      {videoEnabled && <ForgeFloatingJitsi embedSrc={jitsiSrc} fallbackUrl={jitsiUrl} />}
       <ForgeGameCoach guide={coachGuide} knowledge={null} />
       <ForgeGameManualModal open={manualOpen} onClose={() => setManualOpen(false)} />
 
@@ -482,6 +533,12 @@ export function ForgeExpedicionRoom({
           </aside>
         )}
 
+        {v2MapOpen && (
+          <aside className="w-full max-w-md shrink-0 border-r border-[#1B5E4B]/15 bg-white/90 overflow-y-auto z-10 p-3">
+            <ForgeExpedicionV2Workspace courseId={courseId} readOnly={isFac} />
+          </aside>
+        )}
+
         <main className="flex-1 flex flex-col min-w-0 min-h-0 p-2 md:p-3 gap-2">
           {isCoaching && (
             <p className="text-center text-xs text-violet-300 shrink-0">{ft('forge.room.coachingHint')}</p>
@@ -496,8 +553,38 @@ export function ForgeExpedicionRoom({
             </div>
           )}
 
+          {activeMicroCaso && stationSlug && v2 && !boardBlocked && (
+            <div className="shrink-0">
+              <ForgeMicroCasoPanel
+                microCaso={activeMicroCaso}
+                station={stationSlug}
+                balance={v2.ledger.balance}
+                isFacilitator={isFac}
+                onConsultancy={async (optionId) => {
+                  await patchV2({ action: 'consultancy', optionId });
+                }}
+                onValidate={async () => {
+                  await patchV2({
+                    action: 'ledger_entry',
+                    description: 'Premio estación (validación)',
+                    entryType: 'E',
+                    amount: 200,
+                    meta: { kind: 'station_prize', microCasoId: activeMicroCaso.id },
+                  });
+                  setActiveMicroCaso(null);
+                }}
+              />
+            </div>
+          )}
+
+          {v2?.phase === 'finished' && v2.finalScoreBreakdown && (
+            <div className="shrink-0">
+              <ForgeSustainabilityDashboard breakdown={v2.finalScoreBreakdown} />
+            </div>
+          )}
+
           <div className="flex-1 flex flex-col min-h-0 justify-center">
-            {!isCoaching ? (
+            {!isCoaching && !boardBlocked ? (
               gameSpec && syncMode !== 'pending' ? (
                 <div className="flex flex-col h-full min-h-0 [&_.rounded-xl]:bg-transparent">
                   <ForgeGameBoard
@@ -522,6 +609,11 @@ export function ForgeExpedicionRoom({
               myMap && <ForgePersonalMapStrip mapState={myMap} />
             )}
           </div>
+          {boardBlocked && v2?.phase !== 'finished' && (
+            <p className="text-center text-sm text-[#1B5E4B] font-semibold py-8">
+              Completa el Quiz de Madurez para continuar.
+            </p>
+          )}
 
           {myMap && !isCoaching && (
             <div className="shrink-0 max-h-28 overflow-hidden">

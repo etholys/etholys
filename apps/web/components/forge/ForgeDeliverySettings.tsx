@@ -137,6 +137,34 @@ export function ForgeDeliverySettings({
 
       {(mode === 'live' || mode === 'blended') && (
         <div className="space-y-4 rounded-xl border border-sky-200 bg-sky-50/50 p-4">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() =>
+                setLive({ ...live, sessionFormat: 'presencial', videoEnabled: false })
+              }
+              className={`rounded-xl border-2 p-3 text-left text-sm ${
+                live.sessionFormat === 'presencial' ? 'border-[#1B5E4B] bg-emerald-50' : 'border-slate-200'
+              }`}
+            >
+              <p className="font-bold">Presencial (celular, sin vídeo)</p>
+              <p className="text-xs text-slate-600 mt-1">Todos en la misma sala física, cada uno en su móvil.</p>
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setLive({ ...live, sessionFormat: 'online', videoEnabled: true })
+              }
+              className={`rounded-xl border-2 p-3 text-left text-sm ${
+                (live.sessionFormat ?? 'online') === 'online' ? 'border-sky-600 bg-sky-50' : 'border-slate-200'
+              }`}
+            >
+              <p className="font-bold">Online (con videollamada)</p>
+              <p className="text-xs text-slate-600 mt-1">Jitsi integrado en la sala virtual.</p>
+            </button>
+          </div>
+          {(live.sessionFormat ?? 'online') === 'online' && (
+          <>
           <h4 className="flex items-center gap-2 text-sm font-bold text-sky-900">
             <Video className="h-4 w-4" />
             {ft('forge.delivery.video.title')}
@@ -208,6 +236,8 @@ export function ForgeDeliverySettings({
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
             />
           </label>
+          </>
+          )}
         </div>
       )}
 
