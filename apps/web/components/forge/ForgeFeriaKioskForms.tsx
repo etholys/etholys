@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
-import { FERIA_AGE_RANGES, FERIA_GENDERS } from '@/lib/forge/feria-kiosk';
+import { FERIA_AGE_RANGES, FERIA_GENDERS } from '@/lib/forge/feria-kiosk-core';
 import { useForgeLocale, useForgeT } from '@/lib/forge/use-forge-t';
 
 type SuccessPayload = {
