@@ -47,6 +47,7 @@ async function generateUniqueAccessCode(sessionId: string): Promise<string> {
 async function assignRandomPlayGroup(session: {
   id: string;
   courseId: string;
+  editionId?: string | null;
   teamSize: number;
 }): Promise<{ id: string; name: string; teamNumber: number }> {
   const db = getForgeDb();
@@ -76,6 +77,7 @@ async function assignRandomPlayGroup(session: {
   const created = await db.forgePlayGroup.create({
     data: {
       courseId: session.courseId,
+      editionId: session.editionId ?? null,
       name: `Equipo ${teamNumber}`,
       mode: 'live_team',
       feriaSessionId: session.id,
@@ -215,6 +217,7 @@ export async function registerFeriaParticipant(
   const playGroup = await assignRandomPlayGroup({
     id: session.id,
     courseId: session.courseId,
+    editionId: session.editionId,
     teamSize: session.teamSize,
   });
 

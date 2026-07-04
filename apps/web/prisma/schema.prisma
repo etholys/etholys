@@ -1961,6 +1961,7 @@ model ForgeCourseEdition {
   updatedAt DateTime @updatedAt
   course    ForgeCourse    @relation(fields: [courseId], references: [id], onDelete: Cascade)
   playGroups ForgePlayGroup[]
+  feriaSessions ForgeFeriaSession[]
 
   @@index([courseId, status])
   @@index([courseId, startsAt])
@@ -1970,6 +1971,7 @@ model ForgeCourseEdition {
 model ForgeFeriaSession {
   id        String   @id @default(cuid())
   courseId  String
+  editionId String?
   roomCode  String
   title     String?
   teamSize  Int      @default(4)
@@ -1977,12 +1979,14 @@ model ForgeFeriaSession {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   course    ForgeCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  edition   ForgeCourseEdition? @relation(fields: [editionId], references: [id], onDelete: SetNull)
   playGroups ForgePlayGroup[]
   registrations ForgeFeriaRegistration[]
 
   @@unique([courseId, roomCode])
   @@index([roomCode])
   @@index([courseId, active])
+  @@index([editionId])
 }
 
 /// Inscrição na feira — um código pessoal por email por sessão

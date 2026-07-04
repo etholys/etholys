@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { ForgeInviteLearners } from '@/components/forge/ForgeInviteLearners';
+import { ForgeFeriaSessionPanel } from '@/components/forge/ForgeFeriaSessionPanel';
 import { useForgeT } from '@/lib/forge/use-forge-t';
 import { formatSessionWhen, type SerializedLiveSession } from '@/lib/forge/live-sessions';
 
@@ -458,12 +459,14 @@ export function ForgeEditionDetail({
         </div>
       </section>
 
+      <ForgeFeriaSessionPanel courseId={courseId} editionId={editionId} alwaysExpanded />
+
       <section className="rounded-2xl border-2 border-blue-300 bg-blue-50/80 p-4 space-y-3">
         <h2 className="font-bold flex items-center gap-2 text-blue-900">
           <Building2 className="h-5 w-5" />
           {ft('forge.tutorLobby.groups')}
         </h2>
-        <p className="text-xs text-blue-900">{ft('forge.tutorLobby.groupsExplain')}</p>
+        <p className="text-xs text-blue-800">{ft('forge.tutorLobby.groupsManualHint')}</p>
         <div className="flex flex-wrap gap-2">
           <input
             value={newName}

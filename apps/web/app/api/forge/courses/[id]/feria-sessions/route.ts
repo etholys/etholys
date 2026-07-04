@@ -8,7 +8,7 @@ import { loadCourseForTenant, requireForgeTenant } from '@/lib/forge/tenant';
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_req: NextRequest, ctx: Ctx) {
+export async function GET(req: NextRequest, ctx: Ctx) {
   try {
     const tenant = await requireForgeTenant();
     if (!tenant) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
@@ -16,8 +16,10 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
     const course = await loadCourseForTenant(courseId, tenant);
     if (!course) return NextResponse.json({ error: 'Curso não encontrado' }, { status: 404 });
 
+    const editionId = req.nextUrl.searchParams.get('editionId')?.trim() || undefined;
+
     const sessions = await getForgeDb().forgeFeriaSession.findMany({
-      where: { courseId },
+      where: { courseId, ...(editionId ? { editionId } : {}) },
       orderBy: { createdAt: 'desc' },
       include: {
         _count: { select: { registrations: true } },
@@ -99,6 +101,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       title?: string;
       teamSize?: number;
       roomCode?: string;
+      editionId?: string | null;
       sessionId?: string;
       createEmptyGroup?: boolean;
       registrationId?: string;
@@ -126,6 +129,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       const group = await getForgeDb().forgePlayGroup.create({
         data: {
           courseId,
+          editionId: session.editionId,
           name: `Equipo ${teamNumber}`,
           mode: 'live_team',
           feriaSessionId: session.id,
@@ -158,9 +162,22 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       roomCode = await generateUniqueRoomCode(courseId);
     }
 
+    let editionId: string | null = null;
+    if (body.editionId) {
+      const edition = await getForgeDb().forgeCourseEdition.findFirst({
+        where: { id: body.editionId, courseId },
+        select: { id: true },
+      });
+      if (!edition) {
+        return NextResponse.json({ error: 'Turma não encontrada' }, { status: 404 });
+      }
+      editionId = edition.id;
+    }
+
     const session = await getForgeDb().forgeFeriaSession.create({
       data: {
         courseId,
+        editionId,
         roomCode,
         title: body.title?.trim() || null,
         teamSize,
