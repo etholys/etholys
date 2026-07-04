@@ -50,27 +50,27 @@ export const POST_IT_TYPE_STYLES: Record<
 > = {
   diagnostico: {
     label: 'Diagnóstico',
-    bg: 'bg-amber-100',
-    border: 'border-amber-400',
-    text: 'text-amber-950',
+    bg: 'bg-[#FFF9C4]',
+    border: 'border-[#F9A825]',
+    text: 'text-[#5D4037]',
   },
   accion: {
     label: 'Acción',
-    bg: 'bg-sky-100',
-    border: 'border-sky-500',
-    text: 'text-sky-950',
+    bg: 'bg-[#B3E5FC]',
+    border: 'border-[#0288D1]',
+    text: 'text-[#01579B]',
   },
   inversion: {
     label: 'Inversión',
-    bg: 'bg-rose-100',
-    border: 'border-rose-400',
-    text: 'text-rose-950',
+    bg: 'bg-[#F8BBD0]',
+    border: 'border-[#C2185B]',
+    text: 'text-[#880E4F]',
   },
   metrica: {
     label: 'Métrica',
-    bg: 'bg-emerald-100',
-    border: 'border-emerald-500',
-    text: 'text-emerald-950',
+    bg: 'bg-[#C8E6C9]',
+    border: 'border-[#388E3C]',
+    text: 'text-[#1B5E20]',
   },
 };
 

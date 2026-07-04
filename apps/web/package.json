@@ -12,6 +12,9 @@
     "diagnose:db": "tsx --require dotenv/config scripts/diagnose-db.ts",
     "export:system": "tsx --require dotenv/config scripts/export-system-data.ts",
     "test:unit": "tsx --test tests/forge/libro-ocr.test.ts tests/forge/invite-token.test.ts",
+    "test:expedicion-v2": "tsx --test tests/forge/expedicion-v2*.test.ts tests/forge/feria-*.test.ts",
+    "test:e2e:expedicion-v2": "playwright test e2e/expedicion-v2-sala.spec.ts",
+    "verify:expedicion-v2": "tsx scripts/verify-expedicion-v2.ts",
     "test:e2e": "playwright test",
     "test:e2e:forge": "playwright test e2e/forge-invite.spec.ts e2e/forge-multi-org.spec.ts"
   },

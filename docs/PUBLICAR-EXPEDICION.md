@@ -1,8 +1,10 @@
 # Publicar La Expedición (web no celular)
 
-> **Deploy Hetzner + Cloudflare (guia principal):** [DEPLOY-HETZNER-CLOUDFLARE.md](./DEPLOY-HETZNER-CLOUDFLARE.md)
+> **Deploy Contabo + Cloudflare (guia principal):** [DEPLOY-CONTABO-CLOUDFLARE.md](./DEPLOY-CONTABO-CLOUDFLARE.md)  
+> **Metodología V2:** [DEPLOY-EXPEDICION-V2.md](./DEPLOY-EXPEDICION-V2.md)  
+> *(Guia legado Hetzner: [DEPLOY-HETZNER-CLOUDFLARE.md](./DEPLOY-HETZNER-CLOUDFLARE.md))*
 
-O curso **já está criado e com status `published`** na base de dados onde correr o seed. Hoje isso está no teu **Postgres local** (`localhost:5433`). Para amanhã, os participantes precisam da **mesma app no teu domínio** (ex.: `https://forge.seudominio.com`) com **base de dados no servidor Hetzner**.
+O curso **já está criado e com status `published`** na base de dados onde correr o seed. Hoje isso está no teu **Postgres local** (`localhost:5433`). Para amanhã, os participantes precisam da **mesma app no teu domínio** (ex.: `https://forge.seudominio.com`) com **base de dados no servidor Contabo**.
 
 ## O que cada pessoa vê (só o curso)
 

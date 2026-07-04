@@ -265,6 +265,7 @@ function buildExpedicionGameSpec(companyId: string) {
     definition: {
       schemaVersion: 1 as const,
       engine: 'board' as const,
+      expedicionV2: true,
       locale: 'es',
       title: 'La Expedición Sostenible — Taller gamificado',
       theme: 'negocios sostenibles · triple impacto',

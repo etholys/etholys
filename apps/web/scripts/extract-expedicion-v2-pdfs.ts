@@ -56,6 +56,27 @@ function parseMicroCasos(text: string) {
     });
   }
 
+  // Formato alternativo: estación antes de VALIDACIÓN (algunos PDFs de Mercado)
+  const fmtC =
+    /(MERCADO|TIERRA|ALQUIMIA|FUTURO|RAÍCES|RAICES)\s*\n([\s\S]{40,}?)\nVALIDACIÓN\s*\n([\s\S]*?)(?=\n(?:MERCADO|TIERRA|ALQUIMIA|FUTURO|RAÍCES|RAICES)\s*\n|\nImplementas una ruta|$)/gi;
+  while ((m = fmtC.exec(text)) !== null) {
+    const station = normStation(m[1]);
+    const prompt = m[2].replace(/\s+/g, ' ').trim();
+    const validationRubric = m[3].replace(/\s+/g, ' ').trim();
+    if (prompt.length < 30 || validationRubric.length < 15) continue;
+    if (/Efecto:/i.test(prompt)) continue;
+    const dup = cards.some(
+      (c) => c.station === station && c.prompt.slice(0, 40) === prompt.slice(0, 40)
+    );
+    if (dup) continue;
+    cards.push({
+      id: `mc-${String(cards.length + 1).padStart(2, '0')}`,
+      station,
+      prompt,
+      validationRubric,
+    });
+  }
+
   const fmtA = /([\s\S]*?)\n(RAÍCES|RAICES|TIERRA|ALQUIMIA|MERCADO|FUTURO)\s*\n([\s\S]*?)\nVALIDACIÓN/gi;
   while ((m = fmtA.exec(text)) !== null) {
     const prompt = m[1].replace(/\s+/g, ' ').trim();
@@ -240,33 +261,7 @@ function parseQuiz(text: string) {
   return { pre: preQuestions, post: postQuestions, sourceChars: text.length };
 }
 
-const CAPSULAS = [
-  {
-    station: 'raices',
-    title: 'Cápsula Raíces',
-    body: 'El propósito no es un cartel: es el filtro de cada decisión. Diagnóstico = qué tienes y qué falta en identidad, equipo y alianzas. Sin propósito medible, el negocio compite solo por precio.',
-  },
-  {
-    station: 'tierra',
-    title: 'Cápsula Tierra',
-    body: 'Operaciones sostenibles empiezan por medir: agua, energía, residuos. Acción sin medición es costo oculto. Invierte en eficiencia antes de marketing verde.',
-  },
-  {
-    station: 'alquimia',
-    title: 'Cápsula Alquimia',
-    body: 'Diseño circular: reduce materiales, reutiliza subproductos, recicla. Cada cambio de empaque o proceso necesita inversión y una métrica de impacto verificable.',
-  },
-  {
-    station: 'mercado',
-    title: 'Cápsula Mercado',
-    body: 'Comunicar impacto real genera confianza; el greenwashing destruye la marca. Tu métrica de mercado debe ser observable por el cliente (ventas, retención, NPS).',
-  },
-  {
-    station: 'futuro',
-    title: 'Cápsula Futuro',
-    body: 'Resiliencia financiera = saber punto de equilibrio, reservas y escenarios. Toda acción sostenible debe traducirse en números que sobrevivan 12 meses.',
-  },
-];
+import { buildCapsulasTecnicas } from '../lib/forge/expedicion-v2/capsulas-content';
 
 async function main() {
   fs.mkdirSync(OUT, { recursive: true });
@@ -278,10 +273,11 @@ async function main() {
   fs.writeFileSync(path.join(OUT, 'micro-casos.json'), JSON.stringify(microCasos, null, 2));
   fs.writeFileSync(path.join(OUT, 'event-cards.json'), JSON.stringify(events, null, 2));
   fs.writeFileSync(path.join(OUT, 'quiz-maturidade.json'), JSON.stringify(quiz, null, 2));
-  fs.writeFileSync(path.join(OUT, 'capsulas-tecnicas.json'), JSON.stringify(CAPSULAS, null, 2));
+  fs.writeFileSync(path.join(OUT, 'capsulas-tecnicas.json'), JSON.stringify(buildCapsulasTecnicas(), null, 2));
   console.log(`micro-casos: ${microCasos.length}`);
   console.log(`actions: ${events.actions.length}, crises: ${events.crises.length}`);
   console.log(`quiz pre: ${quiz.pre.length}, post: ${quiz.post.length}`);
+  console.log(`capsulas: ${buildCapsulasTecnicas().length}`);
   console.log(`out: ${OUT}`);
 }
 

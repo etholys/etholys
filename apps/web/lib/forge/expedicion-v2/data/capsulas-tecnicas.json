@@ -1,27 +1,52 @@
 [
   {
     "station": "raices",
-    "title": "Cápsula Raíces",
-    "body": "El propósito no es un cartel: es el filtro de cada decisión. Diagnóstico = qué tienes y qué falta en identidad, equipo y alianzas. Sin propósito medible, el negocio compite solo por precio."
+    "title": "Cápsula 1 — Raíces",
+    "guion": "Los que caigan en Raíces: definan propósito y cliente ideal (LOHAS).",
+    "accion": "Pegar ficha de propósito en el hueco Raíces del mapa.",
+    "tecnico": "¿Qué vacío dejaría tu negocio? No vendes solo producto: vendes salud y tradición local. Propuesta = Producto + Beneficio + Diferenciador.",
+    "visual": "Triple Impacto (económico, social, ambiental).",
+    "libro": "Capítulo Raíces — Estrategia y ADN\n\nEl propósito evolutivo pregunta qué vacío dejaría tu negocio si desapareciera mañana. El segmento LOHAS valora trazabilidad y autenticidad por encima del precio más bajo.\n\nEjercicio clave: redactar la Propuesta de Valor Sostenible = Producto + Beneficio social/ambiental + Diferenciador. Tu precio no compite con el supermercado: financia la regeneración de la tierra.",
+    "body": "**Tu propósito es tu brújula.**\n\n### Notas del facilitador\n¿Qué vacío dejaría tu negocio? No vendes solo producto: vendes salud y tradición local. Propuesta = Producto + Beneficio + Diferenciador.\n\n### Libro didáctico\nCapítulo Raíces — Estrategia y ADN\n\nEl propósito evolutivo pregunta qué vacío dejaría tu negocio si desapareciera mañana. El segmento LOHAS valora trazabilidad y autenticidad por encima del precio más bajo.\n\nEjercicio clave: redactar la Propuesta de Valor Sostenible = Producto + Beneficio social/ambiental + Diferenciador. Tu precio no compite con el supermercado: financia la regeneración de la tierra."
   },
   {
     "station": "tierra",
-    "title": "Cápsula Tierra",
-    "body": "Operaciones sostenibles empiezan por medir: agua, energía, residuos. Acción sin medición es costo oculto. Invierte en eficiencia antes de marketing verde."
+    "title": "Cápsula 2 — Tierra",
+    "guion": "Busquen en sus cartas cómo cerrar ciclos. ¿Qué residuo transforman hoy?",
+    "accion": "Semáforo de eficiencia en mapa.",
+    "tecnico": "Cada gota ahorrada es dinero. Residuos = oro negro (compost). Semáforo rojo/verde.",
+    "visual": "Suelo vivo, gota de agua, ahorro.",
+    "libro": "Capítulo Tierra — Producción y regeneración\n\nLa ecoeficiencia reduce costos fijos al ahorrar agua y energía. El suelo vivo retiene agua: +1% materia orgánica ≈ 200.000 L/ha.\n\nSemáforo de eficiencia: identifica una práctica roja (desperdicio) y una verde (mejora inmediata). Los bioinsumos convierten “residuos” en ahorro.",
+    "body": "**Ecoeficiencia = rentabilidad.**\n\n### Notas del facilitador\nCada gota ahorrada es dinero. Residuos = oro negro (compost). Semáforo rojo/verde.\n\n### Libro didáctico\nCapítulo Tierra — Producción y regeneración\n\nLa ecoeficiencia reduce costos fijos al ahorrar agua y energía. El suelo vivo retiene agua: +1% materia orgánica ≈ 200.000 L/ha.\n\nSemáforo de eficiencia: identifica una práctica roja (desperdicio) y una verde (mejora inmediata). Los bioinsumos convierten “residuos” en ahorro."
   },
   {
     "station": "alquimia",
-    "title": "Cápsula Alquimia",
-    "body": "Diseño circular: reduce materiales, reutiliza subproductos, recicla. Cada cambio de empaque o proceso necesita inversión y una métrica de impacto verificable."
+    "title": "Cápsula 3 — Alquimia",
+    "guion": "Definan flujo de trabajo y mensaje de empaque.",
+    "accion": "Flujograma de valor (3 pasos) en mapa.",
+    "tecnico": "Inocuidad = seguro de vida. Etiqueta narrativa = vendedor silencioso.",
+    "visual": "Materia prima → producto final etiquetado.",
+    "libro": "Capítulo Alquimia — Transformación\n\nValor agregado y economía circular: ¿qué subproducto puede ser insumo? Diseña un producto regenerativo con claim honesto en etiqueta.\n\nLa alquimia conecta la materia prima con una historia que el cliente LOHAS puede verificar.",
+    "body": "**Transformar para ganar.**\n\n### Notas del facilitador\nInocuidad = seguro de vida. Etiqueta narrativa = vendedor silencioso.\n\n### Libro didáctico\nCapítulo Alquimia — Transformación\n\nValor agregado y economía circular: ¿qué subproducto puede ser insumo? Diseña un producto regenerativo con claim honesto en etiqueta.\n\nLa alquimia conecta la materia prima con una historia que el cliente LOHAS puede verificar."
   },
   {
     "station": "mercado",
-    "title": "Cápsula Mercado",
-    "body": "Comunicar impacto real genera confianza; el greenwashing destruye la marca. Tu métrica de mercado debe ser observable por el cliente (ventas, retención, NPS)."
+    "title": "Cápsula 4 — Mercado",
+    "guion": "Preparen guion de ventas y catálogo digital.",
+    "accion": "Canales híbridos + mensaje principal en mapa.",
+    "tecnico": "WhatsApp Business: catálogo y etiquetas. Storytelling del detrás de escena.",
+    "visual": "WhatsApp Business, QR, storytelling.",
+    "libro": "Capítulo Mercado — Comercialización\n\nStorytelling digital: mensaje principal para WhatsApp/Instagram. Pitch de 30 segundos para feria de negocios.\n\nEl canal correcto no es “estar en todas partes”, sino donde tu cliente LOHAS ya confía.",
+    "body": "**Venta directa: del campo al celular.**\n\n### Notas del facilitador\nWhatsApp Business: catálogo y etiquetas. Storytelling del detrás de escena.\n\n### Libro didáctico\nCapítulo Mercado — Comercialización\n\nStorytelling digital: mensaje principal para WhatsApp/Instagram. Pitch de 30 segundos para feria de negocios.\n\nEl canal correcto no es “estar en todas partes”, sino donde tu cliente LOHAS ya confía."
   },
   {
     "station": "futuro",
-    "title": "Cápsula Futuro",
-    "body": "Resiliencia financiera = saber punto de equilibrio, reservas y escenarios. Toda acción sostenible debe traducirse en números que sobrevivan 12 meses."
+    "title": "Cápsula 5 — Futuro",
+    "guion": "Saquen las cuentas en su mapa. ¿Es rentable su expedición?",
+    "accion": "Calcular equilibrio y 3 hitos en mapa.",
+    "tecnico": "Costo fijo, punto de equilibrio, hoja de ruta 12 meses.",
+    "visual": "Punto de equilibrio.",
+    "libro": "Capítulo Futuro — Finanzas y escalabilidad\n\nModelo financiero triple: económico, social, ambiental. Meta de ventas mes 1 en unidades. Indicadores simples que puedes medir cada semana.\n\nLa escalabilidad sostenible crece sin depender de subsidios permanentes.",
+    "body": "**Si no hay ganancia, no hay impacto.**\n\n### Notas del facilitador\nCosto fijo, punto de equilibrio, hoja de ruta 12 meses.\n\n### Libro didáctico\nCapítulo Futuro — Finanzas y escalabilidad\n\nModelo financiero triple: económico, social, ambiental. Meta de ventas mes 1 en unidades. Indicadores simples que puedes medir cada semana.\n\nLa escalabilidad sostenible crece sin depender de subsidios permanentes."
   }
 ]

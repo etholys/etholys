@@ -1,19 +1,19 @@
 @echo off
 chcp 65001 >nul
-title Deploy FORGE via consola Hetzner
+title Deploy FORGE via consola Contabo
 echo.
 echo  SSH do PC nao alcanca o servidor.
-echo  Use a CONSOLA WEB da Hetzner:
+echo  Use SSH ou consola do painel Contabo:
 echo.
-echo  1) https://console.hetzner.cloud
-echo  2) Servidor 178.105.80.131 -^> Console
+echo  1) https://my.contabo.com -^> VPS -^> Console / VNC
+echo  2) IP exemplo: 84.247.187.155
 echo  3) Cole:
 echo.
-echo     bash /opt/etholys/scripts/recuperar-servidor-oom.sh
+echo     bash /opt/etholys/scripts/deploy-forge-web.sh
 echo.
-echo  Se a consola mostrar "Out of memory": Power -^> Reboot primeiro.
+echo  Se OOM no build: ver scripts/recuperar-servidor-oom.sh
 echo.
-echo  Guia completo: docs\FORGE-DEPLOY-SEM-SSH.md
+echo  Guia: docs\DEPLOY-CONTABO-CLOUDFLARE.md
 echo.
-start "" "https://console.hetzner.cloud"
+start "" "https://my.contabo.com"
 pause

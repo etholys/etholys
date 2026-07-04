@@ -6,6 +6,10 @@ import { getForgeDb } from '@/lib/forge/db';
 import { parseGameSpecV1 } from '@/lib/forge/schemas/game-spec-v1';
 import { getForgeEngine, validateAndPrepareSpec } from '@/lib/forge/engines';
 import {
+  isExpedicionV2Spec,
+  withExpedicionV2RoomFlags,
+} from '@/lib/forge/expedicion-v2/board-v2-mode';
+import {
   canFacilitateSharedGame,
   serializeSharedGameRoom,
 } from '@/lib/forge/shared-game-room';
@@ -106,6 +110,9 @@ export async function POST(req: NextRequest) {
 
     const spec = validateAndPrepareSpec(parseGameSpecV1(activity.gameSpec.definition));
     const engine = getForgeEngine(spec.engine);
+    const expedicionV2 = isExpedicionV2Spec(spec);
+    const flagV2 = (s: Record<string, unknown>) =>
+      expedicionV2 ? withExpedicionV2RoomFlags(s) : s;
 
     const rosterWhere = {
       courseId: course.id,
@@ -121,12 +128,17 @@ export async function POST(req: NextRequest) {
     const memberIds = enrollments.map((e) => e.userId);
     if (playGroup?.mode === 'live_team' && memberIds.length >= 1) {
       const { createTeamPlayInitialState } = await import('@/lib/forge/expedicion-board-multi');
-      state = createTeamPlayInitialState(
-        playGroup.name,
-        playGroup.id,
-        memberIds,
-        spec
-      ) as unknown as Record<string, unknown>;
+      const { createInitialV2State } = await import('@/lib/forge/expedicion-v2/player-state');
+      const { V2_TEAM_KEY } = await import('@/lib/forge/expedicion-v2/room-v2-store');
+      state = flagV2({
+        ...(createTeamPlayInitialState(
+          playGroup.name,
+          playGroup.id,
+          memberIds,
+          spec
+        ) as unknown as Record<string, unknown>),
+        [V2_TEAM_KEY]: createInitialV2State(),
+      });
     } else if (enrollments.length >= 2) {
       const { createMultiplayerInitialState, rosterFromEnrollments } = await import(
         '@/lib/forge/expedicion-board-multi'
@@ -138,9 +150,9 @@ export async function POST(req: NextRequest) {
           email: e.user.email,
         }))
       );
-      state = createMultiplayerInitialState(roster, spec) as unknown as Record<string, unknown>;
+      state = flagV2(createMultiplayerInitialState(roster, spec) as unknown as Record<string, unknown>);
     } else {
-      state = engine.createInitialState(spec) as Record<string, unknown>;
+      state = flagV2(engine.createInitialState(spec) as Record<string, unknown>);
     }
 
     const room = await getForgeDb().forgeSharedGameRoom.create({

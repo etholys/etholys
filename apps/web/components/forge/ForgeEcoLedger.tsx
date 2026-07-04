@@ -7,11 +7,21 @@ export function ForgeEcoLedger({
   ledger,
   onRequestLoan,
   loanDisabled,
+  peerCredits,
+  teamPeers,
+  myUserId,
 }: {
   ledger: EcoLedgerState;
   onRequestLoan?: () => void;
   loanDisabled?: boolean;
+  peerCredits?: Record<string, number>;
+  teamPeers?: { userId: string; name: string }[];
+  myUserId?: string;
 }) {
+  const myPeerTotal =
+    myUserId && peerCredits?.[myUserId] ? peerCredits[myUserId] : 0;
+  const peerEntries = Object.entries(peerCredits ?? {}).filter(([, v]) => v > 0);
+
   return (
     <div className="rounded-2xl border-2 border-[#1B5E4B]/25 bg-white shadow-sm overflow-hidden">
       <div className="flex items-center justify-between gap-2 bg-[#1B5E4B] px-4 py-2.5 text-white">
@@ -50,9 +60,27 @@ export function ForgeEcoLedger({
           </tbody>
         </table>
       </div>
+      {myPeerTotal > 0 && (
+        <p className="border-t border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-900">
+          Créditos por ayudar a colegas: <strong>{myPeerTotal} Eco</strong>
+        </p>
+      )}
+      {peerEntries.length > 0 && !myUserId && (
+        <div className="border-t border-violet-200 bg-violet-50 px-3 py-2 text-[10px] text-violet-900">
+          <p className="font-bold">Créditos consultoría (mesa)</p>
+          {peerEntries.map(([uid, amt]) => {
+            const name = teamPeers?.find((p) => p.userId === uid)?.name ?? uid.slice(0, 8);
+            return (
+              <p key={uid}>
+                {name}: {amt} Eco
+              </p>
+            );
+          })}
+        </div>
+      )}
       {ledger.greenLoanTaken && ledger.greenLoanDebt > 0 && (
         <p className="border-t border-amber-200 bg-amber-50 px-3 py-2 text-[10px] text-amber-900">
-          Deuda oculta préstamo verde: {ledger.greenLoanDebt} Eco (se liquida al final)
+          Deuda oculta del préstamo verde: {ledger.greenLoanDebt} Eco (se liquida al final)
         </p>
       )}
       {onRequestLoan && !ledger.greenLoanTaken && (
@@ -63,7 +91,7 @@ export function ForgeEcoLedger({
             onClick={onRequestLoan}
             className="w-full rounded-lg bg-[#5B3E8C] px-3 py-2 text-xs font-bold text-white hover:bg-[#4a3275] disabled:opacity-50"
           >
-            Pedir Empréstimo al Banco (+300 Eco)
+            Pedir Préstamo al Banco (+300 Eco)
           </button>
         </div>
       )}

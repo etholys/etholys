@@ -292,5 +292,11 @@
     "station": "raices",
     "prompt": "Quieres delegar tareas, pero no confías en nadie. Sientes que si no estás tú presente, todo el modelo sostenible que armaste se va a caer.",
     "validationRubric": "Debe reconocer el cuello de botella que él mismo causa. La acción: documentar procesos y capacitar. La métrica: número de procesos que pueden ejecutarse sin su presencia directa."
+  },
+  {
+    "id": "mc-50",
+    "station": "mercado",
+    "prompt": "Lanzaste una campaña de marketing genérica que no menciona tu propuesta de valor sostenible. Los clientes no entienden por qué deberían pagar más por tu producto.",
+    "validationRubric": "Diagnóstico: comunicación desalineada con el propósito. Acción: rediseñar mensaje y canales con claims verificables. Inversión: piezas creativas o asesoría. Métrica: aumento en consultas o ventas atribuidas al mensaje sostenible."
   }
 ]

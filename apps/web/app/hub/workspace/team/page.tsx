@@ -8,7 +8,7 @@ import { WorkspaceTopBar } from '@/components/workspace/WorkspaceTopBar';
 import { useHubWorkspaceRoute } from '@/components/hub/HubWorkspaceShell';
 import { WORKSPACE_SYSTEM_KEYS, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
 import { Shield, Lock } from 'lucide-react';
-import { getSiepPermissionGroups, type SiepPermissionKey } from '@/lib/siep/permissions';
+import { getSiepPermissionGroups, type SiepPermissionKey } from '@/lib/siep/permissions-shared';
 import type { Locale } from '@/lib/i18n';
 import { isLikelyDbId } from '@/lib/utils';
 import { StateEmpty, StateError, StateLoading } from '@/components/ui/StateBlocks';

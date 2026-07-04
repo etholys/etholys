@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { getMaturityQuiz } from '@/lib/forge/expedicion-v2/content';
+import { useForgeT } from '@/lib/forge/use-forge-t';
 
 type Q = {
   id: string;
@@ -18,6 +19,7 @@ export function ForgeMaturityQuizGate({
   side: 'pre' | 'post';
   onComplete: (answers: Record<string, string>) => void;
 }) {
+  const ft = useForgeT();
   const quiz = getMaturityQuiz();
   const questions = (side === 'pre' ? quiz.pre : quiz.post) as Q[];
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -34,24 +36,24 @@ export function ForgeMaturityQuizGate({
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#1B5E4B]/90 p-4">
       <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl bg-[#F7F3EB] p-6 shadow-2xl">
         <h2 className="text-xl font-black text-[#1B5E4B]">
-          Quiz de Maturidade {side === 'pre' ? '(Frente)' : '(Verso)'}
+          {ft('forge.v2.maturityQuiz', {
+            side: side === 'pre' ? ft('forge.v2.maturityFront') : ft('forge.v2.maturityBack'),
+          })}
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          {side === 'pre'
-            ? 'Completa antes de entrar al tablero.'
-            : 'Completa para ver tu puntuación final.'}
+          {side === 'pre' ? ft('forge.v2.quizPreHint') : ft('forge.v2.quizPostHint')}
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Nombre del expedicionario"
+            placeholder={ft('forge.v2.expeditionerName')}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
           />
           <input
             value={business}
             onChange={(e) => setBusiness(e.target.value)}
-            placeholder="Negocio / idea"
+            placeholder={ft('forge.v2.businessIdea')}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
@@ -93,7 +95,7 @@ export function ForgeMaturityQuizGate({
           onClick={submit}
           className="mt-6 w-full rounded-xl bg-[#1B5E4B] py-3 text-sm font-bold text-white disabled:opacity-40"
         >
-          {side === 'pre' ? 'Entrar a la Expedición' : 'Ver resultado final'}
+          {side === 'pre' ? ft('forge.v2.enterExpedition') : ft('forge.v2.viewFinalScore')}
         </button>
       </div>
     </div>

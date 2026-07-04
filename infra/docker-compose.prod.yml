@@ -1,4 +1,4 @@
-# Produção — Hetzner + Cloudflare
+# Produção — Contabo + Cloudflare
 # Uso: copiar apps/web/.env.production.example → apps/web/.env e preencher
 #      docker compose -f docker-compose.prod.yml up -d --build
 

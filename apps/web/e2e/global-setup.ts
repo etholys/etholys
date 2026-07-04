@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { generateForgeInviteToken, forgeInviteExpiresAt } from '../lib/forge/invite-token';
+import { seedExpedicionV2E2E } from './seed-expedicion-v2';
 
 function generateMagicLoginToken(): string {
   return randomBytes(32).toString('base64url');
@@ -145,6 +146,8 @@ export default async function globalSetup() {
       },
     });
 
+    const expedicionV2 = await seedExpedicionV2E2E(db, stamp, hash);
+
     fs.writeFileSync(
       OUT,
       JSON.stringify({
@@ -170,6 +173,7 @@ export default async function globalSetup() {
           courseA: { id: courseA.id, title: courseA.title },
           courseB: { id: courseB.id, title: courseB.title },
         },
+        expedicionV2,
       })
     );
   } finally {

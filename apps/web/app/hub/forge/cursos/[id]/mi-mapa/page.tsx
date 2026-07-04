@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { ForgeExpedicionV2Workspace } from '@/components/forge/ForgeExpedicionV2Workspace';
 import { ForgeMaturityQuizGate } from '@/components/forge/ForgeMaturityQuizGate';
 import { ForgeSustainabilityDashboard } from '@/components/forge/ForgeSustainabilityDashboard';
@@ -15,8 +15,10 @@ import { cn } from '@/lib/utils';
 export default function ForgeMiMapaPage() {
   const ft = useForgeT();
   const { id: courseId } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const roomId = searchParams.get('room')?.trim() || null;
   const [title, setTitle] = useState('');
-  const { v2, patch, loading } = useExpedicionV2(courseId);
+  const { v2, teamMode, patch, loading } = useExpedicionV2(courseId, { roomId });
 
   useEffect(() => {
     fetch(`/api/forge/courses/${courseId}/my-journey`)
@@ -24,6 +26,10 @@ export default function ForgeMiMapaPage() {
       .then((d) => setTitle(d.course?.title ?? ''))
       .catch(() => {});
   }, [courseId]);
+
+  const salaHref = roomId
+    ? `/hub/forge/cursos/${courseId}/sala?${searchParams.toString()}`
+    : `/hub/forge/cursos/${courseId}/sala`;
 
   if (loading || !v2) {
     return (
@@ -48,15 +54,20 @@ export default function ForgeMiMapaPage() {
         />
       )}
       <Link
-        href={`/hub/forge/cursos/${courseId}/sala`}
+        href={salaHref}
         className="inline-flex items-center gap-1 text-sm text-[#1B5E4B] font-semibold hover:underline"
       >
         <ArrowLeft className="h-4 w-4" /> {title || ft('forge.mymap.defaultCourse')}
       </Link>
+      {teamMode && (
+        <p className="text-xs text-[#1B5E4B]/80 font-semibold">
+          Mapa compartido de la mesa — cambios visibles para todo el equipo.
+        </p>
+      )}
       {v2.phase === 'finished' && v2.finalScoreBreakdown && (
         <ForgeSustainabilityDashboard breakdown={v2.finalScoreBreakdown} />
       )}
-      <ForgeExpedicionV2Workspace courseId={courseId} />
+      <ForgeExpedicionV2Workspace courseId={courseId} roomId={roomId} />
     </div>
   );
 }

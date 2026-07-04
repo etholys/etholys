@@ -1,5 +1,7 @@
 # Colocar La Expedición online — Hetzner + Cloudflare
 
+> **Nota:** O servidor de produção actual é **Contabo**. Use [DEPLOY-CONTABO-CLOUDFLARE.md](./DEPLOY-CONTABO-CLOUDFLARE.md) como guia principal. Este documento mantém-se como referência legado.
+
 Guia completo para o curso funcionar no **PC e no celular** como **site web** (pode “Adicionar ao ecrã” como app).
 
 Domínio deste projeto: **`forge.etholys.com`** (registo DNS na Cloudflare).
@@ -15,7 +17,7 @@ Domínio deste projeto: **`forge.etholys.com`** (registo DNS na Cloudflare).
 | Peça | Função |
 |------|--------|
 | **Cloudflare** | DNS do teu domínio + HTTPS para visitantes |
-| **Hetzner VPS** | Servidor Linux com Docker |
+| **Hetzner VPS** | Servidor Linux com Docker (**8 GB RAM** recomendado para V2) |
 | **Caddy** | Certificado SSL no servidor + proxy |
 | **Next.js** | App FORGE / curso |
 | **Postgres** | Base de dados (convites, progresso, curso) |
@@ -27,7 +29,7 @@ Domínio deste projeto: **`forge.etholys.com`** (registo DNS na Cloudflare).
 ### 1.1 Criar VPS
 
 1. [Hetzner Cloud](https://console.hetzner.cloud/) → **Add Server**
-2. **Ubuntu 24.04**, tipo **CX22** (ou CPX11) — suficiente para uma turma
+2. **Ubuntu 24.04**, tipo **CX32** (8 GB RAM) — recomendado para La Expedición V2; CX22 (4 GB) pode falhar no build
 3. Localização: perto dos alunos (ex. EU se Brasil, pode usar US também)
 4. **SSH key** — cria e guarda a chave privada no PC
 5. Anota o **IPv4** (ex. `95.xxx.xxx.xxx`)

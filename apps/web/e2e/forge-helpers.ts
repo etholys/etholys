@@ -19,7 +19,12 @@ export type MultiOrgSeed = {
   courseB: { id: string; title: string };
 };
 
-type SeedState = { invite: InviteSeed; invitePassword: InviteSeed; multiOrg: MultiOrgSeed };
+type SeedState = {
+  invite: InviteSeed;
+  invitePassword: InviteSeed;
+  multiOrg: MultiOrgSeed;
+  expedicionV2: import('./seed-expedicion-v2').ExpedicionV2E2ESeed;
+};
 
 function readState(): SeedState {
   const p = path.join(__dirname, '.seed-state.json');
@@ -39,6 +44,10 @@ export function seedInvitePassword(): InviteSeed {
 
 export function seedMultiOrg(): MultiOrgSeed {
   return readState().multiOrg;
+}
+
+export function seedExpedicionV2(): import('./seed-expedicion-v2').ExpedicionV2E2ESeed {
+  return readState().expedicionV2;
 }
 
 /** Login via NextAuth API (mais fiável que só clicar no formulário). */

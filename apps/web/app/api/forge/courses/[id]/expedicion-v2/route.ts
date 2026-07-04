@@ -1,31 +1,39 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { requireForgeTenant } from '@/lib/forge/tenant';
 import { getForgeDb } from '@/lib/forge/db';
 import { ensureLearnerJourney } from '@/lib/forge/learner-journey';
 import {
   mergeV2IntoMapState,
-  parseV2State,
   v2FromJourneyMapState,
 } from '@/lib/forge/expedicion-v2/player-state';
+import { applyV2Action, V2ActionError } from '@/lib/forge/expedicion-v2/apply-v2-action';
 import {
-  addConnection,
-  addPostIt,
-  removePostIt,
-  updatePostIt,
-} from '@/lib/forge/expedicion-v2/construction-map';
+  mergeV2IntoRoomState,
+  v2FromRoomState,
+} from '@/lib/forge/expedicion-v2/room-v2-store';
+import { canPlayerAct, parseMulti } from '@/lib/forge/expedicion-board-multi';
 import {
-  appendLedgerEntry,
-  settleGreenLoan,
-  takeGreenLoan,
-} from '@/lib/forge/expedicion-v2/ledger';
-import { computeSustainabilityScore } from '@/lib/forge/expedicion-v2/score';
+  canFacilitateSharedGame,
+  serializeSharedGameRoom,
+} from '@/lib/forge/shared-game-room';
+import { loadSharedGameRoomForForgeAccess } from '@/lib/forge/tenant';
+import { getForgeCourseAccess } from '@/lib/forge/facilitator-access';
+import { creditPeerConsultancy } from '@/lib/forge/expedicion-v2/peer-consultancy';
 import { CONSULTANCY_OPTIONS } from '@/lib/forge/expedicion-v2/consultancy';
-import type { ExpedicionStationSlug } from '@/lib/forge/expedicion-station-decks';
-import type { PostItType } from '@/lib/forge/expedicion-v2/types';
 
 type Ctx = { params: Promise<{ id: string }> };
+
+const FACILITATOR_ACTIONS = new Set([
+  'approve_micro_caso',
+  'reject_micro_caso',
+  'award_feria_pitch',
+  'reject_feria_pitch',
+  'reset_v2',
+  'force_post_quiz',
+]);
 
 async function authorizeCourse(courseId: string, userId: string, companyIds: string[]) {
   return getForgeDb().forgeCourse.findFirst({
@@ -36,24 +44,61 @@ async function authorizeCourse(courseId: string, userId: string, companyIds: str
   });
 }
 
-export async function GET(_req: NextRequest, ctx: Ctx) {
+async function resolveTeamRoom(roomId: string, courseId: string, tenant: Awaited<ReturnType<typeof requireForgeTenant>>) {
+  if (!tenant) return null;
+  const room = await loadSharedGameRoomForForgeAccess(roomId, tenant);
+  if (!room || room.courseId !== courseId) return null;
+  const multi = parseMulti((room.state ?? {}) as Record<string, unknown>);
+  if (!multi?.teamPlay) return null;
+  return room;
+}
+
+export async function GET(req: NextRequest, ctx: Ctx) {
   try {
     const tenant = await requireForgeTenant();
-    if (!tenant) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     const { id: courseId } = await ctx.params;
     const course = await authorizeCourse(courseId, tenant.userId, tenant.companyIds);
-    if (!course) return NextResponse.json({ error: 'Curso não encontrado' }, { status: 404 });
+    if (!course) return NextResponse.json({ error: 'Curso no encontrado' }, { status: 404 });
+
+    const roomId = req.nextUrl.searchParams.get('roomId')?.trim();
+    if (roomId) {
+      const room = await resolveTeamRoom(roomId, courseId, tenant);
+      if (room) {
+        const v2 = v2FromRoomState((room.state ?? {}) as Record<string, unknown>);
+        const liveConfig = (course.liveConfig ?? {}) as Record<string, unknown>;
+        return NextResponse.json({
+          v2,
+          teamMode: true,
+          roomId: room.id,
+          sessionFormat: liveConfig.sessionFormat ?? 'online',
+          videoEnabled: liveConfig.videoEnabled !== false,
+        });
+      }
+    }
+
     const journey = await ensureLearnerJourney(courseId, tenant.userId);
-    const mapState = (journey.mapState ?? {}) as Record<string, unknown>;
+    let mapState = (journey.mapState ?? {}) as Record<string, unknown>;
+    if (!mapState.v2) {
+      const { createInitialV2State, mergeV2IntoMapState } = await import(
+        '@/lib/forge/expedicion-v2/player-state'
+      );
+      mapState = mergeV2IntoMapState(mapState, createInitialV2State());
+      await getForgeDb().forgeLearnerJourney.update({
+        where: { id: journey.id },
+        data: { mapState: mapState as object },
+      });
+    }
     const v2 = v2FromJourneyMapState(mapState);
     const liveConfig = (course.liveConfig ?? {}) as Record<string, unknown>;
     return NextResponse.json({
       v2,
+      teamMode: false,
       sessionFormat: liveConfig.sessionFormat ?? 'online',
       videoEnabled: liveConfig.videoEnabled !== false,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Erro';
+    const msg = e instanceof Error ? e.message : 'Error interno';
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
@@ -61,117 +106,79 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   try {
     const tenant = await requireForgeTenant();
-    if (!tenant) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     const { id: courseId } = await ctx.params;
     const course = await authorizeCourse(courseId, tenant.userId, tenant.companyIds);
-    if (!course) return NextResponse.json({ error: 'Curso não encontrado' }, { status: 404 });
+    if (!course) return NextResponse.json({ error: 'Curso no encontrado' }, { status: 404 });
 
-    const body = await req.json();
-    const action = body.action as string;
+    const body = (await req.json()) as Record<string, unknown>;
+    const roomId = typeof body.roomId === 'string' ? body.roomId.trim() : '';
+    const action = String(body.action ?? '');
+
+    if (FACILITATOR_ACTIONS.has(action)) {
+      const access = await getForgeCourseAccess(
+        tenant.userId,
+        course.companyId,
+        course.id,
+        course.createdById
+      );
+      if (!access.canFacilitate) {
+        return NextResponse.json({ error: 'Solo el facilitador puede usar esta acción' }, { status: 403 });
+      }
+    }
+
+    if (roomId) {
+      const room = await resolveTeamRoom(roomId, courseId, tenant);
+      if (!room) {
+        return NextResponse.json({ error: 'Sala de equipo no encontrada' }, { status: 404 });
+      }
+      const prev = (room.state ?? {}) as Record<string, unknown>;
+      const multi = parseMulti(prev);
+      const isFac = canFacilitateSharedGame(
+        tenant,
+        room.activity.module.course.companyId,
+        room.facilitatorUserId
+      );
+      if (multi && !canPlayerAct(multi, tenant.userId, isFac, false)) {
+        return NextResponse.json({ error: 'No eres miembro de esta mesa' }, { status: 403 });
+      }
+
+      let v2 = v2FromRoomState(prev);
+      try {
+        v2 = applyV2Action(v2, body);
+      } catch (e) {
+        if (e instanceof V2ActionError) {
+          return NextResponse.json({ error: e.message }, { status: e.status });
+        }
+        throw e;
+      }
+
+      const updated = await getForgeDb().forgeSharedGameRoom.update({
+        where: { id: roomId },
+        data: {
+          state: mergeV2IntoRoomState(prev, v2) as Prisma.InputJsonValue,
+          version: { increment: 1 },
+        },
+      });
+
+      return NextResponse.json({
+        v2,
+        teamMode: true,
+        room: serializeSharedGameRoom(updated),
+      });
+    }
+
     const journey = await ensureLearnerJourney(courseId, tenant.userId);
     const mapState = (journey.mapState ?? {}) as Record<string, unknown>;
     let v2 = v2FromJourneyMapState(mapState);
 
-    switch (action) {
-      case 'complete_pre_quiz': {
-        v2 = {
-          ...v2,
-          phase: 'playing',
-          preQuizAnswers: body.answers ?? {},
-          preQuizCompletedAt: new Date().toISOString(),
-        };
-        break;
+    try {
+      v2 = applyV2Action(v2, body);
+    } catch (e) {
+      if (e instanceof V2ActionError) {
+        return NextResponse.json({ error: e.message }, { status: e.status });
       }
-      case 'complete_post_quiz': {
-        v2 = {
-          ...v2,
-          phase: 'finished',
-          postQuizAnswers: body.answers ?? {},
-          postQuizCompletedAt: new Date().toISOString(),
-        };
-        v2.ledger = settleGreenLoan(v2.ledger);
-        const breakdown = computeSustainabilityScore(v2.ledger, v2.constructionMap);
-        v2.finalScoreBreakdown = breakdown;
-        v2.finalScore = breakdown.total;
-        break;
-      }
-      case 'add_postit': {
-        v2 = {
-          ...v2,
-          constructionMap: addPostIt(
-            v2.constructionMap,
-            body.station as ExpedicionStationSlug,
-            body.type as PostItType,
-            String(body.text ?? ''),
-            body.x,
-            body.y
-          ),
-        };
-        break;
-      }
-      case 'update_postit': {
-        v2 = {
-          ...v2,
-          constructionMap: updatePostIt(v2.constructionMap, body.id, {
-            text: body.text,
-            type: body.type,
-            x: body.x,
-            y: body.y,
-          }),
-        };
-        break;
-      }
-      case 'remove_postit': {
-        v2 = { ...v2, constructionMap: removePostIt(v2.constructionMap, body.id) };
-        break;
-      }
-      case 'add_connection': {
-        v2 = {
-          ...v2,
-          constructionMap: addConnection(v2.constructionMap, body.fromPostItId, body.toPostItId),
-        };
-        break;
-      }
-      case 'ledger_entry': {
-        v2 = {
-          ...v2,
-          ledger: appendLedgerEntry(
-            v2.ledger,
-            String(body.description ?? 'Movimiento'),
-            body.entryType === 'S' ? 'S' : 'E',
-            Number(body.amount) || 0,
-            body.meta
-          ),
-        };
-        break;
-      }
-      case 'consultancy': {
-        const opt = CONSULTANCY_OPTIONS.find((o) => o.id === body.optionId);
-        if (!opt) return NextResponse.json({ error: 'Consultoría inválida' }, { status: 400 });
-        v2 = {
-          ...v2,
-          ledger: appendLedgerEntry(v2.ledger, `Consultoría: ${opt.label}`, 'S', opt.cost, {
-            kind: 'consultancy',
-            optionId: opt.id,
-          }),
-        };
-        break;
-      }
-      case 'green_loan': {
-        v2 = { ...v2, ledger: takeGreenLoan(v2.ledger) };
-        break;
-      }
-      case 'end_cycle': {
-        const cycles = v2.cyclesCompleted + 1;
-        v2 = {
-          ...v2,
-          cyclesCompleted: cycles,
-          phase: cycles >= v2.maxCycles ? 'post_quiz' : 'playing',
-        };
-        break;
-      }
-      default:
-        return NextResponse.json({ error: 'Ação desconhecida' }, { status: 400 });
+      throw e;
     }
 
     await getForgeDb().forgeLearnerJourney.update({
@@ -179,9 +186,22 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       data: { mapState: mergeV2IntoMapState(mapState, v2) as object },
     });
 
-    return NextResponse.json({ v2 });
+    if (action === 'consultancy' && body.optionId === 'companero') {
+      const peerUserId = typeof body.peerUserId === 'string' ? body.peerUserId : '';
+      const opt = CONSULTANCY_OPTIONS.find((o) => o.id === 'companero');
+      if (peerUserId && opt) {
+        const payer = await getForgeDb().user.findUnique({
+          where: { id: tenant.userId },
+          select: { name: true, email: true },
+        });
+        const payerName = payer?.name ?? payer?.email?.split('@')[0];
+        await creditPeerConsultancy(courseId, peerUserId, opt.cost, payerName ?? undefined);
+      }
+    }
+
+    return NextResponse.json({ v2, teamMode: false });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Erro';
+    const msg = e instanceof Error ? e.message : 'Error interno';
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

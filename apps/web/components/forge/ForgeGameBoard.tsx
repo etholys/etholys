@@ -36,6 +36,8 @@ export function ForgeGameBoard({
   onGuideChange,
   onComplete,
   onRoomState,
+  onGameEvents,
+  v2EcoBalance,
 }: {
   sessionId?: string;
   roomId?: string;
@@ -49,6 +51,9 @@ export function ForgeGameBoard({
   onGuideChange?: (guide: BoardGuide | null, knowledge: { title: string; body: string } | null) => void;
   onComplete?: () => void;
   onRoomState?: (state: SessionState, finished: boolean) => void;
+  onGameEvents?: (events: Array<{ type?: string; message?: string; amount?: number }>) => void;
+  /** Saldo V2 — sustituye ecoCredits legado en UI */
+  v2EcoBalance?: number;
 }) {
   const ft = useForgeT();
   const [state, setState] = useState<SessionState>(initialState);
@@ -142,6 +147,7 @@ export function ForgeGameBoard({
         if (m?.guide) onGuideChange?.(m.guide, m.knowledgeCard ?? null);
         const msgs = (data.events ?? []).map((e: { message?: string }) => e.message).filter(Boolean);
         if (msgs.length) setEvents((prev) => [...msgs, ...prev].slice(0, 12));
+        if (data.events?.length) onGameEvents?.(data.events);
         if (action.type === 'roll_dice' && m?.lastRoll) {
           setPendingRoll(m.lastRoll);
         }
@@ -160,6 +166,7 @@ export function ForgeGameBoard({
         setState((data.session?.state ?? {}) as SessionState);
         const msgs = (data.events ?? []).map((e: { message?: string }) => e.message).filter(Boolean);
         if (msgs.length) setEvents((prev) => [...msgs, ...prev].slice(0, 10));
+        if (data.events?.length) onGameEvents?.(data.events);
         if (data.session?.status === 'completed') onComplete?.();
       }
     } catch (e) {
@@ -179,7 +186,7 @@ export function ForgeGameBoard({
   const isMyTurn = Boolean(
     myUserId && turnPlayer && turnPlayer.userId === myUserId && syncMode === 'player'
   );
-  const displayEco = turnPlayer?.ecoCredits ?? state.ecoCredits ?? 500;
+  const displayEco = v2EcoBalance ?? turnPlayer?.ecoCredits ?? state.ecoCredits ?? 500;
   const undoCount = historyCount(initialState as Record<string, unknown>);
 
   async function rollWithAnimation() {
@@ -367,9 +374,16 @@ export function ForgeGameBoard({
       {state.finished && (
         <div className="rounded-xl bg-emerald-100 border border-emerald-300 p-4 text-center">
           <p className="text-lg font-bold text-emerald-900">¡Expedición completada!</p>
-          <p className="text-sm text-emerald-800 mt-1">
-            Eco-Créditos: {state.ecoCredits} · Impacto: {state.impactPoints} · Fichas: {insights.length}
-          </p>
+          {!v2EcoBalance ? (
+            <p className="text-sm text-emerald-800 mt-1">
+              Eco-Créditos: {state.ecoCredits} · Impacto: {state.impactPoints} · Fichas:{' '}
+              {insights.length}
+            </p>
+          ) : (
+            <p className="text-sm text-emerald-800 mt-1">
+              Ledger V2: {v2EcoBalance} Eco · Fichas mapa: {insights.length}
+            </p>
+          )}
         </div>
       )}
 

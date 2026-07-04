@@ -61,15 +61,45 @@ export type ExpedicionV2PlayerState = {
   postQuizCompletedAt?: string;
   finalScore?: number;
   finalScoreBreakdown?: SustainabilityScoreBreakdown;
+  /** Beneficios activos de cartas Acción */
+  benefits?: {
+    halfInvestmentAny?: boolean;
+    halfInvestmentAlquimia?: boolean;
+    doubleMetricMercado?: boolean;
+  };
+  /** Micro-caso enviado, pendiente de validación del facilitador */
+  pendingMicroCaso?: {
+    microCasoId: string;
+    station: ExpedicionStationSlug;
+    answer: string;
+    submittedAt: string;
+    submittedBy?: string;
+  } | null;
+  /** Micro-casos ya resueltos (evita repetir) */
+  completedMicroCasos?: string[];
+  /** Pitch Feria de Negocios pendiente de validación */
+  pendingFeriaPitch?: {
+    pitch: string;
+    submittedAt: string;
+    submittedBy?: string;
+  } | null;
+  /** Premio Feria ya entregado (+300 Eco) */
+  feriaAwarded?: boolean;
+  /** Puntos de Impacto (validaciones facilitador + tablero) */
+  impactPoints?: number;
+  /** Eco ganados por ayudar a colegas (modo mesa) */
+  peerCredits?: Record<string, number>;
 };
 
 export type SustainabilityScoreBreakdown = {
+  /** Eco × 0,6 (fórmula PPT slide 9) */
   ecoComponent: number;
-  postItComponent: number;
-  moduleCompleteComponent: number;
-  connectionComponent: number;
+  /** Puntos de Impacto × 10 × 0,4 */
+  impactComponent: number;
   total: number;
   finalEcoBalance: number;
+  impactPoints: number;
+  /** Detalhe auxiliar do mapa (referência) */
   postItCount: number;
   modulesComplete: number;
   connectionCount: number;

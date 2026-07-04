@@ -13,7 +13,17 @@ const COLORS = [
   'from-violet-500 to-purple-700',
 ];
 
-export function ForgePersonalMapStrip({ mapState }: { mapState: JourneyMapState }) {
+export function ForgePersonalMapStrip({
+  mapState,
+  v2Balance,
+  v2PostItCount,
+  v2ImpactPoints,
+}: {
+  mapState: JourneyMapState;
+  v2Balance?: number;
+  v2PostItCount?: number;
+  v2ImpactPoints?: number;
+}) {
   const ft = useForgeT();
   const board = mapState.board;
 
@@ -51,11 +61,22 @@ export function ForgePersonalMapStrip({ mapState }: { mapState: JourneyMapState 
           </div>
         ))}
       </div>
-      {board && (
+      {(board || v2Balance != null) && (
         <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold text-emerald-200">
-          <span>{ft('forge.map.stat.eco')}: {board.ecoCredits ?? 500}</span>
-          <span>{ft('forge.map.stat.impact')}: {board.impactPoints ?? 0}</span>
-          <span>{ft('forge.map.stat.insights')}: {board.insightsCount ?? 0}</span>
+          <span>
+            {ft('forge.map.stat.eco')}: {v2Balance ?? board?.ecoCredits ?? 500}
+            {v2Balance != null && ' (V2)'}
+          </span>
+          {v2PostItCount != null && <span>Post-its: {v2PostItCount}</span>}
+          {v2ImpactPoints != null && (
+            <span>{ft('forge.map.stat.impact')}: {v2ImpactPoints}</span>
+          )}
+          {!v2Balance && (
+            <>
+              <span>{ft('forge.map.stat.impact')}: {board?.impactPoints ?? 0}</span>
+              <span>{ft('forge.map.stat.insights')}: {board?.insightsCount ?? 0}</span>
+            </>
+          )}
         </div>
       )}
     </div>

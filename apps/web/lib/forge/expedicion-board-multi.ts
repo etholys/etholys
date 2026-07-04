@@ -84,7 +84,7 @@ export function createTeamPlayInitialState(
     teamPlay: true,
     teamMemberIds: memberUserIds,
     guide: {
-      message: `Equipa «${teamName}»: um peão para todos. Decidam juntos e movam o tabuleiro.`,
+      message: `Equipo «${teamName}»: un peón para todos. Decidan juntos y muevan el tablero.`,
       type: 'system',
       at: Date.now(),
     },

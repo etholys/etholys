@@ -12,6 +12,7 @@ export function createInitialV2State(): ExpedicionV2PlayerState {
     maxCycles: MAX_GAME_CYCLES,
     constructionMap: createEmptyConstructionMap(),
     ledger: createInitialLedger(),
+    impactPoints: 0,
   };
 }
 
@@ -32,6 +33,15 @@ export function parseV2State(raw: unknown): ExpedicionV2PlayerState {
     postQuizCompletedAt: o.postQuizCompletedAt,
     finalScore: o.finalScore,
     finalScoreBreakdown: o.finalScoreBreakdown,
+    benefits: o.benefits as ExpedicionV2PlayerState['benefits'],
+    pendingMicroCaso: o.pendingMicroCaso as ExpedicionV2PlayerState['pendingMicroCaso'],
+    completedMicroCasos: Array.isArray(o.completedMicroCasos)
+      ? (o.completedMicroCasos as string[])
+      : undefined,
+    pendingFeriaPitch: o.pendingFeriaPitch as ExpedicionV2PlayerState['pendingFeriaPitch'],
+    feriaAwarded: o.feriaAwarded === true,
+    impactPoints: typeof o.impactPoints === 'number' ? o.impactPoints : 0,
+    peerCredits: o.peerCredits as ExpedicionV2PlayerState['peerCredits'],
   };
 }
 

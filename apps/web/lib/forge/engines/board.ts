@@ -15,6 +15,7 @@ import {
   undoBoardState,
 } from '@/lib/forge/board-history';
 import { drawCardForPosition } from '@/lib/forge/expedicion-station-decks';
+import { adjustEcoCredits, usesV2Ledger } from '@/lib/forge/expedicion-v2/board-v2-mode';
 
 type CurrentCard = { id: string; prompt: string; reflection?: string; xp?: number; type?: string };
 
@@ -76,15 +77,26 @@ function applyFacilitatorAction(
   return null;
 }
 
+/** Preserva flags V2 (ledger financeiro) no state serializado da sala. */
+function preserveV2RoomFlags(state: GameState, roomRaw?: Record<string, unknown>): GameState {
+  if (!roomRaw) return state;
+  const out = { ...(state as Record<string, unknown>) };
+  if (roomRaw.v2FinancialMode === true) out.v2FinancialMode = true;
+  if (roomRaw.v2Team != null) out.v2Team = roomRaw.v2Team;
+  return out as GameState;
+}
+
 function applyMultiAction(
   multi: MultiBoardState,
   action: GameAction,
-  spec: GameSpecV1
+  spec: GameSpecV1,
+  roomRaw?: Record<string, unknown>
 ): { state: GameState; events: GameEvent[] } {
   const raw = syncLegacyFields({ ...multi, players: multi.players.map((p) => ({ ...p })) }) as Record<
     string,
     unknown
   >;
+  const useV2 = usesV2Ledger(roomRaw ?? raw);
   const fac = applyFacilitatorAction(raw, action, spec);
   if (fac) return fac;
 
@@ -104,7 +116,10 @@ function applyMultiAction(
   }
 
   const withHistory = (next: MultiBoardState) =>
-    syncLegacyFields(pushBoardHistory(syncLegacyFields(next) as Record<string, unknown>) as MultiBoardState);
+    preserveV2RoomFlags(
+      syncLegacyFields(pushBoardHistory(syncLegacyFields(next) as Record<string, unknown>) as MultiBoardState),
+      roomRaw
+    );
 
   if (action.type === 'end_turn') {
     s = advanceTurn(s, spec);
@@ -160,11 +175,18 @@ function applyMultiAction(
     };
     const p = s.players[idx];
     if (card.type === 'penalty' || card.prompt.toLowerCase().includes('pag')) {
-      s.players[idx] = { ...p, ecoCredits: Math.max(0, p.ecoCredits - 100) };
+      s.players[idx] = {
+        ...p,
+        ecoCredits: adjustEcoCredits(p.ecoCredits, -100, useV2),
+      };
       events.push({ type: 'penalty', message: `${cur.name}: -100 Eco-Créditos. ${card.prompt}` });
     } else if (card.type === 'bonus') {
-      s.players[idx] = { ...p, ecoCredits: p.ecoCredits + (card.xp ?? 50) };
-      events.push({ type: 'bonus', message: `${cur.name}: bono +${card.xp ?? 50} Eco.` });
+      const bonus = card.xp ?? 50;
+      s.players[idx] = {
+        ...p,
+        ecoCredits: adjustEcoCredits(p.ecoCredits, bonus, useV2),
+      };
+      events.push({ type: 'bonus', message: `${cur.name}: bono +${bonus} Eco.` });
     } else {
       events.push({ type: 'card', message: card.prompt });
     }
@@ -184,7 +206,7 @@ function applyMultiAction(
       ...p,
       insights: [...p.insights, text.slice(0, 2000)],
       impactPoints: p.impactPoints + 1,
-      ecoCredits: p.ecoCredits + 100,
+      ecoCredits: adjustEcoCredits(p.ecoCredits, 100, useV2),
     };
     s.currentCard = null;
     s.guide = {
@@ -200,7 +222,7 @@ function applyMultiAction(
 
   if (action.type === 'skip_card') {
     const p = s.players[idx];
-    s.players[idx] = { ...p, ecoCredits: Math.max(0, p.ecoCredits - 50) };
+    s.players[idx] = { ...p, ecoCredits: adjustEcoCredits(p.ecoCredits, -50, useV2) };
     s.currentCard = null;
     events.push({ type: 'skip', message: `${cur.name}: carta pendiente (-50 Eco).` });
     s = advanceTurn(s, spec);
@@ -247,10 +269,11 @@ export const boardEngine: ForgeEngine = {
     const multiRaw = state as Record<string, unknown>;
     const multi = parseMulti(multiRaw);
     if (multi) {
-      return applyMultiAction(multi, action, spec);
+      return applyMultiAction(multi, action, spec, multiRaw);
     }
 
     const raw = state as Record<string, unknown>;
+    const useV2 = usesV2Ledger(raw);
     const fac = applyFacilitatorAction(raw, action, spec);
     if (fac) return fac;
 
@@ -305,11 +328,12 @@ export const boardEngine: ForgeEngine = {
         type: card.type,
       };
       if (card.type === 'penalty' || card.prompt.toLowerCase().includes('pag')) {
-        s.ecoCredits = Math.max(0, s.ecoCredits - 100);
+        s.ecoCredits = adjustEcoCredits(s.ecoCredits, -100, useV2);
         events.push({ type: 'penalty', message: `Desafío: -100 Eco-Créditos. ${card.prompt}` });
       } else if (card.type === 'bonus') {
-        s.ecoCredits += card.xp ?? 50;
-        events.push({ type: 'bonus', message: `Bono: +${card.xp ?? 50} Eco-Créditos.` });
+        const bonus = card.xp ?? 50;
+        s.ecoCredits = adjustEcoCredits(s.ecoCredits, bonus, useV2);
+        events.push({ type: 'bonus', message: `Bono: +${bonus} Eco-Créditos.` });
       } else {
         events.push({ type: 'card', message: card.prompt, xp: card.xp });
       }
@@ -323,7 +347,7 @@ export const boardEngine: ForgeEngine = {
       }
       s.insights.push(text.slice(0, 2000));
       s.impactPoints += 1;
-      s.ecoCredits += 100;
+      s.ecoCredits = adjustEcoCredits(s.ecoCredits, 100, useV2);
       const xp = spec.scoring?.xpPerInsight ?? 40;
       events.push({
         type: 'validated',
@@ -339,7 +363,7 @@ export const boardEngine: ForgeEngine = {
     }
 
     if (action.type === 'skip_card') {
-      s.ecoCredits = Math.max(0, s.ecoCredits - 50);
+      s.ecoCredits = adjustEcoCredits(s.ecoCredits, -50, useV2);
       s.currentCard = null;
       events.push({ type: 'skip', message: 'Carta corregida más tarde: -50 Eco-Créditos.' });
       return { state: save(s), events };

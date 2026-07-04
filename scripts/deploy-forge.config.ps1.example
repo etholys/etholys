@@ -2,10 +2,9 @@
 # deploy-forge.config.ps1 não é versionado (está no .gitignore).
 
 $DeployForge = @{
-  SshHost      = '178.105.80.131'
+  SshHost      = '84.247.187.155'
   SshUser      = 'root'
   RemoteRepo   = '/opt/etholys'
-  # Caminho da chave SSH (vazio = agente/chave predefinida do Windows)
   SshKeyPath   = ''
   GitBranch    = 'main'
 }

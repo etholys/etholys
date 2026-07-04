@@ -2,6 +2,7 @@ import microCasos from '@/lib/forge/expedicion-v2/data/micro-casos.json';
 import eventCards from '@/lib/forge/expedicion-v2/data/event-cards.json';
 import quizMaturidade from '@/lib/forge/expedicion-v2/data/quiz-maturidade.json';
 import capsulas from '@/lib/forge/expedicion-v2/data/capsulas-tecnicas.json';
+import { CAPSULAS_TECNICAS } from '@/lib/forge/expedicion-v2/capsulas-content';
 import type { ExpedicionStationSlug } from '@/lib/forge/expedicion-station-decks';
 
 export type MicroCaso = {
@@ -47,6 +48,8 @@ export function getMaturityQuiz() {
 }
 
 export function getCapsulaForStation(station: ExpedicionStationSlug) {
+  const rich = CAPSULAS_TECNICAS.find((c) => c.station === station);
+  if (rich) return rich;
   return (capsulas as Array<{ station: string; title: string; body: string }>).find(
     (c) => c.station === station
   );

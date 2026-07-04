@@ -39,9 +39,22 @@ import { ForgeMaturityQuizGate } from '@/components/forge/ForgeMaturityQuizGate'
 import { ForgeSustainabilityDashboard } from '@/components/forge/ForgeSustainabilityDashboard';
 import { ForgeExpedicionV2Workspace } from '@/components/forge/ForgeExpedicionV2Workspace';
 import { ForgeMicroCasoPanel } from '@/components/forge/ForgeMicroCasoPanel';
-import { drawRandomMicroCaso } from '@/lib/forge/expedicion-v2/content';
+import { drawRandomMicroCaso, getMicroCasoById } from '@/lib/forge/expedicion-v2/content';
 import { EXPEDICION_V2_SHELL } from '@/lib/forge/expedicion-v2/theme';
 import type { MicroCaso } from '@/lib/forge/expedicion-v2/content';
+import {
+  resolveBoardLandEvent,
+  type BoardLandEvent,
+} from '@/lib/forge/expedicion-v2/board-land-events';
+import { applyLedgerDrafts, impactPointsFromBoardEvents, ledgerDraftsFromBoardEvents } from '@/lib/forge/expedicion-v2/board-ledger-sync';
+import { ForgeEventCardPanel } from '@/components/forge/ForgeEventCardPanel';
+import { ForgeExpedicionCycleBar } from '@/components/forge/ForgeExpedicionCycleBar';
+import { ForgeFacilitatorV2Panel } from '@/components/forge/ForgeFacilitatorV2Panel';
+import { ForgeFeriaSessionPanel } from '@/components/forge/ForgeFeriaSessionPanel';
+import { ForgeFacilitatorV2Controls } from '@/components/forge/ForgeFacilitatorV2Controls';
+import { ForgeFeriaPanel } from '@/components/forge/ForgeFeriaPanel';
+import { feriaEligible, feriaEligibilityHint } from '@/lib/forge/expedicion-v2/feria';
+import type { TeamPeer } from '@/components/forge/ForgeConsultancyModal';
 
 /** Diapositiva PPT → índice do módulo (quiz da cápsula). */
 const SLIDE_TO_MODULE: Record<number, number> = {
@@ -118,7 +131,17 @@ export function ForgeExpedicionRoom({
   const [slidesOpen, setSlidesOpen] = useState(false);
   const [v2MapOpen, setV2MapOpen] = useState(false);
   const [activeMicroCaso, setActiveMicroCaso] = useState<MicroCaso | null>(null);
-  const { v2, videoEnabled, sessionFormat, patch: patchV2 } = useExpedicionV2(courseId);
+  const [landEvent, setLandEvent] = useState<BoardLandEvent | null>(null);
+  const [cycleBusy, setCycleBusy] = useState(false);
+  const [teamPeers, setTeamPeers] = useState<TeamPeer[]>([]);
+  const lastBoardPosRef = useRef<number | null>(null);
+  const multiBoot = parseMulti(gameState);
+  const teamRoomId =
+    multiBoot?.teamPlay && sharedRoomId ? sharedRoomId : null;
+  const { v2, teamMode, videoEnabled, sessionFormat, patch: patchV2, reload: reloadV2 } = useExpedicionV2(
+    courseId,
+    { roomId: teamRoomId }
+  );
   const booted = useRef(false);
   const slideSyncRef = useRef(0);
   const isCoaching = groupMode === 'individual_coaching';
@@ -236,6 +259,17 @@ export function ForgeExpedicionRoom({
       .catch(() => setGroupMode('live_team'));
   }, [playGroupId]);
 
+  useEffect(() => {
+    if (!playGroupId) {
+      setTeamPeers([]);
+      return;
+    }
+    fetch(`/api/forge/play-groups/${playGroupId}`)
+      .then((r) => r.json())
+      .then((d) => setTeamPeers(d.members ?? []))
+      .catch(() => setTeamPeers([]));
+  }, [playGroupId]);
+
   const syncSlideToRoom = useCallback(
     async (index: number) => {
       if (!sharedRoomId || !isFac) return;
@@ -338,21 +372,71 @@ export function ForgeExpedicionRoom({
     ?.currentCard;
 
   const multi = parseMulti(gameState);
-  const myPosition =
-    multi && myUserId
-      ? multi.players.find((p) => p.userId === myUserId)?.position
-      : typeof (gameState as { position?: number }).position === 'number'
-        ? (gameState as { position: number }).position
-        : undefined;
-  const stationSlug = typeof myPosition === 'number' ? stationSlugForSpace(myPosition) : null;
+  const boardPosition =
+    multi?.teamPlay && typeof multi.position === 'number'
+      ? multi.position
+      : multi && myUserId
+        ? multi.players.find((p) => p.userId === myUserId)?.position
+        : typeof (gameState as { position?: number }).position === 'number'
+          ? (gameState as { position: number }).position
+          : multi?.players[0]?.position;
+  const stationSlug = typeof boardPosition === 'number' ? stationSlugForSpace(boardPosition) : null;
+
+  const handleBoardEvents = useCallback(
+    async (events: Array<{ type?: string; message?: string; amount?: number }>) => {
+      const drafts = ledgerDraftsFromBoardEvents(events);
+      const impact = impactPointsFromBoardEvents(events);
+      if (drafts.length) {
+        await applyLedgerDrafts(courseId, drafts, teamRoomId);
+      }
+      if (impact > 0) {
+        await patchV2({ action: 'add_impact', points: impact });
+      }
+      if (drafts.length || impact > 0) {
+        await reloadV2();
+      }
+    },
+    [courseId, reloadV2, teamRoomId, patchV2]
+  );
 
   useEffect(() => {
-    if (!stationSlug || isFac) return;
-    const mc = drawRandomMicroCaso(stationSlug);
-    if (mc) setActiveMicroCaso(mc);
-  }, [stationSlug, isFac, myPosition]);
+    if (typeof boardPosition !== 'number' || isFac) return;
+    if (lastBoardPosRef.current === boardPosition) return;
+    lastBoardPosRef.current = boardPosition;
+    const ev = resolveBoardLandEvent(boardPosition);
+    if (ev.kind === 'estacion' && ev.station) {
+      if (v2?.pendingMicroCaso && !isFac) {
+        setLandEvent(null);
+        return;
+      }
+      const mc = drawRandomMicroCaso(ev.station, v2?.completedMicroCasos ?? []);
+      if (mc) setActiveMicroCaso(mc);
+      setLandEvent(null);
+    } else if (ev.kind === 'accion' || ev.kind === 'desafio') {
+      setLandEvent(ev);
+      setActiveMicroCaso(null);
+    } else if (ev.kind === 'meta' && v2 && v2.phase === 'playing') {
+      void (async () => {
+        await patchV2({ action: 'end_cycle' });
+        await reloadV2();
+      })();
+    } else {
+      setLandEvent(null);
+    }
+  }, [boardPosition, isFac, v2?.phase, v2?.pendingMicroCaso, v2?.completedMicroCasos, patchV2, reloadV2]);
 
   const boardBlocked = v2?.phase === 'pre_quiz' || v2?.phase === 'post_quiz' || v2?.phase === 'finished';
+
+  const pendingReview = v2?.pendingMicroCaso ?? null;
+  const reviewMicroCaso = pendingReview ? getMicroCasoById(pendingReview.microCasoId) : null;
+  const reviewStation = pendingReview?.station ?? null;
+
+  const feriaSlideOpen = currentSlide?.n === 8;
+  const showFeriaPanel =
+    v2 &&
+    !boardBlocked &&
+    (feriaSlideOpen || Boolean(v2.pendingFeriaPitch) || v2.feriaAwarded);
+  const feriaEligibleNow = v2 ? feriaEligible(v2.constructionMap) : false;
 
   const deckByStation = useMemo(() => {
     if (!gameSpec?.cards) return [];
@@ -392,10 +476,17 @@ export function ForgeExpedicionRoom({
           <p className="text-[10px] font-bold uppercase tracking-widest text-[#F4B942]">
             {ft('forge.room.brand')}
             {sessionFormat === 'presencial' && (
-              <span className="ml-2 rounded bg-white/20 px-1.5 py-0.5 text-[9px]">Presencial</span>
+              <span className="ml-2 rounded bg-white/20 px-1.5 py-0.5 text-[9px]">{ft('forge.v2.presential')}</span>
             )}
           </p>
           <h1 className="truncate text-sm font-black md:text-base">{courseTitle}</h1>
+          {v2 && v2.phase === 'playing' && (
+            <p className="text-[10px] text-white/80">
+              {ft('forge.v2.cycle', { current: v2.cyclesCompleted + 1, max: v2.maxCycles })}
+              {v2.ledger && ` · ${ft('forge.v2.eco', { n: v2.ledger.balance })}`}
+              {teamMode && ` · ${ft('forge.v2.sharedTable')}`}
+            </p>
+          )}
         </div>
         <ForgeGameManualButton onOpen={() => setManualOpen(true)} />
         {presentationSlides.length > 0 && (
@@ -420,10 +511,10 @@ export function ForgeExpedicionRoom({
             v2MapOpen ? 'border-[#F4B942] bg-[#F4B942]/20' : 'border-white/30 hover:bg-white/10'
           )}
         >
-          Mapa + Finanzas
+          {ft('forge.v2.mapFinance')}
         </button>
         <Link
-          href={`/hub/forge/cursos/${courseId}/mi-mapa`}
+        href={`/hub/forge/cursos/${courseId}/mi-mapa${teamRoomId ? `?room=${teamRoomId}` : ''}`}
           className="rounded-lg border border-white/30 px-2 py-1 text-[10px] font-bold hover:bg-white/10"
         >
           {ft('forge.room.myMap')}
@@ -434,6 +525,15 @@ export function ForgeExpedicionRoom({
         >
           {ft('forge.tutorLobby.short')}
         </Link>
+        {!isFac && stationSlug && v2 && v2.phase === 'playing' && (
+          <button
+            type="button"
+            onClick={() => setInvestStation(stationSlug)}
+            className="rounded-lg border border-emerald-400 bg-emerald-900/40 px-2 py-1 text-[10px] font-bold text-emerald-200"
+          >
+            {ft('forge.room.investments')}
+          </button>
+        )}
         {isFac && (
           <>
             <button
@@ -463,7 +563,7 @@ export function ForgeExpedicionRoom({
             >
               {ft('forge.room.deck')}
             </button>
-            {stationSlug && (
+            {stationSlug && v2 && (
               <button
                 type="button"
                 onClick={() => setInvestStation(stationSlug)}
@@ -535,11 +635,60 @@ export function ForgeExpedicionRoom({
 
         {v2MapOpen && (
           <aside className="w-full max-w-md shrink-0 border-r border-[#1B5E4B]/15 bg-white/90 overflow-y-auto z-10 p-3">
-            <ForgeExpedicionV2Workspace courseId={courseId} readOnly={isFac} />
+            <ForgeExpedicionV2Workspace courseId={courseId} readOnly={isFac} roomId={teamRoomId} teamPeers={teamPeers} myUserId={myUserId} />
           </aside>
         )}
 
         <main className="flex-1 flex flex-col min-w-0 min-h-0 p-2 md:p-3 gap-2">
+          {sessionFormat === 'presencial' && (
+            <p className="shrink-0 rounded-lg border border-[#F4B942]/40 bg-[#F4B942]/15 px-3 py-2 text-xs text-[#FFF8E7]">
+              {teamMode
+                ? ft('forge.v2.presentialTeamHint')
+                : ft('forge.v2.presentialSoloHint')}
+            </p>
+          )}
+          {isFac && (
+            <ForgeFacilitatorV2Controls
+              courseId={courseId}
+              roomId={teamRoomId}
+              busy={cycleBusy}
+              onAction={async (action) => {
+                setCycleBusy(true);
+                try {
+                  await patchV2({ action });
+                  await reloadV2();
+                } finally {
+                  setCycleBusy(false);
+                }
+              }}
+            />
+          )}
+          {isFac && <ForgeFacilitatorV2Panel courseId={courseId} />}
+          {isFac && (
+            <div className="px-2 pb-2">
+              <ForgeFeriaSessionPanel courseId={courseId} />
+            </div>
+          )}
+          {v2 && (
+            <ForgeExpedicionCycleBar
+              v2={v2}
+              isFacilitator={isFac}
+              busy={cycleBusy}
+              onEndCycle={
+                isFac
+                  ? async () => {
+                      setCycleBusy(true);
+                      try {
+                        await patchV2({ action: 'end_cycle' });
+                        await reloadV2();
+                      } finally {
+                        setCycleBusy(false);
+                      }
+                    }
+                  : undefined
+              }
+            />
+          )}
           {isCoaching && (
             <p className="text-center text-xs text-violet-300 shrink-0">{ft('forge.room.coachingHint')}</p>
           )}
@@ -553,25 +702,124 @@ export function ForgeExpedicionRoom({
             </div>
           )}
 
-          {activeMicroCaso && stationSlug && v2 && !boardBlocked && (
+          {landEvent?.kind === 'accion' && landEvent.actionCard && v2 && !boardBlocked && (
+            <div className="shrink-0">
+              <ForgeEventCardPanel
+                kind="accion"
+                card={landEvent.actionCard}
+                onApply={async () => {
+                  await patchV2({
+                    action: 'apply_action_card',
+                    cardId: landEvent.actionCard!.id,
+                  });
+                  await reloadV2();
+                  setLandEvent(null);
+                }}
+                onDismiss={() => setLandEvent(null)}
+              />
+            </div>
+          )}
+          {landEvent?.kind === 'desafio' && landEvent.crisisCard && v2 && !boardBlocked && (
+            <div className="shrink-0">
+              <ForgeEventCardPanel
+                kind="desafio"
+                card={landEvent.crisisCard}
+                onApplyCrisis={async (mode) => {
+                  await patchV2({
+                    action: 'apply_crisis_card',
+                    cardId: landEvent.crisisCard!.id,
+                    mode,
+                  });
+                  await reloadV2();
+                  setLandEvent(null);
+                }}
+                onDismiss={() => setLandEvent(null)}
+              />
+            </div>
+          )}
+
+          {v2?.pendingMicroCaso && !isFac && !activeMicroCaso && !landEvent && (
+            <p className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Respuesta enviada — esperando validación del facilitador (+200 Eco).
+            </p>
+          )}
+
+          {activeMicroCaso && stationSlug && v2 && !boardBlocked && !landEvent && !pendingReview && (
             <div className="shrink-0">
               <ForgeMicroCasoPanel
                 microCaso={activeMicroCaso}
                 station={stationSlug}
                 balance={v2.ledger.balance}
                 isFacilitator={isFac}
-                onConsultancy={async (optionId) => {
-                  await patchV2({ action: 'consultancy', optionId });
-                }}
-                onValidate={async () => {
+                teamPeers={teamPeers}
+                myUserId={myUserId}
+                onConsultancy={async (optionId, peerUserId) => {
                   await patchV2({
-                    action: 'ledger_entry',
-                    description: 'Premio estación (validación)',
-                    entryType: 'E',
-                    amount: 200,
-                    meta: { kind: 'station_prize', microCasoId: activeMicroCaso.id },
+                    action: 'consultancy',
+                    optionId,
+                    ...(peerUserId ? { peerUserId } : {}),
                   });
+                  await reloadV2();
+                }}
+                onSubmit={async (answer) => {
+                  await patchV2({
+                    action: 'submit_micro_caso',
+                    microCasoId: activeMicroCaso.id,
+                    station: stationSlug,
+                    answer,
+                    submittedBy: myUserId,
+                  });
+                  await reloadV2();
                   setActiveMicroCaso(null);
+                }}
+              />
+            </div>
+          )}
+
+          {isFac && reviewMicroCaso && reviewStation && v2 && !boardBlocked && !landEvent && (
+            <div className="shrink-0">
+              <ForgeMicroCasoPanel
+                microCaso={reviewMicroCaso}
+                station={reviewStation}
+                balance={v2.ledger.balance}
+                isFacilitator
+                pendingAnswer={pendingReview?.answer}
+                onConsultancy={() => {}}
+                onApprove={async () => {
+                  await patchV2({ action: 'approve_micro_caso' });
+                  await reloadV2();
+                }}
+                onReject={async () => {
+                  await patchV2({ action: 'reject_micro_caso' });
+                  await reloadV2();
+                }}
+              />
+            </div>
+          )}
+
+          {showFeriaPanel && v2 && (
+            <div className="shrink-0">
+              <ForgeFeriaPanel
+                eligible={feriaEligibleNow}
+                eligibilityHint={feriaEligibilityHint(v2.constructionMap)}
+                isFacilitator={isFac}
+                pendingPitch={v2.pendingFeriaPitch?.pitch}
+                awarded={v2.feriaAwarded}
+                onSubmit={async (pitch) => {
+                  await patchV2({
+                    action: 'submit_feria_pitch',
+                    pitch,
+                    submittedBy: myUserId,
+                  });
+                  await reloadV2();
+                }}
+                onAward={async () => {
+                  await patchV2({ action: 'award_feria_pitch' });
+                  await reloadV2();
+                }}
+                onReject={async () => {
+                  await patchV2({ action: 'reject_feria_pitch' });
+                  await reloadV2();
                 }}
               />
             </div>
@@ -598,6 +846,8 @@ export function ForgeExpedicionRoom({
                     facilitatorEmergency={facEmergency}
                     onGuideChange={(g) => setCoachGuide(g)}
                     onRoomState={(s) => setGameState(s as Record<string, unknown>)}
+                    onGameEvents={handleBoardEvents}
+                    v2EcoBalance={v2?.ledger.balance}
                   />
                 </div>
               ) : (
@@ -611,18 +861,38 @@ export function ForgeExpedicionRoom({
           </div>
           {boardBlocked && v2?.phase !== 'finished' && (
             <p className="text-center text-sm text-[#1B5E4B] font-semibold py-8">
-              Completa el Quiz de Madurez para continuar.
+              {ft('forge.v2.completeMaturityQuiz')}
             </p>
           )}
 
           {myMap && !isCoaching && (
             <div className="shrink-0 max-h-28 overflow-hidden">
-              <ForgePersonalMapStrip mapState={myMap} />
+              <ForgePersonalMapStrip
+                mapState={myMap}
+                v2Balance={v2?.ledger.balance}
+                v2PostItCount={v2?.constructionMap.postIts.length}
+                v2ImpactPoints={v2?.impactPoints}
+              />
             </div>
           )}
 
-          {investStation && (
-            <ForgeInvestmentPanel station={investStation} onClose={() => setInvestStation(null)} />
+          {investStation && v2 && (
+            <ForgeInvestmentPanel
+              station={investStation}
+              balance={v2.ledger.balance}
+              benefits={v2.benefits}
+              onClose={() => setInvestStation(null)}
+              onPurchase={async (tierId, label, cost) => {
+                await patchV2({
+                  action: 'purchase_investment',
+                  tierId,
+                  label,
+                  cost,
+                  station: investStation,
+                });
+                await reloadV2();
+              }}
+            />
           )}
 
           {isFac && showDeck && gameSpec?.cards && (
