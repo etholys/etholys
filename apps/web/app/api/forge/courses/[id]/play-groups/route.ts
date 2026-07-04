@@ -31,6 +31,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
         id: g.id,
         name: g.name,
         mode: g.mode,
+        editionId: g.editionId,
         liveSessionId: g.liveSessionId,
         liveSessionTitle: g.liveSession?.title,
         startsAt: g.liveSession?.startsAt?.toISOString(),
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       name?: string;
       mode?: string;
       liveSessionId?: string | null;
+      editionId?: string | null;
     };
     const name = body.name?.trim();
     if (!name) return NextResponse.json({ error: 'Nombre del grupo requerido' }, { status: 400 });
@@ -81,6 +83,15 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       if (!ls) return NextResponse.json({ error: 'Sesión inválida' }, { status: 400 });
     }
 
+    const editionId =
+      typeof body.editionId === 'string' && body.editionId ? body.editionId : null;
+    if (editionId) {
+      const ed = await getForgeDb().forgeCourseEdition.findFirst({
+        where: { id: editionId, courseId },
+      });
+      if (!ed) return NextResponse.json({ error: 'Turma inválida' }, { status: 400 });
+    }
+
     const inviteToken = randomBytes(24).toString('base64url');
     const expires = new Date();
     expires.setDate(expires.getDate() + 30);
@@ -88,6 +99,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     const group = await getForgeDb().forgePlayGroup.create({
       data: {
         courseId,
+        editionId,
         name,
         mode,
         liveSessionId,

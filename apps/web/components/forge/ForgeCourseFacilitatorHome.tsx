@@ -64,8 +64,8 @@ export function ForgeCourseFacilitatorHome({
         <ActionCard
           href={`/hub/forge/cursos/${courseId}/turmas`}
           icon={Video}
-          title={ft('forge.tutorLobby.title')}
-          desc={ft('forge.tutorLobby.subtitle')}
+          title={ft('forge.editions.title')}
+          desc={ft('forge.editions.subtitle')}
           color="sky"
         />
         <ActionCard

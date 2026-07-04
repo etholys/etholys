@@ -1940,10 +1940,30 @@ model ForgeCourse {
   liveSessions   ForgeLiveSession[]
   sharedGameRooms ForgeSharedGameRoom[]
   playGroups     ForgePlayGroup[]
+  editions       ForgeCourseEdition[]
   feriaSessions  ForgeFeriaSession[]
 
   @@index([companyId, status])
   @@index([programId])
+}
+
+/// Edição / turma — uma execução do curso (várias empresas/grupos dentro)
+model ForgeCourseEdition {
+  id        String   @id @default(cuid())
+  courseId  String
+  name      String
+  /** preparation | running | finished | archived */
+  status    String   @default("preparation")
+  startsAt  DateTime?
+  endsAt    DateTime?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  course    ForgeCourse    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  playGroups ForgePlayGroup[]
+
+  @@index([courseId, status])
+  @@index([courseId, startsAt])
 }
 
 /// Sessão de feira / capacitação presencial — código curto da sala + agrupamento automático
@@ -1992,6 +2012,7 @@ model ForgeFeriaRegistration {
 model ForgePlayGroup {
   id              String                @id @default(cuid())
   courseId        String
+  editionId       String?
   liveSessionId   String?
   feriaSessionId  String?
   name            String
@@ -2004,6 +2025,7 @@ model ForgePlayGroup {
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
   course          ForgeCourse           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  edition         ForgeCourseEdition?   @relation(fields: [editionId], references: [id], onDelete: SetNull)
   liveSession     ForgeLiveSession?     @relation(fields: [liveSessionId], references: [id], onDelete: SetNull)
   feriaSession    ForgeFeriaSession?    @relation(fields: [feriaSessionId], references: [id], onDelete: SetNull)
   enrollments     ForgeEnrollment[]
@@ -2011,6 +2033,7 @@ model ForgePlayGroup {
   feriaRegistrations ForgeFeriaRegistration[]
 
   @@index([courseId])
+  @@index([editionId])
   @@index([liveSessionId])
   @@index([feriaSessionId])
 }
