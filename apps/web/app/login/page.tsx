@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/app/providers';
@@ -24,9 +25,20 @@ function LoginContent() {
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', name: '', inviteCode: '' });
+  const [success, setSuccess] = useState('');
 
   // Handle NextAuth error redirects (e.g. from Google SSO failures)
   useEffect(() => {
+    if (searchParams.get('reset') === '1') {
+      setSuccess(
+        locale === 'es'
+          ? 'Contraseña actualizada. Ya puedes iniciar sesión.'
+          : locale === 'pt'
+            ? 'Senha atualizada. Já pode entrar.'
+            : 'Password updated. You can sign in now.'
+      );
+      return;
+    }
     const errorParam = searchParams.get('error');
     if (errorParam) {
       const errorMessages: Record<string, Record<string, string>> = {
@@ -183,6 +195,7 @@ function LoginContent() {
           </p>
 
           {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
+          {success && <div className="mb-4 p-3 bg-emerald-50 text-emerald-700 rounded-lg text-sm">{success}</div>}
 
           {/* Google Sign-In */}
           <button
@@ -231,7 +244,14 @@ function LoginContent() {
               <input type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{tr('auth.password')}</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">{tr('auth.password')}</label>
+                {isLogin && (
+                  <Link href="/login/forgot" className="text-xs text-teal-600 hover:underline">
+                    {locale === 'es' ? '¿Olvidaste tu contraseña?' : locale === 'pt' ? 'Esqueceu a senha?' : 'Forgot password?'}
+                  </Link>
+                )}
+              </div>
               <div className="relative">
                 <input type={showPw ? 'text' : 'password'} required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition pr-10" />
                 <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
