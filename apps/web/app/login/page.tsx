@@ -244,20 +244,21 @@ function LoginContent() {
               <input type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition" />
             </div>
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-medium text-gray-700">{tr('auth.password')}</label>
-                {isLogin && (
-                  <Link href="/login/forgot" className="text-xs text-teal-600 hover:underline">
-                    {locale === 'es' ? '¿Olvidaste tu contraseña?' : locale === 'pt' ? 'Esqueceu a senha?' : 'Forgot password?'}
-                  </Link>
-                )}
-              </div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tr('auth.password')}</label>
               <div className="relative">
                 <input type={showPw ? 'text' : 'password'} required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition pr-10" />
                 <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {isLogin && (
+                <Link
+                  href="/login/forgot"
+                  className="mt-2 inline-block text-sm font-medium text-teal-600 hover:text-teal-700 hover:underline"
+                >
+                  {locale === 'es' ? '¿Olvidaste tu contraseña?' : locale === 'pt' ? 'Esqueceu a senha?' : 'Forgot password?'}
+                </Link>
+              )}
             </div>
             <button type="submit" disabled={loading} className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition disabled:opacity-50">
               {loading ? (
