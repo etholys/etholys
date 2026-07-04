@@ -313,16 +313,19 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
       )}
 
       <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
-        <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
+        <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-gray-100 bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => setSidebarOpen(true)}>
               <Menu className="h-5 w-5" />
             </button>
             <span className="font-bold text-blue-800">FORGE</span>
           </div>
-          <ForgeNotificationsBell />
+          <div className="flex shrink-0 items-center gap-2">
+            <ForgeLocaleSwitcher />
+            <ForgeNotificationsBell />
+          </div>
         </div>
-        <div className="hidden lg:flex absolute right-6 top-4 z-20 items-center gap-3">
+        <div className="hidden shrink-0 items-center justify-end gap-3 border-b border-gray-100 bg-white/90 px-6 py-3 backdrop-blur lg:flex">
           <ForgeLocaleSwitcher />
           <ForgeNotificationsBell />
         </div>

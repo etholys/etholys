@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Download, AlertTriangle, BarChart3 } from 'lucide-react';
 import type { CourseAnalytics } from '@/lib/forge/course-analytics-types';
 import { useForgeLocale, useForgeT } from '@/lib/forge/use-forge-t';
@@ -11,6 +11,13 @@ export default function ForgeCourseAnalyticsPage() {
   const ft = useForgeT();
   const locale = useForgeLocale();
   const { id: courseId } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const fromEdition = searchParams.get('from') === 'edition';
+  const editionReturnId = searchParams.get('editionId');
+  const backHref =
+    fromEdition && editionReturnId
+      ? `/hub/forge/cursos/${courseId}/turmas/${editionReturnId}`
+      : `/hub/forge/cursos/${courseId}`;
   const dateLocale = locale === 'pt' ? 'pt-PT' : locale === 'en' ? 'en-GB' : 'es-ES';
   const [data, setData] = useState<CourseAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,7 +50,7 @@ export default function ForgeCourseAnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
-          href={`/hub/forge/cursos/${courseId}`}
+          href={backHref}
           className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
         >
           <ArrowLeft className="h-4 w-4" /> {ft('forge.analytics.back')}

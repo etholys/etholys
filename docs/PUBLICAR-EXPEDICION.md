@@ -26,7 +26,7 @@ DATABASE_URL=postgresql://...          # Postgres na nuvem (NÃO localhost)
 NEXTAUTH_URL=https://etholys.abacusai.app   # URL exacta do browser
 NEXTAUTH_SECRET=...                    # segredo longo
 RESEND_API_KEY=...                     # opcional: email automático
-FORGE_EMAIL_FROM="FORGE <convites@ruralcommerceglobal.com>"
+FORGE_EMAIL_FROM="Etholys <noreply@etholys.com>"
 ```
 
 ### B) Migrar e gerar cliente

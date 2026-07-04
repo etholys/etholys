@@ -1,182 +1,216 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  Users,
-  Pencil,
-  Eye,
-  Settings,
-  BarChart3,
-  GraduationCap,
-  BookOpen,
-  Video,
-} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import { BookOpen, Eye, GraduationCap, Info, MoreVertical, Pencil, X } from 'lucide-react';
+import { ForgeTutorLobby } from '@/components/forge/ForgeTutorLobby';
 import { useForgeT } from '@/lib/forge/use-forge-t';
+import { deliveryModeLabel } from '@/lib/forge/delivery';
 
 type Props = {
   courseId: string;
   title: string;
+  description?: string | null;
   coverEmoji: string;
   status: string;
   deliveryMode: string;
   gamePlayMode: string;
-  onEdit: () => void;
   onPreviewAsLearner: () => void;
 };
 
 export function ForgeCourseFacilitatorHome({
   courseId,
   title,
+  description,
   coverEmoji,
   status,
   deliveryMode,
   gamePlayMode,
-  onEdit,
   onPreviewAsLearner,
 }: Props) {
   const ft = useForgeT();
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDocClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [menuOpen]);
+
+  const gameLabel =
+    gamePlayMode === 'personal'
+      ? ft('forge.facilitator.gamePersonal')
+      : ft('forge.facilitator.gameShared');
+
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-indigo-50 p-6">
-        <p className="text-xs font-bold uppercase tracking-wide text-violet-700">
-          {ft('forge.facilitator.mode')}
-        </p>
-        <div className="mt-2 flex flex-wrap items-start gap-4">
-          <span className="text-5xl">{coverEmoji}</span>
-          <div>
-            <h1 className="text-2xl font-black text-slate-900">{title}</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              {ft('forge.facilitator.meta', {
-                status,
-                mode: deliveryMode,
-                game:
-                  gamePlayMode === 'personal'
-                    ? ft('forge.facilitator.gamePersonal')
-                    : ft('forge.facilitator.gameShared'),
-              })}
-            </p>
-            <p className="mt-2 text-sm text-violet-900 max-w-2xl">{ft('forge.facilitator.blurb')}</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold uppercase tracking-wide text-violet-700">
+            {ft('forge.facilitator.mode')}
+          </p>
+          <div className="mt-2 flex items-center gap-3">
+            <span className="text-4xl shrink-0">{coverEmoji}</span>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-black text-slate-900 truncate">{title}</h1>
+              <p className="mt-0.5 text-sm text-slate-500">
+                {ft('forge.facilitator.meta', { status, mode: deliveryMode, game: gameLabel })}
+              </p>
+            </div>
           </div>
+        </div>
+
+        <div className="relative shrink-0" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+          >
+            <MoreVertical className="h-4 w-4" />
+            {ft('forge.facilitator.menu')}
+          </button>
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-50 mt-1 w-64 rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
+            >
+              <MenuItem
+                icon={Pencil}
+                label={ft('forge.facilitator.menuContent')}
+                onClick={() => {
+                  setMenuOpen(false);
+                  router.push(`/hub/forge/cursos/${courseId}?edit=content`);
+                }}
+              />
+              <MenuItem
+                icon={Info}
+                label={ft('forge.facilitator.menuInfo')}
+                onClick={() => {
+                  setMenuOpen(false);
+                  setInfoOpen(true);
+                }}
+              />
+              <MenuItem
+                icon={BookOpen}
+                label={ft('forge.facilitator.menuLibro')}
+                href={`/hub/forge/cursos/${courseId}/libro`}
+                onNavigate={() => setMenuOpen(false)}
+              />
+              <MenuItem
+                icon={GraduationCap}
+                label={ft('forge.facilitator.menuTrails')}
+                href="/hub/forge/trilhas"
+                onNavigate={() => setMenuOpen(false)}
+              />
+              <div className="my-1 border-t border-slate-100" />
+              <MenuItem
+                icon={Eye}
+                label={ft('forge.facilitator.menuPreview')}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onPreviewAsLearner();
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <ActionCard
-          href={`/hub/forge/cursos/${courseId}/turmas`}
-          icon={Video}
-          title={ft('forge.editions.title')}
-          desc={ft('forge.editions.subtitle')}
-          color="sky"
-        />
-        <ActionCard
-          href={`/hub/forge/cursos/${courseId}/alumnos`}
-          icon={Users}
-          title={ft('forge.facilitator.alumnos')}
-          desc={ft('forge.facilitator.alumnosDesc')}
-          color="violet"
-        />
-        <button type="button" onClick={onEdit} className="text-left">
-          <ActionCard
-            icon={Pencil}
-            title={ft('forge.facilitator.edit')}
-            desc={ft('forge.facilitator.editDesc')}
-            color="blue"
-            as="div"
-          />
-        </button>
-        <button type="button" onClick={onPreviewAsLearner} className="text-left">
-          <ActionCard
-            icon={Eye}
-            title={ft('forge.facilitator.preview')}
-            desc={ft('forge.facilitator.previewDesc')}
-            color="emerald"
-            as="div"
-          />
-        </button>
-        <Link href={`/hub/forge/cursos/${courseId}?edit=1`} className="text-left">
-          <ActionCard
-            icon={Settings}
-            title={ft('forge.facilitator.settings')}
-            desc={ft('forge.facilitator.settingsDesc')}
-            color="sky"
-            as="div"
-          />
-        </Link>
-        <Link href={`/hub/forge/cursos/${courseId}/libro`} className="text-left">
-          <ActionCard
-            icon={BookOpen}
-            title={ft('forge.facilitator.libro')}
-            desc={ft('forge.facilitator.libroDesc')}
-            color="violet"
-            as="div"
-          />
-        </Link>
-        <Link href={`/hub/forge/cursos/${courseId}/analytics`} className="text-left">
-          <ActionCard
-            icon={BarChart3}
-            title={ft('forge.facilitator.analytics')}
-            desc={ft('forge.facilitator.analyticsDesc')}
-            color="amber"
-            as="div"
-          />
-        </Link>
-        <Link href="/hub/forge/trilhas" className="text-left">
-          <ActionCard
-            icon={GraduationCap}
-            title={ft('forge.facilitator.trails')}
-            desc={ft('forge.facilitator.trailsDesc')}
-            color="slate"
-            as="div"
-          />
-        </Link>
-      </div>
+      {infoOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <h2 className="text-lg font-black text-slate-900">{ft('forge.facilitator.infoTitle')}</h2>
+              <button
+                type="button"
+                onClick={() => setInfoOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <dl className="space-y-3 text-sm">
+              <div>
+                <dt className="text-xs font-bold uppercase text-slate-400">{ft('forge.facilitator.infoName')}</dt>
+                <dd className="mt-0.5 font-semibold text-slate-900">{title}</dd>
+              </div>
+              {description ? (
+                <div>
+                  <dt className="text-xs font-bold uppercase text-slate-400">
+                    {ft('forge.facilitator.infoDescription')}
+                  </dt>
+                  <dd className="mt-0.5 text-slate-700 whitespace-pre-wrap">{description}</dd>
+                </div>
+              ) : null}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <dt className="text-xs font-bold uppercase text-slate-400">{ft('forge.facilitator.infoStatus')}</dt>
+                  <dd className="mt-0.5 font-medium text-slate-800 capitalize">{status}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-bold uppercase text-slate-400">{ft('forge.facilitator.infoMode')}</dt>
+                  <dd className="mt-0.5 font-medium text-slate-800">
+                    {deliveryModeLabel(deliveryMode as 'async')}
+                  </dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-xs font-bold uppercase text-slate-400">{ft('forge.facilitator.infoGame')}</dt>
+                  <dd className="mt-0.5 font-medium text-slate-800">{gameLabel}</dd>
+                </div>
+              </div>
+            </dl>
+            <button
+              type="button"
+              onClick={() => setInfoOpen(false)}
+              className="mt-6 w-full rounded-xl bg-slate-100 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200"
+            >
+              {ft('forge.general.close')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ForgeTutorLobby courseId={courseId} embedded />
     </div>
   );
 }
 
-function ActionCard({
-  href,
+function MenuItem({
   icon: Icon,
-  title,
-  desc,
-  color,
-  as = 'link',
+  label,
+  href,
+  onClick,
+  onNavigate,
 }: {
-  href?: string;
   icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  desc: string;
-  color: 'violet' | 'blue' | 'emerald' | 'sky' | 'amber' | 'slate';
-  as?: 'link' | 'div';
+  label: string;
+  href?: string;
+  onClick?: () => void;
+  onNavigate?: () => void;
 }) {
-  const colors = {
-    violet: 'border-violet-200 hover:border-violet-400 bg-white',
-    blue: 'border-blue-200 hover:border-blue-400 bg-white',
-    emerald: 'border-emerald-200 hover:border-emerald-400 bg-white',
-    sky: 'border-sky-200 hover:border-sky-400 bg-white',
-    amber: 'border-amber-200 hover:border-amber-400 bg-white',
-    slate: 'border-slate-200 hover:border-slate-400 bg-white',
-  };
-  const iconColors = {
-    violet: 'text-violet-600',
-    blue: 'text-blue-600',
-    emerald: 'text-emerald-600',
-    sky: 'text-sky-600',
-    amber: 'text-amber-600',
-    slate: 'text-slate-600',
-  };
-  const className = `block rounded-2xl border p-5 shadow-sm transition hover:shadow-md ${colors[color]}`;
-  const inner = (
-    <>
-      <Icon className={`h-7 w-7 ${iconColors[color]}`} />
-      <p className="mt-3 font-bold text-slate-900">{title}</p>
-      <p className="mt-1 text-xs text-slate-600">{desc}</p>
-    </>
-  );
-  if (as === 'div') return <div className={className}>{inner}</div>;
+  const className =
+    'flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50';
+  if (href) {
+    return (
+      <Link href={href} className={className} onClick={onNavigate}>
+        <Icon className="h-4 w-4 shrink-0 text-slate-500" />
+        {label}
+      </Link>
+    );
+  }
   return (
-    <Link href={href!} className={className}>
-      {inner}
-    </Link>
+    <button type="button" className={className} onClick={onClick}>
+      <Icon className="h-4 w-4 shrink-0 text-slate-500" />
+      {label}
+    </button>
   );
 }

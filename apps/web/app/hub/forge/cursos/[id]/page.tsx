@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useApp } from '@/app/providers';
 import { ForgeCourseEditor } from '@/components/forge/ForgeCourseEditor';
 import { ForgeCourseHome } from '@/components/forge/ForgeCourseHome';
@@ -50,18 +50,26 @@ type CourseDetail = {
 export default function ForgeCursoDetailPage() {
   const ft = useForgeT();
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { activeCompanyId } = useApp();
-  const wantEdit = searchParams.get('edit') === '1';
+  const editParam = searchParams.get('edit');
+  const editContent = editParam === '1' || editParam === 'content';
+  const editSettings = editParam === 'settings';
+  const inEditMode = editContent || editSettings;
   const previewLearner = searchParams.get('preview') === 'learner';
+  const fromEdition = searchParams.get('from') === 'edition';
+  const editionReturnId = searchParams.get('editionId');
   const focusGame = searchParams.get('focus') === 'game';
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [progressMap, setProgressMap] = useState<Record<string, string>>({});
   const [enrolled, setEnrolled] = useState(false);
-  const [editMode, setEditMode] = useState(wantEdit);
   const [loading, setLoading] = useState(true);
   const [certCode, setCertCode] = useState<string | null>(null);
+
+  const backHref =
+    fromEdition && editionReturnId
+      ? `/hub/forge/cursos/${id}/turmas/${editionReturnId}`
+      : `/hub/forge/cursos/${id}`;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -93,10 +101,6 @@ export default function ForgeCursoDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-  useEffect(() => {
-    if (wantEdit) setEditMode(true);
-  }, [wantEdit]);
 
   useEffect(() => {
     if (!id || enrolled || !course) return;
@@ -161,16 +165,13 @@ export default function ForgeCursoDetailPage() {
     );
   }
 
-  if (editMode) {
+  if (inEditMode && course.canFacilitate) {
     return (
       <div className="space-y-6">
-        <Link
-          href={`/hub/forge/cursos/${id}`}
-          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
-        >
-          <ArrowLeft className="h-4 w-4" /> {ft('forge.course.learnerView')}
+        <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
+          <ArrowLeft className="h-4 w-4" /> {ft('forge.course.backFacilitator')}
         </Link>
-        {course.companyId && (
+        {editContent && course.companyId && (
           <ForgeProgramPicker
             courseId={id}
             companyId={course.companyId}
@@ -178,62 +179,68 @@ export default function ForgeCursoDetailPage() {
             onUpdated={load}
           />
         )}
-        <ForgeDeliverySettings
-          deliveryMode={course.deliveryMode ?? 'async'}
-          gamePlayMode={course.gamePlayMode ?? 'personal'}
-          cohortMode={course.cohortMode ?? 'invite_only'}
-          liveConfig={course.liveConfig ?? {}}
-          onSave={async (mode, live, game, cohort) => {
-            const res = await fetch(`/api/forge/courses/${id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                deliveryMode: mode,
-                liveConfig: live,
-                gamePlayMode: game,
-                cohortMode: cohort,
-              }),
-            });
-            if (!res.ok) {
-              const d = await res.json();
-              alert(d.error || ft('forge.course.saveError'));
-              return;
-            }
-            await load();
-          }}
-        />
-        {showsLiveFeatures(course.deliveryMode ?? 'async') && (
+        {editSettings && (
           <>
-            <ForgeLivePanel
-              courseId={id}
-              deliveryMode={course.deliveryMode ?? 'blended'}
+            <ForgeDeliverySettings
+              deliveryMode={course.deliveryMode ?? 'async'}
+              gamePlayMode={course.gamePlayMode ?? 'personal'}
+              cohortMode={course.cohortMode ?? 'invite_only'}
               liveConfig={course.liveConfig ?? {}}
-              showFacilitatorRoom
-              showFacilitatorNotes
+              onSave={async (mode, live, game, cohort) => {
+                const res = await fetch(`/api/forge/courses/${id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    deliveryMode: mode,
+                    liveConfig: live,
+                    gamePlayMode: game,
+                    cohortMode: cohort,
+                  }),
+                });
+                if (!res.ok) {
+                  const d = await res.json();
+                  alert(d.error || ft('forge.course.saveError'));
+                  return;
+                }
+                await load();
+              }}
             />
-            <ForgeLiveSessionsManager courseId={id} modules={course.modules} />
+            {showsLiveFeatures(course.deliveryMode ?? 'async') && (
+              <>
+                <ForgeLivePanel
+                  courseId={id}
+                  deliveryMode={course.deliveryMode ?? 'blended'}
+                  liveConfig={course.liveConfig ?? {}}
+                  showFacilitatorRoom
+                  showFacilitatorNotes
+                />
+                <ForgeLiveSessionsManager courseId={id} modules={course.modules} />
+              </>
+            )}
           </>
         )}
-        <ForgeCourseEditor
-          courseId={id}
-          modules={course.modules}
-          onChange={load}
-          initialFocusGame={focusGame}
-        />
+        {editContent && (
+          <ForgeCourseEditor
+            courseId={id}
+            modules={course.modules}
+            onChange={load}
+            initialFocusGame={focusGame}
+          />
+        )}
       </div>
     );
   }
 
-  if (course.canFacilitate && !previewLearner && !editMode) {
+  if (course.canFacilitate && !previewLearner) {
     return (
       <ForgeCourseFacilitatorHome
         courseId={id}
         title={course.title}
+        description={course.description}
         coverEmoji={course.coverEmoji}
         status={course.status}
         deliveryMode={course.deliveryMode ?? 'async'}
         gamePlayMode={course.gamePlayMode ?? 'personal'}
-        onEdit={() => setEditMode(true)}
         onPreviewAsLearner={() => {
           window.location.href = `/hub/forge/cursos/${id}?preview=learner`;
         }}
@@ -260,7 +267,9 @@ export default function ForgeCursoDetailPage() {
       canFacilitate={course.canFacilitate}
       hasLibro={course.hasLibro}
       onEnroll={enroll}
-      onEdit={() => setEditMode(true)}
+      onEdit={() => {
+        window.location.href = `/hub/forge/cursos/${id}?edit=content`;
+      }}
     />
   );
 }

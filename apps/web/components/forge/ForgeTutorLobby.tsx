@@ -4,12 +4,14 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
+  BarChart3,
   Building2,
   Calendar,
   ChevronRight,
   Copy,
   Filter,
   Plus,
+  Settings,
   UserPlus,
   Users,
   X,
@@ -74,7 +76,7 @@ function formatDateRange(startsAt: string | null, endsAt: string | null): string
   return fmt(endsAt!);
 }
 
-export function ForgeTutorLobby({ courseId }: { courseId: string }) {
+export function ForgeTutorLobby({ courseId, embedded = false }: { courseId: string; embedded?: boolean }) {
   const ft = useForgeT();
   const [editions, setEditions] = useState<EditionSummary[]>([]);
   const [attention, setAttention] = useState<AttentionItem[]>([]);
@@ -136,8 +138,10 @@ export function ForgeTutorLobby({ courseId }: { courseId: string }) {
     <div className="space-y-6 max-w-5xl">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">{ft('forge.editions.title')}</h1>
-          <p className="text-sm text-slate-600 mt-1">{ft('forge.editions.subtitle')}</p>
+          <h2 className={embedded ? 'text-lg font-black text-slate-900' : 'text-2xl font-black text-slate-900'}>
+            {embedded ? ft('forge.editions.sectionTitle') : ft('forge.editions.title')}
+          </h2>
+          {!embedded && <p className="text-sm text-slate-600 mt-1">{ft('forge.editions.subtitle')}</p>}
         </div>
         <button
           type="button"
@@ -432,6 +436,27 @@ export function ForgeEditionDetail({
           </select>
         </div>
       </div>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+        <h2 className="font-bold text-slate-900 text-sm">{ft('forge.edition.settingsTitle')}</h2>
+        <p className="mt-1 text-xs text-slate-500">{ft('forge.edition.settingsHint')}</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <Link
+            href={`/hub/forge/cursos/${courseId}?edit=settings&from=edition&editionId=${editionId}`}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-800 hover:border-violet-300 hover:bg-violet-50/50"
+          >
+            <Settings className="h-4 w-4 text-violet-600 shrink-0" />
+            {ft('forge.edition.settingsDelivery')}
+          </Link>
+          <Link
+            href={`/hub/forge/cursos/${courseId}/analytics?from=edition&editionId=${editionId}`}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-800 hover:border-amber-300 hover:bg-amber-50/50"
+          >
+            <BarChart3 className="h-4 w-4 text-amber-600 shrink-0" />
+            {ft('forge.edition.settingsAnalytics')}
+          </Link>
+        </div>
+      </section>
 
       <section className="rounded-2xl border-2 border-blue-300 bg-blue-50/80 p-4 space-y-3">
         <h2 className="font-bold flex items-center gap-2 text-blue-900">

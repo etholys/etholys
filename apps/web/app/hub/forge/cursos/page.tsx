@@ -106,7 +106,6 @@ export default function ForgeCursosPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900">{ft('forge.courses.title')}</h1>
-          <p className="text-sm text-slate-500">{ft('forge.courses.subtitle')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
