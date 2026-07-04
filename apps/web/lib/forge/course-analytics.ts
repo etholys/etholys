@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { getForgeDb } from '@/lib/forge/db';
+import { getForgeFacilitatorUserIdsForCourse } from '@/lib/forge/facilitator-access';
 import { getCourseProgressPercent } from '@/lib/forge/progress';
 import type { CourseAnalytics, ModuleHeatmapRow } from '@/lib/forge/course-analytics-types';
 
@@ -8,10 +9,35 @@ export type { CourseAnalytics, ModuleHeatmapRow } from '@/lib/forge/course-analy
 
 export async function getCourseAnalytics(courseId: string): Promise<CourseAnalytics> {
   const db = getForgeDb();
-  const enrollments = await db.forgeEnrollment.findMany({
+
+  const course = await db.forgeCourse.findUnique({
+    where: { id: courseId },
+    select: { companyId: true, createdById: true },
+  });
+  if (!course) {
+    return {
+      courseId,
+      learnerCount: 0,
+      completedCount: 0,
+      avgProgress: 0,
+      activeLast7Days: 0,
+      atRisk: [],
+      moduleHeatmap: [],
+      certificatesIssued: 0,
+    };
+  }
+
+  const facilitatorIds = await getForgeFacilitatorUserIdsForCourse(
+    courseId,
+    course.companyId,
+    course.createdById
+  );
+
+  const allEnrollments = await db.forgeEnrollment.findMany({
     where: { courseId, status: { in: ['active', 'completed'] } },
     include: { user: { select: { id: true, name: true, email: true } } },
   });
+  const enrollments = allEnrollments.filter((e) => !facilitatorIds.has(e.userId));
 
   const modules = await db.forgeModule.findMany({
     where: { courseId },

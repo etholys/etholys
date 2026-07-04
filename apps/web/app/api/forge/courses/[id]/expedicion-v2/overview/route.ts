@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getForgeDb } from '@/lib/forge/db';
-import { getForgeCourseAccess } from '@/lib/forge/facilitator-access';
+import { getForgeCourseAccess, getForgeFacilitatorUserIdsForCourse } from '@/lib/forge/facilitator-access';
 import { loadCourseForTenant, requireForgeTenant } from '@/lib/forge/tenant';
 import { parseMulti } from '@/lib/forge/expedicion-board-multi';
 import { v2FromJourneyMapState } from '@/lib/forge/expedicion-v2/player-state';
@@ -51,13 +51,21 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
       })
       .filter(Boolean);
 
+    const facilitatorIds = await getForgeFacilitatorUserIdsForCourse(
+      course.id,
+      course.companyId,
+      course.createdById
+    );
+
     const journeys = await getForgeDb().forgeLearnerJourney.findMany({
       where: { courseId },
       include: { user: { select: { id: true, name: true, email: true } } },
       take: 48,
     });
 
-    const learners = journeys.map((j) => {
+    const learners = journeys
+      .filter((j) => !facilitatorIds.has(j.userId))
+      .map((j) => {
       const mapState = (j.mapState ?? {}) as Record<string, unknown>;
       const v2 = v2FromJourneyMapState(mapState);
       const s = v2TeamSummary(v2);

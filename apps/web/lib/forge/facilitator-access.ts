@@ -48,3 +48,30 @@ export async function getForgeCourseAccess(
 export function isExternalLearnerOnly(canFacilitate: boolean, hasEnrollment: boolean): boolean {
   return hasEnrollment && !canFacilitate;
 }
+
+/** IDs de quem facilita o curso — não entram em "alunos en riesgo" nem contagens de turma. */
+export async function getForgeFacilitatorUserIdsForCourse(
+  courseId: string,
+  companyId: string,
+  createdById?: string | null
+): Promise<Set<string>> {
+  const ids = new Set<string>();
+  if (createdById) ids.add(createdById);
+
+  const assigned = await prisma.forgeCourseFacilitator.findMany({
+    where: { courseId },
+    select: { userId: true },
+  });
+  for (const row of assigned) ids.add(row.userId);
+
+  const staff = await prisma.companyUser.findMany({
+    where: {
+      companyId,
+      role: { in: ['ADMIN', 'PROJECT_MANAGER'] },
+    },
+    select: { userId: true },
+  });
+  for (const row of staff) ids.add(row.userId);
+
+  return ids;
+}
