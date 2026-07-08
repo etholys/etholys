@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Copy,
   Filter,
+  Gamepad2,
   Plus,
   Settings,
   UserPlus,
@@ -437,6 +438,32 @@ export function ForgeEditionDetail({
           </select>
         </div>
       </div>
+
+      <section className="rounded-2xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-indigo-50 p-4">
+        <h2 className="font-bold text-violet-900 text-sm flex items-center gap-2">
+          <Gamepad2 className="h-5 w-5" />
+          {ft('forge.edition.enterRoomTitle')}
+        </h2>
+        <p className="mt-1 text-xs text-violet-800">{ft('forge.edition.enterRoomHint')}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link
+            href={`/hub/forge/cursos/${courseId}/sala?editionId=${editionId}`}
+            className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-violet-800"
+          >
+            <Gamepad2 className="h-4 w-4" />
+            {ft('forge.edition.enterRoom')}
+          </Link>
+          <a
+            href={`/expedicion/entrar`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-white px-4 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-50"
+          >
+            {ft('forge.edition.previewEntryPage')}
+          </a>
+        </div>
+        <p className="mt-2 text-[11px] text-violet-700">{ft('forge.edition.enterRoomSteps')}</p>
+      </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="font-bold text-slate-900 text-sm">{ft('forge.edition.settingsTitle')}</h2>

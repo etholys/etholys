@@ -556,6 +556,12 @@ const forge: Record<Locale, Record<string, string>> = {
     'forge.edition.settingsHint': 'Modalidad, sesiones en vivo y salud de la cohorte.',
     'forge.edition.settingsDelivery': 'Modalidad y sesiones',
     'forge.edition.settingsAnalytics': 'Salud de la turma',
+    'forge.edition.enterRoomTitle': 'Sala de juego (facilitador)',
+    'forge.edition.enterRoom': 'Entrar a la sala',
+    'forge.edition.enterRoomHint': 'Tablero colectivo, presentación, validaciones y equipos — vista del facilitador.',
+    'forge.edition.enterRoomSteps':
+      '1) Comparte el código/enlace de inscripción · 2) Los participantes se registran solos · 3) Tú entras aquí para dirigir la sesión.',
+    'forge.edition.previewEntryPage': 'Ver página de inscripción',
     'forge.editions.courseCalendar': 'Calendario del curso (plantilla)',
     'forge.editions.sessionsCount': '{n} módulos',
     'forge.editions.calendarExplain':
@@ -959,6 +965,12 @@ const forge: Record<Locale, Record<string, string>> = {
     'forge.edition.settingsHint': 'Modalidade, sessões ao vivo e saúde da cohorte.',
     'forge.edition.settingsDelivery': 'Modalidade e sessões',
     'forge.edition.settingsAnalytics': 'Saúde da turma',
+    'forge.edition.enterRoomTitle': 'Sala de jogo (facilitador)',
+    'forge.edition.enterRoom': 'Entrar na sala',
+    'forge.edition.enterRoomHint': 'Tabuleiro coletivo, apresentação, validações e equipas — vista do facilitador.',
+    'forge.edition.enterRoomSteps':
+      '1) Partilhe o código/link de inscrição · 2) Os participantes registam-se · 3) Você entra aqui para conduzir a sessão.',
+    'forge.edition.previewEntryPage': 'Ver página de inscrição',
     'forge.editions.courseCalendar': 'Calendário do curso (modelo)',
     'forge.editions.sessionsCount': '{n} módulos',
     'forge.editions.calendarExplain':
@@ -1696,6 +1708,12 @@ const forge: Record<Locale, Record<string, string>> = {
     'forge.edition.settingsHint': 'Delivery mode, live sessions and cohort health.',
     'forge.edition.settingsDelivery': 'Mode and sessions',
     'forge.edition.settingsAnalytics': 'Cohort health',
+    'forge.edition.enterRoomTitle': 'Game room (facilitator)',
+    'forge.edition.enterRoom': 'Enter game room',
+    'forge.edition.enterRoomHint': 'Collective board, slides, validations and teams — facilitator view.',
+    'forge.edition.enterRoomSteps':
+      '1) Share the registration code/link · 2) Participants self-register · 3) You enter here to run the session.',
+    'forge.edition.previewEntryPage': 'Preview registration page',
     'forge.editions.courseCalendar': 'Course calendar (template)',
     'forge.editions.sessionsCount': '{n} modules',
     'forge.editions.calendarExplain':

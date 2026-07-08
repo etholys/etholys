@@ -26,8 +26,10 @@ function ForgeSalaContent() {
   const { id } = useParams<{ id: string }>();
   const [course, setCourse] = useState<CoursePayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const hasRoom =
-    Boolean(searchParams.get('session')?.trim()) || Boolean(searchParams.get('group')?.trim());
+  const sessionId = searchParams.get('session')?.trim() || '';
+  const groupId = searchParams.get('group')?.trim() || '';
+  const editionId = searchParams.get('editionId')?.trim() || '';
+  const hasRoomParam = Boolean(sessionId) || Boolean(groupId);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,10 +50,15 @@ function ForgeSalaContent() {
   }, [load]);
 
   useEffect(() => {
-    if (!loading && !hasRoom && id) {
-      router.replace(`/hub/forge/cursos/${id}/turmas`);
+    if (loading || !course) return;
+    const canEnterAsFac = Boolean(course.canFacilitate);
+    if (!hasRoomParam && !canEnterAsFac) {
+      const back = editionId
+        ? `/hub/forge/cursos/${id}/turmas/${editionId}`
+        : `/hub/forge/cursos/${id}`;
+      router.replace(back);
     }
-  }, [loading, hasRoom, id, router]);
+  }, [loading, course, hasRoomParam, id, editionId, router]);
 
   const gameActivityId = useMemo(() => {
     if (!course) return null;
@@ -62,7 +69,7 @@ function ForgeSalaContent() {
     return null;
   }, [course]);
 
-  if (loading || !hasRoom) {
+  if (loading || (!hasRoomParam && !course?.canFacilitate)) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950">
         <div className="h-12 w-12 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-500" />
