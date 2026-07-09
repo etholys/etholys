@@ -61,7 +61,7 @@ export function applyV2Action(
       const next = {
         ...v2,
         phase: 'finished' as const,
-        quizGate: null as const,
+        quizGate: null,
         postQuizAnswers: (body.answers as ExpedicionV2PlayerState['postQuizAnswers']) ?? {},
         postQuizCompletedAt: new Date().toISOString(),
       };
