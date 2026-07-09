@@ -223,13 +223,12 @@ export function ForgeTutorLobby({ courseId, embedded = false }: { courseId: stri
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {filtered.map((ed) => (
-            <Link
+            <div
               key={ed.id}
-              href={`/hub/forge/cursos/${courseId}/turmas/${ed.id}`}
-              className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-violet-300 hover:shadow-md"
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
             >
               <div className="flex items-start justify-between gap-2">
-                <h2 className="font-bold text-slate-900 group-hover:text-violet-800">{ed.name}</h2>
+                <h2 className="font-bold text-slate-900">{ed.name}</h2>
                 <span
                   className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${statusBadgeClass(ed.effectiveStatus)}`}
                 >
@@ -256,7 +255,22 @@ export function ForgeTutorLobby({ courseId, embedded = false }: { courseId: stri
                   </span>
                 )}
               </div>
-            </Link>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  href={`/hub/forge/cursos/${courseId}/sala?editionId=${ed.id}`}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-violet-700 px-4 py-2 text-xs font-bold text-white hover:bg-violet-800"
+                >
+                  <Gamepad2 className="h-3.5 w-3.5" />
+                  {ft('forge.edition.enterRoom')}
+                </Link>
+                <Link
+                  href={`/hub/forge/cursos/${courseId}/turmas/${ed.id}`}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  {ft('forge.editions.cardManage')}
+                </Link>
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -414,7 +428,7 @@ export function ForgeEditionDetail({
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div className="rounded-2xl border bg-white p-5">
+      <div className="rounded-2xl border bg-white p-5 space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <span
@@ -437,15 +451,7 @@ export function ForgeEditionDetail({
             ))}
           </select>
         </div>
-      </div>
-
-      <section className="rounded-2xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-indigo-50 p-4">
-        <h2 className="font-bold text-violet-900 text-sm flex items-center gap-2">
-          <Gamepad2 className="h-5 w-5" />
-          {ft('forge.edition.enterRoomTitle')}
-        </h2>
-        <p className="mt-1 text-xs text-violet-800">{ft('forge.edition.enterRoomHint')}</p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
           <Link
             href={`/hub/forge/cursos/${courseId}/sala?editionId=${editionId}`}
             className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-violet-800"
@@ -454,16 +460,15 @@ export function ForgeEditionDetail({
             {ft('forge.edition.enterRoom')}
           </Link>
           <a
-            href={`/expedicion/entrar`}
+            href="/expedicion/entrar"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-white px-4 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-100"
           >
             {ft('forge.edition.previewEntryPage')}
           </a>
         </div>
-        <p className="mt-2 text-[11px] text-violet-700">{ft('forge.edition.enterRoomSteps')}</p>
-      </section>
+      </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="font-bold text-slate-900 text-sm">{ft('forge.edition.settingsTitle')}</h2>

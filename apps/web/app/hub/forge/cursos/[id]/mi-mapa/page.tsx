@@ -9,7 +9,7 @@ import { ForgeSustainabilityDashboard } from '@/components/forge/ForgeSustainabi
 import { useExpedicionV2 } from '@/lib/forge/expedicion-v2/useExpedicionV2';
 import { EXPEDICION_V2_SHELL } from '@/lib/forge/expedicion-v2/theme';
 import { useForgeT } from '@/lib/forge/use-forge-t';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function ForgeMiMapaPage() {
@@ -18,6 +18,7 @@ export default function ForgeMiMapaPage() {
   const searchParams = useSearchParams();
   const roomId = searchParams.get('room')?.trim() || null;
   const [title, setTitle] = useState('');
+  const [quizModal, setQuizModal] = useState<null | 'pre' | 'post'>(null);
   const { v2, teamMode, patch, loading } = useExpedicionV2(courseId, { roomId });
 
   useEffect(() => {
@@ -41,16 +42,14 @@ export default function ForgeMiMapaPage() {
 
   return (
     <div className={cn('space-y-6 -m-4 p-4 md:p-6 min-h-screen', EXPEDICION_V2_SHELL)}>
-      {v2.phase === 'pre_quiz' && (
+      {quizModal && (
         <ForgeMaturityQuizGate
-          side="pre"
-          onComplete={(answers) => patch({ action: 'complete_pre_quiz', answers })}
-        />
-      )}
-      {v2.phase === 'post_quiz' && (
-        <ForgeMaturityQuizGate
-          side="post"
-          onComplete={(answers) => patch({ action: 'complete_post_quiz', answers })}
+          side={quizModal}
+          onClose={() => setQuizModal(null)}
+          onComplete={(answers) => {
+            const action = quizModal === 'pre' ? 'complete_pre_quiz' : 'complete_post_quiz';
+            void patch({ action, answers }).then(() => setQuizModal(null));
+          }}
         />
       )}
       <Link
@@ -63,6 +62,26 @@ export default function ForgeMiMapaPage() {
         <p className="text-xs text-[#1B5E4B]/80 font-semibold">
           Mapa compartido de la mesa — cambios visibles para todo el equipo.
         </p>
+      )}
+      {v2.phase === 'pre_quiz' && (
+        <button
+          type="button"
+          onClick={() => setQuizModal('pre')}
+          className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2 text-sm font-bold text-white"
+        >
+          <ClipboardList className="h-4 w-4" />
+          {ft('forge.v2.lobbyTilePreQuiz')}
+        </button>
+      )}
+      {v2.phase === 'post_quiz' && (
+        <button
+          type="button"
+          onClick={() => setQuizModal('post')}
+          className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2 text-sm font-bold text-white"
+        >
+          <ClipboardList className="h-4 w-4" />
+          {ft('forge.v2.lobbyTilePostQuiz')}
+        </button>
       )}
       {v2.phase === 'finished' && v2.finalScoreBreakdown && (
         <ForgeSustainabilityDashboard breakdown={v2.finalScoreBreakdown} />

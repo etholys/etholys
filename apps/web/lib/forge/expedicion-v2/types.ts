@@ -45,7 +45,7 @@ export type EcoLedgerState = {
   greenLoanDebt: number;
 };
 
-export type GamePhase = 'pre_quiz' | 'playing' | 'post_quiz' | 'finished';
+export type GamePhase = 'lobby' | 'pre_quiz' | 'playing' | 'post_quiz' | 'finished';
 
 export type MaturityQuizAnswers = Record<string, string | number>;
 

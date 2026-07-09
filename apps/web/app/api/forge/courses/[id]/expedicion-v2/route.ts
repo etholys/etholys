@@ -23,6 +23,10 @@ import { loadSharedGameRoomForForgeAccess } from '@/lib/forge/tenant';
 import { getForgeCourseAccess } from '@/lib/forge/facilitator-access';
 import { creditPeerConsultancy } from '@/lib/forge/expedicion-v2/peer-consultancy';
 import { CONSULTANCY_OPTIONS } from '@/lib/forge/expedicion-v2/consultancy';
+import {
+  applyFacilitatorBatchV2,
+  isBatchFacilitatorAction,
+} from '@/lib/forge/expedicion-v2/facilitator-batch';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -33,6 +37,13 @@ const FACILITATOR_ACTIONS = new Set([
   'reject_feria_pitch',
   'reset_v2',
   'force_post_quiz',
+  'open_pre_quiz',
+  'open_post_quiz',
+  'return_to_lobby',
+  'open_pre_quiz_all',
+  'open_post_quiz_all',
+  'return_to_lobby_all',
+  'reset_v2_all',
 ]);
 
 async function authorizeCourse(courseId: string, userId: string, companyIds: string[]) {
@@ -62,6 +73,34 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     if (!course) return NextResponse.json({ error: 'Curso no encontrado' }, { status: 404 });
 
     const roomId = req.nextUrl.searchParams.get('roomId')?.trim();
+    const observeUserId = req.nextUrl.searchParams.get('observeUserId')?.trim();
+    if (observeUserId) {
+      const access = await getForgeCourseAccess(
+        tenant.userId,
+        course.companyId,
+        course.id,
+        course.createdById
+      );
+      if (!access.canFacilitate) {
+        return NextResponse.json({ error: 'Sin permiso' }, { status: 403 });
+      }
+      const journey = await getForgeDb().forgeLearnerJourney.findFirst({
+        where: { courseId, userId: observeUserId },
+      });
+      if (!journey) {
+        return NextResponse.json({ error: 'Jugador no encontrado' }, { status: 404 });
+      }
+      const mapState = (journey.mapState ?? {}) as Record<string, unknown>;
+      const v2 = v2FromJourneyMapState(mapState);
+      const liveConfig = (course.liveConfig ?? {}) as Record<string, unknown>;
+      return NextResponse.json({
+        v2,
+        teamMode: false,
+        observeUserId,
+        sessionFormat: liveConfig.sessionFormat ?? 'online',
+        videoEnabled: liveConfig.videoEnabled !== false,
+      });
+    }
     if (roomId) {
       const room = await resolveTeamRoom(roomId, courseId, tenant);
       if (room) {
@@ -125,6 +164,11 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       if (!access.canFacilitate) {
         return NextResponse.json({ error: 'Solo el facilitador puede usar esta acción' }, { status: 403 });
       }
+    }
+
+    if (isBatchFacilitatorAction(action)) {
+      const { updated } = await applyFacilitatorBatchV2(courseId, action);
+      return NextResponse.json({ ok: true, updated });
     }
 
     if (roomId) {

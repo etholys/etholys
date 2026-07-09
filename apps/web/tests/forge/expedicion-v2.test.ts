@@ -12,8 +12,18 @@ import { getActionCards, getCrisisCards } from '../../lib/forge/expedicion-v2/co
 import { usesV2Ledger, adjustEcoCredits, isExpedicionV2Spec } from '../../lib/forge/expedicion-v2/board-v2-mode';
 import { impactPointsFromBoardEvents } from '../../lib/forge/expedicion-v2/board-ledger-sync';
 
+test('createInitialV2State — starts in lobby', () => {
+  assert.equal(createInitialV2State().phase, 'lobby');
+});
+
+test('applyV2Action — open_pre_quiz from lobby', () => {
+  const v2 = applyV2Action(createInitialV2State(), { action: 'open_pre_quiz' });
+  assert.equal(v2.phase, 'pre_quiz');
+});
+
 test('applyV2Action — pre quiz → playing', () => {
-  const v2 = applyV2Action(createInitialV2State(), {
+  let v2 = applyV2Action(createInitialV2State(), { action: 'open_pre_quiz' });
+  v2 = applyV2Action(v2, {
     action: 'complete_pre_quiz',
     answers: { q1: 'test' },
   });

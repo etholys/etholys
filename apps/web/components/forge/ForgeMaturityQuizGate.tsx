@@ -15,9 +15,14 @@ type Q = {
 export function ForgeMaturityQuizGate({
   side,
   onComplete,
+  preview = false,
+  onClose,
 }: {
   side: 'pre' | 'post';
   onComplete: (answers: Record<string, string>) => void;
+  /** Vista previa del facilitador — no guarda respuestas */
+  preview?: boolean;
+  onClose?: () => void;
 }) {
   const ft = useForgeT();
   const quiz = getMaturityQuiz();
@@ -27,14 +32,33 @@ export function ForgeMaturityQuizGate({
   const [business, setBusiness] = useState('');
 
   const submit = () => {
+    if (preview) {
+      onClose?.();
+      return;
+    }
     onComplete({ ...answers, _name: name, _business: business });
   };
 
-  const allAnswered = questions.every((q) => answers[q.id]?.trim());
+  const allAnswered = preview || questions.every((q) => answers[q.id]?.trim());
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#1B5E4B]/90 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl bg-[#F7F3EB] p-6 shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl bg-[#F7F3EB] p-6 shadow-2xl relative">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-4 top-4 text-slate-500 hover:text-slate-800 text-sm font-bold"
+            aria-label={ft('forge.general.close')}
+          >
+            ✕
+          </button>
+        )}
+        {preview && (
+          <p className="mb-2 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-800">
+            {ft('forge.v2.quizPreviewBanner')}
+          </p>
+        )}
         <h2 className="text-xl font-black text-[#1B5E4B]">
           {ft('forge.v2.maturityQuiz', {
             side: side === 'pre' ? ft('forge.v2.maturityFront') : ft('forge.v2.maturityBack'),
@@ -95,7 +119,11 @@ export function ForgeMaturityQuizGate({
           onClick={submit}
           className="mt-6 w-full rounded-xl bg-[#1B5E4B] py-3 text-sm font-bold text-white disabled:opacity-40"
         >
-          {side === 'pre' ? ft('forge.v2.enterExpedition') : ft('forge.v2.viewFinalScore')}
+          {preview
+            ? ft('forge.general.close')
+            : side === 'pre'
+              ? ft('forge.v2.enterExpedition')
+              : ft('forge.v2.viewFinalScore')}
         </button>
       </div>
     </div>

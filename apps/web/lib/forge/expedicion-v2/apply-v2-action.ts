@@ -43,6 +43,12 @@ export function applyV2Action(
   const action = body.action as string;
 
   switch (action) {
+    case 'open_pre_quiz':
+      return { ...v2, phase: 'pre_quiz' as const };
+    case 'open_post_quiz':
+      return { ...v2, phase: 'post_quiz' as const };
+    case 'return_to_lobby':
+      return { ...v2, phase: 'lobby' as const };
     case 'complete_pre_quiz':
       return {
         ...v2,
@@ -259,7 +265,7 @@ export function applyV2Action(
       return next;
     }
     case 'reset_v2': {
-      const keepPhase = v2.phase !== 'pre_quiz';
+      const keepPhase = v2.phase !== 'lobby' && v2.phase !== 'pre_quiz';
       const fresh = createInitialV2State();
       return keepPhase ? { ...fresh, phase: v2.phase, cyclesCompleted: v2.cyclesCompleted } : fresh;
     }

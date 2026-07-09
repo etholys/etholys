@@ -6,12 +6,15 @@ import type { ExpedicionV2PlayerState } from '@/lib/forge/expedicion-v2/types';
 export type UseExpedicionV2Options = {
   /** Sala compartida — modo presencial equipa (mapa + ledger únicos) */
   roomId?: string | null;
+  /** Facilitador observa jornada de um aluno */
+  observeUserId?: string | null;
   /** Intervalo de sync entre telemóveis da mesa (ms) */
   pollMs?: number;
 };
 
 export function useExpedicionV2(courseId: string, opts?: UseExpedicionV2Options) {
   const roomId = opts?.roomId?.trim() || null;
+  const observeUserId = opts?.observeUserId?.trim() || null;
   const pollMs = opts?.pollMs ?? (roomId ? 3000 : 0);
 
   const [v2, setV2] = useState<ExpedicionV2PlayerState | null>(null);
@@ -23,8 +26,11 @@ export function useExpedicionV2(courseId: string, opts?: UseExpedicionV2Options)
 
   const reload = useCallback(async () => {
     try {
-      const q = roomId ? `?roomId=${encodeURIComponent(roomId)}` : '';
-      const res = await fetch(`/api/forge/courses/${courseId}/expedicion-v2${q}`);
+      const q = new URLSearchParams();
+      if (roomId) q.set('roomId', roomId);
+      if (observeUserId) q.set('observeUserId', observeUserId);
+      const qs = q.toString();
+      const res = await fetch(`/api/forge/courses/${courseId}/expedicion-v2${qs ? `?${qs}` : ''}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro');
       setV2(data.v2);
@@ -37,7 +43,7 @@ export function useExpedicionV2(courseId: string, opts?: UseExpedicionV2Options)
     } finally {
       setLoading(false);
     }
-  }, [courseId, roomId]);
+  }, [courseId, roomId, observeUserId]);
 
   useEffect(() => {
     reload();

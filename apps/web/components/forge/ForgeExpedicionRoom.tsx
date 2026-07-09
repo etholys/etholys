@@ -6,7 +6,6 @@ import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { X, Users, HelpCircle, ShieldAlert, Presentation } from 'lucide-react';
 import { ForgeGameBoard, type ForgeGameSyncMode } from '@/components/forge/ForgeGameBoard';
-import { ForgePresentationViewer } from '@/components/forge/ForgePresentationViewer';
 import { ForgePersonalMapStrip } from '@/components/forge/ForgePersonalMapStrip';
 import { ForgeActivityPlayer } from '@/components/forge/ForgeActivityPlayer';
 import { ForgeInviteLearners } from '@/components/forge/ForgeInviteLearners';
@@ -36,8 +35,14 @@ import {
 import { ForgeInvestmentPanel } from '@/components/forge/ForgeInvestmentPanel';
 import { useExpedicionV2 } from '@/lib/forge/expedicion-v2/useExpedicionV2';
 import { ForgeMaturityQuizGate } from '@/components/forge/ForgeMaturityQuizGate';
+import { ForgeExpedicionLobby } from '@/components/forge/ForgeExpedicionLobby';
+import { ForgeExpedicionTableDock } from '@/components/forge/ForgeExpedicionTableDock';
+import { ForgePresentationView } from '@/components/forge/ForgePresentationView';
+import {
+  ForgeFacilitatorLensBar,
+  type FacilitatorLens,
+} from '@/components/forge/ForgeFacilitatorLensBar';
 import { ForgeSustainabilityDashboard } from '@/components/forge/ForgeSustainabilityDashboard';
-import { ForgeExpedicionV2Workspace } from '@/components/forge/ForgeExpedicionV2Workspace';
 import { ForgeMicroCasoPanel } from '@/components/forge/ForgeMicroCasoPanel';
 import { drawRandomMicroCaso, getMicroCasoById } from '@/lib/forge/expedicion-v2/content';
 import { EXPEDICION_V2_SHELL } from '@/lib/forge/expedicion-v2/theme';
@@ -128,8 +133,22 @@ export function ForgeExpedicionRoom({
   const [groupMode, setGroupMode] = useState<'live_team' | 'individual_coaching'>('live_team');
   const [investStation, setInvestStation] = useState<ExpedicionStationSlug | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
-  const [slidesOpen, setSlidesOpen] = useState(false);
-  const [v2MapOpen, setV2MapOpen] = useState(false);
+  const [roomView, setRoomView] = useState<'hall' | 'table' | 'presentation'>('hall');
+  const [quizModal, setQuizModal] = useState<null | { side: 'pre' | 'post'; preview: boolean }>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [facLens, setFacLens] = useState<FacilitatorLens>({ kind: 'mine' });
+  const [presentationRows, setPresentationRows] = useState<
+    Array<{
+      id: string;
+      name: string;
+      phase: string;
+      balance: number;
+      cyclesCompleted: number;
+      maxCycles: number;
+      impactPoints?: number;
+      hasPendingMicroCaso?: boolean;
+    }>
+  >([]);
   const [activeMicroCaso, setActiveMicroCaso] = useState<MicroCaso | null>(null);
   const [landEvent, setLandEvent] = useState<BoardLandEvent | null>(null);
   const [cycleBusy, setCycleBusy] = useState(false);
@@ -425,7 +444,81 @@ export function ForgeExpedicionRoom({
     }
   }, [boardPosition, isFac, v2?.phase, v2?.pendingMicroCaso, v2?.completedMicroCasos, patchV2, reloadV2]);
 
-  const boardBlocked = v2?.phase === 'pre_quiz' || v2?.phase === 'post_quiz' || v2?.phase === 'finished';
+  const teamV2Active = Boolean(teamRoomId);
+  const v2Phase = v2?.phase ?? 'lobby';
+  const facilitatorPersonalV2 = isFac && !teamV2Active;
+  const effectivePhase = facilitatorPersonalV2 ? 'lobby' : v2Phase;
+
+  const boardBlocked =
+    !isFac &&
+    !facilitatorPersonalV2 &&
+    (effectivePhase === 'lobby' ||
+      effectivePhase === 'pre_quiz' ||
+      effectivePhase === 'post_quiz' ||
+      effectivePhase === 'finished');
+
+  const showHall = roomView === 'hall';
+  const showTable = roomView === 'table';
+
+  const observeRoomId =
+    isFac && facLens.kind === 'team' ? facLens.roomId : teamRoomId;
+  const observeUserId = isFac && facLens.kind === 'learner' ? facLens.userId : null;
+  const dockReadOnly = isFac && facLens.kind !== 'mine';
+  const canResume =
+    isFac || effectivePhase === 'playing' || effectivePhase === 'pre_quiz' || effectivePhase === 'post_quiz';
+
+  const patchFacBatch = useCallback(
+    async (action: string) => {
+      await fetch(`/api/forge/courses/${courseId}/expedicion-v2`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      await reloadV2();
+    },
+    [courseId, reloadV2]
+  );
+
+  const loadPresentationRows = useCallback(() => {
+    if (!isFac) return;
+    fetch(`/api/forge/courses/${courseId}/expedicion-v2/overview`)
+      .then((r) => r.json())
+      .then((d) => {
+        const rows = [
+          ...(d.teams ?? []).map((t: Record<string, unknown>) => ({
+            id: String(t.roomId),
+            name: String(t.name ?? 'Equipo'),
+            phase: String(t.phase ?? 'lobby'),
+            balance: Number(t.balance ?? 0),
+            cyclesCompleted: Number(t.cyclesCompleted ?? 0),
+            maxCycles: Number(t.maxCycles ?? 3),
+            impactPoints: Number(t.impactPoints ?? 0),
+            hasPendingMicroCaso: Boolean(t.hasPendingMicroCaso),
+          })),
+          ...(d.learners ?? []).map((l: Record<string, unknown>) => ({
+            id: String(l.userId),
+            name: String(l.name ?? 'Jugador'),
+            phase: String(l.phase ?? 'lobby'),
+            balance: Number(l.balance ?? 0),
+            cyclesCompleted: 0,
+            maxCycles: 3,
+            impactPoints: Number(l.impactPoints ?? 0),
+          })),
+        ];
+        setPresentationRows(rows);
+      })
+      .catch(() => {});
+  }, [courseId, isFac]);
+
+  useEffect(() => {
+    if (roomView === 'presentation') loadPresentationRows();
+  }, [roomView, loadPresentationRows]);
+
+  useEffect(() => {
+    if (effectivePhase === 'playing' && !isFac && roomView === 'hall') {
+      setRoomView('table');
+    }
+  }, [effectivePhase, isFac, roomView]);
 
   const pendingReview = v2?.pendingMicroCaso ?? null;
   const reviewMicroCaso = pendingReview ? getMicroCasoById(pendingReview.microCasoId) : null;
@@ -448,20 +541,34 @@ export function ForgeExpedicionRoom({
 
   return (
     <div className={cn('fixed inset-0 z-50 flex flex-col text-slate-900', EXPEDICION_V2_SHELL)}>
-      {v2?.phase === 'pre_quiz' && (
+      {quizModal && (
         <ForgeMaturityQuizGate
-          side="pre"
+          side={quizModal.side}
+          preview={quizModal.preview}
+          onClose={() => setQuizModal(null)}
           onComplete={async (answers) => {
-            await patchV2({ action: 'complete_pre_quiz', answers });
+            if (quizModal.preview) {
+              setQuizModal(null);
+              return;
+            }
+            const action =
+              quizModal.side === 'pre' ? 'complete_pre_quiz' : 'complete_post_quiz';
+            await patchV2({ action, answers });
+            setQuizModal(null);
+            if (quizModal.side === 'pre') setRoomView('table');
           }}
         />
       )}
-      {v2?.phase === 'post_quiz' && (
-        <ForgeMaturityQuizGate
-          side="post"
-          onComplete={async (answers) => {
-            await patchV2({ action: 'complete_post_quiz', answers });
-          }}
+      {roomView === 'presentation' && isFac && (
+        <ForgePresentationView
+          courseTitle={courseTitle}
+          slides={presentationSlides}
+          pdfUrl={presentationPdfUrl}
+          embedUrl={presentationEmbedUrl}
+          slideIndex={slideIdx}
+          onSlideIndexChange={setSlideIdxSynced}
+          liveRows={presentationRows}
+          onClose={() => setRoomView('hall')}
         />
       )}
       <header className="flex shrink-0 items-center gap-3 border-b border-[#1B5E4B]/20 bg-[#1B5E4B] px-3 py-2 text-white shadow-md">
@@ -489,36 +596,43 @@ export function ForgeExpedicionRoom({
           )}
         </div>
         <ForgeGameManualButton onOpen={() => setManualOpen(true)} />
-        {presentationSlides.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setRoomView('hall')}
+          className={cn(
+            'rounded-lg border px-2 py-1 text-[10px] font-bold',
+            showHall ? 'border-[#F4B942] bg-[#F4B942]/20' : 'border-white/30 hover:bg-white/10'
+          )}
+        >
+          {ft('forge.v2.lobbyNav')}
+        </button>
+        {showTable && (
           <button
             type="button"
-            onClick={() => setSlidesOpen((v) => !v)}
+            onClick={() => setRoomView('table')}
+            className="rounded-lg border border-emerald-400/50 bg-emerald-900/40 px-2 py-1 text-[10px] font-bold text-emerald-100"
+          >
+            {ft('forge.v2.lobbyResumeTable')}
+          </button>
+        )}
+        {isFac && (
+          <button
+            type="button"
+            onClick={() => {
+              loadPresentationRows();
+              setRoomView('presentation');
+            }}
             className={cn(
               'rounded-lg border px-2 py-1 text-[10px] font-bold flex items-center gap-1',
-              slidesOpen ? 'border-violet-400 bg-violet-900 text-violet-100' : 'border-slate-700 hover:bg-slate-800'
+              roomView === 'presentation'
+                ? 'border-violet-400 bg-violet-900 text-violet-100'
+                : 'border-white/30 hover:bg-white/10'
             )}
           >
             <Presentation className="h-3 w-3" />
-            {ft('forge.room.slides')}
-            {isFac && ` ${slideIdx + 1}/${presentationSlides.length}`}
+            {ft('forge.v2.presentationMode')}
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => setV2MapOpen((v) => !v)}
-          className={cn(
-            'rounded-lg border px-2 py-1 text-[10px] font-bold',
-            v2MapOpen ? 'border-[#F4B942] bg-[#F4B942]/20' : 'border-white/30 hover:bg-white/10'
-          )}
-        >
-          {ft('forge.v2.mapFinance')}
-        </button>
-        <Link
-        href={`/hub/forge/cursos/${courseId}/mi-mapa${teamRoomId ? `?room=${teamRoomId}` : ''}`}
-          className="rounded-lg border border-white/30 px-2 py-1 text-[10px] font-bold hover:bg-white/10"
-        >
-          {ft('forge.room.myMap')}
-        </Link>
         <Link
           href={`/hub/forge/cursos/${courseId}/turmas`}
           className="rounded-lg border border-slate-700 px-2 py-1 text-[10px] font-bold hover:bg-slate-800"
@@ -580,66 +694,9 @@ export function ForgeExpedicionRoom({
       <ForgeGameCoach guide={coachGuide} knowledge={null} />
       <ForgeGameManualModal open={manualOpen} onClose={() => setManualOpen(false)} />
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        {slidesOpen && presentationSlides.length > 0 && (
-          <aside className="w-full max-w-sm shrink-0 border-r border-slate-800 bg-slate-900 overflow-y-auto z-10 flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-800 px-2 py-2">
-              {isFac && (
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setSlideIdxSynced((i) => Math.max(0, i - 1))}
-                    disabled={slideIdx <= 0}
-                    className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold disabled:opacity-40"
-                  >
-                    ←
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSlideIdxSynced((i) => Math.min(presentationSlides.length - 1, i + 1))}
-                    disabled={slideIdx >= presentationSlides.length - 1}
-                    className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold disabled:opacity-40"
-                  >
-                    →
-                  </button>
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => setSlidesOpen(false)}
-                className="ml-auto text-[10px] text-slate-400 hover:text-white"
-              >
-                {ft('forge.general.close')}
-              </button>
-            </div>
-            <ForgePresentationViewer
-              slides={presentationSlides}
-              pdfUrl={presentationPdfUrl}
-              embedUrl={presentationEmbedUrl}
-              compact
-              audienceMode
-              slideIndex={slideIdx}
-              onSlideIndexChange={isFac ? setSlideIdxSynced : undefined}
-            />
-            {capsuleQuiz && isFac && (
-              <button
-                type="button"
-                onClick={() => setQuizOpen(true)}
-                className="m-2 rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold"
-              >
-                {ft('forge.room.openQuiz')} — {capsuleQuiz.title}
-              </button>
-            )}
-          </aside>
-        )}
-
-        {v2MapOpen && (
-          <aside className="w-full max-w-md shrink-0 border-r border-[#1B5E4B]/15 bg-white/90 overflow-y-auto z-10 p-3">
-            <ForgeExpedicionV2Workspace courseId={courseId} readOnly={isFac} roomId={teamRoomId} teamPeers={teamPeers} myUserId={myUserId} />
-          </aside>
-        )}
-
-        <main className="flex-1 flex flex-col min-w-0 min-h-0 p-2 md:p-3 gap-2">
+      <div className="flex flex-1 min-h-0 overflow-hidden flex-col">
+        {roomView !== 'presentation' && (
+        <main className="flex flex-1 flex-col min-w-0 min-h-0 p-2 md:p-3 gap-2">
           {sessionFormat === 'presencial' && (
             <p className="shrink-0 rounded-lg border border-[#F4B942]/40 bg-[#F4B942]/15 px-3 py-2 text-xs text-[#FFF8E7]">
               {teamMode
@@ -647,27 +704,34 @@ export function ForgeExpedicionRoom({
                 : ft('forge.v2.presentialSoloHint')}
             </p>
           )}
-          {isFac && (
-            <ForgeFacilitatorV2Controls
-              courseId={courseId}
-              roomId={teamRoomId}
-              busy={cycleBusy}
-              onAction={async (action) => {
-                setCycleBusy(true);
-                try {
-                  await patchV2({ action });
-                  await reloadV2();
-                } finally {
-                  setCycleBusy(false);
-                }
-              }}
-            />
+          {isFac && showTable && (
+            <ForgeFacilitatorLensBar courseId={courseId} lens={facLens} onLensChange={setFacLens} />
           )}
-          {isFac && <ForgeFacilitatorV2Panel courseId={courseId} />}
-          {isFac && (
-            <div className="px-2 pb-2">
+          {isFac && facLens.kind !== 'mine' && facLens.kind !== 'all' && showTable && (
+            <p className="shrink-0 rounded-lg border border-violet-400/40 bg-violet-950/40 px-3 py-2 text-xs text-violet-100">
+              {ft('forge.v2.lensObserving', { name: facLens.name })}
+            </p>
+          )}
+          {isFac && showHall && (
+            <>
+              <ForgeFacilitatorLensBar courseId={courseId} lens={facLens} onLensChange={setFacLens} />
+              <ForgeFacilitatorV2Controls
+                courseId={courseId}
+                roomId={teamRoomId}
+                busy={cycleBusy}
+                onAction={async (action) => {
+                  setCycleBusy(true);
+                  try {
+                    await patchV2({ action });
+                    await reloadV2();
+                  } finally {
+                    setCycleBusy(false);
+                  }
+                }}
+              />
+              <ForgeFacilitatorV2Panel courseId={courseId} />
               <ForgeFeriaSessionPanel courseId={courseId} />
-            </div>
+            </>
           )}
           {v2 && (
             <ForgeExpedicionCycleBar
@@ -831,39 +895,109 @@ export function ForgeExpedicionRoom({
             </div>
           )}
 
-          <div className="flex-1 flex flex-col min-h-0 justify-center">
-            {!isCoaching && !boardBlocked ? (
-              gameSpec && syncMode !== 'pending' ? (
-                <div className="flex flex-col h-full min-h-0 [&_.rounded-xl]:bg-transparent">
-                  <ForgeGameBoard
-                    spec={gameSpec}
-                    initialState={gameState}
-                    syncMode={syncMode}
-                    roomId={sharedRoomId ?? undefined}
-                    roomVersion={roomVersion}
-                    myUserId={myUserId}
-                    isFacilitator={isFac}
-                    facilitatorEmergency={facEmergency}
-                    onGuideChange={(g) => setCoachGuide(g)}
-                    onRoomState={(s) => setGameState(s as Record<string, unknown>)}
-                    onGameEvents={handleBoardEvents}
-                    v2EcoBalance={v2?.ledger.balance}
-                  />
-                </div>
-              ) : (
-                <p className="text-center text-sm text-amber-200 py-12">
-                  {boardBusy ? ft('forge.general.loading') : ft('forge.room.waitingBoard')}
-                </p>
-              )
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {showHall ? (
+              <ForgeExpedicionLobby
+                phase={effectivePhase}
+                isFacilitator={isFac}
+                teamMode={teamMode}
+                v2={v2}
+                canResume={canResume}
+                quizPreAvailable={effectivePhase === 'pre_quiz'}
+                quizPostAvailable={effectivePhase === 'post_quiz'}
+                profileOpen={profileOpen}
+                onShowProfile={() => setProfileOpen((v) => !v)}
+                onGoToTable={() => setRoomView('table')}
+                onOpenQuiz={(side) => setQuizModal({ side, preview: false })}
+                onPreviewQuiz={(side) => setQuizModal({ side, preview: true })}
+                onPresentation={() => {
+                  loadPresentationRows();
+                  setRoomView('presentation');
+                }}
+                onFacOpenPreQuiz={
+                  isFac
+                    ? async () => {
+                        if (teamV2Active) await patchV2({ action: 'open_pre_quiz' });
+                        else await patchFacBatch('open_pre_quiz_all');
+                        await reloadV2();
+                      }
+                    : undefined
+                }
+                onFacOpenPostQuiz={
+                  isFac
+                    ? async () => {
+                        if (teamV2Active) await patchV2({ action: 'open_post_quiz' });
+                        else await patchFacBatch('open_post_quiz_all');
+                        await reloadV2();
+                      }
+                    : undefined
+                }
+                onFacRestart={
+                  isFac
+                    ? async () => {
+                        if (teamV2Active) await patchV2({ action: 'reset_v2' });
+                        else await patchFacBatch('reset_v2_all');
+                        await patchFacBatch('return_to_lobby_all');
+                        await reloadV2();
+                        setRoomView('hall');
+                      }
+                    : undefined
+                }
+              />
             ) : (
-              myMap && <ForgePersonalMapStrip mapState={myMap} />
+              <div className="flex flex-1 min-h-0 flex-col md:flex-row gap-0">
+                <div className="flex flex-1 flex-col min-h-0 min-w-0 gap-2 overflow-y-auto">
+                  {!isCoaching && !boardBlocked && facLens.kind === 'mine' ? (
+                    gameSpec && syncMode !== 'pending' ? (
+                      <div className="flex flex-col flex-1 min-h-0 [&_.rounded-xl]:bg-transparent">
+                        <ForgeGameBoard
+                          spec={gameSpec}
+                          initialState={gameState}
+                          syncMode={syncMode}
+                          roomId={sharedRoomId ?? undefined}
+                          roomVersion={roomVersion}
+                          myUserId={myUserId}
+                          isFacilitator={isFac}
+                          facilitatorEmergency={facEmergency}
+                          onGuideChange={(g) => setCoachGuide(g)}
+                          onRoomState={(s) => setGameState(s as Record<string, unknown>)}
+                          onGameEvents={handleBoardEvents}
+                          v2EcoBalance={v2?.ledger.balance}
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-center text-sm text-amber-200 py-12">
+                        {boardBusy ? ft('forge.general.loading') : ft('forge.room.waitingBoard')}
+                      </p>
+                    )
+                  ) : dockReadOnly ? (
+                    <p className="text-center text-sm text-violet-200 py-8 px-4">
+                      {ft('forge.v2.lensBoardHint')}
+                    </p>
+                  ) : (
+                    myMap && <ForgePersonalMapStrip mapState={myMap} />
+                  )}
+                  {boardBlocked && effectivePhase !== 'finished' && (
+                    <p className="text-center text-sm text-amber-200 font-semibold py-2">
+                      {effectivePhase === 'lobby' || effectivePhase === 'pre_quiz'
+                        ? ft('forge.v2.lobbyBoardBlocked')
+                        : ft('forge.v2.completeMaturityQuiz')}
+                    </p>
+                  )}
+                </div>
+                <ForgeExpedicionTableDock
+                  courseId={courseId}
+                  roomId={observeRoomId}
+                  observeUserId={observeUserId}
+                  teamPeers={teamPeers}
+                  myUserId={myUserId}
+                  readOnly={dockReadOnly || boardBlocked}
+                  balance={v2?.ledger.balance}
+                  impactPoints={v2?.impactPoints}
+                />
+              </div>
             )}
           </div>
-          {boardBlocked && v2?.phase !== 'finished' && (
-            <p className="text-center text-sm text-[#1B5E4B] font-semibold py-8">
-              {ft('forge.v2.completeMaturityQuiz')}
-            </p>
-          )}
 
           {myMap && !isCoaching && (
             <div className="shrink-0 max-h-28 overflow-hidden">
@@ -905,6 +1039,7 @@ export function ForgeExpedicionRoom({
             </div>
           )}
         </main>
+        )}
       </div>
 
       {quizOpen && capsuleQuiz && (

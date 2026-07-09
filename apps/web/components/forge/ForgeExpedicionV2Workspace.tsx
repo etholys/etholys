@@ -8,6 +8,7 @@ import { useForgeT } from '@/lib/forge/use-forge-t';
 import { CAPSULAS_TECNICAS } from '@/lib/forge/expedicion-v2/capsulas-content';
 import type { ExpedicionStationSlug } from '@/lib/forge/expedicion-station-decks';
 import type { PostItType } from '@/lib/forge/expedicion-v2/types';
+import { cn } from '@/lib/utils';
 
 export function ForgeExpedicionV2Workspace({
   courseId,
@@ -15,18 +16,76 @@ export function ForgeExpedicionV2Workspace({
   roomId,
   teamPeers,
   myUserId,
+  compact,
+  dockTab = 'eco',
+  observeUserId,
 }: {
   courseId: string;
   readOnly?: boolean;
   roomId?: string | null;
   teamPeers?: { userId: string; name: string }[];
   myUserId?: string;
+  /** Vista compacta integrada na mesa */
+  compact?: boolean;
+  dockTab?: 'map' | 'eco';
+  /** Facilitador observa jornada individual */
+  observeUserId?: string | null;
 }) {
   const ft = useForgeT();
-  const { v2, patch, loading } = useExpedicionV2(courseId, { roomId });
+  const { v2, patch, loading } = useExpedicionV2(courseId, {
+    roomId,
+    observeUserId,
+  });
 
   if (loading || !v2) {
-    return <div className="rounded-xl bg-white/60 p-6 text-sm text-slate-500">{ft('forge.v2.loadingMap')}</div>;
+    return (
+      <div className={cn('rounded-xl bg-white/60 text-sm text-slate-500', compact ? 'p-3' : 'p-6')}>
+        {ft('forge.v2.loadingMap')}
+      </div>
+    );
+  }
+
+  if (compact) {
+    return (
+      <div className="space-y-3">
+        {(dockTab === 'eco') && (
+          <ForgeEcoLedger
+            ledger={v2.ledger}
+            peerCredits={v2.peerCredits}
+            teamPeers={teamPeers}
+            myUserId={myUserId}
+            loanDisabled={readOnly}
+            compact
+            onRequestLoan={
+              readOnly
+                ? undefined
+                : async () => {
+                    await patch({ action: 'green_loan' });
+                  }
+            }
+          />
+        )}
+        {dockTab === 'map' && (
+          <ForgeConstructionCanvas
+            map={v2.constructionMap}
+            readOnly={readOnly}
+            compact
+            onAddPostIt={async (station, type, text) => {
+              await patch({ action: 'add_postit', station, type, text });
+            }}
+            onUpdatePostIt={async (id, patchBody) => {
+              await patch({ action: 'update_postit', id, ...patchBody });
+            }}
+            onRemovePostIt={async (id) => {
+              await patch({ action: 'remove_postit', id });
+            }}
+            onAddConnection={async (fromPostItId, toPostItId) => {
+              await patch({ action: 'add_connection', fromPostItId, toPostItId });
+            }}
+          />
+        )}
+      </div>
+    );
   }
 
   return (

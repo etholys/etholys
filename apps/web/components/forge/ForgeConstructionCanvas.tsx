@@ -25,6 +25,7 @@ export function ForgeConstructionCanvas({
   onRemovePostIt,
   onAddConnection,
   readOnly,
+  compact,
 }: {
   map: ConstructionMapState;
   onAddPostIt: (station: ExpedicionStationSlug, type: PostItType, text: string) => void;
@@ -32,6 +33,7 @@ export function ForgeConstructionCanvas({
   onRemovePostIt: (id: string) => void;
   onAddConnection: (fromId: string, toId: string) => void;
   readOnly?: boolean;
+  compact?: boolean;
 }) {
   const ft = useForgeT();
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export function ForgeConstructionCanvas({
 
   return (
     <div
-      className="space-y-3"
+      className={cn('space-y-3', compact && 'max-h-[36vh] overflow-y-auto pr-1')}
       onPointerMove={(e) => {
         if (dragRef.current) onDragMove(e.clientY);
       }}
