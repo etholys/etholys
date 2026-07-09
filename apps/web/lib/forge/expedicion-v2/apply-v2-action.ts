@@ -44,15 +44,16 @@ export function applyV2Action(
 
   switch (action) {
     case 'open_pre_quiz':
-      return { ...v2, phase: 'pre_quiz' as const };
+      return { ...v2, phase: v2.phase === 'finished' ? v2.phase : 'lobby', quizGate: 'pre' as const };
     case 'open_post_quiz':
-      return { ...v2, phase: 'post_quiz' as const };
+      return { ...v2, quizGate: 'post' as const };
     case 'return_to_lobby':
-      return { ...v2, phase: 'lobby' as const };
+      return { ...v2, phase: 'lobby' as const, quizGate: null };
     case 'complete_pre_quiz':
       return {
         ...v2,
         phase: 'playing',
+        quizGate: null,
         preQuizAnswers: (body.answers as ExpedicionV2PlayerState['preQuizAnswers']) ?? {},
         preQuizCompletedAt: new Date().toISOString(),
       };
@@ -60,6 +61,7 @@ export function applyV2Action(
       const next = {
         ...v2,
         phase: 'finished' as const,
+        quizGate: null as const,
         postQuizAnswers: (body.answers as ExpedicionV2PlayerState['postQuizAnswers']) ?? {},
         postQuizCompletedAt: new Date().toISOString(),
       };
@@ -137,10 +139,12 @@ export function applyV2Action(
       return { ...v2, ledger: takeGreenLoan(v2.ledger) };
     case 'end_cycle': {
       const cycles = v2.cyclesCompleted + 1;
+      const done = cycles >= v2.maxCycles;
       return {
         ...v2,
         cyclesCompleted: cycles,
-        phase: cycles >= v2.maxCycles ? 'post_quiz' : 'playing',
+        phase: done ? 'playing' : 'playing',
+        quizGate: done ? ('post' as const) : v2.quizGate ?? null,
       };
     }
     case 'apply_action_card': {
@@ -270,7 +274,7 @@ export function applyV2Action(
       return keepPhase ? { ...fresh, phase: v2.phase, cyclesCompleted: v2.cyclesCompleted } : fresh;
     }
     case 'force_post_quiz':
-      return { ...v2, phase: 'post_quiz' as const };
+      return { ...v2, quizGate: 'post' as const };
     default:
       throw new V2ActionError('Acción desconocida');
   }

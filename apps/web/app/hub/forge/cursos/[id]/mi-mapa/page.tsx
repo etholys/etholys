@@ -63,7 +63,7 @@ export default function ForgeMiMapaPage() {
           Mapa compartido de la mesa — cambios visibles para todo el equipo.
         </p>
       )}
-      {v2.phase === 'pre_quiz' && (
+      {v2.quizGate === 'pre' && (
         <button
           type="button"
           onClick={() => setQuizModal('pre')}
@@ -73,7 +73,7 @@ export default function ForgeMiMapaPage() {
           {ft('forge.v2.lobbyTilePreQuiz')}
         </button>
       )}
-      {v2.phase === 'post_quiz' && (
+      {v2.quizGate === 'post' && (
         <button
           type="button"
           onClick={() => setQuizModal('post')}

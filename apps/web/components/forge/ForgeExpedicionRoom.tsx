@@ -446,26 +446,24 @@ export function ForgeExpedicionRoom({
 
   const teamV2Active = Boolean(teamRoomId);
   const v2Phase = v2?.phase ?? 'lobby';
+  const quizGate = v2?.quizGate ?? null;
   const facilitatorPersonalV2 = isFac && !teamV2Active;
   const effectivePhase = facilitatorPersonalV2 ? 'lobby' : v2Phase;
 
   const boardBlocked =
-    !isFac &&
-    !facilitatorPersonalV2 &&
-    (effectivePhase === 'lobby' ||
-      effectivePhase === 'pre_quiz' ||
-      effectivePhase === 'post_quiz' ||
-      effectivePhase === 'finished');
+    !isFac && !facilitatorPersonalV2 && (effectivePhase === 'lobby' || effectivePhase === 'finished');
 
   const showHall = roomView === 'hall';
   const showTable = roomView === 'table';
+
+  const quizPreAvailable = quizGate === 'pre';
+  const quizPostAvailable = quizGate === 'post';
 
   const observeRoomId =
     isFac && facLens.kind === 'team' ? facLens.roomId : teamRoomId;
   const observeUserId = isFac && facLens.kind === 'learner' ? facLens.userId : null;
   const dockReadOnly = isFac && facLens.kind !== 'mine';
-  const canResume =
-    isFac || effectivePhase === 'playing' || effectivePhase === 'pre_quiz' || effectivePhase === 'post_quiz';
+  const canResume = isFac || effectivePhase === 'playing' || quizPreAvailable || quizPostAvailable;
 
   const patchFacBatch = useCallback(
     async (action: string) => {
@@ -509,6 +507,10 @@ export function ForgeExpedicionRoom({
       })
       .catch(() => {});
   }, [courseId, isFac]);
+
+  useEffect(() => {
+    setQuizModal(null);
+  }, [courseId]);
 
   useEffect(() => {
     if (roomView === 'presentation') loadPresentationRows();
@@ -903,8 +905,8 @@ export function ForgeExpedicionRoom({
                 teamMode={teamMode}
                 v2={v2}
                 canResume={canResume}
-                quizPreAvailable={effectivePhase === 'pre_quiz'}
-                quizPostAvailable={effectivePhase === 'post_quiz'}
+                quizPreAvailable={quizPreAvailable}
+                quizPostAvailable={quizPostAvailable}
                 profileOpen={profileOpen}
                 onShowProfile={() => setProfileOpen((v) => !v)}
                 onGoToTable={() => setRoomView('table')}
@@ -979,9 +981,7 @@ export function ForgeExpedicionRoom({
                   )}
                   {boardBlocked && effectivePhase !== 'finished' && (
                     <p className="text-center text-sm text-amber-200 font-semibold py-2">
-                      {effectivePhase === 'lobby' || effectivePhase === 'pre_quiz'
-                        ? ft('forge.v2.lobbyBoardBlocked')
-                        : ft('forge.v2.completeMaturityQuiz')}
+                      {ft('forge.v2.lobbyBoardBlocked')}
                     </p>
                   )}
                 </div>

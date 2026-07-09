@@ -9,6 +9,7 @@ import {
   mergeV2IntoMapState,
   v2FromJourneyMapState,
 } from '@/lib/forge/expedicion-v2/player-state';
+import { normalizeV2State } from '@/lib/forge/expedicion-v2/normalize-v2';
 import { applyV2Action, V2ActionError } from '@/lib/forge/expedicion-v2/apply-v2-action';
 import {
   mergeV2IntoRoomState,
@@ -104,7 +105,18 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     if (roomId) {
       const room = await resolveTeamRoom(roomId, courseId, tenant);
       if (room) {
-        const v2 = v2FromRoomState((room.state ?? {}) as Record<string, unknown>);
+        const prev = (room.state ?? {}) as Record<string, unknown>;
+        let v2 = v2FromRoomState(prev);
+        const { v2: normalized, changed } = normalizeV2State(v2);
+        v2 = normalized;
+        if (changed) {
+          await getForgeDb().forgeSharedGameRoom.update({
+            where: { id: room.id },
+            data: {
+              state: mergeV2IntoRoomState(prev, v2) as Prisma.InputJsonValue,
+            },
+          });
+        }
         const liveConfig = (course.liveConfig ?? {}) as Record<string, unknown>;
         return NextResponse.json({
           v2,
@@ -128,7 +140,16 @@ export async function GET(req: NextRequest, ctx: Ctx) {
         data: { mapState: mapState as object },
       });
     }
-    const v2 = v2FromJourneyMapState(mapState);
+    let v2 = v2FromJourneyMapState(mapState);
+    const { v2: normalized, changed } = normalizeV2State(v2);
+    v2 = normalized;
+    if (changed) {
+      mapState = mergeV2IntoMapState(mapState, v2);
+      await getForgeDb().forgeLearnerJourney.update({
+        where: { id: journey.id },
+        data: { mapState: mapState as object },
+      });
+    }
     const liveConfig = (course.liveConfig ?? {}) as Record<string, unknown>;
     return NextResponse.json({
       v2,

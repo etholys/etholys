@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { normalizeV2State } from '../../lib/forge/expedicion-v2/normalize-v2';
 import { applyV2Action } from '../../lib/forge/expedicion-v2/apply-v2-action';
 import { createInitialV2State } from '../../lib/forge/expedicion-v2/player-state';
 import { ledgerDraftsFromBoardEvents } from '../../lib/forge/expedicion-v2/board-ledger-sync';
@@ -16,9 +17,20 @@ test('createInitialV2State — starts in lobby', () => {
   assert.equal(createInitialV2State().phase, 'lobby');
 });
 
+test('normalizeV2State — legacy pre_quiz becomes lobby', () => {
+  const { v2, changed } = normalizeV2State({
+    ...createInitialV2State(),
+    phase: 'pre_quiz',
+  });
+  assert.equal(changed, true);
+  assert.equal(v2.phase, 'lobby');
+  assert.equal(v2.quizGate, null);
+});
+
 test('applyV2Action — open_pre_quiz from lobby', () => {
   const v2 = applyV2Action(createInitialV2State(), { action: 'open_pre_quiz' });
-  assert.equal(v2.phase, 'pre_quiz');
+  assert.equal(v2.quizGate, 'pre');
+  assert.equal(v2.phase, 'lobby');
 });
 
 test('applyV2Action — pre quiz → playing', () => {
@@ -45,7 +57,8 @@ test('applyV2Action — end_cycle opens post_quiz after 3 cycles', () => {
   v2 = applyV2Action(v2, { action: 'end_cycle' });
   v2 = applyV2Action(v2, { action: 'end_cycle' });
   assert.equal(v2.cyclesCompleted, 3);
-  assert.equal(v2.phase, 'post_quiz');
+  assert.equal(v2.quizGate, 'post');
+  assert.equal(v2.phase, 'playing');
 });
 
 test('ledgerDraftsFromBoardEvents — validated +100', () => {

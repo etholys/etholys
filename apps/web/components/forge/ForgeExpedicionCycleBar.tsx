@@ -18,9 +18,12 @@ export function ForgeExpedicionCycleBar({
 }) {
   const ft = useForgeT();
 
-  if (v2.phase !== 'playing' && v2.phase !== 'post_quiz') return null;
+  if (v2.phase !== 'playing' && v2.phase !== 'post_quiz' && v2.quizGate !== 'post') return null;
 
-  const current = v2.phase === 'post_quiz' ? v2.maxCycles : v2.cyclesCompleted + 1;
+  const current =
+    v2.quizGate === 'post' || v2.phase === 'post_quiz'
+      ? v2.maxCycles
+      : v2.cyclesCompleted + 1;
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#1B5E4B]/20 bg-white/90 px-3 py-2 text-xs shadow-sm">
@@ -51,10 +54,10 @@ export function ForgeExpedicionCycleBar({
           {ft('forge.v2.cycle', { current, max: v2.maxCycles })} · {ft('forge.v2.cycleGoal')}
         </span>
       )}
-      {v2.phase === 'post_quiz' && (
+      {v2.quizGate === 'post' && (
         <span className="font-semibold text-violet-800">{ft('forge.v2.postQuizCycleDone')}</span>
       )}
-      {isFacilitator && v2.phase === 'playing' && onEndCycle && (
+      {isFacilitator && v2.phase === 'playing' && v2.quizGate !== 'post' && onEndCycle && (
         <button
           type="button"
           disabled={busy}
@@ -65,7 +68,7 @@ export function ForgeExpedicionCycleBar({
           {ft('forge.v2.closeCycle')}
         </button>
       )}
-      {isFacilitator && v2.phase === 'post_quiz' && (
+      {isFacilitator && v2.quizGate === 'post' && (
         <span className="ml-auto inline-flex items-center gap-1 text-amber-800">
           <RotateCcw className="h-3 w-3" />
           {ft('forge.v2.postQuizWait')}

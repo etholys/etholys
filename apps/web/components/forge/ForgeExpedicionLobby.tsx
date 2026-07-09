@@ -217,7 +217,7 @@ export function ForgeExpedicionLobby({
                 {ft('forge.v2.lobbyFacOpenPreQuizAll')}
               </button>
             )}
-            {phase === 'playing' && onFacOpenPostQuiz && (
+            {phase !== 'finished' && onFacOpenPostQuiz && (
               <button
                 type="button"
                 onClick={onFacOpenPostQuiz}

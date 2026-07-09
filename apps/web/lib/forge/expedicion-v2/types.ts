@@ -47,10 +47,15 @@ export type EcoLedgerState = {
 
 export type GamePhase = 'lobby' | 'pre_quiz' | 'playing' | 'post_quiz' | 'finished';
 
+/** Facilitador libertou o quiz — jogadores abrem manualmente (não é fase de bloqueio). */
+export type QuizGate = 'pre' | 'post' | null;
+
 export type MaturityQuizAnswers = Record<string, string | number>;
 
 export type ExpedicionV2PlayerState = {
   phase: GamePhase;
+  /** Quiz disponível para abrir (clique) — separado da fase do jogo */
+  quizGate?: QuizGate;
   cyclesCompleted: number;
   maxCycles: number;
   constructionMap: ConstructionMapState;
