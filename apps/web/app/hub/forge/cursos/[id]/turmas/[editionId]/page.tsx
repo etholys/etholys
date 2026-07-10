@@ -14,7 +14,7 @@ export default function ForgeEditionPage() {
     <div className="space-y-4">
       <Link
         href={`/hub/forge/cursos/${id}`}
-        className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+        className="inline-flex items-center gap-1 text-sm text-[#145A45] font-semibold hover:underline"
       >
         <ArrowLeft className="h-4 w-4" />
         {ft('forge.edition.backToCourse')}

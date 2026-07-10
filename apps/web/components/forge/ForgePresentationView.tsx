@@ -43,13 +43,13 @@ export function ForgePresentationView({
   const [mode, setMode] = useState<Mode>('mixed');
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-[#0f172a] text-white">
-      <header className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2">
-        <Monitor className="h-4 w-4 text-[#F4B942]" />
-        <span className="text-xs font-bold uppercase tracking-wider text-[#F4B942]">
+    <div className="fixed inset-0 z-[70] flex flex-col bg-[#0D4535] text-white">
+      <header className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#145A45] px-3 py-2.5">
+        <Monitor className="h-4 w-4 text-[#C9A227]" />
+        <span className="text-xs font-bold uppercase tracking-wider text-[#C9A227]">
           {ft('forge.v2.presentationMode')}
         </span>
-        <span className="truncate text-sm font-semibold text-white/90">{courseTitle}</span>
+        <span className="truncate text-sm font-semibold text-white/95">{courseTitle}</span>
         <div className="ml-auto flex gap-1">
           {(['slides', 'live', 'mixed'] as const).map((m) => (
             <button
@@ -57,8 +57,8 @@ export function ForgePresentationView({
               type="button"
               onClick={() => setMode(m)}
               className={cn(
-                'rounded-lg px-2 py-1 text-[10px] font-bold',
-                mode === m ? 'bg-[#F4B942] text-[#1B5E4B]' : 'bg-white/10 hover:bg-white/20'
+                'rounded-lg px-2.5 py-1 text-[10px] font-bold transition',
+                mode === m ? 'bg-[#C9A227] text-[#0D4535]' : 'bg-white/10 hover:bg-white/20 text-white'
               )}
             >
               {m === 'slides' && ft('forge.v2.presentationSlides')}
@@ -69,7 +69,7 @@ export function ForgePresentationView({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-white/10 p-1.5 hover:bg-white/20"
+            className="rounded-lg bg-white/10 p-1.5 hover:bg-white/20 ml-1"
             aria-label={ft('forge.general.close')}
           >
             <X className="h-4 w-4" />
@@ -77,38 +77,38 @@ export function ForgePresentationView({
         </div>
       </header>
 
-      <div className="flex flex-1 min-h-0 flex-col md:flex-row">
+      <div className="flex flex-1 min-h-0 flex-col md:flex-row bg-[#F5F2EA]">
         {(mode === 'slides' || mode === 'mixed') && slides.length > 0 && (
           <div
             className={cn(
-              'flex flex-col min-h-0 bg-black',
+              'flex flex-col min-h-0',
               mode === 'mixed' ? 'flex-1 md:flex-[2]' : 'flex-1'
             )}
           >
             {onSlideIndexChange && (
-              <div className="flex shrink-0 gap-1 border-b border-white/10 p-2">
+              <div className="flex shrink-0 gap-1 border-b border-[#145A45]/15 bg-white px-2 py-2">
                 <button
                   type="button"
                   disabled={slideIndex <= 0}
                   onClick={() => onSlideIndexChange(Math.max(0, slideIndex - 1))}
-                  className="rounded bg-white/10 px-3 py-1 text-xs font-bold disabled:opacity-40"
+                  className="rounded-lg border border-[#145A45]/20 bg-[#F5F2EA] px-3 py-1 text-xs font-bold text-[#145A45] disabled:opacity-40"
                 >
                   ←
                 </button>
-                <span className="flex items-center px-2 text-xs text-white/70">
+                <span className="flex items-center px-2 text-xs font-semibold text-[#145A45]">
                   {slideIndex + 1} / {slides.length}
                 </span>
                 <button
                   type="button"
                   disabled={slideIndex >= slides.length - 1}
                   onClick={() => onSlideIndexChange(Math.min(slides.length - 1, slideIndex + 1))}
-                  className="rounded bg-white/10 px-3 py-1 text-xs font-bold disabled:opacity-40"
+                  className="rounded-lg border border-[#145A45]/20 bg-[#F5F2EA] px-3 py-1 text-xs font-bold text-[#145A45] disabled:opacity-40"
                 >
                   →
                 </button>
               </div>
             )}
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto p-3 md:p-4">
               <ForgePresentationViewer
                 slides={slides}
                 pdfUrl={pdfUrl}
@@ -124,29 +124,29 @@ export function ForgePresentationView({
         {(mode === 'live' || mode === 'mixed') && (
           <aside
             className={cn(
-              'flex flex-col min-h-0 border-white/10 bg-[#1B5E4B]/30',
+              'flex flex-col min-h-0 border-[#145A45]/15 bg-white',
               mode === 'mixed' ? 'md:w-80 md:border-l max-md:max-h-[40vh] border-t' : 'flex-1'
             )}
           >
-            <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
-              {mode === 'live' ? <Radio className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+            <div className="flex items-center gap-2 border-b border-[#145A45]/10 bg-[#145A45] px-3 py-2.5 text-white">
+              {mode === 'live' ? <Radio className="h-4 w-4 text-[#C9A227]" /> : <LayoutGrid className="h-4 w-4 text-[#C9A227]" />}
               <span className="text-xs font-bold">{ft('forge.v2.presentationLiveTitle')}</span>
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-2">
               {liveRows.length === 0 && (
-                <p className="text-xs text-white/60 px-2">{ft('forge.v2.noData')}</p>
+                <p className="text-xs text-[#145A45]/60 px-2 py-4">{ft('forge.v2.noData')}</p>
               )}
               {liveRows.map((row) => (
-                <div key={row.id} className="rounded-lg bg-black/30 px-3 py-2 text-xs">
-                  <p className="font-bold text-emerald-200">{row.name}</p>
-                  <p className="text-white/80 mt-0.5">
+                <div key={row.id} className="rounded-xl border border-[#145A45]/12 bg-[#F5F2EA] px-3 py-2.5 text-xs">
+                  <p className="font-bold text-[#145A45]">{row.name}</p>
+                  <p className="text-[#1A3D5C]/90 mt-0.5">
                     {row.phase} · {ft('forge.v2.cycle', { current: row.cyclesCompleted + 1, max: row.maxCycles })}
                     {' · '}
                     {ft('forge.v2.eco', { n: row.balance })}
                     {(row.impactPoints ?? 0) > 0 && ` · ${ft('forge.v2.impact', { n: row.impactPoints ?? 0 })}`}
                   </p>
                   {row.hasPendingMicroCaso && (
-                    <p className="text-amber-300 mt-1">{ft('forge.v2.pendingMicroCaso')}</p>
+                    <p className="text-[#C9A227] mt-1 font-semibold">{ft('forge.v2.pendingMicroCaso')}</p>
                   )}
                 </div>
               ))}

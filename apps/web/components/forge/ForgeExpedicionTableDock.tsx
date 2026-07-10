@@ -36,7 +36,7 @@ export function ForgeExpedicionTableDock({
   return (
     <div
       className={cn(
-        'flex flex-col border-[#1B5E4B]/20 bg-white/95 shadow-lg',
+        'flex flex-col border-[#145A45]/20 bg-white/95 shadow-lg',
         'md:w-[min(38vw,320px)] md:shrink-0 md:border-l md:rounded-l-xl',
         'max-md:border-t max-md:rounded-t-xl'
       )}
@@ -44,10 +44,10 @@ export function ForgeExpedicionTableDock({
       <button
         type="button"
         onClick={() => setCollapsed((v) => !v)}
-        className="flex items-center gap-2 border-b border-[#1B5E4B]/10 px-3 py-2 md:hidden"
+        className="flex items-center gap-2 border-b border-[#145A45]/10 px-3 py-2 md:hidden"
       >
-        <Map className="h-4 w-4 text-[#1B5E4B]" />
-        <span className="text-xs font-bold text-[#1B5E4B]">{ft('forge.v2.tableDockTitle')}</span>
+        <Map className="h-4 w-4 text-[#145A45]" />
+        <span className="text-xs font-bold text-[#145A45]">{ft('forge.v2.tableDockTitle')}</span>
         {balance != null && (
           <span className="ml-auto text-[10px] font-bold text-emerald-700">
             {ft('forge.v2.eco', { n: balance })}
@@ -64,8 +64,8 @@ export function ForgeExpedicionTableDock({
           'md:flex-1 md:max-h-none'
         )}
       >
-        <div className="hidden md:flex items-center gap-2 border-b border-[#1B5E4B]/10 px-3 py-2">
-          <span className="text-[10px] font-bold uppercase tracking-wide text-[#1B5E4B]">
+        <div className="hidden md:flex items-center gap-2 border-b border-[#145A45]/10 px-3 py-2">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-[#145A45]">
             {ft('forge.v2.tableDockTitle')}
           </span>
           {balance != null && (
@@ -75,13 +75,13 @@ export function ForgeExpedicionTableDock({
             </span>
           )}
         </div>
-        <div className="flex border-b border-[#1B5E4B]/10">
+        <div className="flex border-b border-[#145A45]/10">
           <button
             type="button"
             onClick={() => setTab('eco')}
             className={cn(
               'flex-1 flex items-center justify-center gap-1 py-2 text-[10px] font-bold',
-              tab === 'eco' ? 'bg-[#1B5E4B]/10 text-[#1B5E4B]' : 'text-slate-500'
+              tab === 'eco' ? 'bg-[#145A45]/10 text-[#145A45]' : 'text-slate-500'
             )}
           >
             <Wallet className="h-3 w-3" />
@@ -92,7 +92,7 @@ export function ForgeExpedicionTableDock({
             onClick={() => setTab('map')}
             className={cn(
               'flex-1 flex items-center justify-center gap-1 py-2 text-[10px] font-bold',
-              tab === 'map' ? 'bg-[#1B5E4B]/10 text-[#1B5E4B]' : 'text-slate-500'
+              tab === 'map' ? 'bg-[#145A45]/10 text-[#145A45]' : 'text-slate-500'
             )}
           >
             <Map className="h-3 w-3" />

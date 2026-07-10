@@ -20,6 +20,13 @@ import {
 import { ForgeInviteLearners } from '@/components/forge/ForgeInviteLearners';
 import { ForgeFeriaSessionPanel } from '@/components/forge/ForgeFeriaSessionPanel';
 import { useForgeT } from '@/lib/forge/use-forge-t';
+import { cn } from '@/lib/utils';
+import {
+  EXPEDICION_BTN_PRIMARY,
+  EXPEDICION_BTN_SECONDARY,
+  EXPEDICION_CARD,
+  EXPEDICION_SECTION,
+} from '@/lib/forge/expedicion-v2/theme';
 import { formatSessionWhen, type SerializedLiveSession } from '@/lib/forge/live-sessions';
 
 type EditionStatus = 'preparation' | 'running' | 'finished' | 'archived';
@@ -59,14 +66,20 @@ type StatusFilter = (typeof STATUS_FILTERS)[number];
 function statusBadgeClass(status: EditionStatus): string {
   switch (status) {
     case 'running':
-      return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      return 'bg-[#EDF8EB] text-[#145A45] border-[#5FAE4A]/40';
     case 'finished':
       return 'bg-slate-100 text-slate-600 border-slate-200';
     case 'archived':
       return 'bg-slate-50 text-slate-400 border-slate-100';
     default:
-      return 'bg-amber-100 text-amber-900 border-amber-200';
+      return 'bg-[#FFF8E1] text-[#8B6914] border-[#C9A227]/40';
   }
+}
+
+function filterActiveClass(active: boolean): string {
+  return active
+    ? 'bg-[#145A45] text-white border-[#145A45]'
+    : 'bg-white text-[#145A45]/80 border-[#145A45]/20 hover:border-[#145A45]/40';
 }
 
 function formatDateRange(startsAt: string | null, endsAt: string | null): string {
@@ -140,16 +153,12 @@ export function ForgeTutorLobby({ courseId, embedded = false }: { courseId: stri
     <div className="space-y-6 max-w-5xl">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className={embedded ? 'text-lg font-black text-slate-900' : 'text-2xl font-black text-slate-900'}>
+          <h2 className={embedded ? 'text-lg font-black text-[#145A45]' : 'text-2xl font-black text-[#145A45]'}>
             {embedded ? ft('forge.editions.sectionTitle') : ft('forge.editions.title')}
           </h2>
-          {!embedded && <p className="text-sm text-slate-600 mt-1">{ft('forge.editions.subtitle')}</p>}
+          {!embedded && <p className="text-sm text-[#1A3D5C]/70 mt-1">{ft('forge.editions.subtitle')}</p>}
         </div>
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-violet-800"
-        >
+        <button type="button" onClick={() => setModalOpen(true)} className={EXPEDICION_BTN_PRIMARY}>
           <Plus className="h-4 w-4" />
           {ft('forge.editions.create')}
         </button>
@@ -195,11 +204,7 @@ export function ForgeTutorLobby({ courseId, embedded = false }: { courseId: stri
             key={f}
             type="button"
             onClick={() => setFilter(f)}
-            className={`rounded-full px-3 py-1 text-xs font-bold border transition ${
-              filter === f
-                ? 'bg-violet-700 text-white border-violet-700'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'
-            }`}
+            className={`rounded-full px-3 py-1 text-xs font-bold border transition ${filterActiveClass(filter === f)}`}
           >
             {ft(`forge.editions.filter.${f}`)}
           </button>
@@ -214,7 +219,7 @@ export function ForgeTutorLobby({ courseId, embedded = false }: { courseId: stri
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2 text-sm font-bold text-white"
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#145A45] px-4 py-2 text-sm font-bold text-white"
           >
             <Plus className="h-4 w-4" />
             {ft('forge.editions.create')}
@@ -223,10 +228,7 @@ export function ForgeTutorLobby({ courseId, embedded = false }: { courseId: stri
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {filtered.map((ed) => (
-            <div
-              key={ed.id}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-            >
+            <div key={ed.id} className={cn(EXPEDICION_CARD, 'p-5 hover:shadow-md transition-shadow')}>
               <div className="flex items-start justify-between gap-2">
                 <h2 className="font-bold text-slate-900">{ed.name}</h2>
                 <span
@@ -258,14 +260,14 @@ export function ForgeTutorLobby({ courseId, embedded = false }: { courseId: stri
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link
                   href={`/hub/forge/cursos/${courseId}/sala?editionId=${ed.id}`}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-violet-700 px-4 py-2 text-xs font-bold text-white hover:bg-violet-800"
+                  className={cn(EXPEDICION_BTN_PRIMARY, 'px-4 py-2 text-xs')}
                 >
                   <Gamepad2 className="h-3.5 w-3.5" />
                   {ft('forge.edition.enterRoom')}
                 </Link>
                 <Link
                   href={`/hub/forge/cursos/${courseId}/turmas/${ed.id}`}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  className={cn(EXPEDICION_BTN_SECONDARY, 'px-4 py-2 text-xs font-semibold')}
                 >
                   {ft('forge.editions.cardManage')}
                 </Link>
@@ -329,7 +331,7 @@ export function ForgeTutorLobby({ courseId, embedded = false }: { courseId: stri
                 <button
                   type="submit"
                   disabled={busy}
-                  className="flex-1 rounded-lg bg-violet-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                  className={cn(EXPEDICION_BTN_PRIMARY, 'flex-1 disabled:opacity-50')}
                 >
                   {ft('forge.editions.create')}
                 </button>
@@ -427,8 +429,8 @@ export function ForgeEditionDetail({
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="rounded-2xl border bg-white p-5 space-y-4">
+    <div className="space-y-6 max-w-4xl">
+      <div className={cn(EXPEDICION_CARD, 'p-5 md:p-6 space-y-4')}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <span
@@ -454,7 +456,7 @@ export function ForgeEditionDetail({
         <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
           <Link
             href={`/hub/forge/cursos/${courseId}/sala?editionId=${editionId}`}
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-violet-800"
+            className={cn(EXPEDICION_BTN_PRIMARY, 'px-5 py-2.5')}
           >
             <Gamepad2 className="h-4 w-4" />
             {ft('forge.edition.enterRoom')}
@@ -463,29 +465,29 @@ export function ForgeEditionDetail({
             href="/expedicion/entrar"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-100"
+            className={cn(EXPEDICION_BTN_SECONDARY, 'px-4 py-2.5')}
           >
             {ft('forge.edition.previewEntryPage')}
           </a>
         </div>
       </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h2 className="font-bold text-slate-900 text-sm">{ft('forge.edition.settingsTitle')}</h2>
-        <p className="mt-1 text-xs text-slate-500">{ft('forge.edition.settingsHint')}</p>
+      <section className={cn(EXPEDICION_SECTION)}>
+        <h2 className="font-bold text-[#145A45] text-sm">{ft('forge.edition.settingsTitle')}</h2>
+        <p className="mt-1 text-xs text-[#1A3D5C]/70">{ft('forge.edition.settingsHint')}</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <Link
             href={`/hub/forge/cursos/${courseId}?edit=settings&from=edition&editionId=${editionId}`}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-800 hover:border-violet-300 hover:bg-violet-50/50"
+            className={cn(EXPEDICION_BTN_SECONDARY, 'justify-start px-3 py-2.5 text-sm')}
           >
-            <Settings className="h-4 w-4 text-violet-600 shrink-0" />
+            <Settings className="h-4 w-4 text-[#2E5C9A] shrink-0" />
             {ft('forge.edition.settingsDelivery')}
           </Link>
           <Link
             href={`/hub/forge/cursos/${courseId}/analytics?from=edition&editionId=${editionId}`}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-800 hover:border-amber-300 hover:bg-amber-50/50"
+            className={cn(EXPEDICION_BTN_SECONDARY, 'justify-start px-3 py-2.5 text-sm')}
           >
-            <BarChart3 className="h-4 w-4 text-amber-600 shrink-0" />
+            <BarChart3 className="h-4 w-4 text-[#C9A227] shrink-0" />
             {ft('forge.edition.settingsAnalytics')}
           </Link>
         </div>
@@ -493,12 +495,12 @@ export function ForgeEditionDetail({
 
       <ForgeFeriaSessionPanel courseId={courseId} editionId={editionId} alwaysExpanded />
 
-      <section className="rounded-2xl border-2 border-blue-300 bg-blue-50/80 p-4 space-y-3">
-        <h2 className="font-bold flex items-center gap-2 text-blue-900">
-          <Building2 className="h-5 w-5" />
+      <section className={cn(EXPEDICION_SECTION, 'space-y-3')}>
+        <h2 className="font-bold flex items-center gap-2 text-[#145A45]">
+          <Building2 className="h-5 w-5 text-[#2E5C9A]" />
           {ft('forge.tutorLobby.groups')}
         </h2>
-        <p className="text-xs text-blue-800">{ft('forge.tutorLobby.groupsManualHint')}</p>
+        <p className="text-xs text-[#1A3D5C]/80">{ft('forge.tutorLobby.groupsManualHint')}</p>
         <div className="flex flex-wrap gap-2">
           <input
             value={newName}
@@ -522,20 +524,20 @@ export function ForgeEditionDetail({
             type="button"
             disabled={busy}
             onClick={() => void createGroup()}
-            className="inline-flex items-center gap-1 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+            className={cn(EXPEDICION_BTN_PRIMARY, 'disabled:opacity-50')}
           >
             <Plus className="h-4 w-4" />
             {ft('forge.tutorLobby.createCompany')}
           </button>
         </div>
         {lastInvite && (
-          <div className="rounded-lg bg-white border border-blue-200 p-3 text-xs">
-            <p className="font-bold text-blue-900">{ft('forge.tutorLobby.inviteLink')}</p>
-            <p className="mt-1 break-all font-mono text-blue-800">{lastInvite}</p>
+          <div className="rounded-lg bg-white border border-[#145A45]/15 p-3 text-xs">
+            <p className="font-bold text-[#145A45]">{ft('forge.tutorLobby.inviteLink')}</p>
+            <p className="mt-1 break-all font-mono text-[#1A3D5C]">{lastInvite}</p>
             <button
               type="button"
               onClick={() => copyText(lastInvite)}
-              className="mt-2 inline-flex items-center gap-1 rounded-lg bg-blue-700 px-3 py-1.5 font-bold text-white"
+              className={cn(EXPEDICION_BTN_PRIMARY, 'mt-2 px-3 py-1.5 text-xs')}
             >
               <Copy className="h-3.5 w-3.5" />
               {ft('forge.tutorLobby.copyLink')}
@@ -544,7 +546,7 @@ export function ForgeEditionDetail({
         )}
         <ul className="space-y-2">
           {groups.map((g) => (
-            <li key={g.id} className="rounded-xl border border-blue-200 bg-white p-3 space-y-2">
+            <li key={g.id} className="rounded-xl border border-[#145A45]/12 bg-white p-3 space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="font-semibold">{g.name}</p>
@@ -555,7 +557,7 @@ export function ForgeEditionDetail({
                 </div>
                 <Link
                   href={`/hub/forge/cursos/${courseId}/sala?group=${g.id}${g.liveSessionId ? `&session=${g.liveSessionId}` : ''}`}
-                  className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white"
+                  className={cn(EXPEDICION_BTN_PRIMARY, 'px-3 py-2 text-xs')}
                 >
                   {ft('forge.room.enter')}
                 </Link>
@@ -580,36 +582,36 @@ export function ForgeEditionDetail({
         </ul>
       </section>
 
-      <section id="alunos" className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
-        <h2 className="font-bold flex items-center gap-2 text-emerald-900">
-          <UserPlus className="h-5 w-5" />
+      <section id="alunos" className={cn(EXPEDICION_SECTION, 'space-y-3')}>
+        <h2 className="font-bold flex items-center gap-2 text-[#145A45]">
+          <UserPlus className="h-5 w-5 text-[#5FAE4A]" />
           {ft('forge.tutorLobby.enrollTitle')}
         </h2>
-        <p className="text-xs text-emerald-800">{ft('forge.tutorLobby.enrollHint')}</p>
+        <p className="text-xs text-[#1A3D5C]/80">{ft('forge.tutorLobby.enrollHint')}</p>
         <button
           type="button"
           onClick={() => setShowEnroll((v) => !v)}
-          className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white"
+          className={cn(EXPEDICION_BTN_PRIMARY)}
         >
           {showEnroll ? ft('forge.tutorLobby.hideEnroll') : ft('forge.tutorLobby.showEnroll')}
         </button>
         {showEnroll && <ForgeInviteLearners courseId={courseId} />}
         <Link
           href={`/hub/forge/cursos/${courseId}/alumnos`}
-          className="inline-flex items-center gap-1 text-xs font-bold text-violet-700"
+          className="inline-flex items-center gap-1 text-xs font-bold text-[#2E5C9A] hover:underline"
         >
           <Users className="h-3.5 w-3.5" />
           {ft('forge.tutorLobby.seeLearners')}
         </Link>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
+      <section className={cn(EXPEDICION_CARD, 'overflow-hidden')}>
         <button
           type="button"
           onClick={() => setShowCalendar((v) => !v)}
-          className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-bold text-slate-700"
+          className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-bold text-[#145A45]"
         >
-          <Calendar className="h-4 w-4 text-violet-600" />
+          <Calendar className="h-4 w-4 text-[#2E5C9A]" />
           {ft('forge.editions.courseCalendar')}
           <span className="ml-auto text-xs font-normal text-slate-400">
             {ft('forge.editions.sessionsCount', { n: sessions.length })}

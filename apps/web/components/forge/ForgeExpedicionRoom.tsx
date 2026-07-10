@@ -1,10 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { X, Users, HelpCircle, ShieldAlert, Presentation } from 'lucide-react';
+import { Users, HelpCircle, X } from 'lucide-react';
 import { ForgeGameBoard, type ForgeGameSyncMode } from '@/components/forge/ForgeGameBoard';
 import { ForgePersonalMapStrip } from '@/components/forge/ForgePersonalMapStrip';
 import { ForgeActivityPlayer } from '@/components/forge/ForgeActivityPlayer';
@@ -23,7 +22,7 @@ import { useForgeT } from '@/lib/forge/use-forge-t';
 import { cn } from '@/lib/utils';
 import { ForgeFloatingJitsi } from '@/components/forge/ForgeFloatingJitsi';
 import { ForgeGameCoach } from '@/components/forge/ForgeGameCoach';
-import { ForgeGameManualButton, ForgeGameManualModal } from '@/components/forge/ForgeGameManual';
+import { ForgeGameManualModal } from '@/components/forge/ForgeGameManual';
 import { parseMulti, currentPlayer, type BoardGuide } from '@/lib/forge/expedicion-board-multi';
 import { readPresentationSlideIndex } from '@/lib/forge/room-presentation';
 import {
@@ -54,9 +53,9 @@ import {
 import { applyLedgerDrafts, impactPointsFromBoardEvents, ledgerDraftsFromBoardEvents } from '@/lib/forge/expedicion-v2/board-ledger-sync';
 import { ForgeEventCardPanel } from '@/components/forge/ForgeEventCardPanel';
 import { ForgeExpedicionCycleBar } from '@/components/forge/ForgeExpedicionCycleBar';
-import { ForgeFacilitatorV2Panel } from '@/components/forge/ForgeFacilitatorV2Panel';
-import { ForgeFeriaSessionPanel } from '@/components/forge/ForgeFeriaSessionPanel';
-import { ForgeFacilitatorV2Controls } from '@/components/forge/ForgeFacilitatorV2Controls';
+import { ForgeExpedicionRoomHeader } from '@/components/forge/ForgeExpedicionRoomHeader';
+import { ForgeExpedicionSessionStrip } from '@/components/forge/ForgeExpedicionSessionStrip';
+import { ForgeExpedicionFacConsole } from '@/components/forge/ForgeExpedicionFacConsole';
 import { ForgeFeriaPanel } from '@/components/forge/ForgeFeriaPanel';
 import { feriaEligible, feriaEligibilityHint } from '@/lib/forge/expedicion-v2/feria';
 import type { TeamPeer } from '@/components/forge/ForgeConsultancyModal';
@@ -113,6 +112,7 @@ export function ForgeExpedicionRoom({
   const searchParams = useSearchParams();
   const liveSessionId = searchParams.get('session')?.trim() || null;
   const playGroupId = searchParams.get('group')?.trim() || null;
+  const editionId = searchParams.get('editionId')?.trim() || null;
   const isFac = role === 'facilitator';
   const myUserId = session?.user?.id;
   const [facEmergency, setFacEmergency] = useState(false);
@@ -153,6 +153,7 @@ export function ForgeExpedicionRoom({
   const [landEvent, setLandEvent] = useState<BoardLandEvent | null>(null);
   const [cycleBusy, setCycleBusy] = useState(false);
   const [teamPeers, setTeamPeers] = useState<TeamPeer[]>([]);
+  const [presencialHintDismissed, setPresencialHintDismissed] = useState(false);
   const lastBoardPosRef = useRef<number | null>(null);
   const multiBoot = parseMulti(gameState);
   const teamRoomId =
@@ -573,124 +574,29 @@ export function ForgeExpedicionRoom({
           onClose={() => setRoomView('hall')}
         />
       )}
-      <header className="flex shrink-0 items-center gap-3 border-b border-[#0D4535]/30 bg-[#145A45] px-3 py-2 text-white shadow-md">
-        <Link
-          href={`/hub/forge/cursos/${courseId}`}
-          className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 hover:bg-white/20"
-          title={ft('forge.room.exit')}
-        >
-          <X className="h-5 w-5" />
-        </Link>
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[#C9A227]">
-            {ft('forge.room.brand')}
-            {sessionFormat === 'presencial' && (
-              <span className="ml-2 rounded bg-white/20 px-1.5 py-0.5 text-[9px]">{ft('forge.v2.presential')}</span>
-            )}
-          </p>
-          <h1 className="truncate text-sm font-black md:text-base">{courseTitle}</h1>
-          {v2 && v2.phase === 'playing' && (
-            <p className="text-[10px] text-white/80">
-              {ft('forge.v2.cycle', { current: v2.cyclesCompleted + 1, max: v2.maxCycles })}
-              {v2.ledger && ` · ${ft('forge.v2.eco', { n: v2.ledger.balance })}`}
-              {teamMode && ` · ${ft('forge.v2.sharedTable')}`}
-            </p>
-          )}
-        </div>
-        <ForgeGameManualButton onOpen={() => setManualOpen(true)} />
-        <button
-          type="button"
-          onClick={() => setRoomView('hall')}
-          className={cn(
-            'rounded-lg border px-2 py-1 text-[10px] font-bold',
-            showHall ? 'border-[#C9A227] bg-[#C9A227]/25 text-white' : 'border-white/30 hover:bg-white/10'
-          )}
-        >
-          {ft('forge.v2.lobbyNav')}
-        </button>
-        {showTable && (
-          <button
-            type="button"
-            onClick={() => setRoomView('table')}
-            className="rounded-lg border border-emerald-400/50 bg-emerald-900/40 px-2 py-1 text-[10px] font-bold text-emerald-100"
-          >
-            {ft('forge.v2.lobbyResumeTable')}
-          </button>
-        )}
-        {isFac && (
-          <button
-            type="button"
-            onClick={() => {
-              loadPresentationRows();
-              setRoomView('presentation');
-            }}
-            className={cn(
-              'rounded-lg border px-2 py-1 text-[10px] font-bold flex items-center gap-1',
-              roomView === 'presentation'
-                ? 'border-violet-400 bg-violet-900 text-violet-100'
-                : 'border-white/30 hover:bg-white/10'
-            )}
-          >
-            <Presentation className="h-3 w-3" />
-            {ft('forge.v2.presentationMode')}
-          </button>
-        )}
-        <Link
-          href={`/hub/forge/cursos/${courseId}/turmas`}
-          className="rounded-lg border border-slate-700 px-2 py-1 text-[10px] font-bold hover:bg-slate-800"
-        >
-          {ft('forge.tutorLobby.short')}
-        </Link>
-        {!isFac && stationSlug && v2 && v2.phase === 'playing' && (
-          <button
-            type="button"
-            onClick={() => setInvestStation(stationSlug)}
-            className="rounded-lg border border-emerald-400 bg-emerald-900/40 px-2 py-1 text-[10px] font-bold text-emerald-200"
-          >
-            {ft('forge.room.investments')}
-          </button>
-        )}
-        {isFac && (
-          <>
-            <button
-              type="button"
-              onClick={() => setFacEmergency((v) => !v)}
-              className={cn(
-                'rounded-lg border px-2 py-1 text-[10px] font-bold flex items-center gap-1',
-                facEmergency
-                  ? 'border-amber-400 bg-amber-900 text-amber-100'
-                  : 'border-slate-700 hover:bg-slate-800'
-              )}
-            >
-              <ShieldAlert className="h-3 w-3" />
-              {ft('forge.room.emergency')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setInviteOpen(true)}
-              className="rounded-lg border border-slate-700 px-2 py-1 text-[10px] font-bold hover:bg-slate-800"
-            >
-              {ft('forge.room.invites')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowDeck((v) => !v)}
-              className="rounded-lg border border-slate-700 px-2 py-1 text-[10px] font-bold"
-            >
-              {ft('forge.room.deck')}
-            </button>
-            {stationSlug && v2 && (
-              <button
-                type="button"
-                onClick={() => setInvestStation(stationSlug)}
-                className="rounded-lg border border-emerald-600 px-2 py-1 text-[10px] font-bold text-emerald-300"
-              >
-                {ft('forge.room.investments')}
-              </button>
-            )}
-          </>
-        )}
-      </header>
+      <ForgeExpedicionRoomHeader
+        courseId={courseId}
+        courseTitle={courseTitle}
+        roomView={roomView}
+        onRoomViewChange={setRoomView}
+        onOpenPresentation={() => {
+          loadPresentationRows();
+          setRoomView('presentation');
+        }}
+        onOpenManual={() => setManualOpen(true)}
+        isFac={isFac}
+        sessionFormat={sessionFormat}
+        v2Phase={v2?.phase}
+        v2Balance={v2?.ledger.balance}
+        teamMode={teamMode}
+        facEmergency={facEmergency}
+        onToggleEmergency={() => setFacEmergency((v) => !v)}
+        onToggleInvite={() => setInviteOpen(true)}
+        onToggleDeck={() => setShowDeck((v) => !v)}
+        showInvest={Boolean(stationSlug && v2)}
+        stationSlug={stationSlug}
+        onOpenInvest={stationSlug ? () => setInvestStation(stationSlug) : undefined}
+      />
 
       {videoEnabled && <ForgeFloatingJitsi embedSrc={jitsiSrc} fallbackUrl={jitsiUrl} />}
       <ForgeGameCoach guide={coachGuide} knowledge={null} />
@@ -699,12 +605,25 @@ export function ForgeExpedicionRoom({
       <div className="flex flex-1 min-h-0 overflow-hidden flex-col">
         {roomView !== 'presentation' && (
         <main className="flex flex-1 flex-col min-w-0 min-h-0 p-2 md:p-3 gap-2">
-          {sessionFormat === 'presencial' && (
-            <p className="shrink-0 rounded-lg border border-[#145A45]/25 bg-white/95 px-3 py-2 text-xs font-medium text-[#145A45] shadow-sm">
-              {teamMode
-                ? ft('forge.v2.presentialTeamHint')
-                : ft('forge.v2.presentialSoloHint')}
-            </p>
+          <ForgeExpedicionSessionStrip
+            v2={v2}
+            teamMode={teamMode}
+            sessionFormat={sessionFormat}
+          />
+          {sessionFormat === 'presencial' && !presencialHintDismissed && (
+            <div className="shrink-0 flex items-start gap-2 rounded-lg border border-[#145A45]/20 bg-white/95 px-3 py-2 text-xs text-[#145A45] shadow-sm">
+              <p className="flex-1 font-medium">
+                {teamMode ? ft('forge.v2.presentialTeamHint') : ft('forge.v2.presentialSoloHint')}
+              </p>
+              <button
+                type="button"
+                onClick={() => setPresencialHintDismissed(true)}
+                className="shrink-0 text-[#145A45]/50 hover:text-[#145A45] font-bold"
+                aria-label={ft('forge.general.close')}
+              >
+                ✕
+              </button>
+            </div>
           )}
           {isFac && showTable && (
             <ForgeFacilitatorLensBar courseId={courseId} lens={facLens} onLensChange={setFacLens} />
@@ -715,27 +634,25 @@ export function ForgeExpedicionRoom({
             </p>
           )}
           {isFac && showHall && (
-            <>
-              <ForgeFacilitatorLensBar courseId={courseId} lens={facLens} onLensChange={setFacLens} />
-              <ForgeFacilitatorV2Controls
-                courseId={courseId}
-                roomId={teamRoomId}
-                busy={cycleBusy}
-                onAction={async (action) => {
-                  setCycleBusy(true);
-                  try {
-                    await patchV2({ action });
-                    await reloadV2();
-                  } finally {
-                    setCycleBusy(false);
-                  }
-                }}
-              />
-              <ForgeFacilitatorV2Panel courseId={courseId} />
-              <ForgeFeriaSessionPanel courseId={courseId} />
-            </>
+            <ForgeExpedicionFacConsole
+              courseId={courseId}
+              editionId={editionId ?? undefined}
+              lens={facLens}
+              onLensChange={setFacLens}
+              teamRoomId={teamRoomId}
+              cycleBusy={cycleBusy}
+              onAction={async (action) => {
+                setCycleBusy(true);
+                try {
+                  await patchV2({ action });
+                  await reloadV2();
+                } finally {
+                  setCycleBusy(false);
+                }
+              }}
+            />
           )}
-          {v2 && (
+          {v2 && showTable && (
             <ForgeExpedicionCycleBar
               v2={v2}
               isFacilitator={isFac}
@@ -899,6 +816,8 @@ export function ForgeExpedicionRoom({
 
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             {showHall ? (
+              <div className="flex flex-1 items-start justify-center overflow-y-auto py-2 md:py-4">
+                <div className="w-full max-w-lg">
               <ForgeExpedicionLobby
                 phase={effectivePhase}
                 isFacilitator={isFac}
@@ -946,6 +865,8 @@ export function ForgeExpedicionRoom({
                     : undefined
                 }
               />
+                </div>
+              </div>
             ) : (
               <div className="flex flex-1 min-h-0 flex-col md:flex-row gap-0">
                 <div className="flex flex-1 flex-col min-h-0 min-w-0 gap-2 overflow-y-auto">
@@ -968,19 +889,19 @@ export function ForgeExpedicionRoom({
                         />
                       </div>
                     ) : (
-                      <p className="text-center text-sm text-amber-200 py-12">
+                      <p className="text-center text-sm text-[#145A45]/70 py-12">
                         {boardBusy ? ft('forge.general.loading') : ft('forge.room.waitingBoard')}
                       </p>
                     )
                   ) : dockReadOnly ? (
-                    <p className="text-center text-sm text-violet-200 py-8 px-4">
+                    <p className="text-center text-sm text-[#2E5C9A] py-8 px-4">
                       {ft('forge.v2.lensBoardHint')}
                     </p>
                   ) : (
                     myMap && <ForgePersonalMapStrip mapState={myMap} />
                   )}
                   {boardBlocked && effectivePhase !== 'finished' && (
-                    <p className="text-center text-sm text-amber-200 font-semibold py-2">
+                    <p className="text-center text-sm text-[#C9A227] font-semibold py-2">
                       {ft('forge.v2.lobbyBoardBlocked')}
                     </p>
                   )}

@@ -25,8 +25,8 @@ export function ForgeEcoLedger({
   const peerEntries = Object.entries(peerCredits ?? {}).filter(([, v]) => v > 0);
 
   return (
-    <div className="rounded-2xl border-2 border-[#1B5E4B]/25 bg-white shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between gap-2 bg-[#1B5E4B] px-4 py-2.5 text-white">
+    <div className="rounded-2xl border-2 border-[#145A45]/20 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between gap-2 bg-[#145A45] px-4 py-2.5 text-white">
         <div className="flex items-center gap-2">
           <Coins className="h-4 w-4" />
           <span className="text-sm font-bold">Registro Financiero</span>
@@ -91,7 +91,7 @@ export function ForgeEcoLedger({
             type="button"
             disabled={loanDisabled}
             onClick={onRequestLoan}
-            className="w-full rounded-lg bg-[#5B3E8C] px-3 py-2 text-xs font-bold text-white hover:bg-[#4a3275] disabled:opacity-50"
+            className="w-full rounded-lg bg-[#2E5C9A] px-3 py-2 text-xs font-bold text-white hover:bg-[#254D85] disabled:opacity-50"
           >
             Pedir Préstamo al Banco (+300 Eco)
           </button>

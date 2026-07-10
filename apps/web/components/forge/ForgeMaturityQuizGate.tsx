@@ -42,8 +42,8 @@ export function ForgeMaturityQuizGate({
   const allAnswered = preview || questions.every((q) => answers[q.id]?.trim());
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#1B5E4B]/90 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl bg-[#F7F3EB] p-6 shadow-2xl relative">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#145A45]/92 p-4 backdrop-blur-sm">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-[#145A45]/20 bg-[#F5F2EA] p-6 shadow-2xl relative">
         {onClose && (
           <button
             type="button"
@@ -55,11 +55,11 @@ export function ForgeMaturityQuizGate({
           </button>
         )}
         {preview && (
-          <p className="mb-2 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-800">
+          <p className="mb-3 rounded-lg border border-[#6EC4E8]/60 bg-[#EBF7FC] px-3 py-2 text-xs font-semibold text-[#1A3D5C]">
             {ft('forge.v2.quizPreviewBanner')}
           </p>
         )}
-        <h2 className="text-xl font-black text-[#1B5E4B]">
+        <h2 className="text-xl font-black text-[#145A45]">
           {ft('forge.v2.maturityQuiz', {
             side: side === 'pre' ? ft('forge.v2.maturityFront') : ft('forge.v2.maturityBack'),
           })}
@@ -117,7 +117,7 @@ export function ForgeMaturityQuizGate({
           type="button"
           disabled={!allAnswered}
           onClick={submit}
-          className="mt-6 w-full rounded-xl bg-[#1B5E4B] py-3 text-sm font-bold text-white disabled:opacity-40"
+          className="mt-6 w-full rounded-xl bg-[#145A45] py-3 text-sm font-bold text-white hover:bg-[#0D4535] disabled:opacity-40"
         >
           {preview
             ? ft('forge.general.close')

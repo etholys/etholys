@@ -4,6 +4,7 @@ import { MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BOARD_STATION_META, spaceTooltip, stationForSpace } from '@/lib/forge/board-spaces';
 import { boardCellGridPosition, BOARD_TRACK_GRID } from '@/lib/forge/board-track-layout';
+import { boardCellTextClass } from '@/lib/forge/expedicion-v2/theme';
 import { ForgeInfoTip } from '@/components/forge/ForgeInfoTip';
 import type { BoardPlayer } from '@/lib/forge/expedicion-board-multi';
 
@@ -17,7 +18,6 @@ export function ForgeBoardTrack({
   spaces?: number;
   position?: number;
   players?: BoardPlayer[];
-  /** Tablero grande en circuito (centro de la sala). */
   immersive?: boolean;
   compact?: boolean;
   className?: string;
@@ -40,13 +40,13 @@ export function ForgeBoardTrack({
       className={cn(
         'relative w-full',
         immersive
-          ? 'rounded-3xl border-2 border-emerald-600/40 bg-gradient-to-br from-emerald-950 via-teal-950 to-slate-950 p-4 md:p-6 shadow-2xl shadow-emerald-900/30'
-          : 'rounded-2xl border-2 border-emerald-800/30 bg-gradient-to-br from-emerald-950 via-teal-950 to-slate-900 p-3 shadow-inner',
+          ? 'rounded-3xl border-2 border-[#145A45]/25 bg-gradient-to-br from-[#FAFAF7] via-[#F5F2EA] to-[#E8E4D8] p-4 md:p-6 shadow-lg shadow-[#145A45]/10'
+          : 'rounded-2xl border-2 border-[#145A45]/20 bg-[#FAFAF7] p-3 shadow-sm',
         className
       )}
     >
       {!immersive && (
-        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-300/90 mb-2 flex items-center gap-1">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[#145A45]/80 mb-2 flex items-center gap-1">
           <MapPin className="h-3 w-3" />
           Tablero colectivo · La Expedición
           <ForgeInfoTip text="Circuito de 20 casillas. En tu turno lanzas el dado y avanzas." />
@@ -60,14 +60,12 @@ export function ForgeBoardTrack({
         )}
       >
         <div
-          className="absolute inset-[12%] rounded-2xl border-2 border-dashed border-emerald-500/25 bg-emerald-950/40 flex items-center justify-center pointer-events-none"
+          className="absolute inset-[12%] rounded-2xl border-2 border-dashed border-[#145A45]/20 bg-white/80 flex items-center justify-center pointer-events-none shadow-inner"
           aria-hidden
         >
           <div className="text-center px-4">
-            <p className="text-lg md:text-2xl font-black text-emerald-300/90 tracking-wide">
-              LA EXPEDICIÓN
-            </p>
-            <p className="text-[10px] md:text-xs text-emerald-500/80 mt-1 uppercase tracking-widest">
+            <p className="text-lg md:text-2xl font-black text-[#145A45] tracking-wide">LA EXPEDICIÓN</p>
+            <p className="text-[10px] md:text-xs text-[#1A3D5C]/70 mt-1 uppercase tracking-widest">
               Sostenible · Triple impacto
             </p>
           </div>
@@ -87,19 +85,21 @@ export function ForgeBoardTrack({
             const active = players.length === 0 ? i === position : cellPawns.length > 0;
             const isStart = i === 0;
             const isGoal = i === spaces - 1;
+            const textClass = boardCellTextClass(st.name);
 
             return (
               <div
                 key={i}
                 style={{ gridColumn: col + 1, gridRow: row + 1 }}
                 className={cn(
-                  'relative flex flex-col items-center justify-center rounded-lg md:rounded-xl text-white font-bold transition-all z-10',
+                  'relative flex flex-col items-center justify-center rounded-lg md:rounded-xl font-bold transition-all z-10 shadow-sm',
                   immersive
                     ? 'min-h-[2.5rem] sm:min-h-[3rem] md:min-h-[3.5rem] text-[10px] sm:text-xs md:text-sm'
                     : 'h-9 w-full text-[9px] sm:text-[10px]',
                   st.color,
-                  active && `z-20 scale-105 ring-2 ${st.ring} shadow-lg shadow-black/40`,
-                  !active && 'opacity-90'
+                  textClass,
+                  active && `z-20 scale-105 ring-2 ${st.ring} shadow-md`,
+                  !active && 'opacity-95'
                 )}
               >
                 <span className="absolute top-0.5 right-0.5 z-20 scale-75 opacity-80">
@@ -142,9 +142,10 @@ export function ForgeBoardTrack({
           <span
             key={s.name}
             className={cn(
-              'rounded-full px-2 py-0.5 font-bold text-white flex items-center gap-0.5',
+              'rounded-full px-2 py-0.5 font-bold flex items-center gap-0.5 shadow-sm',
               immersive ? 'text-[9px] md:text-[10px]' : 'text-[8px]',
-              s.color
+              s.color,
+              boardCellTextClass(s.name)
             )}
           >
             {s.name}

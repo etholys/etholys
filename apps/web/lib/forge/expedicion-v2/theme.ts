@@ -109,3 +109,26 @@ export const EXPEDICION_HALL_PANEL =
 /** Barras do facilitador sobre fundo claro */
 export const EXPEDICION_FAC_TOOLBAR =
   'rounded-xl border border-[#145A45]/20 bg-white/95 shadow-sm text-[#145A45]';
+
+/** Botões hub / turmas */
+export const EXPEDICION_BTN_PRIMARY =
+  'inline-flex items-center justify-center gap-2 rounded-xl bg-[#145A45] px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-[#0D4535] transition disabled:opacity-50';
+
+export const EXPEDICION_BTN_SECONDARY =
+  'inline-flex items-center justify-center gap-2 rounded-xl border border-[#145A45]/25 bg-white px-4 py-2.5 text-sm font-semibold text-[#145A45] hover:bg-[#F5F2EA] transition';
+
+export const EXPEDICION_BTN_GOLD =
+  'inline-flex items-center justify-center gap-2 rounded-xl bg-[#C9A227] px-4 py-2.5 text-sm font-bold text-[#0D4535] shadow-sm hover:bg-[#B8921F] transition';
+
+/** Cartões hub */
+export const EXPEDICION_CARD =
+  'rounded-2xl border border-[#145A45]/15 bg-white shadow-sm';
+
+export const EXPEDICION_SECTION =
+  'rounded-2xl border border-[#145A45]/12 bg-[#FAFAF7] p-4 md:p-5';
+
+/** Texto legível em casillas claras del tablero */
+export function boardCellTextClass(stationName: string): string {
+  if (stationName === 'Mercado' || stationName === 'Acción') return 'text-[#1A3D5C]';
+  return 'text-white';
+}
