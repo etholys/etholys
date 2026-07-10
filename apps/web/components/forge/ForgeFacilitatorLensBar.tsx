@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Eye, Users, User } from 'lucide-react';
 import { useForgeT } from '@/lib/forge/use-forge-t';
 import { cn } from '@/lib/utils';
+import { EXPEDICION_FAC_TOOLBAR } from '@/lib/forge/expedicion-v2/theme';
 
 export type FacilitatorLens =
   | { kind: 'mine' }
@@ -63,9 +64,9 @@ export function ForgeFacilitatorLensBar({
           : lens.name;
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-white/15 bg-black/25 px-2 py-1.5">
-      <Eye className="h-3.5 w-3.5 text-[#F4B942] shrink-0" />
-      <span className="text-[10px] font-bold text-white/70 shrink-0">{ft('forge.v2.lensLabel')}</span>
+    <div className={cn('flex flex-wrap items-center gap-1.5 px-2 py-1.5', EXPEDICION_FAC_TOOLBAR)}>
+      <Eye className="h-3.5 w-3.5 text-[#2E5C9A] shrink-0" />
+      <span className="text-[10px] font-bold text-[#145A45]/80 shrink-0">{ft('forge.v2.lensLabel')}</span>
       <select
         value={
           lens.kind === 'mine'
@@ -94,7 +95,7 @@ export function ForgeFacilitatorLensBar({
             });
           }
         }}
-        className="max-w-[140px] truncate rounded border border-white/20 bg-[#1B5E4B] px-2 py-1 text-[10px] font-bold text-white"
+        className="max-w-[140px] truncate rounded border border-[#145A45]/25 bg-[#F5F2EA] px-2 py-1 text-[10px] font-bold text-[#145A45]"
       >
         <option value="mine">{ft('forge.v2.lensMine')}</option>
         <option value="all">{ft('forge.v2.lensAll')}</option>
@@ -119,8 +120,8 @@ export function ForgeFacilitatorLensBar({
       </select>
       <span
         className={cn(
-          'hidden sm:inline text-[10px] font-semibold text-white/60 truncate max-w-[100px]',
-          lens.kind !== 'mine' && 'text-[#F4B942]'
+          'hidden sm:inline text-[10px] font-semibold text-[#145A45]/70 truncate max-w-[100px]',
+          lens.kind !== 'mine' && 'text-[#2E5C9A]'
         )}
       >
         {lens.kind === 'team' && <Users className="inline h-3 w-3 mr-0.5" />}

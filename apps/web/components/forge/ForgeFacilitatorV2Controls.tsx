@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { RotateCcw, Flag, Download } from 'lucide-react';
 import { useForgeT } from '@/lib/forge/use-forge-t';
+import { EXPEDICION_FAC_TOOLBAR } from '@/lib/forge/expedicion-v2/theme';
+import { cn } from '@/lib/utils';
 
 export function ForgeFacilitatorV2Controls({
   courseId,
@@ -60,12 +62,12 @@ export function ForgeFacilitatorV2Controls({
   };
 
   return (
-    <div className="flex flex-wrap gap-1.5 rounded-lg border border-white/15 bg-black/25 px-2 py-1.5">
+    <div className={cn('flex flex-wrap gap-1.5 px-2 py-1.5', EXPEDICION_FAC_TOOLBAR)}>
       <button
         type="button"
         disabled={busy}
         onClick={() => void onAction('end_cycle')}
-        className="inline-flex items-center gap-1 rounded bg-amber-900/60 px-2 py-1 text-[10px] font-bold text-amber-100 hover:bg-amber-900"
+        className="inline-flex items-center gap-1 rounded bg-[#3D8B8B] px-2 py-1 text-[10px] font-bold text-white hover:bg-[#2D7070] disabled:opacity-50"
       >
         <Flag className="h-3 w-3" /> {ft('forge.v2.closeCycle')}
       </button>
@@ -73,7 +75,7 @@ export function ForgeFacilitatorV2Controls({
         type="button"
         disabled={busy}
         onClick={() => void onAction('force_post_quiz')}
-        className="inline-flex items-center gap-1 rounded bg-violet-900/60 px-2 py-1 text-[10px] font-bold text-violet-100"
+        className="inline-flex items-center gap-1 rounded bg-[#2E5C9A] px-2 py-1 text-[10px] font-bold text-white hover:bg-[#254D85] disabled:opacity-50"
       >
         {ft('forge.v2.forcePostQuiz')}
       </button>
@@ -82,7 +84,7 @@ export function ForgeFacilitatorV2Controls({
           type="button"
           disabled={busy}
           onClick={() => setConfirmReset(true)}
-          className="inline-flex items-center gap-1 rounded bg-rose-900/50 px-2 py-1 text-[10px] font-bold text-rose-100"
+          className="inline-flex items-center gap-1 rounded border border-rose-300 bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-50"
         >
           <RotateCcw className="h-3 w-3" /> {ft('forge.v2.reset')}
         </button>
@@ -94,7 +96,7 @@ export function ForgeFacilitatorV2Controls({
             void onAction('reset_v2');
             setConfirmReset(false);
           }}
-          className="inline-flex items-center gap-1 rounded bg-rose-700 px-2 py-1 text-[10px] font-bold text-white"
+          className="inline-flex items-center gap-1 rounded bg-rose-700 px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50"
         >
           {ft('forge.v2.confirmReset')}
         </button>
@@ -102,12 +104,12 @@ export function ForgeFacilitatorV2Controls({
       <button
         type="button"
         onClick={exportScores}
-        className="inline-flex items-center gap-1 rounded bg-white/10 px-2 py-1 text-[10px] font-bold text-white ml-auto"
+        className="inline-flex items-center gap-1 rounded border border-[#145A45]/25 bg-[#F5F2EA] px-2 py-1 text-[10px] font-bold text-[#145A45] ml-auto hover:bg-[#E8E4D8]"
       >
         <Download className="h-3 w-3" /> {ft('forge.v2.exportCsv')}
       </button>
       {roomId && (
-        <span className="w-full text-[9px] text-white/50 truncate">
+        <span className="w-full text-[9px] text-[#145A45]/60 truncate">
           {ft('forge.v2.tableLabel', { id: roomId.slice(0, 12) })}
         </span>
       )}

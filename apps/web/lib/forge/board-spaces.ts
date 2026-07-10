@@ -1,12 +1,47 @@
-/** Casillas del tablero La Expedición V2 — paleta Rural Commerce */
+/** Casillas del tablero La Expedición V2 — paleta Rural Commerce (material físico) */
 export const BOARD_STATION_META = [
-  { name: 'Raíces', color: 'bg-[#1B5E4B]', ring: 'ring-[#2E7D5A]', desc: 'Propósito, triple impacto y cliente ideal (LOHAS).' },
-  { name: 'Acción', color: 'bg-[#F4B942]', ring: 'ring-[#E5A82E]', desc: 'Decisiones rápidas: lanza el dado y avanza el plan.' },
-  { name: 'Tierra', color: 'bg-[#8B5A2B]', ring: 'ring-[#A67C52]', desc: 'Recursos, suelo y cadena de valor local.' },
-  { name: 'Desafío', color: 'bg-[#C62828]', ring: 'ring-[#B71C1C]', desc: 'Obstáculo o coste: puede restar Eco-Créditos.' },
-  { name: 'Alquimia', color: 'bg-[#C45C26]', ring: 'ring-[#D97340]', desc: 'Transformar materia prima en propuesta de valor.' },
-  { name: 'Mercado', color: 'bg-[#1E6B8C]', ring: 'ring-[#2980A8]', desc: 'Precio, canal y competencia.' },
-  { name: 'Futuro', color: 'bg-[#5B3E8C]', ring: 'ring-[#7B5BA8]', desc: 'Visión, escalabilidad e impacto a largo plazo.' },
+  {
+    name: 'Raíces',
+    color: 'bg-[#145A45]',
+    ring: 'ring-[#5FAE4A]',
+    desc: 'Propósito, triple impacto y cliente ideal (LOHAS).',
+  },
+  {
+    name: 'Acción',
+    color: 'bg-[#A8D5C4]',
+    ring: 'ring-[#3D8B8B]',
+    desc: 'Decisiones rápidas: lanza el dado y avanza el plan.',
+  },
+  {
+    name: 'Tierra',
+    color: 'bg-[#1A3D5C]',
+    ring: 'ring-[#2E5C9A]',
+    desc: 'Recursos, suelo y cadena de valor local.',
+  },
+  {
+    name: 'Desafío',
+    color: 'bg-[#3D8B8B]',
+    ring: 'ring-[#2D7070]',
+    desc: 'Obstáculo o coste: puede restar Eco-Créditos.',
+  },
+  {
+    name: 'Alquimia',
+    color: 'bg-[#2E5C9A]',
+    ring: 'ring-[#1A3D5C]',
+    desc: 'Transformar materia prima en propuesta de valor.',
+  },
+  {
+    name: 'Mercado',
+    color: 'bg-[#6EC4E8]',
+    ring: 'ring-[#2E5C9A]',
+    desc: 'Precio, canal y competencia.',
+  },
+  {
+    name: 'Futuro',
+    color: 'bg-[#5FAE4A]',
+    ring: 'ring-[#145A45]',
+    desc: 'Visión, escalabilidad e impacto a largo plazo.',
+  },
 ] as const;
 
 const PATTERN = [0, 1, 2, 3, 4, 1, 5, 3, 4, 1, 2, 3, 0, 1, 4, 3, 5, 1, 6, 3];
@@ -22,12 +57,12 @@ export function spaceTooltip(i: number, spaces: number): string {
 }
 
 export const PLAYER_PAWN_COLORS = [
-  '#22c55e',
-  '#3b82f6',
-  '#f59e0b',
-  '#ec4899',
-  '#8b5cf6',
-  '#14b8a6',
-  '#ef4444',
-  '#06b6d4',
+  '#5FAE4A',
+  '#2E5C9A',
+  '#C9A227',
+  '#6EC4E8',
+  '#145A45',
+  '#3D8B8B',
+  '#1A3D5C',
+  '#A8D5C4',
 ] as const;

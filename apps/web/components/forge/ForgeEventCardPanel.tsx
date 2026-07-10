@@ -24,7 +24,7 @@ export function ForgeEventCardPanel({
 
   return (
     <div className="rounded-2xl border-2 border-slate-200 bg-white shadow-lg overflow-hidden">
-      <div className={`flex items-center gap-2 px-4 py-2 text-white ${theme.color}`}>
+      <div className={`flex items-center gap-2 px-4 py-2 ${theme.color} ${theme.text}`}>
         <Icon className="h-4 w-4" />
         <span className="text-xs font-bold uppercase">
           {isAction ? 'Carta de Acción' : 'Carta de Desafío'} — {card.tag.replace(/\s+/g, ' ').trim()}

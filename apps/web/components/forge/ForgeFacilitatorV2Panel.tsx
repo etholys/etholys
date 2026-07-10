@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Users, ChevronDown, ChevronUp } from 'lucide-react';
 import { useForgeT } from '@/lib/forge/use-forge-t';
+import { EXPEDICION_FAC_TOOLBAR } from '@/lib/forge/expedicion-v2/theme';
+import { cn } from '@/lib/utils';
 
 type TeamRow = {
   playGroupId: string;
@@ -58,25 +60,25 @@ export function ForgeFacilitatorV2Panel({ courseId }: { courseId: string }) {
   };
 
   return (
-    <div className="rounded-xl border border-white/20 bg-black/20 overflow-hidden">
+    <div className={cn('overflow-hidden', EXPEDICION_FAC_TOOLBAR)}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[10px] font-bold text-white hover:bg-white/10"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[10px] font-bold text-[#145A45] hover:bg-[#F5F2EA]"
       >
-        <Users className="h-3.5 w-3.5" />
+        <Users className="h-3.5 w-3.5 text-[#2E5C9A]" />
         {ft('forge.v2.panelTitle')}
         {open ? <ChevronUp className="ml-auto h-3 w-3" /> : <ChevronDown className="ml-auto h-3 w-3" />}
       </button>
       {open && (
-        <div className="max-h-40 overflow-auto border-t border-white/10 px-2 py-2 text-[10px]">
+        <div className="max-h-40 overflow-auto border-t border-[#145A45]/15 px-2 py-2 text-[10px]">
           {teams.length === 0 && learners.length === 0 && (
-            <p className="text-white/60 px-1">{ft('forge.v2.noData')}</p>
+            <p className="text-[#145A45]/60 px-1">{ft('forge.v2.noData')}</p>
           )}
           {teams.map((t) => (
-            <div key={t.roomId} className="mb-1.5 rounded-lg bg-white/10 px-2 py-1.5">
-              <p className="font-bold text-emerald-200">{t.name}</p>
-              <p className="text-white/80">
+            <div key={t.roomId} className="mb-1.5 rounded-lg bg-[#E8F5F0] px-2 py-1.5">
+              <p className="font-bold text-[#145A45]">{t.name}</p>
+              <p className="text-[#1A3D5C]/90">
                 {phaseLabel(t.phase)} ·{' '}
                 {ft('forge.v2.cycle', {
                   current: Math.min(t.cyclesCompleted + 1, t.maxCycles),
@@ -85,22 +87,26 @@ export function ForgeFacilitatorV2Panel({ courseId }: { courseId: string }) {
                 · {ft('forge.v2.eco', { n: t.balance })} · {ft('forge.v2.postIts', { n: t.postItCount })}
                 {(t.impactPoints ?? 0) > 0 && ` · ${ft('forge.v2.impact', { n: t.impactPoints ?? 0 })}`}
                 {t.hasPendingMicroCaso && (
-                  <span className="ml-1 text-amber-300">· {ft('forge.v2.pendingMicroCaso')}</span>
+                  <span className="ml-1 text-[#C9A227]">· {ft('forge.v2.pendingMicroCaso')}</span>
                 )}
                 {t.hasPendingFeriaPitch && (
-                  <span className="ml-1 text-[#F4B942]">· {ft('forge.v2.pendingFeriaPitch')}</span>
+                  <span className="ml-1 text-[#2E5C9A]">· {ft('forge.v2.pendingFeriaPitch')}</span>
                 )}
-                {t.feriaAwarded && <span className="ml-1 text-emerald-300">· {ft('forge.v2.feriaAwarded')}</span>}
+                {t.feriaAwarded && (
+                  <span className="ml-1 text-[#5FAE4A]">· {ft('forge.v2.feriaAwarded')}</span>
+                )}
               </p>
             </div>
           ))}
           {learners.length > 0 && teams.length > 0 && (
-            <p className="mt-2 px-1 font-bold uppercase tracking-wide text-white/50">{ft('forge.v2.individuals')}</p>
+            <p className="mt-2 px-1 font-bold uppercase tracking-wide text-[#145A45]/50">
+              {ft('forge.v2.individuals')}
+            </p>
           )}
           {learners.slice(0, 8).map((l) => (
-            <div key={l.userId} className="mb-1 rounded bg-white/5 px-2 py-1">
-              <span className="font-semibold text-white">{l.name ?? l.userId.slice(0, 8)}</span>
-              <span className="text-white/70">
+            <div key={l.userId} className="mb-1 rounded bg-[#F5F2EA] px-2 py-1">
+              <span className="font-semibold text-[#145A45]">{l.name ?? l.userId.slice(0, 8)}</span>
+              <span className="text-[#1A3D5C]/85">
                 {' '}
                 — {phaseLabel(l.phase)} · {ft('forge.v2.eco', { n: l.balance })}
                 {(l.impactPoints ?? 0) > 0 && ` · ${ft('forge.v2.impact', { n: l.impactPoints ?? 0 })}`}

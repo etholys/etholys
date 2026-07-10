@@ -17,7 +17,7 @@ Set-Location $Root
 
 $configPath = Join-Path $PSScriptRoot 'deploy-forge.config.ps1'
 $cfg = @{
-  SshHost    = '178.105.80.131'
+  SshHost    = '84.247.187.155'
   SshUser    = 'root'
   RemoteRepo = '/opt/etholys'
   SshKeyPath = ''

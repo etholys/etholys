@@ -26,8 +26,8 @@ export function ForgeExpedicionCycleBar({
       : v2.cyclesCompleted + 1;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#1B5E4B]/20 bg-white/90 px-3 py-2 text-xs shadow-sm">
-      <span className="font-bold text-[#1B5E4B]">{ft('forge.v2.cyclesTitle')}</span>
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#145A45]/20 bg-white/95 px-3 py-2 text-xs shadow-sm">
+      <span className="font-bold text-[#145A45]">{ft('forge.v2.cyclesTitle')}</span>
       <div className="flex items-center gap-1">
         {Array.from({ length: v2.maxCycles }, (_, i) => {
           const n = i + 1;
@@ -38,8 +38,8 @@ export function ForgeExpedicionCycleBar({
               key={n}
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded-full border-2 text-[10px] font-black',
-                done && 'border-[#1B5E4B] bg-[#1B5E4B] text-white',
-                active && !done && 'border-[#F4B942] bg-[#F4B942]/30 text-[#1B5E4B]',
+                done && 'border-[#145A45] bg-[#145A45] text-white',
+                active && !done && 'border-[#C9A227] bg-[#C9A227]/30 text-[#145A45]',
                 !done && !active && 'border-slate-300 text-slate-400'
               )}
               title={ft('forge.v2.cycleN', { n })}

@@ -573,7 +573,7 @@ export function ForgeExpedicionRoom({
           onClose={() => setRoomView('hall')}
         />
       )}
-      <header className="flex shrink-0 items-center gap-3 border-b border-[#1B5E4B]/20 bg-[#1B5E4B] px-3 py-2 text-white shadow-md">
+      <header className="flex shrink-0 items-center gap-3 border-b border-[#0D4535]/30 bg-[#145A45] px-3 py-2 text-white shadow-md">
         <Link
           href={`/hub/forge/cursos/${courseId}`}
           className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 hover:bg-white/20"
@@ -582,7 +582,7 @@ export function ForgeExpedicionRoom({
           <X className="h-5 w-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[#F4B942]">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#C9A227]">
             {ft('forge.room.brand')}
             {sessionFormat === 'presencial' && (
               <span className="ml-2 rounded bg-white/20 px-1.5 py-0.5 text-[9px]">{ft('forge.v2.presential')}</span>
@@ -603,7 +603,7 @@ export function ForgeExpedicionRoom({
           onClick={() => setRoomView('hall')}
           className={cn(
             'rounded-lg border px-2 py-1 text-[10px] font-bold',
-            showHall ? 'border-[#F4B942] bg-[#F4B942]/20' : 'border-white/30 hover:bg-white/10'
+            showHall ? 'border-[#C9A227] bg-[#C9A227]/25 text-white' : 'border-white/30 hover:bg-white/10'
           )}
         >
           {ft('forge.v2.lobbyNav')}
@@ -700,7 +700,7 @@ export function ForgeExpedicionRoom({
         {roomView !== 'presentation' && (
         <main className="flex flex-1 flex-col min-w-0 min-h-0 p-2 md:p-3 gap-2">
           {sessionFormat === 'presencial' && (
-            <p className="shrink-0 rounded-lg border border-[#F4B942]/40 bg-[#F4B942]/15 px-3 py-2 text-xs text-[#FFF8E7]">
+            <p className="shrink-0 rounded-lg border border-[#145A45]/25 bg-white/95 px-3 py-2 text-xs font-medium text-[#145A45] shadow-sm">
               {teamMode
                 ? ft('forge.v2.presentialTeamHint')
                 : ft('forge.v2.presentialSoloHint')}
@@ -710,7 +710,7 @@ export function ForgeExpedicionRoom({
             <ForgeFacilitatorLensBar courseId={courseId} lens={facLens} onLensChange={setFacLens} />
           )}
           {isFac && facLens.kind !== 'mine' && facLens.kind !== 'all' && showTable && (
-            <p className="shrink-0 rounded-lg border border-violet-400/40 bg-violet-950/40 px-3 py-2 text-xs text-violet-100">
+            <p className="shrink-0 rounded-lg border border-[#2E5C9A]/30 bg-[#E8F0FA] px-3 py-2 text-xs font-medium text-[#1A3D5C]">
               {ft('forge.v2.lensObserving', { name: facLens.name })}
             </p>
           )}

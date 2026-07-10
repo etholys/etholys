@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useForgeT } from '@/lib/forge/use-forge-t';
 import { cn } from '@/lib/utils';
+import { EXPEDICION_HALL_PANEL } from '@/lib/forge/expedicion-v2/theme';
 import type { GamePhase } from '@/lib/forge/expedicion-v2/types';
 import type { ExpedicionV2PlayerState } from '@/lib/forge/expedicion-v2/types';
 
@@ -29,12 +30,13 @@ function ActionBtn({
   hint: string;
   onClick?: () => void;
   disabled?: boolean;
-  variant?: 'default' | 'primary' | 'violet';
+  variant?: 'default' | 'table' | 'quizPre' | 'quizPost';
 }) {
   const styles = {
-    default: 'border-white/25 bg-white/10 hover:bg-white/15 text-white',
-    primary: 'border-emerald-400/50 bg-emerald-800/50 hover:bg-emerald-800 text-emerald-50',
-    violet: 'border-violet-400/50 bg-violet-800/40 hover:bg-violet-800/60 text-violet-50',
+    default: 'border-white/30 bg-white/10 hover:bg-white/15 text-white',
+    table: 'border-[#5FAE4A]/60 bg-[#5FAE4A] hover:bg-[#4F9E3A] text-[#0D4535]',
+    quizPre: 'border-[#6EC4E8]/80 bg-[#6EC4E8] hover:bg-[#5AB8DC] text-[#1A3D5C]',
+    quizPost: 'border-[#2E5C9A]/80 bg-[#2E5C9A] hover:bg-[#254D85] text-white',
   };
   return (
     <button
@@ -47,9 +49,16 @@ function ActionBtn({
         disabled && 'opacity-50 cursor-not-allowed'
       )}
     >
-      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-black/20">{icon}</span>
+      <span
+        className={cn(
+          'flex h-9 w-9 items-center justify-center rounded-lg',
+          variant === 'default' ? 'bg-black/20' : 'bg-black/10'
+        )}
+      >
+        {icon}
+      </span>
       <span className="font-black text-sm">{title}</span>
-      <span className="text-xs opacity-80 leading-snug">{hint}</span>
+      <span className="text-xs opacity-90 leading-snug">{hint}</span>
     </button>
   );
 }
@@ -92,16 +101,16 @@ export function ForgeExpedicionLobby({
   const ft = useForgeT();
 
   return (
-    <div className="mx-auto w-full max-w-lg space-y-5 py-4 px-1">
+    <div className={cn('mx-auto w-full max-w-lg p-4 md:p-5 space-y-5', EXPEDICION_HALL_PANEL)}>
       <div className="text-center space-y-2">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[#F4B942]/50 bg-[#F4B942]/15 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-[#FFF8E7]">
-          <DoorOpen className="h-3.5 w-3.5" />
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#C9A227]/60 bg-[#C9A227]/20 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
+          <DoorOpen className="h-3.5 w-3.5 text-[#C9A227]" />
           {ft('forge.v2.lobbyTitle')}
         </div>
-        <h2 className="text-xl font-black text-[#FFF8E7]">{ft('forge.v2.lobbySessionHeading')}</h2>
-        <p className="text-sm text-white/75">{ft('forge.v2.lobbySessionHint')}</p>
+        <h2 className="text-xl font-black text-white">{ft('forge.v2.lobbySessionHeading')}</h2>
+        <p className="text-sm text-white/85">{ft('forge.v2.lobbySessionHint')}</p>
         {teamMode && (
-          <p className="text-xs text-[#F4B942]/90 font-semibold flex items-center justify-center gap-1">
+          <p className="text-xs text-[#A8D5C4] font-semibold flex items-center justify-center gap-1">
             <Users className="h-3.5 w-3.5" />
             {ft('forge.v2.lobbyTeamHint')}
           </p>
@@ -109,16 +118,16 @@ export function ForgeExpedicionLobby({
       </div>
 
       {!isFacilitator && v2 && onShowProfile && (
-        <div className="rounded-xl border border-white/20 bg-black/20 p-3">
+        <div className="rounded-xl border border-white/25 bg-[#0D4535]/50 p-3">
           <button
             type="button"
             onClick={onShowProfile}
             className="flex w-full items-center gap-2 text-left"
           >
-            <User className="h-5 w-5 text-[#F4B942]" />
+            <User className="h-5 w-5 text-[#C9A227]" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white">{ft('forge.v2.lobbyMyProfile')}</p>
-              <p className="text-[10px] text-white/70 truncate">
+              <p className="text-[10px] text-white/75 truncate">
                 {ft(`forge.v2.phase.${phase}`)} · {ft('forge.v2.eco', { n: v2.ledger.balance })}
                 {' · '}
                 {ft('forge.v2.postIts', { n: v2.constructionMap.postIts.length })}
@@ -126,7 +135,7 @@ export function ForgeExpedicionLobby({
             </div>
           </button>
           {profileOpen && (
-            <div className="mt-3 border-t border-white/10 pt-3 text-xs text-white/80 space-y-1">
+            <div className="mt-3 border-t border-white/15 pt-3 text-xs text-white/85 space-y-1">
               <p>
                 {ft('forge.v2.cycle', {
                   current: Math.min(v2.cyclesCompleted + 1, v2.maxCycles),
@@ -145,7 +154,7 @@ export function ForgeExpedicionLobby({
       <div className="grid gap-2 sm:grid-cols-2">
         {canResume && (
           <ActionBtn
-            variant="primary"
+            variant="table"
             icon={<Gamepad2 className="h-5 w-5" />}
             title={ft('forge.v2.lobbyResumeTable')}
             hint={ft('forge.v2.lobbyResumeTableHint')}
@@ -154,7 +163,7 @@ export function ForgeExpedicionLobby({
         )}
 
         <ActionBtn
-          variant="violet"
+          variant="quizPre"
           icon={<ClipboardList className="h-5 w-5" />}
           title={ft('forge.v2.lobbyTilePreQuiz')}
           hint={
@@ -173,7 +182,7 @@ export function ForgeExpedicionLobby({
 
         {(phase === 'post_quiz' || quizPostAvailable || isFacilitator) && (
           <ActionBtn
-            variant="violet"
+            variant="quizPost"
             icon={<ClipboardList className="h-5 w-5" />}
             title={ft('forge.v2.lobbyTilePostQuiz')}
             hint={
@@ -202,8 +211,8 @@ export function ForgeExpedicionLobby({
       </div>
 
       {isFacilitator && (
-        <div className="rounded-xl border border-white/20 bg-black/20 p-3 space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#F4B942]">
+        <div className="rounded-xl border border-white/20 bg-[#0D4535]/40 p-3 space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#C9A227]">
             {ft('forge.v2.lobbyFacControls')}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -211,7 +220,7 @@ export function ForgeExpedicionLobby({
               <button
                 type="button"
                 onClick={onFacOpenPreQuiz}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-bold text-white hover:bg-violet-800"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#6EC4E8] px-3 py-2 text-xs font-bold text-[#1A3D5C] hover:bg-[#5AB8DC]"
               >
                 <Play className="h-3.5 w-3.5" />
                 {ft('forge.v2.lobbyFacOpenPreQuizAll')}
@@ -221,7 +230,7 @@ export function ForgeExpedicionLobby({
               <button
                 type="button"
                 onClick={onFacOpenPostQuiz}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-bold text-white hover:bg-violet-800"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#2E5C9A] px-3 py-2 text-xs font-bold text-white hover:bg-[#254D85]"
               >
                 <Play className="h-3.5 w-3.5" />
                 {ft('forge.v2.lobbyFacOpenPostQuizAll')}
@@ -231,7 +240,7 @@ export function ForgeExpedicionLobby({
               <button
                 type="button"
                 onClick={onFacRestart}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-400/50 bg-rose-900/30 px-3 py-2 text-xs font-semibold text-rose-100 hover:bg-rose-900/50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300/60 bg-rose-950/40 px-3 py-2 text-xs font-semibold text-rose-100 hover:bg-rose-950/60"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 {ft('forge.v2.lobbyFacRestart')}
@@ -240,7 +249,7 @@ export function ForgeExpedicionLobby({
             <button
               type="button"
               onClick={() => onPreviewQuiz('pre')}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-violet-400/50 bg-violet-900/30 px-3 py-2 text-xs font-semibold text-violet-100"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/15"
             >
               <Eye className="h-3.5 w-3.5" />
               {ft('forge.v2.lobbyPreviewPreQuiz')}
@@ -250,7 +259,7 @@ export function ForgeExpedicionLobby({
       )}
 
       {!isFacilitator && phase === 'lobby' && (
-        <p className="text-center text-xs text-white/60">{ft('forge.v2.lobbyLearnerWait')}</p>
+        <p className="text-center text-xs text-white/70">{ft('forge.v2.lobbyLearnerWait')}</p>
       )}
     </div>
   );
