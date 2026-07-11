@@ -9,6 +9,7 @@ import { ForgeVirtualDice } from '@/components/forge/ForgeVirtualDice';
 import { ForgeInfoTip } from '@/components/forge/ForgeInfoTip';
 import { parseMulti, currentPlayer, type BoardGuide } from '@/lib/forge/expedicion-board-multi';
 import { useForgeT } from '@/lib/forge/use-forge-t';
+import { cn } from '@/lib/utils';
 
 type SessionState = {
   position?: number;
@@ -38,6 +39,8 @@ export function ForgeGameBoard({
   onRoomState,
   onGameEvents,
   v2EcoBalance,
+  projectionMode = false,
+  fitContainer = false,
 }: {
   sessionId?: string;
   roomId?: string;
@@ -54,6 +57,10 @@ export function ForgeGameBoard({
   onGameEvents?: (events: Array<{ type?: string; message?: string; amount?: number }>) => void;
   /** Saldo V2 — sustituye ecoCredits legado en UI */
   v2EcoBalance?: number;
+  /** Facilitador a projetar: tabuleiro maximizado, menos chrome */
+  projectionMode?: boolean;
+  /** Tabuleiro escala ao espaço disponível (mesa) */
+  fitContainer?: boolean;
 }) {
   const ft = useForgeT();
   const [state, setState] = useState<SessionState>(initialState);
@@ -196,9 +203,11 @@ export function ForgeGameBoard({
     setDiceRolling(false);
   }
 
+  const boardFits = fitContainer || projectionMode;
+
   return (
-    <div className="flex flex-col h-full min-h-0 gap-2">
-      {isFacilitator && roomId && (
+    <div className={cn('flex flex-col h-full min-h-0', projectionMode ? 'gap-0 p-1' : 'gap-2 p-2')}>
+      {isFacilitator && roomId && !projectionMode && (
         <div className="flex flex-wrap gap-2 rounded-xl border border-slate-600 bg-slate-800/80 p-2">
           <button
             type="button"
@@ -235,7 +244,7 @@ export function ForgeGameBoard({
           )}
         </div>
       )}
-      {multi && turnPlayer && (
+      {multi && turnPlayer && !projectionMode && (
         <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 px-3 py-2 flex flex-wrap items-center gap-2">
           <p className="text-sm font-bold text-emerald-100">
             {isMyTurn ? ft('forge.room.yourTurn') : ft('forge.room.turnOf', { name: turnPlayer.name })}
@@ -256,10 +265,20 @@ export function ForgeGameBoard({
           )}
         </div>
       )}
-      <div className="flex-1 min-h-0 flex items-center justify-center">
-        <ForgeBoardTrack spaces={spaces} position={pos} players={players} immersive className="w-full" />
+      <div className="flex-1 min-h-0 flex items-stretch justify-center overflow-hidden">
+        <ForgeBoardTrack
+          spaces={spaces}
+          position={pos}
+          players={players}
+          immersive={!boardFits}
+          fitContainer={boardFits}
+          hideLegend={boardFits}
+          className="w-full h-full"
+        />
       </div>
 
+      {!projectionMode && (
+      <>
       <div className="grid grid-cols-4 gap-1 shrink-0">
         <div className="rounded-lg bg-amber-950/80 border border-amber-600/40 p-1.5 text-center">
           <p className="text-[8px] font-bold uppercase text-amber-300">Eco</p>
@@ -393,6 +412,8 @@ export function ForgeGameBoard({
             <li key={i}>• {m}</li>
           ))}
         </ul>
+      )}
+      </>
       )}
     </div>
   );

@@ -209,7 +209,7 @@ export function ForgeExpedicionRoomHeader({
           </button>
         ))}
       </div>
-      {v2Phase === 'playing' && v2Balance != null && (
+      {v2Phase === 'playing' && v2Balance != null && roomView !== 'table' && (
         <div className="border-t border-white/10 px-3 py-1 text-[10px] text-white/75 flex flex-wrap gap-x-2">
           <span>{ft('forge.v2.cyclesTitle')}</span>
           {teamMode && <span>· {ft('forge.v2.sharedTable')}</span>}

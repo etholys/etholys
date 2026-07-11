@@ -514,6 +514,10 @@ export function ForgeExpedicionRoom({
   }, [courseId]);
 
   useEffect(() => {
+    if (roomView === 'table') setPresencialHintDismissed(true);
+  }, [roomView]);
+
+  useEffect(() => {
     if (roomView === 'presentation') loadPresentationRows();
   }, [roomView, loadPresentationRows]);
 
@@ -604,13 +608,15 @@ export function ForgeExpedicionRoom({
 
       <div className="flex flex-1 min-h-0 overflow-hidden flex-col">
         {roomView !== 'presentation' && (
-        <main className="flex flex-1 flex-col min-w-0 min-h-0 p-2 md:p-3 gap-2">
-          <ForgeExpedicionSessionStrip
-            v2={v2}
-            teamMode={teamMode}
-            sessionFormat={sessionFormat}
-          />
-          {sessionFormat === 'presencial' && !presencialHintDismissed && (
+        <main className={cn('flex flex-1 flex-col min-w-0 min-h-0', showTable ? 'gap-0 overflow-hidden' : 'gap-2 p-2 md:p-3')}>
+          {!showTable && (
+            <ForgeExpedicionSessionStrip
+              v2={v2}
+              teamMode={teamMode}
+              sessionFormat={sessionFormat}
+            />
+          )}
+          {sessionFormat === 'presencial' && !presencialHintDismissed && showHall && (
             <div className="shrink-0 flex items-start gap-2 rounded-lg border border-[#145A45]/20 bg-white/95 px-3 py-2 text-xs text-[#145A45] shadow-sm">
               <p className="flex-1 font-medium">
                 {teamMode ? ft('forge.v2.presentialTeamHint') : ft('forge.v2.presentialSoloHint')}
@@ -625,10 +631,7 @@ export function ForgeExpedicionRoom({
               </button>
             </div>
           )}
-          {isFac && showTable && (
-            <ForgeFacilitatorLensBar courseId={courseId} lens={facLens} onLensChange={setFacLens} />
-          )}
-          {isFac && facLens.kind !== 'mine' && facLens.kind !== 'all' && showTable && (
+          {isFac && facLens.kind !== 'mine' && facLens.kind !== 'all' && showHall && (
             <p className="shrink-0 rounded-lg border border-[#2E5C9A]/30 bg-[#E8F0FA] px-3 py-2 text-xs font-medium text-[#1A3D5C]">
               {ft('forge.v2.lensObserving', { name: facLens.name })}
             </p>
@@ -652,7 +655,7 @@ export function ForgeExpedicionRoom({
               }}
             />
           )}
-          {v2 && showTable && (
+          {v2 && showTable && !isFac && (
             <ForgeExpedicionCycleBar
               v2={v2}
               isFacilitator={isFac}
@@ -676,7 +679,7 @@ export function ForgeExpedicionRoom({
             <p className="text-center text-xs text-violet-300 shrink-0">{ft('forge.room.coachingHint')}</p>
           )}
 
-          {card?.prompt && (
+          {card?.prompt && !showTable && (
             <div className="shrink-0 rounded-lg border border-amber-400/50 bg-amber-950/60 px-3 py-2 max-h-24 overflow-y-auto">
               <p className="text-[10px] font-bold uppercase text-amber-300">
                 {isFac ? ft('forge.room.cardFac') : ft('forge.room.cardLearner')}
@@ -685,7 +688,7 @@ export function ForgeExpedicionRoom({
             </div>
           )}
 
-          {landEvent?.kind === 'accion' && landEvent.actionCard && v2 && !boardBlocked && (
+          {landEvent?.kind === 'accion' && landEvent.actionCard && v2 && !boardBlocked && !showTable && (
             <div className="shrink-0">
               <ForgeEventCardPanel
                 kind="accion"
@@ -702,7 +705,7 @@ export function ForgeExpedicionRoom({
               />
             </div>
           )}
-          {landEvent?.kind === 'desafio' && landEvent.crisisCard && v2 && !boardBlocked && (
+          {landEvent?.kind === 'desafio' && landEvent.crisisCard && v2 && !boardBlocked && !showTable && (
             <div className="shrink-0">
               <ForgeEventCardPanel
                 kind="desafio"
@@ -727,7 +730,7 @@ export function ForgeExpedicionRoom({
             </p>
           )}
 
-          {activeMicroCaso && stationSlug && v2 && !boardBlocked && !landEvent && !pendingReview && (
+          {activeMicroCaso && stationSlug && v2 && !boardBlocked && !landEvent && !pendingReview && !showTable && (
             <div className="shrink-0">
               <ForgeMicroCasoPanel
                 microCaso={activeMicroCaso}
@@ -759,7 +762,7 @@ export function ForgeExpedicionRoom({
             </div>
           )}
 
-          {isFac && reviewMicroCaso && reviewStation && v2 && !boardBlocked && !landEvent && (
+          {isFac && reviewMicroCaso && reviewStation && v2 && !boardBlocked && !landEvent && !showTable && (
             <div className="shrink-0">
               <ForgeMicroCasoPanel
                 microCaso={reviewMicroCaso}
@@ -780,7 +783,7 @@ export function ForgeExpedicionRoom({
             </div>
           )}
 
-          {showFeriaPanel && v2 && (
+          {showFeriaPanel && v2 && !showTable && (
             <div className="shrink-0">
               <ForgeFeriaPanel
                 eligible={feriaEligibleNow}
@@ -808,7 +811,7 @@ export function ForgeExpedicionRoom({
             </div>
           )}
 
-          {v2?.phase === 'finished' && v2.finalScoreBreakdown && (
+          {v2?.phase === 'finished' && v2.finalScoreBreakdown && !showTable && (
             <div className="shrink-0">
               <ForgeSustainabilityDashboard breakdown={v2.finalScoreBreakdown} />
             </div>
@@ -868,11 +871,21 @@ export function ForgeExpedicionRoom({
                 </div>
               </div>
             ) : (
-              <div className="flex flex-1 min-h-0 flex-col md:flex-row gap-0">
-                <div className="flex flex-1 flex-col min-h-0 min-w-0 gap-2 overflow-y-auto">
-                  {!isCoaching && !boardBlocked && facLens.kind === 'mine' ? (
-                    gameSpec && syncMode !== 'pending' ? (
-                      <div className="flex flex-col flex-1 min-h-0 [&_.rounded-xl]:bg-transparent">
+              <div className="flex flex-1 min-h-0 flex-col overflow-hidden border-t-4 border-[#145A45] md:border-t-0 md:rounded-none">
+                {isFac && (
+                  <div className="shrink-0 flex items-center gap-2 border-b border-[#145A45]/10 bg-[#F5F2EA] px-2 py-1">
+                    <ForgeFacilitatorLensBar courseId={courseId} lens={facLens} onLensChange={setFacLens} />
+                    {v2 && (
+                      <span className="ml-auto hidden sm:inline text-[10px] font-bold text-[#2E5C9A] shrink-0">
+                        {ft('forge.v2.eco', { n: v2.ledger.balance })}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <div className="flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden bg-[#FAFAF7]">
+                  <div className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">
+                    {!isCoaching && !boardBlocked && facLens.kind === 'mine' ? (
+                      gameSpec && syncMode !== 'pending' ? (
                         <ForgeGameBoard
                           spec={gameSpec}
                           initialState={gameState}
@@ -882,45 +895,48 @@ export function ForgeExpedicionRoom({
                           myUserId={myUserId}
                           isFacilitator={isFac}
                           facilitatorEmergency={facEmergency}
+                          projectionMode={isFac}
+                          fitContainer
                           onGuideChange={(g) => setCoachGuide(g)}
                           onRoomState={(s) => setGameState(s as Record<string, unknown>)}
                           onGameEvents={handleBoardEvents}
                           v2EcoBalance={v2?.ledger.balance}
                         />
-                      </div>
-                    ) : (
-                      <p className="text-center text-sm text-[#145A45]/70 py-12">
-                        {boardBusy ? ft('forge.general.loading') : ft('forge.room.waitingBoard')}
+                      ) : (
+                        <p className="text-center text-sm text-[#145A45]/70 py-12">
+                          {boardBusy ? ft('forge.general.loading') : ft('forge.room.waitingBoard')}
+                        </p>
+                      )
+                    ) : dockReadOnly ? (
+                      <p className="text-center text-sm text-[#2E5C9A] py-8 px-4">
+                        {ft('forge.v2.lensBoardHint')}
                       </p>
-                    )
-                  ) : dockReadOnly ? (
-                    <p className="text-center text-sm text-[#2E5C9A] py-8 px-4">
-                      {ft('forge.v2.lensBoardHint')}
-                    </p>
-                  ) : (
-                    myMap && <ForgePersonalMapStrip mapState={myMap} />
-                  )}
-                  {boardBlocked && effectivePhase !== 'finished' && (
-                    <p className="text-center text-sm text-[#C9A227] font-semibold py-2">
-                      {ft('forge.v2.lobbyBoardBlocked')}
-                    </p>
-                  )}
+                    ) : (
+                      myMap && <ForgePersonalMapStrip mapState={myMap} />
+                    )}
+                    {boardBlocked && effectivePhase !== 'finished' && (
+                      <p className="shrink-0 text-center text-sm text-[#C9A227] font-semibold py-2">
+                        {ft('forge.v2.lobbyBoardBlocked')}
+                      </p>
+                    )}
+                  </div>
+                  <ForgeExpedicionTableDock
+                    courseId={courseId}
+                    roomId={observeRoomId}
+                    observeUserId={observeUserId}
+                    teamPeers={teamPeers}
+                    myUserId={myUserId}
+                    readOnly={dockReadOnly || boardBlocked}
+                    balance={v2?.ledger.balance}
+                    impactPoints={v2?.impactPoints}
+                    defaultCollapsed={isFac}
+                  />
                 </div>
-                <ForgeExpedicionTableDock
-                  courseId={courseId}
-                  roomId={observeRoomId}
-                  observeUserId={observeUserId}
-                  teamPeers={teamPeers}
-                  myUserId={myUserId}
-                  readOnly={dockReadOnly || boardBlocked}
-                  balance={v2?.ledger.balance}
-                  impactPoints={v2?.impactPoints}
-                />
               </div>
             )}
           </div>
 
-          {myMap && !isCoaching && (
+          {myMap && !isCoaching && !(showTable && isFac) && (
             <div className="shrink-0 max-h-28 overflow-hidden">
               <ForgePersonalMapStrip
                 mapState={myMap}
