@@ -463,7 +463,10 @@ export function ForgeExpedicionRoom({
   const observeRoomId =
     isFac && facLens.kind === 'team' ? facLens.roomId : teamRoomId;
   const observeUserId = isFac && facLens.kind === 'learner' ? facLens.userId : null;
-  const dockReadOnly = isFac && facLens.kind !== 'mine';
+  const facObservingIndividual =
+    isFac && (facLens.kind === 'team' || facLens.kind === 'learner');
+  const showSharedBoard = !isCoaching && !boardBlocked && !facObservingIndividual;
+  const dockReadOnly = facObservingIndividual;
   const canResume = isFac || effectivePhase === 'playing' || quizPreAvailable || quizPostAvailable;
 
   const patchFacBatch = useCallback(
@@ -884,7 +887,7 @@ export function ForgeExpedicionRoom({
                 )}
                 <div className="flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden bg-[#FAFAF7]">
                   <div className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">
-                    {!isCoaching && !boardBlocked && facLens.kind === 'mine' ? (
+                    {showSharedBoard ? (
                       gameSpec && syncMode !== 'pending' ? (
                         <ForgeGameBoard
                           spec={gameSpec}
@@ -921,6 +924,13 @@ export function ForgeExpedicionRoom({
                     )}
                   </div>
                   <ForgeExpedicionTableDock
+                    key={
+                      facLens.kind === 'team'
+                        ? `team-${facLens.roomId}`
+                        : facLens.kind === 'learner'
+                          ? `learner-${facLens.userId}`
+                          : facLens.kind
+                    }
                     courseId={courseId}
                     roomId={observeRoomId}
                     observeUserId={observeUserId}
@@ -929,7 +939,7 @@ export function ForgeExpedicionRoom({
                     readOnly={dockReadOnly || boardBlocked}
                     balance={v2?.ledger.balance}
                     impactPoints={v2?.impactPoints}
-                    defaultCollapsed={isFac}
+                    defaultCollapsed={isFac && facLens.kind === 'mine'}
                   />
                 </div>
               </div>
