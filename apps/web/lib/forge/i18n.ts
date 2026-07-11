@@ -825,6 +825,8 @@ const forge: Record<Locale, Record<string, string>> = {
     'forge.v2.lensLearners': 'Jugadores',
     'forge.v2.lensObserving': 'Observando: {name}',
     'forge.v2.lensBoardHint': 'Mapa y finanzas del jugador/equipo seleccionado → panel derecho.',
+    'forge.v2.tableFocusEnter': 'Vista completa del tablero',
+    'forge.v2.tableFocusExit': 'Salir de vista completa',
     'forge.v2.presentialTeamHint':
       'Modo presencial: cada miembro en su móvil, un peón por equipo. Sin videollamada — sincronizad el mapa y el tablero en la sala.',
     'forge.v2.presentialSoloHint': 'Modo presencial: usad vuestros móviles. Sin videollamada Jitsi.',
@@ -1631,6 +1633,8 @@ const forge: Record<Locale, Record<string, string>> = {
     'forge.v2.lensLearners': 'Jogadores',
     'forge.v2.lensObserving': 'A observar: {name}',
     'forge.v2.lensBoardHint': 'Mapa e finanças do jogador/equipa selecionado → painel à direita.',
+    'forge.v2.tableFocusEnter': 'Vista completa do tabuleiro',
+    'forge.v2.tableFocusExit': 'Sair da vista completa',
     'forge.v2.presentialTeamHint':
       'Modo presencial: cada membro no telemóvel, um peão por equipa. Sem videochamada — sincronizem o mapa e o tabuleiro na sala.',
     'forge.v2.presentialSoloHint': 'Modo presencial: usem os telemóveis. Sem videochamada Jitsi.',
@@ -2435,6 +2439,8 @@ const forge: Record<Locale, Record<string, string>> = {
     'forge.v2.lensLearners': 'Players',
     'forge.v2.lensObserving': 'Observing: {name}',
     'forge.v2.lensBoardHint': 'Selected player/team map and finances → right panel.',
+    'forge.v2.tableFocusEnter': 'Full board view',
+    'forge.v2.tableFocusExit': 'Exit full view',
     'forge.v2.presentialTeamHint':
       'In-person mode: each member on their phone, one pawn per team. No video call — sync map and board in the room.',
     'forge.v2.presentialSoloHint': 'In-person mode: use your phones. No Jitsi video call.',

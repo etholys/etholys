@@ -5,7 +5,7 @@ import { MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BOARD_STATION_META, spaceTooltip, stationForSpace } from '@/lib/forge/board-spaces';
 import { boardCellGridPosition, BOARD_TRACK_GRID } from '@/lib/forge/board-track-layout';
-import { boardCellTextClass } from '@/lib/forge/expedicion-v2/theme';
+import { boardCellTextClass, boardCellBorderClass } from '@/lib/forge/expedicion-v2/theme';
 import { ForgeInfoTip } from '@/components/forge/ForgeInfoTip';
 import type { BoardPlayer } from '@/lib/forge/expedicion-board-multi';
 
@@ -54,7 +54,7 @@ export function ForgeBoardTrack({
       const cw = container.clientWidth - pad;
       const ch = container.clientHeight - pad;
       if (cw <= 0 || ch <= 0) return;
-      setBoardSize(Math.floor(Math.min(cw, ch, 640)));
+      setBoardSize(Math.floor(Math.min(cw, ch, 720)));
     };
 
     update();
@@ -74,7 +74,10 @@ export function ForgeBoardTrack({
       style={fitContainer ? { width: boardSize, height: boardSize } : undefined}
     >
       <div
-        className="absolute inset-[12%] rounded-2xl border-2 border-dashed border-[#145A45]/20 bg-white/80 flex items-center justify-center pointer-events-none shadow-inner"
+        className={cn(
+          'absolute rounded-2xl border-2 border-dashed border-[#145A45]/20 bg-white/80 flex items-center justify-center pointer-events-none shadow-inner',
+          fitContainer ? 'inset-[10%]' : 'inset-[12%]'
+        )}
         aria-hidden
       >
         <div className="text-center px-4">
@@ -100,6 +103,8 @@ export function ForgeBoardTrack({
           const isStart = i === 0;
           const isGoal = i === spaces - 1;
           const textClass = boardCellTextClass(st.name);
+          const borderClass = boardCellBorderClass(st.name);
+          const isLightCell = st.name === 'Acción' || st.name === 'Mercado';
 
           return (
             <div
@@ -108,12 +113,14 @@ export function ForgeBoardTrack({
               className={cn(
                 'relative flex flex-col items-center justify-center rounded-lg md:rounded-xl font-bold transition-all z-10 shadow-sm',
                 immersive || fitContainer
-                  ? 'min-h-0 text-[9px] sm:text-[10px]'
+                  ? cn('min-h-0', boardSize >= 420 ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[10px]')
                   : 'h-9 w-full text-[9px] sm:text-[10px]',
                 st.color,
                 textClass,
+                borderClass,
                 active && `z-20 scale-105 ring-2 ${st.ring} shadow-md`,
-                !active && 'opacity-95'
+                !active && !isLightCell && 'opacity-95',
+                active && isLightCell && 'ring-2 ring-[#145A45]/30'
               )}
             >
               <span className="absolute top-0.5 right-0.5 z-20 scale-75 opacity-80">

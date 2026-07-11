@@ -129,6 +129,14 @@ export const EXPEDICION_SECTION =
 
 /** Texto legível em casillas claras del tablero */
 export function boardCellTextClass(stationName: string): string {
-  if (stationName === 'Mercado' || stationName === 'Acción') return 'text-[#1A3D5C]';
+  if (stationName === 'Mercado' || stationName === 'Acción') return 'text-[#0D4535]';
+  if (stationName === 'Futuro') return 'text-white';
   return 'text-white';
+}
+
+/** Bordas visíveis em casillas claras (evita “desaparecer” no fundo creme) */
+export function boardCellBorderClass(stationName: string): string {
+  if (stationName === 'Acción') return 'border-2 border-[#3D8B8B]/80';
+  if (stationName === 'Mercado') return 'border-2 border-[#2E5C9A]/60';
+  return 'border border-black/10';
 }

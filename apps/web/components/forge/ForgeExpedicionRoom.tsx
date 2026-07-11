@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { Users, HelpCircle, X } from 'lucide-react';
+import { Users, HelpCircle, X, Maximize2, Minimize2 } from 'lucide-react';
 import { ForgeGameBoard, type ForgeGameSyncMode } from '@/components/forge/ForgeGameBoard';
 import { ForgePersonalMapStrip } from '@/components/forge/ForgePersonalMapStrip';
 import { ForgeActivityPlayer } from '@/components/forge/ForgeActivityPlayer';
@@ -41,6 +41,7 @@ import {
   ForgeFacilitatorLensBar,
   type FacilitatorLens,
 } from '@/components/forge/ForgeFacilitatorLensBar';
+import { ForgeFacilitatorLensFloating } from '@/components/forge/ForgeFacilitatorLensFloating';
 import { ForgeSustainabilityDashboard } from '@/components/forge/ForgeSustainabilityDashboard';
 import { ForgeMicroCasoPanel } from '@/components/forge/ForgeMicroCasoPanel';
 import { drawRandomMicroCaso, getMicroCasoById } from '@/lib/forge/expedicion-v2/content';
@@ -137,6 +138,7 @@ export function ForgeExpedicionRoom({
   const [quizModal, setQuizModal] = useState<null | { side: 'pre' | 'post'; preview: boolean }>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [facLens, setFacLens] = useState<FacilitatorLens>({ kind: 'mine' });
+  const [tableImmersive, setTableImmersive] = useState(false);
   const [presentationRows, setPresentationRows] = useState<
     Array<{
       id: string;
@@ -518,6 +520,7 @@ export function ForgeExpedicionRoom({
 
   useEffect(() => {
     if (roomView === 'table') setPresencialHintDismissed(true);
+    if (roomView !== 'table') setTableImmersive(false);
   }, [roomView]);
 
   useEffect(() => {
@@ -581,6 +584,7 @@ export function ForgeExpedicionRoom({
           onClose={() => setRoomView('hall')}
         />
       )}
+      {!(showTable && tableImmersive) && (
       <ForgeExpedicionRoomHeader
         courseId={courseId}
         courseTitle={courseTitle}
@@ -604,6 +608,7 @@ export function ForgeExpedicionRoom({
         stationSlug={stationSlug}
         onOpenInvest={stationSlug ? () => setInvestStation(stationSlug) : undefined}
       />
+      )}
 
       {videoEnabled && <ForgeFloatingJitsi embedSrc={jitsiSrc} fallbackUrl={jitsiUrl} />}
       <ForgeGameCoach guide={coachGuide} knowledge={null} />
@@ -874,17 +879,37 @@ export function ForgeExpedicionRoom({
                 </div>
               </div>
             ) : (
-              <div className="flex flex-1 min-h-0 flex-col overflow-hidden border-t-4 border-[#145A45] md:border-t-0 md:rounded-none">
-                {isFac && (
-                  <div className="shrink-0 flex items-center gap-2 border-b border-[#145A45]/10 bg-[#F5F2EA] px-2 py-1">
-                    <ForgeFacilitatorLensBar courseId={courseId} lens={facLens} onLensChange={setFacLens} />
-                    {v2 && (
-                      <span className="ml-auto hidden sm:inline text-[10px] font-bold text-[#2E5C9A] shrink-0">
-                        {ft('forge.v2.eco', { n: v2.ledger.balance })}
-                      </span>
+              <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden border-t-4 border-[#145A45] md:border-t-0 md:rounded-none">
+                <div className="absolute top-2 left-2 z-30 flex items-center gap-2">
+                  {isFac && (
+                    <ForgeFacilitatorLensFloating
+                      courseId={courseId}
+                      lens={facLens}
+                      onLensChange={setFacLens}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setTableImmersive((v) => !v)}
+                    className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#145A45]/25 bg-white/95 text-[#145A45] shadow-lg hover:bg-white"
+                    title={
+                      tableImmersive
+                        ? ft('forge.v2.tableFocusExit')
+                        : ft('forge.v2.tableFocusEnter')
+                    }
+                    aria-label={
+                      tableImmersive
+                        ? ft('forge.v2.tableFocusExit')
+                        : ft('forge.v2.tableFocusEnter')
+                    }
+                  >
+                    {tableImmersive ? (
+                      <Minimize2 className="h-5 w-5" />
+                    ) : (
+                      <Maximize2 className="h-5 w-5" />
                     )}
-                  </div>
-                )}
+                  </button>
+                </div>
                 <div className="flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden bg-[#FAFAF7]">
                   <div className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">
                     {showSharedBoard ? (
