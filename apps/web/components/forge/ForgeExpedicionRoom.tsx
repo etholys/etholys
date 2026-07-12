@@ -61,7 +61,6 @@ import { ForgeExpedicionSessionStrip } from '@/components/forge/ForgeExpedicionS
 import { ForgeExpedicionFacConsole } from '@/components/forge/ForgeExpedicionFacConsole';
 import { ForgeExpedicionMesaToolbar } from '@/components/forge/ForgeExpedicionMesaToolbar';
 import { ForgeFeriaPanel } from '@/components/forge/ForgeFeriaPanel';
-import { currentPlayer } from '@/lib/forge/expedicion-board-multi';
 import { feriaEligible, feriaEligibilityHint } from '@/lib/forge/expedicion-v2/feria';
 import type { TeamPeer } from '@/components/forge/ForgeConsultancyModal';
 
