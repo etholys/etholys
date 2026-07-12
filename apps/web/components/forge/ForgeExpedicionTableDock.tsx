@@ -17,6 +17,7 @@ export function ForgeExpedicionTableDock({
   balance,
   impactPoints,
   defaultCollapsed = false,
+  defaultTab = 'eco',
   observeUserId,
 }: {
   courseId: string;
@@ -29,10 +30,11 @@ export function ForgeExpedicionTableDock({
   impactPoints?: number;
   /** Facilitador: dock recolhido por defeito para dar espaço ao tabuleiro */
   defaultCollapsed?: boolean;
+  defaultTab?: Tab;
   mobileCollapsedDefault?: boolean;
 }) {
   const ft = useForgeT();
-  const [tab, setTab] = useState<Tab>('eco');
+  const [tab, setTab] = useState<Tab>(defaultTab);
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   useEffect(() => {
@@ -73,7 +75,9 @@ export function ForgeExpedicionTableDock({
       className={cn(
         'flex flex-col min-h-0 bg-[#FAFAF7]',
         'w-full max-md:border-t max-md:border-[#145A45]/12',
-        'md:w-[min(30vw,260px)] md:shrink-0 md:border-l md:border-[#145A45]/12'
+        tab === 'map'
+          ? 'md:w-[min(42vw,440px)] md:shrink-0 md:border-l md:border-[#145A45]/12'
+          : 'md:w-[min(28vw,300px)] md:shrink-0 md:border-l md:border-[#145A45]/12'
       )}
     >
       <div className="flex items-center gap-1 border-b border-[#145A45]/10 bg-[#F5F2EA] px-2 py-1.5">
@@ -126,7 +130,12 @@ export function ForgeExpedicionTableDock({
           {ft('forge.v2.tableDockMap')}
         </button>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto p-2 text-sm max-md:max-h-[38vh]">
+      <div
+        className={cn(
+          'flex-1 min-h-0 overflow-y-auto p-2 md:p-3 text-sm',
+          tab === 'map' ? 'max-md:max-h-[50vh]' : 'max-md:max-h-[38vh]'
+        )}
+      >
         <ForgeExpedicionV2Workspace
           courseId={courseId}
           readOnly={readOnly}

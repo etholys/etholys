@@ -1035,6 +1035,7 @@ export function ForgeExpedicionRoom({
                     balance={v2?.ledger.balance}
                     impactPoints={v2?.impactPoints}
                     defaultCollapsed={isFac && facLens.kind === 'mine'}
+                    defaultTab={isFac ? 'eco' : 'map'}
                   />
                 </div>
               </div>

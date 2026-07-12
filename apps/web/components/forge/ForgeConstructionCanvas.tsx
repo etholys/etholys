@@ -89,21 +89,24 @@ export function ForgeConstructionCanvas({
 
   return (
     <div
-      className={cn('space-y-3', compact && 'max-h-[36vh] overflow-y-auto pr-1')}
+      className={cn('space-y-3', compact && 'min-h-0')}
       onPointerMove={(e) => {
         if (dragRef.current) onDragMove(e.clientY);
       }}
       onPointerUp={endDrag}
       onPointerLeave={endDrag}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-bold text-[#1B5E4B]">{ft('forge.v2.mapConstruction')}</h3>
+      <div className={cn('flex flex-wrap items-center justify-between gap-2', compact && 'flex-col items-stretch')}>
+        <h3 className={cn('font-bold text-[#1B5E4B]', compact ? 'text-xs' : 'text-sm')}>
+          {ft('forge.v2.mapConstruction')}
+        </h3>
         {!readOnly && (
           <button
             type="button"
             onClick={() => setConnectFrom(connectFrom ? null : 'pick')}
             className={cn(
-              'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold',
+              'inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold',
+              compact && 'w-full',
               connectFrom ? 'bg-violet-600 text-white' : 'bg-violet-100 text-violet-800'
             )}
           >
@@ -114,12 +117,20 @@ export function ForgeConstructionCanvas({
       </div>
 
       {!readOnly && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white/80 p-3 space-y-2">
-          <div className="flex flex-wrap gap-2">
+        <div
+          className={cn(
+            'rounded-xl border border-dashed border-slate-300 bg-white/80 space-y-2',
+            compact ? 'p-2.5' : 'p-3'
+          )}
+        >
+          <div className={cn('flex gap-2', compact ? 'flex-col' : 'flex-wrap')}>
             <select
               value={draftStation}
               onChange={(e) => setDraftStation(e.target.value as ExpedicionStationSlug)}
-              className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+              className={cn(
+                'rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white',
+                compact && 'w-full'
+              )}
             >
               {EXPEDICION_STATION_SLUGS.map((s) => (
                 <option key={s} value={s}>
@@ -130,7 +141,10 @@ export function ForgeConstructionCanvas({
             <select
               value={draftType}
               onChange={(e) => setDraftType(e.target.value as PostItType)}
-              className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+              className={cn(
+                'rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white',
+                compact && 'w-full'
+              )}
             >
               {TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -139,17 +153,24 @@ export function ForgeConstructionCanvas({
               ))}
             </select>
           </div>
-          <div className="flex gap-2">
-            <input
+          <div className={cn('flex gap-2', compact ? 'flex-col' : '')}>
+            <textarea
               value={draftText}
               onChange={(e) => setDraftText(e.target.value)}
               placeholder={ft('forge.v2.postItPlaceholder')}
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              rows={compact ? 3 : 2}
+              className={cn(
+                'flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none',
+                compact && 'w-full min-h-[72px]'
+              )}
             />
             <button
               type="button"
               onClick={submitPostIt}
-              className="inline-flex items-center gap-1 rounded-lg bg-[#1B5E4B] px-3 py-2 text-xs font-bold text-white"
+              className={cn(
+                'inline-flex items-center justify-center gap-1 rounded-lg bg-[#1B5E4B] px-3 py-2 text-xs font-bold text-white shrink-0',
+                compact && 'w-full'
+              )}
             >
               <Plus className="h-4 w-4" /> {ft('forge.v2.addPostIt')}
             </button>
@@ -167,7 +188,7 @@ export function ForgeConstructionCanvas({
       )}
 
       <div className="relative">
-        {map.connections.length > 0 && (
+        {map.connections.length > 0 && !compact && (
           <svg
             className="pointer-events-none absolute inset-0 z-10 hidden lg:block"
             width="100%"
@@ -206,14 +227,18 @@ export function ForgeConstructionCanvas({
             </defs>
           </svg>
         )}
-        <div className="grid gap-3 lg:grid-cols-5 relative z-0">
+        <div className={cn('grid gap-3 relative z-0', compact ? 'grid-cols-1' : 'lg:grid-cols-5')}>
           {EXPEDICION_STATION_SLUGS.map((station) => {
             const theme = EXPEDICION_V2_STATIONS[station];
             const items = sortedPostIts(map, station);
             return (
               <div
                 key={station}
-                className={cn('rounded-xl border-2 min-h-[200px] flex flex-col', theme.column)}
+                className={cn(
+                  'rounded-xl border-2 flex flex-col',
+                  theme.column,
+                  compact ? 'min-h-0' : 'min-h-[200px]'
+                )}
               >
                 <div className={cn('rounded-t-[10px] px-2 py-2 text-center text-xs font-bold', theme.header)}>
                   {theme.label}
@@ -260,14 +285,19 @@ export function ForgeConstructionCanvas({
                           )}
                         </div>
                         {readOnly ? (
-                          <p className="mt-1 text-[11px] leading-snug">{p.text}</p>
+                          <p className={cn('mt-1 leading-snug', compact ? 'text-xs' : 'text-[11px]')}>
+                            {p.text}
+                          </p>
                         ) : (
                           <textarea
                             value={p.text}
                             onChange={(e) => onUpdatePostIt(p.id, { text: e.target.value })}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="mt-1 w-full resize-none bg-transparent text-[11px] leading-snug outline-none min-h-[48px] cursor-text"
-                            rows={3}
+                            className={cn(
+                              'mt-1 w-full resize-none bg-transparent leading-snug outline-none cursor-text',
+                              compact ? 'text-xs min-h-[56px]' : 'text-[11px] min-h-[48px]'
+                            )}
+                            rows={compact ? 4 : 3}
                           />
                         )}
                       </div>
