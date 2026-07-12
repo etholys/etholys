@@ -209,6 +209,11 @@ export function ForgeGameBoard({
   const isMyTurn = Boolean(
     myUserId && turnPlayer && turnPlayer.userId === myUserId && syncMode === 'player'
   );
+  const isTeamTurn = Boolean(
+    syncMode === 'player' && turnPlayer?.userId?.startsWith('team:')
+  );
+  const canPlayNow =
+    syncMode !== 'player' || isMyTurn || isTeamTurn || !multi;
   const displayEco = v2EcoBalance ?? turnPlayer?.ecoCredits ?? state.ecoCredits ?? 500;
   const undoCount = historyCount(initialState as Record<string, unknown>);
 
@@ -223,13 +228,15 @@ export function ForgeGameBoard({
   const showFullChrome = !projectionMode;
   const showCompactChrome = projectionMode && isFacilitator;
 
-  const diceCardControls = !state.currentCard && !state.finished && canAct && (
+  const showPlayerControls =
+    !state.currentCard && !state.finished && (canAct || syncMode === 'player');
+  const diceCardControls = showPlayerControls && (
     <div className="flex flex-wrap items-center gap-3">
       <ForgeVirtualDice rolling={diceRolling} value={pendingRoll ?? state.lastRoll} />
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={loading || diceRolling}
+          disabled={loading || diceRolling || !canPlayNow}
           onClick={() => void rollWithAnimation()}
           className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
         >
@@ -237,13 +244,13 @@ export function ForgeGameBoard({
         </button>
         <button
           type="button"
-          disabled={loading}
+          disabled={loading || !canPlayNow}
           onClick={() => sendAction({ type: 'draw_card' })}
           className="rounded-lg border-2 border-amber-400 bg-amber-100 px-5 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-200 disabled:opacity-50"
         >
           {ft('forge.room.drawCard')}
         </button>
-        {multi && (
+        {multi && canPlayNow && (
           <button
             type="button"
             disabled={loading}
@@ -254,6 +261,11 @@ export function ForgeGameBoard({
           </button>
         )}
       </div>
+      {syncMode === 'player' && !canPlayNow && turnPlayer && (
+        <p className="w-full text-sm font-medium text-slate-600">
+          {ft('forge.room.turnOf', { name: turnPlayer.name })}
+        </p>
+      )}
     </div>
   );
 
@@ -420,7 +432,7 @@ export function ForgeGameBoard({
         </div>
       )}
 
-      {!state.currentCard && !state.finished && canAct && showFullChrome && diceCardControls}
+      {!state.currentCard && !state.finished && showPlayerControls && showFullChrome && diceCardControls}
 
       {showCompactChrome && diceCardControls && (
         <div className="absolute bottom-16 left-3 right-3 z-20 rounded-xl border border-[#145A45]/20 bg-white/95 p-2 shadow-lg">

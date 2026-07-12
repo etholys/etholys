@@ -217,7 +217,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
         room.activity.module.course.companyId,
         room.facilitatorUserId
       );
-      if (multi && !canPlayerAct(multi, tenant.userId, isFac, false)) {
+      if (multi && !canPlayerAct(multi, tenant.userId, isFac, false, room.playGroupId)) {
         return NextResponse.json({ error: 'No eres miembro de esta mesa' }, { status: 403 });
       }
 

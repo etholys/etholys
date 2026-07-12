@@ -140,19 +140,42 @@ export function isMultiState(raw: Record<string, unknown>): raw is MultiBoardSta
   return raw.multiplayer === true && Array.isArray(raw.players);
 }
 
+export function isTeamPawnUserId(userId: string): boolean {
+  return userId.startsWith('team:');
+}
+
+export function teamPawnPlayGroupId(userId: string): string | null {
+  return isTeamPawnUserId(userId) ? userId.slice('team:'.length) : null;
+}
+
+/** Whether a learner may control the shared board (UI sync + API guard). */
+export function canUserPlayOnBoard(
+  multi: MultiBoardState | null,
+  userId: string | undefined,
+  opts?: { playGroupId?: string | null; teamPeerIds?: string[] }
+): boolean {
+  if (!multi || !userId || multi.finished) return false;
+  if (multi.teamPlay && multi.teamMemberIds?.includes(userId)) return true;
+  if (multi.players.some((p) => p.userId === userId)) return true;
+  const cur = currentPlayer(multi);
+  const pgId = opts?.playGroupId ?? teamPawnPlayGroupId(cur?.userId ?? '');
+  if (pgId && cur?.userId === `team:${pgId}`) {
+    if (multi.teamMemberIds?.includes(userId)) return true;
+    if (opts?.teamPeerIds?.includes(userId)) return true;
+  }
+  return false;
+}
+
 export function canPlayerAct(
   s: MultiBoardState,
   userId: string,
   isFacilitator: boolean,
-  useOverride: boolean
+  useOverride: boolean,
+  playGroupId?: string | null
 ): boolean {
   if (s.finished) return false;
   if (isFacilitator && useOverride) return true;
-  if (s.teamPlay && Array.isArray(s.teamMemberIds)) {
-    return s.teamMemberIds.includes(userId);
-  }
-  const cur = currentPlayer(s);
-  return cur?.userId === userId;
+  return canUserPlayOnBoard(s, userId, { playGroupId });
 }
 
 export function advanceTurn(s: MultiBoardState, spec: GameSpecV1): MultiBoardState {

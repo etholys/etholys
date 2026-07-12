@@ -66,7 +66,7 @@ export async function bootstrapSharedGameRoom(opts: BootstrapOpts) {
   let state: Record<string, unknown>;
   const memberIds = enrollments.map((e) => e.userId);
 
-  if (playGroup?.mode === 'live_team' && memberIds.length >= 1) {
+  if (playGroup?.mode === 'live_team') {
     const { createTeamPlayInitialState } = await import('@/lib/forge/expedicion-board-multi');
     const { createInitialV2State } = await import('@/lib/forge/expedicion-v2/player-state');
     const { V2_TEAM_KEY } = await import('@/lib/forge/expedicion-v2/room-v2-store');
@@ -91,12 +91,25 @@ export async function bootstrapSharedGameRoom(opts: BootstrapOpts) {
       }))
     );
     state = flagV2(createMultiplayerInitialState(roster, spec) as unknown as Record<string, unknown>);
+  } else if (playGroupId && playGroup) {
+    const { createTeamPlayInitialState } = await import('@/lib/forge/expedicion-board-multi');
+    const { createInitialV2State } = await import('@/lib/forge/expedicion-v2/player-state');
+    const { V2_TEAM_KEY } = await import('@/lib/forge/expedicion-v2/room-v2-store');
+    state = flagV2({
+      ...(createTeamPlayInitialState(
+        playGroup.name,
+        playGroup.id,
+        memberIds,
+        spec
+      ) as unknown as Record<string, unknown>),
+      [V2_TEAM_KEY]: createInitialV2State(),
+    });
   } else {
     const { createMultiplayerInitialState } = await import('@/lib/forge/expedicion-board-multi');
     const demoName = playGroup?.name ?? 'Equipo 1';
     const roster = [
       {
-        userId: playGroupId ? `team:${playGroupId}` : `demo:${facilitatorUserId}`,
+        userId: `demo:${facilitatorUserId}`,
         name: demoName,
         color: PLAYER_PAWN_COLORS[0],
         position: spec.board?.startSpace ?? 0,

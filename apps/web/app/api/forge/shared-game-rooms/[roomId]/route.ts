@@ -97,7 +97,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       }
     } else if (multi) {
       const isRoomFac = isFac && room.facilitatorUserId === tenant.userId;
-      if (!canPlayerAct(multi, tenant.userId, isFac, override) && !isRoomFac) {
+      if (!canPlayerAct(multi, tenant.userId, isFac, override, room.playGroupId) && !isRoomFac) {
         return NextResponse.json(
           { error: 'No es tu turno. Espera o pide al facilitador modo emergencia.' },
           { status: 403 }
