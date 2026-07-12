@@ -73,7 +73,11 @@ export default function ForgeMiMapaPage() {
           {ft('forge.v2.lobbyTilePreQuiz')}
         </button>
       )}
-      {v2.quizGate === 'post' && (
+      {(v2.quizGate === 'post' ||
+        v2.phase === 'post_quiz' ||
+        (v2.preQuizCompletedAt &&
+          !v2.postQuizCompletedAt &&
+          v2.cyclesCompleted >= v2.maxCycles)) && (
         <button
           type="button"
           onClick={() => setQuizModal('post')}
