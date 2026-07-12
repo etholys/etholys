@@ -25,7 +25,7 @@ const SEGMENTS = buildSpiralSegments();
 const VIEW_BOX = spiralViewBoxString();
 
 function TileIcon({ icon, className }: { icon: SpiralTileIcon; className?: string }) {
-  const props = { className: cn('h-5 w-5', className), strokeWidth: 2.2 };
+  const props = { className: cn('h-6 w-6', className), strokeWidth: 2.2 };
   switch (icon) {
     case 'leaf':
       return <Leaf {...props} />;
@@ -85,80 +85,107 @@ export function ForgeBoardSpiral({
       role="img"
       aria-label="Tablero La Expedición Sostenible"
     >
-      {SEGMENTS.map((seg) => {
-        const tile = spiralTileByNumber(seg.n);
-        const textColor = spiralTileTextColor(tile.bg);
-        const gameIndex = seg.n <= 20 ? seg.n - 1 : -1;
-        const tip =
-          gameIndex >= 0
-            ? spaceTooltip(gameIndex, spaces)
-            : `Casilla ${String(seg.n).padStart(2, '0')} · ${tile.label ?? ''}`;
+      <defs>
+        <filter id="spiral-shadow" x="-4%" y="-4%" width="108%" height="108%">
+          <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.12" />
+        </filter>
+      </defs>
+      <g filter="url(#spiral-shadow)">
+        {SEGMENTS.map((seg) => {
+          const tile = spiralTileByNumber(seg.n);
+          const hasLabel = Boolean(tile.label);
+          const textColor = hasLabel ? '#FFFFFF' : spiralTileTextColor(tile.bg);
+          const gameIndex = seg.n <= 20 ? seg.n - 1 : -1;
+          const tip =
+            gameIndex >= 0
+              ? spaceTooltip(gameIndex, spaces)
+              : `Casilla ${String(seg.n).padStart(2, '0')} · ${tile.label ?? ''}`;
 
-        const hasPawns = (pawnsByTile.get(seg.n)?.length ?? 0) > 0;
-        const isActive = hasPawns || activeTile === seg.n;
+          const hasPawns = (pawnsByTile.get(seg.n)?.length ?? 0) > 0;
+          const isActive = hasPawns || activeTile === seg.n;
 
-        return (
-          <g key={seg.n}>
-            <path
-              d={seg.path}
-              fill={tile.bg}
-              stroke="#FFFFFF"
-              strokeWidth={3}
-              className={cn(isActive && 'brightness-110')}
-            />
-            <foreignObject
-              x={seg.iconX - 14}
-              y={seg.iconY - 14}
-              width={28}
-              height={28}
-              className="pointer-events-none"
-            >
-              <div
-                className="flex h-full w-full items-center justify-center"
-                style={{ color: textColor }}
-              >
-                <TileIcon icon={tile.icon} className="h-6 w-6 drop-shadow-sm" />
-              </div>
-            </foreignObject>
-            <circle
-              cx={seg.badgeX}
-              cy={seg.badgeY}
-              r={11}
-              fill="#FFFFFF"
-              stroke={tile.bg}
-              strokeWidth={1.5}
-            />
-            <text
-              x={seg.badgeX}
-              y={seg.badgeY + 4}
-              textAnchor="middle"
-              fontSize={9}
-              fontWeight={800}
-              fill="#1A3D5C"
-            >
-              {String(seg.n).padStart(2, '0')}
-            </text>
-            {tile.label && (
+          return (
+            <g key={seg.n}>
+              <path
+                d={seg.path}
+                fill={tile.bg}
+                stroke="#FFFFFF"
+                strokeWidth={3.5}
+                strokeLinejoin="round"
+                className={cn(isActive && 'brightness-110')}
+              />
+              {!hasLabel && (
+                <foreignObject
+                  x={seg.iconX - 16}
+                  y={seg.iconY - 16}
+                  width={32}
+                  height={32}
+                  className="pointer-events-none"
+                >
+                  <div
+                    className="flex h-full w-full items-center justify-center"
+                    style={{ color: textColor }}
+                  >
+                    <TileIcon icon={tile.icon} />
+                  </div>
+                </foreignObject>
+              )}
+              {hasLabel && (
+                <>
+                  <foreignObject
+                    x={seg.iconX - 14}
+                    y={seg.iconY - 22}
+                    width={28}
+                    height={28}
+                    className="pointer-events-none"
+                  >
+                    <div
+                      className="flex h-full w-full items-center justify-center"
+                      style={{ color: textColor }}
+                    >
+                      <TileIcon icon={tile.icon} className="h-5 w-5" />
+                    </div>
+                  </foreignObject>
+                  <text
+                    x={seg.labelX}
+                    y={seg.labelY + 5}
+                    textAnchor="middle"
+                    fontSize={seg.isCenter ? 11 : 10}
+                    fontWeight={900}
+                    fill={textColor}
+                    style={{ letterSpacing: '0.08em' }}
+                  >
+                    {tile.label}
+                  </text>
+                </>
+              )}
+              <circle
+                cx={seg.badgeX}
+                cy={seg.badgeY}
+                r={10.5}
+                fill="#FFFFFF"
+                stroke={tile.bg}
+                strokeWidth={1.5}
+              />
               <text
-                x={seg.labelX}
-                y={seg.labelY}
+                x={seg.badgeX}
+                y={seg.badgeY + 3.5}
                 textAnchor="middle"
-                fontSize={seg.n === 1 ? 13 : 11}
-                fontWeight={900}
-                fill={textColor}
-                style={{ letterSpacing: '0.06em' }}
+                fontSize={8.5}
+                fontWeight={800}
+                fill="#1A3D5C"
               >
-                {tile.label}
+                {String(seg.n).padStart(2, '0')}
               </text>
-            )}
-            {gameIndex >= 0 && (
-              <path d={seg.path} fill="transparent" stroke="none" className="cursor-help">
-                <title>{tip}</title>
-              </path>
-            )}
-          </g>
-        );
-      })}
+              {gameIndex >= 0 && (
+                <path d={seg.path} fill="transparent" stroke="none" className="cursor-help">
+                  <title>{tip}</title>
+                </path>
+              )}
+            </g>
+          );
+        })}
+      </g>
 
       {Array.from(pawnsByTile.entries()).map(([tileN, pawns]) => {
         const seg = SEGMENTS[tileN - 1];
