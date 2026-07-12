@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import {
   Calendar,
   FlaskConical,
@@ -18,10 +18,11 @@ import {
   spiralTileTextColor,
   type SpiralTileIcon,
 } from '@/lib/forge/board-spiral-data';
-import { buildSpiralSegments, SPIRAL_VIEWBOX } from '@/lib/forge/board-spiral-geometry';
+import { buildSpiralSegments, spiralViewBoxString } from '@/lib/forge/board-spiral-geometry';
 import type { BoardPlayer } from '@/lib/forge/expedicion-board-multi';
 
 const SEGMENTS = buildSpiralSegments();
+const VIEW_BOX = spiralViewBoxString();
 
 function TileIcon({ icon, className }: { icon: SpiralTileIcon; className?: string }) {
   const props = { className: cn('h-5 w-5', className), strokeWidth: 2.2 };
@@ -56,9 +57,6 @@ export function ForgeBoardSpiral({
   fitContainer?: boolean;
   className?: string;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState(520);
-
   const pawnsByTile = useMemo(() => {
     const map = new Map<number, BoardPlayer[]>();
     if (players.length > 0) {
@@ -79,30 +77,14 @@ export function ForgeBoardSpiral({
     spaces
   );
 
-  useLayoutEffect(() => {
-    if (!fitContainer) return;
-    const el = containerRef.current;
-    if (!el) return;
-    const update = () => {
-      const pad = 8;
-      const s = Math.floor(Math.min(el.clientWidth - pad, el.clientHeight - pad, 820));
-      if (s > 0) setSize(s);
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [fitContainer]);
-
   const svg = (
     <svg
-      viewBox={`0 0 ${SPIRAL_VIEWBOX.width} ${SPIRAL_VIEWBOX.height}`}
+      viewBox={VIEW_BOX}
       className="h-full w-full"
+      preserveAspectRatio="xMidYMid meet"
       role="img"
       aria-label="Tablero La Expedición Sostenible"
     >
-      <rect width={SPIRAL_VIEWBOX.width} height={SPIRAL_VIEWBOX.height} fill="#FFFFFF" />
-
       {SEGMENTS.map((seg) => {
         const tile = spiralTileByNumber(seg.n);
         const textColor = spiralTileTextColor(tile.bg);
@@ -124,7 +106,6 @@ export function ForgeBoardSpiral({
               strokeWidth={3}
               className={cn(isActive && 'brightness-110')}
             />
-            {/* Icono */}
             <foreignObject
               x={seg.iconX - 14}
               y={seg.iconY - 14}
@@ -139,7 +120,6 @@ export function ForgeBoardSpiral({
                 <TileIcon icon={tile.icon} className="h-6 w-6 drop-shadow-sm" />
               </div>
             </foreignObject>
-            {/* Número */}
             <circle
               cx={seg.badgeX}
               cy={seg.badgeY}
@@ -158,7 +138,6 @@ export function ForgeBoardSpiral({
             >
               {String(seg.n).padStart(2, '0')}
             </text>
-            {/* SALIDA / META */}
             {tile.label && (
               <text
                 x={seg.labelX}
@@ -172,7 +151,6 @@ export function ForgeBoardSpiral({
                 {tile.label}
               </text>
             )}
-            {/* Tooltip hit area */}
             {gameIndex >= 0 && (
               <path d={seg.path} fill="transparent" stroke="none" className="cursor-help">
                 <title>{tip}</title>
@@ -182,7 +160,6 @@ export function ForgeBoardSpiral({
         );
       })}
 
-      {/* Peones */}
       {Array.from(pawnsByTile.entries()).map(([tileN, pawns]) => {
         const seg = SEGMENTS[tileN - 1];
         if (!seg || pawns.length === 0) return null;
@@ -213,17 +190,11 @@ export function ForgeBoardSpiral({
 
   if (fitContainer) {
     return (
-      <div ref={containerRef} className={cn('flex h-full min-h-0 items-center justify-center', className)}>
-        <div style={{ width: size, height: size }} className="max-h-full max-w-full">
-          {svg}
-        </div>
+      <div className={cn('flex h-full w-full min-h-0 min-w-0 items-stretch justify-stretch', className)}>
+        {svg}
       </div>
     );
   }
 
-  return (
-    <div className={cn('w-full max-w-3xl mx-auto bg-white rounded-2xl shadow-md p-2', className)}>
-      {svg}
-    </div>
-  );
+  return <div className={cn('w-full max-w-4xl mx-auto', className)}>{svg}</div>;
 }

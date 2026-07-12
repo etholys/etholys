@@ -78,4 +78,45 @@ export function buildSpiralSegments(): SpiralSegmentGeom[] {
   return segments;
 }
 
+/** ViewBox ajustado ao caracol — sem margem branca extra */
+export function spiralContentBounds(margin = 6): { x: number; y: number; width: number; height: number } {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (let i = 0; i < TOTAL; i++) {
+    const t0 = i / TOTAL;
+    const t1 = (i + 1 - SEG_GAP) / TOTAL;
+    const a0 = -Math.PI / 2 - t0 * TURNS * 2 * Math.PI;
+    const a1 = -Math.PI / 2 - t1 * TURNS * 2 * Math.PI;
+    const rInner0 = R_INNER_START + t0 * (R_OUTER_END - R_INNER_START);
+    const rInner1 = R_INNER_START + t1 * (R_OUTER_END - R_INNER_START);
+    const band0 = 44 + t0 * 12;
+    const band1 = 44 + t1 * 12;
+    const radii = [rInner0, rInner0 + band0, rInner1, rInner1 + band1];
+    for (const r of radii) {
+      for (const a of [a0, a1]) {
+        const p = pt(r, a);
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      }
+    }
+  }
+
+  return {
+    x: minX - margin,
+    y: minY - margin,
+    width: maxX - minX + margin * 2,
+    height: maxY - minY + margin * 2,
+  };
+}
+
+export function spiralViewBoxString(): string {
+  const b = spiralContentBounds();
+  return `${b.x} ${b.y} ${b.width} ${b.height}`;
+}
+
 export const SPIRAL_VIEWBOX = { width: 800, height: 800, cx: CX, cy: CY };

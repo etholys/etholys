@@ -206,7 +206,7 @@ export function ForgeGameBoard({
   const boardFits = fitContainer || projectionMode;
 
   return (
-    <div className={cn('flex flex-col h-full min-h-0', projectionMode ? 'gap-0 p-1' : 'gap-2 p-2')}>
+    <div className={cn('flex flex-col h-full min-h-0', projectionMode ? 'gap-0' : 'gap-2 p-2')}>
       {isFacilitator && roomId && !projectionMode && (
         <div className="flex flex-wrap gap-2 rounded-xl border border-slate-600 bg-slate-800/80 p-2">
           <button
