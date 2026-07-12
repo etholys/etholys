@@ -160,6 +160,7 @@ export function ForgeExpedicionRoom({
   const [teamPeers, setTeamPeers] = useState<TeamPeer[]>([]);
   const [teamCount, setTeamCount] = useState(0);
   const [startBusy, setStartBusy] = useState(false);
+  const [presencialHintDismissed, setPresencialHintDismissed] = useState(false);
   const lastBoardPosRef = useRef<number | null>(null);
   const multiBoot = parseMulti(gameState);
   const teamRoomId =
