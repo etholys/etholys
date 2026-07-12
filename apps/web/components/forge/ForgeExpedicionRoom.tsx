@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { Users, HelpCircle, X, Maximize2, Minimize2 } from 'lucide-react';
 import { ForgeGameBoard, type ForgeGameSyncMode } from '@/components/forge/ForgeGameBoard';
 import { ForgePersonalMapStrip } from '@/components/forge/ForgePersonalMapStrip';
+import { ForgeConstructionCanvas } from '@/components/forge/ForgeConstructionCanvas';
 import { ForgeActivityPlayer } from '@/components/forge/ForgeActivityPlayer';
 import { ForgeInviteLearners } from '@/components/forge/ForgeInviteLearners';
 import {
@@ -459,9 +460,7 @@ export function ForgeExpedicionRoom({
   const showHall = roomView === 'hall';
   const showTable = roomView === 'table';
 
-  const quizPreAvailable =
-    quizGate === 'pre' ||
-    Boolean(v2 && !v2.preQuizCompletedAt && effectivePhase === 'lobby');
+  const quizPreAvailable = v2 ? !v2.preQuizCompletedAt : true;
   const quizPostAvailable =
     quizGate === 'post' ||
     effectivePhase === 'post_quiz' ||
@@ -479,7 +478,46 @@ export function ForgeExpedicionRoom({
     isFac && (facLens.kind === 'team' || facLens.kind === 'learner');
   const showSharedBoard = !isCoaching && !boardBlocked && !facObservingIndividual;
   const dockReadOnly = facObservingIndividual;
+  const mapReadOnly = !isFac && boardBlocked;
+
+  const constructionMapPanel =
+    v2 && (
+      <ForgeConstructionCanvas
+        map={v2.constructionMap}
+        readOnly={mapReadOnly}
+        onAddPostIt={async (station, type, text) => {
+          await patchV2({ action: 'add_postit', station, type, text });
+          await reloadV2();
+        }}
+        onUpdatePostIt={async (id, patchBody) => {
+          await patchV2({ action: 'update_postit', id, ...patchBody });
+          await reloadV2();
+        }}
+        onRemovePostIt={async (id) => {
+          await patchV2({ action: 'remove_postit', id });
+          await reloadV2();
+        }}
+        onAddConnection={async (fromPostItId, toPostItId) => {
+          await patchV2({ action: 'add_connection', fromPostItId, toPostItId });
+          await reloadV2();
+        }}
+      />
+    );
+
   const canResume = isFac || effectivePhase === 'playing' || quizPreAvailable || quizPostAvailable;
+
+  const quizPromptBanner = !v2?.preQuizCompletedAt && !isFac && (
+    <div className="shrink-0 rounded-xl border border-[#C9A227]/40 bg-amber-50 px-4 py-3 text-center">
+      <p className="text-sm font-medium text-[#1A3D5C] mb-2">{ft('forge.v2.completeMaturityQuiz')}</p>
+      <button
+        type="button"
+        onClick={() => setQuizModal({ side: 'pre', preview: false })}
+        className="inline-flex items-center justify-center rounded-lg bg-[#145A45] px-4 py-2 text-sm font-bold text-white hover:bg-[#0D4535]"
+      >
+        {ft('forge.v2.lobbyTilePreQuiz')}
+      </button>
+    </div>
+  );
 
   const patchFacBatch = useCallback(
     async (action: string) => {
@@ -837,8 +875,8 @@ export function ForgeExpedicionRoom({
 
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             {showHall ? (
-              <div className="flex flex-1 items-start justify-center overflow-y-auto py-2 md:py-4">
-                <div className="w-full max-w-lg">
+              <div className="flex flex-1 min-h-0 flex-col md:flex-row gap-2 md:gap-3 overflow-hidden">
+                <div className="shrink-0 md:w-[min(300px,34vw)] md:overflow-y-auto">
               <ForgeExpedicionLobby
                 phase={effectivePhase}
                 isFacilitator={isFac}
@@ -886,6 +924,17 @@ export function ForgeExpedicionRoom({
                     : undefined
                 }
               />
+                </div>
+                <div className="flex flex-1 min-h-[220px] md:min-h-0 flex-col overflow-hidden rounded-2xl border border-[#145A45]/12 bg-white shadow-sm">
+                  <p className="shrink-0 border-b border-[#145A45]/10 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-[#145A45]/80">
+                    {ft('forge.v2.tableDockMap')}
+                  </p>
+                  <div className="flex flex-1 min-h-0 flex-col gap-2 overflow-y-auto p-2 md:p-3">
+                    {constructionMapPanel ?? (
+                      <p className="text-sm text-[#145A45]/60 py-8 text-center">{ft('forge.v2.loadingMap')}</p>
+                    )}
+                    {quizPromptBanner}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -945,6 +994,17 @@ export function ForgeExpedicionRoom({
                           {boardBusy ? ft('forge.general.loading') : ft('forge.room.waitingBoard')}
                         </p>
                       )
+                    ) : boardBlocked ? (
+                      <div className="flex flex-1 flex-col min-h-0 overflow-y-auto p-2 md:p-3 gap-3">
+                        <div className="flex-1 min-h-0">
+                          {constructionMapPanel ?? (
+                            <p className="text-center text-sm text-[#145A45]/70 py-12">
+                              {ft('forge.v2.loadingMap')}
+                            </p>
+                          )}
+                        </div>
+                        {quizPromptBanner}
+                      </div>
                     ) : dockReadOnly ? (
                       <p className="text-center text-sm text-[#2E5C9A] py-8 px-4">
                         {ft('forge.v2.lensBoardHint')}
@@ -952,7 +1012,7 @@ export function ForgeExpedicionRoom({
                     ) : (
                       myMap && <ForgePersonalMapStrip mapState={myMap} />
                     )}
-                    {boardBlocked && effectivePhase !== 'finished' && (
+                    {boardBlocked && effectivePhase !== 'finished' && showSharedBoard && (
                       <p className="shrink-0 text-center text-sm text-[#C9A227] font-semibold py-2">
                         {ft('forge.v2.lobbyBoardBlocked')}
                       </p>
@@ -980,17 +1040,6 @@ export function ForgeExpedicionRoom({
               </div>
             )}
           </div>
-
-          {myMap && !isCoaching && !(showTable && isFac) && (
-            <div className="shrink-0 max-h-28 overflow-hidden">
-              <ForgePersonalMapStrip
-                mapState={myMap}
-                v2Balance={v2?.ledger.balance}
-                v2PostItCount={v2?.constructionMap.postIts.length}
-                v2ImpactPoints={v2?.impactPoints}
-              />
-            </div>
-          )}
 
           {investStation && v2 && (
             <ForgeInvestmentPanel

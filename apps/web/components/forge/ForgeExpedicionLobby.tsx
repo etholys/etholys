@@ -107,8 +107,12 @@ export function ForgeExpedicionLobby({
           <DoorOpen className="h-3.5 w-3.5 text-[#C9A227]" />
           {ft('forge.v2.lobbyTitle')}
         </div>
-        <h2 className="text-xl font-black text-white">{ft('forge.v2.lobbySessionHeading')}</h2>
-        <p className="text-sm text-white/85">{ft('forge.v2.lobbySessionHint')}</p>
+        <h2 className="text-xl font-black text-white">
+          {isFacilitator ? ft('forge.v2.lobbySessionHeading') : ft('forge.v2.lobbyParticipantHeading')}
+        </h2>
+        <p className="text-sm text-white/85">
+          {isFacilitator ? ft('forge.v2.lobbySessionHint') : ft('forge.v2.lobbyParticipantHint')}
+        </p>
         {teamMode && (
           <p className="text-xs text-[#A8D5C4] font-semibold flex items-center justify-center gap-1">
             <Users className="h-3.5 w-3.5" />
