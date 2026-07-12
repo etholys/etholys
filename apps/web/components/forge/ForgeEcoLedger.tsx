@@ -11,6 +11,7 @@ export function ForgeEcoLedger({
   teamPeers,
   myUserId,
   compact,
+  tall,
 }: {
   ledger: EcoLedgerState;
   onRequestLoan?: () => void;
@@ -19,6 +20,8 @@ export function ForgeEcoLedger({
   teamPeers?: { userId: string; name: string }[];
   myUserId?: string;
   compact?: boolean;
+  /** Facilitador a rever extrato — mais linhas visíveis */
+  tall?: boolean;
 }) {
   const myPeerTotal =
     myUserId && peerCredits?.[myUserId] ? peerCredits[myUserId] : 0;
@@ -33,7 +36,11 @@ export function ForgeEcoLedger({
         </div>
         <span className="text-lg font-black tabular-nums">{ledger.balance} Eco</span>
       </div>
-      <div className={compact ? 'max-h-32 overflow-auto' : 'max-h-48 overflow-auto'}>
+      <div
+        className={
+          tall ? 'max-h-[min(55vh,420px)] overflow-auto' : compact ? 'max-h-32 overflow-auto' : 'max-h-48 overflow-auto'
+        }
+      >
         <table className="w-full text-xs">
           <thead className="bg-[#F7F3EB] sticky top-0">
             <tr className="text-left text-slate-600">

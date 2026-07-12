@@ -19,6 +19,7 @@ export function ForgeExpedicionV2Workspace({
   compact,
   dockTab = 'eco',
   observeUserId,
+  facReview,
 }: {
   courseId: string;
   readOnly?: boolean;
@@ -30,6 +31,7 @@ export function ForgeExpedicionV2Workspace({
   dockTab?: 'map' | 'eco';
   /** Facilitador observa jornada individual */
   observeUserId?: string | null;
+  facReview?: boolean;
 }) {
   const ft = useForgeT();
   const { v2, patch, loading } = useExpedicionV2(courseId, {
@@ -56,6 +58,7 @@ export function ForgeExpedicionV2Workspace({
             myUserId={myUserId}
             loanDisabled={readOnly}
             compact
+            tall={facReview && dockTab === 'eco'}
             onRequestLoan={
               readOnly
                 ? undefined

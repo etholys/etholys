@@ -15,7 +15,8 @@ export type UseExpedicionV2Options = {
 export function useExpedicionV2(courseId: string, opts?: UseExpedicionV2Options) {
   const roomId = opts?.roomId?.trim() || null;
   const observeUserId = opts?.observeUserId?.trim() || null;
-  const pollMs = opts?.pollMs ?? (roomId ? 3000 : 0);
+  const pollMs =
+    opts?.pollMs ?? (roomId || observeUserId ? (observeUserId ? 2000 : 3000) : 0);
 
   const [v2, setV2] = useState<ExpedicionV2PlayerState | null>(null);
   const [teamMode, setTeamMode] = useState(false);
@@ -50,12 +51,12 @@ export function useExpedicionV2(courseId: string, opts?: UseExpedicionV2Options)
   }, [reload]);
 
   useEffect(() => {
-    if (!pollMs || !roomId) return;
+    if (!pollMs || (!roomId && !observeUserId)) return;
     const t = setInterval(() => {
       void reload();
     }, pollMs);
     return () => clearInterval(t);
-  }, [pollMs, roomId, reload]);
+  }, [pollMs, roomId, observeUserId, reload]);
 
   const patch = useCallback(
     async (body: Record<string, unknown>) => {

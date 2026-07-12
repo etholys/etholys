@@ -19,6 +19,7 @@ export function ForgeExpedicionTableDock({
   defaultCollapsed = false,
   defaultTab = 'eco',
   observeUserId,
+  facReview,
 }: {
   courseId: string;
   roomId?: string | null;
@@ -32,10 +33,20 @@ export function ForgeExpedicionTableDock({
   defaultCollapsed?: boolean;
   defaultTab?: Tab;
   mobileCollapsedDefault?: boolean;
+  /** Facilitador a rever equipa/jogador — extrato mais alto */
+  facReview?: boolean;
 }) {
   const ft = useForgeT();
   const [tab, setTab] = useState<Tab>(defaultTab);
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+
+  useEffect(() => {
+    setTab(defaultTab);
+  }, [defaultTab]);
+
+  useEffect(() => {
+    if (facReview) setTab('eco');
+  }, [facReview]);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
@@ -75,7 +86,7 @@ export function ForgeExpedicionTableDock({
       className={cn(
         'flex flex-col min-h-0 bg-[#FAFAF7]',
         'w-full max-md:border-t max-md:border-[#145A45]/12',
-        tab === 'map'
+        tab === 'map' && !facReview
           ? 'md:w-[min(42vw,440px)] md:shrink-0 md:border-l md:border-[#145A45]/12'
           : 'md:w-[min(28vw,300px)] md:shrink-0 md:border-l md:border-[#145A45]/12'
       )}
@@ -107,28 +118,38 @@ export function ForgeExpedicionTableDock({
       </div>
 
       <div className="flex border-b border-[#145A45]/10 bg-[#F5F2EA]">
-        <button
-          type="button"
-          onClick={() => setTab('eco')}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-1 py-2 text-[10px] font-bold',
-            tab === 'eco' ? 'bg-[#145A45]/10 text-[#145A45]' : 'text-slate-500'
-          )}
-        >
-          <Wallet className="h-3 w-3" />
-          {ft('forge.v2.tableDockEco')}
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('map')}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-1 py-2 text-[10px] font-bold',
-            tab === 'map' ? 'bg-[#145A45]/10 text-[#145A45]' : 'text-slate-500'
-          )}
-        >
-          <Map className="h-3 w-3" />
-          {ft('forge.v2.tableDockMap')}
-        </button>
+        {!facReview && (
+          <button
+            type="button"
+            onClick={() => setTab('eco')}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-1 py-2 text-[10px] font-bold',
+              tab === 'eco' ? 'bg-[#145A45]/10 text-[#145A45]' : 'text-slate-500'
+            )}
+          >
+            <Wallet className="h-3 w-3" />
+            {ft('forge.v2.tableDockEco')}
+          </button>
+        )}
+        {!facReview && (
+          <button
+            type="button"
+            onClick={() => setTab('map')}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-1 py-2 text-[10px] font-bold',
+              tab === 'map' ? 'bg-[#145A45]/10 text-[#145A45]' : 'text-slate-500'
+            )}
+          >
+            <Map className="h-3 w-3" />
+            {ft('forge.v2.tableDockMap')}
+          </button>
+        )}
+        {facReview && (
+          <div className="flex flex-1 items-center justify-center gap-1 py-2 text-[10px] font-bold bg-[#145A45]/10 text-[#145A45]">
+            <Wallet className="h-3 w-3" />
+            {ft('forge.v2.tableDockEco')}
+          </div>
+        )}
       </div>
       <div
         className={cn(
@@ -144,7 +165,8 @@ export function ForgeExpedicionTableDock({
           teamPeers={teamPeers}
           myUserId={myUserId}
           compact
-          dockTab={tab}
+          dockTab={facReview ? 'eco' : tab}
+          facReview={facReview}
         />
       </div>
     </div>

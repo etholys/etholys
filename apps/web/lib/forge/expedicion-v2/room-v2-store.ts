@@ -18,12 +18,19 @@ export function mergeV2IntoRoomState(
   return { ...roomState, [V2_TEAM_KEY]: v2 };
 }
 
+function lastLedgerEntry(v2: ExpedicionV2PlayerState) {
+  const e = v2.ledger.entries[v2.ledger.entries.length - 1];
+  if (!e) return null;
+  return { description: e.description, amount: e.amount, type: e.type };
+}
+
 export function v2TeamSummary(v2: ExpedicionV2PlayerState) {
   return {
     phase: v2.phase,
     cyclesCompleted: v2.cyclesCompleted,
     maxCycles: v2.maxCycles,
     balance: v2.ledger.balance,
+    lastEntry: lastLedgerEntry(v2),
     postItCount: v2.constructionMap.postIts.length,
     connectionCount: v2.constructionMap.connections.length,
     finalScore: v2.finalScore,

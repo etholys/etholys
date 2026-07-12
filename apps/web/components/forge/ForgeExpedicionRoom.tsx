@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 import { ForgeFloatingJitsi } from '@/components/forge/ForgeFloatingJitsi';
 import { ForgeGameCoach } from '@/components/forge/ForgeGameCoach';
 import { ForgeGameManualModal } from '@/components/forge/ForgeGameManual';
-import { parseMulti, currentPlayer, type BoardGuide } from '@/lib/forge/expedicion-board-multi';
+import { parseMulti, currentPlayer, canUserPlayOnBoard, type BoardGuide } from '@/lib/forge/expedicion-board-multi';
 import { readPresentationSlideIndex } from '@/lib/forge/room-presentation';
 import {
   cardsForStation,
@@ -44,6 +44,7 @@ import {
   type FacilitatorLens,
 } from '@/components/forge/ForgeFacilitatorLensBar';
 import { ForgeFacilitatorLensFloating } from '@/components/forge/ForgeFacilitatorLensFloating';
+import { ForgeFacilitatorReviewCenter } from '@/components/forge/ForgeFacilitatorReviewCenter';
 import { ForgeSustainabilityDashboard } from '@/components/forge/ForgeSustainabilityDashboard';
 import { ForgeMicroCasoPanel } from '@/components/forge/ForgeMicroCasoPanel';
 import { drawRandomMicroCaso, getMicroCasoById } from '@/lib/forge/expedicion-v2/content';
@@ -141,6 +142,7 @@ export function ForgeExpedicionRoom({
   const [quizModal, setQuizModal] = useState<null | { side: 'pre' | 'post'; preview: boolean }>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [facLens, setFacLens] = useState<FacilitatorLens>({ kind: 'mine' });
+  const [facDockTab, setFacDockTab] = useState<'map' | 'eco'>('eco');
   const [tableImmersive, setTableImmersive] = useState(false);
   const [presentationRows, setPresentationRows] = useState<
     Array<{
@@ -169,6 +171,17 @@ export function ForgeExpedicionRoom({
     courseId,
     { roomId: teamRoomId }
   );
+  const facObserveRoomId = isFac && facLens.kind === 'team' ? facLens.roomId : null;
+  const facObserveUserId = isFac && facLens.kind === 'learner' ? facLens.userId : null;
+  const {
+    v2: observedV2,
+    loading: observedLoading,
+  } = useExpedicionV2(courseId, {
+    roomId: facObserveRoomId,
+    observeUserId: facObserveUserId,
+    pollMs: facObserveRoomId || facObserveUserId ? 2000 : 0,
+  });
+  const [observedTurnName, setObservedTurnName] = useState<string | null>(null);
   const booted = useRef(false);
   const slideSyncRef = useRef(0);
   const isCoaching = groupMode === 'individual_coaching';
@@ -211,20 +224,25 @@ export function ForgeExpedicionRoom({
   const setBoardSyncFromState = useCallback(
     (rawState: Record<string, unknown>, isHost: boolean) => {
       const multi = parseMulti(rawState);
-      const cur = multi ? currentPlayer(multi) : null;
+      const teamPeerIds = teamPeers.map((p) => p.userId);
       if (isFac) {
         setSyncMode(facEmergency ? 'host' : 'facilitator');
-      } else if (multi?.teamPlay && myUserId && multi.teamMemberIds?.includes(myUserId)) {
-        setSyncMode('player');
-      } else if (multi && cur && myUserId && cur.userId === myUserId) {
+      } else if (
+        canUserPlayOnBoard(multi, myUserId, { playGroupId, teamPeerIds })
+      ) {
         setSyncMode('player');
       } else {
         setSyncMode('viewer');
       }
       if (multi?.guide) setCoachGuide(multi.guide);
     },
-    [isFac, myUserId, facEmergency]
+    [isFac, myUserId, facEmergency, playGroupId, teamPeers]
   );
+
+  useEffect(() => {
+    if (!gameState || Object.keys(gameState).length === 0) return;
+    setBoardSyncFromState(gameState, isFac);
+  }, [myUserId, playGroupId, teamPeers, gameState, isFac, setBoardSyncFromState]);
 
   const loadBoard = useCallback(async () => {
     if (!gameActivityId) return;
@@ -626,6 +644,32 @@ export function ForgeExpedicionRoom({
   }, [roomView]);
 
   useEffect(() => {
+    if (isFac && (facLens.kind === 'team' || facLens.kind === 'learner')) {
+      setRoomView('table');
+    }
+  }, [isFac, facLens]);
+
+  useEffect(() => {
+    if (!facObserveRoomId) {
+      setObservedTurnName(null);
+      return;
+    }
+    const load = () => {
+      fetch(`/api/forge/shared-game-rooms/${facObserveRoomId}`)
+        .then((r) => r.json())
+        .then((d) => {
+          const multi = parseMulti((d.room?.state ?? {}) as Record<string, unknown>);
+          const cur = multi ? currentPlayer(multi) : null;
+          setObservedTurnName(cur?.name ?? null);
+        })
+        .catch(() => setObservedTurnName(null));
+    };
+    load();
+    const t = setInterval(load, 3000);
+    return () => clearInterval(t);
+  }, [facObserveRoomId]);
+
+  useEffect(() => {
     if (roomView === 'presentation') loadPresentationRows();
   }, [roomView, loadPresentationRows]);
 
@@ -763,6 +807,8 @@ export function ForgeExpedicionRoom({
                   setCycleBusy(false);
                 }
               }}
+              onGoToMesa={() => setRoomView('table')}
+              onDockTab={(tab) => setFacDockTab(tab)}
             />
           )}
           {v2 && showTable && !isFac && (
@@ -1097,9 +1143,16 @@ export function ForgeExpedicionRoom({
                         )}
                       </div>
                     ) : dockReadOnly ? (
-                      <p className="text-center text-sm text-[#2E5C9A] py-8 px-4">
-                        {ft('forge.v2.lensBoardHint')}
-                      </p>
+                      <ForgeFacilitatorReviewCenter
+                        name={
+                          facLens.kind === 'team' || facLens.kind === 'learner'
+                            ? facLens.name
+                            : ''
+                        }
+                        v2={observedV2}
+                        turnName={observedTurnName}
+                        loading={observedLoading}
+                      />
                     ) : (
                       myMap && <ForgePersonalMapStrip mapState={myMap} />
                     )}
@@ -1118,10 +1171,13 @@ export function ForgeExpedicionRoom({
                     teamPeers={teamPeers}
                     myUserId={myUserId}
                     readOnly={dockReadOnly || boardBlocked}
-                    balance={v2?.ledger.balance}
+                    balance={
+                      facObservingIndividual ? observedV2?.ledger.balance : v2?.ledger.balance
+                    }
                     impactPoints={v2?.impactPoints}
-                    defaultCollapsed={isFac && facLens.kind === 'mine'}
-                    defaultTab={isFac ? 'eco' : 'map'}
+                    defaultCollapsed={isFac && facLens.kind === 'mine' && !facObservingIndividual}
+                    defaultTab={facObservingIndividual ? facDockTab : isFac ? 'eco' : 'map'}
+                    facReview={facObservingIndividual}
                   />
                 </div>
               </div>

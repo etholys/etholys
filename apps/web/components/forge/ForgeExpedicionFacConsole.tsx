@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
 import { ForgeFacilitatorLensBar, type FacilitatorLens } from '@/components/forge/ForgeFacilitatorLensBar';
+import { ForgeFacilitatorEcoOverview } from '@/components/forge/ForgeFacilitatorEcoOverview';
 import { ForgeFacilitatorV2Controls } from '@/components/forge/ForgeFacilitatorV2Controls';
 import { ForgeFacilitatorV2Panel } from '@/components/forge/ForgeFacilitatorV2Panel';
 import { ForgeFeriaSessionPanel } from '@/components/forge/ForgeFeriaSessionPanel';
@@ -18,6 +19,8 @@ export function ForgeExpedicionFacConsole({
   teamRoomId,
   cycleBusy,
   onAction,
+  onGoToMesa,
+  onDockTab,
 }: {
   courseId: string;
   editionId?: string;
@@ -26,6 +29,8 @@ export function ForgeExpedicionFacConsole({
   teamRoomId: string | null;
   cycleBusy: boolean;
   onAction: (action: string) => Promise<void>;
+  onGoToMesa?: () => void;
+  onDockTab?: (tab: 'map' | 'eco') => void;
 }) {
   const ft = useForgeT();
   const [open, setOpen] = useState(false);
@@ -50,6 +55,13 @@ export function ForgeExpedicionFacConsole({
       </button>
       {open && (
         <div className="space-y-2 border-t border-[#145A45]/10 p-2">
+          <ForgeFacilitatorEcoOverview
+            courseId={courseId}
+            lens={lens}
+            onLensChange={onLensChange}
+            onGoToMesa={onGoToMesa}
+            onDockTab={onDockTab}
+          />
           <ForgeFacilitatorLensBar courseId={courseId} lens={lens} onLensChange={onLensChange} />
           <ForgeFacilitatorV2Controls
             courseId={courseId}
