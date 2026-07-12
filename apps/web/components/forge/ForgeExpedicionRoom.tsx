@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { Users, HelpCircle, X, Maximize2, Minimize2 } from 'lucide-react';
 import { ForgeGameBoard, type ForgeGameSyncMode } from '@/components/forge/ForgeGameBoard';
 import { ForgeBoardTrack } from '@/components/forge/ForgeBoardTrack';
+import { ForgeBoardLegend } from '@/components/forge/ForgeBoardLegend';
 import { ForgePersonalMapStrip } from '@/components/forge/ForgePersonalMapStrip';
 import { ForgeConstructionCanvas } from '@/components/forge/ForgeConstructionCanvas';
 import { ForgeActivityPlayer } from '@/components/forge/ForgeActivityPlayer';
@@ -1091,7 +1092,7 @@ export function ForgeExpedicionRoom({
                         {gameSpec && syncMode !== 'pending' ? (
                           <div
                             className={cn(
-                              'flex flex-1 min-h-0 min-w-0',
+                              'flex flex-1 min-h-0 min-w-0 h-full w-full',
                               boardBlocked && 'pointer-events-none opacity-55'
                             )}
                           >
@@ -1116,16 +1117,22 @@ export function ForgeExpedicionRoom({
                         ) : (
                           <div
                             className={cn(
-                              'flex flex-1 min-h-0 min-w-0 items-center justify-center p-2',
+                              'flex flex-1 min-h-0 min-w-0 h-full w-full gap-2 p-2 md:p-3',
                               boardBlocked && 'opacity-55'
                             )}
                           >
-                            <ForgeBoardTrack
-                              spaces={20}
-                              position={0}
-                              fitContainer
-                              className="h-full w-full max-h-full"
-                            />
+                            <ForgeBoardLegend className="hidden lg:block w-[132px] shrink-0 self-end" />
+                            <div className="flex flex-1 min-h-0 min-w-0 items-center justify-center">
+                              <div className="aspect-square h-auto w-[min(100%,calc(100vh-17rem))] max-h-full max-w-full">
+                                <ForgeBoardTrack
+                                  spaces={20}
+                                  position={0}
+                                  fitContainer
+                                  hideLegend
+                                  className="h-full w-full"
+                                />
+                              </div>
+                            </div>
                           </div>
                         )}
                         {boardBlocked && effectivePhase !== 'finished' && (

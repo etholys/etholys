@@ -217,9 +217,7 @@ export function ForgeBoardSpiral({
 
   if (fitContainer) {
     return (
-      <div className={cn('flex h-full w-full min-h-0 min-w-0 items-stretch justify-stretch', className)}>
-        {svg}
-      </div>
+      <div className={cn('flex flex-1 h-full w-full min-h-0 min-w-0', className)}>{svg}</div>
     );
   }
 

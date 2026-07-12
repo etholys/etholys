@@ -5,6 +5,7 @@ import type { GameSpecV1 } from '@/lib/forge/schemas/game-spec-v1';
 import { Coins, MapPin, RotateCcw, Sparkles, Target, Undo2, XCircle } from 'lucide-react';
 import { historyCount } from '@/lib/forge/board-history';
 import { ForgeBoardTrack } from '@/components/forge/ForgeBoardTrack';
+import { ForgeBoardLegend } from '@/components/forge/ForgeBoardLegend';
 import { ForgeVirtualDice } from '@/components/forge/ForgeVirtualDice';
 import { ForgeInfoTip } from '@/components/forge/ForgeInfoTip';
 import { parseMulti, currentPlayer, type BoardGuide } from '@/lib/forge/expedicion-board-multi';
@@ -225,8 +226,34 @@ export function ForgeGameBoard({
   }
 
   const boardFits = fitContainer || projectionMode;
+  const mesaLayout = fitContainer && !projectionMode;
   const showFullChrome = !projectionMode;
   const showCompactChrome = projectionMode && isFacilitator;
+
+  const statPills = (
+    <div className="flex flex-wrap items-stretch gap-1.5">
+      <div className="rounded-lg bg-amber-950/80 border border-amber-600/40 px-2.5 py-1 text-center min-w-[4.5rem]">
+        <p className="text-[8px] font-bold uppercase text-amber-300">Eco</p>
+        <p className="text-sm font-black text-amber-100 tabular-nums">{displayEco}</p>
+      </div>
+      <div className="rounded-lg bg-emerald-950/80 border border-emerald-600/40 px-2.5 py-1 text-center min-w-[4.5rem]">
+        <p className="text-[8px] font-bold uppercase text-emerald-300">Impacto</p>
+        <p className="text-sm font-black text-emerald-100 tabular-nums">{state.impactPoints ?? 0}</p>
+      </div>
+      <div className="rounded-lg bg-blue-950/80 border border-blue-600/40 px-2.5 py-1 text-center min-w-[4.5rem]">
+        <p className="text-[8px] font-bold uppercase text-blue-300">Casilla</p>
+        <p className="text-sm font-black text-blue-100 tabular-nums">
+          {pos}/{goal}
+        </p>
+      </div>
+      <div className="rounded-lg bg-violet-950/80 border border-violet-600/40 px-2.5 py-1 text-center min-w-[4.5rem]">
+        <p className="text-[8px] font-bold uppercase text-violet-300">Fichas</p>
+        <p className="text-sm font-black text-violet-100 tabular-nums">
+          {insights.length}/{minInsights}
+        </p>
+      </div>
+    </div>
+  );
 
   const showPlayerControls = !state.currentCard && !state.finished && canAct;
   const diceCardControls = showPlayerControls && (
@@ -269,8 +296,50 @@ export function ForgeGameBoard({
   );
 
   return (
-    <div className={cn('relative flex flex-col h-full min-h-0', projectionMode ? 'gap-0' : 'gap-2 p-2')}>
-      {isFacilitator && roomId && !projectionMode && (
+    <div
+      className={cn(
+        'relative flex h-full w-full min-h-0 min-w-0',
+        mesaLayout ? 'flex-col gap-2 p-2 md:p-3' : projectionMode ? 'flex-col gap-0' : 'flex-col gap-2 p-2'
+      )}
+    >
+      {isFacilitator && roomId && !projectionMode && mesaLayout && (
+        <div className="flex flex-wrap gap-1.5 shrink-0">
+          <button
+            type="button"
+            disabled={loading || undoCount === 0}
+            onClick={() => sendAction({ type: 'undo_last' })}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-500 bg-slate-800/90 px-2.5 py-1 text-[10px] font-bold text-slate-100 hover:bg-slate-700 disabled:opacity-40"
+          >
+            <Undo2 className="h-3 w-3" />
+            {ft('forge.room.undo')} ({undoCount})
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => {
+              if (window.confirm(ft('forge.room.restartConfirm'))) {
+                sendAction({ type: 'restart_game' });
+              }
+            }}
+            className="inline-flex items-center gap-1 rounded-lg border border-amber-500/50 bg-amber-950 px-2.5 py-1 text-[10px] font-bold text-amber-100 hover:bg-amber-900"
+          >
+            <RotateCcw className="h-3 w-3" />
+            {ft('forge.room.restart')}
+          </button>
+          {state.currentCard && (
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => sendAction({ type: 'clear_card' })}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-500 bg-slate-800/90 px-2.5 py-1 text-[10px] font-bold text-slate-200 hover:bg-slate-700"
+            >
+              <XCircle className="h-3 w-3" />
+              {ft('forge.room.clearCard')}
+            </button>
+          )}
+        </div>
+      )}
+      {isFacilitator && roomId && !projectionMode && !mesaLayout && (
         <div className="flex flex-wrap gap-2 rounded-xl border border-slate-600 bg-slate-800/80 p-2">
           <button
             type="button"
@@ -307,7 +376,7 @@ export function ForgeGameBoard({
           )}
         </div>
       )}
-      {multi && turnPlayer && (showFullChrome || showCompactChrome) && (
+      {multi && turnPlayer && (showFullChrome || showCompactChrome) && !mesaLayout && (
         <div
           className={cn(
             'rounded-xl border border-emerald-500/40 bg-emerald-950/60 px-3 py-2 flex flex-wrap items-center gap-2',
@@ -333,7 +402,114 @@ export function ForgeGameBoard({
           )}
         </div>
       )}
-      <div className="flex-1 min-h-0 flex items-stretch justify-center overflow-hidden">
+      {mesaLayout ? (
+        <>
+          {multi && turnPlayer && (
+            <div className="shrink-0 rounded-lg border border-emerald-500/30 bg-emerald-950/70 px-3 py-1.5 flex flex-wrap items-center gap-2">
+              <p className="text-xs font-bold text-emerald-100">
+                {isMyTurn ? ft('forge.room.yourTurn') : ft('forge.room.turnOf', { name: turnPlayer.name })}
+              </p>
+              <div className="flex gap-1 ml-auto">
+                {players.map((p) => (
+                  <span
+                    key={p.userId}
+                    title={`${p.name} · casilla ${p.position}`}
+                    className={`h-3 w-3 rounded-full border-2 ${
+                      p.userId === turnPlayer.userId ? 'border-white scale-125' : 'border-transparent opacity-70'
+                    }`}
+                    style={{ backgroundColor: p.color }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="relative flex flex-1 min-h-0 w-full min-w-0 overflow-hidden">
+            <div className="flex h-full w-full min-h-0 min-w-0 items-stretch gap-2 md:gap-3 p-1 md:p-2">
+              <ForgeBoardLegend className="hidden lg:block w-[132px] shrink-0 self-end" />
+              <div className="flex flex-1 min-h-0 min-w-0 items-center justify-center">
+                <div className="aspect-square h-auto w-[min(100%,calc(100vh-17rem))] max-h-full max-w-full">
+                  <ForgeBoardTrack
+                    spaces={spaces}
+                    position={pos}
+                    players={players}
+                    fitContainer
+                    hideLegend
+                    className="h-full w-full"
+                  />
+                </div>
+              </div>
+            </div>
+            <ForgeBoardLegend className="absolute bottom-2 left-2 z-10 lg:hidden max-w-[min(42vw,148px)]" />
+          </div>
+          <div className="shrink-0 space-y-2 rounded-xl border border-[#145A45]/12 bg-white/95 p-2 md:p-3 shadow-sm">
+            <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
+              {statPills}
+              {!state.currentCard && !state.finished && showPlayerControls && (
+                <div className="flex flex-1 min-w-0 flex-wrap items-center gap-2 lg:justify-end">
+                  {diceCardControls}
+                </div>
+              )}
+            </div>
+            {state.currentCard && (
+              <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 shadow-sm">
+                <p className="text-xs font-bold uppercase text-amber-800 flex items-center gap-1">
+                  Carta actual {state.currentCard.id ? `· ${state.currentCard.id}` : ''}
+                  {state.currentCard.type ? ` · ${state.currentCard.type}` : ''}
+                  <ForgeInfoTip text={state.currentCard.reflection || state.currentCard.prompt} />
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{state.currentCard.prompt}</p>
+                {canAct && (
+                  <>
+                    <textarea
+                      value={answer}
+                      onChange={(e) => setAnswer(e.target.value)}
+                      placeholder="Tu respuesta (escribe o resume tu ficha)..."
+                      rows={2}
+                      className="mt-2 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm"
+                      disabled={loading || state.finished}
+                    />
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={loading || state.finished || answer.trim().length < 8}
+                        onClick={() => {
+                          sendAction({ type: 'complete_card', payload: { text: answer } });
+                          setAnswer('');
+                        }}
+                        className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        Validar ficha (+100)
+                      </button>
+                      <button
+                        type="button"
+                        disabled={loading || state.finished}
+                        onClick={() => sendAction({ type: 'skip_card' })}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600"
+                      >
+                        Corregir después (-50)
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            {state.finished && (
+              <div className="rounded-xl bg-emerald-100 border border-emerald-300 p-3 text-center">
+                <p className="text-base font-bold text-emerald-900">¡Expedición completada!</p>
+              </div>
+            )}
+            {events.length > 0 && (
+              <ul className="space-y-0.5 rounded-lg bg-slate-50 border border-slate-100 p-2 text-[11px] text-slate-600 max-h-16 overflow-y-auto">
+                {events.map((m, i) => (
+                  <li key={i}>• {m}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+      <div className="flex-1 min-h-0 flex items-stretch justify-stretch overflow-hidden w-full">
         <ForgeBoardTrack
           spaces={spaces}
           position={pos}
@@ -341,7 +517,7 @@ export function ForgeGameBoard({
           immersive={!boardFits}
           fitContainer={boardFits}
           hideLegend={!boardFits}
-          className="w-full h-full"
+          className="w-full h-full min-h-0"
         />
       </div>
 
@@ -376,7 +552,6 @@ export function ForgeGameBoard({
           </p>
         </div>
       </div>
-
       {state.currentCard && (
         <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 shadow-sm">
           <p className="text-xs font-bold uppercase text-amber-800 flex items-center gap-1">
@@ -463,6 +638,8 @@ export function ForgeGameBoard({
         </ul>
       )}
       </>
+      )}
+        </>
       )}
     </div>
   );
