@@ -73,6 +73,16 @@ export function ForgeGameBoard({
   const [diceRolling, setDiceRolling] = useState(false);
   const [pendingRoll, setPendingRoll] = useState<number | undefined>();
   const versionRef = useRef(roomVersion);
+  /** Evita repetir lastEvents estáticos en cada poll (p. ej. "Partida compartida iniciada."). */
+  const seenEventsKeyRef = useRef('');
+
+  const appendRoomEvents = useCallback((lastEvents: Array<{ message?: string }> | undefined) => {
+    const key = JSON.stringify(lastEvents ?? []);
+    if (key === seenEventsKeyRef.current) return;
+    seenEventsKeyRef.current = key;
+    const msgs = (lastEvents ?? []).map((e) => e.message).filter(Boolean) as string[];
+    if (msgs.length) setEvents((prev) => [...msgs, ...prev].slice(0, 12));
+  }, []);
 
   const multi = parseMulti(initialState as Record<string, unknown>);
   const readOnly =
@@ -93,6 +103,10 @@ export function ForgeGameBoard({
     versionRef.current = roomVersion;
   }, [roomVersion]);
 
+  useEffect(() => {
+    seenEventsKeyRef.current = '';
+  }, [roomId]);
+
   const pollRoom = useCallback(async () => {
     if (!roomId || syncMode === 'solo' || syncMode === 'host') return;
     const res = await fetch(`/api/forge/shared-game-rooms/${roomId}`);
@@ -101,15 +115,12 @@ export function ForgeGameBoard({
     const next = (data.room.state ?? {}) as SessionState;
     setState(next);
     versionRef.current = data.room.version;
-    const msgs = (data.room.lastEvents ?? [])
-      .map((e: { message?: string }) => e.message)
-      .filter(Boolean);
-    if (msgs.length) setEvents((prev) => [...msgs, ...prev].slice(0, 12));
+    appendRoomEvents(data.room.lastEvents);
     if (data.room.status === 'closed' && next.finished) {
       onRoomState?.(next, true);
       onComplete?.();
     }
-  }, [roomId, syncMode, onComplete, onRoomState]);
+  }, [roomId, syncMode, onComplete, onRoomState, appendRoomEvents]);
 
   useEffect(() => {
     if (!roomId || syncMode === 'solo' || syncMode === 'host') return;
@@ -158,8 +169,7 @@ export function ForgeGameBoard({
         versionRef.current = data.room?.version ?? versionRef.current;
         const m = parseMulti(next as Record<string, unknown>);
         if (m?.guide) onGuideChange?.(m.guide, m.knowledgeCard ?? null);
-        const msgs = (data.events ?? []).map((e: { message?: string }) => e.message).filter(Boolean);
-        if (msgs.length) setEvents((prev) => [...msgs, ...prev].slice(0, 12));
+        appendRoomEvents(data.events ?? data.room?.lastEvents);
         if (data.events?.length) onGameEvents?.(data.events);
         if (action.type === 'roll_dice' && m?.lastRoll) {
           setPendingRoll(m.lastRoll);
