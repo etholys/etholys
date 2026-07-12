@@ -46,7 +46,7 @@ export function ForgeMicroCasoPanel({
 
   return (
     <div className="rounded-2xl border-2 border-slate-200 bg-white overflow-hidden shadow-sm">
-      <div className={cnHeader(theme.header)}>
+      <div className="px-4 py-2" style={theme.headerStyle}>
         <span className="text-xs font-bold uppercase">
           {ft('forge.v2.microCasoTitle', { station: theme.label })}
         </span>
@@ -149,6 +149,3 @@ export function ForgeMicroCasoPanel({
   );
 }
 
-function cnHeader(header: string) {
-  return `px-4 py-2 ${header}`;
-}

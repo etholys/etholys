@@ -240,7 +240,10 @@ export function ForgeConstructionCanvas({
                   compact ? 'min-h-0' : 'min-h-[200px]'
                 )}
               >
-                <div className={cn('rounded-t-[10px] px-2 py-2 text-center text-xs font-bold', theme.header)}>
+                <div
+                  className="rounded-t-[10px] px-2 py-2 text-center text-xs font-bold"
+                  style={theme.headerStyle}
+                >
                   {theme.label}
                 </div>
                 <div className="flex-1 p-2 space-y-2">

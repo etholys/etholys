@@ -11,7 +11,7 @@ export const EXPEDICION_PALETTE = {
   creamDark: '#E8E4D8',
   gold: '#C9A227',
   raices: '#145A45',
-  tierra: '#1A3D5C',
+  tierra: '#1C1C1C',
   futuro: '#5FAE4A',
   mercado: '#6EC4E8',
   alquimia: '#2E5C9A',
@@ -19,41 +19,53 @@ export const EXPEDICION_PALETTE = {
   desafio: '#3D8B8B',
 } as const;
 
-export const EXPEDICION_V2_STATIONS: Record<
-  ExpedicionStationSlug,
-  { label: string; header: string; column: string; accent: string; ring: string }
-> = {
+type StationTheme = {
+  label: string;
+  /** @deprecated use headerStyle — Tailwind arbitrary bg in lib/ is not scanned */
+  header: string;
+  headerStyle: { backgroundColor: string; color: string };
+  column: string;
+  accent: string;
+  ring: string;
+};
+
+export const EXPEDICION_V2_STATIONS: Record<ExpedicionStationSlug, StationTheme> = {
   raices: {
     label: 'Raíces',
-    header: 'bg-[#145A45] text-white',
+    header: 'text-white',
+    headerStyle: { backgroundColor: '#145A45', color: '#FFFFFF' },
     column: 'bg-[#E8F5F0] border-[#145A45]/30',
     accent: EXPEDICION_PALETTE.raices,
     ring: 'ring-[#145A45]/40',
   },
   tierra: {
     label: 'Tierra',
-    header: 'bg-[#1A3D5C] text-white',
-    column: 'bg-[#E8EEF5] border-[#1A3D5C]/30',
+    header: 'text-white',
+    headerStyle: { backgroundColor: '#1C1C1C', color: '#FFFFFF' },
+    column: 'bg-[#F0F0F0] border-[#1C1C1C]/30',
     accent: EXPEDICION_PALETTE.tierra,
-    ring: 'ring-[#1A3D5C]/40',
+    ring: 'ring-[#1C1C1C]/40',
   },
   alquimia: {
     label: 'Alquimia',
-    header: 'bg-[#2E5C9A] text-white',
+    header: 'text-white',
+    headerStyle: { backgroundColor: '#2E5C9A', color: '#FFFFFF' },
     column: 'bg-[#E8F0FA] border-[#2E5C9A]/30',
     accent: EXPEDICION_PALETTE.alquimia,
     ring: 'ring-[#2E5C9A]/40',
   },
   mercado: {
     label: 'Mercado',
-    header: 'bg-[#6EC4E8] text-[#1A3D5C]',
+    header: 'text-[#1A3D5C]',
+    headerStyle: { backgroundColor: '#6EC4E8', color: '#1A3D5C' },
     column: 'bg-[#EBF7FC] border-[#6EC4E8]/50',
     accent: EXPEDICION_PALETTE.mercado,
     ring: 'ring-[#6EC4E8]/60',
   },
   futuro: {
     label: 'Futuro',
-    header: 'bg-[#5FAE4A] text-white',
+    header: 'text-white',
+    headerStyle: { backgroundColor: '#5FAE4A', color: '#FFFFFF' },
     column: 'bg-[#EDF8EB] border-[#5FAE4A]/40',
     accent: EXPEDICION_PALETTE.futuro,
     ring: 'ring-[#5FAE4A]/40',
@@ -152,7 +164,7 @@ export function boardCellVisual(stationName: string): {
   > = {
     Raíces: { bg: '#145A45', text: '#FFFFFF', border: '#0D4535', light: false },
     Acción: { bg: '#8BC4B0', text: '#0D4535', border: '#3D8B8B', light: true },
-    Tierra: { bg: '#1A3D5C', text: '#FFFFFF', border: '#0D4535', light: false },
+    Tierra: { bg: '#1C1C1C', text: '#FFFFFF', border: '#0D4535', light: false },
     Desafío: { bg: '#3D8B8B', text: '#FFFFFF', border: '#2D7070', light: false },
     Alquimia: { bg: '#2E5C9A', text: '#FFFFFF', border: '#1A3D5C', light: false },
     Mercado: { bg: '#6EC4E8', text: '#0D4535', border: '#2E5C9A', light: true },

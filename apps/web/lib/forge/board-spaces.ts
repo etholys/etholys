@@ -14,8 +14,8 @@ export const BOARD_STATION_META = [
   },
   {
     name: 'Tierra',
-    color: 'bg-[#1A3D5C]',
-    ring: 'ring-[#2E5C9A]',
+    color: 'bg-[#1C1C1C]',
+    ring: 'ring-[#1C1C1C]',
     desc: 'Recursos, suelo y cadena de valor local.',
   },
   {
