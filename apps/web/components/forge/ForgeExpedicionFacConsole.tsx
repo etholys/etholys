@@ -30,7 +30,7 @@ export function ForgeExpedicionFacConsole({
   cycleBusy: boolean;
   onAction: (action: string) => Promise<void>;
   onGoToMesa?: () => void;
-  onDockTab?: (tab: 'map' | 'eco') => void;
+  onDockTab?: (tab: 'map' | 'eco' | 'log') => void;
 }) {
   const ft = useForgeT();
   const [open, setOpen] = useState(false);

@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Map, Wallet } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Map, ScrollText, Wallet } from 'lucide-react';
 import { ForgeExpedicionV2Workspace } from '@/components/forge/ForgeExpedicionV2Workspace';
 import { useForgeT } from '@/lib/forge/use-forge-t';
 import { cn } from '@/lib/utils';
 
-type Tab = 'map' | 'eco';
+type Tab = 'map' | 'eco' | 'log';
 
 export function ForgeExpedicionTableDock({
   courseId,
@@ -20,6 +20,7 @@ export function ForgeExpedicionTableDock({
   defaultTab = 'eco',
   observeUserId,
   facReview,
+  boardLog = [],
 }: {
   courseId: string;
   roomId?: string | null;
@@ -35,6 +36,8 @@ export function ForgeExpedicionTableDock({
   mobileCollapsedDefault?: boolean;
   /** Facilitador a rever equipa/jogador — extrato mais alto */
   facReview?: boolean;
+  /** Mensagens do tabuleiro (dado, cartas, início de partida…) */
+  boardLog?: string[];
 }) {
   const ft = useForgeT();
   const [tab, setTab] = useState<Tab>(defaultTab);
@@ -43,10 +46,6 @@ export function ForgeExpedicionTableDock({
   useEffect(() => {
     setTab(defaultTab);
   }, [defaultTab]);
-
-  useEffect(() => {
-    if (facReview) setTab('eco');
-  }, [facReview]);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
@@ -69,7 +68,7 @@ export function ForgeExpedicionTableDock({
         >
           <ChevronLeft className="h-4 w-4 shrink-0" />
           <span className="text-[9px] font-bold uppercase tracking-wide [writing-mode:vertical-rl] rotate-180">
-            {ft('forge.v2.tableDockEco')} · {ft('forge.v2.tableDockMap')}
+            {ft('forge.v2.tableDockEco')} · {ft('forge.v2.tableDockMap')} · {ft('forge.v2.tableDockLog')}
           </span>
           {balance != null && (
             <span className="text-[9px] font-black text-[#2E5C9A] [writing-mode:vertical-rl] rotate-180">
@@ -118,19 +117,17 @@ export function ForgeExpedicionTableDock({
       </div>
 
       <div className="flex border-b border-[#145A45]/10 bg-[#F5F2EA]">
-        {!facReview && (
-          <button
-            type="button"
-            onClick={() => setTab('eco')}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1 py-2 text-[10px] font-bold',
-              tab === 'eco' ? 'bg-[#145A45]/10 text-[#145A45]' : 'text-slate-500'
-            )}
-          >
-            <Wallet className="h-3 w-3" />
-            {ft('forge.v2.tableDockEco')}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setTab('eco')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-1 py-2 text-[10px] font-bold',
+            tab === 'eco' ? 'bg-[#145A45]/10 text-[#145A45]' : 'text-slate-500'
+          )}
+        >
+          <Wallet className="h-3 w-3" />
+          {ft('forge.v2.tableDockEco')}
+        </button>
         {!facReview && (
           <button
             type="button"
@@ -144,19 +141,37 @@ export function ForgeExpedicionTableDock({
             {ft('forge.v2.tableDockMap')}
           </button>
         )}
-        {facReview && (
-          <div className="flex flex-1 items-center justify-center gap-1 py-2 text-[10px] font-bold bg-[#145A45]/10 text-[#145A45]">
-            <Wallet className="h-3 w-3" />
-            {ft('forge.v2.tableDockEco')}
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={() => setTab('log')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-1 py-2 text-[10px] font-bold',
+            tab === 'log' ? 'bg-[#145A45]/10 text-[#145A45]' : 'text-slate-500'
+          )}
+        >
+          <ScrollText className="h-3 w-3" />
+          {ft('forge.v2.tableDockLog')}
+        </button>
       </div>
       <div
         className={cn(
           'flex-1 min-h-0 overflow-y-auto p-2 md:p-3 text-sm',
-          tab === 'map' ? 'max-md:max-h-[50vh]' : 'max-md:max-h-[38vh]'
+          tab === 'map' && !facReview ? 'max-md:max-h-[50vh]' : 'max-md:max-h-[38vh]'
         )}
       >
+        {tab === 'log' ? (
+          boardLog.length === 0 ? (
+            <p className="text-xs text-slate-400 py-4 text-center">{ft('forge.v2.tableDockLogEmpty')}</p>
+          ) : (
+            <ul className="space-y-1.5 rounded-lg border border-slate-100 bg-white p-2 text-xs text-slate-700">
+              {boardLog.map((m, i) => (
+                <li key={`${i}-${m.slice(0, 24)}`} className="leading-snug">
+                  • {m}
+                </li>
+              ))}
+            </ul>
+          )
+        ) : (
         <ForgeExpedicionV2Workspace
           courseId={courseId}
           readOnly={readOnly}
@@ -168,6 +183,7 @@ export function ForgeExpedicionTableDock({
           dockTab={facReview ? 'eco' : tab}
           facReview={facReview}
         />
+        )}
       </div>
     </div>
   );

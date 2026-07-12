@@ -43,6 +43,8 @@ export function ForgeGameBoard({
   projectionMode = false,
   facilitatorDrives = false,
   fitContainer = false,
+  hideEventLog = false,
+  onLogMessages,
 }: {
   sessionId?: string;
   roomId?: string;
@@ -65,6 +67,9 @@ export function ForgeGameBoard({
   facilitatorDrives?: boolean;
   /** Tabuleiro escala ao espaço disponível (mesa) */
   fitContainer?: boolean;
+  /** Ocultar lista de eventos no painel (usar dock lateral) */
+  hideEventLog?: boolean;
+  onLogMessages?: (messages: string[]) => void;
 }) {
   const ft = useForgeT();
   const [state, setState] = useState<SessionState>(initialState);
@@ -107,6 +112,10 @@ export function ForgeGameBoard({
   useEffect(() => {
     seenEventsKeyRef.current = '';
   }, [roomId]);
+
+  useEffect(() => {
+    onLogMessages?.(events);
+  }, [events, onLogMessages]);
 
   const pollRoom = useCallback(async () => {
     if (!roomId || syncMode === 'solo' || syncMode === 'host') return;
@@ -227,6 +236,7 @@ export function ForgeGameBoard({
 
   const boardFits = fitContainer || projectionMode;
   const mesaLayout = fitContainer && !projectionMode;
+  const showEventLog = !hideEventLog && !mesaLayout;
   const showFullChrome = !projectionMode;
   const showCompactChrome = projectionMode && isFacilitator;
 
@@ -498,7 +508,7 @@ export function ForgeGameBoard({
                 <p className="text-base font-bold text-emerald-900">¡Expedición completada!</p>
               </div>
             )}
-            {events.length > 0 && (
+            {showEventLog && events.length > 0 && (
               <ul className="space-y-0.5 rounded-lg bg-slate-50 border border-slate-100 p-2 text-[11px] text-slate-600 max-h-16 overflow-y-auto">
                 {events.map((m, i) => (
                   <li key={i}>• {m}</li>
@@ -630,7 +640,7 @@ export function ForgeGameBoard({
         </div>
       )}
 
-      {events.length > 0 && (
+      {showEventLog && events.length > 0 && (
         <ul className="space-y-1 rounded-lg bg-white border border-slate-100 p-2 text-xs text-slate-600 max-h-32 overflow-y-auto">
           {events.map((m, i) => (
             <li key={i}>• {m}</li>

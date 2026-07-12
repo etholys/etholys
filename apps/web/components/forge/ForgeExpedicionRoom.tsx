@@ -143,7 +143,8 @@ export function ForgeExpedicionRoom({
   const [quizModal, setQuizModal] = useState<null | { side: 'pre' | 'post'; preview: boolean }>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [facLens, setFacLens] = useState<FacilitatorLens>({ kind: 'mine' });
-  const [facDockTab, setFacDockTab] = useState<'map' | 'eco'>('eco');
+  const [facDockTab, setFacDockTab] = useState<'map' | 'eco' | 'log'>('eco');
+  const [boardLog, setBoardLog] = useState<string[]>([]);
   const [tableImmersive, setTableImmersive] = useState(false);
   const [presentationRows, setPresentationRows] = useState<
     Array<{
@@ -1108,6 +1109,8 @@ export function ForgeExpedicionRoom({
                               facilitatorDrives={facDrivesTable}
                               projectionMode={isFac && tableImmersive}
                               fitContainer
+                              hideEventLog
+                              onLogMessages={setBoardLog}
                               onGuideChange={(g) => setCoachGuide(g)}
                               onRoomState={(s) => setGameState(s as Record<string, unknown>)}
                               onGameEvents={handleBoardEvents}
@@ -1185,6 +1188,7 @@ export function ForgeExpedicionRoom({
                     defaultCollapsed={isFac && facLens.kind === 'mine' && !facObservingIndividual}
                     defaultTab={facObservingIndividual ? facDockTab : isFac ? 'eco' : 'map'}
                     facReview={facObservingIndividual}
+                    boardLog={boardLog}
                   />
                 </div>
               </div>
