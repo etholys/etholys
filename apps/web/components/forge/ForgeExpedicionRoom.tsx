@@ -1092,7 +1092,7 @@ export function ForgeExpedicionRoom({
                         {gameSpec && syncMode !== 'pending' ? (
                           <div
                             className={cn(
-                              'flex flex-1 min-h-0 min-w-0 h-full w-full',
+                              'flex flex-1 flex-col min-h-0 min-w-0 h-full w-full',
                               boardBlocked && 'pointer-events-none opacity-55'
                             )}
                           >
@@ -1122,8 +1122,8 @@ export function ForgeExpedicionRoom({
                             )}
                           >
                             <ForgeBoardLegend className="hidden lg:block w-[132px] shrink-0 self-end" />
-                            <div className="flex flex-1 min-h-0 min-w-0 items-center justify-center">
-                              <div className="aspect-square h-auto w-[min(100%,calc(100vh-17rem))] max-h-full max-w-full">
+                            <div className="flex flex-1 min-h-0 min-w-0 items-center justify-center p-2 md:p-4">
+                              <div className="aspect-square w-[min(78vmin,calc(100%-0.5rem))] max-h-full max-w-full shrink-0">
                                 <ForgeBoardTrack
                                   spaces={20}
                                   position={0}

@@ -298,7 +298,7 @@ export function ForgeGameBoard({
   return (
     <div
       className={cn(
-        'relative flex h-full w-full min-h-0 min-w-0',
+        'relative flex flex-1 h-full w-full min-h-0 min-w-0',
         mesaLayout ? 'flex-col gap-2 p-2 md:p-3' : projectionMode ? 'flex-col gap-0' : 'flex-col gap-2 p-2'
       )}
     >
@@ -423,11 +423,11 @@ export function ForgeGameBoard({
               </div>
             </div>
           )}
-          <div className="relative flex flex-1 min-h-0 w-full min-w-0 overflow-hidden">
+          <div className="relative grid flex-1 min-h-0 w-full min-w-0 grid-rows-[1fr] overflow-hidden">
             <div className="flex h-full w-full min-h-0 min-w-0 items-stretch gap-2 md:gap-3 p-1 md:p-2">
-              <ForgeBoardLegend className="hidden lg:block w-[132px] shrink-0 self-end" />
+              <ForgeBoardLegend className="hidden xl:block w-[132px] shrink-0 self-end" />
               <div className="flex flex-1 min-h-0 min-w-0 items-center justify-center">
-                <div className="aspect-square h-auto w-[min(100%,calc(100vh-17rem))] max-h-full max-w-full">
+                <div className="aspect-square w-[min(78vmin,calc(100%-0.5rem))] max-h-full max-w-full shrink-0">
                   <ForgeBoardTrack
                     spaces={spaces}
                     position={pos}
@@ -439,7 +439,7 @@ export function ForgeGameBoard({
                 </div>
               </div>
             </div>
-            <ForgeBoardLegend className="absolute bottom-2 left-2 z-10 lg:hidden max-w-[min(42vw,148px)]" />
+            <ForgeBoardLegend className="absolute bottom-2 left-2 z-10 xl:hidden max-w-[min(42vw,148px)]" />
           </div>
           <div className="shrink-0 space-y-2 rounded-xl border border-[#145A45]/12 bg-white/95 p-2 md:p-3 shadow-sm">
             <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
