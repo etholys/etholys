@@ -96,7 +96,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
         return NextResponse.json({ error: 'Solo el facilitador puede usar esta acción' }, { status: 403 });
       }
     } else if (multi) {
-      if (!canPlayerAct(multi, tenant.userId, isFac, override)) {
+      const isRoomFac = isFac && room.facilitatorUserId === tenant.userId;
+      if (!canPlayerAct(multi, tenant.userId, isFac, override) && !isRoomFac) {
         return NextResponse.json(
           { error: 'No es tu turno. Espera o pide al facilitador modo emergencia.' },
           { status: 403 }

@@ -59,7 +59,9 @@ import { ForgeExpedicionCycleBar } from '@/components/forge/ForgeExpedicionCycle
 import { ForgeExpedicionRoomHeader } from '@/components/forge/ForgeExpedicionRoomHeader';
 import { ForgeExpedicionSessionStrip } from '@/components/forge/ForgeExpedicionSessionStrip';
 import { ForgeExpedicionFacConsole } from '@/components/forge/ForgeExpedicionFacConsole';
+import { ForgeExpedicionMesaToolbar } from '@/components/forge/ForgeExpedicionMesaToolbar';
 import { ForgeFeriaPanel } from '@/components/forge/ForgeFeriaPanel';
+import { currentPlayer } from '@/lib/forge/expedicion-board-multi';
 import { feriaEligible, feriaEligibilityHint } from '@/lib/forge/expedicion-v2/feria';
 import type { TeamPeer } from '@/components/forge/ForgeConsultancyModal';
 
@@ -157,7 +159,8 @@ export function ForgeExpedicionRoom({
   const [landEvent, setLandEvent] = useState<BoardLandEvent | null>(null);
   const [cycleBusy, setCycleBusy] = useState(false);
   const [teamPeers, setTeamPeers] = useState<TeamPeer[]>([]);
-  const [presencialHintDismissed, setPresencialHintDismissed] = useState(false);
+  const [teamCount, setTeamCount] = useState(0);
+  const [startBusy, setStartBusy] = useState(false);
   const lastBoardPosRef = useRef<number | null>(null);
   const multiBoot = parseMulti(gameState);
   const teamRoomId =
@@ -453,7 +456,7 @@ export function ForgeExpedicionRoom({
   const v2Phase = v2?.phase ?? 'lobby';
   const quizGate = v2?.quizGate ?? null;
   const facilitatorPersonalV2 = isFac && !teamV2Active;
-  const effectivePhase = facilitatorPersonalV2 ? 'lobby' : v2Phase;
+  const effectivePhase = isFac ? (v2Phase ?? 'lobby') : v2Phase;
 
   const boardBlocked =
     !isFac && !facilitatorPersonalV2 && (effectivePhase === 'lobby' || effectivePhase === 'finished');
@@ -537,8 +540,10 @@ export function ForgeExpedicionRoom({
     fetch(`/api/forge/courses/${courseId}/expedicion-v2/overview`)
       .then((r) => r.json())
       .then((d) => {
+        const teamRows = d.teams ?? [];
+        setTeamCount(teamRows.length);
         const rows = [
-          ...(d.teams ?? []).map((t: Record<string, unknown>) => ({
+          ...teamRows.map((t: Record<string, unknown>) => ({
             id: String(t.roomId),
             name: String(t.name ?? 'Equipo'),
             phase: String(t.phase ?? 'lobby'),
@@ -566,6 +571,54 @@ export function ForgeExpedicionRoom({
   useEffect(() => {
     setQuizModal(null);
   }, [courseId]);
+
+  useEffect(() => {
+    if (!isFac) return;
+    loadPresentationRows();
+  }, [isFac, loadPresentationRows]);
+
+  const handleStartGame = useCallback(async () => {
+    if (!isFac || !gameActivityId) return;
+    setStartBusy(true);
+    try {
+      await fetch(`/api/forge/courses/${courseId}/expedicion-v2`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'bootstrap_team_rooms', activityId: gameActivityId }),
+      });
+      if (teamV2Active) {
+        await patchV2({ action: 'start_playing' });
+      } else {
+        await patchFacBatch('start_playing_all');
+        await patchV2({ action: 'start_playing' });
+      }
+      if (!sharedRoomId) {
+        await startBoard();
+      } else {
+        await loadBoard();
+      }
+      await reloadV2();
+      loadPresentationRows();
+      setRoomView('table');
+    } finally {
+      setStartBusy(false);
+    }
+  }, [
+    isFac,
+    gameActivityId,
+    courseId,
+    teamV2Active,
+    patchV2,
+    patchFacBatch,
+    sharedRoomId,
+    startBoard,
+    loadBoard,
+    reloadV2,
+    loadPresentationRows,
+  ]);
+
+  const boardTurnPlayer = multi ? currentPlayer(multi) : null;
+  const facDrivesTable = isFac && showTable && !facObservingIndividual;
 
   useEffect(() => {
     if (roomView === 'table') setPresencialHintDismissed(true);
@@ -924,6 +977,8 @@ export function ForgeExpedicionRoom({
                       }
                     : undefined
                 }
+                onFacStartGame={isFac ? () => void handleStartGame() : undefined}
+                startGameBusy={startBusy}
               />
                 </div>
                 <div className="flex flex-1 min-h-[220px] md:min-h-0 flex-col overflow-hidden rounded-2xl border border-[#145A45]/12 bg-white shadow-sm">
@@ -940,6 +995,19 @@ export function ForgeExpedicionRoom({
               </div>
             ) : (
               <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden border-t-4 border-[#145A45] md:border-t-0 md:rounded-none">
+                {isFac && (
+                  <ForgeExpedicionMesaToolbar
+                    courseId={courseId}
+                    editionId={editionId}
+                    phase={effectivePhase}
+                    teamCount={teamCount}
+                    players={multi?.players ?? []}
+                    turnName={boardTurnPlayer?.name}
+                    busy={startBusy || boardBusy}
+                    onStartGame={handleStartGame}
+                    canRoll={effectivePhase === 'playing' && Boolean(sharedRoomId)}
+                  />
+                )}
                 <div className="absolute top-2 left-2 z-30 flex items-center gap-2">
                   {isFac && (
                     <ForgeFacilitatorLensFloating
@@ -990,7 +1058,8 @@ export function ForgeExpedicionRoom({
                               myUserId={myUserId}
                               isFacilitator={isFac}
                               facilitatorEmergency={facEmergency}
-                              projectionMode={isFac}
+                              facilitatorDrives={facDrivesTable}
+                              projectionMode={isFac && tableImmersive}
                               fitContainer
                               onGuideChange={(g) => setCoachGuide(g)}
                               onRoomState={(s) => setGameState(s as Record<string, unknown>)}

@@ -75,6 +75,8 @@ export function ForgeExpedicionLobby({
   onFacOpenPreQuiz,
   onFacOpenPostQuiz,
   onFacRestart,
+  onFacStartGame,
+  startGameBusy,
   onShowProfile,
   profileOpen,
   quizPreAvailable,
@@ -92,6 +94,8 @@ export function ForgeExpedicionLobby({
   onFacOpenPreQuiz?: () => void;
   onFacOpenPostQuiz?: () => void;
   onFacRestart?: () => void;
+  onFacStartGame?: () => void;
+  startGameBusy?: boolean;
   onShowProfile?: () => void;
   profileOpen?: boolean;
   quizPreAvailable: boolean;
@@ -153,6 +157,19 @@ export function ForgeExpedicionLobby({
             </div>
           )}
         </div>
+      )}
+
+      {isFacilitator && onFacStartGame && (phase === 'lobby' || phase === 'pre_quiz') && (
+        <button
+          type="button"
+          disabled={startGameBusy}
+          onClick={onFacStartGame}
+          className="flex w-full flex-col items-center gap-2 rounded-2xl border-2 border-[#5FAE4A] bg-[#5FAE4A] px-4 py-4 text-center text-[#0D4535] shadow-lg transition hover:bg-[#4F9E3A] disabled:opacity-50"
+        >
+          <Play className="h-8 w-8" />
+          <span className="font-black text-base">{ft('forge.v2.mesaStartGame')}</span>
+          <span className="text-xs font-medium opacity-90">{ft('forge.v2.mesaStartGameHint')}</span>
+        </button>
       )}
 
       <div className="grid gap-2 sm:grid-cols-2">

@@ -41,10 +41,13 @@ const FACILITATOR_ACTIONS = new Set([
   'open_pre_quiz',
   'open_post_quiz',
   'return_to_lobby',
+  'start_playing',
   'open_pre_quiz_all',
   'open_post_quiz_all',
   'return_to_lobby_all',
   'reset_v2_all',
+  'start_playing_all',
+  'bootstrap_team_rooms',
 ]);
 
 async function authorizeCourse(courseId: string, userId: string, companyIds: string[]) {
@@ -185,6 +188,16 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       if (!access.canFacilitate) {
         return NextResponse.json({ error: 'Solo el facilitador puede usar esta acción' }, { status: 403 });
       }
+    }
+
+    if (action === 'bootstrap_team_rooms') {
+      const activityId = typeof body.activityId === 'string' ? body.activityId.trim() : '';
+      if (!activityId) {
+        return NextResponse.json({ error: 'activityId obrigatório' }, { status: 400 });
+      }
+      const { bootstrapAllTeamRooms } = await import('@/lib/forge/bootstrap-shared-rooms');
+      const result = await bootstrapAllTeamRooms(courseId, activityId, tenant.userId);
+      return NextResponse.json({ ok: true, ...result });
     }
 
     if (isBatchFacilitatorAction(action)) {

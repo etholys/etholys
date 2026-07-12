@@ -27,6 +27,13 @@ test('normalizeV2State — legacy pre_quiz becomes lobby', () => {
   assert.equal(v2.quizGate, null);
 });
 
+test('applyV2Action — start_playing from lobby', () => {
+  const v2 = applyV2Action(createInitialV2State(), { action: 'start_playing' });
+  assert.equal(v2.phase, 'playing');
+  assert.equal(v2.quizGate, null);
+  assert.ok(v2.preQuizCompletedAt);
+});
+
 test('applyV2Action — open_pre_quiz from lobby', () => {
   const v2 = applyV2Action(createInitialV2State(), { action: 'open_pre_quiz' });
   assert.equal(v2.quizGate, 'pre');

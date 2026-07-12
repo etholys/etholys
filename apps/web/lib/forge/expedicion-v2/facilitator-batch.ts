@@ -9,6 +9,7 @@ const BATCH_TO_SINGLE: Record<string, string> = {
   open_post_quiz_all: 'open_post_quiz',
   return_to_lobby_all: 'return_to_lobby',
   reset_v2_all: 'reset_v2',
+  start_playing_all: 'start_playing',
 };
 
 export async function applyFacilitatorBatchV2(courseId: string, action: string) {

@@ -40,6 +40,7 @@ export function ForgeGameBoard({
   onGameEvents,
   v2EcoBalance,
   projectionMode = false,
+  facilitatorDrives = false,
   fitContainer = false,
 }: {
   sessionId?: string;
@@ -59,6 +60,8 @@ export function ForgeGameBoard({
   v2EcoBalance?: number;
   /** Facilitador a projetar: tabuleiro maximizado, menos chrome */
   projectionMode?: boolean;
+  /** Facilitador conduce la mesa (puede lanzar dado sin modo emergencia) */
+  facilitatorDrives?: boolean;
   /** Tabuleiro escala ao espaço disponível (mesa) */
   fitContainer?: boolean;
 }) {
@@ -73,12 +76,13 @@ export function ForgeGameBoard({
 
   const multi = parseMulti(initialState as Record<string, unknown>);
   const readOnly =
-    syncMode === 'viewer' || (syncMode === 'facilitator' && !facilitatorEmergency);
+    syncMode === 'viewer' ||
+    (syncMode === 'facilitator' && !facilitatorEmergency && !facilitatorDrives);
   const canAct =
     syncMode === 'solo' ||
     syncMode === 'host' ||
     syncMode === 'player' ||
-    (syncMode === 'facilitator' && facilitatorEmergency);
+    (syncMode === 'facilitator' && (facilitatorEmergency || facilitatorDrives));
   useEffect(() => {
     setState(initialState);
     const m = parseMulti(initialState as Record<string, unknown>);
@@ -121,7 +125,9 @@ export function ForgeGameBoard({
     setLoading(true);
     const payload = {
       ...action.payload,
-      ...(facilitatorEmergency && isFacilitator ? { facilitatorOverride: true } : {}),
+      ...((facilitatorEmergency || facilitatorDrives) && isFacilitator
+        ? { facilitatorOverride: true }
+        : {}),
     };
     try {
       if (
@@ -204,9 +210,45 @@ export function ForgeGameBoard({
   }
 
   const boardFits = fitContainer || projectionMode;
+  const showFullChrome = !projectionMode;
+  const showCompactChrome = projectionMode && isFacilitator;
+
+  const diceCardControls = !state.currentCard && !state.finished && canAct && (
+    <div className="flex flex-wrap items-center gap-3">
+      <ForgeVirtualDice rolling={diceRolling} value={pendingRoll ?? state.lastRoll} />
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={loading || diceRolling}
+          onClick={() => void rollWithAnimation()}
+          className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
+        >
+          {ft('forge.room.rollDice')}
+        </button>
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => sendAction({ type: 'draw_card' })}
+          className="rounded-lg border-2 border-amber-400 bg-amber-100 px-5 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-200 disabled:opacity-50"
+        >
+          {ft('forge.room.drawCard')}
+        </button>
+        {multi && (
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => sendAction({ type: 'end_turn' })}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+          >
+            {ft('forge.room.endTurn')}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
-    <div className={cn('flex flex-col h-full min-h-0', projectionMode ? 'gap-0' : 'gap-2 p-2')}>
+    <div className={cn('relative flex flex-col h-full min-h-0', projectionMode ? 'gap-0' : 'gap-2 p-2')}>
       {isFacilitator && roomId && !projectionMode && (
         <div className="flex flex-wrap gap-2 rounded-xl border border-slate-600 bg-slate-800/80 p-2">
           <button
@@ -244,8 +286,13 @@ export function ForgeGameBoard({
           )}
         </div>
       )}
-      {multi && turnPlayer && !projectionMode && (
-        <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 px-3 py-2 flex flex-wrap items-center gap-2">
+      {multi && turnPlayer && (showFullChrome || showCompactChrome) && (
+        <div
+          className={cn(
+            'rounded-xl border border-emerald-500/40 bg-emerald-950/60 px-3 py-2 flex flex-wrap items-center gap-2',
+            showCompactChrome && 'absolute bottom-3 left-3 right-3 z-20 bg-emerald-950/90 shadow-lg'
+          )}
+        >
           <p className="text-sm font-bold text-emerald-100">
             {isMyTurn ? ft('forge.room.yourTurn') : ft('forge.room.turnOf', { name: turnPlayer.name })}
           </p>
@@ -277,7 +324,14 @@ export function ForgeGameBoard({
         />
       </div>
 
-      {!projectionMode && (
+      {!showFullChrome && showCompactChrome && state.currentCard && (
+        <div className="absolute bottom-3 left-3 right-3 z-20 rounded-xl border-2 border-amber-300 bg-amber-50/95 p-3 shadow-lg max-h-40 overflow-y-auto">
+          <p className="text-xs font-bold uppercase text-amber-800">{ft('forge.room.cardFac')}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-900 line-clamp-3">{state.currentCard.prompt}</p>
+        </div>
+      )}
+
+      {showFullChrome && (
       <>
       <div className="grid grid-cols-4 gap-1 shrink-0">
         <div className="rounded-lg bg-amber-950/80 border border-amber-600/40 p-1.5 text-center">
@@ -356,41 +410,15 @@ export function ForgeGameBoard({
         </div>
       )}
 
-      {!state.currentCard && !state.finished && canAct && (
-        <div className="flex flex-wrap items-center gap-3">
-          <ForgeVirtualDice rolling={diceRolling} value={pendingRoll ?? state.lastRoll} />
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={loading || diceRolling}
-              onClick={() => void rollWithAnimation()}
-              className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
-            >
-              {ft('forge.room.rollDice')}
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => sendAction({ type: 'draw_card' })}
-              className="rounded-lg border-2 border-amber-400 bg-amber-100 px-5 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-200 disabled:opacity-50"
-            >
-              {ft('forge.room.drawCard')}
-            </button>
-            {multi && (
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => sendAction({ type: 'end_turn' })}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
-              >
-                {ft('forge.room.endTurn')}
-              </button>
-            )}
-          </div>
+      {!state.currentCard && !state.finished && canAct && showFullChrome && diceCardControls}
+
+      {showCompactChrome && diceCardControls && (
+        <div className="absolute bottom-16 left-3 right-3 z-20 rounded-xl border border-[#145A45]/20 bg-white/95 p-2 shadow-lg">
+          {diceCardControls}
         </div>
       )}
 
-      {state.finished && (
+      {state.finished && showFullChrome && (
         <div className="rounded-xl bg-emerald-100 border border-emerald-300 p-4 text-center">
           <p className="text-lg font-bold text-emerald-900">¡Expedición completada!</p>
           {!v2EcoBalance ? (

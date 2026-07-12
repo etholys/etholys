@@ -43,6 +43,14 @@ export function applyV2Action(
   const action = body.action as string;
 
   switch (action) {
+    case 'start_playing':
+      if (v2.phase === 'finished') return v2;
+      return {
+        ...v2,
+        phase: 'playing',
+        quizGate: null,
+        preQuizCompletedAt: v2.preQuizCompletedAt ?? new Date().toISOString(),
+      };
     case 'open_pre_quiz':
       return { ...v2, phase: v2.phase === 'finished' ? v2.phase : 'lobby', quizGate: 'pre' as const };
     case 'open_post_quiz':
