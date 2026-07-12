@@ -28,10 +28,10 @@ export function ForgeConstructionCanvas({
   compact,
 }: {
   map: ConstructionMapState;
-  onAddPostIt: (station: ExpedicionStationSlug, type: PostItType, text: string) => void;
-  onUpdatePostIt: (id: string, patch: { text?: string; type?: PostItType; x?: number; y?: number }) => void;
-  onRemovePostIt: (id: string) => void;
-  onAddConnection: (fromId: string, toId: string) => void;
+  onAddPostIt?: (station: ExpedicionStationSlug, type: PostItType, text: string) => void;
+  onUpdatePostIt?: (id: string, patch: { text?: string; type?: PostItType; x?: number; y?: number }) => void;
+  onRemovePostIt?: (id: string) => void;
+  onAddConnection?: (fromId: string, toId: string) => void;
   readOnly?: boolean;
   compact?: boolean;
 }) {
@@ -56,13 +56,13 @@ export function ForgeConstructionCanvas({
       setConnectFrom(null);
       return;
     }
-    onAddConnection(connectFrom, id);
+    onAddConnection?.(connectFrom, id);
     setConnectFrom(null);
   };
 
   const submitPostIt = () => {
     if (!draftText.trim()) return;
-    onAddPostIt(draftStation, draftType, draftText.trim());
+    onAddPostIt?.(draftStation, draftType, draftText.trim());
     setDraftText('');
   };
 
@@ -71,7 +71,7 @@ export function ForgeConstructionCanvas({
       const drag = dragRef.current;
       if (!drag) return;
       const delta = clientY - drag.startY;
-      onUpdatePostIt(drag.id, { y: Math.max(0, drag.origY + delta) });
+      onUpdatePostIt?.(drag.id, { y: Math.max(0, drag.origY + delta) });
     },
     [onUpdatePostIt]
   );
@@ -279,7 +279,7 @@ export function ForgeConstructionCanvas({
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onRemovePostIt(p.id);
+                                onRemovePostIt?.(p.id);
                               }}
                               className="rounded p-0.5 hover:bg-black/10"
                             >
@@ -294,7 +294,7 @@ export function ForgeConstructionCanvas({
                         ) : (
                           <textarea
                             value={p.text}
-                            onChange={(e) => onUpdatePostIt(p.id, { text: e.target.value })}
+                            onChange={(e) => onUpdatePostIt?.(p.id, { text: e.target.value })}
                             onPointerDown={(e) => e.stopPropagation()}
                             className={cn(
                               'mt-1 w-full resize-none bg-transparent leading-snug outline-none cursor-text',

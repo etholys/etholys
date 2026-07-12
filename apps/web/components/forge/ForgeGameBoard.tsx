@@ -228,8 +228,7 @@ export function ForgeGameBoard({
   const showFullChrome = !projectionMode;
   const showCompactChrome = projectionMode && isFacilitator;
 
-  const showPlayerControls =
-    !state.currentCard && !state.finished && (canAct || syncMode === 'player');
+  const showPlayerControls = !state.currentCard && !state.finished && canAct;
   const diceCardControls = showPlayerControls && (
     <div className="flex flex-wrap items-center gap-3">
       <ForgeVirtualDice rolling={diceRolling} value={pendingRoll ?? state.lastRoll} />
