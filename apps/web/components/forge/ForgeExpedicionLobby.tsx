@@ -258,7 +258,7 @@ export function ForgeExpedicionLobby({
         </div>
       )}
 
-      {!isFacilitator && phase === 'lobby' && (
+      {!isFacilitator && phase === 'lobby' && !quizPreAvailable && !canResume && (
         <p className="text-center text-xs text-white/70">{ft('forge.v2.lobbyLearnerWait')}</p>
       )}
     </div>

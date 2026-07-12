@@ -459,8 +459,18 @@ export function ForgeExpedicionRoom({
   const showHall = roomView === 'hall';
   const showTable = roomView === 'table';
 
-  const quizPreAvailable = quizGate === 'pre';
-  const quizPostAvailable = quizGate === 'post';
+  const quizPreAvailable =
+    quizGate === 'pre' ||
+    Boolean(v2 && !v2.preQuizCompletedAt && effectivePhase === 'lobby');
+  const quizPostAvailable =
+    quizGate === 'post' ||
+    effectivePhase === 'post_quiz' ||
+    Boolean(
+      v2 &&
+        !v2.postQuizCompletedAt &&
+        v2.preQuizCompletedAt &&
+        v2.cyclesCompleted >= v2.maxCycles
+    );
 
   const observeRoomId =
     isFac && facLens.kind === 'team' ? facLens.roomId : teamRoomId;
