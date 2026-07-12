@@ -272,7 +272,7 @@ export function ForgeGameBoard({
           players={players}
           immersive={!boardFits}
           fitContainer={boardFits}
-          hideLegend={boardFits}
+          hideLegend={!boardFits}
           className="w-full h-full"
         />
       </div>

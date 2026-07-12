@@ -66,3 +66,36 @@ export function spiralTileTextColor(bg: string): string {
   const light = ['#A5D8F0', '#7DAF7A', '#5CB868'];
   return light.includes(bg) ? '#1A3D5C' : '#FFFFFF';
 }
+
+/** Leyenda del tablero físico — colores alineados con iconos del caracol */
+export type SpiralLegendKey =
+  | 'raices'
+  | 'tierra'
+  | 'alquimia'
+  | 'futuro'
+  | 'mercado'
+  | 'desafio'
+  | 'accion';
+
+export type SpiralLegendItem = {
+  key: SpiralLegendKey;
+  color: string;
+};
+
+/** Sección superior (5 estaciones) + inferior (acción/desafío) */
+export const SPIRAL_BOARD_LEGEND: {
+  top: SpiralLegendItem[];
+  bottom: SpiralLegendItem[];
+} = {
+  top: [
+    { key: 'raices', color: '#1F5C48' },
+    { key: 'tierra', color: '#1C1C1C' },
+    { key: 'alquimia', color: '#4554B8' },
+    { key: 'futuro', color: '#5CB868' },
+    { key: 'mercado', color: '#A5D8F0' },
+  ],
+  bottom: [
+    { key: 'desafio', color: '#7DAF7A' },
+    { key: 'accion', color: '#4D9B8C' },
+  ],
+};
