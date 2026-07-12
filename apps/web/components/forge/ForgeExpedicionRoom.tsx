@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Users, HelpCircle, X, Maximize2, Minimize2 } from 'lucide-react';
 import { ForgeGameBoard, type ForgeGameSyncMode } from '@/components/forge/ForgeGameBoard';
+import { ForgeBoardTrack } from '@/components/forge/ForgeBoardTrack';
 import { ForgePersonalMapStrip } from '@/components/forge/ForgePersonalMapStrip';
 import { ForgeConstructionCanvas } from '@/components/forge/ForgeConstructionCanvas';
 import { ForgeActivityPlayer } from '@/components/forge/ForgeActivityPlayer';
@@ -476,7 +477,7 @@ export function ForgeExpedicionRoom({
   const observeUserId = isFac && facLens.kind === 'learner' ? facLens.userId : null;
   const facObservingIndividual =
     isFac && (facLens.kind === 'team' || facLens.kind === 'learner');
-  const showSharedBoard = !isCoaching && !boardBlocked && !facObservingIndividual;
+  const showTableBoardCenter = !isCoaching && !facObservingIndividual;
   const dockReadOnly = facObservingIndividual;
   const mapReadOnly = !isFac && boardBlocked;
 
@@ -971,39 +972,60 @@ export function ForgeExpedicionRoom({
                 </div>
                 <div className="flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden bg-[#FAFAF7]">
                   <div className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">
-                    {showSharedBoard ? (
-                      gameSpec && syncMode !== 'pending' ? (
-                        <ForgeGameBoard
-                          spec={gameSpec}
-                          initialState={gameState}
-                          syncMode={syncMode}
-                          roomId={sharedRoomId ?? undefined}
-                          roomVersion={roomVersion}
-                          myUserId={myUserId}
-                          isFacilitator={isFac}
-                          facilitatorEmergency={facEmergency}
-                          projectionMode={isFac}
-                          fitContainer
-                          onGuideChange={(g) => setCoachGuide(g)}
-                          onRoomState={(s) => setGameState(s as Record<string, unknown>)}
-                          onGameEvents={handleBoardEvents}
-                          v2EcoBalance={v2?.ledger.balance}
-                        />
-                      ) : (
-                        <p className="text-center text-sm text-[#145A45]/70 py-12">
-                          {boardBusy ? ft('forge.general.loading') : ft('forge.room.waitingBoard')}
-                        </p>
-                      )
-                    ) : boardBlocked ? (
-                      <div className="flex flex-1 flex-col min-h-0 overflow-y-auto p-2 md:p-3 gap-3">
-                        <div className="flex-1 min-h-0">
-                          {constructionMapPanel ?? (
-                            <p className="text-center text-sm text-[#145A45]/70 py-12">
-                              {ft('forge.v2.loadingMap')}
-                            </p>
-                          )}
-                        </div>
-                        {quizPromptBanner}
+                    {showTableBoardCenter ? (
+                      <div className="relative flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">
+                        {gameSpec && syncMode !== 'pending' ? (
+                          <div
+                            className={cn(
+                              'flex flex-1 min-h-0 min-w-0',
+                              boardBlocked && 'pointer-events-none opacity-55'
+                            )}
+                          >
+                            <ForgeGameBoard
+                              spec={gameSpec}
+                              initialState={gameState}
+                              syncMode={syncMode}
+                              roomId={sharedRoomId ?? undefined}
+                              roomVersion={roomVersion}
+                              myUserId={myUserId}
+                              isFacilitator={isFac}
+                              facilitatorEmergency={facEmergency}
+                              projectionMode={isFac}
+                              fitContainer
+                              onGuideChange={(g) => setCoachGuide(g)}
+                              onRoomState={(s) => setGameState(s as Record<string, unknown>)}
+                              onGameEvents={handleBoardEvents}
+                              v2EcoBalance={v2?.ledger.balance}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            className={cn(
+                              'flex flex-1 min-h-0 min-w-0 items-center justify-center p-2',
+                              boardBlocked && 'opacity-55'
+                            )}
+                          >
+                            <ForgeBoardTrack
+                              spaces={20}
+                              position={0}
+                              fitContainer
+                              className="h-full w-full max-h-full"
+                            />
+                          </div>
+                        )}
+                        {boardBlocked && effectivePhase !== 'finished' && (
+                          <div className="absolute inset-0 z-20 flex items-end justify-center bg-[#1A3D5C]/15 p-3 md:p-6 pointer-events-none">
+                            <div className="pointer-events-auto w-full max-w-lg shadow-lg">
+                              {quizPromptBanner ?? (
+                                <div className="shrink-0 rounded-xl border border-[#C9A227]/40 bg-amber-50 px-4 py-3 text-center">
+                                  <p className="text-sm font-medium text-[#1A3D5C]">
+                                    {ft('forge.v2.lobbyBoardBlocked')}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : dockReadOnly ? (
                       <p className="text-center text-sm text-[#2E5C9A] py-8 px-4">
@@ -1011,11 +1033,6 @@ export function ForgeExpedicionRoom({
                       </p>
                     ) : (
                       myMap && <ForgePersonalMapStrip mapState={myMap} />
-                    )}
-                    {boardBlocked && effectivePhase !== 'finished' && showSharedBoard && (
-                      <p className="shrink-0 text-center text-sm text-[#C9A227] font-semibold py-2">
-                        {ft('forge.v2.lobbyBoardBlocked')}
-                      </p>
                     )}
                   </div>
                   <ForgeExpedicionTableDock
