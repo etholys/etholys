@@ -92,7 +92,7 @@ export const POST_IT_TYPE_STYLES: Record<
 
 /** Tabuleiro V2 — casas especiais (legenda do jogo físico) */
 export const BOARD_V2_CELL = {
-  accion: { name: 'Acción', color: 'bg-[#A8D5C4]', ring: 'ring-[#3D8B8B]', text: 'text-[#1A3D5C]' },
+  accion: { name: 'Acción', color: 'bg-[#8BC4B0]', ring: 'ring-[#3D8B8B]', text: 'text-[#0D4535]' },
   desafio: { name: 'Desafío', color: 'bg-[#3D8B8B]', ring: 'ring-[#2D7070]', text: 'text-white' },
   salida: { name: 'Salida', color: 'bg-[#145A45]', ring: 'ring-[#0D4535]', text: 'text-white' },
   meta: { name: 'Meta', color: 'bg-[#145A45]', ring: 'ring-[#5FAE4A]', text: 'text-white' },
@@ -129,14 +129,39 @@ export const EXPEDICION_SECTION =
 
 /** Texto legível em casillas claras del tablero */
 export function boardCellTextClass(stationName: string): string {
-  if (stationName === 'Mercado' || stationName === 'Acción') return 'text-[#0D4535]';
-  if (stationName === 'Futuro') return 'text-white';
-  return 'text-white';
+  return boardCellVisual(stationName).textClass;
 }
 
 /** Bordas visíveis em casillas claras (evita “desaparecer” no fundo creme) */
 export function boardCellBorderClass(stationName: string): string {
-  if (stationName === 'Acción') return 'border-2 border-[#3D8B8B]/80';
-  if (stationName === 'Mercado') return 'border-2 border-[#2E5C9A]/60';
-  return 'border border-black/10';
+  return boardCellVisual(stationName).borderClass;
+}
+
+/** Cores garantidas (inline) — evita Tailwind purgar arbitrary bg */
+export function boardCellVisual(stationName: string): {
+  bg: string;
+  text: string;
+  border: string;
+  textClass: string;
+  borderClass: string;
+  light: boolean;
+} {
+  const map: Record<
+    string,
+    { bg: string; text: string; border: string; light: boolean }
+  > = {
+    Raíces: { bg: '#145A45', text: '#FFFFFF', border: '#0D4535', light: false },
+    Acción: { bg: '#8BC4B0', text: '#0D4535', border: '#3D8B8B', light: true },
+    Tierra: { bg: '#1A3D5C', text: '#FFFFFF', border: '#0D4535', light: false },
+    Desafío: { bg: '#3D8B8B', text: '#FFFFFF', border: '#2D7070', light: false },
+    Alquimia: { bg: '#2E5C9A', text: '#FFFFFF', border: '#1A3D5C', light: false },
+    Mercado: { bg: '#6EC4E8', text: '#0D4535', border: '#2E5C9A', light: true },
+    Futuro: { bg: '#5FAE4A', text: '#FFFFFF', border: '#145A45', light: false },
+  };
+  const v = map[stationName] ?? map['Raíces'];
+  return {
+    ...v,
+    textClass: v.light ? 'text-[#0D4535]' : 'text-white',
+    borderClass: v.light ? 'border-2' : 'border border-black/15',
+  };
 }

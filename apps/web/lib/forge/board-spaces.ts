@@ -8,7 +8,7 @@ export const BOARD_STATION_META = [
   },
   {
     name: 'Acción',
-    color: 'bg-[#A8D5C4]',
+    color: 'bg-[#8BC4B0]',
     ring: 'ring-[#3D8B8B]',
     desc: 'Decisiones rápidas: lanza el dado y avanza el plan.',
   },

@@ -4,10 +4,16 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BOARD_STATION_META, spaceTooltip, stationForSpace } from '@/lib/forge/board-spaces';
-import { boardCellGridPosition, BOARD_TRACK_GRID } from '@/lib/forge/board-track-layout';
-import { boardCellTextClass, boardCellBorderClass } from '@/lib/forge/expedicion-v2/theme';
+import {
+  boardCellGridPosition,
+  BOARD_TRACK_ASPECT,
+  BOARD_TRACK_GRID,
+} from '@/lib/forge/board-track-layout';
+import { boardCellTextClass, boardCellVisual } from '@/lib/forge/expedicion-v2/theme';
 import { ForgeInfoTip } from '@/components/forge/ForgeInfoTip';
 import type { BoardPlayer } from '@/lib/forge/expedicion-board-multi';
+
+type BoardDims = { width: number; height: number };
 
 export function ForgeBoardTrack({
   spaces = 20,
@@ -22,14 +28,13 @@ export function ForgeBoardTrack({
   position?: number;
   players?: BoardPlayer[];
   immersive?: boolean;
-  /** Redimensiona o tabuleiro para caber no espaço disponível (sem clip por transform) */
   fitContainer?: boolean;
   hideLegend?: boolean;
   compact?: boolean;
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [boardSize, setBoardSize] = useState(480);
+  const [boardDims, setBoardDims] = useState<BoardDims>({ width: 720, height: 240 });
 
   const pawnsByCell = new Map<number, BoardPlayer[]>();
   if (players.length > 0) {
@@ -43,6 +48,7 @@ export function ForgeBoardTrack({
   }
 
   const cellIndices = Array.from({ length: spaces }, (_, i) => i);
+  const cellMin = Math.min(boardDims.width / BOARD_TRACK_GRID.cols, boardDims.height / BOARD_TRACK_GRID.rows);
 
   useLayoutEffect(() => {
     if (!fitContainer) return;
@@ -50,11 +56,21 @@ export function ForgeBoardTrack({
     if (!container) return;
 
     const update = () => {
-      const pad = 16;
+      const pad = 12;
       const cw = container.clientWidth - pad;
       const ch = container.clientHeight - pad;
       if (cw <= 0 || ch <= 0) return;
-      setBoardSize(Math.floor(Math.min(cw, ch, 720)));
+
+      let w = cw;
+      let h = w / BOARD_TRACK_ASPECT;
+      if (h > ch) {
+        h = ch;
+        w = h * BOARD_TRACK_ASPECT;
+      }
+      setBoardDims({
+        width: Math.floor(Math.min(w, 960)),
+        height: Math.floor(Math.min(h, 960 / BOARD_TRACK_ASPECT)),
+      });
     };
 
     update();
@@ -71,17 +87,28 @@ export function ForgeBoardTrack({
         immersive && !fitContainer ? 'aspect-[4/3] min-h-[280px] sm:min-h-[340px] md:min-h-[420px]' : '',
         !immersive && !fitContainer ? 'max-w-4xl' : ''
       )}
-      style={fitContainer ? { width: boardSize, height: boardSize } : undefined}
+      style={
+        fitContainer
+          ? { width: boardDims.width, height: boardDims.height }
+          : undefined
+      }
     >
       <div
         className={cn(
           'absolute rounded-2xl border-2 border-dashed border-[#145A45]/20 bg-white/80 flex items-center justify-center pointer-events-none shadow-inner',
-          fitContainer ? 'inset-[10%]' : 'inset-[12%]'
+          fitContainer ? 'inset-[8%]' : 'inset-[12%]'
         )}
         aria-hidden
       >
         <div className="text-center px-4">
-          <p className="text-lg md:text-2xl font-black text-[#145A45] tracking-wide">LA EXPEDICIÓN</p>
+          <p
+            className={cn(
+              'font-black text-[#145A45] tracking-wide',
+              fitContainer && cellMin >= 52 ? 'text-xl md:text-2xl' : 'text-lg'
+            )}
+          >
+            LA EXPEDICIÓN
+          </p>
           <p className="text-[10px] md:text-xs text-[#1A3D5C]/70 mt-1 uppercase tracking-widest">
             Sostenible · Triple impacto
           </p>
@@ -98,41 +125,49 @@ export function ForgeBoardTrack({
         {cellIndices.map((i) => {
           const { col, row } = boardCellGridPosition(i, spaces);
           const st = stationForSpace(i);
+          const visual = boardCellVisual(st.name);
           const cellPawns = pawnsByCell.get(i) ?? [];
           const active = players.length === 0 ? i === position : cellPawns.length > 0;
           const isStart = i === 0;
           const isGoal = i === spaces - 1;
-          const textClass = boardCellTextClass(st.name);
-          const borderClass = boardCellBorderClass(st.name);
-          const isLightCell = st.name === 'Acción' || st.name === 'Mercado';
 
           return (
             <div
               key={i}
-              style={{ gridColumn: col + 1, gridRow: row + 1 }}
+              style={{
+                gridColumn: col + 1,
+                gridRow: row + 1,
+                backgroundColor: visual.bg,
+                color: visual.text,
+                borderColor: visual.border,
+              }}
               className={cn(
                 'relative flex flex-col items-center justify-center rounded-lg md:rounded-xl font-bold transition-all z-10 shadow-sm',
                 immersive || fitContainer
-                  ? cn('min-h-0', boardSize >= 420 ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[10px]')
+                  ? cn(
+                      'min-h-0',
+                      cellMin >= 56 ? 'text-[11px] sm:text-xs' : cellMin >= 44 ? 'text-[10px]' : 'text-[9px]'
+                    )
                   : 'h-9 w-full text-[9px] sm:text-[10px]',
-                st.color,
-                textClass,
-                borderClass,
-                active && `z-20 scale-105 ring-2 ${st.ring} shadow-md`,
-                !active && !isLightCell && 'opacity-95',
-                active && isLightCell && 'ring-2 ring-[#145A45]/30'
+                visual.textClass,
+                visual.borderClass,
+                active && `z-20 scale-[1.04] ring-2 ${st.ring} shadow-md`
               )}
             >
-              <span className="absolute top-0.5 right-0.5 z-20 scale-75 opacity-80">
+              <span className="absolute top-0.5 right-0.5 z-20 scale-75 opacity-90">
                 <ForgeInfoTip text={spaceTooltip(i, spaces)} />
               </span>
               {isStart && <span className="absolute -top-1 left-0.5 text-[8px]">▶</span>}
               {isGoal && <span className="absolute -top-1 left-0.5 text-[8px]">🏁</span>}
-              <span className="font-black">{i}</span>
+              <span className="font-black drop-shadow-sm">{i}</span>
               <span
                 className={cn(
-                  'font-medium opacity-90 truncate max-w-full px-0.5',
-                  immersive || fitContainer ? 'text-[7px] sm:text-[8px]' : 'hidden sm:block text-[7px]'
+                  'font-semibold truncate max-w-full px-0.5 drop-shadow-sm',
+                  immersive || fitContainer
+                    ? cellMin >= 48
+                      ? 'text-[9px] sm:text-[10px]'
+                      : 'text-[8px]'
+                    : 'hidden sm:block text-[7px]'
                 )}
               >
                 {st.name}
@@ -181,7 +216,7 @@ export function ForgeBoardTrack({
         ref={containerRef}
         className={cn(
           'flex flex-1 min-h-0 items-center justify-center',
-          fitContainer ? 'overflow-hidden p-2' : ''
+          fitContainer ? 'overflow-hidden p-1' : ''
         )}
       >
         {boardInner}
@@ -189,20 +224,23 @@ export function ForgeBoardTrack({
 
       {!hideLegend && !fitContainer && (
         <div className="mt-3 flex flex-wrap gap-1 justify-center shrink-0">
-          {BOARD_STATION_META.map((s) => (
-            <span
-              key={s.name}
-              className={cn(
-                'rounded-full px-2 py-0.5 font-bold flex items-center gap-0.5 shadow-sm',
-                immersive ? 'text-[9px] md:text-[10px]' : 'text-[8px]',
-                s.color,
-                boardCellTextClass(s.name)
-              )}
-            >
-              {s.name}
-              <ForgeInfoTip text={s.desc} />
-            </span>
-          ))}
+          {BOARD_STATION_META.map((s) => {
+            const v = boardCellVisual(s.name);
+            return (
+              <span
+                key={s.name}
+                style={{ backgroundColor: v.bg, color: v.text, borderColor: v.border }}
+                className={cn(
+                  'rounded-full px-2 py-0.5 font-bold flex items-center gap-0.5 shadow-sm border',
+                  immersive ? 'text-[9px] md:text-[10px]' : 'text-[8px]',
+                  boardCellTextClass(s.name)
+                )}
+              >
+                {s.name}
+                <ForgeInfoTip text={s.desc} />
+              </span>
+            );
+          })}
         </div>
       )}
     </div>
