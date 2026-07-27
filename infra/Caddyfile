@@ -1,6 +1,8 @@
-# Substitua o domínio em APP_DOMAIN no .env da pasta infra/
-# Com Cloudflare proxy (nuvem laranja): use SSL/TLS "Full" no painel Cloudflare.
-# Caddy obtém certificado Let's Encrypt no servidor (portas 80 e 443 abertas no Hetzner).
+# Produção Contabo — app + Etholys Meet (Jitsi)
+# APP_DOMAIN e MEET_DOMAIN vêm de infra/.env (docker compose)
+#
+# Com Cloudflare proxy (nuvem laranja): SSL/TLS "Full" no painel.
+# Para WebRTC do Jitsi, preferir DNS only (cinza) em meet.* se houver problemas de áudio/vídeo.
 
 {$APP_DOMAIN} {
 	reverse_proxy web:3000
@@ -9,5 +11,25 @@
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
+
+# Jitsi self-hosted (docker-jitsi-meet em :8000 no host).
+# Só activo quando MEET_DOMAIN estiver definido (ex.: meet.etholys.com).
+{$MEET_DOMAIN} {
+	encode gzip
+	reverse_proxy host.docker.internal:8000 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		transport http {
+			read_timeout 24h
+			write_timeout 24h
+		}
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
 	}
 }

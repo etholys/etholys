@@ -5,6 +5,7 @@ export { default as TimelineSection } from './TimelineSection';
 export { TasksSection } from './TasksSection';
 export { RisksSection } from './RisksSection';
 export { TeamSection } from './TeamSection';
+export { MeetingsSection } from './MeetingsSection';
 export { MonitoringSection } from './MonitoringSection';
 export { default as ReportsSection } from './ReportsSection';
 export { default as SOWSection } from './SOWSection';

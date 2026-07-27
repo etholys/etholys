@@ -15,8 +15,10 @@ async def complete_chat(messages: list[dict[str, str]]) -> tuple[str, str]:
     Retorna (texto_resposta, nome_do_modelo_usado).
     messages: [{"role": "user"|"assistant"|"system", "content": "..."}]
     """
-    provider = (settings.ai_provider or "gemini").lower().strip()
+    provider = (settings.ai_provider or "anthropic").lower().strip()
 
+    if provider == "anthropic":
+        return await _anthropic_chat(messages)
     if provider == "gemini":
         return await _gemini_chat(messages)
     if provider == "openai":
@@ -24,8 +26,77 @@ async def complete_chat(messages: list[dict[str, str]]) -> tuple[str, str]:
     if provider == "ollama":
         return await _ollama_chat(messages)
     raise LLMError(
-        f"AI_PROVIDER desconhecido: {settings.ai_provider}. Use gemini, ollama ou openai."
+        f"AI_PROVIDER desconhecido: {settings.ai_provider}. Use anthropic, gemini, ollama ou openai."
     )
+
+
+def _messages_to_anthropic(messages: list[dict[str, str]]) -> tuple[str | None, list[dict]]:
+    system_chunks: list[str] = []
+    out: list[dict] = []
+    for m in messages:
+        role = (m.get("role") or "user").lower()
+        content = m.get("content") or ""
+        if role == "system":
+            system_chunks.append(content)
+            continue
+        if role == "assistant":
+            out.append({"role": "assistant", "content": content})
+        else:
+            out.append({"role": "user", "content": content})
+    system = "\n\n".join(system_chunks) if system_chunks else None
+    return system, out
+
+
+async def _anthropic_chat(messages: list[dict[str, str]]) -> tuple[str, str]:
+    if not settings.anthropic_api_key:
+        raise LLMError("ANTHROPIC_API_KEY não definido (AI_PROVIDER=anthropic).")
+    model = settings.anthropic_model
+    key = settings.anthropic_api_key.strip()
+    system, anth_messages = _messages_to_anthropic(messages)
+    if not anth_messages:
+        raise LLMError("Nenhuma mensagem user/assistant para enviar ao Claude.")
+
+    url = "https://api.anthropic.com/v1/messages"
+    headers = {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+    }
+    body: dict[str, Any] = {
+        "model": model,
+        "max_tokens": 8192,
+        "temperature": 0.2,
+        "messages": anth_messages,
+    }
+    if system:
+        body["system"] = system
+
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            r = await client.post(url, headers=headers, json=body)
+            r.raise_for_status()
+            data = r.json()
+    except httpx.HTTPStatusError as e:
+        detail = ""
+        try:
+            detail = e.response.text[:800]
+        except Exception:
+            pass
+        raise LLMError(f"Claude HTTP {e.response.status_code}: {detail}") from e
+    except httpx.HTTPError as e:
+        raise LLMError(f"Falha de rede no Claude: {e}") from e
+
+    err = data.get("error") if isinstance(data, dict) else None
+    if isinstance(err, dict) and err.get("message"):
+        raise LLMError(f"Claude: {err['message']}")
+
+    content = data.get("content") or []
+    text = "".join(
+        (p.get("text") or "") for p in content if isinstance(p, dict) and p.get("type") == "text"
+    ).strip()
+    if not text:
+        raise LLMError(f"Conteúdo vazio na resposta Claude: {json.dumps(data)[:500]}")
+    return text, model
 
 
 def _messages_to_gemini_parts(messages: list[dict[str, str]]) -> tuple[str | None, list[dict]]:

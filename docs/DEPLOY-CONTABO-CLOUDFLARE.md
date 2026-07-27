@@ -150,6 +150,8 @@ Smoke test manual (2 telemóveis): [SMOKE-TEST-EXPEDICION-V2.md](./SMOKE-TEST-EX
 | 502 / app caída | Container parado | `docker compose -f docker-compose.prod.yml ps` e logs |
 | SSH timeout | Firewall Contabo | Painel Contabo → rede → portas 22/80/443 |
 | Certificado SSL | Caddy / DNS | `APP_DOMAIN` correcto; portas 80/443 abertas |
+| Meet corta aos 5 min | `meet.jit.si` | Subir Jitsi: [MEET-JITSI-CONTABO.md](./MEET-JITSI-CONTABO.md) |
+| Meet sem áudio/vídeo | UDP 10000 fechado | Firewall Contabo + `ufw allow 10000/udp` |
 
 Recuperação OOM: ver `scripts/recuperar-servidor-oom.sh` (adaptar comentários para Contabo).
 
@@ -164,3 +166,4 @@ Recuperação OOM: ver `scripts/recuperar-servidor-oom.sh` (adaptar comentários
 - [ ] `npm run verify:expedicion-v2` (local) antes de push
 - [ ] Health OK + convite teste no telemóvel
 - [ ] Sala V2 presencial com 2 dispositivos (smoke test)
+- [ ] **Etholys Meet / Jitsi:** DNS `meet` + UDP 10000 + `scripts/setup-jitsi-contabo.sh` — ver [MEET-JITSI-CONTABO.md](./MEET-JITSI-CONTABO.md)

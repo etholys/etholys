@@ -33,7 +33,11 @@ function briefingLines(b: OpportunityBriefing): string {
 function isWebSearchEnabled(): boolean {
   const flag = process.env.OPPORTUNITY_WEB_SEARCH?.trim().toLowerCase();
   if (flag === '0' || flag === 'false' || flag === 'off') return false;
-  return Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+  return Boolean(
+    process.env.ANTHROPIC_API_KEY ||
+      process.env.CLAUDE_API_KEY ||
+      process.env.LLM_API_KEY,
+  );
 }
 
 function promptsForFocus(scanFocus: ScanFocus) {
@@ -41,7 +45,7 @@ function promptsForFocus(scanFocus: ScanFocus) {
 
   if (scanFocus === 'open_now') {
     return {
-      research: `You are an opportunity scout. Use Google Search to find funding calls that are ACCEPTING APPLICATIONS RIGHT NOW.
+      research: `You are an opportunity scout. Use web search to find funding calls that are ACCEPTING APPLICATIONS RIGHT NOW.
 
 TODAY'S DATE: ${today}
 

@@ -43,8 +43,12 @@ function detectOutputLanguageFromMessage(
   return fallback;
 }
 
-const SIEP_REPORT_GEMINI_MODEL =
-  (process.env.GEMINI_SIEP_REPORT_MODEL || 'gemini-2.5-pro').trim();
+const SIEP_REPORT_LLM_MODEL = (
+  process.env.LLM_SIEP_REPORT_MODEL ||
+  process.env.ANTHROPIC_SIEP_REPORT_MODEL ||
+  process.env.GEMINI_SIEP_REPORT_MODEL ||
+  'claude-opus-4-6'
+).trim();
 
 type RouteCtx = { params: Promise<{ sessionId: string }> };
 
@@ -206,7 +210,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
       systemInstruction: systemPrompt,
       userText: fullUserText,
       maxOutputTokens: 16384,
-      model: SIEP_REPORT_GEMINI_MODEL,
+      model: SIEP_REPORT_LLM_MODEL,
       temperature: 0.2,
     });
     const rawReply = result.text;

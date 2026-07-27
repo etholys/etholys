@@ -24,9 +24,12 @@ def _require(cmd: str, errors: list[str]) -> None:
 
 
 def _validate_required_env(errors: list[str], warnings: list[str]) -> None:
-    provider = (os.environ.get("AI_PROVIDER") or "gemini").strip().lower()
-    if provider not in {"gemini", "openai", "ollama"}:
-        errors.append("AI_PROVIDER must be one of: gemini, openai, ollama")
+    provider = (os.environ.get("AI_PROVIDER") or "anthropic").strip().lower()
+    if provider not in {"anthropic", "gemini", "openai", "ollama"}:
+        errors.append("AI_PROVIDER must be one of: anthropic, gemini, openai, ollama")
+
+    if provider == "anthropic" and not (os.environ.get("ANTHROPIC_API_KEY") or "").strip():
+        errors.append("ANTHROPIC_API_KEY is required when AI_PROVIDER=anthropic")
 
     if provider == "gemini" and not (os.environ.get("GEMINI_API_KEY") or "").strip():
         errors.append("GEMINI_API_KEY is required when AI_PROVIDER=gemini")

@@ -60,5 +60,6 @@ export function drawCardForPosition(
   const fresh = pool.filter((c) => !usedIds.includes(c.id));
   const pickFrom = fresh.length > 0 ? fresh : pool;
   if (!pickFrom.length) return null;
-  return pickFrom[Math.floor(Math.random() * pickFrom.length)]!;
+  // Manual: mazos ordenados 1→10, no aleatorio
+  return pickFrom[0]!;
 }

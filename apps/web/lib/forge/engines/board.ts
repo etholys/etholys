@@ -66,7 +66,7 @@ function applyFacilitatorAction(
   if (action.type === 'restart_game') {
     const fresh = restartBoardState(raw, spec);
     return {
-      state: fresh,
+      state: preserveV2RoomFlags(fresh, raw),
       events: [{ type: 'restart', message: 'Partida reiniciada. Mismos jugadores, tablero desde el inicio.' }],
     };
   }
@@ -137,6 +137,7 @@ function applyMultiAction(
     const sides = spec.rules?.diceSides ?? 6;
     const roll = Math.floor(Math.random() * sides) + 1;
     s.lastRoll = roll;
+    s.lastRollBy = cur.userId;
     s.turn = s.turn || 1;
     let next = cur.position + roll;
     if (spec.board?.loops && next > goal) next = next % spaces;
@@ -147,6 +148,27 @@ function applyMultiAction(
       type: 'rolled',
       message: `${cur.name} sacó ${roll} y avanzó a casilla ${next}.`,
     });
+
+    // Manual: al caer se activa la carta de inmediato (no hace falta "Robar carta").
+    const cards = spec.cards ?? [];
+    const drawn = drawCardForPosition(cards, next, []);
+    if (drawn) {
+      s.currentCard = {
+        id: drawn.id,
+        prompt: drawn.prompt,
+        reflection: drawn.reflection,
+        type: drawn.type,
+        forUserId: cur.userId,
+      };
+      s.guide = {
+        message: `${cur.name}: lee la carta en voz alta y resuélvela en el mapa.`,
+        type: 'card',
+        playerName: cur.name,
+        at: Date.now(),
+      };
+      events.push({ type: 'card', message: drawn.prompt });
+    }
+
     if (s.turn >= maxTurns) {
       s.finished = true;
       events.push({ type: 'max_turns', message: 'Turnos agotados.' });
@@ -305,6 +327,18 @@ export const boardEngine: ForgeEngine = {
       }
       s.position = next;
       events.push({ type: 'rolled', message: `Dado: ${roll}. Casilla ${s.position}.` });
+
+      const card = drawCardForPosition(spec.cards ?? [], s.position, []);
+      if (card) {
+        s.currentCard = {
+          id: card.id,
+          prompt: card.prompt,
+          reflection: card.reflection,
+          xp: card.xp,
+          type: card.type,
+        };
+        events.push({ type: 'card', message: card.prompt, xp: card.xp });
+      }
 
       if (s.turn >= maxTurns) {
         s.finished = true;

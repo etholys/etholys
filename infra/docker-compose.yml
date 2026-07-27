@@ -42,7 +42,7 @@ services:
       - ../apps/web/.env
     environment:
       DATABASE_URL: postgresql://etholys:etholys_dev_change_me@postgres:5432/etholys
-      # AI_PROVIDER, GEMINI_*, OPENAI_* vêm do env_file (apps/web/.env)
+      # AI_PROVIDER, ANTHROPIC_*, GEMINI_*, OPENAI_* vêm do env_file (apps/web/.env)
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
@@ -70,7 +70,7 @@ services:
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
       NODE_ENV: development
-      # Gemini: GEMINI_API_KEY, GEMINI_MODEL, GEMINI_MAX_OUTPUT_TOKENS no env_file (.env)
+      # Claude: ANTHROPIC_API_KEY, LLM_MODEL / ANTHROPIC_MODEL, LLM_MAX_OUTPUT_TOKENS no env_file (.env)
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       # Forzamos a Next.js a escuchar en todas las interfaces y en el puerto 3000
       HOSTNAME: "0.0.0.0"

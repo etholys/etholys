@@ -31,7 +31,7 @@ A IA **não gera aplicações ad hoc** por pedido. Gera **`GameSpec`** (JSON ver
 | **Rota Hub** | `/hub/forge` |
 | **Chave de licença** | `FORGE` em `Company.enabledSystems` / workspace |
 | **Código atual** | Mockup UI: `apps/web/app/hub/forge/page.tsx`; ledger MVP: `apps/web/app/api/company-memory/forge-ledger/route.ts` |
-| **LLM** | Gemini (`apps/web/lib/gemini-client.ts`) — mesmo padrão que NEXUS para geração estruturada JSON |
+| **LLM** | Anthropic Claude (`apps/web/lib/llm-client.ts`) — mesmo padrão que NEXUS para geração estruturada JSON |
 
 ### Integrações previstas
 
@@ -129,7 +129,7 @@ Tudo o que o aluno “faz” para avançar é uma **Activity**. Gamificação es
 | `media` | Vídeo, PDF, embed | URL ou asset em documentos Core |
 | `quiz` | Avaliação formativa/somativa | Banco de perguntas, tentativas, nota mínima |
 | `game` | Experiência lúdica | Referência a `GameSpec` + `engine` |
-| `live` | Webinar / Jitsi (futuro) | Agenda, gravação, presença |
+| `live` | Webinar / Jitsi via **Etholys Meet** | Agenda, breakouts, gravação, presença — ver [etholys-meet.md](./etholys-meet.md) |
 | `assignment` | Entrega | Upload, rubrica, correção |
 | `forum` | Discussão | Tópico ligado ao módulo |
 

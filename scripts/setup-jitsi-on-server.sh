@@ -1,8 +1,15 @@
 #!/bin/bash
+# LEGADO (Hetzner + Nginx). No Contabo use:
+#   bash scripts/setup-jitsi-contabo.sh
+#   docs/MEET-JITSI-CONTABO.md
+#
 # Jitsi Meet self-hosted para FORGE (sem limite de 5 min do meet.jit.si).
 # Pré-requisito DNS: meet.forge → IP do servidor (Cloudflare OK).
 # Uso: bash /opt/etholys/scripts/setup-jitsi-on-server.sh
 set -eu
+
+echo "AVISO: este script é legado (Nginx). Contabo → setup-jitsi-contabo.sh"
+echo ""
 
 JITSI_DIR="${JITSI_DIR:-/opt/jitsi-docker}"
 DOMAIN="${JITSI_DOMAIN:-meet.forge.etholys.com}"

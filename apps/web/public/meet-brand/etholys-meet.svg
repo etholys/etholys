@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 160" role="img" aria-label="Etholys Meet">
+  <defs>
+    <linearGradient id="e" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="24" width="112" height="112" rx="28" fill="url(#e)"/>
+  <path fill="#fff" d="M40 56h56v14H56v12h36v14H56v18h40v14H40V56z"/>
+  <text x="140" y="78" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="52" font-weight="700" fill="#0f172a">Etholys</text>
+  <text x="140" y="122" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="36" font-weight="600" fill="#0284c7">Meet</text>
+</svg>

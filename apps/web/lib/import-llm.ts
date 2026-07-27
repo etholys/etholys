@@ -1,10 +1,13 @@
 /**
- * SIEP import: Google Gemini (JSON estruturado).
+ * SIEP import: Anthropic Claude (JSON estruturado).
  */
 
-import { geminiGenerateContent, getGeminiMaxOutputTokens, getGeminiModel } from '@/lib/gemini-client';
+import { llmGenerateContent, getLlmMaxOutputTokens, getLlmModel } from '@/lib/llm-client';
 
-export { DEFAULT_GEMINI_MODEL as DEFAULT_GEMINI_IMPORT_MODEL, getGeminiModel as getGeminiImportModel } from '@/lib/gemini-client';
+export {
+  DEFAULT_LLM_MODEL as DEFAULT_GEMINI_IMPORT_MODEL,
+  getLlmModel as getGeminiImportModel,
+} from '@/lib/llm-client';
 
 type ChatContentPart =
   | { type: 'text'; text: string }
@@ -41,9 +44,9 @@ export const buildPlainTextPromptForOllama = buildPlainTextPromptFromParts;
 
 export async function callImportLlm(systemPrompt: string, userContent: ChatContentPart[]): Promise<string> {
   const userText = await buildPlainTextPromptFromParts(userContent);
-  const maxOut = getGeminiMaxOutputTokens();
+  const maxOut = getLlmMaxOutputTokens();
 
-  const { text, finishReason } = await geminiGenerateContent({
+  const { text, finishReason } = await llmGenerateContent({
     systemInstruction: systemPrompt,
     userText,
     maxOutputTokens: maxOut,
@@ -53,7 +56,7 @@ export async function callImportLlm(systemPrompt: string, userContent: ChatConte
 
   if (finishReason === 'MAX_TOKENS') {
     throw new Error(
-      `Gemini cortou a resposta (limite de saída). Defina GEMINI_MAX_OUTPUT_TOKENS=65536 no .env, reinicie o servidor, ou importe ficheiros menores. Modelo: ${getGeminiModel()}`
+      `Claude cortou a resposta (limite de saída). Defina LLM_MAX_OUTPUT_TOKENS=32000 no .env, reinicie o servidor, ou importe ficheiros menores. Modelo: ${getLlmModel()}`,
     );
   }
 

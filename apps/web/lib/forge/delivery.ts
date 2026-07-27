@@ -123,6 +123,8 @@ export function jitsiEmbedUrl(
     'desktopSharingFrameRate.max=30',
     'startWithAudioMuted=false',
     'startWithVideoMuted=false',
+    // Capacitações: host precisa de breakout rooms (Jitsi self-hosted)
+    'breakoutRooms.hideAddRoomButton=false',
   ];
   if (opts?.tileView) config.push('tileViewEnabled=true');
   if (opts?.filmstripOnly) config.push('filmStripOnly=true');

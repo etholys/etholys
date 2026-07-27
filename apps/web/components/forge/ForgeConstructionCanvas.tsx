@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ConstructionMapState, PostItType } from '@/lib/forge/expedicion-v2/types';
 import type { ExpedicionStationSlug } from '@/lib/forge/expedicion-station-decks';
 import { EXPEDICION_V2_STATIONS, POST_IT_TYPE_STYLES } from '@/lib/forge/expedicion-v2/theme';
@@ -10,6 +10,18 @@ import { cn } from '@/lib/utils';
 import { useForgeT } from '@/lib/forge/use-forge-t';
 
 const TYPES: PostItType[] = ['diagnostico', 'accion', 'inversion', 'metrica'];
+
+const TYPE_HINTS: Record<PostItType, string> = {
+  diagnostico: '¿Cuál es el problema raíz?',
+  accion: '¿Qué vas a hacer para resolverlo?',
+  inversion: '¿Qué recursos / Eco-Créditos necesitás? (Baja 100 · Media 300 · Alta 600)',
+  metrica: '¿Cómo medís el éxito en 30 días? (un número concreto)',
+};
+
+function nextMissingType(map: ConstructionMapState, station: ExpedicionStationSlug): PostItType {
+  const have = new Set(map.postIts.filter((p) => p.station === station).map((p) => p.type));
+  return TYPES.find((t) => !have.has(t)) ?? 'diagnostico';
+}
 
 function sortedPostIts(map: ConstructionMapState, station: ExpedicionStationSlug) {
   return map.postIts
@@ -26,6 +38,7 @@ export function ForgeConstructionCanvas({
   onAddConnection,
   readOnly,
   compact,
+  focusStation,
 }: {
   map: ConstructionMapState;
   onAddPostIt?: (station: ExpedicionStationSlug, type: PostItType, text: string) => void;
@@ -34,6 +47,8 @@ export function ForgeConstructionCanvas({
   onAddConnection?: (fromId: string, toId: string) => void;
   readOnly?: boolean;
   compact?: boolean;
+  /** Estación activa del tablero — guía automática sin elegir menús. */
+  focusStation?: ExpedicionStationSlug | null;
 }) {
   const ft = useForgeT();
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
@@ -42,6 +57,16 @@ export function ForgeConstructionCanvas({
   const [draftText, setDraftText] = useState('');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragRef = useRef<{ id: string; startY: number; origY: number } | null>(null);
+
+  const guided = Boolean(focusStation);
+  const effectiveStation = focusStation ?? draftStation;
+  const activeType = guided ? nextMissingType(map, effectiveStation) : draftType;
+  const stationTheme = EXPEDICION_V2_STATIONS[effectiveStation];
+  const typeStyle = POST_IT_TYPE_STYLES[activeType];
+
+  useEffect(() => {
+    if (focusStation) setDraftStation(focusStation);
+  }, [focusStation]);
 
   const handlePostItClick = (id: string) => {
     if (readOnly) return;
@@ -62,7 +87,7 @@ export function ForgeConstructionCanvas({
 
   const submitPostIt = () => {
     if (!draftText.trim()) return;
-    onAddPostIt?.(draftStation, draftType, draftText.trim());
+    onAddPostIt?.(effectiveStation, activeType, draftText.trim());
     setDraftText('');
   };
 
@@ -123,41 +148,57 @@ export function ForgeConstructionCanvas({
             compact ? 'p-2.5' : 'p-3'
           )}
         >
-          <div className={cn('flex gap-2', compact ? 'flex-col' : 'flex-wrap')}>
-            <select
-              value={draftStation}
-              onChange={(e) => setDraftStation(e.target.value as ExpedicionStationSlug)}
-              className={cn(
-                'rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white',
-                compact && 'w-full'
-              )}
-            >
-              {EXPEDICION_STATION_SLUGS.map((s) => (
-                <option key={s} value={s}>
-                  {EXPEDICION_V2_STATIONS[s].label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={draftType}
-              onChange={(e) => setDraftType(e.target.value as PostItType)}
-              className={cn(
-                'rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white',
-                compact && 'w-full'
-              )}
-            >
-              {TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {POST_IT_TYPE_STYLES[t].label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {guided ? (
+            <div className="space-y-1.5">
+              <p className="text-xs font-bold text-[#1B5E4B]">
+                Estás en{' '}
+                <span style={{ color: stationTheme.accent }}>{stationTheme.label}</span>
+                {' · '}
+                paso {TYPES.indexOf(activeType) + 1}/4:{' '}
+                <span className="uppercase">{typeStyle.label}</span>
+              </p>
+              <p className="text-[11px] leading-snug text-slate-600">{TYPE_HINTS[activeType]}</p>
+              <p className="text-[10px] text-slate-500">
+                Escribí tu idea abajo y tocá «Agregar». No hace falta elegir estación ni tipo.
+              </p>
+            </div>
+          ) : (
+            <div className={cn('flex gap-2', compact ? 'flex-col' : 'flex-wrap')}>
+              <select
+                value={draftStation}
+                onChange={(e) => setDraftStation(e.target.value as ExpedicionStationSlug)}
+                className={cn(
+                  'rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white',
+                  compact && 'w-full'
+                )}
+              >
+                {EXPEDICION_STATION_SLUGS.map((s) => (
+                  <option key={s} value={s}>
+                    {EXPEDICION_V2_STATIONS[s].label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={draftType}
+                onChange={(e) => setDraftType(e.target.value as PostItType)}
+                className={cn(
+                  'rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white',
+                  compact && 'w-full'
+                )}
+              >
+                {TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {POST_IT_TYPE_STYLES[t].label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className={cn('flex gap-2', compact ? 'flex-col' : '')}>
             <textarea
               value={draftText}
               onChange={(e) => setDraftText(e.target.value)}
-              placeholder={ft('forge.v2.postItPlaceholder')}
+              placeholder={TYPE_HINTS[activeType]}
               rows={compact ? 3 : 2}
               className={cn(
                 'flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none',
@@ -181,7 +222,7 @@ export function ForgeConstructionCanvas({
           {connectFrom === 'pick' && (
             <p className="text-[10px] text-violet-700">{ft('forge.v2.selectFirstPostIt')}</p>
           )}
-          {!connectFrom && (
+          {!connectFrom && !guided && (
             <p className="text-[10px] text-slate-500">{ft('forge.v2.dragToReorder')}</p>
           )}
         </div>

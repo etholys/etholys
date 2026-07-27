@@ -9,7 +9,7 @@ import type { Locale } from '@/lib/i18n';
 import Link from 'next/link';
 import {
   Layers, BarChart3, Sprout, HandCoins, GraduationCap, Cpu, Target, LayoutGrid, Scale,
-  LogOut, Globe, ArrowRight, Lock, ExternalLink, BrainCircuit,
+  LogOut, Globe, ArrowRight, Lock, ExternalLink, BrainCircuit, Video,
 } from 'lucide-react';
 import {
   deriveModuleHints,
@@ -171,6 +171,26 @@ const systems: Array<{
     borderColor: 'border-slate-300',
     bgHover: 'hover:border-slate-500 hover:shadow-slate-100/80',
     href: '/hub/carta',
+    active: true,
+  },
+  {
+    id: 'meet',
+    name: 'Meet',
+    tagline: {
+      es: 'Reuniones y videollamadas',
+      pt: 'Reuni\u00f5es e videochamadas',
+      en: 'Meetings & video calls',
+    },
+    description: {
+      es: 'Herramienta transversal: salas, breakouts, invitaciones e IA post-reuni\u00f3n \u2014 espejos en FORGE y SIEP.',
+      pt: 'Ferramenta transversal: salas, breakouts, convites e IA p\u00f3s-reuni\u00e3o \u2014 espelhos no FORGE e SIEP.',
+      en: 'Cross-cutting tool: rooms, breakouts, invites & post-meeting AI \u2014 mirrors in FORGE and SIEP.',
+    },
+    icon: Video,
+    color: 'from-sky-500 to-cyan-700',
+    borderColor: 'border-sky-200',
+    bgHover: 'hover:border-sky-400 hover:shadow-sky-100',
+    href: '/hub/meet',
     active: true,
   },
 ];

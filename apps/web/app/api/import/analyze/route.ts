@@ -360,15 +360,16 @@ ${hintParts.length ? `\nInstrucciones adicionales:\n- ${hintParts.join('\n- ')}`
     } catch (llmErr: any) {
       console.error('[Import] LLM error:', llmErr);
       const detail = String(llmErr?.message || llmErr);
-      const geminiModel = getGeminiImportModel();
+      const llmModel = getGeminiImportModel();
       return NextResponse.json(
         {
           error:
-            'Não foi possível processar os documentos com IA (Google Gemini). Veja o detalhe abaixo e confira GEMINI_API_KEY e GEMINI_MODEL no .env.',
+            'Não foi possível processar os documentos com IA (Anthropic Claude). Veja o detalhe abaixo e confira ANTHROPIC_API_KEY e LLM_MODEL no .env.',
           detail,
-          geminiModel,
+          geminiModel: llmModel,
+          llmModel,
           hint:
-            'Modelos obsoletos (gemini-1.5-*, gemini-2.0-*) já não funcionam. Use GEMINI_MODEL=gemini-2.5-flash ou gemini-2.5-flash-lite. A app tenta automaticamente gemini-3.5-flash e gemini-2.5-pro se houver 503. Reinicie o servidor após alterar o .env.',
+            'Use LLM_MODEL=claude-sonnet-4-6 (ou claude-haiku-4-5). A app tenta fallbacks se houver 429/503. Reinicie o servidor após alterar o .env.',
           modelsTried: getGeminiModelCandidates(),
         },
         { status: 502 }
@@ -399,7 +400,7 @@ ${hintParts.length ? `\nInstrucciones adicionales:\n- ${hintParts.join('\n- ')}`
       return NextResponse.json(
         {
           error:
-            'La respuesta de la IA no era JSON válido (a veces por límite de tokens o texto extra). Pruebe con menos archivos a la vez o aumente GEMINI_MAX_OUTPUT_TOKENS en el servidor.',
+            'La respuesta de la IA no era JSON válido (a veces por límite de tokens o texto extra). Pruebe con menos archivos a la vez o aumente LLM_MAX_OUTPUT_TOKENS en el servidor.',
           detail: String((parseErr as Error)?.message || parseErr),
           rawPreview: rawContent.substring(0, 400),
         },

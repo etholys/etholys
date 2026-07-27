@@ -23,7 +23,8 @@ function pickCard(pool: EventCard[], used: Set<string>): EventCard | undefined {
   const fresh = pool.filter((c) => !used.has(c.id));
   const list = fresh.length ? fresh : pool;
   if (!list.length) return undefined;
-  const card = list[Math.floor(Math.random() * list.length)]!;
+  // Manual: mazo ordenado, no aleatorio
+  const card = list[0]!;
   used.add(card.id);
   return card;
 }

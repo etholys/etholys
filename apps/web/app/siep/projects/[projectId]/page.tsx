@@ -24,6 +24,7 @@ import {
   Trash2,
   Building2,
   Globe,
+  Video,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -33,6 +34,7 @@ import {
   TasksSection,
   RisksSection,
   TeamSection,
+  MeetingsSection,
   MonitoringSection,
   SOWSection,
   ReportsSection,
@@ -56,6 +58,7 @@ const TAB_IDS = [
   'marco',
   'budget',
   'activities',
+  'meetings',
   'reports',
   'risks',
   'team',
@@ -196,6 +199,7 @@ export default function ProjectDetailPage() {
       const done = (p?.tasks ?? []).filter((t: any) => t?.status === 'DONE').length + (p?.milestones ?? []).filter((m: any) => m?.completed).length;
       return `${done}/${total}`;
     } },
+    { id: 'meetings', label: L(ml('Meetings', 'Reuniones', 'Reuniões')), icon: Video },
     { id: 'reports', label: siepTr('siep.project.tab.reports'), icon: FileText, badge: (p: any) => {
       const reps = (p?.meReports ?? []).length;
       return reps > 0 ? String(reps) : null;
@@ -327,6 +331,7 @@ export default function ProjectDetailPage() {
         {tabPanel('marco', <LogFrameSection {...sectionProps} />)}
         {tabPanel('budget', <BudgetSection {...sectionProps} />)}
         {tabPanel('activities', <TasksSection {...sectionProps} />)}
+        {tabPanel('meetings', <MeetingsSection {...sectionProps} />)}
         {tabPanel('reports', <ReportsSection {...sectionProps} />)}
         {tabPanel('risks', <RisksSection {...sectionProps} />)}
         {tabPanel('team', <TeamSection {...sectionProps} />)}

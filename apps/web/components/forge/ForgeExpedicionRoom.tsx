@@ -48,7 +48,7 @@ import { ForgeFacilitatorLensFloating } from '@/components/forge/ForgeFacilitato
 import { ForgeFacilitatorReviewCenter } from '@/components/forge/ForgeFacilitatorReviewCenter';
 import { ForgeSustainabilityDashboard } from '@/components/forge/ForgeSustainabilityDashboard';
 import { ForgeMicroCasoPanel } from '@/components/forge/ForgeMicroCasoPanel';
-import { drawRandomMicroCaso, getMicroCasoById } from '@/lib/forge/expedicion-v2/content';
+import { drawNextMicroCaso, getMicroCasoById } from '@/lib/forge/expedicion-v2/content';
 import { EXPEDICION_V2_SHELL } from '@/lib/forge/expedicion-v2/theme';
 import type { MicroCaso } from '@/lib/forge/expedicion-v2/content';
 import {
@@ -447,28 +447,30 @@ export function ForgeExpedicionRoom({
   );
 
   useEffect(() => {
-    if (typeof boardPosition !== 'number' || isFac) return;
+    if (typeof boardPosition !== 'number') return;
     if (lastBoardPosRef.current === boardPosition) return;
     lastBoardPosRef.current = boardPosition;
     const ev = resolveBoardLandEvent(boardPosition);
+    // Tutor também precisa ver a carta para ler em voz alta (manual V2).
     if (ev.kind === 'estacion' && ev.station) {
-      if (v2?.pendingMicroCaso && !isFac) {
+      if (v2?.pendingMicroCaso) {
         setLandEvent(null);
         return;
       }
-      const mc = drawRandomMicroCaso(ev.station, v2?.completedMicroCasos ?? []);
+      const mc = drawNextMicroCaso(ev.station, v2?.completedMicroCasos ?? []);
       if (mc) setActiveMicroCaso(mc);
       setLandEvent(null);
     } else if (ev.kind === 'accion' || ev.kind === 'desafio') {
       setLandEvent(ev);
       setActiveMicroCaso(null);
-    } else if (ev.kind === 'meta' && v2 && v2.phase === 'playing') {
+    } else if (ev.kind === 'meta' && v2 && v2.phase === 'playing' && !isFac) {
       void (async () => {
         await patchV2({ action: 'end_cycle' });
         await reloadV2();
       })();
     } else {
       setLandEvent(null);
+      if (ev.kind !== 'estacion') setActiveMicroCaso(null);
     }
   }, [boardPosition, isFac, v2?.phase, v2?.pendingMicroCaso, v2?.completedMicroCasos, patchV2, reloadV2]);
 
@@ -509,6 +511,8 @@ export function ForgeExpedicionRoom({
       <ForgeConstructionCanvas
         map={v2.constructionMap}
         readOnly={mapReadOnly}
+        focusStation={stationSlug}
+        compact
         onAddPostIt={async (station, type, text) => {
           await patchV2({ action: 'add_postit', station, type, text });
           await reloadV2();
@@ -638,7 +642,8 @@ export function ForgeExpedicionRoom({
   ]);
 
   const boardTurnPlayer = multi ? currentPlayer(multi) : null;
-  const facDrivesTable = isFac && showTable && !facObservingIndividual;
+  // Manual: el jugador lanza el dado. Tutor solo mueve en modo emergencia.
+  const facDrivesTable = isFac && showTable && !facObservingIndividual && facEmergency;
 
   useEffect(() => {
     if (roomView === 'table') setPresencialHintDismissed(true);
@@ -837,7 +842,7 @@ export function ForgeExpedicionRoom({
             <p className="text-center text-xs text-violet-300 shrink-0">{ft('forge.room.coachingHint')}</p>
           )}
 
-          {card?.prompt && !showTable && (
+          {card?.prompt && (
             <div className="shrink-0 rounded-lg border border-amber-400/50 bg-amber-950/60 px-3 py-2 max-h-24 overflow-y-auto">
               <p className="text-[10px] font-bold uppercase text-amber-300">
                 {isFac ? ft('forge.room.cardFac') : ft('forge.room.cardLearner')}
@@ -846,7 +851,7 @@ export function ForgeExpedicionRoom({
             </div>
           )}
 
-          {landEvent?.kind === 'accion' && landEvent.actionCard && v2 && !boardBlocked && !showTable && (
+          {landEvent?.kind === 'accion' && landEvent.actionCard && v2 && !boardBlocked && (
             <div className="shrink-0">
               <ForgeEventCardPanel
                 kind="accion"
@@ -863,7 +868,7 @@ export function ForgeExpedicionRoom({
               />
             </div>
           )}
-          {landEvent?.kind === 'desafio' && landEvent.crisisCard && v2 && !boardBlocked && !showTable && (
+          {landEvent?.kind === 'desafio' && landEvent.crisisCard && v2 && !boardBlocked && (
             <div className="shrink-0">
               <ForgeEventCardPanel
                 kind="desafio"
@@ -888,7 +893,7 @@ export function ForgeExpedicionRoom({
             </p>
           )}
 
-          {activeMicroCaso && stationSlug && v2 && !boardBlocked && !landEvent && !pendingReview && !showTable && (
+          {activeMicroCaso && stationSlug && v2 && !boardBlocked && !landEvent && !pendingReview && (
             <div className="shrink-0">
               <ForgeMicroCasoPanel
                 microCaso={activeMicroCaso}
@@ -905,22 +910,26 @@ export function ForgeExpedicionRoom({
                   });
                   await reloadV2();
                 }}
-                onSubmit={async (answer) => {
-                  await patchV2({
-                    action: 'submit_micro_caso',
-                    microCasoId: activeMicroCaso.id,
-                    station: stationSlug,
-                    answer,
-                    submittedBy: myUserId,
-                  });
-                  await reloadV2();
-                  setActiveMicroCaso(null);
-                }}
+                onSubmit={
+                  isFac
+                    ? undefined
+                    : async (answer) => {
+                        await patchV2({
+                          action: 'submit_micro_caso',
+                          microCasoId: activeMicroCaso.id,
+                          station: stationSlug,
+                          answer,
+                          submittedBy: myUserId,
+                        });
+                        await reloadV2();
+                        setActiveMicroCaso(null);
+                      }
+                }
               />
             </div>
           )}
 
-          {isFac && reviewMicroCaso && reviewStation && v2 && !boardBlocked && !landEvent && !showTable && (
+          {isFac && reviewMicroCaso && reviewStation && v2 && !boardBlocked && !landEvent && (
             <div className="shrink-0">
               <ForgeMicroCasoPanel
                 microCaso={reviewMicroCaso}

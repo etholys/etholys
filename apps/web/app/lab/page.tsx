@@ -4,7 +4,7 @@ import { useApp } from '@/app/providers';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { Sparkles, ArrowRight, FlaskConical, Users, Plus, X, Copy, Check, Trash2, Mail } from 'lucide-react';
+import { Sparkles, ArrowRight, FlaskConical, Users, Plus, X, Copy, Check, Trash2, Mail, Hammer } from 'lucide-react';
 
 const tools = [
   {
@@ -19,6 +19,24 @@ const tools = [
     icon: Sparkles,
     color: 'from-violet-500 to-purple-600',
     href: '/lab/muse',
+    active: true,
+  },
+  {
+    id: 'anvil',
+    name: 'ANVIL',
+    tagline: {
+      es: 'Agente de ingenier&iacute;a interno (1 por proyecto)',
+      pt: 'Agente de engenharia interno (1 por projeto)',
+      en: 'Internal engineering agent (1 per project)',
+    },
+    description: {
+      es: 'Desarrolla y publica software interno Etholys, externo o OSS con pol&iacute;ticas de reuso y deploy flexible (preview → Contabo/custom).',
+      pt: 'Desenvolve e publica software interno Etholys, externo ou OSS com pol&iacute;ticas de reuso e deploy flex&iacute;vel (preview → Contabo/custom).',
+      en: 'Build and ship Etholys-internal, external, or OSS software with reuse policies and flexible deploy (preview → Contabo/custom).',
+    },
+    icon: Hammer,
+    color: 'from-amber-500 to-orange-700',
+    href: '/lab/anvil',
     active: true,
   },
 ];

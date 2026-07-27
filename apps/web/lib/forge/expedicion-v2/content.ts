@@ -29,10 +29,19 @@ export function getMicroCasoById(id: string): MicroCaso | undefined {
   return (microCasos as MicroCaso[]).find((c) => c.id === id);
 }
 
-export function drawRandomMicroCaso(station: ExpedicionStationSlug, exclude: string[] = []): MicroCaso | null {
+/** Próximo micro-caso na ordem do mazo (1→10), nunca aleatório — manual V2. */
+export function drawNextMicroCaso(
+  station: ExpedicionStationSlug,
+  exclude: string[] = []
+): MicroCaso | null {
   const pool = getMicroCasosForStation(station).filter((c) => !exclude.includes(c.id));
   if (pool.length === 0) return null;
-  return pool[Math.floor(Math.random() * pool.length)] ?? null;
+  return pool[0] ?? null;
+}
+
+/** @deprecated Preferir drawNextMicroCaso (ordem fixa do manual). */
+export function drawRandomMicroCaso(station: ExpedicionStationSlug, exclude: string[] = []): MicroCaso | null {
+  return drawNextMicroCaso(station, exclude);
 }
 
 export function getActionCards(): EventCard[] {

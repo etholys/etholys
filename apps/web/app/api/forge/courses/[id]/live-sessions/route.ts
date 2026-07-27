@@ -19,7 +19,10 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
     const rows = await getForgeDb().forgeLiveSession.findMany({
       where: { courseId },
       orderBy: { startsAt: 'asc' },
-      include: { focusActivity: { select: { title: true } } },
+      include: {
+        focusActivity: { select: { title: true } },
+        meetSessions: { select: { id: true }, take: 1, orderBy: { createdAt: 'asc' } },
+      },
     });
 
     return NextResponse.json({
@@ -83,7 +86,39 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       include: { focusActivity: { select: { title: true } } },
     });
 
-    return NextResponse.json({ session: serializeLiveSession(row) }, { status: 201 });
+    // Provisiona Etholys Meet (sala Jitsi + breakouts) quando não há URL externa
+    let meetSessionId: string | null = null;
+    try {
+      const { ensureMeetForForgeLiveSession } = await import('@/lib/meet/forge-bridge');
+      const meet = await ensureMeetForForgeLiveSession({
+        companyId: course.companyId,
+        createdById: tenant.userId,
+        live: {
+          id: row.id,
+          title: row.title,
+          startsAt: row.startsAt,
+          endsAt: row.endsAt,
+          meetingUrl: row.meetingUrl,
+          courseId: row.courseId,
+        },
+        courseTitle: course.title,
+      });
+      meetSessionId = meet.meetSessionId;
+      if (!row.meetingUrl) {
+        row.meetingUrl = meet.meetingUrl;
+      }
+    } catch (meetErr) {
+      console.warn('[forge/live-sessions] Meet provision skipped:', meetErr);
+    }
+
+    return NextResponse.json(
+      {
+        session: {
+          ...serializeLiveSession({ ...row, meetSessions: meetSessionId ? [{ id: meetSessionId }] : [] }),
+        },
+      },
+      { status: 201 },
+    );
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erro';
     return NextResponse.json({ error: msg }, { status: 500 });

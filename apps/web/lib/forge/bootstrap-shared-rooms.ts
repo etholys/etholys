@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { getForgeDb } from '@/lib/forge/db';
 import { parseGameSpecV1 } from '@/lib/forge/schemas/game-spec-v1';
-import { getForgeEngine, validateAndPrepareSpec } from '@/lib/forge/engines';
+import { validateAndPrepareSpec } from '@/lib/forge/engines';
 import {
   isExpedicionV2Spec,
   withExpedicionV2RoomFlags,
@@ -15,11 +15,17 @@ type BootstrapOpts = {
   facilitatorUserId: string;
   liveSessionId?: string | null;
   playGroupId?: string | null;
+  /** Só reinicia tabuleiro se true; por omissão reutiliza sala aberta (não apaga mapa/ledger). */
+  forceRestart?: boolean;
 };
 
-/** Cria (ou recria) uma sala compartilhada com roster de equipas/jogadores. */
+/** Cria (ou reutiliza) uma sala compartilhada com roster de equipas/jogadores.
+ *  Por omissão NÃO apaga uma sala aberta existente (preserva mapa/ledger V2).
+ *  Passar `forceRestart: true` só quando o facilitador pedir reinício explícito.
+ */
 export async function bootstrapSharedGameRoom(opts: BootstrapOpts) {
-  const { courseId, activityId, facilitatorUserId, liveSessionId, playGroupId } = opts;
+  const { courseId, activityId, facilitatorUserId, liveSessionId, playGroupId, forceRestart } =
+    opts;
 
   const activity = await getForgeDb().forgeLearningActivity.findFirst({
     where: { id: activityId, module: { courseId } },
@@ -36,18 +42,38 @@ export async function bootstrapSharedGameRoom(opts: BootstrapOpts) {
     if (!playGroup) throw new Error('Grupo inválido');
   }
 
+  const existingOpen = await getForgeDb().forgeSharedGameRoom.findFirst({
+    where: {
+      activityId,
+      status: 'open',
+      ...(playGroupId ? { playGroupId } : { playGroupId: null }),
+      ...(liveSessionId ? { liveSessionId } : {}),
+    },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  if (existingOpen && !forceRestart) {
+    const spec = validateAndPrepareSpec(parseGameSpecV1(activity.gameSpec.definition));
+    return { room: existingOpen, spec: spec as GameSpecV1 };
+  }
+
+  const { V2_TEAM_KEY } = await import('@/lib/forge/expedicion-v2/room-v2-store');
+  const preservedV2 =
+    existingOpen != null
+      ? (existingOpen.state as Record<string, unknown> | null)?.[V2_TEAM_KEY]
+      : undefined;
+
   await getForgeDb().forgeSharedGameRoom.updateMany({
     where: {
       activityId,
       status: 'open',
-      ...(playGroupId ? { playGroupId } : {}),
+      ...(playGroupId ? { playGroupId } : { playGroupId: null }),
       ...(liveSessionId ? { liveSessionId } : {}),
     },
     data: { status: 'closed' },
   });
 
   const spec = validateAndPrepareSpec(parseGameSpecV1(activity.gameSpec.definition));
-  const engine = getForgeEngine(spec.engine);
   const expedicionV2 = isExpedicionV2Spec(spec);
   const flagV2 = (s: Record<string, unknown>) =>
     expedicionV2 ? withExpedicionV2RoomFlags(s) : s;
@@ -65,11 +91,11 @@ export async function bootstrapSharedGameRoom(opts: BootstrapOpts) {
 
   let state: Record<string, unknown>;
   const memberIds = enrollments.map((e) => e.userId);
+  const { createInitialV2State } = await import('@/lib/forge/expedicion-v2/player-state');
+  const v2Initial = preservedV2 ?? createInitialV2State();
 
   if (playGroup?.mode === 'live_team') {
     const { createTeamPlayInitialState } = await import('@/lib/forge/expedicion-board-multi');
-    const { createInitialV2State } = await import('@/lib/forge/expedicion-v2/player-state');
-    const { V2_TEAM_KEY } = await import('@/lib/forge/expedicion-v2/room-v2-store');
     state = flagV2({
       ...(createTeamPlayInitialState(
         playGroup.name,
@@ -77,7 +103,7 @@ export async function bootstrapSharedGameRoom(opts: BootstrapOpts) {
         memberIds,
         spec
       ) as unknown as Record<string, unknown>),
-      [V2_TEAM_KEY]: createInitialV2State(),
+      [V2_TEAM_KEY]: v2Initial,
     });
   } else if (enrollments.length >= 2) {
     const { createMultiplayerInitialState, rosterFromEnrollments } = await import(
@@ -90,11 +116,12 @@ export async function bootstrapSharedGameRoom(opts: BootstrapOpts) {
         email: e.user.email,
       }))
     );
-    state = flagV2(createMultiplayerInitialState(roster, spec) as unknown as Record<string, unknown>);
+    state = flagV2({
+      ...(createMultiplayerInitialState(roster, spec) as unknown as Record<string, unknown>),
+      ...(expedicionV2 ? { [V2_TEAM_KEY]: v2Initial } : {}),
+    });
   } else if (playGroupId && playGroup) {
     const { createTeamPlayInitialState } = await import('@/lib/forge/expedicion-board-multi');
-    const { createInitialV2State } = await import('@/lib/forge/expedicion-v2/player-state');
-    const { V2_TEAM_KEY } = await import('@/lib/forge/expedicion-v2/room-v2-store');
     state = flagV2({
       ...(createTeamPlayInitialState(
         playGroup.name,
@@ -102,7 +129,7 @@ export async function bootstrapSharedGameRoom(opts: BootstrapOpts) {
         memberIds,
         spec
       ) as unknown as Record<string, unknown>),
-      [V2_TEAM_KEY]: createInitialV2State(),
+      [V2_TEAM_KEY]: v2Initial,
     });
   } else {
     const { createMultiplayerInitialState } = await import('@/lib/forge/expedicion-board-multi');
@@ -118,7 +145,10 @@ export async function bootstrapSharedGameRoom(opts: BootstrapOpts) {
         insights: [] as string[],
       },
     ];
-    state = flagV2(createMultiplayerInitialState(roster, spec) as unknown as Record<string, unknown>);
+    state = flagV2({
+      ...(createMultiplayerInitialState(roster, spec) as unknown as Record<string, unknown>),
+      ...(expedicionV2 ? { [V2_TEAM_KEY]: v2Initial } : {}),
+    });
   }
 
   const room = await getForgeDb().forgeSharedGameRoom.create({
@@ -131,7 +161,14 @@ export async function bootstrapSharedGameRoom(opts: BootstrapOpts) {
       state: state as Prisma.InputJsonValue,
       status: 'open',
       version: 1,
-      lastEvents: [{ type: 'room_opened', message: 'Partida compartida iniciada.' }] as Prisma.InputJsonValue,
+      lastEvents: [
+        {
+          type: 'room_opened',
+          message: forceRestart
+            ? 'Tablero reiniciado (mapa y finanzas preservados).'
+            : 'Partida compartida iniciada.',
+        },
+      ] as Prisma.InputJsonValue,
     },
   });
 

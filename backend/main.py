@@ -135,7 +135,8 @@ def health_ready():
 
     provider = (settings.ai_provider or "").strip().lower()
     ai_config_ok = (
-        (provider == "gemini" and bool(settings.gemini_api_key))
+        (provider == "anthropic" and bool(settings.anthropic_api_key))
+        or (provider == "gemini" and bool(settings.gemini_api_key))
         or (provider == "openai" and bool(settings.openai_api_key))
         or (provider == "ollama" and bool(settings.ollama_base_url) and bool(settings.ollama_model))
     )

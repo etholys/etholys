@@ -11,7 +11,7 @@ import { isS3Configured } from '@/lib/forge/course-libro';
 const MIN_TEXT_CHARS = 280;
 
 export type LibroOcrMeta = {
-  method: 'pdf-parse' | 'gemini' | 'pdf-parse+gemini';
+  method: 'pdf-parse' | 'claude' | 'pdf-parse+claude' | 'gemini' | 'pdf-parse+gemini';
   pages?: number;
   charCount: number;
 };
@@ -93,13 +93,13 @@ export async function runLibroOcr(courseId: string): Promise<{ ok: boolean; stat
     if (text.length < MIN_TEXT_CHARS) {
       try {
         getGeminiApiKey();
-        const geminiText = await extractWithGemini(buffer);
-        if (geminiText.length > text.length) {
-          text = geminiText;
-          method = text.length >= MIN_TEXT_CHARS ? 'gemini' : 'pdf-parse+gemini';
+        const claudeText = await extractWithGemini(buffer);
+        if (claudeText.length > text.length) {
+          text = claudeText;
+          method = text.length >= MIN_TEXT_CHARS ? 'claude' : 'pdf-parse+claude';
         }
       } catch {
-        /* Gemini opcional */
+        /* Claude opcional */
       }
     }
 

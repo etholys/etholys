@@ -25,6 +25,9 @@ ufw default allow outgoing
 ufw allow OpenSSH
 ufw allow 80/tcp
 ufw allow 443/tcp
+# Jitsi JVB (WebRTC media) — obrigatório para áudio/vídeo no Meet
+ufw allow 10000/udp comment 'Jitsi JVB'
+ufw allow 10000/tcp comment 'Jitsi JVB tcp'
 echo y | ufw enable
 ufw status numbered
 

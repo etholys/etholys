@@ -8,6 +8,9 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 |------|-----------|------------|
 | **Ecossistema de produtos (visão geral)** | [ETHOLYS_Arquitectura_v2.md](./ETHOLYS_Arquitectura_v2.md) | Módulos, princípios, integrações entre sistemas |
 | **FORGE — EAD unificado + jogos + gamificação** | [docs/architecture/forge-ead.md](./docs/architecture/forge-ead.md) | Qualquer trabalho em `/hub/forge`, APIs `forge`, LMS, jogos, IA geradora de jogos |
+| **Etholys Meet — reuniões / vídeo (transversal)** | [docs/architecture/etholys-meet.md](./docs/architecture/etholys-meet.md) | Jitsi, breakouts, convites, gravação, IA pós-reunião, espelhos FORGE/SIEP |
+| **Lab ANVIL — agente de engenharia interno** | [docs/architecture/lab-anvil.md](./docs/architecture/lab-anvil.md) | `/lab/anvil` — 1 agente/projeto, OSS vs Etholys, deploy targets, owners+convites |
+| **Jitsi no Contabo (ops)** | [docs/MEET-JITSI-CONTABO.md](./docs/MEET-JITSI-CONTABO.md) | Subir `meet.etholys.com` — sem isto a app usa meet.jit.si |
 | **Índice de toda a documentação** | [docs/README.md](./docs/README.md) | Encontrar outros guias em `docs/` |
 | **Backend (releases)** | [docs/backend-release-hygiene.md](./docs/backend-release-hygiene.md) | Publicar apenas `backend/` |
 | **Instruções legadas (encoding, módulos)** | [etholys-web/.project_instructions.md](./etholys-web/.project_instructions.md) | Convenções JSX/encoding e histórico de módulos |
@@ -17,7 +20,7 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 - Next.js App Router — `apps/web/`
 - Prisma + PostgreSQL — `apps/web/prisma/schema.prisma`
 - Auth: NextAuth — multi-tenant por `companyId`
-- LLM: Gemini — `apps/web/lib/gemini-client.ts`
+- LLM: Anthropic Claude — `apps/web/lib/llm-client.ts` (shim legado: `gemini-client.ts`)
 - Hub de sistemas: `apps/web/app/hub/`
 - Chaves de sistema: `ATLAS`, `SIEP`, `FUNDHUB`, `NEXUS`, `FORGE`, `PRISM` — ver `apps/web/lib/integrated-workspace.ts`
 

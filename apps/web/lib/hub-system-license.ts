@@ -14,9 +14,9 @@ export function hubSystemIdToLicenseKey(systemId: string): WorkspaceSystemKey | 
   return HUB_ID_TO_KEY[systemId] ?? null;
 }
 
-/** Advisor e CARTA não passam por IntegratedWorkspaceAccess. */
+/** Advisor, CARTA e Meet não passam por IntegratedWorkspaceAccess. */
 export function isHubLicenseExempt(systemId: string): boolean {
-  return systemId === 'advisor' || systemId === 'carta';
+  return systemId === 'advisor' || systemId === 'carta' || systemId === 'meet';
 }
 
 export type HubCardAccess = 'open' | 'locked' | 'coming_soon';

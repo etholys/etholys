@@ -101,6 +101,14 @@ model User {
   activityReportsAuthored       TaskActivityReport[]         @relation("ActivityReportAuthor")
   activityReportsReviewed       TaskActivityReport[]         @relation("ActivityReportReviewer")
   reportGuidesUploaded          ProjectReportGuide[]         @relation("ReportGuideUploader")
+  meetSessionsCreated           MeetSession[]                @relation("MeetSessionCreator")
+  meetParticipations            MeetParticipant[]
+  labAnvilMembers               LabAnvilMember[]             @relation("LabAnvilMemberUser")
+  labAnvilMembersInvited        LabAnvilMember[]             @relation("LabAnvilMemberInviter")
+  labAnvilProjectsCreated       LabAnvilProject[]            @relation("LabAnvilProjectCreator")
+  labAnvilProjectMembers        LabAnvilProjectMember[]      @relation("LabAnvilProjectMemberUser")
+  labAnvilProjectMembersInvited LabAnvilProjectMember[]      @relation("LabAnvilProjectMemberInviter")
+  labAnvilSessionsCreated       LabAnvilSession[]            @relation("LabAnvilSessionCreator")
 }
 
 model Account {
@@ -155,7 +163,7 @@ model Company {
   businessActivityCode        String?
   businessActivity            String?
   entityType                  String?
-  /// Respostas do assistente de contexto (sector, com√©rcio, metas) ‚Äî aciona m√≥dulos e mem√≥ria de IA; n√£o substitui aconselhamento legal.
+  /// Respostas do assistente de contexto (sector, comÈrcio, metas) ? aciona mÛdulos e memÛria de IA; n„o substitui aconselhamento legal.
   contextSetupJson            Json?
   contextSetupAt              DateTime?
   aiSessions                  AiAdvisorSession[]
@@ -186,7 +194,7 @@ model Company {
   nexusNetworksAnchored       NexusNetwork[]               @relation("NexusNetworkAnchor")
   nexusNetworkMemberships     NexusNetworkMember[]
   nexusVentureState           NexusVentureState?
-  /// Quem pode usar o Centro de trabalho integrado nesta empresa (n√£o duplica l√≥gica dos sistemas; s√≥ espelha APIs).
+  /// Quem pode usar o Centro de trabalho integrado nesta empresa (n„o duplica lÛgica dos sistemas; sÛ espelha APIs).
   integratedWorkspaceAccesses  IntegratedWorkspaceAccess[]
   products                    Product[]
   productComponents           ProductComponent[]           @relation("CompanyProductComponents")
@@ -207,14 +215,15 @@ model Company {
   forgeGameSpecs              ForgeGameSpec[]
   forgeGamificationEvents     ForgeGamificationEvent[]
   forgeCertificates           ForgeCertificate[]
+  meetSessions                MeetSession[]
 }
 
-/// Autoriza√ß√£o ao Hub /hub/workspace ‚Äî espelho operacional: quais sistemas o utilizador v√™ e usa a partir dali (dados continuam nos sistemas de origem).
+/// AutorizaÁ„o ao Hub /hub/workspace ? espelho operacional: quais sistemas o utilizador vÍ e usa a partir dali (dados continuam nos sistemas de origem).
 model IntegratedWorkspaceAccess {
   id              String   @id @default(cuid())
   companyId       String
   userId          String
-  /// JSON: ["ATLAS","SIEP","FUNDHUB","NEXUS","FORGE","PRISM"] ‚Äî subconjunto contratado / relevante
+  /// JSON: ["ATLAS","SIEP","FUNDHUB","NEXUS","FORGE","PRISM"] ? subconjunto contratado / relevante
   systems         Json     @default("[]")
   enabled         Boolean  @default(true)
   grantedByUserId String?
@@ -249,7 +258,7 @@ model CompanyUser {
   companyId       String
   role            UserRole @default(COLLABORATOR)
   isDefault       Boolean  @default(false)
-  /// Permiss√µes SIEP granulares (array JSON de chaves ‚Äî ver lib/siep/permissions.ts)
+  /// Permissıes SIEP granulares (array JSON de chaves ? ver lib/siep/permissions.ts)
   siepPermissions Json?
   createdAt       DateTime @default(now())
   company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -361,9 +370,10 @@ model Project {
   transactions               Transaction[]
   activityReports            TaskActivityReport[]
   reportGuides               ProjectReportGuide[]
+  meetSessions               MeetSession[]
 }
 
-/// Manual / gu√≠a de reporte del financiador ‚Äî referencia permanente para la IA.
+/// Manual / guÌa de reporte del financiador ? referencia permanente para la IA.
 model ProjectReportGuide {
   id               String   @id @default(cuid())
   projectId        String
@@ -374,7 +384,7 @@ model ProjectReportGuide {
   fileSizeBytes    Int      @default(0)
   extractedText    String?  @db.Text
   extractionStatus String   @default("pending")
-  /// general | me | budget ‚Äî √°mbito del manual para la IA
+  /// general | me | budget ? ·mbito del manual para la IA
   domain           String   @default("general")
   uploadedById     String?
   order            Int      @default(0)
@@ -437,6 +447,7 @@ model Task {
   project          Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   dependedBy       TaskDependency[] @relation("DependencyTask")
   dependsOn        TaskDependency[] @relation("DependentTask")
+  meetActionItems  MeetActionItem[]
   timeEntries      TimeEntry[]
   activityReports  TaskActivityReport[]
 }
@@ -853,7 +864,7 @@ model Product {
   stockMovements            StockMovement[]
 }
 
-/// Estrutura de materiais (BOM): define insumos necess√°rios para produzir um produto final
+/// Estrutura de materiais (BOM): define insumos necess·rios para produzir um produto final
 model ProductComponent {
   id             String   @id @default(cuid())
   companyId      String
@@ -1293,11 +1304,11 @@ model FundingOpportunityFeedback {
   @@index([fundId])
 }
 
-/// Checklist de compliance por empresa ‚Äî persiste o estado (JSON) de cada categoria
+/// Checklist de compliance por empresa ? persiste o estado (JSON) de cada categoria
 model FundhubComplianceChecklist {
   id          String   @id @default(cuid())
   companyId   String
-  fundId      String?  // null = checklist gen√©rico, preenchido = associado a um fundo
+  fundId      String?  // null = checklist genÈrico, preenchido = associado a um fundo
   checklistId String   // ex: "governance", "financial", "esg", "compliance"
   itemsJson   String   // JSON: { [itemId]: boolean }
   notes       String?
@@ -1388,11 +1399,11 @@ model FundhubAlert {
   userId      String
   name        String
   description String?
-  /// M√≠nimo match % para ativar alerta (ex: 70)
+  /// MÌnimo match % para ativar alerta (ex: 70)
   matchThreshold Int     @default(70)
   /// true = ativo, false = desativado
   isActive    Boolean   @default(true)
-  /// Tipo de notifica√ß√£o: 'in_app' | 'email' | 'both'
+  /// Tipo de notificaÁ„o: 'in_app' | 'email' | 'both'
   notificationType String @default("in_app")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -1419,7 +1430,7 @@ model FundhubAlertTrigger {
   @@index([fundId, triggeredAt])
 }
 
-/// Checklist de elegibilidade gerado por IA para um fundo espec√≠fico
+/// Checklist de elegibilidade gerado por IA para um fundo especÌfico
 model FundhubEligibilityCheck {
   id          String   @id @default(cuid())
   companyId   String
@@ -1446,7 +1457,7 @@ model NexusNetwork {
   /// COOP_HIERARCHY | SALES_NETWORK | MIXED
   kind            String               @default("COOP_HIERARCHY")
   anchorCompanyId String
-  /// Projeto SIEP opcional que contextualiza toda a rede (ex.: projeto tempor√°rio)
+  /// Projeto SIEP opcional que contextualiza toda a rede (ex.: projeto tempor·rio)
   siepProjectId   String?
   isActive        Boolean              @default(true)
   createdAt       DateTime             @default(now())
@@ -1460,7 +1471,7 @@ model NexusNetwork {
   @@index([siepProjectId])
 }
 
-/// Jornada tipo incubadora + prontid√£o internacional (Nexus)
+/// Jornada tipo incubadora + prontid„o internacional (Nexus)
 model NexusVentureState {
   id                       String         @id @default(cuid())
   companyId                String?        @unique
@@ -1480,9 +1491,9 @@ model NexusNetworkMember {
   id            String       @id @default(cuid())
   networkId     String
   companyId     String
-  /// anchor = empresa m√£e / √¢ncora; member = filial ou participante da rede
+  /// anchor = empresa m„e / ‚ncora; member = filial ou participante da rede
   memberRole    String       @default("member")
-  /// Override opcional: projeto SIEP espec√≠fico deste membro (sen√£o usa o da rede)
+  /// Override opcional: projeto SIEP especÌfico deste membro (sen„o usa o da rede)
   siepProjectId String?
   sortOrder     Int          @default(0)
   createdAt     DateTime     @default(now())
@@ -1608,7 +1619,7 @@ model TaskActivityReport {
   @@index([status])
 }
 
-/// Reembolso de combust√≠vel / visita de campo ligado a um informe.
+/// Reembolso de combustÌvel / visita de campo ligado a um informe.
 model TaskMileageClaim {
   id                   String             @id @default(cuid())
   reportId             String             @unique
@@ -1703,7 +1714,7 @@ model MEReportPackage {
   periodEnd       DateTime?
   status          String         @default("draft")
   donorFormat     String         @default("generic")
-  /// me | budget ‚Äî separa pacotes M&E de informes financieros
+  /// me | budget ? separa pacotes M&E de informes financieros
   domain          String         @default("me")
   notes           String?
   /// Pacote trimestral alimentado por pacotes mensais
@@ -1780,7 +1791,7 @@ model AiAdvisorSession {
   companyId String
   userId    String
   title     String?
-  /** Separa o assessor ‚Äúworkspace‚Äù (/hub/advisor + chat IA contexto) do copiloto NEXUS (/hub/nexus); evita misturar prompts na mesma sess√£o. */
+  /** Separa o assessor ?workspace? (/hub/advisor + chat IA contexto) do copiloto NEXUS (/hub/nexus); evita misturar prompts na mesma sess„o. */
   kind      AiAdvisorSessionKind @default(WORKSPACE_ADVISOR)
   /// Estado espelhado na coluna direita do NEXUS (acordo com assessor IA + artefactos; conversa como fonte de verdade)
   nexusMirror Json?
@@ -1874,7 +1885,7 @@ model WorkChatMessage {
   @@index([sessionId])
 }
 
-// --- FORGE (EAD unificado: cursos + atividades + jogos + gamifica√ß√£o) ---
+// --- FORGE (EAD unificado: cursos + atividades + jogos + gamificaÁ„o) ---
 
 model ForgeProgram {
   id           String        @id @default(cuid())
@@ -1900,22 +1911,22 @@ model ForgeCourse {
   title          String
   description    String?
   status         String                  @default("draft")
-  /** async | live | blended ‚Äî ass√≠ncrono, s√≥ vide chamada, ou ambos */
+  /** async | live | blended ? assÌncrono, sÛ vide chamada, ou ambos */
   deliveryMode   String                  @default("async")
-  /** personal = cada aluno seu tabuleiro; shared_live = tablero √∫nico do facilitador */
+  /** personal = cada aluno seu tabuleiro; shared_live = tablero ˙nico do facilitador */
   gamePlayMode   String                  @default("personal")
-  /** open = aparece no cat√°logo da org; invite_only = s√≥ alunos convidados ao curso */
+  /** open = aparece no cat·logo da org; invite_only = sÛ alunos convidados ao curso */
   cohortMode     String                  @default("invite_only")
   /** { meetingUrl, platform, scheduledLabel, facilitatorNotes, roomName } */
   liveConfig     Json?
-  coverEmoji     String                  @default("üìö")
+  coverEmoji     String                  @default("??")
   gamification   Json?
   estimatedHours Int?
   programSortOrder Int                   @default(0)
-  /** PDF del libro did√°ctico (S3 o /public/uploads/forge) */
+  /** PDF del libro did·ctico (S3 o /public/uploads/forge) */
   libroPdfPath     String?
   libroPdfName     String?
-  /** Texto extra√≠do del PDF (pdf-parse + Gemini OCR si hace falta) */
+  /** Texto extraÌdo del PDF (pdf-parse + Gemini OCR si hace falta) */
   libroOcrText     String?                 @db.Text
   libroOcrStatus   String?                 /// pending | done | failed | skipped
   libroOcrAt       DateTime?
@@ -1924,7 +1935,7 @@ model ForgeCourse {
   presentationPdfPath   String?
   presentationPdfName   String?
   presentationEmbedUrl  String?
-  /** Diapositivas integradas (guion PPT) ‚Äî { n, title, visual, texto, guion, tecnico, accion }[] */
+  /** Diapositivas integradas (guion PPT) ? { n, title, visual, texto, guion, tecnico, accion }[] */
   presentationSlides    Json?
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
@@ -1947,7 +1958,7 @@ model ForgeCourse {
   @@index([programId])
 }
 
-/// Edi√ß√£o / turma ‚Äî uma execu√ß√£o do curso (v√°rias empresas/grupos dentro)
+/// EdiÁ„o / turma ? uma execuÁ„o do curso (v·rias empresas/grupos dentro)
 model ForgeCourseEdition {
   id        String   @id @default(cuid())
   courseId  String
@@ -1967,7 +1978,7 @@ model ForgeCourseEdition {
   @@index([courseId, startsAt])
 }
 
-/// Sess√£o de feira / capacita√ß√£o presencial ‚Äî c√≥digo curto da sala + agrupamento autom√°tico
+/// Sess„o de feira / capacitaÁ„o presencial ? cÛdigo curto da sala + agrupamento autom·tico
 model ForgeFeriaSession {
   id        String   @id @default(cuid())
   courseId  String
@@ -1989,7 +2000,7 @@ model ForgeFeriaSession {
   @@index([editionId])
 }
 
-/// Inscri√ß√£o na feira ‚Äî um c√≥digo pessoal por email por sess√£o
+/// InscriÁ„o na feira ? um cÛdigo pessoal por email por sess„o
 model ForgeFeriaRegistration {
   id          String   @id @default(cuid())
   sessionId   String
@@ -2022,7 +2033,7 @@ model ForgePlayGroup {
   name            String
   /** live_team = jogo colectivo; individual_coaching = pos-jogo 1:1 */
   mode            String                @default("live_team")
-  /** Grupo criado automaticamente na feira (agrupamento aleat√≥rio) */
+  /** Grupo criado automaticamente na feira (agrupamento aleatÛrio) */
   autoGenerated   Boolean               @default(false)
   inviteToken     String?               @unique
   inviteExpiresAt DateTime?
@@ -2042,7 +2053,7 @@ model ForgePlayGroup {
   @@index([feriaSessionId])
 }
 
-/// Sess√£o agendada ao vivo (calend√°rio do curso)
+/// Sess„o agendada ao vivo (calend·rio do curso)
 model ForgeLiveSession {
   id                 String                 @id @default(cuid())
   courseId           String
@@ -2050,7 +2061,7 @@ model ForgeLiveSession {
   startsAt           DateTime
   endsAt             DateTime?
   meetingUrl         String?
-  /** Grabaci√≥n publicada (YouTube, Drive, etc.) tras la sesi√≥n */
+  /** GrabaciÛn publicada (YouTube, Drive, etc.) tras la sesiÛn */
   recordingUrl       String?
   recordingNotes     String?
   activityId         String?
@@ -2063,6 +2074,7 @@ model ForgeLiveSession {
   sharedGameRooms    ForgeSharedGameRoom[]
   attendances        ForgeLiveAttendance[]
   playGroups         ForgePlayGroup[]
+  meetSessions       MeetSession[]
 
   @@index([courseId, startsAt])
   @@index([activityId])
@@ -2106,7 +2118,7 @@ model ForgeModule {
   @@index([courseId, sortOrder])
 }
 
-/// Atividade de aprendizagem FORGE (n√£o confundir com model Activity = audit log)
+/// Atividade de aprendizagem FORGE (n„o confundir com model Activity = audit log)
 model ForgeLearningActivity {
   id         String                @id @default(cuid())
   moduleId   String
@@ -2129,7 +2141,7 @@ model ForgeLearningActivity {
   @@index([gameSpecId])
 }
 
-/// Tablero/juego compartido en sesi√≥n en vivo (estado √∫nico para toda la clase)
+/// Tablero/juego compartido en sesiÛn en vivo (estado ˙nico para toda la clase)
 model ForgeSharedGameRoom {
   id                String                 @id @default(cuid())
   activityId        String
@@ -2192,12 +2204,12 @@ model ForgeEnrollment {
   courseId     String
   userId       String
   status       String      @default("active")
-  /** course_only = s√≥ este curso, sem cat√°logo FORGE; organization = equipa da org */
+  /** course_only = sÛ este curso, sem cat·logo FORGE; organization = equipa da org */
   accessScope  String      @default("course_only")
   enrolledAt   DateTime    @default(now())
   completedAt  DateTime?
   invitedById      String?
-  /** Token de convite (link m√°gico /hub/forge/entrar?token=) */
+  /** Token de convite (link m·gico /hub/forge/entrar?token=) */
   inviteToken           String?   @unique
   inviteExpiresAt       DateTime?
   magicLoginToken       String?   @unique
@@ -2245,16 +2257,16 @@ model ForgeLearnerProfile {
   @@unique([courseId, userId])
 }
 
-/// Mapa personal, materiais e hist√≥rico por aluno (conta individual)
+/// Mapa personal, materiais e histÛrico por aluno (conta individual)
 model ForgeLearnerJourney {
   id         String      @id @default(cuid())
   courseId   String
   userId     String
-  /** Estaciones/m√≥dulos + tablero personal */
+  /** Estaciones/mÛdulos + tablero personal */
   mapState   Json        @default("{}")
   /** Fichas, insights, entregas */
   materials  Json        @default("[]")
-  /** L√≠nea de tiempo de eventos */
+  /** LÌnea de tiempo de eventos */
   timeline   Json        @default("[]")
   updatedAt  DateTime    @updatedAt
   createdAt  DateTime    @default(now())
@@ -2358,4 +2370,222 @@ enum InvoiceType {
   PAYABLE
   CREDIT_NOTE
   DEBIT_NOTE
+}
+
+/// Etholys Meet ? sess„o transversal (espelhos: loose / forge / siep / nexus)
+/// Spec: docs/architecture/etholys-meet.md
+model MeetSession {
+  id                 String            @id @default(cuid())
+  companyId          String
+  createdById        String?
+  title              String
+  description        String?
+  /// loose | forge | siep | nexus
+  mirror             String            @default("loose")
+  /// scheduled | live | ended | cancelled
+  status             String            @default("scheduled")
+  scheduledAt        DateTime?
+  endsAt             DateTime?
+  startedAt          DateTime?
+  endedAt            DateTime?
+  roomSlug           String            @unique
+  meetingUrl         String?
+  recordingUrl       String?
+  transcriptText     String?           @db.Text
+  summaryText        String?           @db.Text
+  projectId          String?
+  forgeLiveSessionId String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  company            Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy          User?             @relation("MeetSessionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  project            Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  forgeLiveSession   ForgeLiveSession? @relation(fields: [forgeLiveSessionId], references: [id], onDelete: SetNull)
+  participants       MeetParticipant[]
+  actionItems        MeetActionItem[]
+
+  @@index([companyId, scheduledAt])
+  @@index([projectId])
+  @@index([forgeLiveSessionId])
+  @@index([status])
+}
+
+model MeetParticipant {
+  id          String      @id @default(cuid())
+  sessionId   String
+  userId      String?
+  email       String?
+  displayName String?
+  /// host | cohost | guest
+  role        String      @default("guest")
+  invitedAt   DateTime    @default(now())
+  joinedAt    DateTime?
+  leftAt      DateTime?
+  session     MeetSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([userId])
+  @@index([email])
+}
+
+/// PrÛximo passo / tarefa prÈ-criada pela IA ? validaÁ„o humana antes de virar Task SIEP
+model MeetActionItem {
+  id           String      @id @default(cuid())
+  sessionId    String
+  title        String
+  notes        String?
+  assigneeHint String?
+  dueHint      DateTime?
+  /// draft | accepted | rejected | converted
+  status       String      @default("draft")
+  taskId       String?
+  sortOrder    Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  session      MeetSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  task         Task?       @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([status])
+  @@index([taskId])
+}
+
+/// ETHOLYS Lab ANVIL ? agente de engenharia interno (1 agente por projeto)
+/// Spec: docs/architecture/lab-anvil.md
+model LabAnvilProject {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  name            String
+  description     String?  @db.Text
+  /// private | public_oss
+  visibility      String   @default("private")
+  /// standalone | etholys_core | consumes_etholys_api | whitelabel_instance
+  relation        String   @default("standalone")
+  /// etholys_monorepo | external_repo | sandbox
+  workspaceKind   String   @default("sandbox")
+  repoUrl         String?
+  repoPath        String?
+  defaultBranch   String   @default("main")
+  /// Pacotes/APIs/repos OSS aprovados para reuso (JSON string[])
+  allowedReuse    Json     @default("[]")
+  parentProjectId String?
+  /// active | archived
+  status          String   @default("active")
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       User?    @relation("LabAnvilProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  parentProject   LabAnvilProject?  @relation("LabAnvilProjectTree", fields: [parentProjectId], references: [id], onDelete: SetNull)
+  childProjects   LabAnvilProject[] @relation("LabAnvilProjectTree")
+  agent           LabAnvilAgent?
+  deployTargets   LabAnvilDeployTarget[]
+  members         LabAnvilProjectMember[]
+  sessions        LabAnvilSession[]
+
+  @@index([status])
+  @@index([visibility])
+  @@index([relation])
+  @@index([parentProjectId])
+}
+
+model LabAnvilAgent {
+  id               String   @id @default(cuid())
+  projectId        String   @unique
+  systemPromptExtra String? @db.Text
+  memoryJson       Json?
+  /// idle | running | error
+  status           String   @default("idle")
+  lastRunAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  project          LabAnvilProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model LabAnvilDeployTarget {
+  id        String   @id @default(cuid())
+  projectId String
+  /// preview | staging | contabo | custom
+  kind      String
+  label     String
+  isDefault Boolean  @default(false)
+  configJson Json?
+  /// idle | ready | deploying | live | error
+  status    String   @default("idle")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   LabAnvilProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+/// Acesso global a ferramenta ANVIL (alem dos owners por env)
+model LabAnvilMember {
+  id          String   @id @default(cuid())
+  email       String
+  userId      String?
+  /// member (owners via LAB_ANVIL_OWNER_EMAILS)
+  role        String   @default("member")
+  /// pending | active | revoked
+  status      String   @default("pending")
+  inviteCode  String   @unique
+  invitedById String?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User?    @relation("LabAnvilMemberUser", fields: [userId], references: [id], onDelete: SetNull)
+  invitedBy   User?    @relation("LabAnvilMemberInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([status])
+}
+
+model LabAnvilProjectMember {
+  id          String   @id @default(cuid())
+  projectId   String
+  email       String
+  userId      String?
+  /// owner | collaborator
+  role        String   @default("collaborator")
+  /// pending | active | revoked
+  status      String   @default("pending")
+  invitedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     LabAnvilProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user        User?    @relation("LabAnvilProjectMemberUser", fields: [userId], references: [id], onDelete: SetNull)
+  invitedBy   User?    @relation("LabAnvilProjectMemberInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, email])
+  @@index([projectId])
+  @@index([userId])
+}
+
+model LabAnvilSession {
+  id          String   @id @default(cuid())
+  projectId   String
+  createdById String?
+  title       String?
+  /// open | closed
+  status      String   @default("open")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     LabAnvilProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy   User?    @relation("LabAnvilSessionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  messages    LabAnvilMessage[]
+
+  @@index([projectId])
+}
+
+model LabAnvilMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  /// user | assistant | system | tool
+  role      String
+  content   String   @db.Text
+  metaJson  Json?
+  createdAt DateTime @default(now())
+  session   LabAnvilSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
 }

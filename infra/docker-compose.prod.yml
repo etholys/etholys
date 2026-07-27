@@ -51,6 +51,11 @@ services:
       - '443:443'
     environment:
       APP_DOMAIN: ${APP_DOMAIN:?Defina APP_DOMAIN em infra/.env}
+      # Subdomínio Jitsi (Etholys Meet). Ex.: meet.etholys.com
+      MEET_DOMAIN: ${MEET_DOMAIN:-meet.etholys.com}
+    extra_hosts:
+      # Proxy Caddy → Jitsi no host (:8000, docker-jitsi-meet)
+      - 'host.docker.internal:host-gateway'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

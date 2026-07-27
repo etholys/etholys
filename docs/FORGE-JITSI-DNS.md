@@ -1,46 +1,31 @@
-# Jitsi sem limite de 5 minutos (FORGE)
+# Jitsi sem limite de 5 minutos (FORGE / Meet)
 
-O embed em `meet.jit.si` corta a ~5 minutos. Produção deve usar **Jitsi self-hosted** em subdomínio próprio.
+> **Produção actual = Contabo.** Use o guia completo: **[MEET-JITSI-CONTABO.md](./MEET-JITSI-CONTABO.md)**  
+> Script: `scripts/setup-jitsi-contabo.sh` → `https://meet.etholys.com`
 
-## 1. DNS (Cloudflare ou registrador)
+O embed em `meet.jit.si` corta a ~5 minutos. Produção deve usar **Jitsi self-hosted**.
+
+## Contabo (recomendado)
 
 | Registro | Tipo | Valor |
 |----------|------|--------|
-| `meet.forge` | A | IP do servidor Hetzner (ex. `178.105.80.131`) |
-
-Resultado: `https://meet.forge.etholys.com`
-
-## 2. Nginx + SSL no servidor
+| `meet` | A | IP Contabo (ex. `84.247.187.155`) |
 
 ```bash
-# No servidor (já existe script no repo)
-cd /opt/etholys
-bash scripts/setup-jitsi-on-server.sh
-certbot --nginx -d meet.forge.etholys.com
+bash scripts/setup-jitsi-contabo.sh
 ```
-
-Proxy reverso: porta **8000** (docker Jitsi) → `meet.forge.etholys.com`.
-
-## 3. Variáveis da app
-
-Em `apps/web/.env` / produção:
 
 ```env
-JITSI_BASE_URL=https://meet.forge.etholys.com
-NEXT_PUBLIC_JITSI_BASE_URL=https://meet.forge.etholys.com
+JITSI_BASE_URL=https://meet.etholys.com
+NEXT_PUBLIC_JITSI_BASE_URL=https://meet.etholys.com
 ```
 
-Rebuild do contentor `web`.
+## Legado Hetzner / Nginx (`meet.forge`)
 
-## 4. Partilha de ecrã
+Script antigo: `scripts/setup-jitsi-on-server.sh` + `infra/nginx-meet.forge.etholys.com.conf`.
 
-Com Jitsi próprio, o iframe inclui `enableScreensharing=true`. O utilizador usa o botão **Compartilhar tela** na barra do Jitsi (ícone monitor).
+| Registro | Tipo | Valor |
+|----------|------|--------|
+| `meet.forge` | A | IP Hetzner (legado) |
 
-## Verificação
-
-```bash
-dig meet.forge.etholys.com +short
-curl -I https://meet.forge.etholys.com
-```
-
-Deve responder 200/301, não NXDOMAIN.
+Não usar no Contabo (lá o TLS é Caddy, não Nginx).

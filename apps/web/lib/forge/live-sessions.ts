@@ -9,6 +9,8 @@ export type SerializedLiveSession = {
   startsAt: string;
   endsAt: string | null;
   meetingUrl: string | null;
+  /** Etholys Meet espelho (se provisionado) */
+  meetSessionId: string | null;
   activityId: string | null;
   activityTitle: string | null;
   facilitatorNotes: string | null;

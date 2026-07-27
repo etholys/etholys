@@ -3,6 +3,7 @@ import { sessionStatus, type SerializedLiveSession } from '@/lib/forge/live-sess
 
 type Row = ForgeLiveSession & {
   focusActivity?: Pick<ForgeLearningActivity, 'title'> | null;
+  meetSessions?: { id: string }[];
 };
 
 export function serializeLiveSession(row: Row, now = new Date()): SerializedLiveSession {
@@ -15,6 +16,7 @@ export function serializeLiveSession(row: Row, now = new Date()): SerializedLive
     startsAt: startsAt.toISOString(),
     endsAt: endsAt?.toISOString() ?? null,
     meetingUrl: row.meetingUrl,
+    meetSessionId: row.meetSessions?.[0]?.id ?? null,
     activityId: row.activityId,
     activityTitle: row.focusActivity?.title ?? null,
     facilitatorNotes: row.facilitatorNotes,
