@@ -163,7 +163,7 @@ model Company {
   businessActivityCode        String?
   businessActivity            String?
   entityType                  String?
-   — aciona módulos e memória de IA; não substitui aconselhamento legal.
+  /// Respostas do assistente de contexto (sector, comércio, metas) — aciona módulos e memória de IA; não substitui aconselhamento legal.
   contextSetupJson            Json?
   contextSetupAt              DateTime?
   aiSessions                  AiAdvisorSession[]
@@ -218,12 +218,12 @@ model Company {
   meetSessions                MeetSession[]
 }
 
- — espelho operacional: quais sistemas o utilizador vê e usa a partir dali (dados continuam nos sistemas de origem).
+/// Autorização ao Hub /hub/workspace — espelho operacional: quais sistemas o utilizador vê e usa a partir dali (dados continuam nos sistemas de origem).
 model IntegratedWorkspaceAccess {
   id              String   @id @default(cuid())
   companyId       String
   userId          String
-   — subconjunto contratado / relevante
+  /// JSON: ["ATLAS","SIEP","FUNDHUB","NEXUS","FORGE","PRISM"] — subconjunto contratado / relevante
   systems         Json     @default("[]")
   enabled         Boolean  @default(true)
   grantedByUserId String?
@@ -258,7 +258,7 @@ model CompanyUser {
   companyId       String
   role            UserRole @default(COLLABORATOR)
   isDefault       Boolean  @default(false)
-   — ver lib/siep/permissions.ts)
+  /// Permissões SIEP granulares (array JSON de chaves — ver lib/siep/permissions.ts)
   siepPermissions Json?
   createdAt       DateTime @default(now())
   company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -373,7 +373,7 @@ model Project {
   meetSessions               MeetSession[]
 }
 
- — referencia permanente para la IA.
+/// Manual / guía de reporte del financiador — referencia permanente para la IA.
 model ProjectReportGuide {
   id               String   @id @default(cuid())
   projectId        String
@@ -384,7 +384,7 @@ model ProjectReportGuide {
   fileSizeBytes    Int      @default(0)
   extractedText    String?  @db.Text
   extractionStatus String   @default("pending")
-   — ámbito del manual para la IA
+  /// general | me | budget — ámbito del manual para la IA
   domain           String   @default("general")
   uploadedById     String?
   order            Int      @default(0)
@@ -1304,7 +1304,7 @@ model FundingOpportunityFeedback {
   @@index([fundId])
 }
 
- — persiste o estado (JSON) de cada categoria
+/// Checklist de compliance por empresa — persiste o estado (JSON) de cada categoria
 model FundhubComplianceChecklist {
   id          String   @id @default(cuid())
   companyId   String
@@ -1714,7 +1714,7 @@ model MEReportPackage {
   periodEnd       DateTime?
   status          String         @default("draft")
   donorFormat     String         @default("generic")
-   — separa pacotes M&E de informes financieros
+  /// me | budget — separa pacotes M&E de informes financieros
   domain          String         @default("me")
   notes           String?
   /// Pacote trimestral alimentado por pacotes mensais
@@ -1911,7 +1911,7 @@ model ForgeCourse {
   title          String
   description    String?
   status         String                  @default("draft")
-  /** async | live | blended ? assíncrono, só vide chamada, ou ambos */
+  /** async | live | blended — assíncrono, só vide chamada, ou ambos */
   deliveryMode   String                  @default("async")
   /** personal = cada aluno seu tabuleiro; shared_live = tablero único do facilitador */
   gamePlayMode   String                  @default("personal")
@@ -1935,7 +1935,7 @@ model ForgeCourse {
   presentationPdfPath   String?
   presentationPdfName   String?
   presentationEmbedUrl  String?
-  /** Diapositivas integradas (guion PPT) ? { n, title, visual, texto, guion, tecnico, accion }[] */
+  /** Diapositivas integradas (guion PPT) — { n, title, visual, texto, guion, tecnico, accion }[] */
   presentationSlides    Json?
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
@@ -1958,7 +1958,7 @@ model ForgeCourse {
   @@index([programId])
 }
 
- — uma execução do curso (várias empresas/grupos dentro)
+/// Edição / turma — uma execução do curso (várias empresas/grupos dentro)
 model ForgeCourseEdition {
   id        String   @id @default(cuid())
   courseId  String
@@ -1978,7 +1978,7 @@ model ForgeCourseEdition {
   @@index([courseId, startsAt])
 }
 
- — código curto da sala + agrupamento automático
+/// Sessão de feira / capacitação presencial — código curto da sala + agrupamento automático
 model ForgeFeriaSession {
   id        String   @id @default(cuid())
   courseId  String
@@ -2000,7 +2000,7 @@ model ForgeFeriaSession {
   @@index([editionId])
 }
 
- — um código pessoal por email por sessão
+/// Inscrição na feira — um código pessoal por email por sessão
 model ForgeFeriaRegistration {
   id          String   @id @default(cuid())
   sessionId   String
@@ -2372,7 +2372,7 @@ enum InvoiceType {
   DEBIT_NOTE
 }
 
- — sessão transversal (espelhos: loose / forge / siep / nexus)
+/// Etholys Meet — sessão transversal (espelhos: loose / forge / siep / nexus)
 /// Spec: docs/architecture/etholys-meet.md
 model MeetSession {
   id                 String            @id @default(cuid())
@@ -2429,7 +2429,7 @@ model MeetParticipant {
   @@index([email])
 }
 
- — validação humana antes de virar Task SIEP
+/// Próximo passo / tarefa pré-criada pela IA — validação humana antes de virar Task SIEP
 model MeetActionItem {
   id           String      @id @default(cuid())
   sessionId    String
@@ -2451,7 +2451,7 @@ model MeetActionItem {
   @@index([taskId])
 }
 
- — agente de engenharia interno (1 agente por projeto)
+/// ETHOLYS Lab ANVIL — agente de engenharia interno (1 agente por projeto)
 /// Spec: docs/architecture/lab-anvil.md
 model LabAnvilProject {
   id              String   @id @default(cuid())
