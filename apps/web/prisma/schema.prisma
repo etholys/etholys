@@ -163,7 +163,7 @@ model Company {
   businessActivityCode        String?
   businessActivity            String?
   entityType                  String?
-  /// Respostas do assistente de contexto (sector, comércio, metas) ? aciona módulos e memória de IA; não substitui aconselhamento legal.
+   â€” aciona mÃ³dulos e memÃ³ria de IA; nÃ£o substitui aconselhamento legal.
   contextSetupJson            Json?
   contextSetupAt              DateTime?
   aiSessions                  AiAdvisorSession[]
@@ -194,7 +194,7 @@ model Company {
   nexusNetworksAnchored       NexusNetwork[]               @relation("NexusNetworkAnchor")
   nexusNetworkMemberships     NexusNetworkMember[]
   nexusVentureState           NexusVentureState?
-  /// Quem pode usar o Centro de trabalho integrado nesta empresa (não duplica lógica dos sistemas; só espelha APIs).
+  /// Quem pode usar o Centro de trabalho integrado nesta empresa (nÃ£o duplica lÃ³gica dos sistemas; sÃ³ espelha APIs).
   integratedWorkspaceAccesses  IntegratedWorkspaceAccess[]
   products                    Product[]
   productComponents           ProductComponent[]           @relation("CompanyProductComponents")
@@ -218,12 +218,12 @@ model Company {
   meetSessions                MeetSession[]
 }
 
-/// Autorização ao Hub /hub/workspace ? espelho operacional: quais sistemas o utilizador vê e usa a partir dali (dados continuam nos sistemas de origem).
+ â€” espelho operacional: quais sistemas o utilizador vÃª e usa a partir dali (dados continuam nos sistemas de origem).
 model IntegratedWorkspaceAccess {
   id              String   @id @default(cuid())
   companyId       String
   userId          String
-  /// JSON: ["ATLAS","SIEP","FUNDHUB","NEXUS","FORGE","PRISM"] ? subconjunto contratado / relevante
+   â€” subconjunto contratado / relevante
   systems         Json     @default("[]")
   enabled         Boolean  @default(true)
   grantedByUserId String?
@@ -258,7 +258,7 @@ model CompanyUser {
   companyId       String
   role            UserRole @default(COLLABORATOR)
   isDefault       Boolean  @default(false)
-  /// Permissões SIEP granulares (array JSON de chaves ? ver lib/siep/permissions.ts)
+   â€” ver lib/siep/permissions.ts)
   siepPermissions Json?
   createdAt       DateTime @default(now())
   company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -373,7 +373,7 @@ model Project {
   meetSessions               MeetSession[]
 }
 
-/// Manual / guía de reporte del financiador ? referencia permanente para la IA.
+ â€” referencia permanente para la IA.
 model ProjectReportGuide {
   id               String   @id @default(cuid())
   projectId        String
@@ -384,7 +384,7 @@ model ProjectReportGuide {
   fileSizeBytes    Int      @default(0)
   extractedText    String?  @db.Text
   extractionStatus String   @default("pending")
-  /// general | me | budget ? ámbito del manual para la IA
+   â€” Ã¡mbito del manual para la IA
   domain           String   @default("general")
   uploadedById     String?
   order            Int      @default(0)
@@ -864,7 +864,7 @@ model Product {
   stockMovements            StockMovement[]
 }
 
-/// Estrutura de materiais (BOM): define insumos necessários para produzir um produto final
+/// Estrutura de materiais (BOM): define insumos necessÃ¡rios para produzir um produto final
 model ProductComponent {
   id             String   @id @default(cuid())
   companyId      String
@@ -1304,11 +1304,11 @@ model FundingOpportunityFeedback {
   @@index([fundId])
 }
 
-/// Checklist de compliance por empresa ? persiste o estado (JSON) de cada categoria
+ â€” persiste o estado (JSON) de cada categoria
 model FundhubComplianceChecklist {
   id          String   @id @default(cuid())
   companyId   String
-  fundId      String?  // null = checklist genérico, preenchido = associado a um fundo
+  fundId      String?  // null = checklist genÃ©rico, preenchido = associado a um fundo
   checklistId String   // ex: "governance", "financial", "esg", "compliance"
   itemsJson   String   // JSON: { [itemId]: boolean }
   notes       String?
@@ -1399,11 +1399,11 @@ model FundhubAlert {
   userId      String
   name        String
   description String?
-  /// Mínimo match % para ativar alerta (ex: 70)
+  /// MÃ­nimo match % para ativar alerta (ex: 70)
   matchThreshold Int     @default(70)
   /// true = ativo, false = desativado
   isActive    Boolean   @default(true)
-  /// Tipo de notificação: 'in_app' | 'email' | 'both'
+  /// Tipo de notificaÃ§Ã£o: 'in_app' | 'email' | 'both'
   notificationType String @default("in_app")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -1430,7 +1430,7 @@ model FundhubAlertTrigger {
   @@index([fundId, triggeredAt])
 }
 
-/// Checklist de elegibilidade gerado por IA para um fundo específico
+/// Checklist de elegibilidade gerado por IA para um fundo especÃ­fico
 model FundhubEligibilityCheck {
   id          String   @id @default(cuid())
   companyId   String
@@ -1457,7 +1457,7 @@ model NexusNetwork {
   /// COOP_HIERARCHY | SALES_NETWORK | MIXED
   kind            String               @default("COOP_HIERARCHY")
   anchorCompanyId String
-  /// Projeto SIEP opcional que contextualiza toda a rede (ex.: projeto temporário)
+  /// Projeto SIEP opcional que contextualiza toda a rede (ex.: projeto temporÃ¡rio)
   siepProjectId   String?
   isActive        Boolean              @default(true)
   createdAt       DateTime             @default(now())
@@ -1471,7 +1471,7 @@ model NexusNetwork {
   @@index([siepProjectId])
 }
 
-/// Jornada tipo incubadora + prontidão internacional (Nexus)
+/// Jornada tipo incubadora + prontidÃ£o internacional (Nexus)
 model NexusVentureState {
   id                       String         @id @default(cuid())
   companyId                String?        @unique
@@ -1491,9 +1491,9 @@ model NexusNetworkMember {
   id            String       @id @default(cuid())
   networkId     String
   companyId     String
-  /// anchor = empresa mãe / âncora; member = filial ou participante da rede
+  /// anchor = empresa mÃ£e / Ã¢ncora; member = filial ou participante da rede
   memberRole    String       @default("member")
-  /// Override opcional: projeto SIEP específico deste membro (senão usa o da rede)
+  /// Override opcional: projeto SIEP especÃ­fico deste membro (senÃ£o usa o da rede)
   siepProjectId String?
   sortOrder     Int          @default(0)
   createdAt     DateTime     @default(now())
@@ -1619,7 +1619,7 @@ model TaskActivityReport {
   @@index([status])
 }
 
-/// Reembolso de combustível / visita de campo ligado a um informe.
+/// Reembolso de combustÃ­vel / visita de campo ligado a um informe.
 model TaskMileageClaim {
   id                   String             @id @default(cuid())
   reportId             String             @unique
@@ -1714,7 +1714,7 @@ model MEReportPackage {
   periodEnd       DateTime?
   status          String         @default("draft")
   donorFormat     String         @default("generic")
-  /// me | budget ? separa pacotes M&E de informes financieros
+   â€” separa pacotes M&E de informes financieros
   domain          String         @default("me")
   notes           String?
   /// Pacote trimestral alimentado por pacotes mensais
@@ -1791,7 +1791,7 @@ model AiAdvisorSession {
   companyId String
   userId    String
   title     String?
-  /** Separa o assessor ?workspace? (/hub/advisor + chat IA contexto) do copiloto NEXUS (/hub/nexus); evita misturar prompts na mesma sessão. */
+  /** Separa o assessor ?workspace? (/hub/advisor + chat IA contexto) do copiloto NEXUS (/hub/nexus); evita misturar prompts na mesma sessÃ£o. */
   kind      AiAdvisorSessionKind @default(WORKSPACE_ADVISOR)
   /// Estado espelhado na coluna direita do NEXUS (acordo com assessor IA + artefactos; conversa como fonte de verdade)
   nexusMirror Json?
@@ -1885,7 +1885,7 @@ model WorkChatMessage {
   @@index([sessionId])
 }
 
-// --- FORGE (EAD unificado: cursos + atividades + jogos + gamificação) ---
+// --- FORGE (EAD unificado: cursos + atividades + jogos + gamificaÃ§Ã£o) ---
 
 model ForgeProgram {
   id           String        @id @default(cuid())
@@ -1911,11 +1911,11 @@ model ForgeCourse {
   title          String
   description    String?
   status         String                  @default("draft")
-  /** async | live | blended ? assíncrono, só vide chamada, ou ambos */
+  /** async | live | blended ? assÃ­ncrono, sÃ³ vide chamada, ou ambos */
   deliveryMode   String                  @default("async")
-  /** personal = cada aluno seu tabuleiro; shared_live = tablero único do facilitador */
+  /** personal = cada aluno seu tabuleiro; shared_live = tablero Ãºnico do facilitador */
   gamePlayMode   String                  @default("personal")
-  /** open = aparece no catálogo da org; invite_only = só alunos convidados ao curso */
+  /** open = aparece no catÃ¡logo da org; invite_only = sÃ³ alunos convidados ao curso */
   cohortMode     String                  @default("invite_only")
   /** { meetingUrl, platform, scheduledLabel, facilitatorNotes, roomName } */
   liveConfig     Json?
@@ -1923,10 +1923,10 @@ model ForgeCourse {
   gamification   Json?
   estimatedHours Int?
   programSortOrder Int                   @default(0)
-  /** PDF del libro didáctico (S3 o /public/uploads/forge) */
+  /** PDF del libro didÃ¡ctico (S3 o /public/uploads/forge) */
   libroPdfPath     String?
   libroPdfName     String?
-  /** Texto extraído del PDF (pdf-parse + Gemini OCR si hace falta) */
+  /** Texto extraÃ­do del PDF (pdf-parse + Gemini OCR si hace falta) */
   libroOcrText     String?                 @db.Text
   libroOcrStatus   String?                 /// pending | done | failed | skipped
   libroOcrAt       DateTime?
@@ -1958,7 +1958,7 @@ model ForgeCourse {
   @@index([programId])
 }
 
-/// Edição / turma ? uma execução do curso (várias empresas/grupos dentro)
+ â€” uma execuÃ§Ã£o do curso (vÃ¡rias empresas/grupos dentro)
 model ForgeCourseEdition {
   id        String   @id @default(cuid())
   courseId  String
@@ -1978,7 +1978,7 @@ model ForgeCourseEdition {
   @@index([courseId, startsAt])
 }
 
-/// Sessão de feira / capacitação presencial ? código curto da sala + agrupamento automático
+ â€” cÃ³digo curto da sala + agrupamento automÃ¡tico
 model ForgeFeriaSession {
   id        String   @id @default(cuid())
   courseId  String
@@ -2000,7 +2000,7 @@ model ForgeFeriaSession {
   @@index([editionId])
 }
 
-/// Inscrição na feira ? um código pessoal por email por sessão
+ â€” um cÃ³digo pessoal por email por sessÃ£o
 model ForgeFeriaRegistration {
   id          String   @id @default(cuid())
   sessionId   String
@@ -2033,7 +2033,7 @@ model ForgePlayGroup {
   name            String
   /** live_team = jogo colectivo; individual_coaching = pos-jogo 1:1 */
   mode            String                @default("live_team")
-  /** Grupo criado automaticamente na feira (agrupamento aleatório) */
+  /** Grupo criado automaticamente na feira (agrupamento aleatÃ³rio) */
   autoGenerated   Boolean               @default(false)
   inviteToken     String?               @unique
   inviteExpiresAt DateTime?
@@ -2053,7 +2053,7 @@ model ForgePlayGroup {
   @@index([feriaSessionId])
 }
 
-/// Sessão agendada ao vivo (calendário do curso)
+/// SessÃ£o agendada ao vivo (calendÃ¡rio do curso)
 model ForgeLiveSession {
   id                 String                 @id @default(cuid())
   courseId           String
@@ -2061,7 +2061,7 @@ model ForgeLiveSession {
   startsAt           DateTime
   endsAt             DateTime?
   meetingUrl         String?
-  /** Grabación publicada (YouTube, Drive, etc.) tras la sesión */
+  /** GrabaciÃ³n publicada (YouTube, Drive, etc.) tras la sesiÃ³n */
   recordingUrl       String?
   recordingNotes     String?
   activityId         String?
@@ -2118,7 +2118,7 @@ model ForgeModule {
   @@index([courseId, sortOrder])
 }
 
-/// Atividade de aprendizagem FORGE (não confundir com model Activity = audit log)
+/// Atividade de aprendizagem FORGE (nÃ£o confundir com model Activity = audit log)
 model ForgeLearningActivity {
   id         String                @id @default(cuid())
   moduleId   String
@@ -2141,7 +2141,7 @@ model ForgeLearningActivity {
   @@index([gameSpecId])
 }
 
-/// Tablero/juego compartido en sesión en vivo (estado único para toda la clase)
+/// Tablero/juego compartido en sesiÃ³n en vivo (estado Ãºnico para toda la clase)
 model ForgeSharedGameRoom {
   id                String                 @id @default(cuid())
   activityId        String
@@ -2204,12 +2204,12 @@ model ForgeEnrollment {
   courseId     String
   userId       String
   status       String      @default("active")
-  /** course_only = só este curso, sem catálogo FORGE; organization = equipa da org */
+  /** course_only = sÃ³ este curso, sem catÃ¡logo FORGE; organization = equipa da org */
   accessScope  String      @default("course_only")
   enrolledAt   DateTime    @default(now())
   completedAt  DateTime?
   invitedById      String?
-  /** Token de convite (link mágico /hub/forge/entrar?token=) */
+  /** Token de convite (link mÃ¡gico /hub/forge/entrar?token=) */
   inviteToken           String?   @unique
   inviteExpiresAt       DateTime?
   magicLoginToken       String?   @unique
@@ -2257,16 +2257,16 @@ model ForgeLearnerProfile {
   @@unique([courseId, userId])
 }
 
-/// Mapa personal, materiais e histórico por aluno (conta individual)
+/// Mapa personal, materiais e histÃ³rico por aluno (conta individual)
 model ForgeLearnerJourney {
   id         String      @id @default(cuid())
   courseId   String
   userId     String
-  /** Estaciones/módulos + tablero personal */
+  /** Estaciones/mÃ³dulos + tablero personal */
   mapState   Json        @default("{}")
   /** Fichas, insights, entregas */
   materials  Json        @default("[]")
-  /** Línea de tiempo de eventos */
+  /** LÃ­nea de tiempo de eventos */
   timeline   Json        @default("[]")
   updatedAt  DateTime    @updatedAt
   createdAt  DateTime    @default(now())
@@ -2372,7 +2372,7 @@ enum InvoiceType {
   DEBIT_NOTE
 }
 
-/// Etholys Meet ? sessão transversal (espelhos: loose / forge / siep / nexus)
+ â€” sessÃ£o transversal (espelhos: loose / forge / siep / nexus)
 /// Spec: docs/architecture/etholys-meet.md
 model MeetSession {
   id                 String            @id @default(cuid())
@@ -2429,7 +2429,7 @@ model MeetParticipant {
   @@index([email])
 }
 
-/// Próximo passo / tarefa pré-criada pela IA ? validação humana antes de virar Task SIEP
+ â€” validaÃ§Ã£o humana antes de virar Task SIEP
 model MeetActionItem {
   id           String      @id @default(cuid())
   sessionId    String
@@ -2451,7 +2451,7 @@ model MeetActionItem {
   @@index([taskId])
 }
 
-/// ETHOLYS Lab ANVIL ? agente de engenharia interno (1 agente por projeto)
+ â€” agente de engenharia interno (1 agente por projeto)
 /// Spec: docs/architecture/lab-anvil.md
 model LabAnvilProject {
   id              String   @id @default(cuid())
