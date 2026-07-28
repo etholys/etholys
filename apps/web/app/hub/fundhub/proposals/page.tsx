@@ -183,12 +183,7 @@ export default function ProposalsPage() {
   }, []);
 
   const handleOpenWorkspace = useCallback(async () => {
-    if (!fund) {
-      setError('Fund não carregado');
-      return;
-    }
-
-    if (!editalLink && selectedFiles.length === 0) {
+    if (!editalLink.trim() && selectedFiles.length === 0) {
       setError('Cole um link do edital ou selecione pelo menos um arquivo');
       return;
     }
@@ -197,15 +192,21 @@ export default function ProposalsPage() {
     setError(null);
 
     try {
-      const workspaceId = `workspace:${fund.id}:${Date.now()}`;
+      const resolvedFund = fund ?? {
+        id: `adhoc-${Date.now()}`,
+        name: selectedFiles[0]?.name?.replace(/\.[^.]+$/, '') || 'Proposta avulsa',
+        institution: 'Sem fundo vinculado',
+        description: '',
+      };
+      const workspaceId = `workspace:${resolvedFund.id}:${Date.now()}`;
       const uploadedAt = new Date().toISOString();
 
       const intakeData: ProposalIntake = {
         workspaceId,
-        fundId: fund.id,
-        fundName: fund.name,
-        fundInstitution: fund.institution,
-        editalLink,
+        fundId: resolvedFund.id,
+        fundName: resolvedFund.name,
+        fundInstitution: resolvedFund.institution,
+        editalLink: editalLink.trim(),
         intakeNotes,
         attachedFiles: selectedFiles.length
           ? selectedFiles.map((file) => ({
@@ -217,34 +218,43 @@ export default function ProposalsPage() {
           : undefined,
       };
 
-      localStorage.setItem(`proposalIntake:${workspaceId}`, JSON.stringify(intakeData));
+      try {
+        localStorage.setItem(`proposalIntake:${workspaceId}`, JSON.stringify(intakeData));
+      } catch {
+        throw new Error(
+          'Não foi possível guardar os anexos no browser (armazenamento cheio). Remova alguns ficheiros ou limpe o cache e tente de novo.',
+        );
+      }
 
       const textLike = selectedFiles.filter(
-        (f) =>
-          f.type.startsWith('text') ||
-          /\.(txt|md)$/i.test(f.name),
+        (f) => f.type.startsWith('text') || /\.(txt|md|csv)$/i.test(f.name),
       );
       if (textLike.length) {
-        const stored = await Promise.all(
-          textLike.map(async (file) => ({
-            name: file.name,
-            content: await file.text(),
-            uploadedAt,
-          })),
-        );
-        localStorage.setItem(`proposalFiles:${workspaceId}`, JSON.stringify(stored));
+        try {
+          const stored = await Promise.all(
+            textLike.slice(0, 10).map(async (file) => ({
+              name: file.name,
+              content: (await file.text()).slice(0, 80000),
+              uploadedAt,
+            })),
+          );
+          localStorage.setItem(`proposalFiles:${workspaceId}`, JSON.stringify(stored));
+          localStorage.setItem(
+            `proposalFile:${workspaceId}`,
+            JSON.stringify({ name: stored[0]!.name, content: stored[0]!.content, uploadedAt }),
+          );
+        } catch {
+          // Metadados já gravados — segue sem conteúdo textual completo
+        }
       }
 
-      // Compatibilidade com chave antiga (primeiro ficheiro de texto)
-      if (textLike[0]) {
-        const content = await textLike[0].text();
-        localStorage.setItem(
-          `proposalFile:${workspaceId}`,
-          JSON.stringify({ name: textLike[0].name, content, uploadedAt }),
-        );
+      if (!fund) {
+        localStorage.setItem('selectedFund', JSON.stringify(resolvedFund));
       }
 
-      router.push(`/hub/fundhub/proposals/editor?workspace=${encodeURIComponent(workspaceId)}`);
+      const qs = new URLSearchParams({ workspace: workspaceId });
+      if (resolvedFund.id) qs.set('fundId', resolvedFund.id);
+      router.push(`/hub/fundhub/proposals/editor?${qs.toString()}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao abrir workspace');
       setIsLoading(false);
@@ -508,7 +518,7 @@ export default function ProposalsPage() {
                     <p className="mt-1 text-xs text-gray-500">Contexto que será enviado ao assistente para análise</p>
                   </div>
 
-                  {fund && (
+                  {fund ? (
                     <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
                       <p className="text-sm text-gray-600">
                         <span className="font-medium text-gray-900">Fund:</span> {fund.name}
@@ -517,11 +527,24 @@ export default function ProposalsPage() {
                         <span className="font-medium text-gray-900">Instituição:</span> {fund.institution}
                       </p>
                     </div>
+                  ) : (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                      Sem fundo vinculado — a proposta será aberta como <strong>avulsa</strong>. Pode associar um
+                      fundo depois em Descobrir / Meus fundos.
+                    </div>
+                  )}
+
+                  {error && activeTab === 'new' && (
+                    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                      <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                      <span>{error}</span>
+                    </div>
                   )}
 
                   <button
+                    type="button"
                     onClick={handleOpenWorkspace}
-                    disabled={isLoading || (!editalLink && selectedFiles.length === 0)}
+                    disabled={isLoading || (!editalLink.trim() && selectedFiles.length === 0)}
                     className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 font-medium text-white shadow hover:shadow-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
                     {isLoading ? (

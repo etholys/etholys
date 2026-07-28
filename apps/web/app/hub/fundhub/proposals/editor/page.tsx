@@ -102,6 +102,23 @@ export default function FundHubProposalEditorPage() {
           setEditalLink(intake.editalLink || initialLink);
           setAttachedFiles(intake.attachedFiles || []);
           setIntakeNotes(intake.intakeNotes || '');
+          if (intake.fundName) {
+            setFund((prev) =>
+              prev || {
+                id: intake.fundId || 'adhoc',
+                name: intake.fundName,
+                institution: intake.fundInstitution || '',
+                type: '',
+                category: '',
+                amount: 0,
+                currency: '',
+                deadline: '',
+                countries: '',
+                sectors: '',
+                status: 'draft',
+              },
+            );
+          }
         } catch (err) {
           console.error('Error loading intake:', err);
         }
