@@ -215,10 +215,14 @@ export default function FundHubProposalEditorPage() {
     event.target.value = '';
     if (!files.length) return;
 
-    const MAX_FILES = 20;
-    const MAX_FILE_BYTES = 10 * 1024 * 1024;
+    const MAX_FILES = 50;
+    const MAX_FILE_BYTES = 25 * 1024 * 1024;
+    const ACCEPTED_EXT =
+      /\.(pdf|docx?|xlsx?|pptx?|txt|md|csv|rtf|odt|ods|odp|zip|rar|7z|png|jpe?g|gif|webp)$/i;
     const errors: string[] = [];
     const additions: AttachedFile[] = [];
+    let skippedFormat = 0;
+    let skippedSize = 0;
 
     setAttachedFiles((prev) => {
       const next = [...prev];
@@ -227,8 +231,12 @@ export default function FundHubProposalEditorPage() {
           errors.push(`Máximo de ${MAX_FILES} arquivos por proposta.`);
           break;
         }
+        if (!ACCEPTED_EXT.test(file.name)) {
+          skippedFormat += 1;
+          continue;
+        }
         if (file.size > MAX_FILE_BYTES) {
-          errors.push(`"${file.name}" — deve ter menos de 10MB.`);
+          skippedSize += 1;
           continue;
         }
         if (next.some((f) => f.name === file.name && f.size === file.size)) continue;
@@ -254,7 +262,15 @@ export default function FundHubProposalEditorPage() {
       }
     }
 
-    if (errors.length) setError(errors[0]);
+    if (skippedFormat) {
+      errors.push(
+        `${skippedFormat} arquivo(s) ignorado(s): formato não suportado (PDF, Word, Excel, PPT, imagens, ZIP…).`,
+      );
+    }
+    if (skippedSize) {
+      errors.push(`${skippedSize} arquivo(s) ignorado(s): cada um deve ter menos de 25MB.`);
+    }
+    if (errors.length) setError(errors.join(' '));
   }, []);
 
   const handleRemoveAttachedFile = useCallback((index: number) => {
@@ -578,7 +594,7 @@ export default function FundHubProposalEditorPage() {
                       <input
                         type="file"
                         multiple
-                        accept=".pdf,.docx,.doc,.txt,.md"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.rtf,.odt,.ods,.odp,.zip,.rar,.7z,.png,.jpg,.jpeg,.gif,.webp"
                         onChange={handleAttachFile}
                         className="hidden"
                       />

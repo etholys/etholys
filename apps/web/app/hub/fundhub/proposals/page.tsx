@@ -49,9 +49,12 @@ interface ProposalIntake {
   }>;
 }
 
-const MAX_FILES = 20;
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
-const ACCEPTED_EXT = /\.(pdf|docx?|txt|md)$/i;
+const MAX_FILES = 50;
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
+const ACCEPTED_EXT =
+  /\.(pdf|docx?|xlsx?|pptx?|txt|md|csv|rtf|odt|ods|odp|zip|rar|7z|png|jpe?g|gif|webp)$/i;
+const ACCEPT_ATTR =
+  '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.rtf,.odt,.ods,.odp,.zip,.rar,.7z,.png,.jpg,.jpeg,.gif,.webp';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -129,6 +132,8 @@ export default function ProposalsPage() {
     setSelectedFiles((prev) => {
       const next = [...prev];
       const errors: string[] = [];
+      let skippedFormat = 0;
+      let skippedSize = 0;
 
       for (const file of list) {
         if (next.length >= MAX_FILES) {
@@ -136,11 +141,11 @@ export default function ProposalsPage() {
           break;
         }
         if (!ACCEPTED_EXT.test(file.name)) {
-          errors.push(`"${file.name}" — formato não suportado (PDF, DOC, DOCX, TXT, MD).`);
+          skippedFormat += 1;
           continue;
         }
         if (file.size > MAX_FILE_BYTES) {
-          errors.push(`"${file.name}" — deve ter menos de 10MB.`);
+          skippedSize += 1;
           continue;
         }
         const duplicate = next.some(
@@ -150,7 +155,16 @@ export default function ProposalsPage() {
         next.push(file);
       }
 
-      setError(errors.length ? errors[0] : null);
+      if (skippedFormat) {
+        errors.push(
+          `${skippedFormat} arquivo(s) ignorado(s): formato não suportado. Use PDF, Word, Excel, PowerPoint, imagens, ZIP, TXT, etc.`,
+        );
+      }
+      if (skippedSize) {
+        errors.push(`${skippedSize} arquivo(s) ignorado(s): cada um deve ter menos de 25MB.`);
+      }
+
+      setError(errors.length ? errors.join(' ') : null);
       return next;
     });
   }, []);
@@ -440,7 +454,8 @@ export default function ProposalsPage() {
                             Clique para selecionar ou arraste vários arquivos
                           </p>
                           <p className="text-xs text-gray-500">
-                            PDF, DOC, DOCX, TXT ou MD — até 10MB cada · máx. {MAX_FILES} arquivos
+                            PDF, Word, Excel, PowerPoint, imagens, ZIP, TXT… — até 25MB cada · máx.{' '}
+                            {MAX_FILES} arquivos
                           </p>
                         </div>
                         <input
@@ -448,7 +463,7 @@ export default function ProposalsPage() {
                           type="file"
                           multiple
                           onChange={handleFileSelect}
-                          accept=".pdf,.docx,.txt,.doc,.md"
+                          accept={ACCEPT_ATTR}
                           className="hidden"
                         />
                       </label>
