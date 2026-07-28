@@ -211,22 +211,55 @@ export default function FundHubProposalEditorPage() {
   }, [proposalSections, activeSection]);
 
   const handleAttachFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!files.length) return;
 
-    const item: AttachedFile = {
-      name: file.name,
-      size: file.size,
-      type: file.type || 'application/octet-stream',
-      uploadedAt: new Date().toISOString(),
-    };
-    setAttachedFiles([item, ...attachedFiles.slice(0, 2)]);
+    const MAX_FILES = 20;
+    const MAX_FILE_BYTES = 10 * 1024 * 1024;
+    const errors: string[] = [];
+    const additions: AttachedFile[] = [];
 
-    if (file.type.startsWith('text') || file.name.endsWith('.md') || file.name.endsWith('.txt')) {
-      const text = await file.text();
-      setIntakeNotes((prev) => prev || text.slice(0, 10000));
+    setAttachedFiles((prev) => {
+      const next = [...prev];
+      for (const file of files) {
+        if (next.length + additions.length >= MAX_FILES) {
+          errors.push(`Máximo de ${MAX_FILES} arquivos por proposta.`);
+          break;
+        }
+        if (file.size > MAX_FILE_BYTES) {
+          errors.push(`"${file.name}" — deve ter menos de 10MB.`);
+          continue;
+        }
+        if (next.some((f) => f.name === file.name && f.size === file.size)) continue;
+        additions.push({
+          name: file.name,
+          size: file.size,
+          type: file.type || 'application/octet-stream',
+          uploadedAt: new Date().toISOString(),
+        });
+      }
+      return [...next, ...additions];
+    });
+
+    for (const file of files) {
+      if (file.type.startsWith('text') || file.name.endsWith('.md') || file.name.endsWith('.txt')) {
+        try {
+          const text = await file.text();
+          setIntakeNotes((prev) => prev || text.slice(0, 10000));
+          break;
+        } catch {
+          // ignore read errors for binary-like text
+        }
+      }
     }
-  }, [attachedFiles]);
+
+    if (errors.length) setError(errors[0]);
+  }, []);
+
+  const handleRemoveAttachedFile = useCallback((index: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
 
   const parseSectionTitles = (answer: string) => {
     const lines = answer
@@ -533,18 +566,42 @@ export default function FundHubProposalEditorPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">Arquivos do edital</label>
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      Arquivos do edital
+                      {attachedFiles.length > 0 && (
+                        <span className="ml-2 font-normal text-gray-500">({attachedFiles.length})</span>
+                      )}
+                    </label>
                     <label className="group flex cursor-pointer items-center gap-3 rounded-3xl border border-dashed border-gray-300 bg-gray-50 px-4 py-4 text-sm font-medium text-gray-700 hover:border-amber-300 hover:bg-amber-50">
                       <Paperclip className="w-5 h-5 text-amber-600" />
-                      <span>Anexar arquivo</span>
-                      <input type="file" accept=".pdf,.docx,.doc,.txt,.md" onChange={handleAttachFile} className="hidden" />
+                      <span>Anexar arquivos (documento base + anexos)</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept=".pdf,.docx,.doc,.txt,.md"
+                        onChange={handleAttachFile}
+                        className="hidden"
+                      />
                     </label>
                     {attachedFiles.length > 0 && (
                       <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
                         <p className="font-semibold">Arquivos anexados</p>
-                        {attachedFiles.map((file) => (
-                          <p key={file.uploadedAt} className="mt-2">{file.name} • {(file.size / 1024).toFixed(1)} KB</p>
-                        ))}
+                        <ul className="mt-2 space-y-2">
+                          {attachedFiles.map((file, index) => (
+                            <li key={`${file.name}-${file.uploadedAt}-${index}`} className="flex items-center justify-between gap-3">
+                              <span>
+                                {file.name} • {(file.size / 1024).toFixed(1)} KB
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveAttachedFile(index)}
+                                className="text-xs font-medium text-red-600 hover:text-red-800"
+                              >
+                                Remover
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     )}
                   </div>

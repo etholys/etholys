@@ -8,9 +8,7 @@ import { isLikelyDbId } from '@/lib/utils';
 import {
   ArrowLeft,
   Plus,
-  Upload,
   UploadCloud,
-  ExternalLink,
   Trash2,
   FileText,
   Calendar,
@@ -51,6 +49,16 @@ interface ProposalIntake {
   }>;
 }
 
+const MAX_FILES = 20;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const ACCEPTED_EXT = /\.(pdf|docx?|txt|md)$/i;
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function ProposalsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -64,7 +72,7 @@ export default function ProposalsPage() {
   const [fund, setFund] = useState<FundSummary | null>(null);
   const [editalLink, setEditalLink] = useState('');
   const [intakeNotes, setIntakeNotes] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [drafts, setDrafts] = useState<ProposalDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -114,16 +122,50 @@ export default function ProposalsPage() {
       .catch(() => {});
   }, [companyId]);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        setError('Arquivo deve ter menos de 10MB');
-        return;
+  const addFiles = useCallback((incoming: FileList | File[]) => {
+    const list = Array.from(incoming);
+    if (!list.length) return;
+
+    setSelectedFiles((prev) => {
+      const next = [...prev];
+      const errors: string[] = [];
+
+      for (const file of list) {
+        if (next.length >= MAX_FILES) {
+          errors.push(`Máximo de ${MAX_FILES} arquivos por proposta.`);
+          break;
+        }
+        if (!ACCEPTED_EXT.test(file.name)) {
+          errors.push(`"${file.name}" — formato não suportado (PDF, DOC, DOCX, TXT, MD).`);
+          continue;
+        }
+        if (file.size > MAX_FILE_BYTES) {
+          errors.push(`"${file.name}" — deve ter menos de 10MB.`);
+          continue;
+        }
+        const duplicate = next.some(
+          (f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified,
+        );
+        if (duplicate) continue;
+        next.push(file);
       }
-      setSelectedFile(file);
-      setError(null);
-    }
+
+      setError(errors.length ? errors[0] : null);
+      return next;
+    });
+  }, []);
+
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files?.length) addFiles(e.target.files);
+      e.target.value = '';
+    },
+    [addFiles],
+  );
+
+  const handleRemoveFile = useCallback((index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    setError(null);
   }, []);
 
   const handleOpenWorkspace = useCallback(async () => {
@@ -132,8 +174,8 @@ export default function ProposalsPage() {
       return;
     }
 
-    if (!editalLink && !selectedFile) {
-      setError('Cole um link do edital ou selecione um arquivo');
+    if (!editalLink && selectedFiles.length === 0) {
+      setError('Cole um link do edital ou selecione pelo menos um arquivo');
       return;
     }
 
@@ -142,6 +184,7 @@ export default function ProposalsPage() {
 
     try {
       const workspaceId = `workspace:${fund.id}:${Date.now()}`;
+      const uploadedAt = new Date().toISOString();
 
       const intakeData: ProposalIntake = {
         workspaceId,
@@ -150,31 +193,41 @@ export default function ProposalsPage() {
         fundInstitution: fund.institution,
         editalLink,
         intakeNotes,
-        attachedFiles: selectedFile
-          ? [
-              {
-                name: selectedFile.name,
-                type: selectedFile.type,
-                size: selectedFile.size,
-                uploadedAt: new Date().toISOString(),
-              },
-            ]
+        attachedFiles: selectedFiles.length
+          ? selectedFiles.map((file) => ({
+              name: file.name,
+              type: file.type || 'application/octet-stream',
+              size: file.size,
+              uploadedAt,
+            }))
           : undefined,
       };
 
       localStorage.setItem(`proposalIntake:${workspaceId}`, JSON.stringify(intakeData));
 
-      if (selectedFile) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const content = event.target?.result;
-          localStorage.setItem(`proposalFile:${workspaceId}`, JSON.stringify({
-            name: selectedFile.name,
-            content: content,
-            uploadedAt: new Date().toISOString(),
-          }));
-        };
-        reader.readAsText(selectedFile);
+      const textLike = selectedFiles.filter(
+        (f) =>
+          f.type.startsWith('text') ||
+          /\.(txt|md)$/i.test(f.name),
+      );
+      if (textLike.length) {
+        const stored = await Promise.all(
+          textLike.map(async (file) => ({
+            name: file.name,
+            content: await file.text(),
+            uploadedAt,
+          })),
+        );
+        localStorage.setItem(`proposalFiles:${workspaceId}`, JSON.stringify(stored));
+      }
+
+      // Compatibilidade com chave antiga (primeiro ficheiro de texto)
+      if (textLike[0]) {
+        const content = await textLike[0].text();
+        localStorage.setItem(
+          `proposalFile:${workspaceId}`,
+          JSON.stringify({ name: textLike[0].name, content, uploadedAt }),
+        );
       }
 
       router.push(`/hub/fundhub/proposals/editor?workspace=${encodeURIComponent(workspaceId)}`);
@@ -182,7 +235,7 @@ export default function ProposalsPage() {
       setError(err instanceof Error ? err.message : 'Erro ao abrir workspace');
       setIsLoading(false);
     }
-  }, [fund, editalLink, selectedFile, intakeNotes, router]);
+  }, [fund, editalLink, selectedFiles, intakeNotes, router]);
 
   const handleDeleteDraft = useCallback((workspaceId: string) => {
     const updated = drafts.filter((d) => d.workspaceId !== workspaceId);
@@ -340,7 +393,9 @@ export default function ProposalsPage() {
               <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
                 <div className="mb-6">
                   <h2 className="text-2xl font-bold text-gray-900">Começar Nova Proposta</h2>
-                  <p className="mt-2 text-gray-600">Cole o link ou carregue o arquivo do edital para análise</p>
+                  <p className="mt-2 text-gray-600">
+                    Cole o link e carregue o documento base e os anexos do edital para análise
+                  </p>
                 </div>
 
                 <div className="space-y-6">
@@ -357,28 +412,73 @@ export default function ProposalsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Upload do Edital</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Upload do Edital e Anexos
+                      {selectedFiles.length > 0 && (
+                        <span className="ml-2 font-normal text-gray-500">
+                          ({selectedFiles.length}/{MAX_FILES})
+                        </span>
+                      )}
+                    </label>
                     <div className="mt-2">
                       <label
                         htmlFor="file-upload"
                         className="flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 px-6 py-10 transition hover:border-blue-400 hover:bg-blue-50"
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
+                        }}
                       >
                         <div className="text-center">
                           <UploadCloud className="mx-auto h-12 w-12 text-gray-400" />
                           <p className="mt-2 text-sm font-medium text-gray-900">
-                            {selectedFile ? selectedFile.name : 'Clique para selecionar ou arraste aqui'}
+                            Clique para selecionar ou arraste vários arquivos
                           </p>
-                          <p className="text-xs text-gray-500">PDF, DOCX ou TXT - até 10MB</p>
+                          <p className="text-xs text-gray-500">
+                            PDF, DOC, DOCX, TXT ou MD — até 10MB cada · máx. {MAX_FILES} arquivos
+                          </p>
                         </div>
                         <input
                           id="file-upload"
                           type="file"
+                          multiple
                           onChange={handleFileSelect}
-                          accept=".pdf,.docx,.txt,.doc"
+                          accept=".pdf,.docx,.txt,.doc,.md"
                           className="hidden"
                         />
                       </label>
                     </div>
+                    {selectedFiles.length > 0 && (
+                      <ul className="mt-3 space-y-2">
+                        {selectedFiles.map((file, index) => (
+                          <li
+                            key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                          >
+                            <div className="flex min-w-0 items-center gap-2">
+                              <FileText className="h-4 w-4 flex-shrink-0 text-blue-600" />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-gray-900">{file.name}</p>
+                                <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFile(index)}
+                              className="rounded-md p-1.5 text-red-600 hover:bg-red-50"
+                              title="Remover arquivo"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
 
                   <div>
@@ -406,7 +506,7 @@ export default function ProposalsPage() {
 
                   <button
                     onClick={handleOpenWorkspace}
-                    disabled={isLoading || (!editalLink && !selectedFile)}
+                    disabled={isLoading || (!editalLink && selectedFiles.length === 0)}
                     className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 font-medium text-white shadow hover:shadow-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
                     {isLoading ? (
@@ -434,7 +534,7 @@ export default function ProposalsPage() {
                 <ol className="mt-4 space-y-3">
                   <li className="flex gap-3">
                     <span className="font-semibold text-blue-600 min-w-fit">1.</span>
-                    <span className="text-sm text-gray-600">Cole o link ou carregue o arquivo do edital</span>
+                    <span className="text-sm text-gray-600">Cole o link e carregue o documento base e os anexos do edital</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="font-semibold text-blue-600 min-w-fit">2.</span>
