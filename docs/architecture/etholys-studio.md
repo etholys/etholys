@@ -2,7 +2,7 @@
 
 **Versão:** 0.2  
 **Data:** 2026-07-30  
-**Status:** F0–F1 em código (biblioteca, editor, consent, marca, export PDF/DOCX)  
+**Status:** F0–F2 em código (biblioteca, editor, consent, marca, export, preview Mermaid)  
 **Público:** product, desenvolvedores, agentes de IA  
 
 **Fonte de verdade** para o estúdio de documentos com IA no Etholys.  
@@ -32,8 +32,8 @@
 |------|---------|--------|
 | **F0** | Spec + pastas + docs + templates seed + editor dual-pane + agente consent | ✅ |
 | **F1** | Kit de marca da empresa + export PDF/DOCX | ✅ |
-| **F2** | Diagramas editáveis + “ajusta o diagrama” no chat | Seguinte |
-| **F3** | Pontes “Abrir no Studio” desde SIEP/FUNDHUB/Meet | |
+| **F2** | Diagramas editáveis + “ajusta o diagrama” no chat | ✅ preview Mermaid + patches via agente |
+| **F3** | Pontes “Abrir no Studio” desde SIEP/FUNDHUB/Meet | Seguinte |
 | **F4** | Templates por domínio + colaboração/comentários | |
 
 ---

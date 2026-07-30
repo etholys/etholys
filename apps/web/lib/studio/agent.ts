@@ -99,7 +99,8 @@ Responde **apenas** com JSON válido (sem markdown):
 
 - Usa canvasPatches para editar blocos existentes (ids do canvas).
 - Se pedires consentimento, canvasPatches pode ficar vazio ou só com ajustes estruturais sem dados sensíveis.
-- Para diagramas (kind diagram), o campo text deve ser Mermaid válido quando aplicável.`;
+- Para diagramas (kind diagram), o campo text deve ser Mermaid válido quando aplicável.
+- Se o utilizador pedir ajustes a um diagrama («torna isto horizontal», «adiciona nó X»), atualiza o bloco diagram correspondente com Mermaid completo e válido (flowchart/sequence/erDiagram conforme o pedido).`;
 }
 
 function truncate(s: string, n: number) {

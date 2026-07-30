@@ -21,6 +21,7 @@ import type {
   StudioConsentRequest,
   StudioBlock,
 } from '@/lib/studio/types';
+import { StudioMermaidPreview } from '@/components/studio/StudioMermaidPreview';
 
 type ChatMsg = { id: string; role: string; content: string };
 
@@ -432,9 +433,7 @@ function BlockEditor({ block, onChange }: { block: StudioBlock; onChange: (text:
             className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs text-slate-800 outline-none focus:border-orange-400"
             spellCheck={false}
           />
-          <pre className="overflow-x-auto rounded-lg border border-dashed border-slate-200 bg-white p-3 text-[11px] text-slate-600">
-            {block.text || '(diagrama vazio)'}
-          </pre>
+          <StudioMermaidPreview source={block.text} />
         </div>
       ) : (
         <textarea
