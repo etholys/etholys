@@ -49,6 +49,9 @@ export default function WorkspaceTeamPage() {
         boolean
       >
   );
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!companyId) {
@@ -160,6 +163,49 @@ export default function WorkspaceTeamPage() {
     await load();
   };
 
+  const inviteByFunction = async () => {
+    const email = inviteEmail.trim().toLowerCase();
+    const systems = WORKSPACE_SYSTEM_KEYS.filter((k) => sel[k]);
+    if (!email.includes('@')) {
+      setInviteMsg(t('Indique um e-mail válido.', 'Indique un email válido.', 'Enter a valid email.'));
+      return;
+    }
+    if (systems.length === 0) {
+      setInviteMsg(t('Marque pelo menos um sistema.', 'Marque al menos un sistema.', 'Select at least one system.'));
+      return;
+    }
+    setInviteBusy(true);
+    setInviteMsg(null);
+    try {
+      const r = await fetch('/api/invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId, email, systems, role: 'COLLABORATOR' }),
+      });
+      const d = (await r.json()) as { error?: string; invitation?: { code?: string; alreadyAccepted?: boolean } };
+      if (!r.ok) throw new Error(d.error || 'Error');
+      setInviteEmail('');
+      setInviteMsg(
+        d.invitation?.alreadyAccepted
+          ? t(
+              'Utilizador já existia — acesso às funções atribuído.',
+              'Usuario ya existía — acceso a funciones asignado.',
+              'User already existed — function access granted.',
+            )
+          : t(
+              `Convite enviado. Código: ${d.invitation?.code || '—'}`,
+              `Invitación enviada. Código: ${d.invitation?.code || '—'}`,
+              `Invite sent. Code: ${d.invitation?.code || '—'}`,
+            ),
+      );
+      await load();
+    } catch (e) {
+      setInviteMsg(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setInviteBusy(false);
+    }
+  };
+
   const pickMyself = () => {
     if (!meId) {
       setMsg(t('Sessão sem ID de utilizador.', 'Sesión sin ID de usuario.', 'Session has no user id.'));
@@ -262,14 +308,52 @@ export default function WorkspaceTeamPage() {
         </h1>
         <p className="mt-1 text-sm text-slate-600">
           {t(
-            'Apenas os utilizadores abaixo veem o centro. Os dados mantêm-se em cada sistema (ATLAS, SIEP, …).',
-            'Solo los usuarios listados abajo usan el centro. Los datos siguen en cada sistema.',
-            'Only users you authorize see the center. Data stays in each system.'
+            'Convide pessoas só para funções (SIEP, ATLAS, …). Não verão o Hub nem a homepage completa.',
+            'Invite a personas solo a funciones (SIEP, ATLAS, …). No verán el Hub ni la homepage completa.',
+            'Invite people to functions only (SIEP, ATLAS, …). They will not see Hub or the full homepage.',
           )}
         </p>
 
+        <div className="mt-6 space-y-4 rounded-xl border border-teal-200 bg-teal-50/40 p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-teal-950">
+            {t('Convidar por função (e-mail)', 'Invitar por función (email)', 'Invite by function (email)')}
+          </h2>
+          <input
+            type="email"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            placeholder="pessoa@org.com"
+            className="w-full rounded-lg border border-teal-200 bg-white px-3 py-2 text-sm"
+          />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {WORKSPACE_SYSTEM_KEYS.map((k) => (
+              <label key={`inv-${k}`} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={sel[k]}
+                  onChange={(e) => setSel((s) => ({ ...s, [k]: e.target.checked }))}
+                />
+                {k}
+              </label>
+            ))}
+          </div>
+          <button
+            type="button"
+            disabled={inviteBusy}
+            onClick={() => void inviteByFunction()}
+            className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+          >
+            {inviteBusy
+              ? t('A enviar…', 'Enviando…', 'Sending…')
+              : t('Enviar convite', 'Enviar invitación', 'Send invite')}
+          </button>
+          {inviteMsg && <p className="text-sm text-teal-950">{inviteMsg}</p>}
+        </div>
+
         <div className="mt-6 space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {t('Membros já na empresa', 'Miembros ya en la empresa', 'Existing company members')}
+          </p>
             <div className="flex flex-wrap items-end justify-between gap-2">
               <label className="text-sm font-medium text-slate-700">{t('Utilizador', 'Usuario', 'User')}</label>
               {meId && members.some((m) => m.userId === meId) && (
@@ -294,7 +378,6 @@ export default function WorkspaceTeamPage() {
                 </option>
               ))}
             </select>
-          </div>
           <div className="space-y-2">
             <p className="text-sm font-medium text-slate-700">{t('Sistemas', 'Sistemas', 'Systems')}</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

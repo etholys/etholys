@@ -109,6 +109,8 @@ model User {
   labAnvilProjectMembers        LabAnvilProjectMember[]      @relation("LabAnvilProjectMemberUser")
   labAnvilProjectMembersInvited LabAnvilProjectMember[]      @relation("LabAnvilProjectMemberInviter")
   labAnvilSessionsCreated       LabAnvilSession[]            @relation("LabAnvilSessionCreator")
+  studioFoldersCreated          StudioFolder[]               @relation("StudioFolderCreator")
+  studioDocumentsCreated        StudioDocument[]             @relation("StudioDocumentCreator")
 }
 
 model Account {
@@ -216,6 +218,9 @@ model Company {
   forgeGamificationEvents     ForgeGamificationEvent[]
   forgeCertificates           ForgeCertificate[]
   meetSessions                MeetSession[]
+  studioFolders               StudioFolder[]
+  studioDocuments             StudioDocument[]
+  studioTemplates             StudioTemplate[]
 }
 
 /// Autorização ao Hub /hub/workspace — espelho operacional: quais sistemas o utilizador vê e usa a partir dali (dados continuam nos sistemas de origem).
@@ -823,6 +828,8 @@ model Invitation {
   code       String    @unique @default(cuid())
   invitedBy  String
   status     String    @default("pending")
+  /// JSON: ["SIEP","ATLAS",…] — convite só a funções; null = legado
+  systems    Json?
   expiresAt  DateTime?
   acceptedAt DateTime?
   createdAt  DateTime  @default(now())
@@ -1784,6 +1791,7 @@ enum AiAdvisorSessionKind {
   WORKSPACE_ADVISOR
   NEXUS_COPILOT
   SIEP_REPORT
+  STUDIO_DOC
 }
 
 model AiAdvisorSession {
@@ -2588,4 +2596,72 @@ model LabAnvilMessage {
   session   LabAnvilSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
+}
+
+/// Etholys Studio — pasta na biblioteca de documentos (ferramenta transversal /hub/studio)
+model StudioFolder {
+  id          String           @id @default(cuid())
+  companyId   String
+  parentId    String?
+  name        String
+  createdById String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent      StudioFolder?    @relation("StudioFolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    StudioFolder[]   @relation("StudioFolderTree")
+  documents   StudioDocument[]
+  createdBy   User?            @relation("StudioFolderCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([parentId])
+}
+
+/// Documento rico editável (canvas JSON) — distinto do repositório de ficheiros `Document`
+model StudioDocument {
+  id          String        @id @default(cuid())
+  companyId   String
+  folderId    String?
+  title       String
+  /// report | proposal | brief | letter | presentation | diagram | other
+  format      String        @default("report")
+  status      String        @default("draft")
+  canvasState Json
+  brandKitJson Json?
+  templateKey String?
+  aiSessionId String?
+  createdById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  folder      StudioFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  createdBy   User?         @relation("StudioDocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([folderId])
+  @@index([companyId, updatedAt])
+}
+
+/// Template de sistema (companyId null) ou da empresa
+model StudioTemplate {
+  id           String   @id @default(cuid())
+  companyId    String?
+  key          String
+  nameEs       String
+  namePt       String
+  nameEn       String
+  descriptionEs String?
+  descriptionPt String?
+  descriptionEn String?
+  format       String   @default("report")
+  canvasSeed   Json
+  isSystem     Boolean  @default(false)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  company      Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, key])
+  @@index([companyId])
+  @@index([isSystem, sortOrder])
 }

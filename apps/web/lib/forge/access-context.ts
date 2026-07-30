@@ -1,9 +1,11 @@
 import 'server-only';
 
+import { prisma } from '@/lib/prisma';
 import { getForgeDb } from '@/lib/forge/db';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { getCourseProgressPercent } from '@/lib/forge/progress';
 import { parseDeliveryMode } from '@/lib/forge/delivery';
+import { defaultRedirectForCourseOnly } from '@/lib/forge/access-context-shared';
 import type { ForgeAccessContext, ForgeAccessCourse } from '@/lib/forge/access-context-shared';
 
 export type {
@@ -12,6 +14,60 @@ export type {
   ForgeAccessContext,
 } from '@/lib/forge/access-context-shared';
 export { isPathAllowedForCourseOnly, defaultRedirectForCourseOnly } from '@/lib/forge/access-context-shared';
+
+/** Payload leve para JWT / middleware (sem progresso). */
+export type ForgeJwtScope = {
+  mode: 'organization' | 'course_only';
+  allowedCourseIds: string[];
+  homePath: string;
+};
+
+/**
+ * Resolve âmbito FORGE para um userId (login mágico / refresh JWT).
+ * Sem CompanyUser → course_only; com org → organization.
+ */
+export async function resolveForgeJwtScope(userId: string): Promise<ForgeJwtScope> {
+  const companyUsers = await prisma.companyUser.findMany({
+    where: { userId },
+    select: { companyId: true },
+    take: 1,
+  });
+  if (companyUsers.length > 0) {
+    return { mode: 'organization', allowedCourseIds: [], homePath: '/hub' };
+  }
+
+  const enrollments = await getForgeDb().forgeEnrollment.findMany({
+    where: {
+      userId,
+      status: { in: ['active', 'completed'] },
+      accessScope: { not: 'organization' },
+    },
+    include: {
+      course: { select: { id: true, deliveryMode: true } },
+    },
+    orderBy: { enrolledAt: 'desc' },
+  });
+
+  const allowedCourseIds = enrollments.map((e) => e.courseId);
+  const courses = enrollments.map((e) => ({
+    id: e.course.id,
+    title: '',
+    coverEmoji: '',
+    status: 'published',
+    deliveryMode: parseDeliveryMode(e.course.deliveryMode),
+    progressPercent: 0,
+  }));
+
+  const homePath = defaultRedirectForCourseOnly({
+    mode: 'course_only',
+    userId,
+    companyIds: [],
+    allowedCourseIds,
+    courses,
+  });
+
+  return { mode: 'course_only', allowedCourseIds, homePath };
+}
 
 /**
  * Regra simples:

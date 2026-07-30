@@ -18,6 +18,21 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const requestedCompanyId = String(url.searchParams.get('companyId') ?? '').trim();
 
+  // Convidados FORGE sem empresa: nunca mandar para /hub do ecossistema
+  if (tenant.companyIds.length === 0) {
+    const { getForgeAccessContext, defaultRedirectForCourseOnly } = await import(
+      '@/lib/forge/access-context'
+    );
+    const ctx = await getForgeAccessContext();
+    if (ctx?.mode === 'course_only') {
+      return NextResponse.json({
+        href: defaultRedirectForCourseOnly(ctx),
+        reason: 'course_only',
+      });
+    }
+    return NextResponse.json({ href: '/hub/forge/mis-cursos', reason: 'no_company_forge' });
+  }
+
   let companyId = isLikelyDbId(requestedCompanyId) ? requestedCompanyId : '';
   if (!companyId) {
     const cookieHeader = req.headers.get('cookie') ?? '';
@@ -39,11 +54,30 @@ export async function GET(req: Request) {
   }
 
   const access = await getWorkspaceAccessForUser(userId, companyId);
-  if (access.ok && access.systems.length === 1) {
-    const key = access.systems[0];
-    const href = LICENSE_KEY_TO_HREF[key];
-    if (href) {
-      return NextResponse.json({ href, reason: 'single_system', system: key, companyId });
+  if (access.ok && access.systems.length >= 1) {
+    const { isPrecommercialMode } = await import('@/lib/platform-access');
+    const { isCompanyAdmin } = await import('@/lib/integrated-workspace');
+    const admin = await isCompanyAdmin(userId, companyId);
+    // Pré-comercial + não-admin: nunca mandar ao Hub — ir à função (ou primeira se várias)
+    if (isPrecommercialMode() && !admin) {
+      const key = access.systems[0];
+      const href = LICENSE_KEY_TO_HREF[key];
+      if (href) {
+        return NextResponse.json({
+          href,
+          reason: access.systems.length === 1 ? 'single_system' : 'function_only',
+          system: key,
+          companyId,
+        });
+      }
+      return NextResponse.json({ href: '/acesso', reason: 'no_href', companyId });
+    }
+    if (access.systems.length === 1) {
+      const key = access.systems[0];
+      const href = LICENSE_KEY_TO_HREF[key];
+      if (href) {
+        return NextResponse.json({ href, reason: 'single_system', system: key, companyId });
+      }
     }
   }
 

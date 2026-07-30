@@ -26,6 +26,7 @@ export function isPathAllowedForCourseOnly(pathname: string, allowedCourseIds: s
   if (
     pathname === '/hub/forge/mis-cursos' ||
     pathname === '/hub/forge/certificados' ||
+    pathname === '/hub/forge/mi-cuenta' ||
     pathname.startsWith('/hub/forge/entrar') ||
     pathname.startsWith('/hub/forge/activar') ||
     pathname.startsWith('/verificar-forge')

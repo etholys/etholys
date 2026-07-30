@@ -19,13 +19,32 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { tr, locale, setLocale } = useApp();
-  const [isLogin, setIsLogin] = useState(true);
+  const inviteFromUrl = (searchParams.get('invite') || searchParams.get('code') || '').trim();
+  const precommercial =
+    (process.env.NEXT_PUBLIC_ETHOLYS_PRECOMMERCIAL || '').toLowerCase() === 'true' ||
+    (process.env.NEXT_PUBLIC_ETHOLYS_PRECOMMERCIAL || '').toLowerCase() === '1' ||
+    // fallback: produção pública Etholys
+    (typeof window !== 'undefined' && window.location.hostname.includes('etholys.com'));
+
+  const [isLogin, setIsLogin] = useState(!inviteFromUrl);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const [form, setForm] = useState({ email: '', password: '', name: '', inviteCode: '' });
+  const [form, setForm] = useState({
+    email: '',
+    password: '',
+    name: '',
+    inviteCode: inviteFromUrl,
+  });
   const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    if (inviteFromUrl) {
+      setForm((f) => ({ ...f, inviteCode: inviteFromUrl }));
+      setIsLogin(false);
+    }
+  }, [inviteFromUrl]);
 
   // Handle NextAuth error redirects (e.g. from Google SSO failures)
   useEffect(() => {
@@ -97,7 +116,8 @@ function LoginContent() {
 
   const handleGoogleSignIn = () => {
     setGoogleLoading(true);
-    signIn('google', { redirect: true, callbackUrl: '/hub' });
+    // Pós-login: entry-route decide hub vs função (não forçar /hub)
+    signIn('google', { redirect: true, callbackUrl: '/' });
   };
 
   const features = locale === 'es'
@@ -191,7 +211,17 @@ function LoginContent() {
             {isLogin ? tr('auth.welcome') : tr('auth.signup')}
           </h3>
           <p className="text-gray-500 mb-6">
-            {locale === 'es' ? 'Accede al ecosistema ETHOLYS' : locale === 'pt' ? 'Acesse o ecossistema ETHOLYS' : 'Access the ETHOLYS ecosystem'}
+            {precommercial && !inviteFromUrl
+              ? locale === 'es'
+                ? 'Acceso privado. Solo administradores o invitados por función.'
+                : locale === 'pt'
+                  ? 'Acesso privado. Só administradores ou convidados por função.'
+                  : 'Private access. Admins or function invitees only.'
+              : locale === 'es'
+                ? 'Accede al ecosistema ETHOLYS'
+                : locale === 'pt'
+                  ? 'Acesse o ecossistema ETHOLYS'
+                  : 'Access the ETHOLYS ecosystem'}
           </p>
 
           {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
@@ -234,8 +264,27 @@ function LoginContent() {
                   <input type="text" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{locale === 'es' ? 'C\u00f3digo de invitaci\u00f3n (opcional)' : locale === 'pt' ? 'C\u00f3digo de convite (opcional)' : 'Invitation code (optional)'}</label>
-                  <input type="text" value={form.inviteCode} onChange={e => setForm({ ...form, inviteCode: e.target.value })} placeholder={locale === 'es' ? 'Si tienes un c\u00f3digo, ingr\u00e9salo aqu\u00ed' : locale === 'pt' ? 'Se tiver um c\u00f3digo, insira aqui' : 'If you have a code, enter it here'} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition font-mono" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {locale === 'es'
+                      ? 'Código de invitación (obligatorio)'
+                      : locale === 'pt'
+                        ? 'Código de convite (obrigatório)'
+                        : 'Invitation code (required)'}
+                  </label>
+                  <input
+                    type="text"
+                    required={precommercial}
+                    value={form.inviteCode}
+                    onChange={(e) => setForm({ ...form, inviteCode: e.target.value })}
+                    placeholder={
+                      locale === 'es'
+                        ? 'Código del correo de invitación'
+                        : locale === 'pt'
+                          ? 'Código do e-mail de convite'
+                          : 'Code from invite email'
+                    }
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition font-mono"
+                  />
                 </div>
               </>
             )}
@@ -271,12 +320,23 @@ function LoginContent() {
             </button>
           </form>
 
+          {!(precommercial && !inviteFromUrl) && (
           <p className="mt-6 text-center text-sm text-gray-500">
             {isLogin ? tr('auth.noAccount') : tr('auth.hasAccount')}{' '}
             <button onClick={() => { setIsLogin(!isLogin); setError(''); }} className="text-teal-600 font-medium hover:underline">
               {isLogin ? tr('auth.signup') : tr('auth.login')}
             </button>
           </p>
+          )}
+          {precommercial && !inviteFromUrl && (
+            <p className="mt-6 text-center text-xs text-slate-500">
+              {locale === 'es'
+                ? 'Sin invitación no hay registro público. Si es administrador, inicie sesión con su cuenta.'
+                : locale === 'pt'
+                  ? 'Sem convite não há registo público. Se for administrador, entre com a sua conta.'
+                  : 'No public signup without invite. Admins: sign in with your account.'}
+            </p>
+          )}
         </div>
       </div>
     </div>

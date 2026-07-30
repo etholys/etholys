@@ -5,6 +5,7 @@ import type { Session } from 'next-auth';
 import { useState, useEffect, createContext, useContext } from 'react';
 import type { Locale } from '@/lib/i18n';
 import { t } from '@/lib/i18n';
+import { StudioHotButton } from '@/components/studio/StudioHotButton';
 
 interface AppContextType {
   locale: Locale;
@@ -70,6 +71,7 @@ export default function Providers({
     <SessionProvider session={session ?? undefined}>
       <AppContext.Provider value={{ locale, setLocale: handleSetLocale, activeCompanyId, setActiveCompanyId: handleSetCompany, tr }}>
         {children}
+        <StudioHotButton />
       </AppContext.Provider>
     </SessionProvider>
   );

@@ -1,0 +1,102 @@
+-- Etholys Studio (ferramenta transversal) — aplicar manualmente se prisma migrate não estiver disponível
+-- Spec: docs/architecture/etholys-studio.md
+
+DO $$ BEGIN
+  ALTER TYPE "AiAdvisorSessionKind" ADD VALUE IF NOT EXISTS 'STUDIO_DOC';
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+  WHEN undefined_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "StudioFolder" (
+  "id" TEXT NOT NULL,
+  "companyId" TEXT NOT NULL,
+  "parentId" TEXT,
+  "name" TEXT NOT NULL,
+  "createdById" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "StudioFolder_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "StudioFolder_companyId_idx" ON "StudioFolder"("companyId");
+CREATE INDEX IF NOT EXISTS "StudioFolder_parentId_idx" ON "StudioFolder"("parentId");
+
+CREATE TABLE IF NOT EXISTS "StudioDocument" (
+  "id" TEXT NOT NULL,
+  "companyId" TEXT NOT NULL,
+  "folderId" TEXT,
+  "title" TEXT NOT NULL,
+  "format" TEXT NOT NULL DEFAULT 'report',
+  "status" TEXT NOT NULL DEFAULT 'draft',
+  "canvasState" JSONB NOT NULL,
+  "brandKitJson" JSONB,
+  "templateKey" TEXT,
+  "aiSessionId" TEXT,
+  "createdById" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "StudioDocument_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "StudioDocument_companyId_idx" ON "StudioDocument"("companyId");
+CREATE INDEX IF NOT EXISTS "StudioDocument_folderId_idx" ON "StudioDocument"("folderId");
+CREATE INDEX IF NOT EXISTS "StudioDocument_companyId_updatedAt_idx" ON "StudioDocument"("companyId", "updatedAt");
+
+CREATE TABLE IF NOT EXISTS "StudioTemplate" (
+  "id" TEXT NOT NULL,
+  "companyId" TEXT,
+  "key" TEXT NOT NULL,
+  "nameEs" TEXT NOT NULL,
+  "namePt" TEXT NOT NULL,
+  "nameEn" TEXT NOT NULL,
+  "descriptionEs" TEXT,
+  "descriptionPt" TEXT,
+  "descriptionEn" TEXT,
+  "format" TEXT NOT NULL DEFAULT 'report',
+  "canvasSeed" JSONB NOT NULL,
+  "isSystem" BOOLEAN NOT NULL DEFAULT false,
+  "sortOrder" INT NOT NULL DEFAULT 0,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "StudioTemplate_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "StudioTemplate_companyId_key_key" ON "StudioTemplate"("companyId", "key");
+CREATE INDEX IF NOT EXISTS "StudioTemplate_companyId_idx" ON "StudioTemplate"("companyId");
+CREATE INDEX IF NOT EXISTS "StudioTemplate_isSystem_sortOrder_idx" ON "StudioTemplate"("isSystem", "sortOrder");
+
+DO $$ BEGIN
+  ALTER TABLE "StudioFolder" ADD CONSTRAINT "StudioFolder_companyId_fkey"
+    FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "StudioFolder" ADD CONSTRAINT "StudioFolder_parentId_fkey"
+    FOREIGN KEY ("parentId") REFERENCES "StudioFolder"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "StudioFolder" ADD CONSTRAINT "StudioFolder_createdById_fkey"
+    FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "StudioDocument" ADD CONSTRAINT "StudioDocument_companyId_fkey"
+    FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "StudioDocument" ADD CONSTRAINT "StudioDocument_folderId_fkey"
+    FOREIGN KEY ("folderId") REFERENCES "StudioFolder"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "StudioDocument" ADD CONSTRAINT "StudioDocument_createdById_fkey"
+    FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "StudioTemplate" ADD CONSTRAINT "StudioTemplate_companyId_fkey"
+    FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

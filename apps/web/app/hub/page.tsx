@@ -9,7 +9,7 @@ import type { Locale } from '@/lib/i18n';
 import Link from 'next/link';
 import {
   Layers, BarChart3, Sprout, HandCoins, GraduationCap, Cpu, Target, LayoutGrid, Scale,
-  LogOut, Globe, ArrowRight, Lock, ExternalLink, BrainCircuit, Video,
+  LogOut, Globe, ArrowRight, Lock, ExternalLink, BrainCircuit, Video, PenLine,
 } from 'lucide-react';
 import {
   deriveModuleHints,
@@ -33,8 +33,8 @@ const systems: Array<{
   bgHover: string;
   href: string;
   active: boolean;
-  /** Cartão de produto reforçado (Advisor = transversal) */
-  productTier?: 'advisor' | 'default';
+  /** Cartão de produto reforçado (Advisor) ou ferramenta avulsa (Studio) */
+  productTier?: 'advisor' | 'tool' | 'default';
 }> = [
   {
     id: 'advisor',
@@ -58,13 +58,34 @@ const systems: Array<{
     productTier: 'advisor',
   },
   {
+    id: 'studio',
+    name: 'Etholys Studio',
+    tagline: {
+      es: 'Documentos con IA',
+      pt: 'Documentos com IA',
+      en: 'AI documents',
+    },
+    description: {
+      es: 'Herramienta transversal: carpetas, plantillas, canvas y chat para redactar informes, propuestas y diagramas — atajo naranja en todos los sistemas.',
+      pt: 'Ferramenta transversal: pastas, templates, canvas e chat para redigir relatórios, propostas e diagramas — atalho laranja em todos os sistemas.',
+      en: 'Cross-cutting tool: folders, templates, canvas & chat to draft reports, proposals, and diagrams — orange shortcut on every system.',
+    },
+    icon: PenLine,
+    color: 'from-orange-500 to-amber-600',
+    borderColor: 'border-orange-300',
+    bgHover: 'hover:border-orange-400 hover:shadow-orange-100',
+    href: '/hub/studio',
+    active: true,
+    productTier: 'tool',
+  },
+  {
     id: 'atlas',
     name: 'ATLAS',
-    tagline: { es: 'ERP Integral', pt: 'ERP Integral', en: 'Comprehensive ERP' },
+    tagline: { es: 'ERP 360\u00b0', pt: 'ERP 360\u00b0', en: 'ERP 360\u00b0' },
     description: {
-      es: 'Gesti\u00f3n empresarial: finanzas, RRHH, inventario, facturaci\u00f3n y operaciones.',
-      pt: 'Gest\u00e3o empresarial: finan\u00e7as, RH, estoque, fatura\u00e7\u00e3o e opera\u00e7\u00f5es.',
-      en: 'Business management: finance, HR, inventory, invoicing, and operations.',
+      es: 'Gesti\u00f3n institucional y empresarial: finanzas, RRHH, inventario, facturaci\u00f3n y operaciones.',
+      pt: 'Gest\u00e3o institucional e empresarial: finan\u00e7as, RH, estoque, fatura\u00e7\u00e3o e opera\u00e7\u00f5es.',
+      en: 'Institutional & business management: finance, HR, inventory, invoicing, and operations.',
     },
     icon: BarChart3,
     color: 'from-teal-500 to-emerald-600',
@@ -76,11 +97,15 @@ const systems: Array<{
   {
     id: 'siep',
     name: 'SIEP',
-    tagline: { es: 'Gesti\u00f3n de Proyectos', pt: 'Gest\u00e3o de Projetos', en: 'Project Management' },
+    tagline: {
+      es: 'Ejecuci\u00f3n e innovaci\u00f3n de proyectos',
+      pt: 'Execu\u00e7\u00e3o e inova\u00e7\u00e3o de projetos',
+      en: 'Project execution & innovation',
+    },
     description: {
-      es: 'Portafolio de proyectos, ejecuci\u00f3n, stakeholders y marco l\u00f3gico.',
-      pt: 'Portf\u00f3lio de projetos, execu\u00e7\u00e3o, stakeholders e marco l\u00f3gico.',
-      en: 'Project portfolio, execution, stakeholders, and logical framework.',
+      es: 'Portafolio, ejecuci\u00f3n, stakeholders, marco l\u00f3gico y monitoreo de proyectos de cooperaci\u00f3n e innovaci\u00f3n.',
+      pt: 'Portf\u00f3lio, execu\u00e7\u00e3o, stakeholders, marco l\u00f3gico e monitoriza\u00e7\u00e3o de projetos de coopera\u00e7\u00e3o e inova\u00e7\u00e3o.',
+      en: 'Portfolio, delivery, stakeholders, logical framework, and monitoring for cooperation and innovation projects.',
     },
     icon: Sprout,
     color: 'from-indigo-500 to-blue-600',
@@ -108,11 +133,11 @@ const systems: Array<{
   {
     id: 'nexus',
     name: 'NEXUS',
-    tagline: { es: 'Desarrollo de negocio', pt: 'Desenvolvimento de neg\u00f3cio', en: 'Business development' },
+    tagline: { es: 'Desarrollo MIPYME', pt: 'Desenvolvimento MIPYME', en: 'MIPYME development' },
     description: {
-      es: 'Red de contactos, asistencia comercial y copiloto para crecer con datos del ecosistema.',
-      pt: 'Rede de contactos, assist\u00eancia comercial e copiloto para crescer com dados do ecossistema.',
-      en: 'Contact network, commercial assistance, and copilot powered by ecosystem data.',
+      es: 'Diagn\u00f3stico 360\u00b0, ruta de desarrollo, asistencia t\u00e9cnica h\u00edbrida y copiloto para MIPYMEs de todos los sectores.',
+      pt: 'Diagn\u00f3stico 360\u00b0, rota de desenvolvimento, assist\u00eancia t\u00e9cnica h\u00edbrida e copiloto para MIPYMEs de todos os setores.',
+      en: '360\u00b0 diagnosis, development roadmap, hybrid technical assistance, and copilot for MSMEs across all sectors.',
     },
     icon: GraduationCap,
     color: 'from-blue-500 to-indigo-600',
@@ -124,11 +149,11 @@ const systems: Array<{
   {
     id: 'forge',
     name: 'FORGE',
-    tagline: { es: 'Educaci\u00f3n y juegos', pt: 'Educa\u00e7\u00e3o e jogos', en: 'Education & games' },
+    tagline: { es: 'EAD / LMS', pt: 'EAD / LMS', en: 'EAD / LMS' },
     description: {
-      es: 'Formaci\u00f3n, tableros did\u00e1cticos y aprendizaje tradicional con enfoque territorial.',
-      pt: 'Forma\u00e7\u00e3o, jogos de tabuleiro e aprendizagem tradicional com foco territorial.',
-      en: 'Training, board games, and traditional learning with a territorial focus.',
+      es: 'Cursos, actividades (aulas, quizzes, juegos), gamificaci\u00f3n transversal y conexiones formativas.',
+      pt: 'Cursos, atividades (aulas, quizzes, jogos), gamifica\u00e7\u00e3o transversal e conex\u00f5es formativas.',
+      en: 'Courses, activities (lessons, quizzes, games), cross-cutting gamification, and learning connections.',
     },
     icon: Cpu,
     color: 'from-violet-500 to-purple-600',
@@ -140,11 +165,11 @@ const systems: Array<{
   {
     id: 'prism',
     name: 'PRISM',
-    tagline: { es: 'ESG y est\u00e1ndares', pt: 'ESG e padr\u00f5es', en: 'ESG & standards' },
+    tagline: { es: 'BI 360\u00b0', pt: 'BI 360\u00b0', en: 'BI 360\u00b0' },
     description: {
-      es: 'Datos ESG, marcos de referencia y lectura para financiadores \u2014 no duplica el M&E del SIEP.',
-      pt: 'Dados ESG, referenciais e leitura para financiadores \u2014 n\u00e3o duplica o M&E do SIEP.',
-      en: 'ESG data, frameworks, and funder-ready views \u2014 not a duplicate of SIEP M&E.',
+      es: 'Panel ejecutivo e inteligencia de datos: dashboards cruzados, an\u00e1lisis predictivo e indicadores de impacto (incl. ESG).',
+      pt: 'Painel executivo e intelig\u00eancia de dados: dashboards cruzados, an\u00e1lise preditiva e indicadores de impacto (incl. ESG).',
+      en: 'Executive panel & data intelligence: cross-system dashboards, predictive analysis, and impact indicators (incl. ESG).',
     },
     icon: Target,
     color: 'from-rose-500 to-pink-600',
@@ -162,9 +187,9 @@ const systems: Array<{
       en: 'Governance & approvals',
     },
     description: {
-      es: 'Capa transversal: trazabilidad m\u00ednima de aprobaciones (v0) \u2014 pr\u00f3ximas iteraciones multi-m\u00f3dulo.',
-      pt: 'Camada transversal: rasto m\u00ednimo de aprova\u00e7\u00f5es (v0) \u2014 itera\u00e7\u00f5es multi-m\u00f3dulo a seguir.',
-      en: 'Cross-cutting layer: minimal approval trail (v0) \u2014 multi-module flows in later iterations.',
+      es: 'Capa transversal de gobernanza: trazabilidad de aprobaciones y decisiones entre m\u00f3dulos.',
+      pt: 'Camada transversal de governan\u00e7a: rasto de aprova\u00e7\u00f5es e decis\u00f5es entre m\u00f3dulos.',
+      en: 'Cross-cutting governance layer: approval and decision trail across modules.',
     },
     icon: Scale,
     color: 'from-slate-600 to-slate-800',
@@ -175,7 +200,7 @@ const systems: Array<{
   },
   {
     id: 'meet',
-    name: 'Meet',
+    name: 'Etholys Meet',
     tagline: {
       es: 'Reuniones y videollamadas',
       pt: 'Reuni\u00f5es e videochamadas',
@@ -269,6 +294,15 @@ export default function HubPage() {
     if (status === 'unauthenticated') router.replace('/login');
   }, [status, router]);
 
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const mode = (session?.user as { forgeAccessMode?: string } | undefined)?.forgeAccessMode;
+    const home = (session?.user as { forgeHomePath?: string } | undefined)?.forgeHomePath;
+    if (mode === 'course_only') {
+      router.replace(home && home.startsWith('/') ? home : '/hub/forge/mis-cursos');
+    }
+  }, [status, session, router]);
+
   if (status === 'loading' || status === 'unauthenticated') {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
@@ -280,7 +314,7 @@ export default function HubPage() {
   const firstName = session?.user?.name?.split(' ')?.[0] || '';
   const hintSet = new Set(moduleHints);
   const visibleSystems = systems.filter((sys) => {
-    if (sys.id === 'advisor') return true;
+    if (sys.id === 'advisor' || sys.id === 'studio' || sys.id === 'meet' || sys.id === 'carta') return true;
     if (!hasMeaningfulSetup || moduleHints.length === 0) return true;
     const code = sys.id.toUpperCase() as ModuleHintCode;
     return hintSet.has(code);
@@ -429,6 +463,7 @@ export default function HubPage() {
           {visibleSystems.map((sys) => {
             const Icon = sys.icon;
             const isAdvisor = sys.productTier === 'advisor';
+            const isTool = sys.productTier === 'tool';
             const cardAccess = resolveHubCardAccess(sys.id, sys.active, licensedSystems);
             if (cardAccess === 'locked') {
               return (
@@ -467,7 +502,9 @@ export default function HubPage() {
                 className={`group relative bg-white rounded-2xl border-2 p-6 transition-all duration-200 hover:shadow-lg ${
                   isAdvisor
                     ? 'border-violet-300 ring-2 ring-violet-200/80 shadow-md shadow-violet-100/50 ' + sys.bgHover
-                    : `${sys.borderColor} ${sys.bgHover}`
+                    : isTool
+                      ? 'border-orange-300 ring-2 ring-orange-200/70 shadow-md shadow-orange-100/40 ' + sys.bgHover
+                      : `${sys.borderColor} ${sys.bgHover}`
                 } `}
               >
                 <div className="flex items-start justify-between mb-4">
@@ -484,6 +521,16 @@ export default function HubPage() {
                         {locale === 'es' ? 'También: botón flotante' : locale === 'pt' ? 'Também: botão flutuante' : 'Also: floating button'}
                       </span>
                     </div>
+                  ) : isTool ? (
+                    <div className="flex max-w-[10rem] flex-col items-end gap-0.5">
+                      <div className="flex items-center gap-1.5 rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-900">
+                        <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                        {locale === 'es' ? 'Herramienta' : locale === 'pt' ? 'Ferramenta' : 'Tool'}
+                      </div>
+                      <span className="text-right text-[10px] text-orange-700/90">
+                        {locale === 'es' ? 'Atajo naranja' : locale === 'pt' ? 'Atalho laranja' : 'Orange shortcut'}
+                      </span>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-medium">
                       <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
@@ -496,7 +543,7 @@ export default function HubPage() {
                 <p className="text-sm text-slate-400 leading-relaxed mb-4">{pickLocalized(sys.description, locale)}</p>
                 <div
                   className={`flex items-center gap-1 text-sm font-medium group-hover:gap-2 transition-all ${
-                    isAdvisor ? 'text-violet-700' : 'text-teal-600'
+                    isAdvisor ? 'text-violet-700' : isTool ? 'text-orange-700' : 'text-teal-600'
                   }`}
                 >
                   {locale === 'es' ? 'Acceder' : locale === 'pt' ? 'Acessar' : 'Access'}
@@ -528,19 +575,18 @@ export default function HubPage() {
         <p className="mt-4 text-center text-sm text-slate-500">
           {locale === 'pt' ? (
             <>
-              <strong className="text-violet-800">Dica:</strong> em qualquer ecrã autenticado, o{' '}
-              <strong>botão roxo</strong> (canto inferior esquerdo) abre o mesmo assessor: alertas rápidos. O <strong>chat teal</strong>{' '}
-              (canto direito) é diálogo e canais de trabalho — outro propósito.
+              <strong className="text-orange-800">Studio</strong> (botão laranja, canto inferior esquerdo) = documentos com IA.{' '}
+              <strong className="text-violet-800">Advisor</strong> = alertas multi-sistema. O <strong>chat teal</strong> (direita) = diálogo e canais.
             </>
           ) : locale === 'es' ? (
             <>
-              <strong className="text-violet-800">Tip:</strong> en cualquier pantalla, el <strong>botón morado</strong> (abajo a la
-              izquierda) = Advisor. El <strong>chat teal</strong> (derecha) = diálogo y equipos.
+              <strong className="text-orange-800">Studio</strong> (botón naranja, abajo izquierda) = documentos con IA.{' '}
+              <strong className="text-violet-800">Advisor</strong> = alertas. El <strong>chat teal</strong> = diálogo.
             </>
           ) : (
             <>
-              <strong className="text-violet-800">Tip:</strong> on any screen, the <strong>purple button</strong> (bottom left) = Advisor
-              digests. The <strong>teal chat</strong> (right) = work dialogue — different purpose.
+              <strong className="text-orange-800">Studio</strong> (orange button, bottom left) = AI documents.{' '}
+              <strong className="text-violet-800">Advisor</strong> = alerts. The <strong>teal chat</strong> = work dialogue.
             </>
           )}
         </p>

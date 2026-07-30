@@ -1,0 +1,452 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import {
+  ArrowLeft,
+  FilePlus2,
+  FolderPlus,
+  Folder,
+  FileText,
+  Loader2,
+  PenLine,
+  ChevronRight,
+  Palette,
+} from 'lucide-react';
+import { useApp } from '@/app/providers';
+import { isLikelyDbId } from '@/lib/utils';
+
+type FolderRow = { id: string; name: string; parentId: string | null };
+type DocRow = {
+  id: string;
+  title: string;
+  format: string;
+  status: string;
+  folderId: string | null;
+  updatedAt: string;
+};
+type TemplateRow = {
+  key: string;
+  format: string;
+  nameEs: string;
+  namePt: string;
+  nameEn: string;
+  descriptionEs: string;
+  descriptionPt: string;
+  descriptionEn: string;
+};
+
+export default function StudioHubPage() {
+  const { locale, activeCompanyId } = useApp();
+  const router = useRouter();
+  const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
+  const companyId = activeCompanyId && isLikelyDbId(activeCompanyId) ? activeCompanyId : '';
+
+  const [folderId, setFolderId] = useState<string | null>(null);
+  const [folders, setFolders] = useState<FolderRow[]>([]);
+  const [allFolders, setAllFolders] = useState<FolderRow[]>([]);
+  const [documents, setDocuments] = useState<DocRow[]>([]);
+  const [templates, setTemplates] = useState<TemplateRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showBrand, setShowBrand] = useState(false);
+  const [brandColor, setBrandColor] = useState('#ea580c');
+  const [brandOrg, setBrandOrg] = useState('');
+  const [brandLogo, setBrandLogo] = useState('');
+  const [brandFooter, setBrandFooter] = useState('');
+  const [brandSaving, setBrandSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!companyId) {
+      setLoading(false);
+      setError(t('Selecione uma empresa no Hub.', 'Seleccione una empresa en el Hub.', 'Select a company in the Hub.'));
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const q = new URLSearchParams({ companyId });
+      if (folderId) q.set('folderId', folderId);
+      const r = await fetch(`/api/studio/documents?${q}`, { cache: 'no-store' });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
+      setFolders(d.folders || []);
+      setAllFolders(d.allFolders || []);
+      setDocuments(d.documents || []);
+      setTemplates(d.templates || []);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId, folderId, locale]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const breadcrumb = useMemo(() => {
+    const trail: FolderRow[] = [];
+    let cur = folderId;
+    while (cur) {
+      const f = allFolders.find((x) => x.id === cur);
+      if (!f) break;
+      trail.unshift(f);
+      cur = f.parentId;
+    }
+    return trail;
+  }, [allFolders, folderId]);
+
+  async function createFolder() {
+    const name = window.prompt(
+      t('Nome da pasta', 'Nombre de la carpeta', 'Folder name'),
+      t('Nova pasta', 'Nueva carpeta', 'New folder'),
+    );
+    if (!name?.trim() || !companyId) return;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/studio/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId, name: name.trim(), parentId: folderId }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error);
+      await load();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createDoc(templateKey?: string) {
+    if (!companyId) return;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/studio/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId, folderId, templateKey }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error);
+      router.push(`/hub/studio/${d.document.id}`);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro');
+      setBusy(false);
+    }
+  }
+
+  async function openBrand() {
+    if (!companyId) return;
+    setShowBrand(true);
+    try {
+      const r = await fetch(`/api/studio/brand?companyId=${encodeURIComponent(companyId)}`);
+      const d = await r.json();
+      if (r.ok && d.brand) {
+        setBrandColor(d.brand.primaryColor || '#ea580c');
+        setBrandOrg(d.brand.orgName || '');
+        setBrandLogo(d.brand.logoUrl || '');
+        setBrandFooter(d.brand.footerText || '');
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function saveBrand() {
+    if (!companyId) return;
+    setBrandSaving(true);
+    try {
+      const r = await fetch('/api/studio/brand', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          primaryColor: brandColor,
+          orgName: brandOrg,
+          logoUrl: brandLogo || null,
+          footerText: brandFooter,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Erro');
+      setShowBrand(false);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBrandSaving(false);
+    }
+  }
+
+  function templateName(tpl: TemplateRow) {
+    return locale === 'pt' ? tpl.namePt : locale === 'es' ? tpl.nameEs : tpl.nameEn;
+  }
+  function templateDesc(tpl: TemplateRow) {
+    return locale === 'pt' ? tpl.descriptionPt : locale === 'es' ? tpl.descriptionEs : tpl.descriptionEn;
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-amber-50/80 via-white to-slate-50">
+      <header className="border-b border-amber-200/60 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/hub"
+              className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-amber-800"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Hub
+            </Link>
+            <div className="flex items-center gap-2 text-slate-900">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 text-white">
+                <PenLine className="h-4 w-4" />
+              </span>
+              <div>
+                <span className="font-bold tracking-tight">Studio</span>
+                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+                  {t('ferramenta', 'herramienta', 'tool')}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={!companyId}
+              onClick={() => void openBrand()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <Palette className="h-4 w-4" />
+              {t('Marca', 'Marca', 'Brand')}
+            </button>
+            <button
+              type="button"
+              disabled={busy || !companyId}
+              onClick={() => void createFolder()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <FolderPlus className="h-4 w-4" />
+              {t('Pasta', 'Carpeta', 'Folder')}
+            </button>
+            <button
+              type="button"
+              disabled={busy || !companyId}
+              onClick={() => setShowTemplates(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-50"
+            >
+              <FilePlus2 className="h-4 w-4" />
+              {t('Novo documento', 'Nuevo documento', 'New document')}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">
+            {t('Biblioteca de documentos', 'Biblioteca de documentos', 'Document library')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">
+            {t(
+              'Crie e organize documentos com IA. Atalho laranja em qualquer sistema.',
+              'Cree y organice documentos con IA. Atajo naranja en cualquier sistema.',
+              'Create and organize documents with AI. Orange shortcut on every system.',
+            )}
+          </p>
+        </div>
+
+        <nav className="mb-4 flex flex-wrap items-center gap-1 text-sm text-slate-600">
+          <button
+            type="button"
+            onClick={() => setFolderId(null)}
+            className="rounded px-1.5 py-0.5 font-medium hover:bg-amber-50 hover:text-amber-900"
+          >
+            {t('Raiz', 'Raíz', 'Root')}
+          </button>
+          {breadcrumb.map((f) => (
+            <span key={f.id} className="inline-flex items-center gap-1">
+              <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+              <button
+                type="button"
+                onClick={() => setFolderId(f.id)}
+                className="rounded px-1.5 py-0.5 font-medium hover:bg-amber-50 hover:text-amber-900"
+              >
+                {f.name}
+              </button>
+            </span>
+          ))}
+        </nav>
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-slate-500">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            {t('A carregar…', 'Cargando…', 'Loading…')}
+          </div>
+        ) : error ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <p className="font-semibold">{t('Studio indisponível', 'Studio no disponible', 'Studio unavailable')}</p>
+            <p className="mt-1">{error}</p>
+            <p className="mt-2 text-xs text-amber-800">
+              {t(
+                'Aplique manual_etholys_studio.sql e execute prisma generate.',
+                'Aplique manual_etholys_studio.sql y ejecute prisma generate.',
+                'Apply manual_etholys_studio.sql and run prisma generate.',
+              )}
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {folders.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFolderId(f.id)}
+                className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-amber-300 hover:shadow-md"
+              >
+                <Folder className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                <div>
+                  <p className="font-semibold text-slate-900">{f.name}</p>
+                  <p className="text-xs text-slate-500">{t('Pasta', 'Carpeta', 'Folder')}</p>
+                </div>
+              </button>
+            ))}
+            {documents.map((doc) => (
+              <Link
+                key={doc.id}
+                href={`/hub/studio/${doc.id}`}
+                className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-300 hover:shadow-md"
+              >
+                <FileText className="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-slate-900">{doc.title}</p>
+                  <p className="text-xs text-slate-500">
+                    {doc.format} · {new Date(doc.updatedAt).toLocaleString(locale === 'en' ? 'en' : locale)}
+                  </p>
+                </div>
+              </Link>
+            ))}
+            {folders.length === 0 && documents.length === 0 && (
+              <p className="col-span-full text-sm text-slate-500">
+                {t(
+                  'Pasta vazia. Crie um documento a partir de um template.',
+                  'Carpeta vacía. Cree un documento desde una plantilla.',
+                  'Empty folder. Create a document from a template.',
+                )}
+              </p>
+            )}
+          </div>
+        )}
+      </main>
+
+      {showBrand && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h2 className="text-lg font-bold text-slate-900">
+              {t('Kit de marca', 'Kit de marca', 'Brand kit')}
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              {t(
+                'Aplicado aos exports PDF/DOCX e à identidade visual do Studio.',
+                'Aplicado a exports PDF/DOCX y a la identidad visual del Studio.',
+                'Applied to PDF/DOCX exports and Studio visual identity.',
+              )}
+            </p>
+            <div className="mt-4 space-y-3">
+              <label className="block text-sm">
+                <span className="text-slate-600">{t('Cor principal', 'Color principal', 'Primary color')}</span>
+                <input
+                  type="color"
+                  value={brandColor}
+                  onChange={(e) => setBrandColor(e.target.value)}
+                  className="mt-1 h-10 w-full cursor-pointer rounded border border-slate-200"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-slate-600">{t('Nome da org', 'Nombre org', 'Org name')}</span>
+                <input
+                  value={brandOrg}
+                  onChange={(e) => setBrandOrg(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-slate-600">Logo URL</span>
+                <input
+                  value={brandLogo}
+                  onChange={(e) => setBrandLogo(e.target.value)}
+                  placeholder="https://…"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-slate-600">Footer</span>
+                <input
+                  value={brandFooter}
+                  onChange={(e) => setBrandFooter(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowBrand(false)}
+                className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                {t('Cancelar', 'Cancelar', 'Cancel')}
+              </button>
+              <button
+                type="button"
+                disabled={brandSaving}
+                onClick={() => void saveBrand()}
+                className="rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {brandSaving ? '…' : t('Guardar', 'Guardar', 'Save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTemplates && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+              <h2 className="text-lg font-bold text-slate-900">
+                {t('Escolher template', 'Elegir plantilla', 'Choose template')}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowTemplates(false)}
+                className="text-sm text-slate-500 hover:text-slate-800"
+              >
+                {t('Fechar', 'Cerrar', 'Close')}
+              </button>
+            </div>
+            <ul className="space-y-2 p-4">
+              {templates.map((tpl) => (
+                <li key={tpl.key}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void createDoc(tpl.key)}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-orange-300 hover:bg-orange-50/50 disabled:opacity-50"
+                  >
+                    <p className="font-semibold text-slate-900">{templateName(tpl)}</p>
+                    <p className="mt-0.5 text-sm text-slate-600">{templateDesc(tpl)}</p>
+                    <p className="mt-1 text-[10px] uppercase tracking-wide text-slate-400">{tpl.format}</p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -9,6 +9,7 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 | **Ecossistema de produtos (visão geral)** | [ETHOLYS_Arquitectura_v2.md](./ETHOLYS_Arquitectura_v2.md) | Módulos, princípios, integrações entre sistemas |
 | **FORGE — EAD unificado + jogos + gamificação** | [docs/architecture/forge-ead.md](./docs/architecture/forge-ead.md) | Qualquer trabalho em `/hub/forge`, APIs `forge`, LMS, jogos, IA geradora de jogos |
 | **Etholys Meet — reuniões / vídeo (transversal)** | [docs/architecture/etholys-meet.md](./docs/architecture/etholys-meet.md) | Jitsi, breakouts, convites, gravação, IA pós-reunião, espelhos FORGE/SIEP |
+| **Etholys Studio — documentos com IA (ferramenta)** | [docs/architecture/etholys-studio.md](./docs/architecture/etholys-studio.md) | `/hub/studio`, pastas, templates, canvas+chat, agente com consentimento, atalho hot |
 | **Lab ANVIL — agente de engenharia interno** | [docs/architecture/lab-anvil.md](./docs/architecture/lab-anvil.md) | `/lab/anvil` — 1 agente/projeto, OSS vs Etholys, deploy targets, owners+convites |
 | **Jitsi no Contabo (ops)** | [docs/MEET-JITSI-CONTABO.md](./docs/MEET-JITSI-CONTABO.md) | Subir `meet.etholys.com` — sem isto a app usa meet.jit.si |
 | **Índice de toda a documentação** | [docs/README.md](./docs/README.md) | Encontrar outros guias em `docs/` |
