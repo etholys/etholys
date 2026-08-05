@@ -1,9 +1,26 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useApp } from '@/app/providers';
 import { useSession } from 'next-auth/react';
-import { Sparkles, Send, Save, Trash2, RefreshCw, Lightbulb, Cpu, Wrench, Cog, Layers, Link2, Zap, X } from 'lucide-react';
+import {
+  Sparkles,
+  Send,
+  Save,
+  Trash2,
+  RefreshCw,
+  Lightbulb,
+  Cpu,
+  Wrench,
+  Cog,
+  Layers,
+  Link2,
+  Zap,
+  X,
+  Hammer,
+  ExternalLink,
+} from 'lucide-react';
 
 const CATEGORIES = [
   { id: 'system', label: 'Nuevo Sistema', icon: Cpu, color: '#6366f1' },
@@ -44,6 +61,8 @@ export default function MusePage() {
   const [catFilter, setCatFilter] = useState('');
   const [saveMode, setSaveMode] = useState(false);
   const [saveForm, setSaveForm] = useState({ title: '', category: 'improvement', priority: 'MEDIUM', description: '' });
+  const [implementingId, setImplementingId] = useState<string | null>(null);
+  const [implementError, setImplementError] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -143,6 +162,36 @@ export default function MusePage() {
       body: JSON.stringify({ action: 'delete', id }),
     });
     fetchSuggestions();
+  };
+
+  const canImplement = (sug: { status: string; anvilProjectId?: string | null }) =>
+    !sug.anvilProjectId &&
+    (sug.status === 'ACCEPTED' || sug.status === 'IMPLEMENTING');
+
+  const implementSuggestion = async (id: string) => {
+    setImplementError('');
+    setImplementingId(id);
+    try {
+      const res = await fetch('/api/muse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'implement', id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setImplementError(data.error || 'Error al implementar');
+        return;
+      }
+      fetchSuggestions();
+      setActiveView('suggestions');
+      if (data.href) {
+        window.open(data.href, '_blank', 'noopener,noreferrer');
+      }
+    } catch (e: any) {
+      setImplementError(e?.message || 'Error al implementar');
+    } finally {
+      setImplementingId(null);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -279,6 +328,12 @@ export default function MusePage() {
             </button>
           </div>
 
+          {implementError && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              {implementError}
+            </div>
+          )}
+
           {/* Suggestions List */}
           {sugLoading ? (
             <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-24 bg-slate-800 rounded-xl animate-pulse" />)}</div>
@@ -309,15 +364,55 @@ export default function MusePage() {
                             <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: (pr?.color || '#f59e0b') + '20', color: pr?.color || '#f59e0b' }}>{pr?.label || sug.priority}</span>
                           </div>
                           <p className="text-sm text-slate-400 mt-1 line-clamp-2">{sug.description}</p>
-                          <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
+                          <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
                             <span>{cat?.label || sug.category}</span>
                             {sug.createdBy && <span>{`\u00b7 ${sug.createdBy.name}`}</span>}
                             {sug.company && <span>{`\u00b7 ${sug.company.shortName}`}</span>}
                             <span>{`\u00b7 ${new Date(sug.createdAt).toLocaleDateString()}`}</span>
+                            {sug.anvilProject && (
+                              <Link
+                                href={`/lab/anvil/${sug.anvilProject.id}`}
+                                className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300"
+                              >
+                                <Hammer className="w-3 h-3" />
+                                ANVIL: {sug.anvilProject.name}
+                                <ExternalLink className="w-3 h-3" />
+                              </Link>
+                            )}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
+                        {(sug.anvilProject || canImplement(sug)) && (
+                          sug.anvilProject ? (
+                            <Link
+                              href={`/lab/anvil/${sug.anvilProject.id}`}
+                              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/25 hover:bg-amber-500/25 transition"
+                            >
+                              <Hammer className="w-3.5 h-3.5" />
+                              {locale === 'pt' ? 'Abrir ANVIL' : locale === 'en' ? 'Open ANVIL' : 'Abrir ANVIL'}
+                            </Link>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => implementSuggestion(sug.id)}
+                              disabled={implementingId === sug.id}
+                              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500 transition disabled:opacity-50"
+                              title={
+                                locale === 'pt'
+                                  ? 'Criar projeto ANVIL a partir desta sugestão'
+                                  : locale === 'en'
+                                    ? 'Create ANVIL project from this suggestion'
+                                    : 'Crear proyecto ANVIL desde esta sugerencia'
+                              }
+                            >
+                              <Hammer className="w-3.5 h-3.5" />
+                              {implementingId === sug.id
+                                ? (locale === 'pt' ? '…' : '…')
+                                : (locale === 'pt' ? 'Implementar' : locale === 'en' ? 'Implement' : 'Implementar')}
+                            </button>
+                          )
+                        )}
                         <select value={sug.status} onChange={e => updateSuggestion(sug.id, { status: e.target.value })} className="text-xs px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none">
                           {STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                         </select>

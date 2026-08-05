@@ -1,8 +1,8 @@
 # ETHOLYS Lab — ANVIL (agente de engenharia interno)
 
-**Versão:** 0.1  
-**Data:** 2026-07-27  
-**Status:** F0–F1 em código (projetos, políticas, chat agente, membros, deploy targets)  
+**Versão:** 0.2  
+**Data:** 2026-08-05  
+**Status:** F0–F1 feito · F2 sandbox+preview em código · ponte MUSE → ANVIL  
 **Público:** admin Etholys / agentes de IA  
 
 **Fonte de verdade** para o desenvolvedor de código interno (estilo Cursor/Abacus), exclusivo do Lab.  
@@ -21,7 +21,8 @@ ANVIL não é produto licenciado aos clientes. Vive em `/lab/anvil`, atrás de a
 | **Runtime** | LLM, APIs, UI, convites, audit |
 | **Projeto** | Unidade de trabalho (Etholys, OSS, externo) |
 | **Agente** | 1:1 com projeto — memória e regras desse contexto |
-| **Deploy target** | preview / staging / Contabo / custom — escolhido por fase |
+| **Sandbox** | Árvore de ficheiros (`LabAnvilFile`) quando `workspaceKind=sandbox` |
+| **Deploy target** | preview / staging / Contabo / custom — preview F2 activo |
 | **Reuse policy** | O que o agente pode e não pode tocar |
 
 ---
@@ -58,11 +59,14 @@ Lab geral (`/lab`) continua com o seu próprio gate. Anvil exige **acesso Anvil*
 ```
 LabAnvilProject 1──1 LabAnvilAgent
        │
-       ├── LabAnvilDeployTarget[]
+       ├── LabAnvilDeployTarget[]   # preview configJson.token
+       ├── LabAnvilFile[]           # sandbox FS (F2)
        ├── LabAnvilProjectMember[]
        └── LabAnvilSession[] ── LabAnvilMessage[]
 
 LabAnvilMember  (acesso global à ferramenta)
+
+MuseSuggestion.anvilProjectId ──► LabAnvilProject  (handoff MUSE)
 ```
 
 Campos-chave do projeto: `visibility`, `relation`, `workspaceKind`, `repoUrl`, `repoPath`, `allowedReuse` (JSON), `parentProjectId` (subprojetos Etholys).
@@ -75,10 +79,24 @@ Campos-chave do projeto: `visibility`, `relation`, `workspaceKind`, `repoUrl`, `
 |------|---------|--------|
 | **F0** | Spec + Prisma + access + CRUD projetos/targets/membros | ✅ |
 | **F1** | Chat por agente + system prompt com política + planos/artefactos | ✅ |
-| **F2** | Sandbox de ficheiros + preview URL | Pendente |
+| **F2** | Sandbox de ficheiros + preview URL estático | ✅ (MVP) |
 | **F3** | Deploy Contabo / custom por target | Pendente |
 | **F4** | Git branch/PR no monorepo Etholys | Pendente |
 | **F5** | Extração assistida “para OSS” (sugerir API/pacote) | Pendente |
+
+### F2 — APIs
+
+| Rota | Papel |
+|------|--------|
+| `GET/PUT/DELETE /api/lab/anvil/projects/[id]/files` | Listar / ler / gravar / apagar; `PUT action=apply` para batch |
+| `POST /api/lab/anvil/projects/[id]/preview` | Gera token no target `preview`, status `live` |
+| `GET /api/lab/anvil/preview/[token]/[[...path]]` | Serve ficheiros do sandbox (público via token) |
+
+Sandbox só para `workspaceKind=sandbox`. Artefactos do chat com `content` → botão “Aplicar ao sandbox”.
+
+### Ponte MUSE
+
+`POST /api/muse` com `action: implement` → `implementMuseSuggestionToAnvil` (brief no agente + sessão). Ver [lab-muse.md](./lab-muse.md).
 
 ---
 
@@ -88,9 +106,12 @@ Campos-chave do projeto: `visibility`, `relation`, `workspaceKind`, `repoUrl`, `
 apps/web/
   app/lab/anvil/           # UI
   app/api/lab/anvil/       # APIs
-  lib/lab-anvil/           # access, policy, prompts, agent
+  lib/lab-anvil/           # access, policy, prompts, agent, sandbox-fs, preview
+  lib/muse/implement-to-anvil.ts
   prisma/schema.prisma     # LabAnvil*
   prisma/migrations/manual_lab_anvil.sql
+  prisma/migrations/manual_lab_anvil_f2.sql
+  prisma/migrations/manual_muse_anvil_handoff.sql
 ```
 
 ---

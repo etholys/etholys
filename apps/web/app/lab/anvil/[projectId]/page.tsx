@@ -13,6 +13,9 @@ import {
   Settings2,
   Loader2,
   Trash2,
+  FolderTree,
+  FileCode2,
+  ExternalLink,
 } from 'lucide-react';
 
 type DeployTarget = {
@@ -21,6 +24,7 @@ type DeployTarget = {
   label: string;
   isDefault: boolean;
   status: string;
+  configJson?: { token?: string; entry?: string; fileCount?: number; builtAt?: string } | null;
 };
 
 type Message = {
@@ -29,7 +33,7 @@ type Message = {
   content: string;
   metaJson?: {
     plan?: string[];
-    artifacts?: Array<{ path: string; summary: string }>;
+    artifacts?: Array<{ path: string; summary: string; language?: string; content?: string }>;
     policyWarnings?: string[];
     suggestedDeployKind?: string;
     reuseDecision?: string;
@@ -43,6 +47,15 @@ type Session = {
   title?: string | null;
   status: string;
   _count?: { messages: number };
+};
+
+type SandboxFileMeta = {
+  id: string;
+  path: string;
+  size: number;
+  sha256?: string | null;
+  mimeType?: string | null;
+  updatedAt: string;
 };
 
 type Project = {
@@ -72,10 +85,20 @@ export default function AnvilProjectPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [tab, setTab] = useState<'chat' | 'deploy' | 'members' | 'settings'>('chat');
+  const [tab, setTab] = useState<'chat' | 'files' | 'deploy' | 'members' | 'settings'>('chat');
   const [memberEmail, setMemberEmail] = useState('');
   const [newTarget, setNewTarget] = useState({ kind: 'contabo', label: 'Contabo prod' });
   const [error, setError] = useState('');
+  const [files, setFiles] = useState<SandboxFileMeta[]>([]);
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState('');
+  const [fileDirty, setFileDirty] = useState(false);
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [savingFile, setSavingFile] = useState(false);
+  const [applyingMsgId, setApplyingMsgId] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [buildingPreview, setBuildingPreview] = useState(false);
+  const [newFilePath, setNewFilePath] = useState('index.html');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const t = (es: string, pt: string, en: string) =>
@@ -102,13 +125,179 @@ export default function AnvilProjectPage() {
     setMessages(data.session.messages || []);
   }, []);
 
+  const loadFiles = useCallback(async () => {
+    if (!projectId) return;
+    setFilesLoading(true);
+    try {
+      const res = await fetch(`/api/lab/anvil/projects/${projectId}/files`);
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 400) {
+          setFiles([]);
+          return;
+        }
+        setError(data.error || 'Erro ao listar ficheiros');
+        return;
+      }
+      setFiles(data.files || []);
+    } finally {
+      setFilesLoading(false);
+    }
+  }, [projectId]);
+
+  const openFile = async (path: string) => {
+    const res = await fetch(
+      `/api/lab/anvil/projects/${projectId}/files?path=${encodeURIComponent(path)}`,
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || 'Erro ao ler ficheiro');
+      return;
+    }
+    setSelectedPath(path);
+    setFileContent(data.file?.contentText ?? '');
+    setFileDirty(false);
+  };
+
+  const saveFile = async () => {
+    if (!selectedPath) return;
+    setSavingFile(true);
+    try {
+      const res = await fetch(`/api/lab/anvil/projects/${projectId}/files`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: selectedPath, content: fileContent }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Erro ao gravar');
+        return;
+      }
+      setFileDirty(false);
+      await loadFiles();
+    } finally {
+      setSavingFile(false);
+    }
+  };
+
+  const createFile = async () => {
+    const path = newFilePath.trim();
+    if (!path) return;
+    const res = await fetch(`/api/lab/anvil/projects/${projectId}/files`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path,
+        content: path.endsWith('.html')
+          ? '<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>ANVIL</title></head>\n<body>\n  <h1>Hello ANVIL</h1>\n</body>\n</html>\n'
+          : '',
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || 'Erro ao criar');
+      return;
+    }
+    await loadFiles();
+    await openFile(path);
+  };
+
+  const deleteFile = async (path: string) => {
+    if (!confirm(`Apagar ${path}?`)) return;
+    const res = await fetch(`/api/lab/anvil/projects/${projectId}/files`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || 'Erro ao apagar');
+      return;
+    }
+    if (selectedPath === path) {
+      setSelectedPath(null);
+      setFileContent('');
+      setFileDirty(false);
+    }
+    await loadFiles();
+  };
+
+  const applyArtifacts = async (msg: Message) => {
+    const arts = (msg.metaJson?.artifacts || [])
+      .filter((a) => a.path && typeof a.content === 'string')
+      .map((a) => ({ path: a.path, content: a.content as string, summary: a.summary }));
+    if (arts.length === 0) {
+      setError(
+        t(
+          'Sin content en artifacts — pide al agente que incluya content en el JSON.',
+          'Sem content nos artifacts — pede ao agente que inclua content no JSON.',
+          'No content in artifacts — ask the agent to include content in the JSON.',
+        ),
+      );
+      return;
+    }
+    setApplyingMsgId(msg.id);
+    try {
+      const res = await fetch(`/api/lab/anvil/projects/${projectId}/files`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'apply', artifacts: arts }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Erro ao aplicar');
+        return;
+      }
+      if (data.errors?.length) {
+        setError(data.errors.map((e: { path: string; error: string }) => `${e.path}: ${e.error}`).join('; '));
+      }
+      await loadFiles();
+      setTab('files');
+    } finally {
+      setApplyingMsgId(null);
+    }
+  };
+
+  const buildPreview = async () => {
+    setBuildingPreview(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/lab/anvil/projects/${projectId}/preview`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Erro no preview');
+        return;
+      }
+      setPreviewUrl(data.url || data.path);
+      await loadProject();
+    } finally {
+      setBuildingPreview(false);
+    }
+  };
+
   useEffect(() => {
     loadProject();
   }, [loadProject]);
 
   useEffect(() => {
+    if (tab === 'files' && project?.workspaceKind === 'sandbox') {
+      loadFiles();
+    }
+  }, [tab, project?.workspaceKind, loadFiles]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sending]);
+
+  // Sync preview URL from deploy target config
+  useEffect(() => {
+    const preview = project?.deployTargets?.find((d) => d.kind === 'preview' && d.configJson?.token);
+    if (preview?.configJson?.token) {
+      setPreviewUrl(`/api/lab/anvil/preview/${preview.configJson.token}`);
+    }
+  }, [project?.deployTargets]);
 
   const startSession = async () => {
     const res = await fetch(`/api/lab/anvil/projects/${projectId}/sessions`, {
@@ -277,6 +466,7 @@ export default function AnvilProjectPage() {
         {(
           [
             ['chat', t('Chat', 'Chat', 'Chat')],
+            ['files', t('Archivos', 'Ficheiros', 'Files')],
             ['deploy', t('Deploy', 'Deploy', 'Deploy')],
             ['members', t('Miembros', 'Membros', 'Members')],
             ['settings', t('Política', 'Política', 'Policy')],
@@ -344,10 +534,28 @@ export default function AnvilProjectPage() {
                   {m.content}
                   {m.metaJson?.artifacts && m.metaJson.artifacts.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-slate-700/50 space-y-1">
-                      <div className="text-[10px] uppercase text-amber-400/80">Artifacts</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[10px] uppercase text-amber-400/80">Artifacts</div>
+                        {project.workspaceKind === 'sandbox' &&
+                          m.metaJson.artifacts.some((a) => a.content) && (
+                            <button
+                              type="button"
+                              onClick={() => applyArtifacts(m)}
+                              disabled={applyingMsgId === m.id}
+                              className="text-[10px] px-2 py-0.5 rounded bg-amber-600/80 text-white hover:bg-amber-500 disabled:opacity-50"
+                            >
+                              {applyingMsgId === m.id
+                                ? '…'
+                                : t('Aplicar al sandbox', 'Aplicar ao sandbox', 'Apply to sandbox')}
+                            </button>
+                          )}
+                      </div>
                       {m.metaJson.artifacts.map((a, i) => (
                         <div key={i} className="text-xs text-slate-400">
                           <span className="font-mono text-amber-300/90">{a.path}</span> — {a.summary}
+                          {a.content ? (
+                            <span className="text-emerald-500/80 ml-1">(+content)</span>
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -398,6 +606,138 @@ export default function AnvilProjectPage() {
         </div>
       )}
 
+      {tab === 'files' && (
+        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
+          {project.workspaceKind !== 'sandbox' ? (
+            <p className="text-sm text-slate-400">
+              {t(
+                'El sandbox de archivos es para workspaceKind=sandbox. Monorepo llega en F4 (git/PR).',
+                'O sandbox de ficheiros é para workspaceKind=sandbox. Monorepo chega em F4 (git/PR).',
+                'File sandbox is for workspaceKind=sandbox. Monorepo comes in F4 (git/PR).',
+              )}
+            </p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <h3 className="font-semibold text-white flex items-center gap-2">
+                  <FolderTree className="w-4 h-4 text-amber-400" />
+                  Sandbox
+                </h3>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={buildPreview}
+                    disabled={buildingPreview || files.length === 0}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-50"
+                  >
+                    {buildingPreview ? <Loader2 className="w-3 h-3 animate-spin" /> : <Rocket className="w-3 h-3" />}
+                    {t('Build preview', 'Build preview', 'Build preview')}
+                  </button>
+                  {previewUrl && (
+                    <a
+                      href={previewUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      Open
+                    </a>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={newFilePath}
+                  onChange={(e) => setNewFilePath(e.target.value)}
+                  placeholder="path/file.ext"
+                  className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={createFile}
+                  className="px-3 py-2 bg-slate-700 text-white rounded-lg text-sm hover:bg-slate-600"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-3 min-h-[50vh]">
+                <div className="bg-slate-800/40 rounded-xl border border-slate-800 p-2 max-h-[60vh] overflow-y-auto space-y-0.5">
+                  {filesLoading && (
+                    <div className="flex justify-center py-6">
+                      <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                    </div>
+                  )}
+                  {!filesLoading && files.length === 0 && (
+                    <p className="text-xs text-slate-500 px-2 py-4">
+                      {t('Sin archivos', 'Sem ficheiros', 'No files')}
+                    </p>
+                  )}
+                  {files.map((f) => (
+                    <div
+                      key={f.id}
+                      className={`flex items-center gap-1 rounded-lg group ${
+                        selectedPath === f.path ? 'bg-amber-500/15' : 'hover:bg-slate-800'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => openFile(f.path)}
+                        className="flex-1 text-left px-2 py-1.5 text-xs font-mono text-slate-300 truncate"
+                      >
+                        <FileCode2 className="w-3 h-3 inline mr-1 text-amber-400/70" />
+                        {f.path}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteFile(f.path)}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-500 hover:text-red-400"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-col bg-slate-800/30 rounded-xl border border-slate-800 min-h-[50vh]">
+                  {selectedPath ? (
+                    <>
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-800">
+                        <span className="text-xs font-mono text-amber-300">{selectedPath}</span>
+                        <button
+                          type="button"
+                          onClick={saveFile}
+                          disabled={!fileDirty || savingFile}
+                          className="px-2.5 py-1 text-xs rounded-lg bg-amber-600 text-white disabled:opacity-40"
+                        >
+                          {savingFile ? '…' : t('Guardar', 'Guardar', 'Save')}
+                        </button>
+                      </div>
+                      <textarea
+                        value={fileContent}
+                        onChange={(e) => {
+                          setFileContent(e.target.value);
+                          setFileDirty(true);
+                        }}
+                        className="flex-1 w-full p-3 bg-transparent text-sm text-slate-200 font-mono resize-none focus:outline-none min-h-[40vh]"
+                        spellCheck={false}
+                      />
+                    </>
+                  ) : (
+                    <p className="text-sm text-slate-500 text-center py-16">
+                      {t(
+                        'Selecciona o crea un archivo',
+                        'Selecciona ou cria um ficheiro',
+                        'Select or create a file',
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {tab === 'deploy' && (
         <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-4">
           <h3 className="font-semibold text-white flex items-center gap-2">
@@ -423,8 +763,29 @@ export default function AnvilProjectPage() {
                     <span className="text-xs text-slate-500">({d.kind})</span>
                   </div>
                   <div className="text-[10px] text-slate-500 uppercase">{d.status}</div>
+                  {d.kind === 'preview' && d.configJson?.token && (
+                    <a
+                      href={`/api/lab/anvil/preview/${d.configJson.token}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-amber-400 hover:underline inline-flex items-center gap-1 mt-1"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      preview URL
+                    </a>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {d.kind === 'preview' && project.workspaceKind === 'sandbox' && (
+                    <button
+                      type="button"
+                      onClick={buildPreview}
+                      disabled={buildingPreview}
+                      className="text-xs text-amber-300 hover:text-amber-200"
+                    >
+                      {buildingPreview ? '…' : 'rebuild'}
+                    </button>
+                  )}
                   {d.isDefault ? (
                     <span className="text-[10px] text-amber-400">default</span>
                   ) : (
@@ -467,7 +828,7 @@ export default function AnvilProjectPage() {
             </div>
           )}
           <p className="text-xs text-slate-500">
-            F2/F3: execução real de preview e Contabo ainda pendente — targets já ficam no projeto.
+            F2: preview estático do sandbox activo. F3: Contabo/custom ainda pendente.
           </p>
         </div>
       )}

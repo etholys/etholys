@@ -7,10 +7,12 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 | Área | Documento | Quando ler |
 |------|-----------|------------|
 | **Ecossistema de produtos (visão geral)** | [ETHOLYS_Arquitectura_v2.md](./ETHOLYS_Arquitectura_v2.md) | Módulos, princípios, integrações entre sistemas |
-| **Etholys Tools — faixa de ferramentas** | [docs/architecture/etholys-tools.md](./docs/architecture/etholys-tools.md) | Advisor, Studio, Meet, CARTA — não confundir com Core nem com Studio como guarda-chuva |
+| **Etholys Tools — faixa de ferramentas** | [docs/architecture/etholys-tools.md](./docs/architecture/etholys-tools.md) | Advisor, Studio, Meet, CARTA, Work — não confundir com Core nem com Studio como guarda-chuva |
+| **Etholys Work — motor de tarefas** | [docs/architecture/etholys-work.md](./docs/architecture/etholys-work.md) | `Task` único, espelhos ATLAS/SIEP/Meet; grupos, aprovações via CARTA |
 | **FORGE — EAD unificado + jogos + gamificação** | [docs/architecture/forge-ead.md](./docs/architecture/forge-ead.md) | Qualquer trabalho em `/hub/forge`, APIs `forge`, LMS, jogos, IA geradora de jogos |
 | **Etholys Meet — reuniões / vídeo (transversal)** | [docs/architecture/etholys-meet.md](./docs/architecture/etholys-meet.md) | Jitsi, breakouts, convites, gravação, IA pós-reunião, espelhos FORGE/SIEP/NEXUS |
 | **Etholys Studio — documentos com IA (ferramenta)** | [docs/architecture/etholys-studio.md](./docs/architecture/etholys-studio.md) | `/hub/studio`, pastas, templates, canvas+chat, agente com consentimento, atalho hot |
+| **Lab MUSE — inovação / I+D+i interno** | [docs/architecture/lab-muse.md](./docs/architecture/lab-muse.md) | `/lab/muse` — sugestões estratégicas, observatório; pipeline → ANVIL (não fundir) |
 | **Lab ANVIL — agente de engenharia interno** | [docs/architecture/lab-anvil.md](./docs/architecture/lab-anvil.md) | `/lab/anvil` — 1 agente/projeto, OSS vs Etholys, deploy targets, owners+convites |
 | **Jitsi no Contabo (ops)** | [docs/MEET-JITSI-CONTABO.md](./docs/MEET-JITSI-CONTABO.md) | Subir `meet.etholys.com` — sem isto a app usa meet.jit.si |
 | **Meet VPS + Jibri (ops)** | [docs/MEET-VPS-JIBRI.md](./docs/MEET-VPS-JIBRI.md) | VPS dedicado, gravação → R2, webhook |

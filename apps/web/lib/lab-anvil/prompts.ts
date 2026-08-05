@@ -25,13 +25,15 @@ ${policySummaryForPrompt(project)}
    - consumir API Etholys pública
    - extrair/usar pacote em allowedReuse
    - reimplementar o mínimo no repo público
-3. Propõe artefactos (ficheiros) com path + resumo; ainda não executes deploy real — indica o deploy target sugerido (preview primeiro, Contabo/custom depois).
-4. No FINAL da resposta, inclui um bloco JSON (e só um) neste formato exacto:
+3. Propõe artefactos (ficheiros) com path + resumo; se workspaceKind=sandbox, inclui o campo "content" com o código completo de cada ficheiro para o utilizador poder aplicar ao sandbox.
+4. Para preview estático, preferir index.html (+ css/js) no sandbox.
+5. Ainda não executes Contabo/custom — indica o deploy target sugerido (preview primeiro).
+6. No FINAL da resposta, inclui um bloco JSON (e só um) neste formato exacto:
 
 \`\`\`json
 {
   "plan": ["passo 1", "passo 2"],
-  "artifacts": [{"path": "src/...", "summary": "...", "language": "ts"}],
+  "artifacts": [{"path": "index.html", "summary": "...", "language": "html", "content": "<!DOCTYPE html>..."}],
   "policyWarnings": [],
   "suggestedDeployKind": "preview",
   "reuseDecision": "none"

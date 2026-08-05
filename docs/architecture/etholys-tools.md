@@ -19,7 +19,7 @@
 | **Sistemas** | ATLAS, SIEP, FUNDHUB, NEXUS, FORGE, PRISM — produtos licenciáveis |
 | **Etholys Tools** | Advisor, Studio, Meet, CARTA — ferramentas avulsas no Hub; atalhos / espelhos nos sistemas |
 | **Etholys Core** | SSO, chat, Docs S3, i18n, permissões, notif. — infraestrutura incluída |
-| **Etholys Lab** | Ferramentas internas da fábrica (ANVIL, MUSE, …) — não públicas |
+| **Etholys Lab** | Ferramentas internas da fábrica — [MUSE](./lab-muse.md) (o quê) + [ANVIL](./lab-anvil.md) (como); separados, com pipeline; não públicas |
 
 **Studio não é o guarda-chuva.** Studio é uma ferramenta *dentro* de Etholys Tools (documentos com IA).
 
@@ -33,8 +33,9 @@
 | **Studio** | `/hub/studio` | [etholys-studio.md](./etholys-studio.md) |
 | **Meet** | `/hub/meet` | [etholys-meet.md](./etholys-meet.md) |
 | **CARTA** | `/hub/carta` | Governança / aprovações |
+| **Work** (tarefas) | `/tasks` hoje; `/hub/work` depois | [etholys-work.md](./etholys-work.md) — motor único `Task` |
 
-Futuro candidato (mesmo padrão Meet: um motor, vários espelhos): **inbox de tarefas da equipa** — não duplicar `Task` do SIEP; ver discussão de produto (motor único + `projectId` opcional).
+Candidato futuro (Tools, fora de Work): **Board** — mural da empresa (links, docs, senhas).
 
 ---
 

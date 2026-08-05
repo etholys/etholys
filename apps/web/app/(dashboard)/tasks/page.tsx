@@ -31,7 +31,7 @@ export default function TasksPage() {
   const [taskScopeFilter, setTaskScopeFilter] = useState(''); // '' = all, 'project' = with project, 'company' = without project
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState<any>(null);
-  const [form, setForm] = useState<any>({ title: '', description: '', projectId: '', departmentId: '', assigneeId: '', priority: 'MEDIUM', status: 'TODO', dueDate: '', isRecurring: false, recurrenceMonths: '1', recurrenceCount: '1' });
+  const [form, setForm] = useState<any>({ title: '', description: '', projectId: '', departmentId: '', assigneeId: '', priority: 'MEDIUM', status: 'TODO', dueDate: '', tags: '', isRecurring: false, recurrenceMonths: '1', recurrenceCount: '1' });
   const [newComment, setNewComment] = useState('');
   const [taskDetail, setTaskDetail] = useState<any>(null);
   const [editingTask, setEditingTask] = useState(false);
@@ -39,7 +39,14 @@ export default function TasksPage() {
   const [newChecklistItem, setNewChecklistItem] = useState('');
   const [newTimeHours, setNewTimeHours] = useState('');
   const [newTimeDesc, setNewTimeDesc] = useState('');
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [detailLoading, setDetailLoading] = useState(false);
 
+  const parseTags = (raw: unknown): string[] => {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw.map(String).map((t) => t.trim()).filter(Boolean);
+    return String(raw).split(',').map((t) => t.trim()).filter(Boolean);
+  };
   const fetchTasks = () => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -62,6 +69,7 @@ export default function TasksPage() {
     const body: any = {
       ...form,
       dueDate: form.dueDate ? new Date(form.dueDate) : null,
+      tags: form.tags || null,
       isRecurring: form.isRecurring || false,
       recurrenceMonths: form.isRecurring ? parseInt(form.recurrenceMonths) || 1 : null,
       recurrenceCount: form.isRecurring ? parseInt(form.recurrenceCount) || 1 : null,
@@ -71,22 +79,35 @@ export default function TasksPage() {
     if (!body.projectId) { delete body.projectId; if (activeCompanyId) body.companyId = activeCompanyId; }
     await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     setShowForm(false);
-    setForm({ title: '', description: '', projectId: '', departmentId: '', assigneeId: '', priority: 'MEDIUM', status: 'TODO', dueDate: '', isRecurring: false, recurrenceMonths: '1', recurrenceCount: '1' });
+    setForm({ title: '', description: '', projectId: '', departmentId: '', assigneeId: '', priority: 'MEDIUM', status: 'TODO', dueDate: '', tags: '', isRecurring: false, recurrenceMonths: '1', recurrenceCount: '1' });
     fetchTasks();
   };
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
     await fetch(`/api/tasks/${taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) });
     fetchTasks();
+    if (taskDetail?.id === taskId) openTaskDetail(taskId);
   };
 
   const openTaskDetail = async (taskId: string) => {
-    const res = await fetch(`/api/tasks/${taskId}`);
-    const data = await res.json();
-    setTaskDetail(data?.task);
+    setDetailLoading(true);
     setShowDetail(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`);
+      const data = await res.json();
+      if (!res.ok || !data?.task) {
+        setTaskDetail(null);
+        setShowDetail(false);
+        return;
+      }
+      setTaskDetail(data.task);
+    } catch {
+      setTaskDetail(null);
+      setShowDetail(false);
+    } finally {
+      setDetailLoading(false);
+    }
   };
-
   const addComment = async () => {
     if (!newComment.trim() || !taskDetail?.id) return;
     await fetch('/api/comments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskId: taskDetail.id, content: newComment }) });
@@ -118,10 +139,33 @@ export default function TasksPage() {
     if (!taskDetail?.id) return;
     const data: any = { ...taskEditForm };
     if (data.dueDate) data.dueDate = new Date(data.dueDate);
+    else data.dueDate = null;
     if (data.estimatedHours) data.estimatedHours = parseFloat(data.estimatedHours);
+    else data.estimatedHours = null;
     if (!data.assigneeId) data.assigneeId = null;
+    data.tags = data.tags ?? '';
     await fetch(`/api/tasks/${taskDetail.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     setEditingTask(false);
+    openTaskDetail(taskDetail.id);
+    fetchTasks();
+  };
+
+  const addSubtask = async () => {
+    if (!newSubtaskTitle.trim() || !taskDetail?.id) return;
+    const body: any = {
+      title: newSubtaskTitle.trim(),
+      parentId: taskDetail.id,
+      status: 'TODO',
+      priority: taskDetail.priority || 'MEDIUM',
+      projectId: taskDetail.projectId || undefined,
+      companyId: taskDetail.companyId || activeCompanyId || undefined,
+      departmentId: taskDetail.departmentId || undefined,
+    };
+    if (!body.projectId) delete body.projectId;
+    if (!body.companyId && activeCompanyId) body.companyId = activeCompanyId;
+    if (!body.departmentId) delete body.departmentId;
+    await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    setNewSubtaskTitle('');
     openTaskDetail(taskDetail.id);
     fetchTasks();
   };
@@ -135,7 +179,9 @@ export default function TasksPage() {
   };
 
   const filtered = (tasks ?? []).filter((t: any) => {
-    if (search && !(t?.title ?? '').toLowerCase().includes(search.toLowerCase()) && !(t?.description ?? '').toLowerCase().includes(search.toLowerCase())) return false;
+    // Subtasks live under parent detail — keep board/list top-level only
+    if (t?.parentId) return false;
+    if (search && !(t?.title ?? '').toLowerCase().includes(search.toLowerCase()) && !(t?.description ?? '').toLowerCase().includes(search.toLowerCase()) && !parseTags(t?.tags).some((tag) => tag.toLowerCase().includes(search.toLowerCase()))) return false;
     if (priorityFilter && t?.priority !== priorityFilter) return false;
     if (statusFilter && t?.status !== statusFilter) return false;
     if (assigneeFilter && t?.assigneeId !== assigneeFilter) return false;
@@ -244,6 +290,13 @@ export default function TasksPage() {
                           {t?.isRecurring && <Repeat className="w-3 h-3 text-purple-500 inline mr-1" />}
                           {t?.title ?? ''}
                         </p>
+                        {parseTags(t?.tags).length > 0 && (
+                          <div className="mb-2 flex flex-wrap gap-1">
+                            {parseTags(t.tags).slice(0, 3).map((tag) => (
+                              <span key={tag} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{tag}</span>
+                            ))}
+                          </div>
+                        )}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             {t?.assignee && <div className="w-6 h-6 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[10px] font-bold">{getInitials(t.assignee?.name)}</div>}
@@ -264,11 +317,18 @@ export default function TasksPage() {
         ) : (
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <table className="w-full text-sm">
-              <thead><tr className="border-b bg-gray-50"><th className="text-left p-3 font-medium text-gray-500">{tr('task.title')}</th><th className="text-left p-3 font-medium text-gray-500">{tr('nav.projects')}</th><th className="text-left p-3 font-medium text-gray-500">{tr('task.assignee')}</th><th className="text-left p-3 font-medium text-gray-500">{tr('general.status')}</th><th className="text-left p-3 font-medium text-gray-500">{tr('general.priority')}</th><th className="text-left p-3 font-medium text-gray-500">{tr('task.dueDate')}</th></tr></thead>
+              <thead><tr className="border-b bg-gray-50"><th className="text-left p-3 font-medium text-gray-500">{tr('task.title')}</th><th className="text-left p-3 font-medium text-gray-500">{L(ml('Tags','Etiquetas','Tags'))}</th><th className="text-left p-3 font-medium text-gray-500">{tr('nav.projects')}</th><th className="text-left p-3 font-medium text-gray-500">{tr('task.assignee')}</th><th className="text-left p-3 font-medium text-gray-500">{tr('general.status')}</th><th className="text-left p-3 font-medium text-gray-500">{tr('general.priority')}</th><th className="text-left p-3 font-medium text-gray-500">{tr('task.dueDate')}</th></tr></thead>
               <tbody>
                 {filtered.map((t: any) => (
                   <tr key={t?.id} onClick={() => openTaskDetail(t?.id)} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition">
                     <td className="p-3 font-medium text-gray-900">{t?.isRecurring && <Repeat className="w-3 h-3 text-purple-500 inline mr-1" />}{t?.title ?? ''}</td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-1">
+                        {parseTags(t?.tags).map((tag) => (
+                          <span key={tag} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{tag}</span>
+                        ))}
+                      </div>
+                    </td>
                     <td className="p-3 text-gray-500">{t?.project?.name ?? ''}</td>
                     <td className="p-3">{t?.assignee ? <span className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[10px] font-bold">{getInitials(t.assignee?.name)}</div>{t.assignee?.name}</span> : '-'}</td>
                     <td className="p-3"><span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: getStatusColor(t?.status ?? '') + '20', color: getStatusColor(t?.status ?? '') }}>{tr(`status.${(t?.status ?? '').toLowerCase()}`)}</span></td>
@@ -330,6 +390,16 @@ export default function TasksPage() {
                 </div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">{tr('task.dueDate')}</label><input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm" /></div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{L(ml('Tags','Etiquetas','Tags'))}</label>
+                <input
+                  value={form.tags}
+                  onChange={e => setForm({ ...form, tags: e.target.value })}
+                  placeholder={L(ml('finance, ops, weekly…','finanzas, ops, semanal…','finanças, ops, semanal…'))}
+                  className="w-full px-3 py-2 rounded-lg border text-sm"
+                />
+                <p className="mt-1 text-xs text-gray-400">{L(ml('Comma-separated','Separadas por comas','Separadas por vírgula'))}</p>
+              </div>
               {/* Recurring */}
               <div className="border-t pt-3">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -371,9 +441,13 @@ export default function TasksPage() {
       )}
 
       {/* Task Detail Modal */}
-      {showDetail && taskDetail && (
+      {(showDetail || detailLoading) && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => { setShowDetail(false); setTaskDetail(null); setEditingTask(false); }}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            {detailLoading && !taskDetail ? (
+              <div className="p-10 text-center text-sm text-gray-500">{L(ml('Loading…','Cargando…','A carregar…'))}</div>
+            ) : taskDetail ? (
+            <>
             <div className="p-5 border-b">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -381,13 +455,18 @@ export default function TasksPage() {
                   <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: getPriorityColor(taskDetail?.priority ?? '') + '20', color: getPriorityColor(taskDetail?.priority ?? '') }}>{tr(`priority.${(taskDetail?.priority ?? '').toLowerCase()}`)}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => { setEditingTask(true); setTaskEditForm({ title: taskDetail?.title, description: taskDetail?.description, assigneeId: taskDetail?.assigneeId || '', priority: taskDetail?.priority, dueDate: taskDetail?.dueDate ? new Date(taskDetail.dueDate).toISOString().split('T')[0] : '', estimatedHours: taskDetail?.estimatedHours || '' }); }} className="text-gray-400 hover:text-teal-600"><Edit2 className="w-4 h-4" /></button>
+                  <button onClick={() => { setEditingTask(true); setTaskEditForm({ title: taskDetail?.title, description: taskDetail?.description, assigneeId: taskDetail?.assigneeId || '', priority: taskDetail?.priority, dueDate: taskDetail?.dueDate ? new Date(taskDetail.dueDate).toISOString().split('T')[0] : '', estimatedHours: taskDetail?.estimatedHours || '', tags: parseTags(taskDetail?.tags).join(', ') }); }} className="text-gray-400 hover:text-teal-600"><Edit2 className="w-4 h-4" /></button>
                   <button onClick={() => deleteTask(taskDetail.id, taskDetail.title)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                   <button onClick={() => { setShowDetail(false); setTaskDetail(null); setEditingTask(false); }}><X className="w-5 h-5 text-gray-400" /></button>
                 </div>
               </div>
               <h2 className="text-xl font-bold text-gray-900 mt-3">{taskDetail?.title ?? ''}</h2>
               <p className="text-sm text-gray-500 mt-1">{taskDetail?.project?.name ?? ''} · {taskDetail?.project?.company?.shortName ?? ''}</p>
+              {taskDetail?.parent && (
+                <button type="button" onClick={() => openTaskDetail(taskDetail.parent.id)} className="mt-2 text-xs text-teal-700 hover:underline">
+                  {L(ml('Parent task','Tarea padre','Tarefa pai'))}: {taskDetail.parent.title}
+                </button>
+              )}
             </div>
 
             <div className="p-5 space-y-5">
@@ -404,6 +483,10 @@ export default function TasksPage() {
                     <div><label className="block text-sm font-medium mb-1">{tr('task.dueDate')}</label><input type="date" value={taskEditForm.dueDate ?? ''} onChange={e => setTaskEditForm({ ...taskEditForm, dueDate: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm" /></div>
                     <div><label className="block text-sm font-medium mb-1">{L(ml('Estimated Hours','Horas Estimadas','Horas Estimadas'))}</label><input type="number" step="0.5" value={taskEditForm.estimatedHours ?? ''} onChange={e => setTaskEditForm({ ...taskEditForm, estimatedHours: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm" /></div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{L(ml('Tags','Etiquetas','Tags'))}</label>
+                    <input value={taskEditForm.tags ?? ''} onChange={e => setTaskEditForm({ ...taskEditForm, tags: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm" placeholder={L(ml('Comma-separated','Separadas por comas','Separadas por vírgula'))} />
+                  </div>
                   <div className="flex justify-end gap-2">
                     <button onClick={() => setEditingTask(false)} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 rounded-lg">{tr('general.cancel')}</button>
                     <button onClick={saveTaskEdit} className="px-3 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700">{tr('general.save')}</button>
@@ -412,6 +495,13 @@ export default function TasksPage() {
               ) : (
                 <>
                   {taskDetail?.description && <div><h4 className="text-sm font-medium text-gray-700 mb-1">{tr('project.description')}</h4><p className="text-sm text-gray-600">{taskDetail.description}</p></div>}
+                  {parseTags(taskDetail?.tags).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {parseTags(taskDetail.tags).map((tag) => (
+                        <span key={tag} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">{tag}</span>
+                      ))}
+                    </div>
+                  )}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="p-3 bg-gray-50 rounded-lg"><p className="text-xs text-gray-500">{tr('task.assignee')}</p><p className="text-sm font-medium">{taskDetail?.assignee?.name ?? '-'}</p></div>
                     <div className="p-3 bg-gray-50 rounded-lg"><p className="text-xs text-gray-500">{tr('task.dueDate')}</p><p className="text-sm font-medium">{formatDate(taskDetail?.dueDate)}</p></div>
@@ -424,6 +514,28 @@ export default function TasksPage() {
                   </div>
                 </>
               )}
+
+              {/* Subtasks */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1"><CheckSquare className="w-4 h-4" />{tr('task.subtasks')}</h4>
+                <div className="space-y-1">
+                  {(taskDetail?.subtasks ?? []).map((st: any) => (
+                    <button
+                      key={st?.id}
+                      type="button"
+                      onClick={() => openTaskDetail(st.id)}
+                      className="flex w-full items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                    >
+                      <span className={cn(st?.status === 'DONE' && 'line-through text-gray-400')}>{st?.title ?? ''}</span>
+                      <span className="text-xs text-gray-400">{st?.assignee?.name ?? tr(`status.${(st?.status ?? 'todo').toLowerCase()}`)}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <input value={newSubtaskTitle} onChange={e => setNewSubtaskTitle(e.target.value)} placeholder={L(ml('New subtask…','Nueva subtarea…','Nova subtarefa…'))} className="flex-1 px-3 py-1.5 rounded-lg border text-sm" onKeyDown={e => e.key === 'Enter' && addSubtask()} />
+                  <button onClick={addSubtask} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200"><Plus className="w-4 h-4" /></button>
+                </div>
+              </div>
 
               {/* Checklist */}
               <div>
@@ -481,6 +593,8 @@ export default function TasksPage() {
                 </div>
               </div>
             </div>
+            </>
+            ) : null}
           </div>
         </div>
       )}

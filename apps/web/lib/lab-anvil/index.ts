@@ -4,3 +4,6 @@ export * from './policy';
 export * from './prompts';
 export * from './create-project';
 export * from './run-agent';
+export * from './sandbox-fs';
+export * from './apply-artifacts';
+export * from './preview';

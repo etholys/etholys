@@ -27,6 +27,8 @@ export type CreateAnvilProjectInput = {
   defaultBranch?: string;
   allowedReuse?: string[];
   parentProjectId?: string;
+  /** Extra de política/brief no agente (ex.: handoff MUSE) */
+  systemPromptExtra?: string;
   createdById: string;
   createdByEmail: string;
 };
@@ -65,7 +67,12 @@ export async function createAnvilProject(input: CreateAnvilProjectInput) {
       allowedReuse: input.allowedReuse || [],
       parentProjectId: input.parentProjectId || null,
       createdById: input.createdById,
-      agent: { create: { status: 'idle' } },
+      agent: {
+        create: {
+          status: 'idle',
+          systemPromptExtra: input.systemPromptExtra?.trim() || null,
+        },
+      },
       deployTargets: {
         create: [
           {
