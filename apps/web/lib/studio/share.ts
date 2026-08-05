@@ -79,9 +79,14 @@ export async function isCompanyMember(userId: string, companyId: string): Promis
 }
 
 export async function listCompanyMembersForShare(companyId: string) {
+  // Select explícito: `include` traria todas as colunas de CompanyUser e quebra
+  // se a BD estiver atrasada em relação ao schema.
   const rows = await prisma.companyUser.findMany({
     where: { companyId },
-    include: { user: { select: { id: true, name: true, email: true } } },
+    select: {
+      role: true,
+      user: { select: { id: true, name: true, email: true } },
+    },
     orderBy: { createdAt: 'asc' },
   });
   return rows
@@ -231,7 +236,7 @@ export async function createStudioShare(opts: {
 
   const member = await prisma.companyUser.findFirst({
     where: { companyId: opts.companyId, user: { email } },
-    include: { user: { select: { id: true, name: true, email: true } } },
+    select: { user: { select: { id: true, name: true, email: true } } },
   });
 
   const accessMode =
