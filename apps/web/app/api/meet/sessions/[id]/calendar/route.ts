@@ -80,6 +80,9 @@ export async function POST(req: Request, ctx: Ctx) {
       locationUrl: session.meetingUrl || undefined,
       startsAt,
       endsAt,
+      attendeeEmails: session.participants
+        .filter((participant) => participant.role !== 'host' && participant.email)
+        .map((participant) => participant.email!),
     };
 
     const created =

@@ -14,6 +14,19 @@ function meetEmailFrom(): string {
   );
 }
 
+function htmlEscape(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function compactUtc(date: Date): string {
+  return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+}
+
 export function buildMeetInviteEmailHtml(opts: {
   title: string;
   meetingUrl: string;
@@ -49,13 +62,34 @@ export function buildMeetInviteEmailHtml(opts: {
       : loc === 'en'
         ? 'Attachment: calendar file (.ics) for Google/Outlook.'
         : 'Adjunto: archivo de calendario (.ics) para Google/Outlook.';
+  const starts = opts.scheduledAt ?? new Date();
+  const ends = opts.endsAt ?? new Date(starts.getTime() + 60 * 60 * 1000);
+  const googleCalendar = new URL('https://calendar.google.com/calendar/render');
+  googleCalendar.searchParams.set('action', 'TEMPLATE');
+  googleCalendar.searchParams.set('text', opts.title);
+  googleCalendar.searchParams.set('dates', `${compactUtc(starts)}/${compactUtc(ends)}`);
+  googleCalendar.searchParams.set('details', opts.meetingUrl);
+  googleCalendar.searchParams.set('location', opts.meetingUrl);
+  const outlookCalendar = new URL('https://outlook.live.com/calendar/0/deeplink/compose');
+  outlookCalendar.searchParams.set('subject', opts.title);
+  outlookCalendar.searchParams.set('startdt', starts.toISOString());
+  outlookCalendar.searchParams.set('enddt', ends.toISOString());
+  outlookCalendar.searchParams.set('body', opts.meetingUrl);
+  outlookCalendar.searchParams.set('location', opts.meetingUrl);
+  const addLabel =
+    loc === 'pt' ? 'Adicionar ao calendário' : loc === 'en' ? 'Add to calendar' : 'Añadir al calendario';
 
   const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;line-height:1.5;color:#111">
 <p>${intro}</p>
-<p><strong>${opts.title}</strong></p>
+<p><strong>${htmlEscape(opts.title)}</strong></p>
 ${when ? `<p>${when}</p>` : ''}
-<p><a href="${opts.meetingUrl}" style="display:inline-block;background:#0284c7;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold">${cta}</a></p>
-<p style="font-size:12px;color:#666;word-break:break-all">${opts.meetingUrl}</p>
+<p><a href="${htmlEscape(opts.meetingUrl)}" style="display:inline-block;background:#0284c7;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold">${cta}</a></p>
+<p style="font-size:14px"><strong>${addLabel}:</strong>
+  <a href="${htmlEscape(googleCalendar.toString())}">Google Calendar</a>
+  &nbsp;·&nbsp;
+  <a href="${htmlEscape(outlookCalendar.toString())}">Outlook</a>
+</p>
+<p style="font-size:12px;color:#666;word-break:break-all">${htmlEscape(opts.meetingUrl)}</p>
 <p style="font-size:12px;color:#666">${cal}</p>
 <p style="font-size:12px;color:#999">— Etholys Meet</p>
 </body></html>`;

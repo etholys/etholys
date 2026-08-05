@@ -55,7 +55,7 @@ export async function createMeetSession(input: CreateMeetSessionInput) {
       description: input.description?.trim() || null,
       mirror,
       status: 'scheduled',
-      scheduledAt: input.scheduledAt ?? new Date(),
+      scheduledAt: input.scheduledAt === undefined ? new Date() : input.scheduledAt,
       endsAt: input.endsAt ?? null,
       projectId: input.projectId || null,
       forgeLiveSessionId: input.forgeLiveSessionId || null,

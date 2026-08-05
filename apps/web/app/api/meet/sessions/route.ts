@@ -48,6 +48,7 @@ export async function POST(req: Request) {
       inviteEmails?: string[];
       sendInvites?: boolean;
       locale?: string;
+      unscheduled?: boolean;
     };
 
     const companyId = body.companyId?.trim();
@@ -64,7 +65,11 @@ export async function POST(req: Request) {
       title: body.title,
       description: body.description,
       mirror: body.mirror && isMeetMirror(body.mirror) ? body.mirror : 'loose',
-      scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : new Date(),
+      scheduledAt: body.unscheduled
+        ? null
+        : body.scheduledAt
+          ? new Date(body.scheduledAt)
+          : new Date(),
       endsAt: body.endsAt ? new Date(body.endsAt) : null,
       projectId: body.projectId || null,
       forgeLiveSessionId: body.forgeLiveSessionId || null,

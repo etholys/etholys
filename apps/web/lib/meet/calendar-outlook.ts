@@ -110,6 +110,10 @@ export async function createOutlookCalendarEvent(
     start: { dateTime: event.startsAt.toISOString().replace(/\.\d{3}Z$/, ''), timeZone: 'UTC' },
     end: { dateTime: event.endsAt.toISOString().replace(/\.\d{3}Z$/, ''), timeZone: 'UTC' },
     location: event.locationUrl ? { displayName: event.locationUrl } : undefined,
+    attendees: event.attendeeEmails?.map((email) => ({
+      emailAddress: { address: email },
+      type: 'required',
+    })),
   };
 
   const res = await fetch(MS_EVENTS, {

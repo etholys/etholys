@@ -1,8 +1,9 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import {
   ArrowLeft,
   Video,
@@ -20,10 +21,20 @@ import {
   Users,
   Zap,
   X,
+  Link2,
+  CalendarRange,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
 import { MeetPostMeetingPanel } from '@/components/meet/MeetPostMeetingPanel';
+import {
+  MeetScheduleDialog,
+  type ScheduleDraft,
+} from '@/components/meet/MeetScheduleDialog';
+import {
+  MeetCalendarView,
+  type MeetCalendarScale,
+} from '@/components/meet/MeetCalendarView';
 import { meetHubJoinPath } from '@/lib/meet/types';
 
 type MeetSessionRow = {
@@ -89,25 +100,23 @@ function MeetHubContent() {
   const [joinInput, setJoinInput] = useState('');
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [inviteEmails, setInviteEmails] = useState('');
-  const [sendInvites, setSendInvites] = useState(false);
-  const [projectId, setProjectId] = useState('');
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [shareSession, setShareSession] = useState<{ id: string; meetingUrl: string } | null>(null);
   const [postSessionId, setPostSessionId] = useState<string | null>(null);
   const [calBusyId, setCalBusyId] = useState<string | null>(null);
   const [jitsiStatus, setJitsiStatus] = useState<{ baseUrl: string; isDemo: boolean } | null>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  const [connections, setConnections] = useState<{
+    google: { configured: boolean; connected: boolean; ready: boolean; needsReconnect: boolean };
+    outlook: { configured: boolean; connected: boolean; ready: boolean; needsReconnect: boolean };
+  } | null>(null);
+  const [mainView, setMainView] = useState<'agenda' | 'calendar'>('agenda');
+  const [calendarScale, setCalendarScale] = useState<MeetCalendarScale>('month');
 
   useEffect(() => {
     const post = searchParams.get('post')?.trim();
     if (post) setPostSessionId(post);
   }, [searchParams]);
-
-  useEffect(() => {
-    if (scheduleOpen) titleInputRef.current?.focus();
-  }, [scheduleOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,7 +162,6 @@ function MeetHubContent() {
   useEffect(() => {
     if (!companyId) {
       setProjects([]);
-      setProjectId('');
       return;
     }
     let cancelled = false;
@@ -171,6 +179,25 @@ function MeetHubContent() {
     };
   }, [companyId]);
 
+  const loadConnections = useCallback(async () => {
+    try {
+      const response = await fetch('/api/meet/calendar/connections');
+      const data = (await response.json()) as typeof connections & { error?: string };
+      if (response.ok && data) {
+        setConnections({
+          google: data.google,
+          outlook: data.outlook,
+        });
+      }
+    } catch {
+      /* A agenda Etholys continua funcional sem OAuth. */
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadConnections();
+  }, [loadConnections]);
+
   const week = useMemo(() => weekOf(selectedDate), [selectedDate]);
 
   const dayGroups = useMemo(() => {
@@ -185,6 +212,12 @@ function MeetHubContent() {
       return av - bv;
     });
     return {
+      unscheduled: sessions.filter(
+        (session) =>
+          !session.scheduledAt &&
+          session.status !== 'ended' &&
+          session.status !== 'cancelled',
+      ),
       live: byTime.filter((s) => s.status === 'live'),
       upcoming: byTime.filter(
         (s) =>
@@ -202,33 +235,35 @@ function MeetHubContent() {
     };
   }, [sessions, selectedDate]);
 
-  async function createSession(opts: { instant: boolean }) {
+  async function createSession(mode: 'instant' | 'later' | 'scheduled', draft?: ScheduleDraft) {
     if (!companyId) return;
-    const finalTitle = opts.instant
-      ? t('Reunião agora', 'Reunión ahora', 'Meeting now')
-      : title.trim();
-    if (!finalTitle) return;
+    const finalTitle =
+      mode === 'instant'
+        ? t('Reunião agora', 'Reunión ahora', 'Meeting now')
+        : mode === 'later'
+          ? t('Reunião para mais tarde', 'Reunión para más tarde', 'Meeting for later')
+          : draft?.title || '';
+    if (!finalTitle.trim()) return;
 
     setSaving(true);
     setError(null);
     try {
-      const emails = opts.instant
-        ? []
-        : inviteEmails
-            .split(/[,;\s]+/)
-            .map((x) => x.trim())
-            .filter(Boolean);
-      const linkedProject = opts.instant ? null : projectId || null;
+      const emails = draft?.inviteEmails ?? [];
+      const linkedProject = draft?.projectId ?? null;
       const r = await fetch('/api/meet/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId,
-          title: finalTitle,
+          title: finalTitle.trim(),
+          description: draft?.description,
           mirror: linkedProject ? 'siep' : 'loose',
           projectId: linkedProject,
           inviteEmails: emails,
-          sendInvites: !opts.instant && sendInvites && emails.length > 0,
+          sendInvites: Boolean(draft?.sendInvites && emails.length),
+          scheduledAt: draft?.startsAt,
+          endsAt: draft?.endsAt,
+          unscheduled: mode === 'later',
           locale,
         }),
       });
@@ -238,13 +273,43 @@ function MeetHubContent() {
       };
       if (!r.ok) throw new Error(d.error || 'Error');
 
-      setTitle('');
-      setInviteEmails('');
-      setProjectId('');
-      setScheduleOpen(false);
       setNewMenuOpen(false);
 
-      if (d.session?.id) {
+      if (mode === 'scheduled' && d.session?.id && draft) {
+        let calendarSyncError: string | null = null;
+        if (draft.calendarProvider !== 'none') {
+          const calendarResponse = await fetch(`/api/meet/sessions/${d.session.id}/calendar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ companyId, provider: draft.calendarProvider }),
+          });
+          const calendarData = (await calendarResponse.json()) as {
+            error?: string;
+            event?: { htmlLink?: string };
+          };
+          if (!calendarResponse.ok) {
+            calendarSyncError = t(
+              `A reunião foi criada, mas o calendário não sincronizou: ${calendarData.error || 'erro'}`,
+              `La reunión fue creada, pero el calendario no se sincronizó: ${calendarData.error || 'error'}`,
+              `The meeting was created, but calendar sync failed: ${calendarData.error || 'error'}`,
+            );
+          }
+        }
+        setScheduleOpen(false);
+        setSelectedDate(new Date(draft.startsAt));
+        setMainView('calendar');
+        await load();
+        if (calendarSyncError) setError(calendarSyncError);
+        return;
+      }
+
+      if (mode === 'later' && d.session?.id && d.session.meetingUrl) {
+        setShareSession({ id: d.session.id, meetingUrl: d.session.meetingUrl });
+        await load();
+        return;
+      }
+
+      if (mode === 'instant' && d.session?.id) {
         router.push(meetHubJoinPath(d.session.id, companyId));
         return;
       }
@@ -254,6 +319,13 @@ function MeetHubContent() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function connectCalendar(provider: 'google' | 'azure-ad') {
+    void signIn(provider, {
+      callbackUrl: '/hub/meet?calendarConnected=1',
+      redirect: true,
+    });
   }
 
   function joinByCode() {
@@ -385,14 +457,34 @@ function MeetHubContent() {
                   <div className="absolute right-0 top-full z-20 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
                     <button
                       type="button"
-                      onClick={() => void createSession({ instant: true })}
+                      onClick={() => void createSession('later')}
+                      disabled={saving}
+                      className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+                      <span>
+                        <span className="block text-sm font-medium text-slate-900">
+                          {t(
+                            'Criar uma reunião para mais tarde',
+                            'Crear una reunión para más tarde',
+                            'Create a meeting for later',
+                          )}
+                        </span>
+                        <span className="block text-xs text-slate-500">
+                          {t('Cria um link para partilhar', 'Crea un enlace para compartir', 'Creates a link to share')}
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void createSession('instant')}
                       disabled={saving}
                       className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 disabled:opacity-60"
                     >
                       <Zap className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
                       <span>
                         <span className="block text-sm font-medium text-slate-900">
-                          {t('Iniciar reunião agora', 'Iniciar reunión ahora', 'Start an instant meeting')}
+                          {t('Iniciar uma reunião instantânea', 'Iniciar una reunión instantánea', 'Start an instant meeting')}
                         </span>
                         <span className="block text-xs text-slate-500">
                           {t('Entra imediatamente na sala', 'Entra de inmediato en la sala', 'Joins the room right away')}
@@ -410,10 +502,18 @@ function MeetHubContent() {
                       <CalendarPlus className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
                       <span>
                         <span className="block text-sm font-medium text-slate-900">
-                          {t('Criar com convidados', 'Crear con invitados', 'Create with guests')}
+                          {t(
+                            'Programar no calendário',
+                            'Programar en el calendario',
+                            'Schedule in calendar',
+                          )}
                         </span>
                         <span className="block text-xs text-slate-500">
-                          {t('Título, projeto SIEP e e-mails', 'Título, proyecto SIEP y emails', 'Title, SIEP project and emails')}
+                          {t(
+                            'Data, horário, convidados e calendário',
+                            'Fecha, horario, invitados y calendario',
+                            'Date, time, guests and calendar',
+                          )}
                         </span>
                       </span>
                     </button>
@@ -455,6 +555,61 @@ function MeetHubContent() {
           </div>
         )}
 
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex rounded-xl bg-slate-100 p-1">
+            <button
+              type="button"
+              onClick={() => setMainView('agenda')}
+              className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                mainView === 'agenda' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600'
+              }`}
+            >
+              <Video className="mr-1.5 inline h-4 w-4" />
+              {t('Reuniões', 'Reuniones', 'Meetings')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMainView('calendar')}
+              className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                mainView === 'calendar' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600'
+              }`}
+            >
+              <CalendarRange className="mr-1.5 inline h-4 w-4" />
+              {t('Meu calendário', 'Mi calendario', 'My calendar')}
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            {connections?.google.ready ? (
+              <span className="rounded-full bg-emerald-50 px-3 py-1.5 font-medium text-emerald-700">
+                Google Calendar · {t('ligado', 'conectado', 'connected')}
+              </span>
+            ) : connections?.google.configured ? (
+              <button
+                type="button"
+                onClick={() => connectCalendar('google')}
+                className="rounded-full border border-slate-200 px-3 py-1.5 font-medium text-sky-700 hover:bg-sky-50"
+              >
+                {t('Ligar Google Calendar', 'Conectar Google Calendar', 'Connect Google Calendar')}
+              </button>
+            ) : null}
+            {connections?.outlook.ready ? (
+              <span className="rounded-full bg-emerald-50 px-3 py-1.5 font-medium text-emerald-700">
+                Outlook · {t('ligado', 'conectado', 'connected')}
+              </span>
+            ) : connections?.outlook.configured ? (
+              <button
+                type="button"
+                onClick={() => connectCalendar('azure-ad')}
+                className="rounded-full border border-slate-200 px-3 py-1.5 font-medium text-sky-700 hover:bg-sky-50"
+              >
+                {t('Ligar Outlook', 'Conectar Outlook', 'Connect Outlook')}
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {mainView === 'agenda' ? (
+          <>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold capitalize text-slate-900">{headerDate}</h1>
@@ -523,7 +678,7 @@ function MeetHubContent() {
             <div className="flex justify-center py-16">
               <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
             </div>
-          ) : dayGroups.live.length + dayGroups.upcoming.length + dayGroups.past.length === 0 ? (
+          ) : dayGroups.unscheduled.length + dayGroups.live.length + dayGroups.upcoming.length + dayGroups.past.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 py-16 text-center">
               <Video className="mx-auto h-9 w-9 text-slate-300" />
               <p className="mt-3 text-sm font-medium text-slate-700">
@@ -582,9 +737,35 @@ function MeetHubContent() {
                   t={t}
                 />
               )}
+              {dayGroups.unscheduled.length > 0 && (
+                <MeetingGroup
+                  label={t('Links sem data', 'Enlaces sin fecha', 'Unscheduled links')}
+                  sessions={dayGroups.unscheduled}
+                  companyId={companyId}
+                  intlLocale={intlLocale}
+                  copiedId={copiedId}
+                  calBusyId={calBusyId}
+                  onCopy={copyUrl}
+                  onCalendar={syncCalendar}
+                  onPost={setPostSessionId}
+                  t={t}
+                />
+              )}
             </div>
           )}
         </div>
+          </>
+        ) : (
+          <MeetCalendarView
+            locale={locale}
+            companyId={companyId}
+            sessions={sessions}
+            anchor={selectedDate}
+            scale={calendarScale}
+            onAnchorChange={setSelectedDate}
+            onScaleChange={setCalendarScale}
+          />
+        )}
 
         {postSessionId && companyId && (
           <div className="mt-8">
@@ -624,116 +805,71 @@ function MeetHubContent() {
       </footer>
 
       {scheduleOpen && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4">
-          <div className="w-full max-w-lg rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-6">
+        <MeetScheduleDialog
+          locale={locale}
+          projects={projects}
+          connections={connections}
+          saving={saving}
+          onClose={() => setScheduleOpen(false)}
+          onConnect={connectCalendar}
+          onSave={(draft) => createSession('scheduled', draft)}
+        />
+      )}
+
+      {shareSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">
-                  {t('Nova reunião', 'Nueva reunión', 'New meeting')}
+                  {t('A sua reunião está pronta', 'Tu reunión está lista', 'Your meeting is ready')}
                 </h2>
-                <p className="mt-0.5 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-slate-500">
                   {t(
-                    'A sala abre logo após criar.',
-                    'La sala se abre justo después de crear.',
-                    'The room opens right after you create it.',
+                    'Partilhe este link com quem vai participar.',
+                    'Comparte este enlace con quienes participarán.',
+                    'Share this link with the participants.',
                   )}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setScheduleOpen(false)}
-                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                onClick={() => setShareSession(null)}
+                className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-
-            <form
-              className="mt-5 space-y-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void createSession({ instant: false });
-              }}
-            >
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  {t('Título', 'Título', 'Title')} *
-                </label>
-                <input
-                  ref={titleInputRef}
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-                  placeholder={t(
-                    'Capacitação equipe campo',
-                    'Capacitación equipo campo',
-                    'Field team training',
-                  )}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  {t('Projeto SIEP (opcional)', 'Proyecto SIEP (opcional)', 'SIEP project (optional)')}
-                </label>
-                <select
-                  value={projectId}
-                  onChange={(e) => setProjectId(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-                >
-                  <option value="">
-                    {t('Sem vínculo', 'Sin vínculo', 'No link')}
-                  </option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  {t('Convidados (e-mails)', 'Invitados (emails)', 'Guests (emails)')}
-                </label>
-                <input
-                  value={inviteEmails}
-                  onChange={(e) => setInviteEmails(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-                  placeholder="a@org.com, b@org.com"
-                />
-              </div>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={sendInvites}
-                  onChange={(e) => setSendInvites(e.target.checked)}
-                  className="rounded border-slate-300"
-                />
-                {t(
-                  'Enviar convite por e-mail agora',
-                  'Enviar invitación por email ahora',
-                  'Send email invite now',
-                )}
-              </label>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setScheduleOpen(false)}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
-                >
-                  {t('Cancelar', 'Cancelar', 'Cancel')}
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving || !title.trim()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
-                >
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
-                  {t('Criar e entrar', 'Crear y entrar', 'Create and join')}
-                </button>
-              </div>
-            </form>
+            <div className="mt-5 flex items-center gap-2 rounded-xl bg-slate-100 p-2 pl-3">
+              <span className="min-w-0 flex-1 truncate text-sm text-slate-700">
+                {shareSession.meetingUrl}
+              </span>
+              <button
+                type="button"
+                onClick={() => void copyUrl(shareSession.meetingUrl, shareSession.id)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-sky-700 shadow-sm"
+              >
+                {copiedId === shareSession.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {copiedId === shareSession.id
+                  ? t('Copiado', 'Copiado', 'Copied')
+                  : t('Copiar', 'Copiar', 'Copy')}
+              </button>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShareSession(null)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              >
+                {t('Fechar', 'Cerrar', 'Close')}
+              </button>
+              <Link
+                href={meetHubJoinPath(shareSession.id, companyId)}
+                className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+              >
+                {t('Entrar agora', 'Entrar ahora', 'Join now')}
+              </Link>
+            </div>
           </div>
         </div>
       )}

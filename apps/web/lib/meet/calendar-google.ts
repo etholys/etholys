@@ -82,6 +82,7 @@ export type MeetCalendarEventInput = {
   locationUrl?: string;
   startsAt: Date;
   endsAt: Date;
+  attendeeEmails?: string[];
 };
 
 export async function createGoogleCalendarEvent(
@@ -101,9 +102,12 @@ export async function createGoogleCalendarEvent(
     location: event.locationUrl || undefined,
     start: { dateTime: event.startsAt.toISOString() },
     end: { dateTime: event.endsAt.toISOString() },
+    attendees: event.attendeeEmails?.map((email) => ({ email })),
   };
 
-  const res = await fetch(GOOGLE_CALENDAR_EVENTS, {
+  const url = new URL(GOOGLE_CALENDAR_EVENTS);
+  if (event.attendeeEmails?.length) url.searchParams.set('sendUpdates', 'all');
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,

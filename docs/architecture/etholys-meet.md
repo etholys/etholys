@@ -38,7 +38,7 @@ Ver [etholys-tools.md](./etholys-tools.md) para a faixa de ferramentas.
 | **F3** | Pós-reunião IA + gravação cloud | ✅ resumo/tarefas; app preparada para Jibri→R2 (infra pendente) |
 | **F4** | Tarefas pré-criadas + validação → Task SIEP | ✅ |
 | **F5** | Transcrição real + atribuição por participante | App/API estruturadas; requer Jigasi + STT no servidor |
-| **F6** | OAuth Google / Outlook Calendar | ✅ API + UI; requer `GOOGLE_CALENDAR_ENABLED=1` / Azure AD |
+| **F6** | Agenda dia/semana/mês/ano + OAuth Google / Outlook | ✅ API + UI; ligação persistente em `Account`; requer `GOOGLE_CALENDAR_ENABLED=1` / Azure AD |
 
 ### Breakouts
 
@@ -86,6 +86,7 @@ apps/web/
   app/api/meet/sessions/[id]/transcribe/
   app/api/meet/sessions/[id]/transcript/
   app/api/meet/sessions/[id]/calendar/
+  app/api/meet/calendar/connections/ # estado OAuth persistente do utilizador
   app/api/meet/webhooks/jibri/
   app/api/meet/nexus/           # espelho NEXUS
   lib/meet/                     # room, ICS, bridges, R2, STT, calendário
@@ -107,7 +108,7 @@ Não fundir os três produtos.
 ## 6. Critérios de sucesso (piloto capacitação)
 
 1. Facilitador abre sessão FORGE com breakouts estáveis (Jitsi self-hosted)
-2. Convite por e-mail + `.ics` (+ OAuth se configurado)
+2. Convite por e-mail com Google/Outlook + `.ics`; convidados do evento recebem RSVP do provedor
 3. Participantes entram pelo curso **ou** Hub Meet
 4. Encerra → gravação (Jibri/upload) → STT opcional → resumo + ações editáveis
 
