@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { resolveStudioCompanyId } from '@/lib/studio/access';
 import {
+  buildStudioShareUrl,
   createStudioShare,
   getDocumentAccess,
   getFolderAccess,
@@ -77,11 +78,18 @@ export async function GET(req: NextRequest) {
       createdAt: true,
       acceptedAt: true,
       expiresAt: true,
+      token: true,
       user: { select: { id: true, name: true } },
     },
   });
 
-  return NextResponse.json({ shares, visibility });
+  // O endpoint já é restrito ao dono, por isso pode devolver o link de cada convite.
+  const withUrls = shares.map(({ token, ...rest }) => ({
+    ...rest,
+    inviteUrl: buildStudioShareUrl(token),
+  }));
+
+  return NextResponse.json({ shares: withUrls, visibility });
 }
 
 /** POST /api/studio/shares — create share */
@@ -99,6 +107,7 @@ export async function POST(req: NextRequest) {
   const email = typeof body.email === 'string' ? body.email.trim() : '';
   const role = body.role === 'editor' ? 'editor' : 'viewer';
   const forceExternal = body.forceExternal === true;
+  const sendEmail = body.sendEmail !== false;
   const folderId = typeof body.folderId === 'string' ? body.folderId : null;
   const documentId = typeof body.documentId === 'string' ? body.documentId : null;
 
@@ -124,6 +133,7 @@ export async function POST(req: NextRequest) {
         email,
         role,
         forceExternal,
+        sendEmail,
       });
       return NextResponse.json(result, { status: 201 });
     }
@@ -145,6 +155,7 @@ export async function POST(req: NextRequest) {
       email,
       role,
       forceExternal,
+      sendEmail,
     });
     return NextResponse.json(result, { status: 201 });
   } catch (e: unknown) {
