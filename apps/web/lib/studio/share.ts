@@ -223,6 +223,8 @@ export async function createStudioShare(opts: {
   role?: StudioShareRole;
   /** Se true, força guest externo mesmo que seja membro */
   forceExternal?: boolean;
+  /** Se false, cria a partilha sem enviar email — o convite é entregue como link copiado */
+  sendEmail?: boolean;
 }): Promise<{ share: { id: string; token: string; accessMode: string }; inviteUrl: string; emailSent: boolean }> {
   const email = opts.email.trim().toLowerCase();
   if (!email.includes('@')) throw new Error('Email inválido');
@@ -304,17 +306,20 @@ export async function createStudioShare(opts: {
     select: { name: true },
   });
 
-  const mail = await sendAuthHtmlEmail({
-    to: email,
-    subject: `Etholys Studio — partilha: ${targetLabel}`,
-    html: `<p>${inviter?.name || 'Alguém'} partilhou consigo ${targetLabel} no Etholys Studio.</p>
+  const mail =
+    opts.sendEmail === false
+      ? { sent: false }
+      : await sendAuthHtmlEmail({
+          to: email,
+          subject: `Etholys Studio — partilha: ${targetLabel}`,
+          html: `<p>${inviter?.name || 'Alguém'} partilhou consigo ${targetLabel} no Etholys Studio.</p>
 <p><a href="${inviteUrl}">Abrir partilha</a></p>
 <p style="color:#64748b;font-size:12px">${
-      accessMode === 'external_guest'
-        ? 'O seu acesso é limitado apenas a este conteúdo partilhado.'
-        : 'Pode abrir este conteúdo na sua conta Etholys da empresa.'
-    }</p>`,
-  });
+            accessMode === 'external_guest'
+              ? 'O seu acesso é limitado apenas a este conteúdo partilhado.'
+              : 'Pode abrir este conteúdo na sua conta Etholys da empresa.'
+          }</p>`,
+        });
 
   return {
     share: { id: share.id, token: share.token, accessMode: share.accessMode },
