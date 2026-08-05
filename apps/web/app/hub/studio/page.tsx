@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Palette,
   Share2,
+  X,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
@@ -55,6 +56,9 @@ export default function StudioHubPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderError, setNewFolderError] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showBrand, setShowBrand] = useState(false);
   const [brandColor, setBrandColor] = useState('#ea580c');
@@ -109,24 +113,31 @@ export default function StudioHubPage() {
     return trail;
   }, [allFolders, folderId]);
 
-  async function createFolder() {
-    const name = window.prompt(
-      t('Nome da pasta', 'Nombre de la carpeta', 'Folder name'),
-      t('Nova pasta', 'Nueva carpeta', 'New folder'),
-    );
-    if (!name?.trim() || !companyId) return;
+  function openNewFolder() {
+    setNewFolderName('');
+    setNewFolderError(null);
+    setShowNewFolder(true);
+  }
+
+  async function createFolder(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = newFolderName.trim();
+    if (!name || !companyId) return;
     setBusy(true);
+    setNewFolderError(null);
     try {
       const r = await fetch('/api/studio/folders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, name: name.trim(), parentId: folderId }),
+        body: JSON.stringify({ companyId, name, parentId: folderId }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.detail || d.error);
+      setShowNewFolder(false);
+      setNewFolderName('');
       await load();
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Erro');
+      setNewFolderError(e instanceof Error ? e.message : t('Não foi possível criar a pasta.', 'No se pudo crear la carpeta.', 'Could not create the folder.'));
     } finally {
       setBusy(false);
     }
@@ -236,7 +247,7 @@ export default function StudioHubPage() {
             <button
               type="button"
               disabled={busy || !companyId}
-              onClick={() => void createFolder()}
+              onClick={openNewFolder}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               <FolderPlus className="h-4 w-4" />
@@ -330,11 +341,12 @@ export default function StudioHubPage() {
                 {(f.access === 'owner' || !f.access) && (
                   <button
                     type="button"
-                    title={t('Partilhar', 'Compartir', 'Share')}
+                    title={t('Compartilhar pasta', 'Compartir carpeta', 'Share folder')}
                     onClick={() => setShareTarget({ folderId: f.id, title: f.name })}
-                    className="rounded-lg p-2 text-slate-400 hover:bg-orange-50 hover:text-orange-700"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs font-semibold text-amber-800 hover:border-amber-300 hover:bg-amber-100"
                   >
                     <Share2 className="h-4 w-4" />
+                    {t('Compartilhar', 'Compartir', 'Share')}
                   </button>
                 )}
               </div>
@@ -359,11 +371,12 @@ export default function StudioHubPage() {
                 {(doc.access === 'owner' || !doc.access) && (
                   <button
                     type="button"
-                    title={t('Partilhar', 'Compartir', 'Share')}
+                    title={t('Compartilhar documento', 'Compartir documento', 'Share document')}
                     onClick={() => setShareTarget({ documentId: doc.id, title: doc.title })}
-                    className="rounded-lg p-2 text-slate-400 hover:bg-orange-50 hover:text-orange-700"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-2 text-xs font-semibold text-orange-800 hover:border-orange-300 hover:bg-orange-100"
                   >
                     <Share2 className="h-4 w-4" />
+                    {t('Compartilhar', 'Compartir', 'Share')}
                   </button>
                 )}
               </div>
@@ -380,6 +393,97 @@ export default function StudioHubPage() {
           </div>
         )}
       </main>
+
+      {showNewFolder && (
+        <div
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-4 backdrop-blur-[2px] sm:items-center"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !busy) setShowNewFolder(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-folder-title"
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                  <FolderPlus className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <h2 id="new-folder-title" className="font-bold text-slate-900">
+                    {t('Criar nova pasta', 'Crear nueva carpeta', 'Create new folder')}
+                  </h2>
+                  <p className="truncate text-xs text-slate-500">
+                    {folderId
+                      ? `${t('Dentro de', 'Dentro de', 'Inside')} / ${breadcrumb.map((item) => item.name).join(' / ')}`
+                      : t('Na raiz da biblioteca', 'En la raíz de la biblioteca', 'At the library root')}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                aria-label={t('Fechar', 'Cerrar', 'Close')}
+                disabled={busy}
+                onClick={() => setShowNewFolder(false)}
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={createFolder} className="p-5">
+              <label htmlFor="new-folder-name" className="text-sm font-semibold text-slate-800">
+                {t('Nome da pasta', 'Nombre de la carpeta', 'Folder name')}
+              </label>
+              <input
+                id="new-folder-name"
+                autoFocus
+                maxLength={120}
+                value={newFolderName}
+                onChange={(event) => {
+                  setNewFolderName(event.target.value);
+                  if (newFolderError) setNewFolderError(null);
+                }}
+                placeholder={t('Ex.: Relatórios 2026', 'Ej.: Informes 2026', 'E.g. Reports 2026')}
+                className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+              />
+              <div className="mt-1.5 flex min-h-5 items-start justify-between gap-3 text-xs">
+                <p className={newFolderError ? 'text-red-600' : 'text-slate-500'}>
+                  {newFolderError ||
+                    t(
+                      'A pasta será privada por padrão.',
+                      'La carpeta será privada por defecto.',
+                      'The folder will be private by default.',
+                    )}
+                </p>
+                <span className="shrink-0 text-slate-400">{newFolderName.trim().length}/120</span>
+              </div>
+
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setShowNewFolder(false)}
+                  className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+                >
+                  {t('Cancelar', 'Cancelar', 'Cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={busy || !newFolderName.trim()}
+                  className="inline-flex min-w-28 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderPlus className="h-4 w-4" />}
+                  {t('Criar pasta', 'Crear carpeta', 'Create folder')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {shareTarget && companyId && (
         <StudioShareDialog

@@ -184,7 +184,7 @@ export function StudioShareDialog({
           <div>
             <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
               <Share2 className="h-5 w-5 text-orange-600" />
-              {t('Partilhar', 'Compartir', 'Share')}
+              {t('Compartilhar e gerenciar acesso', 'Compartir y gestionar acceso', 'Share and manage access')}
             </h2>
             <p className="mt-0.5 truncate text-xs text-slate-500">{title}</p>
           </div>
