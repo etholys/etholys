@@ -22,10 +22,16 @@ CREATE TABLE IF NOT EXISTS "ProjectReportGuide" (
   CONSTRAINT "ProjectReportGuide_pkey" PRIMARY KEY ("id")
 );
 CREATE INDEX IF NOT EXISTS "ProjectReportGuide_projectId_idx" ON "ProjectReportGuide"("projectId");
-ALTER TABLE "ProjectReportGuide" ADD CONSTRAINT "ProjectReportGuide_projectId_fkey"
-  FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "ProjectReportGuide" ADD CONSTRAINT "ProjectReportGuide_uploadedById_fkey"
-  FOREIGN KEY ("uploadedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+DO $$ BEGIN
+  ALTER TABLE "ProjectReportGuide" ADD CONSTRAINT "ProjectReportGuide_projectId_fkey"
+    FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "ProjectReportGuide" ADD CONSTRAINT "ProjectReportGuide_uploadedById_fkey"
+    FOREIGN KEY ("uploadedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS "TaskActivityReport" (
   "id" TEXT NOT NULL,
@@ -80,17 +86,37 @@ CREATE TABLE IF NOT EXISTS "TaskMileageClaim" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "TaskMileageClaim_reportId_key" ON "TaskMileageClaim"("reportId");
 
-ALTER TABLE "TaskActivityReport" ADD CONSTRAINT "TaskActivityReport_projectId_fkey"
-  FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "TaskActivityReport" ADD CONSTRAINT "TaskActivityReport_taskId_fkey"
-  FOREIGN KEY ("taskId") REFERENCES "Task"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "TaskActivityReport" ADD CONSTRAINT "TaskActivityReport_authorId_fkey"
-  FOREIGN KEY ("authorId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "TaskActivityReport" ADD CONSTRAINT "TaskActivityReport_reviewedById_fkey"
-  FOREIGN KEY ("reviewedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-ALTER TABLE "TaskActivityReport" ADD CONSTRAINT "TaskActivityReport_budgetLineId_fkey"
-  FOREIGN KEY ("budgetLineId") REFERENCES "BudgetLine"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-ALTER TABLE "TaskActivityReport" ADD CONSTRAINT "TaskActivityReport_transactionId_fkey"
-  FOREIGN KEY ("transactionId") REFERENCES "Transaction"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-ALTER TABLE "TaskMileageClaim" ADD CONSTRAINT "TaskMileageClaim_reportId_fkey"
-  FOREIGN KEY ("reportId") REFERENCES "TaskActivityReport"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "TaskActivityReport" ADD CONSTRAINT "TaskActivityReport_projectId_fkey"
+    FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "TaskActivityReport" ADD CONSTRAINT "TaskActivityReport_taskId_fkey"
+    FOREIGN KEY ("taskId") REFERENCES "Task"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "TaskActivityReport" ADD CONSTRAINT "TaskActivityReport_authorId_fkey"
+    FOREIGN KEY ("authorId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "TaskActivityReport" ADD CONSTRAINT "TaskActivityReport_reviewedById_fkey"
+    FOREIGN KEY ("reviewedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "TaskActivityReport" ADD CONSTRAINT "TaskActivityReport_budgetLineId_fkey"
+    FOREIGN KEY ("budgetLineId") REFERENCES "BudgetLine"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "TaskActivityReport" ADD CONSTRAINT "TaskActivityReport_transactionId_fkey"
+    FOREIGN KEY ("transactionId") REFERENCES "Transaction"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "TaskMileageClaim" ADD CONSTRAINT "TaskMileageClaim_reportId_fkey"
+    FOREIGN KEY ("reportId") REFERENCES "TaskActivityReport"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
