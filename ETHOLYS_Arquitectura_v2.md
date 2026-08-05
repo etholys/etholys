@@ -297,10 +297,12 @@ No se vende solo; viene incluida en cada sistema. Es lo que permite la integraci
 
 Espacio exclusivo para herramientas internas de la fábrica. No visible en ningún menú público.
 
+**Decisión (ago/2026):** MUSE y ANVIL permanecen **separados** (estrategia vs ingeniería) bajo el mismo Lab, con **pipeline** MUSE → ANVIL (“Implementar” crea/enlaza proyecto). Specs: [docs/architecture/lab-muse.md](./docs/architecture/lab-muse.md), [docs/architecture/lab-anvil.md](./docs/architecture/lab-anvil.md).
+
 | Herramienta | Descripción | Estado |
 |-------------|-------------|--------|
-| MUSE | Motor Universal de Sugerencias Estratégicas — IA que analiza el ecosistema y propone innovaciones | ✅ Construido (/lab/muse) |
-| ANVIL | Agente de ingeniería interno (1 por proyecto): Etholys / externo / OSS + deploy flexible | ✅ F0–F1 (/lab/anvil) — ver docs/architecture/lab-anvil.md |
+| MUSE | Motor Universal de Sugerencias Estratégicas — qué/porqué; observatorio + bitácora | ✅ MVP (/lab/muse) — ver lab-muse.md; observatorio continuo pendiente |
+| ANVIL | Agente de ingeniería interno (1 por proyecto): cómo/entregar; Etholys / externo / OSS + deploy | ✅ F0–F1 (/lab/anvil) — ver lab-anvil.md; handoff MUSE pendiente |
 | Smart Import | Importación inteligente de documentos de donantes → proyecto pre-llenado | 🔲 Planificado (add-on pago) |
 | Sistema de Invitaciones Lab | Acceso por ADMIN + código de invitación | ✅ Construido |
 
@@ -335,8 +337,10 @@ Espacio exclusivo para herramientas internas de la fábrica. No visible en ning�
 - Onboarding
 
 **Lab**:
-- MUSE (chat IA + sugerencias estratégicas)
+- MUSE (chat IA + sugerencias; pipeline → ANVIL documentado)
+- ANVIL (F0–F1: proyectos, políticas, chat)
 - Sistema de invitaciones
+- Decisión: MUSE y ANVIL separados + pipeline (ago/2026)
 
 **Módulos construidos que deben migrar de ATLAS a SIEP**:
 - Gestión de proyectos y portafolio

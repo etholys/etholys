@@ -38,7 +38,7 @@ export type LabAnvilProjectContext = {
 
 export type LabAnvilAgentMeta = {
   plan?: string[];
-  artifacts?: Array<{ path: string; summary: string; language?: string }>;
+  artifacts?: Array<{ path: string; summary: string; language?: string; content?: string }>;
   policyWarnings?: string[];
   suggestedDeployKind?: LabAnvilDeployKind;
   reuseDecision?: 'api' | 'oss_package' | 'reimplement' | 'etholys_internal' | 'none';

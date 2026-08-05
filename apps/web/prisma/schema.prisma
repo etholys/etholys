@@ -1517,22 +1517,25 @@ model NexusNetworkMember {
 }
 
 model MuseSuggestion {
-  id          String   @id @default(cuid())
-  title       String
-  category    String
-  description String
-  rationale   String?
-  priority    String   @default("MEDIUM")
-  status      String   @default("NEW")
-  source      String?
-  createdById String?
-  companyId   String?
-  projectId   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  company     Company? @relation(fields: [companyId], references: [id])
-  createdBy   User?    @relation(fields: [createdById], references: [id])
-  project     Project? @relation(fields: [projectId], references: [id])
+  id             String           @id @default(cuid())
+  title          String
+  category       String
+  description    String
+  rationale      String?
+  priority       String           @default("MEDIUM")
+  status         String           @default("NEW")
+  source         String?
+  createdById    String?
+  companyId      String?
+  projectId      String?
+  /// Projeto ANVIL criado pelo handoff "Implementar" (pipeline MUSE → ANVIL)
+  anvilProjectId String?          @unique
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  company        Company?         @relation(fields: [companyId], references: [id])
+  createdBy      User?            @relation(fields: [createdById], references: [id])
+  project        Project?         @relation(fields: [projectId], references: [id])
+  anvilProject   LabAnvilProject? @relation("MuseAnvilHandoff", fields: [anvilProjectId], references: [id], onDelete: SetNull)
 }
 
 model LabInvite {
@@ -2513,11 +2516,34 @@ model LabAnvilProject {
   deployTargets   LabAnvilDeployTarget[]
   members         LabAnvilProjectMember[]
   sessions        LabAnvilSession[]
+  files           LabAnvilFile[]
+  /// Sugestão MUSE que originou este projeto (handoff)
+  museHandoff     MuseSuggestion? @relation("MuseAnvilHandoff")
 
   @@index([status])
   @@index([visibility])
   @@index([relation])
   @@index([parentProjectId])
+}
+
+/// Ficheiro no sandbox do projeto (F2). Conteúdo texto em DB; blobs grandes via storageKey (R2).
+model LabAnvilFile {
+  id          String   @id @default(cuid())
+  projectId   String
+  /// Path relativo normalizado (ex: index.html, src/app.ts)
+  path        String
+  contentText String?  @db.Text
+  storageKey  String?
+  size        Int      @default(0)
+  sha256      String?
+  mimeType    String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     LabAnvilProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path])
+  @@index([projectId])
 }
 
 model LabAnvilAgent {

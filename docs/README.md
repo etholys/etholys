@@ -9,7 +9,8 @@
 | [../ETHOLYS_Arquitectura_v2.md](../ETHOLYS_Arquitectura_v2.md) | Visão do ecossistema (6 sistemas + Core) |
 | [../ETHOLYS_Arquitectura_Productos.md](../ETHOLYS_Arquitectura_Productos.md) | Versão anterior / complementar |
 | [architecture/README.md](./architecture/README.md) | Índice de arquitetura por sistema |
-| **[architecture/etholys-tools.md](./architecture/etholys-tools.md)** | **Etholys Tools — faixa de ferramentas (Advisor, Studio, Meet, CARTA)** |
+| **[architecture/etholys-tools.md](./architecture/etholys-tools.md)** | **Etholys Tools — faixa de ferramentas (Advisor, Studio, Meet, CARTA, Work)** |
+| **[architecture/etholys-work.md](./architecture/etholys-work.md)** | **Etholys Work — motor de tarefas (um Task, vários espelhos)** |
 | **[architecture/forge-ead.md](./architecture/forge-ead.md)** | **FORGE — EAD unificado, jogos com IA, gamificação (fonte de verdade)** |
 | **[architecture/etholys-meet.md](./architecture/etholys-meet.md)** | **Meet — reuniões transversais (motor + espelhos FORGE/SIEP/NEXUS)** |
 | **[architecture/lab-muse.md](./architecture/lab-muse.md)** | **Lab MUSE — inteligência de inovação interna (pipeline → ANVIL)** |

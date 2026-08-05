@@ -5,10 +5,12 @@ Documentação detalhada para implementação. O mapa geral do ecossistema está
 | Sistema | Documento | Estado da spec |
 |---------|-----------|----------------|
 | **Etholys Tools** (faixa de ferramentas Hub) | [etholys-tools.md](./etholys-tools.md) | ✅ Nome + membros (ago/2026) |
+| **Etholys Work** (tarefas / inbox) | [etholys-work.md](./etholys-work.md) | 🔧 F0 consolidação (ago/2026) |
 | **FORGE** (EAD, jogos, gamificação) | [forge-ead.md](./forge-ead.md) | ✅ Definida (mai/2026) — pronta para implementação |
 | **Meet** (reuniões, Jitsi, IA pós-call) | [etholys-meet.md](./etholys-meet.md) | ✅ Fundação v0.1 (jul/2026) — motor + espelhos |
 | **Studio** (documentos IA, ferramenta Hub) | [etholys-studio.md](./etholys-studio.md) | ✅ F0–F1 (jul/2026) — biblioteca, marca, export |
-| **Lab ANVIL** (agente engenharia interno) | [lab-anvil.md](./lab-anvil.md) | ✅ F0–F1 (jul/2026) — projetos, políticas, chat |
+| **Lab MUSE** (inovação / I+D+i interno) | [lab-muse.md](./lab-muse.md) | ✅ F0–F1 (ago/2026) — chat, board, handoff → ANVIL |
+| **Lab ANVIL** (agente engenharia interno) | [lab-anvil.md](./lab-anvil.md) | ✅ F0–F1 (jul/2026) — projetos, políticas, chat; handoff MUSE pendente |
 | ATLAS | — | Ver `ETHOLYS_Arquitectura_v2.md` |
 | SIEP | — | Ver `ETHOLYS_Arquitectura_v2.md` + `etholys-web/.project_instructions.md` |
 | FUNDHUB | — | Ver `ETHOLYS_Arquitectura_v2.md` |

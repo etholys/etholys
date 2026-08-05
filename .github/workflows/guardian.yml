@@ -1,0 +1,39 @@
+name: Guardião (segurança)
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Histórico completo: o Guardião também olha para o que está commitado.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Falha apenas com achados NOVOS (fora da baseline) de gravidade alta ou crítica,
+      # para que o trabalho em curso não fique bloqueado pela dívida já conhecida.
+      - name: Varredura de segurança
+        working-directory: apps/web
+        run: node scripts/guardian/index.mjs --new --fail-on high
+
+      - name: Relatório completo (todos os achados)
+        if: always()
+        working-directory: apps/web
+        run: node scripts/guardian/index.mjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: guardian-report
+          path: .guardian/
+          retention-days: 30

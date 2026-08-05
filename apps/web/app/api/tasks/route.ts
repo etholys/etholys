@@ -58,7 +58,32 @@ export async function POST(req: Request) {
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     const body = await req.json();
-    const { recurrenceCount, ...taskData } = body;
+    const { recurrenceCount, ...rawTaskData } = body;
+
+    const normalizeTags = (tags: unknown): string | null => {
+      if (tags == null || tags === '') return null;
+      const raw = Array.isArray(tags)
+        ? tags.map((t) => String(t).trim()).filter(Boolean)
+        : String(tags)
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean);
+      return raw.length ? raw.join(',') : null;
+    };
+
+    const taskData: Record<string, unknown> = { ...rawTaskData };
+    if ('tags' in taskData) taskData.tags = normalizeTags(taskData.tags);
+    if (!taskData.assigneeId) delete taskData.assigneeId;
+    if (!taskData.departmentId) delete taskData.departmentId;
+    if (!taskData.projectId) delete taskData.projectId;
+    if (!taskData.parentId) delete taskData.parentId;
+    if (taskData.dueDate) taskData.dueDate = new Date(String(taskData.dueDate));
+    if (taskData.startDate) taskData.startDate = new Date(String(taskData.startDate));
+    if (taskData.estimatedHours !== undefined && taskData.estimatedHours !== '') {
+      taskData.estimatedHours = parseFloat(String(taskData.estimatedHours));
+    } else {
+      delete taskData.estimatedHours;
+    }
 
     // If recurring with count > 1, create multiple tasks with incremented due dates
     const count = body.isRecurring && recurrenceCount ? Math.min(parseInt(recurrenceCount) || 1, 60) : 1;
@@ -87,7 +112,7 @@ export async function POST(req: Request) {
             recurrenceMonths: recMonths,
             recurrenceGroup: groupId,
             title: `${taskData.title} (${i + 1}/${count})`,
-          },
+          } as any,
           include: { assignee: true, project: true },
         });
         created.push(tx);
@@ -105,7 +130,7 @@ export async function POST(req: Request) {
     }
 
     const task = await prisma.task.create({
-      data: { ...taskData, creatorId: tenant.userId },
+      data: { ...taskData, creatorId: tenant.userId } as any,
       include: { assignee: true, project: true },
     });
     // Notify assignee

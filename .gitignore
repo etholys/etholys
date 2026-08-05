@@ -25,6 +25,9 @@ test_write.txt
 # VS Code/Cursor local
 .vscode/
 
+# Relatórios do Guardião (gerados; podem conter caminhos e excertos sensíveis)
+.guardian/
+
 .env
 .env
 infra/.env
