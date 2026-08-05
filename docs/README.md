@@ -12,9 +12,16 @@
 | **[architecture/etholys-tools.md](./architecture/etholys-tools.md)** | **Etholys Tools — faixa de ferramentas (Advisor, Studio, Meet, CARTA)** |
 | **[architecture/forge-ead.md](./architecture/forge-ead.md)** | **FORGE — EAD unificado, jogos com IA, gamificação (fonte de verdade)** |
 | **[architecture/etholys-meet.md](./architecture/etholys-meet.md)** | **Meet — reuniões transversais (motor + espelhos FORGE/SIEP/NEXUS)** |
+| **[architecture/lab-muse.md](./architecture/lab-muse.md)** | **Lab MUSE — inteligência de inovação interna (pipeline → ANVIL)** |
 | **[architecture/lab-anvil.md](./architecture/lab-anvil.md)** | **Lab ANVIL — agente de engenharia interno (Cursor/Abacus Lab)** |
 | **[MEET-JITSI-CONTABO.md](./MEET-JITSI-CONTABO.md)** | **Subir Jitsi no Contabo (`meet.etholys.com`)** |
 | **[MEET-VPS-JIBRI.md](./MEET-VPS-JIBRI.md)** | **VPS dedicado + Jibri → R2 / webhook** |
+
+## Design
+
+| Documento | Descrição |
+|-----------|-----------|
+| [design/ux-audit.md](./design/ux-audit.md) | Auditoria de UX/UI do ecossistema (análise por blocos) |
 
 ## Operações
 
