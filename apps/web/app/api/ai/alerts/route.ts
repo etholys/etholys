@@ -138,13 +138,22 @@ async function generateAlerts(companyId: string): Promise<AlertInput[]> {
   const in30d = new Date(now.getTime() + 30 * 86400000);
   const alerts: AlertInput[] = [];
 
-  const [invoices, tasks, products, contracts, proposals, funds] = await Promise.all([
+  const [invoices, tasks, products, contracts, proposals, funds, meetDraftActions] = await Promise.all([
     prisma.invoice.findMany({ where: { companyId, isActive: true, status: { notIn: ['PAID', 'CANCELLED'] } }, select: { id: true, number: true, type: true, total: true, currency: true, dueDate: true, contactName: true } }),
     prisma.task.findMany({ where: { companyId, isActive: true, status: { notIn: ['DONE', 'CANCELLED'] }, dueDate: { lt: now } }, select: { id: true, title: true, priority: true, dueDate: true } }),
     prisma.product.findMany({ where: { companyId, isActive: true, minStock: { not: null } }, select: { id: true, name: true, stockQty: true, minStock: true } }),
     prisma.employeeContract.findMany({ where: { companyId, isActive: true, endDate: { not: null, lte: in30d } }, select: { id: true, position: true, endDate: true, userId: true } }),
     prisma.proposal.findMany({ where: { companyId, deletedAt: null, status: 'draft' }, select: { id: true, title: true, createdAt: true } }),
     prisma.fund.findMany({ where: { companyId, isActive: true, deadline: { not: null, lte: in30d } }, select: { id: true, name: true, deadline: true, amount: true, currency: true } }),
+    // Meet: rascunhos / aceites ainda por converter em Task SIEP
+    typeof (prisma as { meetActionItem?: { count?: unknown } }).meetActionItem?.count === 'function'
+      ? prisma.meetActionItem.count({
+          where: {
+            status: { in: ['draft', 'accepted'] },
+            session: { companyId },
+          },
+        })
+      : Promise.resolve(0),
   ]);
 
   // Overdue invoices
@@ -259,6 +268,23 @@ async function generateAlerts(companyId: string): Promise<AlertInput[]> {
       expiresAt: new Date(f.deadline!),
     });
   });
+
+  // Etholys Meet — tarefas de reunião por validar (Advisor)
+  if (meetDraftActions > 0) {
+    alerts.push({
+      companyId,
+      type: 'meet_actions_pending',
+      severity: meetDraftActions >= 5 ? 'warning' : 'info',
+      title:
+        meetDraftActions === 1
+          ? '1 tarefa de reunião por validar'
+          : `${meetDraftActions} tarefas de reunião por validar`,
+      message:
+        'Há próximos passos gerados pelo Meet (IA) em rascunho ou aceites. Abra Meet → Pós-reunião para validar ou converter no SIEP.',
+      link: '/hub/meet',
+      expiresAt: in7d,
+    });
+  }
 
   return alerts;
 }

@@ -36,9 +36,9 @@ export default function PrismSettingsPage() {
           </h1>
           <p className="mt-1 text-sm text-gray-600">
             {t(
-              'Preferências ESG, referenciais e relatórios para financiadores. Organização e licenças ficam na administração Etholys.',
-              'Preferencias ESG, marcos de referencia e informes a financiadores. Organización y licencias están en administración Etholys.',
-              'ESG preferences, frameworks, and funder reports. Organization and licenses live in Etholys administration.',
+              'Preferências de painel executivo, fontes de dados e indicadores. Organização e licenças ficam na administração Etholys.',
+              'Preferencias de panel ejecutivo, fuentes de datos e indicadores. Organización y licencias están en administración Etholys.',
+              'Executive panel preferences, data sources, and indicators. Organization and licenses live in Etholys administration.',
             )}
           </p>
         </header>
@@ -47,9 +47,9 @@ export default function PrismSettingsPage() {
           <h2 className="text-sm font-semibold text-gray-900">{t('Módulo PRISM', 'Módulo PRISM', 'PRISM module')}</h2>
           <p className="mt-2 text-sm text-gray-600">
             {t(
-              'Em breve: idioma de relatórios ESG, templates para financiadores e ligação ao ledger de evidências.',
-              'Próximamente: idioma de informes ESG, plantillas para financiadores y vínculo al ledger de evidencias.',
-              'Coming soon: ESG report language, funder templates, and evidence ledger defaults.',
+              'Preferências avançadas deste módulo ainda não estão disponíveis. Use os atalhos abaixo para organização e acessos.',
+              'Las preferencias avanzadas de este módulo aún no están disponibles. Use los atajos de abajo para organización y accesos.',
+              'Advanced preferences for this module are not available yet. Use the shortcuts below for organization and access.',
             )}
           </p>
         </section>

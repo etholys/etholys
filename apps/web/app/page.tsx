@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 /**
- * Landing pré-comercial: sem botão Ingresar / login público.
+ * Landing pré-comercial: sem login público.
  * Admins e allowlist vão ao Hub; convidados por função usam o link do e-mail.
  */
 export default function HomePage() {
@@ -50,7 +50,7 @@ export default function HomePage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-6 text-center">
       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-teal-400/90">Etholys</p>
       <h1 className="mt-4 max-w-lg text-3xl font-bold tracking-tight text-white sm:text-4xl">
-        Solutions Factory
+        Fábrica de Soluciones
       </h1>
       <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-400">
         Plataforma en fase privada. El acceso al Hub y a los sistemas es solo por invitación a

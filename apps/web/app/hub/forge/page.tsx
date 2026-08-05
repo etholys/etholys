@@ -119,18 +119,18 @@ export default function ForgeDashboard() {
         >
           <GraduationCap className="h-6 w-6 text-violet-600" />
           <h3 className="mt-2 font-bold">{ft('forge.nav.courses')}</h3>
-          <p className="text-xs text-slate-500">Aulas, quizzes e jogos como atividades</p>
+          <p className="text-xs text-slate-500">{ft('forge.editor.contentHint')}</p>
           <ArrowRight className="mt-2 h-4 w-4 text-violet-500 opacity-0 group-hover:opacity-100" />
         </Link>
         <Link href="/hub/forge/trilhas" className="group rounded-xl border bg-white p-4 shadow-sm hover:shadow-md">
           <Route className="h-6 w-6 text-indigo-600" />
           <h3 className="mt-2 font-bold">{ft('forge.nav.trails')}</h3>
-          <p className="text-xs text-slate-500">Programas com vários cursos</p>
+          <p className="text-xs text-slate-500">{ft('forge.facilitator.trailsDesc')}</p>
         </Link>
         <Link href="/hub/forge/gamificacao" className="group rounded-xl border bg-white p-4 shadow-sm hover:shadow-md">
           <Trophy className="h-6 w-6 text-amber-600" />
           <h3 className="mt-2 font-bold">{ft('forge.nav.gamification')}</h3>
-          <p className="text-xs text-slate-500">XP, ranking, certificados</p>
+          <p className="text-xs text-slate-500">{ft('forge.gamification.subtitle')}</p>
         </Link>
       </div>
 

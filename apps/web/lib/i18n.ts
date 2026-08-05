@@ -4,7 +4,7 @@ const translations: Record<Locale, Record<string, string>> = {
   en: {
     // General
     'app.name': 'ATLAS ERP',
-    'app.tagline': 'Integrated Project & Task Management',
+    'app.tagline': 'ERP 360° — Institutional & Business Management',
     'general.save': 'Save',
     'general.cancel': 'Cancel',
     'general.delete': 'Delete',
@@ -161,7 +161,7 @@ const translations: Record<Locale, Record<string, string>> = {
   es: {
     // General
     'app.name': 'ATLAS ERP',
-    'app.tagline': 'Gestión Integral de Proyectos y Tareas',
+    'app.tagline': 'ERP 360° — Gestión institucional y empresarial',
     'general.save': 'Guardar',
     'general.cancel': 'Cancelar',
     'general.delete': 'Eliminar',
@@ -286,7 +286,7 @@ const translations: Record<Locale, Record<string, string>> = {
   pt: {
     // General
     'app.name': 'ATLAS ERP',
-    'app.tagline': 'Gestão Integral de Projetos e Tarefas',
+    'app.tagline': 'ERP 360° — Gestão institucional e empresarial',
     'general.save': 'Salvar',
     'general.cancel': 'Cancelar',
     'general.delete': 'Excluir',

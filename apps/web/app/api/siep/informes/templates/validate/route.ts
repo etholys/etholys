@@ -4,7 +4,7 @@ export const maxDuration = 120;
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { geminiGenerateContent } from '@/lib/gemini-client';
+import { llmGenerateContent } from '@/lib/llm-client';
 import {
   applyCopilotCanvasUpdate,
 } from '@/lib/siep/report-canvas-merge';
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       ? `HISTÓRICO:\n${historyText}\n\nNOVA MENSAGEM:\n${message}`
       : message;
 
-    const result = await geminiGenerateContent({
+    const result = await llmGenerateContent({
       systemInstruction: systemPrompt,
       userText,
       maxOutputTokens: 8192,

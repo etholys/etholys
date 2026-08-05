@@ -12,7 +12,8 @@
 
 ## 1. Princípio
 
-> **Ferramenta avulsa, atalho em todo o lado.** Não é SIEP, ATLAS nem Core básico.
+> **Ferramenta avulsa, atalho em todo o lado.** Não é SIEP, ATLAS nem Core básico.  
+> Pertence à faixa **[Etholys Tools](./etholys-tools.md)** (Studio ≠ guarda-chuva das outras ferramentas).
 
 | Camada | Papel |
 |--------|--------|
@@ -20,7 +21,7 @@
 | **Studio** (`/hub/studio`) | Addon/ferramenta: pastas, templates, canvas + chat IA |
 | **Sistemas** | Continuam fluxos específicos (informe SIEP, proposta FUNDHUB); Studio é o motor geral |
 
-- Cartão no Hub na faixa de **ferramentas** (junto a Meet / CARTA / Advisor)  
+- Cartão no Hub na secção **Etholys Tools** (junto a Meet / CARTA / Advisor)  
 - **Botão hot** flutuante em ecrãs autenticados → atalho para `/hub/studio`  
 - Licença: isento como Meet/CARTA no MVP (produto addon; gate comercial depois)
 

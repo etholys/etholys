@@ -106,13 +106,13 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
 
   const [expandedIndicator, setExpandedIndicator] = useState<string | null>(null);
 
-  /* Full row editing state (P1) */
+  /* Full row editing state */
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [rowForm, setRowForm] = useState<any>({});
   const [rowSaving, setRowSaving] = useState(false);
   const [pendingParentChange, setPendingParentChange] = useState<{ objectiveId: string; newParentId: string } | null>(null);
 
-  /* Cascading dropdown state for measurement creation (P2) */
+  /* Cascading dropdown state for measurement creation */
   const [cascadeOE, setCascadeOE] = useState('');
   const [cascadeOC, setCascadeOC] = useState('');
   const [cascadeOP, setCascadeOP] = useState('');
@@ -198,7 +198,6 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
     if (missingMetricsCount > 0) runMetadataRepair(false);
   }, [project?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- uma vez por projeto
 
-  /* ---- Cascading dropdown filtered lists (P2) ---- */
   const cascadeFiltered = useMemo(() => {
     const oeList = byType.objective || [];
     const ocList = (byType.outcome || []).filter((o: any) => !cascadeOE || o.ancestors?.objective?.id === cascadeOE);
@@ -236,7 +235,6 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
 
   useEffect(() => { fetchMeasurements(); }, [fetchMeasurements]);
 
-  /* ---- Row editing helpers (P1) ---- */
   const startRowEdit = (obj: any) => {
     const metrics = resolveIndicatorMetrics(obj);
     setEditingRow(obj.id);
@@ -294,7 +292,6 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
     } catch (e) { console.error(e); }
   };
 
-  /* ---- Measurement CRUD ---- */
   const closeMeasForm = () => {
     setShowMeasForm(false);
     setMeasContextObj(null);
@@ -358,7 +355,6 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
     fetchMeasurements();
   };
 
-  /* ---- Stats ---- */
   const indicatorStats = useMemo(() => {
     const total = indicatorObjs.length;
     const withMeasurements = new Set(measurements.map(m => m.objectiveId)).size;
@@ -594,7 +590,7 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
                                 );
                               })}
 
-                              {/* Indicator name — editable (P1) */}
+                              {/* Indicator name — editable */}
                               <td className="py-2.5 px-3">
                                 {isEditingThis ? (
                                   <input
@@ -608,7 +604,7 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
                                 )}
                               </td>
 
-                              {/* Unit — editable (P1) */}
+                              {/* Unit — editable */}
                               <td className="py-2.5 px-2">
                                 {isEditingThis ? (
                                   <input value={rowForm.unitOfMeasure} onChange={e => setRowForm({ ...rowForm, unitOfMeasure: e.target.value })} className="w-20 px-1.5 py-0.5 text-xs rounded border border-amber-300 focus:ring-1 focus:ring-amber-500 outline-none" />
@@ -617,7 +613,7 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
                                 )}
                               </td>
 
-                              {/* Baseline — editable (P1) */}
+                              {/* Baseline — editable */}
                               <td className="py-2.5 px-2 text-right">
                                 {isEditingThis ? (
                                   <input value={rowForm.baseline} onChange={e => setRowForm({ ...rowForm, baseline: e.target.value })} className="w-16 px-1.5 py-0.5 text-xs rounded border border-amber-300 text-right focus:ring-1 focus:ring-amber-500 outline-none" />
@@ -626,7 +622,7 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
                                 )}
                               </td>
 
-                              {/* Target — editable (P1) */}
+                              {/* Target — editable */}
                               <td className="py-2.5 px-2 text-right">
                                 {isEditingThis ? (
                                   <input value={rowForm.target} onChange={e => setRowForm({ ...rowForm, target: e.target.value })} className="w-16 px-1.5 py-0.5 text-xs rounded border border-amber-300 text-right focus:ring-1 focus:ring-amber-500 outline-none" />
@@ -635,7 +631,7 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
                                 )}
                               </td>
 
-                              {/* Actual — editable (P1) */}
+                              {/* Actual — editable */}
                               <td className="py-2.5 px-2 text-right">
                                 {isEditingThis ? (
                                   <input
@@ -670,7 +666,7 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
                                 </button>
                               </td>
 
-                              {/* Actions (P1) */}
+                              {/* Actions */}
                               <td className="py-2.5 px-1">
                                 {isEditingThis ? (
                                   <div className="flex items-center gap-0.5">
@@ -734,7 +730,7 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
         </div>
       </div>
 
-      {/* Measurement Form Modal (P2 — cascading dropdowns) */}
+      {/* Measurement Form Modal */}
       {showMeasForm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>

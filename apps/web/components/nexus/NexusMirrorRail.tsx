@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, ChevronRight, Loader2, Video } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { getNexusHybridCopy } from '@/lib/nexus-hybrid';
 import { stageLabel, type VentureStageId } from '@/lib/nexus-venture';
@@ -9,7 +10,8 @@ import { NEXUS_RUNWAY_CHAPTERS, isChapterComplete } from '@/lib/nexus-runway';
 import { useNexusRunway } from '@/components/nexus/NexusRunwayContext';
 import type { NexusAdvisorMirrorState } from '@/lib/nexus-advisor-mirror';
 import type { NexusQuickStep } from '@/lib/nexus-guides';
-import { cn } from '@/lib/utils';
+import { cn, isLikelyDbId } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 function pickLoc(loc: string) {
   if (loc === 'en') return 'en';
@@ -37,10 +39,44 @@ export function NexusMirrorRail({
   loc,
   advisorMirror,
 }: Props) {
-  const { locale } = useApp();
+  const { locale, activeCompanyId } = useApp();
+  const router = useRouter();
   const t = getNexusHybridCopy(locale);
   const L = pickLoc(loc);
   const { continueHref, percent, done, total, touch, metrics, loading: runwayLoading } = useNexusRunway();
+  const [meetBusy, setMeetBusy] = useState(false);
+  const [meetErr, setMeetErr] = useState<string | null>(null);
+  const companyId = activeCompanyId && isLikelyDbId(activeCompanyId) ? activeCompanyId : '';
+
+  const meetLabel =
+    L === 'es'
+      ? { title: 'Abrir Meet (NEXUS)', hint: 'Reunión AT / red con el motor Etholys Meet', err: 'No se pudo abrir Meet' }
+      : L === 'en'
+        ? { title: 'Open Meet (NEXUS)', hint: 'AT / network call via Etholys Meet', err: 'Could not open Meet' }
+        : { title: 'Abrir Meet (NEXUS)', hint: 'Reunião AT / rede via Etholys Meet', err: 'Não foi possível abrir o Meet' };
+
+  async function openNexusMeet() {
+    if (!companyId) {
+      setMeetErr(meetLabel.err);
+      return;
+    }
+    setMeetBusy(true);
+    setMeetErr(null);
+    try {
+      const r = await fetch('/api/meet/nexus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId }),
+      });
+      const d = (await r.json()) as { error?: string; joinPath?: string };
+      if (!r.ok) throw new Error(d.error || meetLabel.err);
+      if (d.joinPath) router.push(d.joinPath);
+    } catch (e) {
+      setMeetErr(e instanceof Error ? e.message : meetLabel.err);
+    } finally {
+      setMeetBusy(false);
+    }
+  }
 
   const labels =
     L === 'es'
@@ -112,6 +148,24 @@ export function NexusMirrorRail({
           </div>
         </div>
       </header>
+
+      <section className="rounded-2xl border border-sky-200/90 bg-sky-50/50 p-4">
+        <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-sky-800">
+          <Video className="h-3.5 w-3.5" />
+          Meet
+        </p>
+        <p className="mt-1 text-xs text-slate-600">{meetLabel.hint}</p>
+        <button
+          type="button"
+          disabled={meetBusy || !companyId}
+          onClick={() => void openNexusMeet()}
+          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-800 disabled:opacity-50"
+        >
+          {meetBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+          {meetLabel.title}
+        </button>
+        {meetErr && <p className="mt-2 text-[11px] text-red-700">{meetErr}</p>}
+      </section>
 
       {focusStep && focusTx && (
         <section className="rounded-2xl border border-violet-200/90 bg-white p-4 shadow-sm">

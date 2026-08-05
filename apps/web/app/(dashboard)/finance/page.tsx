@@ -260,7 +260,6 @@ export default function FinancePage() {
     return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0])).slice(-12);
   }, [filtered]);
 
-  /* ---- form helpers ---- */
   const openNew = () => {
     setEditingId(null);
     editOpenedForecastOnly.current = null;
@@ -466,7 +465,6 @@ export default function FinancePage() {
     fetchData();
   };
 
-  /* ---- batch operations ---- */
   const toggleSelect = (id: string) => {
     setSelected(prev => {
       const next = new Set(prev);

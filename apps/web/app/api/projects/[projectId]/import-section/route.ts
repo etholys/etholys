@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { geminiGenerateContent } from '@/lib/gemini-client';
+import { llmGenerateContent } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
 import { buildImportSectionContent } from '@/lib/siep/import-file-parts';
 import { applyImportSectionToProject } from '@/lib/siep/apply-import-section';
@@ -52,7 +52,7 @@ export async function POST(req: Request, { params }: { params: { projectId: stri
     const { userParts, fileNames } = await buildImportSectionContent(files);
     const systemPrompt = buildSectionPrompt(section, contextRaw || undefined);
 
-    const { text } = await geminiGenerateContent({
+    const { text } = await llmGenerateContent({
       systemInstruction: systemPrompt,
       userParts,
       temperature: 0.05,

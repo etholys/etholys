@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { geminiGenerateContent } from '@/lib/gemini-client';
+import { llmGenerateContent } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
 import { buildImportSectionContent } from '@/lib/siep/import-file-parts';
 import {
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
 
     let rawContent: string;
     try {
-      const { text } = await geminiGenerateContent({
+      const { text } = await llmGenerateContent({
         systemInstruction: systemPrompt,
         userParts,
         temperature: 0.05,

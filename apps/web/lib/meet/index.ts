@@ -28,5 +28,14 @@ export {
   ensureMeetForForgeLiveSession,
   forgeMeetJoinUrl,
 } from '@/lib/meet/forge-bridge';
+export { createMeetForNexus } from '@/lib/meet/nexus-bridge';
 export { generateMeetPostMeetingAi } from '@/lib/meet/post-meeting-ai';
 export { generateMeetLiveBriefing } from '@/lib/meet/live-briefing';
+export {
+  isMeetRecordingStorageReady,
+  presignMeetRecordingUpload,
+  putMeetRecordingBuffer,
+  resolveMeetRecordingUrl,
+} from '@/lib/meet/recording-storage';
+export { isMeetTranscribeConfigured, transcribeMeetRecording } from '@/lib/meet/transcribe';
+export { notifyMeetActionsPending } from '@/lib/meet/notify-pending-actions';

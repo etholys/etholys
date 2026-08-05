@@ -33,7 +33,7 @@ const systems: Array<{
   bgHover: string;
   href: string;
   active: boolean;
-  /** Cartão de produto reforçado (Advisor) ou ferramenta avulsa (Studio) */
+  /** Cartão Advisor (transversal) ou ferramenta na faixa Etholys Tools */
   productTier?: 'advisor' | 'tool' | 'default';
 }> = [
   {
@@ -197,6 +197,7 @@ const systems: Array<{
     bgHover: 'hover:border-slate-500 hover:shadow-slate-100/80',
     href: '/hub/carta',
     active: true,
+    productTier: 'tool',
   },
   {
     id: 'meet',
@@ -217,8 +218,15 @@ const systems: Array<{
     bgHover: 'hover:border-sky-400 hover:shadow-sky-100',
     href: '/hub/meet',
     active: true,
+    productTier: 'tool',
   },
 ];
+
+const TOOLS_IDS = new Set(['advisor', 'studio', 'meet', 'carta']);
+
+function isEtholysTool(sys: (typeof systems)[number]): boolean {
+  return TOOLS_IDS.has(sys.id) || sys.productTier === 'advisor' || sys.productTier === 'tool';
+}
 
 function pickLocalized<T extends Record<Locale, string>>(row: T, locale: Locale): string {
   return row[locale] ?? row.es;
@@ -314,11 +322,127 @@ export default function HubPage() {
   const firstName = session?.user?.name?.split(' ')?.[0] || '';
   const hintSet = new Set(moduleHints);
   const visibleSystems = systems.filter((sys) => {
-    if (sys.id === 'advisor' || sys.id === 'studio' || sys.id === 'meet' || sys.id === 'carta') return true;
+    if (isEtholysTool(sys)) return true;
     if (!hasMeaningfulSetup || moduleHints.length === 0) return true;
     const code = sys.id.toUpperCase() as ModuleHintCode;
     return hintSet.has(code);
   });
+  const toolCards = visibleSystems.filter(isEtholysTool);
+  const systemCards = visibleSystems.filter((sys) => !isEtholysTool(sys));
+
+  const renderHubCard = (sys: (typeof systems)[number]) => {
+    const Icon = sys.icon;
+    const isAdvisor = sys.productTier === 'advisor';
+    const isTool = sys.productTier === 'tool';
+    const cardAccess = resolveHubCardAccess(sys.id, sys.active, licensedSystems);
+    if (cardAccess === 'locked') {
+      return (
+        <div
+          key={sys.id}
+          className={`relative rounded-2xl border-2 border-dashed ${sys.borderColor} bg-white/80 p-6 opacity-75`}
+        >
+          <div className="mb-4 flex items-start justify-between">
+            <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${sys.color} opacity-50 shadow-sm`}>
+              <Icon className="h-6 w-6 text-white" />
+            </div>
+            <div className="flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+              <Lock className="h-3 w-3" />
+              {locale === 'es' ? 'Sin licencia' : locale === 'pt' ? 'Sem licença' : 'No license'}
+            </div>
+          </div>
+          <h3 className="mb-1 text-xl font-bold text-slate-700">{sys.name}</h3>
+          <p className="mb-3 text-sm font-medium text-slate-400">{pickLocalized(sys.tagline, locale)}</p>
+          <p className="mb-4 text-sm leading-relaxed text-slate-400">
+            {locale === 'pt'
+              ? 'O administrador da empresa ainda não lhe atribuiu este sistema.'
+              : locale === 'es'
+                ? 'El administrador aún no le ha asignado este sistema.'
+                : 'Your company admin has not assigned this system to you yet.'}
+          </p>
+          <Link href="/hub/admin" className="text-sm font-medium text-teal-700 hover:underline">
+            {locale === 'pt' ? 'Administração Etholys' : locale === 'es' ? 'Administración Etholys' : 'Etholys administration'}
+          </Link>
+        </div>
+      );
+    }
+    if (cardAccess === 'open') {
+      return (
+        <Link
+          key={sys.id}
+          href={sys.href}
+          className={`group relative bg-white rounded-2xl border-2 p-6 transition-all duration-200 hover:shadow-lg ${
+            isAdvisor
+              ? 'border-violet-300 ring-2 ring-violet-200/80 shadow-md shadow-violet-100/50 ' + sys.bgHover
+              : isTool
+                ? 'border-orange-300 ring-2 ring-orange-200/70 shadow-md shadow-orange-100/40 ' + sys.bgHover
+                : `${sys.borderColor} ${sys.bgHover}`
+          } `}
+        >
+          <div className="flex items-start justify-between mb-4">
+            <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${sys.color} flex items-center justify-center shadow-sm`}>
+              <Icon className="w-6 h-6 text-white" />
+            </div>
+            {isAdvisor ? (
+              <div className="flex max-w-[10rem] flex-col items-end gap-0.5">
+                <div className="flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800">
+                  <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+                  {locale === 'es' ? 'Transversal' : locale === 'pt' ? 'Transversal' : 'Transversal'}
+                </div>
+                <span className="text-right text-[10px] text-violet-600/90">
+                  {locale === 'es' ? 'También: botón flotante' : locale === 'pt' ? 'Também: botão flutuante' : 'Also: floating button'}
+                </span>
+              </div>
+            ) : isTool ? (
+              <div className="flex max-w-[10rem] flex-col items-end gap-0.5">
+                <div className="flex items-center gap-1.5 rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-900">
+                  <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                  {locale === 'es' ? 'Herramienta' : locale === 'pt' ? 'Ferramenta' : 'Tool'}
+                </div>
+                <span className="text-right text-[10px] text-orange-700/90">
+                  {locale === 'es' ? 'Etholys Tools' : locale === 'pt' ? 'Etholys Tools' : 'Etholys Tools'}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-medium">
+                <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                {locale === 'es' ? 'Activo' : locale === 'pt' ? 'Ativo' : 'Active'}
+              </div>
+            )}
+          </div>
+          <h3 className="text-xl font-bold text-slate-900 mb-1">{sys.name}</h3>
+          <p className="text-sm font-medium text-slate-500 mb-3">{pickLocalized(sys.tagline, locale)}</p>
+          <p className="text-sm text-slate-400 leading-relaxed mb-4">{pickLocalized(sys.description, locale)}</p>
+          <div
+            className={`flex items-center gap-1 text-sm font-medium group-hover:gap-2 transition-all ${
+              isAdvisor ? 'text-violet-700' : isTool ? 'text-orange-700' : 'text-teal-600'
+            }`}
+          >
+            {locale === 'es' ? 'Acceder' : locale === 'pt' ? 'Acessar' : 'Access'}
+            <ArrowRight className="w-4 h-4" />
+          </div>
+        </Link>
+      );
+    }
+    return (
+      <div
+        key={sys.id}
+        className={`relative rounded-2xl border-2 bg-white/60 ${sys.borderColor} p-6 opacity-60`}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${sys.color} flex items-center justify-center shadow-sm opacity-50`}>
+            <Icon className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-medium">
+            <Lock className="w-3 h-3" />
+            {locale === 'es' ? 'Pr\u00f3ximamente' : locale === 'pt' ? 'Em breve' : 'Coming soon'}
+          </div>
+        </div>
+        <h3 className="text-xl font-bold text-slate-700 mb-1">{sys.name}</h3>
+        <p className="text-sm font-medium text-slate-400 mb-3">{pickLocalized(sys.tagline, locale)}</p>
+        <p className="text-sm text-slate-400 leading-relaxed">{pickLocalized(sys.description, locale)}</p>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -366,9 +490,10 @@ export default function HubPage() {
           </h1>
           <p className="text-slate-500 text-lg">
             {locale === 'es'
-              ? 'Selecciona un sistema para comenzar a trabajar.'
-              : locale === 'pt' ? 'Selecione um sistema para come\u00e7ar a trabalhar.'
-              : 'Select a system to start working.'}
+              ? 'Elige un sistema o una herramienta de Etholys Tools.'
+              : locale === 'pt'
+                ? 'Escolhe um sistema ou uma ferramenta do Etholys Tools.'
+                : 'Choose a system or an Etholys Tools item.'}
           </p>
         </div>
 
@@ -458,138 +583,61 @@ export default function HubPage() {
           )}
         </div>
 
-        {/* System Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {visibleSystems.map((sys) => {
-            const Icon = sys.icon;
-            const isAdvisor = sys.productTier === 'advisor';
-            const isTool = sys.productTier === 'tool';
-            const cardAccess = resolveHubCardAccess(sys.id, sys.active, licensedSystems);
-            if (cardAccess === 'locked') {
-              return (
-                <div
-                  key={sys.id}
-                  className={`relative rounded-2xl border-2 border-dashed ${sys.borderColor} bg-white/80 p-6 opacity-75`}
-                >
-                  <div className="mb-4 flex items-start justify-between">
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${sys.color} opacity-50 shadow-sm`}>
-                      <Icon className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
-                      <Lock className="h-3 w-3" />
-                      {locale === 'es' ? 'Sin licencia' : locale === 'pt' ? 'Sem licença' : 'No license'}
-                    </div>
-                  </div>
-                  <h3 className="mb-1 text-xl font-bold text-slate-700">{sys.name}</h3>
-                  <p className="mb-3 text-sm font-medium text-slate-400">{pickLocalized(sys.tagline, locale)}</p>
-                  <p className="mb-4 text-sm leading-relaxed text-slate-400">
-                    {locale === 'pt'
-                      ? 'O administrador da empresa ainda não lhe atribuiu este sistema.'
-                      : locale === 'es'
-                        ? 'El administrador aún no le ha asignado este sistema.'
-                        : 'Your company admin has not assigned this system to you yet.'}
-                  </p>
-                  <Link href="/hub/admin" className="text-sm font-medium text-teal-700 hover:underline">
-                    {locale === 'pt' ? 'Administração Etholys' : locale === 'es' ? 'Administración Etholys' : 'Etholys administration'}
-                  </Link>
-                </div>
-              );
-            }
-            return cardAccess === 'open' ? (
-              <Link
-                key={sys.id}
-                href={sys.href}
-                className={`group relative bg-white rounded-2xl border-2 p-6 transition-all duration-200 hover:shadow-lg ${
-                  isAdvisor
-                    ? 'border-violet-300 ring-2 ring-violet-200/80 shadow-md shadow-violet-100/50 ' + sys.bgHover
-                    : isTool
-                      ? 'border-orange-300 ring-2 ring-orange-200/70 shadow-md shadow-orange-100/40 ' + sys.bgHover
-                      : `${sys.borderColor} ${sys.bgHover}`
-                } `}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${sys.color} flex items-center justify-center shadow-sm`}>
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
-                  {isAdvisor ? (
-                    <div className="flex max-w-[10rem] flex-col items-end gap-0.5">
-                      <div className="flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800">
-                        <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
-                        {locale === 'es' ? 'Transversal' : locale === 'pt' ? 'Transversal' : 'Transversal'}
-                      </div>
-                      <span className="text-right text-[10px] text-violet-600/90">
-                        {locale === 'es' ? 'También: botón flotante' : locale === 'pt' ? 'Também: botão flutuante' : 'Also: floating button'}
-                      </span>
-                    </div>
-                  ) : isTool ? (
-                    <div className="flex max-w-[10rem] flex-col items-end gap-0.5">
-                      <div className="flex items-center gap-1.5 rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-900">
-                        <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                        {locale === 'es' ? 'Herramienta' : locale === 'pt' ? 'Ferramenta' : 'Tool'}
-                      </div>
-                      <span className="text-right text-[10px] text-orange-700/90">
-                        {locale === 'es' ? 'Atajo naranja' : locale === 'pt' ? 'Atalho laranja' : 'Orange shortcut'}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-medium">
-                      <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-                      {locale === 'es' ? 'Activo' : locale === 'pt' ? 'Ativo' : 'Active'}
-                    </div>
-                  )}
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-1">{sys.name}</h3>
-                <p className="text-sm font-medium text-slate-500 mb-3">{pickLocalized(sys.tagline, locale)}</p>
-                <p className="text-sm text-slate-400 leading-relaxed mb-4">{pickLocalized(sys.description, locale)}</p>
-                <div
-                  className={`flex items-center gap-1 text-sm font-medium group-hover:gap-2 transition-all ${
-                    isAdvisor ? 'text-violet-700' : isTool ? 'text-orange-700' : 'text-teal-600'
-                  }`}
-                >
-                  {locale === 'es' ? 'Acceder' : locale === 'pt' ? 'Acessar' : 'Access'}
-                  <ArrowRight className="w-4 h-4" />
-                </div>
-              </Link>
-            ) : (
-              <div
-                key={sys.id}
-                className={`relative rounded-2xl border-2 bg-white/60 ${sys.borderColor} p-6 opacity-60`}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${sys.color} flex items-center justify-center shadow-sm opacity-50`}>
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-medium">
-                    <Lock className="w-3 h-3" />
-                    {locale === 'es' ? 'Pr\u00f3ximamente' : locale === 'pt' ? 'Em breve' : 'Coming soon'}
-                  </div>
-                </div>
-                <h3 className="text-xl font-bold text-slate-700 mb-1">{sys.name}</h3>
-                <p className="text-sm font-medium text-slate-400 mb-3">{pickLocalized(sys.tagline, locale)}</p>
-                <p className="text-sm text-slate-400 leading-relaxed">{pickLocalized(sys.description, locale)}</p>
-              </div>
-            );
-          })}
-        </div>
+        {toolCards.length > 0 && (
+          <section className="mb-10">
+            <div className="mb-4">
+              <h2 className="text-xl font-bold text-slate-900">Etholys Tools</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {locale === 'pt'
+                  ? 'Ferramentas transversais: atalho em todos os sistemas. Não substituem ATLAS, SIEP nem o Core.'
+                  : locale === 'es'
+                    ? 'Herramientas transversales: atajo en todos los sistemas. No sustituyen ATLAS, SIEP ni el Core.'
+                    : 'Cross-cutting tools: shortcuts across systems. They do not replace ATLAS, SIEP, or Core.'}
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {toolCards.map(renderHubCard)}
+            </div>
+            <p className="mt-4 text-center text-sm text-slate-500">
+              {locale === 'pt' ? (
+                <>
+                  <strong className="text-orange-800">Studio</strong> (botão laranja) = documentos com IA.{' '}
+                  <strong className="text-violet-800">Advisor</strong> = alertas multi-sistema. O <strong>chat teal</strong> = diálogo (Core).
+                </>
+              ) : locale === 'es' ? (
+                <>
+                  <strong className="text-orange-800">Studio</strong> (botón naranja) = documentos con IA.{' '}
+                  <strong className="text-violet-800">Advisor</strong> = alertas. El <strong>chat teal</strong> = diálogo (Core).
+                </>
+              ) : (
+                <>
+                  <strong className="text-orange-800">Studio</strong> (orange button) = AI documents.{' '}
+                  <strong className="text-violet-800">Advisor</strong> = alerts. The <strong>teal chat</strong> = dialogue (Core).
+                </>
+              )}
+            </p>
+          </section>
+        )}
 
-        <p className="mt-4 text-center text-sm text-slate-500">
-          {locale === 'pt' ? (
-            <>
-              <strong className="text-orange-800">Studio</strong> (botão laranja, canto inferior esquerdo) = documentos com IA.{' '}
-              <strong className="text-violet-800">Advisor</strong> = alertas multi-sistema. O <strong>chat teal</strong> (direita) = diálogo e canais.
-            </>
-          ) : locale === 'es' ? (
-            <>
-              <strong className="text-orange-800">Studio</strong> (botón naranja, abajo izquierda) = documentos con IA.{' '}
-              <strong className="text-violet-800">Advisor</strong> = alertas. El <strong>chat teal</strong> = diálogo.
-            </>
-          ) : (
-            <>
-              <strong className="text-orange-800">Studio</strong> (orange button, bottom left) = AI documents.{' '}
-              <strong className="text-violet-800">Advisor</strong> = alerts. The <strong>teal chat</strong> = work dialogue.
-            </>
-          )}
-        </p>
+        {systemCards.length > 0 && (
+          <section>
+            <div className="mb-4">
+              <h2 className="text-xl font-bold text-slate-900">
+                {locale === 'pt' ? 'Sistemas' : locale === 'es' ? 'Sistemas' : 'Systems'}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {locale === 'pt'
+                  ? 'Produtos licenciáveis do ecossistema Etholys.'
+                  : locale === 'es'
+                    ? 'Productos licenciables del ecosistema Etholys.'
+                    : 'Licensable products in the Etholys ecosystem.'}
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {systemCards.map(renderHubCard)}
+            </div>
+          </section>
+        )}
 
         {/* ETHOLYS Core banner */}
         <div className="mt-10 bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-6 sm:p-8 text-white">

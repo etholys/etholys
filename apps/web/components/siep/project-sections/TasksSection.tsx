@@ -44,7 +44,7 @@ export function TasksSection({ project, onRefresh }: SectionProps) {
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'kanban' | 'gantt' | 'milestones'>('table');
 
-  /* Milestone state (P3) */
+  /* Milestone state */
   const [showMsForm, setShowMsForm] = useState(false);
   const [editingMsId, setEditingMsId] = useState<string | null>(null);
   const [msForm, setMsForm] = useState<any>({ name: '', description: '', dueDate: '' });
@@ -124,7 +124,6 @@ export function TasksSection({ project, onRefresh }: SectionProps) {
     return m?.user?.name || null;
   };
 
-  /* ---- Milestone handlers (P3) ---- */
   const openMsCreate = () => { setEditingMsId(null); setMsForm({ name: '', description: '', dueDate: '' }); setShowMsForm(true); };
   const openMsEdit = (m: any) => {
     setEditingMsId(m.id);
@@ -177,7 +176,7 @@ export function TasksSection({ project, onRefresh }: SectionProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* View mode tabs (P3: added milestones) */}
+          {/* View mode tabs */}
           <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
             <button onClick={() => setViewMode('table')} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition ${viewMode === 'table' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
               <Table2 className="w-3.5 h-3.5" />Tabla
@@ -259,7 +258,7 @@ export function TasksSection({ project, onRefresh }: SectionProps) {
         </div>
       )}
 
-      {/* === TABLE VIEW === */}
+      {}
       {viewMode === 'table' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
@@ -381,7 +380,7 @@ export function TasksSection({ project, onRefresh }: SectionProps) {
         </div>
       )}
 
-      {/* === KANBAN VIEW === */}
+      {}
       {viewMode === 'kanban' && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {KANBAN_COLS.map(col => {
@@ -425,7 +424,7 @@ export function TasksSection({ project, onRefresh }: SectionProps) {
         </div>
       )}
 
-      {/* === GANTT VIEW === */}
+      {}
       {viewMode === 'gantt' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           {!ganttData ? (
@@ -486,7 +485,7 @@ export function TasksSection({ project, onRefresh }: SectionProps) {
         </div>
       )}
 
-      {/* === MILESTONES VIEW (P3) === */}
+      {}
       {viewMode === 'milestones' && (
         <div>
           {/* Milestone summary cards */}

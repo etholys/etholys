@@ -1,4 +1,4 @@
-/** Casillas del tablero La Expedición V2 — paleta Rural Commerce (material físico) */
+/** Casillas del tablero La Expedición V2 — paleta del material físico */
 export const BOARD_STATION_META = [
   {
     name: 'Raíces',

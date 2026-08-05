@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { getForgeDb } from '@/lib/forge/db';
-import { geminiCompleteJsonText } from '@/lib/gemini-client';
+import { llmCompleteJsonText } from '@/lib/llm-client';
 import { parseGameSpecV1, safeParseGameSpecV1 } from '@/lib/forge/schemas/game-spec-v1';
 import { validateAndPrepareSpec } from '@/lib/forge/engines';
 import {
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       engineHint = methodology.length > 200 ? 'board' : 'quiz_race';
     }
 
-    const rawJson = await geminiCompleteJsonText(
+    const rawJson = await llmCompleteJsonText(
       buildGameGenerateSystemInstruction(),
       buildGameGenerateUserText({
         methodology,
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erro';
-    const status = msg.includes('GEMINI') || msg.includes('Gemini') || msg.includes('Falta GEMINI') ? 503 : 500;
+    const status = /API.?key|LLM|Falta chave|429|503|overloaded|rate.?limit/i.test(msg) ? 503 : 500;
     return NextResponse.json({ error: msg }, { status });
   }
 }

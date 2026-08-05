@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { geminiCompleteJsonText } from '@/lib/gemini-client';
+import { llmCompleteJsonText } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
 import { loadReportGuideContext } from '@/lib/siep/report-guide-context';
 import { extractTextDetailed } from '@/lib/siep/extract-file-text';
@@ -118,7 +118,7 @@ ${activityReports.slice(0, 15).map((r) => `- ${r.reportDate.toISOString().slice(
 
 ${guideContext ? `\n${guideContext}\n` : ''}`;
 
-  const raw = await geminiCompleteJsonText(PROMPT, userText, { maxOutputTokens: 16384 });
+  const raw = await llmCompleteJsonText(PROMPT, userText, { maxOutputTokens: 16384 });
   const parsed = extractFirstJsonObject(raw) as Partial<DonorReportDraftResult>;
 
   return {

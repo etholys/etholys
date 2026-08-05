@@ -98,28 +98,28 @@ export default function PrismHubPage() {
       <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
         <div className="rounded-2xl border border-rose-200 bg-white p-6 shadow-sm sm:p-8">
           <h1 className="text-2xl font-bold text-slate-900">
-            {t('Impacto, evidência e relatórios', 'Impacto, evidencia e informes', 'Impact, evidence & reporting')}
+            {t('Painel executivo e BI institucional', 'Panel ejecutivo y BI institucional', 'Executive panel & institutional BI')}
           </h1>
           <div
-            className="mt-4 rounded-xl border border-amber-200/90 bg-amber-50/90 px-4 py-3 text-sm text-amber-950"
+            className="mt-4 rounded-xl border border-rose-200/90 bg-rose-50/90 px-4 py-3 text-sm text-rose-950"
             role="note"
           >
             <p className="font-semibold">
-              {t('Isto não é o “dashboard” do dia a dia', 'Esto no es el “dashboard” del día a día', 'This is not your day-to-day “dashboard”')}
+              {t('Inteligência de dados 360°', 'Inteligencia de datos 360°', '360° data intelligence')}
             </p>
-            <p className="mt-1 text-amber-950/90">
+            <p className="mt-1 text-rose-950/90">
               {t(
-                'O Centro integrado (Workspace) concentra o que fazer hoje, filas, prazos e alertas. O PRISM responde a: «que diferença fizemos?» e «o que mostramos ao financiador?» — M&E, evidência, relatórios a funders, narrativa de impacto.',
-                'El Workspace concentra el qué hacer hoy. PRISM responde: “¿qué impacto tuvimos?” e informes a financiadores — M&E, evidencia, narrativa hacia el donante.',
-                'The integrated workspace is for what to do today, queues, and deadlines. PRISM is for “what impact did we have?” and donor-facing story — M&E, evidence, funder reports — not a generic BI layer competing with the cockpit.'
+                'O PRISM cruza dados dos sistemas contratados (ATLAS, SIEP, FUNDHUB, NEXUS…) com leitura executiva e análise preditiva. O Centro integrado continua a ser o cockpit do dia a dia; aqui o foco é visão consolidada e decisão.',
+                'PRISM cruza datos de los sistemas contratados (ATLAS, SIEP, FUNDHUB, NEXUS…) con lectura ejecutiva y análisis predictivo. El Centro integrado sigue siendo el cockpit diario; aquí el foco es visión consolidada y decisión.',
+                'PRISM cross-cuts data from licensed systems (ATLAS, SIEP, FUNDHUB, NEXUS…) for executive reads and predictive analysis. The integrated workspace remains the daily cockpit; here the focus is consolidated insight and decisions.',
               )}
             </p>
           </div>
           <p className="mt-4 text-slate-600">
             {t(
-              'PRISM é a lente de monitorização e avaliação: indicadores, relatórios a financiadores e leitura consolidada dos dados do tenant. O «cockpit» do dia a dia (tarefas e alertas) está no Centro integrado — aqui o foco é accountability e M&E.',
-              'PRISM es la lente de monitoreo y evaluación: indicadores, informes a financiadores y lectura consolidada. El cockpit diario está en el Centro integrado.',
-              'PRISM is the monitoring & evaluation lens: indicators, donor-facing reports, and consolidated reads. Your daily cockpit (tasks & alerts) lives in the integrated workspace — here the focus is accountability and M&E.'
+              'Dashboards, indicadores de impacto (incluindo ESG) e relatórios multinível. O M&E de projeto continua no SIEP; o PRISM agrega a lente institucional.',
+              'Dashboards, indicadores de impacto (incluido ESG) e informes multinivel. El M&E de proyecto sigue en SIEP; PRISM aporta la lente institucional.',
+              'Dashboards, impact indicators (including ESG), and multi-level reports. Project M&E stays in SIEP; PRISM adds the institutional lens.',
             )}
           </p>
 

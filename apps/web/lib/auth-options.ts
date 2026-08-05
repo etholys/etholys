@@ -1,10 +1,19 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
+import AzureADProvider from 'next-auth/providers/azure-ad';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { findEnrollmentByMagicToken } from '@/lib/forge/invite-auth';
+
+const googleCalendarEnabled = process.env.GOOGLE_CALENDAR_ENABLED === '1';
+const azureClientId =
+  process.env.AZURE_AD_CLIENT_ID?.trim() || process.env.AZURE_AD_CLIENTID?.trim() || '';
+const azureClientSecret =
+  process.env.AZURE_AD_CLIENT_SECRET?.trim() || process.env.AZURE_AD_CLIENTSECRET?.trim() || '';
+const azureTenant =
+  process.env.AZURE_AD_TENANT_ID?.trim() || process.env.AZURE_AD_TENANTID?.trim() || 'common';
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -13,7 +22,34 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GOOGLE_CLIENT_ID ?? '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
       allowDangerousEmailAccountLinking: true,
+      ...(googleCalendarEnabled
+        ? {
+            authorization: {
+              params: {
+                scope:
+                  'openid email profile https://www.googleapis.com/auth/calendar.events',
+                access_type: 'offline',
+                prompt: 'consent',
+              },
+            },
+          }
+        : {}),
     }),
+    ...(azureClientId && azureClientSecret
+      ? [
+          AzureADProvider({
+            clientId: azureClientId,
+            clientSecret: azureClientSecret,
+            tenantId: azureTenant,
+            authorization: {
+              params: {
+                scope: 'openid email profile offline_access Calendars.ReadWrite',
+              },
+            },
+            allowDangerousEmailAccountLinking: true,
+          }),
+        ]
+      : []),
     CredentialsProvider({
       name: 'credentials',
       credentials: {

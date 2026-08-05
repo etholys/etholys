@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse, NextRequest } from 'next/server';
-import { geminiCompleteText } from '@/lib/gemini-client';
+import { llmCompleteText } from '@/lib/llm-client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
         'Você é um especialista em elaboração de propostas para editais de financiamento. Você tem profundo conhecimento em estrutura de projetos, viabilidade financeira, gestão de risco, e melhores práticas em propostas. Responda de forma clara, objetiva e prátitica, dando recomendações concretas baseadas nos requisitos do edital. Quando necessário, peça esclarecimentos sobre pontos específicos do projeto.';
     }
 
-    const answer = await geminiCompleteText(systemInstruction, prompt, {
+    const answer = await llmCompleteText(systemInstruction, prompt, {
       maxOutputTokens: 800,
       temperature: mode === 'structure' ? 0.15 : 0.25,
     });

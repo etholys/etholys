@@ -637,7 +637,7 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
           </div>
         </div>
 
-        {/* ============ LÍNEAS TAB ============ */}
+        {}
         {budgetTab === 'lines' && (
           <>
             {linesLoading ? (
@@ -784,7 +784,7 @@ export default function BudgetSection({ project, onRefresh, tr }: SectionProps) 
           </>
         )}
 
-        {/* ============ TRANSACCIONES TAB ============ */}
+        {}
         {budgetTab === 'transactions' && (
           <>
             {/* Sub-tabs for transaction types */}

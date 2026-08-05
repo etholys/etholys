@@ -6,7 +6,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { prismaHasEnumValue } from '@/lib/prisma-has-field';
-import { geminiGenerateContent } from '@/lib/gemini-client';
+import { llmGenerateContent } from '@/lib/llm-client';
 import {
   buildSiepReportSystemPrompt,
   extractCopilotPayload,
@@ -46,7 +46,6 @@ function detectOutputLanguageFromMessage(
 const SIEP_REPORT_LLM_MODEL = (
   process.env.LLM_SIEP_REPORT_MODEL ||
   process.env.ANTHROPIC_SIEP_REPORT_MODEL ||
-  process.env.GEMINI_SIEP_REPORT_MODEL ||
   'claude-opus-4-6'
 ).trim();
 
@@ -206,7 +205,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
       fullUserText = `══ ELEMENTO SELECCIONADO PELO UTILIZADOR ══\n${selectionBlock}\n\nA mensagem seguinte refere-se PRINCIPALMENTE a este elemento.\n\n${fullUserText}`;
     }
 
-    const result = await geminiGenerateContent({
+    const result = await llmGenerateContent({
       systemInstruction: systemPrompt,
       userText: fullUserText,
       maxOutputTokens: 16384,

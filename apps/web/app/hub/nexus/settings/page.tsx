@@ -19,9 +19,9 @@ export default function NexusSettingsPage() {
         </h1>
         <p className="mt-1 text-sm text-gray-600">
           {t(
-            'Preferências de rede, alertas comerciais e integração SIEP. Organização e licenças ficam na administração Etholys.',
-            'Preferencias de red, alertas comerciales e integración SIEP. Organización y licencias están en administración Etholys.',
-            'Network preferences, commercial alerts, and SIEP integration. Organization and licenses live in Etholys administration.',
+            'Preferências de diagnóstico MIPYME, rota de desenvolvimento e pontes com ATLAS/FUNDHUB. Organização e licenças ficam na administração Etholys.',
+            'Preferencias de diagnóstico MIPYME, ruta de desarrollo y puentes con ATLAS/FUNDHUB. Organización y licencias están en administración Etholys.',
+            'MIPYME diagnosis preferences, development roadmap, and ATLAS/FUNDHUB bridges. Organization and licenses live in Etholys administration.',
           )}
         </p>
       </header>
@@ -30,9 +30,9 @@ export default function NexusSettingsPage() {
         <h2 className="text-sm font-semibold text-gray-900">{t('Módulo NEXUS', 'Módulo NEXUS', 'NEXUS module')}</h2>
         <p className="mt-2 text-sm text-gray-600">
           {t(
-            'Em breve: notificações de contactos, lembretes da rota comercial e ligação a projetos SIEP.',
-            'Próximamente: notificaciones de contactos, recordatorios de ruta comercial y vínculo con proyectos SIEP.',
-            'Coming soon: contact notifications, commercial roadmap reminders, and SIEP project links.',
+            'Preferências avançadas deste módulo ainda não estão disponíveis. Use os atalhos abaixo para organização e acessos.',
+            'Las preferencias avanzadas de este módulo aún no están disponibles. Use los atajos de abajo para organización y accesos.',
+            'Advanced preferences for this module are not available yet. Use the shortcuts below for organization and access.',
           )}
         </p>
       </section>

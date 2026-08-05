@@ -60,7 +60,7 @@ export function ForgeLearnShell({
 
   return (
     <div className="-mx-4 md:-mx-6 -mt-4 md:-mt-6 mb-0">
-      {/* Banner estilo Rural Commerce */}
+      {/* Banner do curso */}
       <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-900 px-4 pb-16 pt-6 md:px-8 md:pt-8">
         <div
           className="pointer-events-none absolute inset-0 opacity-30"

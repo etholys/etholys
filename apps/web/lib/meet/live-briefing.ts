@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { geminiCompleteJsonText } from '@/lib/gemini-client';
+import { llmCompleteJsonText } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
 
 export type MeetLiveBriefing = {
@@ -42,7 +42,7 @@ NOTAS PARCIAIS:
 ${notes.slice(0, 12000)}
 ---`;
 
-  const raw = await geminiCompleteJsonText(
+  const raw = await llmCompleteJsonText(
     'JSON válido apenas — briefing em curso de reunião.',
     prompt,
     { maxOutputTokens: 2048 },

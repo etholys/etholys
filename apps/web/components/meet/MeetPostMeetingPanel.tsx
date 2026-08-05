@@ -20,6 +20,7 @@ type SessionDetail = {
   projectId: string | null;
   summaryText: string | null;
   transcriptText: string | null;
+  recordingUrl: string | null;
   actionItems: ActionItem[];
 };
 
@@ -46,6 +47,8 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
     openDecisions: string[];
     suggestedNextSteps: string[];
   } | null>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [transcribeBusy, setTranscribeBusy] = useState(false);
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -178,6 +181,84 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
     }
   }
 
+  async function uploadRecording(file: File) {
+    setUploadBusy(true);
+    setError(null);
+    try {
+      const presign = await fetch(`/api/meet/sessions/${sessionId}/recording`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          action: 'presign',
+          fileName: file.name,
+          contentType: file.type || 'application/octet-stream',
+        }),
+      });
+      const signed = (await presign.json()) as {
+        error?: string;
+        uploadUrl?: string;
+        storageKey?: string;
+        publicUrl?: string | null;
+      };
+      if (!presign.ok) throw new Error(signed.error || 'Presign failed');
+      if (!signed.uploadUrl || !signed.storageKey) throw new Error('Presign incomplete');
+
+      const put = await fetch(signed.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      });
+      if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+
+      const confirm = await fetch(`/api/meet/sessions/${sessionId}/recording`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          action: 'confirm',
+          storageKey: signed.storageKey,
+          recordingUrl: signed.publicUrl || undefined,
+        }),
+      });
+      const conf = (await confirm.json()) as { error?: string };
+      if (!confirm.ok) throw new Error(conf.error || 'Confirm failed');
+      setMsg(t('Gravação enviada para a nuvem.', 'Grabación subida a la nube.', 'Recording uploaded to cloud.'));
+      await loadDetail();
+      onUpdated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setUploadBusy(false);
+    }
+  }
+
+  async function runTranscribe(finalize: boolean) {
+    setTranscribeBusy(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/meet/sessions/${sessionId}/transcribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId, locale, finalize }),
+      });
+      const d = (await r.json()) as { error?: string; transcriptText?: string };
+      if (!r.ok) throw new Error(d.error || 'Error');
+      if (d.transcriptText) setNotes(d.transcriptText);
+      setMsg(
+        finalize
+          ? t('Transcrição + resumo gerados.', 'Transcripción + resumen listos.', 'Transcript + summary ready.')
+          : t('Transcrição pronta — revê e gera o resumo.', 'Transcripción lista — revisa y genera el resumen.', 'Transcript ready — review and generate summary.'),
+      );
+      await loadDetail();
+      onUpdated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setTranscribeBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-8">
@@ -209,12 +290,60 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
         </button>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-        {t(
-          'Gravação: durante a call, no menu «⋯» / Gravar → gravação local → o ficheiro descarrega no teu PC. Cole aqui a transcrição (ou notas) para a IA gerar o resumo. Nuvem automática (R2) vem a seguir.',
-          'Grabación: durante la call, menú «⋯» / Grabar → grabación local → el archivo se descarga en tu PC. Pega aquí la transcripción (o notas) para que la IA genere el resumen. Nube automática (R2) viene después.',
-          'Recording: during the call, ⋯ / Record → local recording → file downloads to your PC. Paste transcript (or notes) here for AI summary. Automatic cloud (R2) comes next.',
-        )}
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 space-y-2">
+        <p>
+          {t(
+            'Gravação: upload para R2/S3, webhook Jibri, ou gravação local no Jitsi. Com OPENAI_API_KEY, pode transcrever automaticamente.',
+            'Grabación: sube a R2/S3, webhook Jibri, o grabación local en Jitsi. Con OPENAI_API_KEY puedes transcribir automáticamente.',
+            'Recording: upload to R2/S3, Jibri webhook, or local Jitsi record. With OPENAI_API_KEY you can auto-transcribe.',
+          )}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-100">
+            {uploadBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+            {t('Enviar gravação', 'Subir grabación', 'Upload recording')}
+            <input
+              type="file"
+              accept="audio/*,video/*,.webm,.mp4,.mp3,.wav,.m4a"
+              className="hidden"
+              disabled={uploadBusy}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void uploadRecording(f);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          {detail.recordingUrl && (
+            <>
+              <a
+                href={detail.recordingUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-semibold text-sky-700 hover:underline"
+              >
+                {t('Abrir gravação', 'Abrir grabación', 'Open recording')}
+              </a>
+              <button
+                type="button"
+                disabled={transcribeBusy}
+                onClick={() => void runTranscribe(false)}
+                className="rounded border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-900 disabled:opacity-50"
+              >
+                {transcribeBusy ? <Loader2 className="inline h-3 w-3 animate-spin" /> : null}{' '}
+                {t('Transcrever', 'Transcribir', 'Transcribe')}
+              </button>
+              <button
+                type="button"
+                disabled={transcribeBusy}
+                onClick={() => void runTranscribe(true)}
+                className="rounded bg-sky-700 px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                {t('Transcrever + finalizar', 'Transcribir + finalizar', 'Transcribe + finalize')}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div>

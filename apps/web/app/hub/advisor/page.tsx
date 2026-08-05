@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-/** Assessor transversal Etholys — UI dedicada em construção; cockpit em /hub/workspace. */
+/** Assessor transversal Etholys — redireciona para o cockpit em /hub/workspace. */
 export default function HubAdvisorPage() {
   redirect('/hub/workspace');
 }

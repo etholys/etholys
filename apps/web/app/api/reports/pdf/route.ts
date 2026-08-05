@@ -91,7 +91,7 @@ export async function GET(req: Request) {
       ` : ''}
 
       <div class="footer">
-        <p>ATLAS ERP — Gestión Integral de Proyectos y Tareas</p>
+        <p>ATLAS ERP — Gestión institucional y empresarial</p>
         <p>Este reporte fue generado automáticamente. Todos los datos son actualizados al momento de la generación.</p>
       </div>
     </body></html>`;

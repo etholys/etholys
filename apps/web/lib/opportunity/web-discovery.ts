@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { randomUUID } from 'crypto';
-import { geminiCompleteJsonText, geminiCompleteWithWebSearch } from '@/lib/gemini-client';
+import { llmCompleteJsonText, llmCompleteWithWebSearch } from '@/lib/llm-client';
 import { normalizeCandidates } from '@/lib/opportunity/candidate-store';
 import { OFFICIAL_LINK_PROMPT_RULES } from '@/lib/opportunity/official-url';
 import type { OpportunityBriefing, ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
@@ -147,7 +147,7 @@ export async function discoverOpportunitiesOnline(opts: {
       `\nSearch the web now. Prefer site:ec.europa.eu site:worldbank.org site:funding-tenders.europa.eu for official pages.`,
     ].join('');
 
-    const { text: research, searchQueries } = await geminiCompleteWithWebSearch(
+    const { text: research, searchQueries } = await llmCompleteWithWebSearch(
       RESEARCH_SYSTEM,
       userResearch,
       { maxOutputTokens: 16384, temperature: scanFocus === 'open_now' ? 0.15 : 0.25 },
@@ -160,7 +160,7 @@ export async function discoverOpportunitiesOnline(opts: {
       focusHint,
     ].join('');
 
-    const jsonText = await geminiCompleteJsonText(STRUCTURE_SYSTEM, structureUser, {
+    const jsonText = await llmCompleteJsonText(STRUCTURE_SYSTEM, structureUser, {
       maxOutputTokens: 16384,
     });
     const parsed = JSON.parse(jsonText) as { candidates?: unknown[] };
@@ -208,7 +208,7 @@ async function knowledgeOnlyDiscovery(
     optionalExtraContext?.trim() ? `\nOPTIONAL PORTALS:\n${optionalExtraContext.trim()}` : '',
     `\nTODAY: ${todayIso()}`,
   ].join('');
-  const jsonText = await geminiCompleteJsonText(system, user, { maxOutputTokens: 16384 });
+  const jsonText = await llmCompleteJsonText(system, user, { maxOutputTokens: 16384 });
   const parsed = JSON.parse(jsonText) as { candidates?: unknown[] };
   let candidates = normalizeCandidates(parsed.candidates ?? [], scanFocus).map((c) => ({
     ...c,

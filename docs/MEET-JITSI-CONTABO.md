@@ -148,13 +148,13 @@ Com Jitsi self-hosted, o host vê **salas de breakout** na barra do Jitsi. A app
 
 ---
 
-## 8. O que ainda não está neste setup
+## 8. O que ainda não está neste setup (piloto Contabo)
 
-| Item | Estado |
-|------|--------|
-| Gravação (Jibri) | Depois — precisa mais disco/RAM (ideal VPS 2) |
-| Transcrição automática | Depois (áudio → R2 → Gemini) |
-| OAuth Google/Outlook | F6 — hoje só `.ics` |
+| Item | Estado | Doc |
+|------|--------|-----|
+| Gravação (Jibri) + R2 | Código app pronto; precisa VPS/Jibri + env | [MEET-VPS-JIBRI.md](./MEET-VPS-JIBRI.md) |
+| Transcrição automática | Whisper (`OPENAI_API_KEY`) | idem |
+| OAuth Google/Outlook | F6 no Hub; flags `GOOGLE_CALENDAR_ENABLED` / Azure AD | architecture/etholys-meet.md |
 
 ---
 

@@ -1,13 +1,10 @@
 /**
- * SIEP import: Anthropic Claude (JSON estruturado).
+ * SIEP import: LLM com JSON estruturado.
  */
 
 import { llmGenerateContent, getLlmMaxOutputTokens, getLlmModel } from '@/lib/llm-client';
 
-export {
-  DEFAULT_LLM_MODEL as DEFAULT_GEMINI_IMPORT_MODEL,
-  getLlmModel as getGeminiImportModel,
-} from '@/lib/llm-client';
+export { DEFAULT_LLM_MODEL, getLlmModel } from '@/lib/llm-client';
 
 type ChatContentPart =
   | { type: 'text'; text: string }
@@ -39,9 +36,6 @@ export async function buildPlainTextPromptFromParts(parts: ChatContentPart[]): P
   return chunks.join('\n\n');
 }
 
-/** @deprecated Use buildPlainTextPromptFromParts */
-export const buildPlainTextPromptForOllama = buildPlainTextPromptFromParts;
-
 export async function callImportLlm(systemPrompt: string, userContent: ChatContentPart[]): Promise<string> {
   const userText = await buildPlainTextPromptFromParts(userContent);
   const maxOut = getLlmMaxOutputTokens();
@@ -56,7 +50,7 @@ export async function callImportLlm(systemPrompt: string, userContent: ChatConte
 
   if (finishReason === 'MAX_TOKENS') {
     throw new Error(
-      `Claude cortou a resposta (limite de saída). Defina LLM_MAX_OUTPUT_TOKENS=32000 no .env, reinicie o servidor, ou importe ficheiros menores. Modelo: ${getLlmModel()}`,
+      `A IA cortou a resposta (limite de saída). Defina LLM_MAX_OUTPUT_TOKENS=32000 no .env, reinicie o servidor, ou importe ficheiros menores.`,
     );
   }
 

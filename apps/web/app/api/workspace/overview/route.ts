@@ -203,7 +203,7 @@ export async function GET(req: NextRequest) {
     meta: { freshAt: new Date().toISOString() },
     company,
     access: { systems: systems as WorkspaceSystemKey[] },
-    /** Etholys AI Advisor — inbox no cockpit (Fase 1) */
+    /** Etholys AI Advisor — inbox no cockpit */
     advisor: {
       alerts: advisorAlerts.map((a) => ({
         id: a.id,

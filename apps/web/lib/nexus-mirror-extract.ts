@@ -8,7 +8,7 @@ import {
   parseNexusAdvisorMirror,
 } from '@/lib/nexus-advisor-mirror';
 import type { PrismaClient } from '@prisma/client';
-import { geminiCompleteJsonText } from '@/lib/gemini-client';
+import { llmCompleteJsonText } from '@/lib/llm-client';
 
 type ExtractJson = {
   focalSummary?: string | null;
@@ -71,7 +71,7 @@ export async function tryMergeNexusMirrorAfterCopilotReply(
 
   let extracted: ExtractJson;
   try {
-    const raw = await geminiCompleteJsonText(system, assistantText.slice(0, 24_000), { maxOutputTokens: 1536 });
+    const raw = await llmCompleteJsonText(system, assistantText.slice(0, 24_000), { maxOutputTokens: 1536 });
     extracted = JSON.parse(raw) as ExtractJson;
   } catch {
     return;

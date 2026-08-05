@@ -11,17 +11,27 @@ export function buildMeetRoomUrl(sessionId: string, jitsiBaseUrl?: string): stri
   return `${base}/${meetRoomSlug(sessionId)}`;
 }
 
-/** Query params úteis para embed (ecrã partilhado, breakouts) — alinhado ao FORGE. */
-export function meetEmbedUrl(meetingUrl: string, opts?: { host?: boolean }): string {
+/** Overrides Jitsi para embed/abertura externa, sem expor o slug técnico como título. */
+export function meetEmbedUrl(
+  meetingUrl: string,
+  opts?: { host?: boolean; title?: string },
+): string {
   try {
     const u = new URL(meetingUrl);
-    u.searchParams.set('config.prejoinConfig.enabled', 'true');
-    u.searchParams.set('config.disableDeepLinking', 'true');
+    const overrides = new URLSearchParams(u.hash.replace(/^#/, ''));
+    overrides.set('config.prejoinConfig.enabled', 'true');
+    overrides.set('config.disableDeepLinking', 'true');
     // Breakout rooms: botão visível para o host na barra Jitsi (self-hosted).
-    u.searchParams.set('config.breakoutRooms.hideAddRoomButton', 'false');
-    if (opts?.host) {
-      u.searchParams.set('config.startWithAudioMuted', 'false');
+    overrides.set('config.breakoutRooms.hideAddRoomButton', 'false');
+    const title = opts?.title?.trim();
+    if (title) {
+      // Sem isto, o Jitsi transforma o slug "etholys-abc123" num título feio.
+      overrides.set('config.subject', JSON.stringify(title.slice(0, 200)));
     }
+    if (opts?.host) {
+      overrides.set('config.startWithAudioMuted', 'false');
+    }
+    u.hash = overrides.toString();
     return u.toString();
   } catch {
     return meetingUrl;

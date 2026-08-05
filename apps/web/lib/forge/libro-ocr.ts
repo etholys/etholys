@@ -4,14 +4,14 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { createS3Client, getBucketConfig } from '@/lib/aws-config';
-import { geminiCompleteJsonWithPdf, getGeminiApiKey } from '@/lib/gemini-client';
+import { llmCompleteJsonWithPdf, getLlmApiKey } from '@/lib/llm-client';
 import { getForgeDb } from '@/lib/forge/db';
 import { isS3Configured } from '@/lib/forge/course-libro';
 
 const MIN_TEXT_CHARS = 280;
 
 export type LibroOcrMeta = {
-  method: 'pdf-parse' | 'claude' | 'pdf-parse+claude' | 'gemini' | 'pdf-parse+gemini';
+  method: 'pdf-parse' | 'llm' | 'pdf-parse+llm';
   pages?: number;
   charCount: number;
 };
@@ -49,9 +49,9 @@ async function extractWithPdfParse(buffer: Buffer): Promise<{ text: string; page
   return { text: (data.text ?? '').trim(), pages: data.numpages };
 }
 
-async function extractWithGemini(buffer: Buffer): Promise<string> {
+async function extractWithLlm(buffer: Buffer): Promise<string> {
   const b64 = buffer.toString('base64');
-  const raw = await geminiCompleteJsonWithPdf(
+  const raw = await llmCompleteJsonWithPdf(
     'Extrae TODO el texto legible del manual PDF en español. Responde JSON: {"text":"..."} sin markdown.',
     'Devuelve el texto completo en el campo text.',
     b64,
@@ -92,14 +92,14 @@ export async function runLibroOcr(courseId: string): Promise<{ ok: boolean; stat
 
     if (text.length < MIN_TEXT_CHARS) {
       try {
-        getGeminiApiKey();
-        const claudeText = await extractWithGemini(buffer);
-        if (claudeText.length > text.length) {
-          text = claudeText;
-          method = text.length >= MIN_TEXT_CHARS ? 'claude' : 'pdf-parse+claude';
+        getLlmApiKey();
+        const llmText = await extractWithLlm(buffer);
+        if (llmText.length > text.length) {
+          text = llmText;
+          method = text.length >= MIN_TEXT_CHARS ? 'llm' : 'pdf-parse+llm';
         }
       } catch {
-        /* Claude opcional */
+        /* OCR com LLM opcional */
       }
     }
 

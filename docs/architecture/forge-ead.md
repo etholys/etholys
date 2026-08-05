@@ -239,7 +239,7 @@ Motores devem ser **determinísticos** na validação: mesma jogada + mesmo esta
 sequenceDiagram
   participant I as Instrutor
   participant API as POST /api/forge/games/generate
-  participant G as Gemini
+  participant G as LLM
   participant E as Editor FORGE
   participant M as Motor
 
@@ -491,7 +491,7 @@ export interface ForgeEngine {
 | **F2** | Gamificação básica (XP em `activity.completed`) | F1 |
 | **F3** | Motor `quiz_race` + atividade `quiz` | F1 |
 | **F4** | Motor `board` + `GameSession` | F1, GameSpec schema |
-| **F5** | `POST /games/generate` + editor rascunho | F4, Gemini |
+| **F5** | `POST /games/generate` + editor rascunho | F4, LLM |
 | **F6** | Trilha híbrida demo + certificado | F2–F5 |
 | **F7** | Webinars, marketplace, PRISM export | Core, F6 |
 
@@ -526,7 +526,7 @@ export interface ForgeEngine {
 |----------|---------|
 | [ETHOLYS_Arquitectura_v2.md](../../ETHOLYS_Arquitectura_v2.md) | Secção Sistema 5 FORGE (resumo + link aqui) |
 | [apps/web/app/hub/forge/page.tsx](../../apps/web/app/hub/forge/page.tsx) | Mockup UI |
-| [apps/web/lib/gemini-client.ts](../../apps/web/lib/gemini-client.ts) | Cliente LLM |
+| [apps/web/lib/llm-client.ts](../../apps/web/lib/llm-client.ts) | Cliente LLM |
 | [apps/web/lib/nexus-copilot-prompts.ts](../../apps/web/lib/nexus-copilot-prompts.ts) | Referência de estilo de prompts |
 | [apps/web/lib/integrated-workspace.ts](../../apps/web/lib/integrated-workspace.ts) | Chave `FORGE` |
 

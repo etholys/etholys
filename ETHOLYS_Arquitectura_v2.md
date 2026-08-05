@@ -6,7 +6,7 @@
 
 ## 1. Visión General del Ecosistema
 
-ETHOLYS opera como un holding de propiedad intelectual que diseña, desarrolla y licencia soluciones integradas (software + hardware + metodologías). El ecosistema se compone de **6 sistemas independientes** + **1 capa transversal** + **1 laboratorio interno**.
+ETHOLYS opera como un holding de propiedad intelectual que diseña, desarrolla y licencia soluciones integradas (software + hardware + metodologías). El ecosistema se compone de **6 sistemas independientes** + **Etholys Tools** (herramientas transversales) + **1 capa Core** + **1 laboratorio interno**.
 
 ### Principios Fundamentales
 
@@ -27,14 +27,18 @@ ETHOLYS opera como un holding de propiedad intelectual que diseña, desarrolla y
 │  ATLAS   │  SIEP    │ FundHub  │ NEXUS    │FORGE   │PRISM   │
 │  ERP 360 │Proyectos │ Captac.  │ MIPYMEs  │  EAD   │ BI 360 │
 ├──────────┴──────────┴──────────┴──────────┴────────┴────────┤
+│         ETHOLYS TOOLS (herramientas transversales)          │
+│     Advisor | Studio | Meet | CARTA | [futuras]             │
+├─────────────────────────────────────────────────────────────┤
 │            CAPA TRANSVERSAL: ETHOLYS CORE                   │
 │     (SSO, Chat, Docs, APIs, i18n, Permisos, Notif.)        │
 ├─────────────────────────────────────────────────────────────┤
 │            ETHOLYS LAB (Herramientas internas)              │
-│            MUSE | Smart Import | [futuras]                  │
+│            MUSE | ANVIL | Smart Import | [futuras]          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
+**Etholys Tools** ≠ Core: son productos/herramientas que el usuario abre (reunión, documento, aprobación). Spec: [docs/architecture/etholys-tools.md](./docs/architecture/etholys-tools.md).
 ### Modelo de Licenciamiento por Empresa
 
 ```
@@ -296,6 +300,7 @@ Espacio exclusivo para herramientas internas de la fábrica. No visible en ning�
 | Herramienta | Descripción | Estado |
 |-------------|-------------|--------|
 | MUSE | Motor Universal de Sugerencias Estratégicas — IA que analiza el ecosistema y propone innovaciones | ✅ Construido (/lab/muse) |
+| ANVIL | Agente de ingeniería interno (1 por proyecto): Etholys / externo / OSS + deploy flexible | ✅ F0–F1 (/lab/anvil) — ver docs/architecture/lab-anvil.md |
 | Smart Import | Importación inteligente de documentos de donantes → proyecto pre-llenado | 🔲 Planificado (add-on pago) |
 | Sistema de Invitaciones Lab | Acceso por ADMIN + código de invitación | ✅ Construido |
 

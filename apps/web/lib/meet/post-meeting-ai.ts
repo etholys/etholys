@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { geminiCompleteJsonText } from '@/lib/gemini-client';
+import { llmCompleteJsonText } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
 
 export type MeetAiActionDraft = {
@@ -68,7 +68,7 @@ export async function generateMeetPostMeetingAi(opts: {
     throw new Error('Notas/transcrição demasiado curtas (mín. ~20 caracteres)');
   }
 
-  const raw = await geminiCompleteJsonText(
+  const raw = await llmCompleteJsonText(
     'Devolves apenas JSON válido para pós-reunião Etholys Meet.',
     buildPrompt({ ...opts, notes }),
     { maxOutputTokens: 4096 },

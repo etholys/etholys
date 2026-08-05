@@ -19,9 +19,9 @@ export default function SiepSettingsPage() {
         </h1>
         <p className="mt-1 text-sm text-gray-600">
           {t(
-            'Preferências do módulo de gestão de projetos. Organização, utilizadores e licenças de sistemas ficam na administração Etholys.',
-            'Preferencias del módulo de gestión de proyectos. Organización, usuarios y licencias están en la administración Etholys.',
-            'Project management module preferences. Organization, users and system licenses live in Etholys administration.',
+            'Preferências do módulo de execução e inovação de projetos. Organização, utilizadores e licenças ficam na administração Etholys.',
+            'Preferencias del módulo de ejecución e innovación de proyectos. Organización, usuarios y licencias están en la administración Etholys.',
+            'Project execution & innovation preferences. Organization, users and system licenses live in Etholys administration.',
           )}
         </p>
       </header>
@@ -30,9 +30,9 @@ export default function SiepSettingsPage() {
         <h2 className="text-sm font-semibold text-gray-900">{t('Módulo SIEP', 'Módulo SIEP', 'SIEP module')}</h2>
         <p className="mt-2 text-sm text-gray-600">
           {t(
-            'Em breve: idioma de relatórios, templates de marco lógico, regras de aprovação de actividades e integração com orçamento ATLAS.',
-            'Próximamente: idioma de informes, plantillas de marco lógico y reglas de aprobación de actividades.',
-            'Coming soon: report language, logframe templates, activity approval rules, and ATLAS budget integration.',
+            'Preferências avançadas deste módulo ainda não estão disponíveis. Use os atalhos abaixo para organização e acessos.',
+            'Las preferencias avanzadas de este módulo aún no están disponibles. Use los atajos de abajo para organización y accesos.',
+            'Advanced preferences for this module are not available yet. Use the shortcuts below for organization and access.',
           )}
         </p>
       </section>

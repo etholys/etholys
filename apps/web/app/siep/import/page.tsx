@@ -196,7 +196,7 @@ export default function SmartImportPage() {
           err.error,
           err.detail && `Detalhe: ${err.detail}`,
           err.rawPreview && `Prévia da resposta: ${err.rawPreview}`,
-          err.geminiModel && `Modelo Gemini: ${err.geminiModel}`,
+          err.llmModel && `Modelo IA: ${err.llmModel}`,
           err.hint && `Dica: ${err.hint}`,
         ].filter(Boolean);
         throw new Error(lines.length ? lines.join('\n\n') : L(ml('Could not analyze files', 'No se pudieron analizar los archivos', 'Não foi possível analisar os arquivos')));

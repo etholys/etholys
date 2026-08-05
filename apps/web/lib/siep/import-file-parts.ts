@@ -1,12 +1,12 @@
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
-import type { GeminiPart } from '@/lib/gemini-client';
+import type { LlmPart } from '@/lib/llm-client';
 
 export async function buildImportSectionContent(files: File[]): Promise<{
-  userParts: GeminiPart[];
+  userParts: LlmPart[];
   fileNames: string[];
 }> {
-  const userParts: GeminiPart[] = [];
+  const userParts: LlmPart[] = [];
   const fileNames: string[] = [];
 
   userParts.push({

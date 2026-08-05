@@ -24,7 +24,6 @@ type TaxFiling = {
   createdBy: { id: string; name: string | null };
 };
 
-/* ===== Multilingual helpers ===== */
 type ML = { es: string; pt: string; en: string };
 const ml = (en: string, es: string, pt: string): ML => ({ en, es, pt });
 
@@ -44,9 +43,6 @@ const FORM_TYPES = [
   { value: '5472', label: 'Form 5472 — Information Return (25% Foreign-Owned U.S. Corp.)' },
 ];
 
-/* ================================================================
-   FORM 1120 – Faithful replica of IRS Form 1120
-   ================================================================ */
 const FORM_1120_SECTIONS: SectionDef[] = [
   {
     id: 'header',
@@ -211,7 +207,6 @@ const FORM_1120_SECTIONS: SectionDef[] = [
     titles: ml('Schedule K — Other Information', 'Schedule K — Otra Información', 'Schedule K — Outras Informações'),
     icon: FileText,
     fields: [
-      /* === Page 4: Questions 1–12 === */
       { key: 'accountingMethod', labels: ml('1. Check accounting method: a Cash, b Accrual, c Other (specify)', '1. Método contable: a Efectivo, b Devengo, c Otro (especifique)', '1. Método contábil: a Caixa, b Competência, c Outro (especifique)'), type: 'select', options: ['Cash', 'Accrual', 'Other'] },
       { key: 'schedK_q1_other', labels: ml('1c. (If "Other," specify)', '1c. (Si "Otro", especifique)', '1c. (Se "Outro", especifique)'), type: 'text' },
       { key: 'schedK_q2_code', labels: ml('2a. Business activity code no.', '2a. Código de actividad comercial', '2a. Código de atividade comercial'), type: 'text' },
@@ -235,7 +230,6 @@ const FORM_1120_SECTIONS: SectionDef[] = [
       { key: 'schedK_q11b', labels: ml('10. Enter the number of shareholders at the end of the tax year (if 100 or fewer) ▶', '10. Número de accionistas al final del año fiscal (si 100 o menos) ▶', '10. Número de acionistas no final do exercício (se 100 ou menos) ▶'), type: 'text' },
       { key: 'schedK_q12', labels: ml('11. If the corporation has an NOL for the tax year and is electing to forego the carryback period, check here (see instructions) ▶', '11. Si tiene NOL y elige renunciar al período de retroactividad, marque aquí ▶', '11. Se tem NOL e opta por renunciar ao período de retroatividade, marque aqui ▶'), type: 'select', options: ['Yes', 'No'] },
       { key: 'schedK_q15', labels: ml('12. Enter the available NOL carryover from prior tax years (do not reduce it by any deduction reported on page 1, line 29a) ▶ $', '12. Arrastre de NOL disponible de años anteriores (no reducir por línea 29a, pág. 1) ▶ $', '12. Saldo de NOL disponível de anos anteriores (não reduzir pela linha 29a, pág. 1) ▶ $'), type: 'money' },
-      /* === Page 5: Questions 13–32 === */
       { key: 'schedK_q13', labels: ml('13. Are the corporation\'s total receipts (page 1, line 1a, plus lines 4 through 10) for the tax year AND its total assets at the end of the tax year less than $250,000? If "Yes," the corporation is not required to complete Schedules L, M-1, and M-2.', '13. ¿Los ingresos totales Y activos totales son menores a $250,000? Si "Sí", no se requiere completar Schedules L, M-1 y M-2.', '13. As receitas totais E ativos totais são inferiores a $250.000? Se "Sim", não é necessário completar Schedules L, M-1 e M-2.'), type: 'select', options: ['Yes', 'No'] },
       { key: 'schedK_q14', labels: ml('14. Is the corporation required to file Schedule UTP (Form 1120), Uncertain Tax Position Statement? See instructions. If "Yes," complete and attach Schedule UTP.', '14. ¿Se requiere presentar Schedule UTP (Form 1120)? Si "Sí", complete y adjunte Schedule UTP.', '14. É necessário apresentar Schedule UTP (Form 1120)? Se "Sim", complete e anexe Schedule UTP.'), type: 'select', options: ['Yes', 'No'] },
       { key: 'schedK_q20', labels: ml('15a. Did the corporation make any payments in the calendar year that would require it to file Form(s) 1099?', '15a. ¿Realizó pagos que requieran presentar Form(s) 1099?', '15a. Fez pagamentos que exijam apresentar Form(s) 1099?'), type: 'select', options: ['Yes', 'No'] },
@@ -266,7 +260,6 @@ const FORM_1120_SECTIONS: SectionDef[] = [
     titles: ml('Schedule L — Balance Sheets per Books', 'Schedule L — Balance General según Libros', 'Schedule L — Balanço Patrimonial por Livros'),
     icon: FileText,
     fields: [
-      /* === ASSETS === */
       { key: 'cashBOY', labels: ml('1. Cash — Beginning of tax year', '1. Efectivo — Inicio del año fiscal', '1. Caixa — Início do exercício'), type: 'money' },
       { key: 'cashEOY', labels: ml('1. Cash — End of tax year', '1. Efectivo — Fin del año fiscal', '1. Caixa — Final do exercício'), type: 'money' },
       { key: 'accountsReceivableBOY', labels: ml('2a. Trade notes & accounts receivable — BOY', '2a. Cuentas por cobrar comerciales — Inicio', '2a. Contas a receber comerciais — Início'), type: 'money' },
@@ -301,7 +294,6 @@ const FORM_1120_SECTIONS: SectionDef[] = [
       { key: 'otherAssetsEOY', labels: ml('13. Other assets (attach statement) — EOY', '13. Otros activos (adjuntar declaración) — Fin', '13. Outros ativos (anexar declaração) — Final'), type: 'money' },
       { key: 'totalAssetsBOY', labels: ml('14. Total assets — BOY', '14. Total activos — Inicio', '14. Total de ativos — Início'), type: 'money', computed: true },
       { key: 'totalAssetsEOY', labels: ml('14. Total assets — EOY', '14. Total activos — Fin', '14. Total de ativos — Final'), type: 'money', computed: true },
-      /* === LIABILITIES === */
       { key: 'accountsPayableBOY', labels: ml('15. Accounts payable — BOY', '15. Cuentas por pagar — Inicio', '15. Contas a pagar — Início'), type: 'money' },
       { key: 'accountsPayableEOY', labels: ml('15. Accounts payable — EOY', '15. Cuentas por pagar — Fin', '15. Contas a pagar — Final'), type: 'money' },
       { key: 'mortgagesLT1yrBOY', labels: ml('16. Mortgages, notes, bonds payable in less than 1 year — BOY', '16. Hipotecas, pagarés, bonos pagaderos en menos de 1 año — Inicio', '16. Hipotecas, notas, títulos pagáveis em menos de 1 ano — Início'), type: 'money' },
@@ -316,7 +308,6 @@ const FORM_1120_SECTIONS: SectionDef[] = [
       { key: 'otherLiabilitiesEOY', labels: ml('20. Other liabilities (attach statement) — EOY', '20. Otros pasivos (adjuntar declaración) — Fin', '20. Outros passivos (anexar declaração) — Final'), type: 'money' },
       { key: 'totalLiabilitiesBOY', labels: ml('21. Total liabilities — BOY', '21. Total pasivos — Inicio', '21. Total de passivos — Início'), type: 'money', computed: true },
       { key: 'totalLiabilitiesEOY', labels: ml('21. Total liabilities — EOY', '21. Total pasivos — Fin', '21. Total de passivos — Final'), type: 'money', computed: true },
-      /* === STOCKHOLDERS' EQUITY === */
       { key: 'capitalStockBOY', labels: ml('22. Capital stock: a Preferred stock — BOY', '22. Capital social: a Acciones preferentes — Inicio', '22. Capital social: a Ações preferenciais — Início'), type: 'money' },
       { key: 'capitalStockEOY', labels: ml('22. Capital stock: a Preferred stock — EOY', '22. Capital social: a Acciones preferentes — Fin', '22. Capital social: a Ações preferenciais — Final'), type: 'money' },
       { key: 'additionalPaidInCapBOY', labels: ml('23. Additional paid-in capital — BOY', '23. Capital pagado adicional — Inicio', '23. Capital integralizado adicional — Início'), type: 'money' },
@@ -369,9 +360,6 @@ const FORM_1120_SECTIONS: SectionDef[] = [
   },
 ];
 
-/* ================================================================
-   FORM 5472 – Faithful replica of IRS Form 5472
-   ================================================================ */
 const FORM_5472_SECTIONS: SectionDef[] = [
   {
     id: 'partI',
@@ -522,9 +510,6 @@ const FORM_5472_SECTIONS: SectionDef[] = [
   },
 ];
 
-/* ================================================================
-   UI STRINGS (multilingual)
-   ================================================================ */
 const UI = {
   taxFilings: ml('Tax Filings', 'Declaraciones de Impuestos', 'Declarações de Impostos'),
   taxSubtitle: ml('IRS Forms 1120 and 5472 for foreign-owned U.S. LLCs', 'Formularios IRS 1120 y 5472 para LLC con propietario extranjero', 'Formulários IRS 1120 e 5472 para LLC com proprietário estrangeiro'),
@@ -824,7 +809,6 @@ export default function TaxFilingPage() {
 
   const isAutoField = (key: string) => autoData && key in autoData && !key.startsWith('_');
 
-  /* ===== Auto-compute CALC fields ===== */
   useEffect(() => {
     if (!activeFiling) return;
     const d = { ...formData };
@@ -872,16 +856,14 @@ export default function TaxFilingPage() {
       const m2l8 = m2l4 - m2l7;
       if (d.m2_line8 !== Math.round(m2l8 * 100) / 100) { d.m2_line8 = Math.round(m2l8 * 100) / 100; changed = true; }
 
-      // === Schedule C computed lines ===
-      // Line 9: Subtotal (lines 1-8)
+            // Line 9: Subtotal (lines 1-8)
       const schedC9 = num('schedC_1') + num('schedC_2') + num('schedC_3') + num('schedC_4') + num('schedC_5') + num('schedC_6') + num('schedC_7') + num('schedC_8');
       if (d.schedC_9 !== Math.round(schedC9 * 100) / 100) { d.schedC_9 = Math.round(schedC9 * 100) / 100; changed = true; }
       // Line 23: Total dividends and inclusions (lines 9-20)
       const schedC23 = schedC9 + num('schedC_10') + num('schedC_11') + num('schedC_12') + num('schedC_13') + num('schedC_14') + num('schedC_15') + num('schedC_16a') + num('schedC_16b') + num('schedC_16c') + num('schedC_17') + num('schedC_18') + num('schedC_19') + num('schedC_20');
       if (d.schedC_23 !== Math.round(schedC23 * 100) / 100) { d.schedC_23 = Math.round(schedC23 * 100) / 100; changed = true; }
 
-      // === Schedule J computed lines ===
-      // Line 6: Total income tax (1a through 5c)
+            // Line 6: Total income tax (1a through 5c)
       const schedJ6 = num('schedJ_1a') + num('schedJ_1b') + num('schedJ_2') + num('schedJ_3') + num('schedJ_4') + num('schedJ_5a') + num('schedJ_5b') + num('schedJ_5c');
       if (d.schedJ_6 !== Math.round(schedJ6 * 100) / 100) { d.schedJ_6 = Math.round(schedJ6 * 100) / 100; changed = true; }
       // Line 11: Total credits (7a through 10)
@@ -903,8 +885,7 @@ export default function TaxFilingPage() {
       const schedJ31 = schedJ28 + num('schedJ_29') + num('schedJ_30');
       if (d.schedJ_31 !== Math.round(schedJ31 * 100) / 100) { d.schedJ_31 = Math.round(schedJ31 * 100) / 100; changed = true; }
 
-      // === Schedule L auto-computed subtotals ===
-      // Line 14: Total assets (lines 1-13, noting 2b/10b/11b are subtractive)
+            // Line 14: Total assets (lines 1-13, noting 2b/10b/11b are subtractive)
       const totalAssetsBOY = num('cashBOY') + num('accountsReceivableBOY') - num('badDebtAllowanceBOY')
         + num('inventoriesBOY') + num('usGovObligationsBOY') + num('taxExemptSecuritiesBOY')
         + num('otherCurrentAssetsBOY') + num('loansToStockholdersBOY') + num('mortgageRealEstateLoansBOY')
@@ -949,7 +930,6 @@ export default function TaxFilingPage() {
     if (changed) setFormData(d);
   }, [formData, activeFiling]);
 
-  /* ====== LIST VIEW ====== */
   if (view === 'list') {
     return (
       <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
@@ -1052,7 +1032,6 @@ export default function TaxFilingPage() {
     );
   }
 
-  /* ====== FORM EDITOR VIEW ====== */
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-4">
       {/* Top bar */}

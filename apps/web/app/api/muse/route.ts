@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { geminiStreamAsOpenAICompatibleSSE } from '@/lib/gemini-client';
+import { llmStreamAsOpenAICompatibleSSE } from '@/lib/llm-client';
 
 // GET: fetch saved suggestions
 export async function GET(req: Request) {
@@ -190,11 +190,11 @@ INSTRUCCIONES:
 - Responde siempre en espa\u00f1ol
 - S\u00e9 concreto y accionable
 - Prioriza sugerencias por impacto
-- Considera el contexto de desarrollo rural y comercio
+- Considera el contexto multi-sector del ecosistema Etholys (institucional, empresarial, cooperación, formación, MIPYMEs)
 - No repitas sugerencias previamente generadas (ver previousSuggestions)
 - Formato: responde en texto libre, claro y bien estructurado con secciones y puntos clave`;
 
-    const stream = geminiStreamAsOpenAICompatibleSSE(systemPrompt, userPrompt);
+    const stream = llmStreamAsOpenAICompatibleSSE(systemPrompt, userPrompt);
 
     return new Response(stream, {
       headers: {

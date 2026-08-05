@@ -4,16 +4,20 @@ import { useApp } from '@/app/providers';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { Sparkles, ArrowRight, FlaskConical, Users, Plus, X, Copy, Check, Trash2, Mail, Hammer } from 'lucide-react';
+import { Sparkles, ArrowRight, FlaskConical, Users, Plus, Copy, Check, Trash2, Mail, Hammer } from 'lucide-react';
 
 const tools = [
   {
     id: 'muse',
     name: 'MUSE',
-    tagline: { es: 'Motor Universal de Sugerencias Estrat&eacute;gicas', pt: 'Motor Universal de Sugest&otilde;es Estrat&eacute;gicas', en: 'Universal Strategic Suggestions Engine' },
+    tagline: {
+      es: 'Motor Universal de Sugerencias Estratégicas',
+      pt: 'Motor Universal de Sugestões Estratégicas',
+      en: 'Universal Strategic Suggestions Engine',
+    },
     description: {
-      es: 'Director de innovaci&oacute;n IA que observa el ecosistema, identifica patrones y propone nuevos sistemas, mejoras y optimizaciones.',
-      pt: 'Diretor de inova&ccedil;&atilde;o IA que observa o ecossistema, identifica padr&otilde;es e prop&otilde;e novos sistemas, melhorias e otimiza&ccedil;&otilde;es.',
+      es: 'Director de innovación con IA que observa el ecosistema, identifica patrones y propone nuevos sistemas, mejoras y optimizaciones.',
+      pt: 'Diretor de inovação com IA que observa o ecossistema, identifica padrões e propõe novos sistemas, melhorias e otimizações.',
       en: 'AI innovation director that observes the ecosystem, identifies patterns, and proposes new systems, improvements, and optimizations.',
     },
     icon: Sparkles,
@@ -25,13 +29,13 @@ const tools = [
     id: 'anvil',
     name: 'ANVIL',
     tagline: {
-      es: 'Agente de ingenier&iacute;a interno (1 por proyecto)',
+      es: 'Agente de ingeniería interno (1 por proyecto)',
       pt: 'Agente de engenharia interno (1 por projeto)',
       en: 'Internal engineering agent (1 per project)',
     },
     description: {
-      es: 'Desarrolla y publica software interno Etholys, externo o OSS con pol&iacute;ticas de reuso y deploy flexible (preview → Contabo/custom).',
-      pt: 'Desenvolve e publica software interno Etholys, externo ou OSS com pol&iacute;ticas de reuso e deploy flex&iacute;vel (preview → Contabo/custom).',
+      es: 'Desarrolla y publica software interno Etholys, externo o OSS con políticas de reuso y deploy flexible (preview → Contabo/custom).',
+      pt: 'Desenvolve e publica software interno Etholys, externo ou OSS com políticas de reuso e deploy flexível (preview → Contabo/custom).',
       en: 'Build and ship Etholys-internal, external, or OSS software with reuse policies and flexible deploy (preview → Contabo/custom).',
     },
     icon: Hammer,
@@ -93,7 +97,6 @@ export default function LabPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
@@ -106,9 +109,10 @@ export default function LabPage() {
           </div>
           <p className="text-slate-400 text-sm ml-[52px]">
             {locale === 'es'
-              ? 'Herramientas internas de la f&aacute;brica de soluciones.'
-              : locale === 'pt' ? 'Ferramentas internas da f&aacute;brica de solu&ccedil;&otilde;es.'
-              : 'Internal tools from the solutions factory.'}
+              ? 'Herramientas internas de la fábrica de soluciones.'
+              : locale === 'pt'
+                ? 'Ferramentas internas da fábrica de soluções.'
+                : 'Internal tools from the solutions factory.'}
           </p>
         </div>
         {isAdmin && (
@@ -124,7 +128,6 @@ export default function LabPage() {
         )}
       </div>
 
-      {/* Invitations Panel (Admin only) */}
       {isAdmin && showInvites && (
         <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
           <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
@@ -132,7 +135,6 @@ export default function LabPage() {
             {locale === 'es' ? 'Gestionar Invitaciones' : locale === 'pt' ? 'Gerenciar Convites' : 'Manage Invitations'}
           </h3>
 
-          {/* Create invite */}
           <div className="flex gap-2 mb-4">
             <input
               type="email"
@@ -151,9 +153,8 @@ export default function LabPage() {
             </button>
           </div>
 
-          {/* Invite list */}
           {invites.length === 0 ? (
-            <p className="text-sm text-slate-500">{locale === 'es' ? 'Sin invitaciones a&uacute;n.' : locale === 'pt' ? 'Sem convites ainda.' : 'No invitations yet.'}</p>
+            <p className="text-sm text-slate-500">{locale === 'es' ? 'Sin invitaciones aún.' : locale === 'pt' ? 'Sem convites ainda.' : 'No invitations yet.'}</p>
           ) : (
             <div className="space-y-2">
               {invites.map((inv: any) => (
@@ -192,7 +193,6 @@ export default function LabPage() {
         </div>
       )}
 
-      {/* Tool Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {tools.map((tool) => {
           const Icon = tool.icon;
@@ -214,8 +214,8 @@ export default function LabPage() {
                 )}
               </div>
               <h3 className="text-xl font-bold text-white mb-1">{tool.name}</h3>
-              <p className="text-sm font-medium text-violet-300 mb-3" dangerouslySetInnerHTML={{ __html: tool.tagline[locale] || tool.tagline.es }} />
-              <p className="text-sm text-slate-400 leading-relaxed mb-4" dangerouslySetInnerHTML={{ __html: tool.description[locale] || tool.description.es }} />
+              <p className="text-sm font-medium text-violet-300 mb-3">{tool.tagline[locale] || tool.tagline.es}</p>
+              <p className="text-sm text-slate-400 leading-relaxed mb-4">{tool.description[locale] || tool.description.es}</p>
               <div className="flex items-center gap-1 text-violet-400 text-sm font-medium group-hover:gap-2 transition-all">
                 {locale === 'es' ? 'Acceder' : locale === 'pt' ? 'Acessar' : 'Access'}
                 <ArrowRight className="w-4 h-4" />

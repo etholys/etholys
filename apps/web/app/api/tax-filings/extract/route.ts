@@ -4,14 +4,12 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import * as XLSX from 'xlsx';
-import { geminiCompleteJsonText, geminiCompleteVision, imageMimeFromFilename } from '@/lib/gemini-client';
+import { llmCompleteJsonText, llmCompleteVision, imageMimeFromFilename } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
 
-// ============================================================
 // GENERIC TAX DATA EXTRACTION
 // Mode 1: Excel/CSV with "IRS Category" column → deterministic
 // Mode 2: AI extraction for PDFs and uncategorized files
-// ============================================================
 
 type ExtractedTransaction = {
   date: string;
@@ -110,9 +108,7 @@ const CATEGORY_TO_FORM_LINE: Record<string, { line: string; field: string; type:
   'unclassified': { line: 'N/A', field: '_unclassified', type: 'excluded' },
 };
 
-// ============================================================
 // CSV PARSING UTILITIES
-// ============================================================
 
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
@@ -133,10 +129,8 @@ function parseCSVLine(line: string): string[] {
   return result;
 }
 
-// ============================================================
 // MODE 1: CATEGORIZED EXCEL (deterministic)
 // Requires "IRS Category" or "Categoria IRS" column
-// ============================================================
 
 function isCategorizedFile(csvText: string): boolean {
   const firstLine = csvText.split('\n')[0]?.toLowerCase() || '';
@@ -184,10 +178,8 @@ function parseCategorizedFile(csvText: string, fileName: string): ExtractionResu
   };
 }
 
-// ============================================================
 // MODE 2: GENERIC CSV PARSING (no IRS Category)
 // Parses transactions but marks them as needing AI or manual classification
-// ============================================================
 
 function parseGenericCSV(csvText: string, fileName: string): ExtractionResult {
   const lines = csvText.split('\n');
@@ -240,10 +232,8 @@ function parseGenericCSV(csvText: string, fileName: string): ExtractionResult {
   };
 }
 
-// ============================================================
 // MODE 3: AI EXTRACTION (for PDFs and complex files)
 // Generic prompt — no company-specific context
-// ============================================================
 
 async function extractWithAI(base64Content: string, fileName: string, formType: string): Promise<ExtractionResult> {
   const transactions: ExtractedTransaction[] = [];
@@ -300,7 +290,7 @@ Return ONLY valid JSON:
 
     if (lower.match(/\.(png|jpg|jpeg|webp|gif|bmp)$/)) {
       try {
-        text = await geminiCompleteVision(
+        text = await llmCompleteVision(
           systemMsg,
           prompt,
           buffer.toString('base64'),
@@ -308,11 +298,11 @@ Return ONLY valid JSON:
           { maxOutputTokens: 8192 }
         );
       } catch (e: any) {
-        console.error('[Tax Extract AI] Gemini vision:', e);
+        console.error('[Tax Extract AI] vision:', e);
         return {
           transactions,
           mode: 'ai',
-          summary: e?.message || 'Error: IA imagen (Gemini)',
+          summary: e?.message || 'Error: IA imagen',
         };
       }
     } else if (lower.endsWith('.pdf')) {
@@ -329,24 +319,24 @@ Return ONLY valid JSON:
         return { transactions, mode: 'ai', summary: 'PDF sin texto extraíble' };
       }
       try {
-        text = await geminiCompleteJsonText(
+        text = await llmCompleteJsonText(
           systemMsg,
           `${prompt}\n\n--- DOCUMENT TEXT ---\n${docText.slice(0, 100000)}`,
           { maxOutputTokens: 8192 }
         );
       } catch (e: any) {
-        console.error('[Tax Extract AI] Gemini:', e);
-        return { transactions, mode: 'ai', summary: e?.message || 'Error Gemini' };
+        console.error('[Tax Extract AI]:', e);
+        return { transactions, mode: 'ai', summary: e?.message || 'Error IA' };
       }
     } else {
       const docText = buffer.toString('utf-8').slice(0, 100000);
       try {
-        text = await geminiCompleteJsonText(systemMsg, `${prompt}\n\n--- DOCUMENT ---\n${docText}`, {
+        text = await llmCompleteJsonText(systemMsg, `${prompt}\n\n--- DOCUMENT ---\n${docText}`, {
           maxOutputTokens: 8192,
         });
       } catch (e: any) {
-        console.error('[Tax Extract AI] Gemini:', e);
-        return { transactions, mode: 'ai', summary: e?.message || 'Error Gemini' };
+        console.error('[Tax Extract AI]:', e);
+        return { transactions, mode: 'ai', summary: e?.message || 'Error IA' };
       }
     }
     let parsed: any = {};
@@ -391,9 +381,7 @@ Return ONLY valid JSON:
   }
 }
 
-// ============================================================
 // SPREADSHEET PARSING (xlsx/xls to CSV)
-// ============================================================
 
 function parseSpreadsheetToCSV(base64Content: string): string {
   try {
@@ -417,9 +405,7 @@ function isSpreadsheet(fileName: string): boolean {
   return ext.endsWith('.xlsx') || ext.endsWith('.xls') || ext.endsWith('.csv');
 }
 
-// ============================================================
 // AGGREGATION: Transactions → Form Fields
-// ============================================================
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -542,9 +528,7 @@ function aggregateToForm5472(transactions: ExtractedTransaction[]): Record<strin
   };
 }
 
-// ============================================================
 // MAIN API HANDLER
-// ============================================================
 
 export async function POST(req: Request) {
   try {

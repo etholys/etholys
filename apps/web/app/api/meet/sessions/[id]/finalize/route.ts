@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { getMeetSessionForCompany } from '@/lib/meet/create-session';
 import { generateMeetPostMeetingAi } from '@/lib/meet/post-meeting-ai';
+import { notifyMeetActionsPending } from '@/lib/meet/notify-pending-actions';
 import { prisma } from '@/lib/prisma';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -104,6 +105,14 @@ export async function POST(req: Request, ctx: Ctx) {
         participants: true,
         actionItems: { orderBy: { sortOrder: 'asc' } },
       },
+    });
+
+    await notifyMeetActionsPending({
+      companyId,
+      sessionId: session.id,
+      sessionTitle: session.title,
+      createdById: session.createdById,
+      draftCount: createdActions.length,
     });
 
     return NextResponse.json({

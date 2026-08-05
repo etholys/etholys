@@ -2411,6 +2411,7 @@ model MeetSession {
   forgeLiveSession   ForgeLiveSession? @relation(fields: [forgeLiveSessionId], references: [id], onDelete: SetNull)
   participants       MeetParticipant[]
   actionItems        MeetActionItem[]
+  transcriptSegments MeetTranscriptSegment[]
 
   @@index([companyId, scheduledAt])
   @@index([projectId])
@@ -2435,6 +2436,25 @@ model MeetParticipant {
   @@index([sessionId])
   @@index([userId])
   @@index([email])
+}
+
+/// Trecho de transcrição ao vivo enviado pelo Jigasi/Jitsi, atribuído ao participante.
+model MeetTranscriptSegment {
+  id              String      @id @default(cuid())
+  sessionId       String
+  messageId       String
+  participantId   String?
+  participantName String
+  language        String?
+  text            String      @db.Text
+  startedAt       DateTime    @default(now())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  session         MeetSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, messageId])
+  @@index([sessionId, startedAt])
+  @@index([participantId])
 }
 
 /// Próximo passo / tarefa pré-criada pela IA — validação humana antes de virar Task SIEP

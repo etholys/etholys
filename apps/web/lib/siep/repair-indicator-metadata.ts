@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { geminiGenerateContent } from '@/lib/gemini-client';
+import { llmGenerateContent } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
 import { extractIndicatorFields, inferUnitFromTitle, metricsMissing } from '@/lib/siep/indicator-fields';
 
@@ -103,7 +103,7 @@ ${JSON.stringify(payload)}
 
 Responda APENAS JSON: { "items": [{ "id", "unitOfMeasure", "baseline", "target" }] }`;
 
-  const { text } = await geminiGenerateContent({
+  const { text } = await llmGenerateContent({
     systemInstruction: prompt,
     userParts: [{ text: 'Preencha metadados M&E em falta.' }],
     temperature: 0.1,

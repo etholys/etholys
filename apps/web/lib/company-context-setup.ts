@@ -1,5 +1,5 @@
 /**
- * Dados do assistente de contexto (Fase 2) — alimenta priorização e futuros feature flags.
+ * Dados do assistente de contexto — alimenta priorização e feature flags.
  * Não constitui aconselhamento legal ou fiscal; o utilizador confirma com o seu contador.
  */
 export const COMPANY_SECTORS = [
@@ -57,12 +57,12 @@ export const MODULE_HINT_LABEL: Record<
   ModuleHintCode,
   { pt: string; es: string; en: string }
 > = {
-  ATLAS: { pt: 'ATLAS (finanças, stock, POs)', es: 'ATLAS (finanzas, stock, OCs)', en: 'ATLAS (finance, stock, POs)' },
-  SIEP: { pt: 'SIEP (projetos e execução)', es: 'SIEP (proyectos)', en: 'SIEP (projects & delivery)' },
-  FUNDHUB: { pt: 'FUNDHUB (funding e propostas)', es: 'FUNDHUB (funding y propuestas)', en: 'FUNDHUB (funding & proposals)' },
-  NEXUS: { pt: 'NEXUS (rede, roadmap)', es: 'NEXUS (red, hoja de ruta)', en: 'NEXUS (network, roadmap)' },
-  PRISM: { pt: 'PRISM (M&E, evidência para funders)', es: 'PRISM (M&E, evidencia)', en: 'PRISM (M&E, donor evidence)' },
-  CARTA: { pt: 'CARTA (aprovações ligeiras)', es: 'CARTA (aprobaciones)', en: 'CARTA (light approvals)' },
+  ATLAS: { pt: 'ATLAS (ERP 360°, finanças, stock)', es: 'ATLAS (ERP 360°, finanzas, stock)', en: 'ATLAS (ERP 360°, finance, stock)' },
+  SIEP: { pt: 'SIEP (execução e inovação de projetos)', es: 'SIEP (ejecución e innovación de proyectos)', en: 'SIEP (project execution & innovation)' },
+  FUNDHUB: { pt: 'FUNDHUB (captação e propostas)', es: 'FUNDHUB (captación y propuestas)', en: 'FUNDHUB (funding & proposals)' },
+  NEXUS: { pt: 'NEXUS (diagnóstico MIPYME, rota)', es: 'NEXUS (diagnóstico MIPYME, ruta)', en: 'NEXUS (MIPYME diagnosis, roadmap)' },
+  PRISM: { pt: 'PRISM (BI 360°, dashboards)', es: 'PRISM (BI 360°, dashboards)', en: 'PRISM (BI 360°, dashboards)' },
+  CARTA: { pt: 'CARTA (governação e aprovações)', es: 'CARTA (gobernanza y aprobaciones)', en: 'CARTA (governance & approvals)' },
 };
 
 export function emptyContextSetup(): CompanyContextSetup {

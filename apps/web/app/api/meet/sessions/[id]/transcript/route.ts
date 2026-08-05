@@ -1,0 +1,116 @@
+export const dynamic = 'force-dynamic';
+
+import { NextResponse } from 'next/server';
+import { getUserCompanyIds } from '@/lib/tenant';
+import { getMeetSessionForCompany } from '@/lib/meet/create-session';
+import { prisma } from '@/lib/prisma';
+
+type Ctx = { params: Promise<{ id: string }> };
+
+function renderTranscript(
+  rows: Array<{ participantName: string; text: string; startedAt: Date }>,
+): string {
+  return rows
+    .map((row) => {
+      const time = row.startedAt.toISOString().slice(11, 19);
+      return `[${time}] ${row.participantName}: ${row.text}`;
+    })
+    .join('\n');
+}
+
+export async function GET(req: Request, ctx: Ctx) {
+  try {
+    const tenant = await getUserCompanyIds();
+    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+
+    const { id } = await ctx.params;
+    const companyId = new URL(req.url).searchParams.get('companyId')?.trim();
+    if (!companyId || !tenant.companyIds.includes(companyId)) {
+      return NextResponse.json({ error: 'companyId inválido' }, { status: 400 });
+    }
+    const session = await getMeetSessionForCompany(id, companyId);
+    if (!session) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+
+    const segments = await prisma.meetTranscriptSegment.findMany({
+      where: { sessionId: id },
+      orderBy: [{ startedAt: 'asc' }, { createdAt: 'asc' }],
+      take: 5000,
+    });
+    return NextResponse.json({ segments, transcriptText: renderTranscript(segments) });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error interno';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+/** Persiste apenas chunks finais emitidos por transcriptionChunkReceived (Jigasi). */
+export async function POST(req: Request, ctx: Ctx) {
+  try {
+    const tenant = await getUserCompanyIds();
+    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+
+    const { id } = await ctx.params;
+    const body = (await req.json()) as {
+      companyId?: string;
+      messageId?: string;
+      participantId?: string;
+      participantName?: string;
+      language?: string;
+      text?: string;
+      startedAt?: string;
+    };
+    const companyId = body.companyId?.trim();
+    if (!companyId || !tenant.companyIds.includes(companyId)) {
+      return NextResponse.json({ error: 'companyId inválido' }, { status: 400 });
+    }
+    const session = await getMeetSessionForCompany(id, companyId);
+    if (!session) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+
+    const messageId = body.messageId?.trim().slice(0, 200);
+    const text = body.text?.trim().slice(0, 20_000);
+    if (!messageId || !text) {
+      return NextResponse.json({ error: 'messageId e text obrigatórios' }, { status: 400 });
+    }
+    const participantName =
+      body.participantName?.trim().slice(0, 200) || 'Participante';
+    const parsedDate = body.startedAt ? new Date(body.startedAt) : new Date();
+    const startedAt = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+
+    const segment = await prisma.meetTranscriptSegment.upsert({
+      where: { sessionId_messageId: { sessionId: id, messageId } },
+      create: {
+        sessionId: id,
+        messageId,
+        participantId: body.participantId?.trim().slice(0, 200) || null,
+        participantName,
+        language: body.language?.trim().slice(0, 20) || null,
+        text,
+        startedAt,
+      },
+      update: {
+        participantId: body.participantId?.trim().slice(0, 200) || null,
+        participantName,
+        language: body.language?.trim().slice(0, 20) || null,
+        text,
+      },
+    });
+
+    // Mantém o campo legado sincronizado para resumo/finalização e exportação simples.
+    const rows = await prisma.meetTranscriptSegment.findMany({
+      where: { sessionId: id },
+      orderBy: [{ startedAt: 'asc' }, { createdAt: 'asc' }],
+      select: { participantName: true, text: true, startedAt: true },
+      take: 5000,
+    });
+    await prisma.meetSession.update({
+      where: { id },
+      data: { transcriptText: renderTranscript(rows).slice(0, 100_000) },
+    });
+
+    return NextResponse.json({ segment });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error interno';
+    console.error('[meet/transcript]', error);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

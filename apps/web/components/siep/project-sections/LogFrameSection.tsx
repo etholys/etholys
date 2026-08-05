@@ -8,9 +8,6 @@ import { flattenObjectives, describeReparentError } from '@/lib/siep/objective-h
 import DiamantLogico from './DiamantLogico';
 import HierarchyLinkPanel from './HierarchyLinkPanel';
 
-/* ================================================================
-   ALL NODE TYPES
-   ================================================================ */
 interface NodeType { value: string; label: string; color: string }
 
 const ALL_TYPES: NodeType[] = [
@@ -32,9 +29,6 @@ const getLabel = (type: string) => ALL_TYPES.find(t => t.value === type)?.label 
 
 type LogFrameView = 'diagram' | 'hierarchy' | 'fix';
 
-/* ================================================================
-   MAIN COMPONENT — Marco Lógico com sub-abas
-   ================================================================ */
 export default function LogFrameSection({ project, onRefresh, tr }: SectionProps) {
   const [activeView, setActiveView] = useState<LogFrameView>('diagram');
   const [showForm, setShowForm] = useState(false);
@@ -92,7 +86,6 @@ export default function LogFrameSection({ project, onRefresh, tr }: SectionProps
       })
     : ALL_TYPES;
 
-  /* ---- Handlers ---- */
   const openCreate = (pid: string | null, type: string, lane?: string) => {
     setParentId(pid);
     setFormLane(lane || '');
@@ -246,7 +239,7 @@ export default function LogFrameSection({ project, onRefresh, tr }: SectionProps
         </div>
       </div>
 
-      {/* ============ CREATE MODAL ============ */}
+      {}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
@@ -340,7 +333,7 @@ export default function LogFrameSection({ project, onRefresh, tr }: SectionProps
         </div>
       )}
 
-      {/* ============ EDIT MODAL ============ */}
+      {}
       {editSwimObj && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>

@@ -1,6 +1,5 @@
 /**
- * Cliente Anthropic Claude (Messages API) — LLM único na aplicação Next.js.
- * @see https://docs.anthropic.com/en/api/messages
+ * Cliente LLM — único provider de modelo na aplicação Next.js.
  */
 
 const ANTHROPIC_API_ROOT = 'https://api.anthropic.com/v1';
@@ -62,7 +61,7 @@ function isAuthLlmError(status: number, body: string): boolean {
   return /authentication_error|invalid.?api.?key|permission/i.test(body);
 }
 
-/** Limite alto para JSON grande (importação SIEP, extratos). Claude aceita até ~64k em vários modelos. */
+/** Limite alto para JSON grande (importação SIEP, extratos). */
 export const DEFAULT_LLM_MAX_OUTPUT = 32000;
 
 export function getLlmApiKey(): string {
@@ -71,7 +70,7 @@ export function getLlmApiKey(): string {
     process.env.CLAUDE_API_KEY ||
     process.env.LLM_API_KEY;
   if (!key?.trim()) {
-    throw new Error('Falta ANTHROPIC_API_KEY no .env (https://platform.claude.com/settings/keys)');
+    throw new Error('Falta chave LLM no .env (ANTHROPIC_API_KEY ou LLM_API_KEY)');
   }
   return key.trim();
 }
@@ -104,7 +103,7 @@ export function getLlmMaxOutputTokens(override?: number): number {
   return clampMaxTokens(override ?? base);
 }
 
-/** Parte multimodal compatível com o formato antigo (GeminiPart). */
+/** Parte multimodal (texto / imagem / documento). */
 export type LlmPart = {
   text?: string;
   inlineData?: { mimeType: string; data: string };
@@ -117,7 +116,7 @@ export type LlmGenerateOptions = {
   maxOutputTokens?: number;
   temperature?: number;
   responseMimeType?: 'application/json' | 'text/plain';
-  /** Pesquisa web via tool Anthropic web_search. */
+  /** Pesquisa web via tool do provider (web_search). */
   webSearch?: boolean;
   /** Força um modelo específico (ex.: claude-opus-4-6 para redacção SIEP). */
   model?: string;
@@ -166,7 +165,7 @@ function partsToAnthropicContent(parts: LlmPart[]): AnthropicContentBlock[] {
     }
     out.push({
       type: 'text',
-      text: `[Anexo binário omitido: tipo ${mime} não suportado nativamente pelo Claude. Preferir PDF, imagem ou texto extraído.]`,
+      text: `[Anexo binário omitido: tipo ${mime} não suportado nativamente pelo modelo. Preferir PDF, imagem ou texto extraído.]`,
     });
   }
   if (out.length === 0) {
@@ -248,8 +247,8 @@ export async function llmGenerateContent(opts: LlmGenerateOptions): Promise<LlmG
 
   throw new Error(
     lastError
-      ? `Claude API: todos os modelos falharam.\n${summary}\nÚltimo erro: ${lastError.message.slice(0, 400)}`
-      : `Claude API: falha após tentativas com todos os modelos.\n${summary}`,
+      ? `LLM: todos os modelos falharam.\n${summary}\nÚltimo erro: ${lastError.message.slice(0, 400)}`
+      : `LLM: falha após tentativas com todos os modelos.\n${summary}`,
   );
 }
 
@@ -304,12 +303,12 @@ async function llmGenerateContentWithModel(
   const errText = await response.text();
   if (!response.ok) {
     if (isAuthLlmError(response.status, errText)) {
-      throw new Error(`Claude API (${model}): ${errText.slice(0, 800)}`);
+      throw new Error(`LLM (${model}): ${errText.slice(0, 800)}`);
     }
     if (shouldTryNextModel(response.status, errText)) {
-      throw new Error(`Claude API (${model}): ${errText.slice(0, 800)}`);
+      throw new Error(`LLM (${model}): ${errText.slice(0, 800)}`);
     }
-    throw new Error(`Claude API (${model}): ${errText.slice(0, 800)}`);
+    throw new Error(`LLM (${model}): ${errText.slice(0, 800)}`);
   }
 
   let data: {
@@ -320,17 +319,17 @@ async function llmGenerateContentWithModel(
   try {
     data = JSON.parse(errText) as typeof data;
   } catch {
-    throw new Error(`Claude API (${model}): resposta inválida`);
+    throw new Error(`LLM (${model}): resposta inválida`);
   }
 
   if (data.error?.message) {
-    throw new Error(`Claude API (${model}): ${data.error.message}`);
+    throw new Error(`LLM (${model}): ${data.error.message}`);
   }
 
   const { text: rawText, searchQueries } = extractTextAndQueries(data);
   if (!rawText.trim() && !opts.webSearch) {
     const reason = data.stop_reason || 'sem content';
-    throw new Error(`Claude API (${model}): resposta vazia (${reason})`);
+    throw new Error(`LLM (${model}): resposta vazia (${reason})`);
   }
 
   let text = rawText;
@@ -373,13 +372,13 @@ export async function llmCompleteJsonText(
   });
   if (finishReason === 'MAX_TOKENS') {
     throw new Error(
-      'Claude cortou a resposta (limite de saída). Aumente LLM_MAX_OUTPUT_TOKENS no .env (até 64000), divida o ficheiro em partes menores, ou reduza linhas no Excel/CSV.',
+      'A IA cortou a resposta (limite de saída). Aumente LLM_MAX_OUTPUT_TOKENS no .env (até 64000), divida o ficheiro em partes menores, ou reduza linhas no Excel/CSV.',
     );
   }
   return text;
 }
 
-/** Pesquisa web via Anthropic web_search tool. */
+/** Pesquisa web via tool do provider. */
 export async function llmCompleteWithWebSearch(
   systemInstruction: string,
   userText: string,
@@ -407,7 +406,7 @@ export async function llmCompleteWithWebSearch(
     }
   }
 
-  throw lastError ?? new Error('Claude web search: todos os modelos falharam');
+  throw lastError ?? new Error('LLM web search: todos os modelos falharam');
 }
 
 export async function llmCompleteVision(
@@ -426,7 +425,7 @@ export async function llmCompleteVision(
   });
   if (finishReason === 'MAX_TOKENS') {
     throw new Error(
-      'Claude cortou a resposta (limite de saída). Aumente LLM_MAX_OUTPUT_TOKENS no .env (até 64000) e reinicie o servidor.',
+      'A IA cortou a resposta (limite de saída). Aumente LLM_MAX_OUTPUT_TOKENS no .env (até 64000) e reinicie o servidor.',
     );
   }
   return text;
@@ -451,7 +450,7 @@ export async function llmCompleteJsonWithPdf(
   });
   if (finishReason === 'MAX_TOKENS') {
     throw new Error(
-      'Claude cortou a resposta (limite de saída). Aumente LLM_MAX_OUTPUT_TOKENS no .env (até 64000), ou use um PDF mais curto.',
+      'A IA cortou a resposta (limite de saída). Aumente LLM_MAX_OUTPUT_TOKENS no .env (até 64000), ou use um PDF mais curto.',
     );
   }
   return text;
@@ -493,7 +492,7 @@ export function llmStreamAsOpenAICompatibleSSE(
         const msg = e instanceof Error ? e.message : String(e);
         controller.enqueue(
           encoder.encode(
-            `data: ${JSON.stringify({ choices: [{ delta: { content: `Erro Claude: ${msg.slice(0, 400)}` } }] })}\n\n`,
+            `data: ${JSON.stringify({ choices: [{ delta: { content: `Erro IA: ${msg.slice(0, 400)}` } }] })}\n\n`,
           ),
         );
       } finally {

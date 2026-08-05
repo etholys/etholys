@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import type { GeminiPart } from '@/lib/gemini-client';
-import { geminiGenerateContent } from '@/lib/gemini-client';
-import { buildGeminiAttachmentsFromFiles } from '@/lib/nexus-chat-attachments';
+import type { LlmPart } from '@/lib/llm-client';
+import { llmGenerateContent } from '@/lib/llm-client';
+import { buildLlmAttachmentsFromFiles } from '@/lib/nexus-chat-attachments';
 import { tryMergeNexusMirrorAfterCopilotReply } from '@/lib/nexus-mirror-extract';
 import { buildNexusAdvisorContextBlock } from '@/lib/nexus-ai-context';
 import { buildNexusCopilotSnapshot } from '@/lib/nexus-copilot-snapshot';
@@ -29,7 +29,7 @@ async function parseAdvisorPostBody(req: NextRequest): Promise<
   | {
       ok: true;
       body: Record<string, unknown>;
-      attachmentGeminiParts: GeminiPart[];
+      attachmentLlmParts: LlmPart[];
       attachmentSummarySuffix: string;
       attachmentsMeta: Array<{ name: string; mimeType: string; size: number }>;
     }
@@ -42,7 +42,7 @@ async function parseAdvisorPostBody(req: NextRequest): Promise<
       return {
         ok: true,
         body,
-        attachmentGeminiParts: [],
+        attachmentLlmParts: [],
         attachmentSummarySuffix: '',
         attachmentsMeta: [],
       };
@@ -98,18 +98,18 @@ async function parseAdvisorPostBody(req: NextRequest): Promise<
     return {
       ok: true,
       body,
-      attachmentGeminiParts: [],
+      attachmentLlmParts: [],
       attachmentSummarySuffix: '',
       attachmentsMeta: [],
     };
   }
 
   try {
-    const built = await buildGeminiAttachmentsFromFiles(blobs, names);
+    const built = await buildLlmAttachmentsFromFiles(blobs, names);
     return {
       ok: true,
       body,
-      attachmentGeminiParts: built.geminiParts,
+      attachmentLlmParts: built.llmParts,
       attachmentSummarySuffix: built.summaryLine,
       attachmentsMeta: built.meta,
     };
@@ -269,7 +269,7 @@ export async function POST(
   if (!parsedBody.ok) {
     return NextResponse.json({ error: parsedBody.error }, { status: parsedBody.status ?? 400 });
   }
-  const { body, attachmentGeminiParts, attachmentSummarySuffix, attachmentsMeta } = parsedBody;
+  const { body, attachmentLlmParts, attachmentSummarySuffix, attachmentsMeta } = parsedBody;
 
   const nexusMode = (body.nexusMode as string | undefined) || undefined;
   const bootstrapNexus = body.bootstrapNexus === true;
@@ -438,11 +438,11 @@ export async function POST(
     }
   }
 
-  const hasAttachments = attachmentGeminiParts.length > 0;
+  const hasAttachments = attachmentLlmParts.length > 0;
   if (hasAttachments) {
     const attachmentBlurb =
       nexusLocale === 'es'
-        ? 'DOCUMENTOS DE ESTE TURNO: hay archivo(s) adjunto(s) al mensaje siguiente. Lee el contenido junto al texto del usuario y responde citando los nombres de archivo cuando proceda; si Gemini no puede interpretar un formato, dímelo con claridad.'
+        ? 'DOCUMENTOS DE ESTE TURNO: hay archivo(s) adjunto(s) al mensaje siguiente. Lee el contenido junto al texto del usuario y responde citando los nombres de archivo cuando proceda; si el modelo no puede interpretar un formato, dímelo con claridad.'
         : nexusLocale === 'en'
           ? 'TURN DOCUMENTS: one or more files are attached to the following user prompt. Read them together with the user text and answer; cite filenames when relevant. If the model cannot reliably read a MIME type or format, say so clearly.'
           : useDesignPartner
@@ -521,19 +521,19 @@ export async function POST(
     });
   }
 
-  // Call Gemini
+  // Call LLM
   let aiText: string;
   try {
-    const result = await geminiGenerateContent({
+    const result = await llmGenerateContent({
       systemInstruction: systemPrompt,
       userText: fullUserText,
-      userParts: hasAttachments ? attachmentGeminiParts : undefined,
+      userParts: hasAttachments ? attachmentLlmParts : undefined,
       maxOutputTokens: bootstrapNexus ? 1024 : 2048,
       temperature: useDesignPartner ? 0.52 : 0.3,
     });
     aiText = result.text;
   } catch (err) {
-    console.error('[AI Advisor] Gemini error:', err);
+    console.error('[AI Advisor] LLM error:', err);
     return NextResponse.json({ error: 'AI unavailable', detail: String(err) }, { status: 503 });
   }
 

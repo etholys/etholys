@@ -6,12 +6,12 @@ import { authOptions } from '@/lib/auth-options';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
 import {
-  geminiCompleteJsonText,
-  geminiCompleteJsonWithPdf,
-  geminiCompleteVision,
-  getGeminiMaxOutputTokens,
+  llmCompleteJsonText,
+  llmCompleteJsonWithPdf,
+  llmCompleteVision,
+  getLlmMaxOutputTokens,
   imageMimeFromFilename,
-} from '@/lib/gemini-client';
+} from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
 
 const SYSTEM_PROMPT = `You are a financial transaction parser. Input may be CSV/Excel text, OR a PDF/image of bank statements, invoices, receipts, credit card summaries, or accounting reports (Spanish, Portuguese, English, or mixed).
@@ -52,7 +52,7 @@ Return this exact structure:
   "summary": "Brief description of what was parsed (e.g. '3 transactions from a bank statement')"
 }`;
 
-/** Limite aproximado do pedido Gemini (documento inline + texto); margem de segurança. */
+/** Limite aproximado do pedido multimodal (documento inline + texto). */
 const MAX_INLINE_PDF_BYTES = 18 * 1024 * 1024;
 
 type PreparedForLlm =
@@ -65,7 +65,7 @@ async function extractFileContent(file: File): Promise<PreparedForLlm> {
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  // PDF: enviar o ficheiro ao Gemini (lê digitalizações e layout). pdf-parse só como apoio.
+  // PDF: enviar o ficheiro à IA (digitalizações e layout). pdf-parse só como apoio.
   if (name.endsWith('.pdf')) {
     let txt = '';
     try {
@@ -99,7 +99,7 @@ async function extractFileContent(file: File): Promise<PreparedForLlm> {
     };
   }
 
-  // Imagens → Gemini (multimodal)
+  // Imagens → IA multimodal
   if (name.match(/\.(jpg|jpeg|png|webp|gif|bmp|tiff?)$/)) {
     return {
       mode: 'vision',
@@ -162,11 +162,11 @@ export async function POST(req: Request) {
 
     const prepared = await extractFileContent(file);
 
-    const importMaxOut = getGeminiMaxOutputTokens();
+    const importMaxOut = getLlmMaxOutputTokens();
     let content: string;
     try {
       if (prepared.mode === 'vision') {
-        content = await geminiCompleteVision(
+        content = await llmCompleteVision(
           SYSTEM_PROMPT,
           prepared.userText,
           prepared.imageBase64,
@@ -175,22 +175,22 @@ export async function POST(req: Request) {
         );
       } else if (prepared.mode === 'pdf') {
         try {
-          content = await geminiCompleteJsonWithPdf(SYSTEM_PROMPT, prepared.userText, prepared.pdfBase64, {
+          content = await llmCompleteJsonWithPdf(SYSTEM_PROMPT, prepared.userText, prepared.pdfBase64, {
             maxOutputTokens: importMaxOut,
           });
         } catch (pdfErr: any) {
-          console.warn('Gemini PDF inline failed, falling back to text extraction:', pdfErr?.message);
-          content = await geminiCompleteJsonText(SYSTEM_PROMPT, prepared.fallbackUserText, {
+          console.warn('PDF inline failed, falling back to text extraction:', pdfErr?.message);
+          content = await llmCompleteJsonText(SYSTEM_PROMPT, prepared.fallbackUserText, {
             maxOutputTokens: importMaxOut,
           });
         }
       } else {
-        content = await geminiCompleteJsonText(SYSTEM_PROMPT, prepared.userText, { maxOutputTokens: importMaxOut });
+        content = await llmCompleteJsonText(SYSTEM_PROMPT, prepared.userText, { maxOutputTokens: importMaxOut });
       }
     } catch (e: any) {
-      console.error('Gemini import error:', e);
+      console.error('AI import error:', e);
       return NextResponse.json(
-        { error: e?.message || 'Error processing file with AI (Gemini)' },
+        { error: e?.message || 'Error processing file with AI' },
         { status: 502 }
       );
     }

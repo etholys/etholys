@@ -65,7 +65,7 @@ export default function OnboardingPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white mb-4">
             <Sparkles className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{L(ml('Welcome to RC 360°!','¡Bienvenido a RC 360°!','Bem-vindo ao RC 360°!'))}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{L(ml('Welcome to ETHOLYS!','¡Bienvenido a ETHOLYS!','Bem-vindo à ETHOLYS!'))}</h1>
           <p className="text-gray-500 mt-1">{L(ml('Hello','Hola','Olá'))} {session?.user?.name ?? ''}, {L(ml('set up your workspace','configura tu espacio de trabajo','configure seu espaço de trabalho'))}</p>
         </div>
 
@@ -125,7 +125,7 @@ export default function OnboardingPage() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-4">
-          {L(ml('RC 360° — Integrated Rural Project Management','RC 360° — Gestión Integral de Proyectos Rurales','RC 360° — Gestão Integral de Projetos Rurais'))}
+          {L(ml('ETHOLYS — Solutions Factory','ETHOLYS — Fábrica de Soluciones','ETHOLYS — Fábrica de Soluções'))}
         </p>
       </div>
     </div>

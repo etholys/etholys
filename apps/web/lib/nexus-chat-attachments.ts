@@ -1,7 +1,7 @@
 /**
- * Limites e validação de anexos no chat NEXUS / assessor Etholys (Gemini multimodal).
+ * Limites e validação de anexos no chat NEXUS / assessor Etholys (multimodal).
  */
-import type { GeminiPart } from '@/lib/gemini-client';
+import type { LlmPart } from '@/lib/llm-client';
 
 export const NEXUS_MAX_FILES = 8;
 /** Por ficheiro (bytes antes de Base64). */
@@ -10,7 +10,7 @@ export const NEXUS_MAX_FILE_BYTES = 8 * 1024 * 1024;
 export const NEXUS_MAX_TOTAL_BYTES = 24 * 1024 * 1024;
 
 export type AttachmentParseOk = {
-  geminiParts: GeminiPart[];
+  llmParts: LlmPart[];
   /** Nomes para registar na mensagem guardada */
   summaryLine: string;
   meta: Array<{ name: string; mimeType: string; size: number }>;
@@ -25,7 +25,7 @@ const INLINE_MIME = new Set([
   'application/rtf',
   'text/html',
   'application/json',
-  // Word/Office (Gemini lê vários como documento quando suportado)
+  // Word/Office (enviados como documento quando suportado)
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -87,9 +87,9 @@ function bufferToBase64(buf: ArrayBuffer): string {
 }
 
 /**
- * Converte blobs (FormData) em partes inline para Gemini; texto corrido vai no `userText` da geração, não aqui.
+ * Converte blobs (FormData) em partes multimodais inline; texto corrido vai no `userText` da geração, não aqui.
  */
-export async function buildGeminiAttachmentsFromFiles(
+export async function buildLlmAttachmentsFromFiles(
   files: Blob[],
   displayNames: string[],
 ): Promise<AttachmentParseOk> {
@@ -97,7 +97,7 @@ export async function buildGeminiAttachmentsFromFiles(
     throw new Error(`Máximo de ${NEXUS_MAX_FILES} ficheiros por mensagem.`);
   }
   let total = 0;
-  const geminiParts: GeminiPart[] = [];
+  const llmParts: LlmPart[] = [];
   const meta: AttachmentParseOk['meta'] = [];
 
   for (let i = 0; i < files.length; i++) {
@@ -124,7 +124,7 @@ export async function buildGeminiAttachmentsFromFiles(
     ) {
       try {
         const text = new TextDecoder('utf-8', { fatal: false }).decode(buf);
-        geminiParts.push({
+        llmParts.push({
           text: `\n--- Ficheiro: ${name} (${mimeType}) ---\n${text.slice(0, 500_000)}`,
         });
         meta.push({ name, mimeType, size });
@@ -135,11 +135,11 @@ export async function buildGeminiAttachmentsFromFiles(
     }
 
     if ((mimeType === 'application/octet-stream' || !INLINE_MIME.has(mimeType)) && !mimeType.startsWith('text/')) {
-      /** Ainda assim enviamos inline; Gemini pode falhar por tipo — erro subirá ao utilizador */
+      /** Ainda assim enviamos inline; o modelo pode falhar por tipo — erro sobe ao utilizador */
     }
 
     const b64 = bufferToBase64(buf);
-    geminiParts.push({
+    llmParts.push({
       inlineData: { mimeType: mimeType || 'application/octet-stream', data: b64 },
     });
     meta.push({ name, mimeType: mimeType || 'application/octet-stream', size });
@@ -150,5 +150,5 @@ export async function buildGeminiAttachmentsFromFiles(
       ? `\n\n[${meta.length} anexo(s) nesta mensagem: ${meta.map((m) => `${m.name} (${m.mimeType})`).join('; ')}]`
       : '';
 
-  return { geminiParts, summaryLine, meta };
+  return { llmParts, summaryLine, meta };
 }

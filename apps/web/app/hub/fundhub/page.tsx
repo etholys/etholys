@@ -66,21 +66,45 @@ export default function FundHubPage() {
   ];
 
   const highlights = [
-    {
-      title: t('Prazo urgente', 'Plazo urgente', 'Urgent deadline'),
-      detail: t('Fundo rural com submissão em 10 dias', 'Fondo rural con envío en 10 días', 'Rural fund due in 10 days'),
-      badge: t('Alta prioridade', 'Alta prioridad', 'High priority'),
-    },
-    {
-      title: t('Melhor potencial', 'Mejor potencial', 'Best fit'),
-      detail: t('Edital ESG com alta compatibilidade', 'Convocatoria ESG con alta compatibilidad', 'ESG call with strong match'),
-      badge: t('Oportunidade', 'Oportunidad', 'Opportunity'),
-    },
-    {
-      title: t('Parceria recomendada', 'Alianza recomendada', 'Recommended partner'),
-      detail: t('ONG local para edital social', 'ONG local para convocatoria social', 'Local NGO for social call'),
-      badge: t('Parceiro', 'Socio', 'Partner'),
-    },
+    ...(kpi.deadlinesSoon > 0
+      ? [
+          {
+            title: t('Prazos próximos', 'Plazos próximos', 'Upcoming deadlines'),
+            detail: t(
+              `${kpi.deadlinesSoon} edital(is) nos próximos 14 dias`,
+              `${kpi.deadlinesSoon} convocatoria(s) en los próximos 14 días`,
+              `${kpi.deadlinesSoon} call(s) within 14 days`,
+            ),
+            badge: t('Atenção', 'Atención', 'Attention'),
+          },
+        ]
+      : []),
+    ...(kpi.draftProposals > 0
+      ? [
+          {
+            title: t('Propostas em rascunho', 'Borradores', 'Draft proposals'),
+            detail: t(
+              `${kpi.draftProposals} proposta(s) por concluir`,
+              `${kpi.draftProposals} propuesta(s) por completar`,
+              `${kpi.draftProposals} proposal(s) to finish`,
+            ),
+            badge: t('Em curso', 'En curso', 'In progress'),
+          },
+        ]
+      : []),
+    ...(kpi.complianceInProgress > 0
+      ? [
+          {
+            title: t('Compliance', 'Compliance', 'Compliance'),
+            detail: t(
+              `${kpi.complianceInProgress} checklist(s) em andamento`,
+              `${kpi.complianceInProgress} checklist(s) en curso`,
+              `${kpi.complianceInProgress} checklist(s) in progress`,
+            ),
+            badge: t('Revisar', 'Revisar', 'Review'),
+          },
+        ]
+      : []),
   ];
 
   const actions = [
@@ -193,11 +217,22 @@ export default function FundHubPage() {
                 </h2>
               </div>
               <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-                {t('Actualizado', 'Actualizado', 'Updated')}
+                {highlights.length > 0
+                  ? t('Com base nos seus dados', 'Según sus datos', 'Based on your data')
+                  : t('Sem alertas', 'Sin alertas', 'No alerts')}
               </span>
             </div>
             <div className="mt-6 space-y-3">
-              {highlights.map((item) => (
+              {highlights.length === 0 ? (
+                <p className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+                  {t(
+                    'Quando houver prazos, rascunhos ou checklists, aparecem aqui.',
+                    'Cuando haya plazos, borradores o checklists, aparecerán aquí.',
+                    'Deadlines, drafts, and checklists will show up here when available.',
+                  )}
+                </p>
+              ) : (
+                highlights.map((item) => (
                 <div key={item.title} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -209,7 +244,8 @@ export default function FundHubPage() {
                     </span>
                   </div>
                 </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 

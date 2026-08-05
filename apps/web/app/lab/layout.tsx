@@ -19,13 +19,11 @@ export default function LabLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (status !== 'authenticated') return;
-    // Fast path: ADMIN always has access
     const role = (session?.user as any)?.role;
     if (role === 'ADMIN') {
       setAccessState('granted');
       return;
     }
-    // For non-admins, verify via API (checks invite status)
     fetch('/api/lab/access')
       .then(r => r.json())
       .then(d => {
@@ -42,7 +40,6 @@ export default function LabLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Invite code entry screen
   if (accessState === 'invite') {
     return <LabInviteGate locale={locale} onSuccess={() => setAccessState('granted')} />;
   }
@@ -117,7 +114,6 @@ export default function LabLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ---- Invite Gate Component ---- */
 function LabInviteGate({ locale, onSuccess }: { locale: string; onSuccess: () => void }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');

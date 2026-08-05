@@ -1,6 +1,6 @@
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { createS3Client, getBucketConfig } from './aws-config';
+import { createS3Client, getBucketConfig, getS3PublicBaseUrl } from './aws-config';
 
 const s3 = createS3Client();
 const { bucketName, folderPrefix } = getBucketConfig();
@@ -21,6 +21,8 @@ export async function generatePresignedUploadUrl(fileName: string, contentType: 
 
 export async function getFileUrl(cloudStoragePath: string, isPublic: boolean) {
   if (isPublic) {
+    const publicBase = getS3PublicBaseUrl();
+    if (publicBase) return `${publicBase}/${cloudStoragePath}`;
     const region = process.env.AWS_REGION ?? 'us-east-1';
     return `https://${bucketName}.s3.${region}.amazonaws.com/${cloudStoragePath}`;
   }

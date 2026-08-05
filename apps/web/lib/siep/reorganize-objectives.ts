@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { geminiGenerateContent } from '@/lib/gemini-client';
+import { llmGenerateContent } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
 import {
   canReparentTo,
@@ -56,7 +56,7 @@ export async function suggestObjectiveReparentLinks(
   const flatExport = summarizeFlatForAi(dbFlat as ObjectiveNode[]);
   const prompt = buildReorganizePrompt(flatExport, userInstructions);
 
-  const { text } = await geminiGenerateContent({
+  const { text } = await llmGenerateContent({
     systemInstruction: prompt,
     userParts: [{ text: 'Reorganize os parentId conforme a cadeia M&E canónica.' }],
     temperature: 0.1,

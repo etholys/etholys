@@ -30,9 +30,9 @@ export default function ForgeSettingsPage() {
         <h2 className="text-sm font-semibold text-gray-900">{t('Módulo FORGE', 'Módulo FORGE', 'FORGE module')}</h2>
         <p className="mt-2 text-sm text-gray-600">
           {t(
-            'Em breve: idioma por defeito dos cursos, regras de certificação e integração com trilhas.',
-            'Próximamente: idioma por defecto de cursos, reglas de certificación e integración con rutas.',
-            'Coming soon: default course language, certification rules, and trail integration.',
+            'Preferências avançadas deste módulo ainda não estão disponíveis. Use os atalhos abaixo para organização e acessos.',
+            'Las preferencias avanzadas de este módulo aún no están disponibles. Use los atajos de abajo para organización y accesos.',
+            'Advanced preferences for this module are not available yet. Use the shortcuts below for organization and access.',
           )}
         </p>
       </section>

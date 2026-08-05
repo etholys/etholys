@@ -76,9 +76,9 @@ export default function SiepDashboardPage() {
             <Users className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{locale === 'es' ? 'Stakeholders' : locale === 'pt' ? 'Stakeholders' : 'Stakeholders'}</p>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{locale === 'es' ? 'Riesgos altos' : locale === 'pt' ? 'Riscos altos' : 'High risks'}</p>
             <p className="text-2xl font-bold text-gray-900 mt-0.5">{s?.highCriticalRisks ?? 0}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{locale === 'es' ? 'riesgos activos' : locale === 'pt' ? 'riscos ativos' : 'active risks'}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{locale === 'es' ? 'críticos / altos' : locale === 'pt' ? 'críticos / altos' : 'critical / high'}</p>
           </div>
         </div>
       </div>

@@ -13,7 +13,7 @@ Migrações relevantes: `inviteToken`, `magicLoginToken`, `ForgeCourseFacilitato
 ## Libro PDF + OCR
 
 - Facilitador: **Alumnos** → arrastrar PDF (S3 si hay AWS, si no `public/uploads/forge-libros/`)
-- Tras subir: OCR automático (`pdf-parse`; si poco texto → Gemini con `GEMINI_API_KEY`)
+- Tras subir: OCR automático (`pdf-parse`; si poco texto → LLM con clave en `.env`)
 - Alumnos: **Lector** + búsqueda en texto extraído
 - Manual: `POST /api/forge/courses/[id]/libro/ocr`
 

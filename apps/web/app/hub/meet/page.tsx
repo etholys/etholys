@@ -1,22 +1,25 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   Video,
-  Users,
   Calendar,
+  CalendarPlus,
   Sparkles,
-  GraduationCap,
-  Sprout,
-  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  Keyboard,
   Download,
   Plus,
   Loader2,
   Copy,
   Check,
+  Users,
+  Zap,
+  X,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
@@ -29,17 +32,38 @@ type MeetSessionRow = {
   mirror: string;
   status: string;
   scheduledAt: string | null;
+  endsAt: string | null;
   meetingUrl: string | null;
   roomSlug: string;
   projectId?: string | null;
   _count?: { participants: number; actionItems: number };
 };
 
+const DAY_MS = 86_400_000;
+
+function startOfDay(date: Date): Date {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+/** Semana de segunda a domingo, como no Google Meet. */
+function weekOf(date: Date): Date[] {
+  const base = startOfDay(date);
+  const weekday = (base.getDay() + 6) % 7;
+  const monday = new Date(base.getTime() - weekday * DAY_MS);
+  return Array.from({ length: 7 }, (_, i) => new Date(monday.getTime() + i * DAY_MS));
+}
+
+function sameDay(a: Date, b: Date): boolean {
+  return startOfDay(a).getTime() === startOfDay(b).getTime();
+}
+
 export default function MeetHubPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="flex min-h-screen items-center justify-center bg-white">
           <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
         </div>
       }
@@ -50,28 +74,31 @@ export default function MeetHubPage() {
 }
 
 function MeetHubContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { locale, activeCompanyId } = useApp();
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
+  const intlLocale = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
   const companyId = activeCompanyId && isLikelyDbId(activeCompanyId) ? activeCompanyId : '';
 
   const [sessions, setSessions] = useState<MeetSessionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
+  const [joinInput, setJoinInput] = useState('');
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [inviteEmails, setInviteEmails] = useState('');
   const [sendInvites, setSendInvites] = useState(false);
   const [projectId, setProjectId] = useState('');
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [postSessionId, setPostSessionId] = useState<string | null>(null);
-  const [jitsiStatus, setJitsiStatus] = useState<{
-    baseUrl: string;
-    isDemo: boolean;
-    message: string;
-  } | null>(null);
+  const [calBusyId, setCalBusyId] = useState<string | null>(null);
+  const [jitsiStatus, setJitsiStatus] = useState<{ baseUrl: string; isDemo: boolean } | null>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const post = searchParams.get('post')?.trim();
@@ -79,24 +106,20 @@ function MeetHubContent() {
   }, [searchParams]);
 
   useEffect(() => {
+    if (scheduleOpen) titleInputRef.current?.focus();
+  }, [scheduleOpen]);
+
+  useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const r = await fetch('/api/meet/status');
-        const d = (await r.json()) as {
-          baseUrl?: string;
-          isDemo?: boolean;
-          message?: string;
-        };
+        const d = (await r.json()) as { baseUrl?: string; isDemo?: boolean };
         if (!cancelled && r.ok) {
-          setJitsiStatus({
-            baseUrl: d.baseUrl || '',
-            isDemo: Boolean(d.isDemo),
-            message: d.message || '',
-          });
+          setJitsiStatus({ baseUrl: d.baseUrl || '', isDemo: Boolean(d.isDemo) });
         }
       } catch {
-        /* ignore */
+        /* status é informativo */
       }
     })();
     return () => {
@@ -109,7 +132,9 @@ function MeetHubContent() {
     setLoading(true);
     setError(null);
     try {
-      const r = await fetch(`/api/meet/sessions?companyId=${encodeURIComponent(companyId)}`);
+      const r = await fetch(
+        `/api/meet/sessions?companyId=${encodeURIComponent(companyId)}&limit=100`,
+      );
       const d = (await r.json()) as { sessions?: MeetSessionRow[]; error?: string };
       if (!r.ok) throw new Error(d.error || 'Error');
       setSessions(d.sessions ?? []);
@@ -132,7 +157,7 @@ function MeetHubContent() {
       return;
     }
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const r = await fetch(`/api/projects?companyId=${encodeURIComponent(companyId)}`);
         const d = (await r.json()) as { projects?: { id: string; name: string }[] };
@@ -146,28 +171,64 @@ function MeetHubContent() {
     };
   }, [companyId]);
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!companyId || !title.trim()) return;
+  const week = useMemo(() => weekOf(selectedDate), [selectedDate]);
+
+  const dayGroups = useMemo(() => {
+    const now = Date.now();
+    const ofDay = sessions.filter((s) => {
+      const when = s.scheduledAt ? new Date(s.scheduledAt) : null;
+      return when ? sameDay(when, selectedDate) : false;
+    });
+    const byTime = [...ofDay].sort((a, b) => {
+      const av = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0;
+      const bv = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
+      return av - bv;
+    });
+    return {
+      live: byTime.filter((s) => s.status === 'live'),
+      upcoming: byTime.filter(
+        (s) =>
+          s.status !== 'live' &&
+          s.status !== 'ended' &&
+          s.status !== 'cancelled' &&
+          (!s.scheduledAt || new Date(s.scheduledAt).getTime() >= now),
+      ),
+      past: byTime.filter(
+        (s) =>
+          s.status === 'ended' ||
+          s.status === 'cancelled' ||
+          (s.status !== 'live' && !!s.scheduledAt && new Date(s.scheduledAt).getTime() < now),
+      ),
+    };
+  }, [sessions, selectedDate]);
+
+  async function createSession(opts: { instant: boolean }) {
+    if (!companyId) return;
+    const finalTitle = opts.instant
+      ? t('Reunião agora', 'Reunión ahora', 'Meeting now')
+      : title.trim();
+    if (!finalTitle) return;
+
     setSaving(true);
     setError(null);
-    setCreatedUrl(null);
     try {
-      const emails = inviteEmails
-        .split(/[,;\s]+/)
-        .map((x) => x.trim())
-        .filter(Boolean);
-      const linkedProject = projectId || null;
+      const emails = opts.instant
+        ? []
+        : inviteEmails
+            .split(/[,;\s]+/)
+            .map((x) => x.trim())
+            .filter(Boolean);
+      const linkedProject = opts.instant ? null : projectId || null;
       const r = await fetch('/api/meet/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId,
-          title: title.trim(),
+          title: finalTitle,
           mirror: linkedProject ? 'siep' : 'loose',
           projectId: linkedProject,
           inviteEmails: emails,
-          sendInvites: sendInvites && emails.length > 0,
+          sendInvites: !opts.instant && sendInvites && emails.length > 0,
           locale,
         }),
       });
@@ -176,14 +237,17 @@ function MeetHubContent() {
         error?: string;
       };
       if (!r.ok) throw new Error(d.error || 'Error');
+
       setTitle('');
       setInviteEmails('');
       setProjectId('');
-      if (d.session?.meetingUrl && d.session?.id && companyId) {
-        window.location.href = meetHubJoinPath(d.session.id, companyId);
+      setScheduleOpen(false);
+      setNewMenuOpen(false);
+
+      if (d.session?.id) {
+        router.push(meetHubJoinPath(d.session.id, companyId));
         return;
       }
-      if (d.session?.meetingUrl) setCreatedUrl(d.session.meetingUrl);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -192,89 +256,411 @@ function MeetHubContent() {
     }
   }
 
+  function joinByCode() {
+    const raw = joinInput.trim();
+    if (!raw || !companyId) return;
+    setError(null);
+
+    const needle = raw.replace(/\/+$/, '').split('/').pop() || raw;
+    const match = sessions.find(
+      (s) => s.roomSlug === needle || s.id === needle || s.meetingUrl === raw,
+    );
+    if (match) {
+      router.push(meetHubJoinPath(match.id, companyId));
+      return;
+    }
+    if (/^https?:\/\//i.test(raw)) {
+      window.open(raw, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    setError(
+      t(
+        'Código não encontrado nas reuniões desta empresa. Cole o link completo.',
+        'Código no encontrado en las reuniones de esta empresa. Pega el enlace completo.',
+        'Code not found in this company’s meetings. Paste the full link.',
+      ),
+    );
+  }
+
   async function copyUrl(url: string, id: string) {
     try {
       await navigator.clipboard.writeText(url);
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
-      /* ignore */
+      /* clipboard pode estar bloqueado */
     }
   }
 
+  async function syncCalendar(sessionId: string, provider: 'google' | 'outlook') {
+    if (!companyId) return;
+    setCalBusyId(`${sessionId}:${provider}`);
+    setError(null);
+    try {
+      const r = await fetch(`/api/meet/sessions/${sessionId}/calendar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId, provider }),
+      });
+      const d = (await r.json()) as { error?: string; event?: { htmlLink?: string } };
+      if (!r.ok) throw new Error(d.error || 'Error');
+      if (d.event?.htmlLink) window.open(d.event.htmlLink, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error');
+    } finally {
+      setCalBusyId(null);
+    }
+  }
+
+  const headerDate = new Intl.DateTimeFormat(intlLocale, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(selectedDate);
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50/80 to-slate-50">
-      <header className="border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+    <div className="flex min-h-screen flex-col bg-white">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Link
             href="/hub"
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-800 hover:text-slate-600"
+            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
           >
             <ArrowLeft className="h-4 w-4" />
-            {t('Voltar ao Hub', 'Volver al Hub', 'Back to Hub')}
+            <span className="hidden sm:inline">Hub</span>
           </Link>
-          <div className="flex items-center gap-2 text-slate-800">
-            <Video className="h-6 w-6 text-sky-700" />
-            <span className="font-bold tracking-tight">Meet</span>
-            <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-900">
-              F5
+
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-600">
+              <Video className="h-4 w-4 text-white" />
             </span>
+            <span className="text-lg font-semibold tracking-tight text-slate-900">
+              Etholys Meet
+            </span>
+          </div>
+
+          <div className="order-last flex w-full items-center gap-2 sm:order-none sm:ml-auto sm:w-auto">
+            <div className="flex flex-1 items-center gap-2 rounded-full bg-slate-100 px-3 py-2 sm:w-72">
+              <Keyboard className="h-4 w-4 shrink-0 text-slate-500" />
+              <input
+                value={joinInput}
+                onChange={(e) => setJoinInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') joinByCode();
+                }}
+                placeholder={t(
+                  'Insira um código ou link',
+                  'Ingresa un código o enlace',
+                  'Enter a code or link',
+                )}
+                className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-500"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={joinByCode}
+              disabled={!joinInput.trim()}
+              className="rounded-full px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 disabled:text-slate-400 disabled:hover:bg-transparent"
+            >
+              {t('Entrar', 'Unirse', 'Join')}
+            </button>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setNewMenuOpen((open) => !open)}
+                disabled={!companyId}
+                className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+                {t('Nova', 'Nueva', 'New')}
+              </button>
+              {newMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setNewMenuOpen(false)}
+                    aria-hidden
+                  />
+                  <div className="absolute right-0 top-full z-20 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                    <button
+                      type="button"
+                      onClick={() => void createSession({ instant: true })}
+                      disabled={saving}
+                      className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      <Zap className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+                      <span>
+                        <span className="block text-sm font-medium text-slate-900">
+                          {t('Iniciar reunião agora', 'Iniciar reunión ahora', 'Start an instant meeting')}
+                        </span>
+                        <span className="block text-xs text-slate-500">
+                          {t('Entra imediatamente na sala', 'Entra de inmediato en la sala', 'Joins the room right away')}
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewMenuOpen(false);
+                        setScheduleOpen(true);
+                      }}
+                      className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-slate-50"
+                    >
+                      <CalendarPlus className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+                      <span>
+                        <span className="block text-sm font-medium text-slate-900">
+                          {t('Criar com convidados', 'Crear con invitados', 'Create with guests')}
+                        </span>
+                        <span className="block text-xs text-slate-500">
+                          {t('Título, projeto SIEP e e-mails', 'Título, proyecto SIEP y emails', 'Title, SIEP project and emails')}
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">
-        {jitsiStatus?.isDemo && (
-          <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            <p className="font-semibold">
-              {t(
-                'Jitsi ainda em modo demo (meet.jit.si)',
-                'Jitsi aún en modo demo (meet.jit.si)',
-                'Jitsi still in demo mode (meet.jit.si)',
-              )}
-            </p>
-            <p className="mt-1 text-amber-900/90">
-              {t(
-                'Chamadas no iframe cortam ~5 min. No Contabo: DNS meet → IP, firewall UDP 10000, depois bash scripts/setup-jitsi-contabo.sh. Guia: docs/MEET-JITSI-CONTABO.md',
-                'Las llamadas en iframe cortan ~5 min. En Contabo: DNS meet → IP, firewall UDP 10000, luego bash scripts/setup-jitsi-contabo.sh. Guía: docs/MEET-JITSI-CONTABO.md',
-                'Iframe calls cut at ~5 min. On Contabo: DNS meet → IP, firewall UDP 10000, then bash scripts/setup-jitsi-contabo.sh. Guide: docs/MEET-JITSI-CONTABO.md',
-              )}
-            </p>
-          </div>
-        )}
-        {jitsiStatus && !jitsiStatus.isDemo && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs text-emerald-900">
-            {t('Vídeo:', 'Vídeo:', 'Video:')} {jitsiStatus.baseUrl}
-          </div>
-        )}
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <h1 className="text-2xl font-bold text-slate-900">
-            {t('Nova reunião', 'Nueva reunión', 'New meeting')}
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
+        {!companyId && (
+          <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {t(
-              'Cria uma sala, descarrega o calendário (.ics) e envia convites por e-mail (se Resend estiver configurado). Na call: use «Gravar» no Jitsi para guardar o vídeo no teu PC. Depois: Pós-reunião → colar notas/transcrição → IA cria resumo e tarefas.',
-              'Crea una sala, descarga el calendario (.ics) y envía invitaciones (si Resend está configurado). En la call: usa «Grabar» en Jitsi para guardar el vídeo en tu PC. Después: Post-reunión → pegar notas/transcripción → IA crea resumen y tareas.',
-              'Create a room, download calendar (.ics), send email invites (if Resend is set). In-call: use Record in Jitsi to save video to your PC. After: Post-meeting → paste notes/transcript → AI summary and tasks.',
+              'Selecione uma empresa no Hub para criar ou ver reuniões.',
+              'Selecciona una empresa en el Hub para crear o ver reuniones.',
+              'Select a company in the Hub to create or view meetings.',
             )}
           </p>
+        )}
 
-          {!companyId ? (
-            <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              {t(
-                'Selecione uma empresa no Hub para criar reuniões.',
-                'Selecciona una empresa en el Hub para crear reuniones.',
-                'Select a company in the Hub to create meetings.',
-              )}
-            </p>
+        {jitsiStatus?.isDemo && (
+          <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {t(
+              'Servidor de vídeo em modo demo (meet.jit.si): as chamadas cortam a ~5 minutos.',
+              'Servidor de vídeo en modo demo (meet.jit.si): las llamadas se cortan a ~5 minutos.',
+              'Video server in demo mode (meet.jit.si): calls cut off at ~5 minutes.',
+            )}
+          </p>
+        )}
+
+        {error && (
+          <div className="mb-5 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <span>{error}</span>
+            <button type="button" onClick={() => setError(null)} className="shrink-0">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-semibold capitalize text-slate-900">{headerDate}</h1>
+            <button
+              type="button"
+              onClick={() => setSelectedDate(startOfDay(new Date()))}
+              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              {t('Hoje', 'Hoy', 'Today')}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setSelectedDate((d) => new Date(d.getTime() - 7 * DAY_MS))}
+              className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+              aria-label={t('Semana anterior', 'Semana anterior', 'Previous week')}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            {week.map((day) => {
+              const isSelected = sameDay(day, selectedDate);
+              const isToday = sameDay(day, new Date());
+              const label = new Intl.DateTimeFormat(intlLocale, { weekday: 'short' })
+                .format(day)
+                .replace('.', '')
+                .toUpperCase();
+              return (
+                <button
+                  key={day.toISOString()}
+                  type="button"
+                  onClick={() => setSelectedDate(day)}
+                  className={`flex w-11 flex-col items-center rounded-xl px-1 py-1.5 text-[11px] transition ${
+                    isSelected ? 'bg-sky-100 text-sky-900' : 'text-slate-500 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="font-medium">{label}</span>
+                  <span
+                    className={`mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${
+                      isSelected
+                        ? 'bg-sky-600 text-white'
+                        : isToday
+                          ? 'text-sky-700'
+                          : 'text-slate-700'
+                    }`}
+                  >
+                    {day.getDate()}
+                  </span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setSelectedDate((d) => new Date(d.getTime() + 7 * DAY_MS))}
+              className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+              aria-label={t('Semana seguinte', 'Semana siguiente', 'Next week')}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
+            </div>
+          ) : dayGroups.live.length + dayGroups.upcoming.length + dayGroups.past.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 py-16 text-center">
+              <Video className="mx-auto h-9 w-9 text-slate-300" />
+              <p className="mt-3 text-sm font-medium text-slate-700">
+                {t('Nenhuma reunião neste dia', 'Ninguna reunión este día', 'No meetings on this day')}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {t(
+                  'Use «Nova» para começar agora ou criar com convidados.',
+                  'Usa «Nueva» para empezar ahora o crear con invitados.',
+                  'Use “New” to start now or create with guests.',
+                )}
+              </p>
+            </div>
           ) : (
-            <form onSubmit={handleCreate} className="mt-6 space-y-4">
+            <div className="space-y-8">
+              {dayGroups.live.length > 0 && (
+                <MeetingGroup
+                  label={t('A decorrer', 'En curso', 'Happening now')}
+                  accent
+                  sessions={dayGroups.live}
+                  companyId={companyId}
+                  intlLocale={intlLocale}
+                  copiedId={copiedId}
+                  calBusyId={calBusyId}
+                  onCopy={copyUrl}
+                  onCalendar={syncCalendar}
+                  onPost={setPostSessionId}
+                  t={t}
+                />
+              )}
+              {dayGroups.upcoming.length > 0 && (
+                <MeetingGroup
+                  label={t('Próximas', 'Próximas', 'Upcoming')}
+                  sessions={dayGroups.upcoming}
+                  companyId={companyId}
+                  intlLocale={intlLocale}
+                  copiedId={copiedId}
+                  calBusyId={calBusyId}
+                  onCopy={copyUrl}
+                  onCalendar={syncCalendar}
+                  onPost={setPostSessionId}
+                  t={t}
+                />
+              )}
+              {dayGroups.past.length > 0 && (
+                <MeetingGroup
+                  label={t('Passadas', 'Pasadas', 'Past')}
+                  sessions={dayGroups.past}
+                  companyId={companyId}
+                  intlLocale={intlLocale}
+                  copiedId={copiedId}
+                  calBusyId={calBusyId}
+                  onCopy={copyUrl}
+                  onCalendar={syncCalendar}
+                  onPost={setPostSessionId}
+                  t={t}
+                />
+              )}
+            </div>
+          )}
+        </div>
+
+        {postSessionId && companyId && (
+          <div className="mt-8">
+            <MeetPostMeetingPanel
+              companyId={companyId}
+              sessionId={postSessionId}
+              locale={locale}
+              onClose={() => setPostSessionId(null)}
+              onUpdated={() => void load()}
+            />
+          </div>
+        )}
+      </main>
+
+      <footer className="border-t border-slate-200 px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500">
+          <span>
+            {t('Espelhos:', 'Espejos:', 'Mirrors:')}{' '}
+            <Link href="/hub/forge" className="text-sky-700 hover:underline">
+              FORGE
+            </Link>
+            {' · '}
+            <Link href="/siep" className="text-sky-700 hover:underline">
+              SIEP
+            </Link>
+            {' · '}
+            <Link href="/hub/nexus" className="text-sky-700 hover:underline">
+              NEXUS
+            </Link>
+          </span>
+          {jitsiStatus && !jitsiStatus.isDemo && jitsiStatus.baseUrl && (
+            <span>
+              {t('Vídeo:', 'Vídeo:', 'Video:')} {jitsiStatus.baseUrl.replace(/^https?:\/\//, '')}
+            </span>
+          )}
+        </div>
+      </footer>
+
+      {scheduleOpen && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4">
+          <div className="w-full max-w-lg rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {t('Nova reunião', 'Nueva reunión', 'New meeting')}
+                </h2>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  {t(
+                    'A sala abre logo após criar.',
+                    'La sala se abre justo después de crear.',
+                    'The room opens right after you create it.',
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScheduleOpen(false)}
+                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form
+              className="mt-5 space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void createSession({ instant: false });
+              }}
+            >
               <div>
                 <label className="block text-sm font-medium text-slate-700">
                   {t('Título', 'Título', 'Title')} *
                 </label>
                 <input
+                  ref={titleInputRef}
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -296,7 +682,7 @@ function MeetHubContent() {
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
                 >
                   <option value="">
-                    {t('Sem vínculo — reunião solta', 'Sin vínculo — reunión libre', 'No link — loose meeting')}
+                    {t('Sem vínculo', 'Sin vínculo', 'No link')}
                   </option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -324,203 +710,197 @@ function MeetHubContent() {
                   className="rounded border-slate-300"
                 />
                 {t(
-                  'Enviar e-mail agora (requer RESEND_API_KEY)',
-                  'Enviar email ahora (requiere RESEND_API_KEY)',
-                  'Send email now (requires RESEND_API_KEY)',
+                  'Enviar convite por e-mail agora',
+                  'Enviar invitación por email ahora',
+                  'Send email invite now',
                 )}
               </label>
-              <button
-                type="submit"
-                disabled={saving}
-                className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                {t('Criar sala', 'Crear sala', 'Create room')}
-              </button>
-            </form>
-          )}
 
-          {createdUrl && (
-            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm">
-              <span className="font-medium text-sky-900">{t('Sala pronta', 'Sala lista', 'Room ready')}</span>
-              <a
-                href={createdUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 font-semibold text-sky-700 underline"
-              >
-                {t('Abrir Jitsi', 'Abrir Jitsi', 'Open Jitsi')}
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            </div>
-          )}
-
-          {error && (
-            <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-              {error}
-            </p>
-          )}
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-bold text-slate-900">
-              {t('Reuniões recentes', 'Reuniones recientes', 'Recent meetings')}
-            </h2>
-            <button
-              type="button"
-              onClick={() => void load()}
-              className="text-sm text-sky-700 hover:underline"
-            >
-              {t('Atualizar', 'Actualizar', 'Refresh')}
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center py-10">
-              <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
-            </div>
-          ) : sessions.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500">
-              {t('Nenhuma reunião ainda.', 'Ninguna reunión aún.', 'No meetings yet.')}
-            </p>
-          ) : (
-            <ul className="mt-4 space-y-3">
-              {sessions.map((s) => (
-                <li
-                  key={s.id}
-                  className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setScheduleOpen(false)}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
                 >
-                  <div>
-                    <p className="font-semibold text-slate-900">{s.title}</p>
-                    <p className="text-xs text-slate-500">
-                      {s.mirror} · {s.status}
-                      {s.projectId
-                        ? ` · SIEP`
-                        : ''}
-                      {s.scheduledAt
-                        ? ` · ${new Date(s.scheduledAt).toLocaleString(locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES')}`
-                        : ''}
-                      {s._count ? ` · ${s._count.participants} ${t('pessoas', 'personas', 'people')}` : ''}
-                    </p>
+                  {t('Cancelar', 'Cancelar', 'Cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving || !title.trim()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+                  {t('Criar e entrar', 'Crear y entrar', 'Create and join')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type GroupProps = {
+  label: string;
+  accent?: boolean;
+  sessions: MeetSessionRow[];
+  companyId: string;
+  intlLocale: string;
+  copiedId: string | null;
+  calBusyId: string | null;
+  onCopy: (url: string, id: string) => void;
+  onCalendar: (sessionId: string, provider: 'google' | 'outlook') => void;
+  onPost: (sessionId: string) => void;
+  t: (pt: string, es: string, en: string) => string;
+};
+
+function MeetingGroup({
+  label,
+  accent,
+  sessions,
+  companyId,
+  intlLocale,
+  copiedId,
+  calBusyId,
+  onCopy,
+  onCalendar,
+  onPost,
+  t,
+}: GroupProps) {
+  const timeFmt = new Intl.DateTimeFormat(intlLocale, { hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <section>
+      <h2 className="text-sm font-medium text-slate-500">{label}</h2>
+      <ul className="mt-3 space-y-3">
+        {sessions.map((s) => {
+          const start = s.scheduledAt ? new Date(s.scheduledAt) : null;
+          const end = s.endsAt ? new Date(s.endsAt) : null;
+          const timeLabel = start
+            ? end
+              ? `${timeFmt.format(start)} – ${timeFmt.format(end)}`
+              : timeFmt.format(start)
+            : '';
+          return (
+            <li
+              key={s.id}
+              className={`group rounded-2xl px-4 py-4 transition sm:px-5 ${
+                accent ? 'bg-sky-50 ring-1 ring-sky-200' : 'bg-slate-50 hover:bg-slate-100/80'
+              }`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  {timeLabel && (
+                    <p className="text-xs font-medium text-slate-500">{timeLabel}</p>
+                  )}
+                  <p className="mt-0.5 truncate text-base font-semibold text-slate-900">
+                    {s.title}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                    {s.projectId && (
+                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-medium text-indigo-700">
+                        SIEP
+                      </span>
+                    )}
+                    {s.mirror !== 'loose' && s.mirror !== 'siep' && (
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 font-medium uppercase text-slate-600">
+                        {s.mirror}
+                      </span>
+                    )}
+                    {s._count && s._count.participants > 0 && (
+                      <span className="inline-flex items-center gap-1">
+                        <Users className="h-3.5 w-3.5" />
+                        {s._count.participants}
+                      </span>
+                    )}
+                    {s._count && s._count.actionItems > 0 && (
+                      <span className="inline-flex items-center gap-1 text-amber-700">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        {s._count.actionItems}{' '}
+                        {t('tarefas', 'tareas', 'tasks')}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {s.meetingUrl && companyId && (
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {s.meetingUrl && companyId && s.status !== 'ended' && (
+                    <Link
+                      href={meetHubJoinPath(s.id, companyId)}
+                      className="rounded-full bg-sky-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-sky-700"
+                    >
+                      {t('Entrar', 'Unirse', 'Join')}
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onPost(s.id)}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <Sparkles className="mr-1 inline h-3 w-3" />
+                    {t('Resumo', 'Resumen', 'Summary')}
+                  </button>
+
+                  <div className="flex items-center gap-1 opacity-70 transition group-hover:opacity-100">
+                    {s.meetingUrl && (
+                      <button
+                        type="button"
+                        onClick={() => onCopy(s.meetingUrl!, s.id)}
+                        title={t('Copiar link', 'Copiar enlace', 'Copy link')}
+                        className="rounded-full p-2 text-slate-500 hover:bg-white hover:text-slate-800"
+                      >
+                        {copiedId === s.id ? (
+                          <Check className="h-3.5 w-3.5" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    )}
+                    {companyId && (
                       <>
-                        <Link
-                          href={meetHubJoinPath(s.id, companyId)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700"
+                        <a
+                          href={`/api/meet/sessions/${s.id}/ics?companyId=${encodeURIComponent(companyId)}`}
+                          title=".ics"
+                          className="rounded-full p-2 text-slate-500 hover:bg-white hover:text-slate-800"
                         >
-                          {t('Entrar', 'Entrar', 'Join')}
-                        </Link>
+                          <Download className="h-3.5 w-3.5" />
+                        </a>
                         <button
                           type="button"
-                          onClick={() => void copyUrl(s.meetingUrl!, s.id)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          disabled={calBusyId === `${s.id}:google`}
+                          onClick={() => onCalendar(s.id, 'google')}
+                          title="Google Calendar"
+                          className="rounded-full p-2 text-slate-500 hover:bg-white hover:text-slate-800 disabled:opacity-50"
                         >
-                          {copiedId === s.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                          {t('Copiar link', 'Copiar enlace', 'Copy link')}
+                          {calBusyId === `${s.id}:google` ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Calendar className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={calBusyId === `${s.id}:outlook`}
+                          onClick={() => onCalendar(s.id, 'outlook')}
+                          title="Outlook Calendar"
+                          className="rounded-full p-2 text-slate-500 hover:bg-white hover:text-slate-800 disabled:opacity-50"
+                        >
+                          {calBusyId === `${s.id}:outlook` ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <CalendarPlus className="h-3.5 w-3.5" />
+                          )}
                         </button>
                       </>
                     )}
-                    {companyId && (
-                      <a
-                        href={`/api/meet/sessions/${s.id}/ics?companyId=${encodeURIComponent(companyId)}`}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        <Download className="h-3 w-3" />
-                        .ics
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setPostSessionId(s.id)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-800 hover:bg-sky-100"
-                    >
-                      <Sparkles className="h-3 w-3" />
-                      {t('Pós-reunião', 'Post-reunión', 'Post-meeting')}
-                    </button>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {postSessionId && companyId && (
-          <MeetPostMeetingPanel
-            companyId={companyId}
-            sessionId={postSessionId}
-            locale={locale}
-            onClose={() => setPostSessionId(null)}
-            onUpdated={() => void load()}
-          />
-        )}
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            {t('Espelhos e roadmap', 'Espejos y roadmap', 'Mirrors & roadmap')}
-          </h2>
-          <ul className="mt-4 space-y-3 text-sm text-slate-800">
-            <li className="flex gap-3">
-              <Users className="h-5 w-5 shrink-0 text-sky-700" />
-              <span>
-                {t(
-                  'Breakouts: no Jitsi self-hosted, o host cria salas paralelas (essencial para capacitações).',
-                  'Breakouts: en Jitsi self-hosted, el host crea salas paralelas (esencial para capacitaciones).',
-                  'Breakouts: on self-hosted Jitsi, the host creates parallel rooms (essential for trainings).',
-                )}
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <Calendar className="h-5 w-5 shrink-0 text-sky-700" />
-              <span>
-                {t(
-                  'Calendário: .ics agora; OAuth Google/Outlook depois.',
-                  'Calendario: .ics ahora; OAuth Google/Outlook después.',
-                  'Calendar: .ics now; Google/Outlook OAuth later.',
-                )}
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <Sparkles className="h-5 w-5 shrink-0 text-sky-700" />
-              <span>
-                {t(
-                  'IA pós-reunião: resumo, tarefas SIEP e alerta em curso na sala integrada.',
-                  'IA post-reunión: resumen, tareas SIEP y alerta en curso en la sala integrada.',
-                  'Post-meeting AI: summary, SIEP tasks, and live briefing in the integrated room.',
-                )}
-              </span>
-            </li>
-          </ul>
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <Link
-              href="/hub/forge"
-              className="flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50/50 px-4 py-3 text-sm transition hover:border-violet-400"
-            >
-              <GraduationCap className="h-5 w-5 shrink-0 text-violet-700" />
-              <div>
-                <p className="font-semibold text-slate-900">FORGE</p>
-                <p className="mt-0.5 text-slate-600">
-                  {t('Capacitações / salão', 'Capacitaciones / salón', 'Trainings / salon')}
-                </p>
+                </div>
               </div>
-            </Link>
-            <Link
-              href="/siep"
-              className="flex items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50/50 px-4 py-3 text-sm transition hover:border-indigo-400"
-            >
-              <Sprout className="h-5 w-5 shrink-0 text-indigo-700" />
-              <div>
-                <p className="font-semibold text-slate-900">SIEP</p>
-                <p className="mt-0.5 text-slate-600">
-                  {t('Reuniões por projeto (aba Meetings)', 'Reuniones por proyecto (pestaña Meetings)', 'Project meetings (Meetings tab)')}
-                </p>
-              </div>
-            </Link>
-          </div>
-        </div>
-      </main>
-    </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

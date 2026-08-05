@@ -1,4 +1,4 @@
-import { geminiGenerateContent } from '@/lib/gemini-client';
+import { llmGenerateContent } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
 
 const DEFAULT_L_PER_100KM = 9;
@@ -31,7 +31,7 @@ Use dados de mercado recentes (2025-2026). Responda APENAS JSON:
 { "fuelPriceUsdPerLiter": number, "notes": "breve fonte ou raciocínio" }`;
 
   try {
-    const { text } = await geminiGenerateContent({
+    const { text } = await llmGenerateContent({
       systemInstruction: prompt,
       userParts: [{ text: 'Estimar preço combustível USD/L' }],
       temperature: 0.1,

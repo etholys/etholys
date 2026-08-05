@@ -20,7 +20,7 @@ function metadataBaseUrl(): URL {
 
 export const metadata: Metadata = {
   title: 'ETHOLYS — Fábrica de Soluciones | Laboratorio I+D+i',
-  description: 'Soluciones integradas de software, hardware y metodologías para transformar la gestión institucional, el desarrollo rural y la innovación productiva.',
+  description: 'Soluciones integradas de software, hardware y metodologías para la gestión institucional, el desarrollo empresarial y la innovación productiva.',
   metadataBase: metadataBaseUrl(),
   icons: { icon: '/favicon.svg' },
   openGraph: { images: ['/og-image.png'] },

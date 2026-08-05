@@ -1,22 +1,30 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
+  Cloud,
   ExternalLink,
+  FileText,
+  HardDrive,
   Loader2,
+  Mic,
   PanelRightClose,
   PanelRightOpen,
   PhoneOff,
-  Sparkles,
+  Square,
   Video,
 } from 'lucide-react';
 import { meetEmbedUrl } from '@/lib/meet/room';
 import { canEmbedJitsiInIframe } from '@/lib/forge/jitsi-config';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
+import {
+  MeetConferenceFrame,
+  type MeetConferenceHandle,
+} from '@/components/meet/MeetConferenceFrame';
 
 type SessionRow = {
   id: string;
@@ -24,13 +32,17 @@ type SessionRow = {
   status: string;
   meetingUrl: string | null;
   projectId: string | null;
+  transcriptText?: string | null;
 };
 
-type Briefing = {
-  alert: string;
-  themes: string[];
-  openDecisions: string[];
-  suggestedNextSteps: string[];
+type TranscriptSegment = {
+  messageId: string;
+  participantId?: string;
+  participantName: string;
+  text: string;
+  language?: string;
+  startedAt: string;
+  final: boolean;
 };
 
 type Props = {
@@ -51,10 +63,17 @@ export function MeetRoomClient({ sessionId }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
-  const [notes, setNotes] = useState('');
-  const [briefBusy, setBriefBusy] = useState(false);
-  const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [ending, setEnding] = useState(false);
+  const [transcriptionOn, setTranscriptionOn] = useState(false);
+  const [recordingMode, setRecordingMode] = useState<'local' | 'cloud' | null>(null);
+  const [showRecordMenu, setShowRecordMenu] = useState(false);
+  const [segments, setSegments] = useState<TranscriptSegment[]>([]);
+  const [features, setFeatures] = useState({
+    liveTranscriptionEnabled: false,
+    cloudRecordingEnabled: false,
+  });
+  const conferenceRef = useRef<MeetConferenceHandle>(null);
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     if (!companyId) {
@@ -84,6 +103,40 @@ export function MeetRoomClient({ sessionId }: Props) {
   }, [load]);
 
   useEffect(() => {
+    if (!companyId) return;
+    void Promise.all([
+      fetch('/api/meet/status')
+        .then((r) => r.json())
+        .then((d) =>
+          setFeatures({
+            liveTranscriptionEnabled: Boolean(d.liveTranscriptionEnabled),
+            cloudRecordingEnabled: Boolean(d.cloudRecordingEnabled),
+          }),
+        ),
+      fetch(
+        `/api/meet/sessions/${sessionId}/transcript?companyId=${encodeURIComponent(companyId)}`,
+      )
+        .then((r) => r.json())
+        .then((d) => {
+          if (!Array.isArray(d.segments)) return;
+          setSegments(
+            d.segments.map((row: any) => ({
+              messageId: row.messageId,
+              participantId: row.participantId || undefined,
+              participantName: row.participantName,
+              text: row.text,
+              language: row.language || undefined,
+              startedAt: row.startedAt,
+              final: true,
+            })),
+          );
+        }),
+    ]).catch(() => {
+      // A sala continua funcional mesmo se o estado auxiliar ainda não estiver disponível.
+    });
+  }, [companyId, sessionId]);
+
+  useEffect(() => {
     if (!companyId || !session || session.status === 'live' || session.status === 'ended') return;
     void fetch(`/api/meet/sessions/${sessionId}`, {
       method: 'PATCH',
@@ -94,43 +147,147 @@ export function MeetRoomClient({ sessionId }: Props) {
     });
   }, [companyId, session, sessionId]);
 
-  const embedSrc = useMemo(() => {
+  const externalRoomUrl = useMemo(() => {
     const url = session?.meetingUrl;
-    if (!url || !canEmbedJitsiInIframe(url)) return null;
-    return meetEmbedUrl(url, { host: true });
-  }, [session?.meetingUrl]);
+    if (!url) return null;
+    return meetEmbedUrl(url, { host: true, title: session.title });
+  }, [session?.meetingUrl, session?.title]);
 
-  async function runBriefing() {
-    if (!companyId) return;
-    setBriefBusy(true);
-    setBriefing(null);
-    try {
-      const r = await fetch(`/api/meet/sessions/${sessionId}/briefing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, notesSoFar: notes, locale, markLive: true }),
+  useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [segments]);
+
+  const handleTranscriptionChunk = useCallback(
+    (chunk: {
+      language?: string;
+      messageID?: string;
+      participant?: { id?: string; name?: string };
+      final?: string;
+      stable?: string;
+      unstable?: string;
+    }) => {
+      const text = (chunk.final || chunk.stable || chunk.unstable || '').trim();
+      if (!text) return;
+      const messageId =
+        chunk.messageID ||
+        `${chunk.participant?.id || 'unknown'}-${Date.now()}-${text.slice(0, 12)}`;
+      const row: TranscriptSegment = {
+        messageId,
+        participantId: chunk.participant?.id,
+        participantName:
+          chunk.participant?.name?.trim() ||
+          t('Participante', 'Participante', 'Participant'),
+        text,
+        language: chunk.language,
+        startedAt: new Date().toISOString(),
+        final: Boolean(chunk.final),
+      };
+      setSegments((current) => {
+        const index = current.findIndex((item) => item.messageId === messageId);
+        if (index < 0) return [...current, row];
+        const next = [...current];
+        next[index] = { ...current[index], ...row };
+        return next;
       });
-      const d = (await r.json()) as { error?: string; briefing?: Briefing };
-      if (!r.ok) throw new Error(d.error || 'Error');
-      setBriefing(d.briefing ?? null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error');
-    } finally {
-      setBriefBusy(false);
+
+      if (chunk.final && companyId) {
+        void fetch(`/api/meet/sessions/${sessionId}/transcript`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyId,
+            messageId,
+            participantId: row.participantId,
+            participantName: row.participantName,
+            language: row.language,
+            text: row.text,
+            startedAt: row.startedAt,
+          }),
+        }).catch(() => setError(t(
+          'Falha ao guardar um trecho da transcrição.',
+          'No se pudo guardar un fragmento de la transcripción.',
+          'Failed to save a transcript segment.',
+        )));
+      }
+    },
+    [companyId, sessionId, locale],
+  );
+
+  function toggleTranscription() {
+    setError(null);
+    if (!features.liveTranscriptionEnabled) {
+      setError(
+        t(
+          'A transcrição ao vivo ainda não está activa no servidor Jitsi (Jigasi).',
+          'La transcripción en vivo aún no está activa en el servidor Jitsi (Jigasi).',
+          'Live transcription is not enabled on the Jitsi server yet (Jigasi).',
+        ),
+      );
+      return;
     }
+    if (transcriptionOn) conferenceRef.current?.stopTranscription();
+    else conferenceRef.current?.startTranscription();
+  }
+
+  function startRecording(destination: 'local' | 'cloud') {
+    setError(null);
+    if (destination === 'cloud' && !features.cloudRecordingEnabled) {
+      setError(
+        t(
+          'A gravação na nuvem requer o Jibri no VPS. Escolha «Este computador» por agora.',
+          'La grabación en la nube requiere Jibri en el VPS. Elige «Este ordenador» por ahora.',
+          'Cloud recording requires Jibri on the VPS. Choose “This computer” for now.',
+        ),
+      );
+      return;
+    }
+    conferenceRef.current?.startRecording(destination);
+    setShowRecordMenu(false);
+  }
+
+  function stopRecording() {
+    if (!recordingMode) return;
+    conferenceRef.current?.stopRecording(recordingMode);
   }
 
   async function endMeeting() {
     if (!companyId) return;
     setEnding(true);
     try {
-      await fetch(`/api/meet/sessions/${sessionId}`, {
-        method: 'PATCH',
+      if (transcriptionOn) conferenceRef.current?.stopTranscription();
+      if (recordingMode) conferenceRef.current?.stopRecording(recordingMode);
+
+      const transcript = segments
+        .filter((row) => row.final)
+        .map((row) => `${row.participantName}: ${row.text}`)
+        .join('\n');
+      const endpoint =
+        transcript.length >= 20
+          ? `/api/meet/sessions/${sessionId}/finalize`
+          : `/api/meet/sessions/${sessionId}`;
+      const response = await fetch(endpoint, {
+        method: transcript.length >= 20 ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, status: 'ended' }),
+        body: JSON.stringify(
+          transcript.length >= 20
+            ? {
+                companyId,
+                transcriptText: transcript,
+                endMeeting: true,
+                replaceDrafts: true,
+                locale,
+              }
+            : { companyId, status: 'ended' },
+        ),
       });
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || 'Falha ao encerrar reunião');
+      }
+      conferenceRef.current?.hangup();
       router.push(`/hub/meet?post=${sessionId}`);
-    } catch {
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
       setEnding(false);
     }
   }
@@ -143,7 +300,7 @@ export function MeetRoomClient({ sessionId }: Props) {
     );
   }
 
-  if (error || !session) {
+  if (!session) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-4">
         <p className="text-sm text-red-700">{error || t('Sessão não encontrada.', 'Sesión no encontrada.', 'Session not found.')}</p>
@@ -176,14 +333,14 @@ export function MeetRoomClient({ sessionId }: Props) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {session.meetingUrl && (
+          {externalRoomUrl && (
             <a
-              href={session.meetingUrl}
+              href={externalRoomUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800"
             >
-              Jitsi
+              {t('Nova janela', 'Nueva ventana', 'New window')}
               <ExternalLink className="h-3 w-3" />
             </a>
           )}
@@ -193,7 +350,7 @@ export function MeetRoomClient({ sessionId }: Props) {
             className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800"
           >
             {panelOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
-            {t('IA', 'IA', 'AI')}
+            {t('Transcrição', 'Transcripción', 'Transcript')}
           </button>
           <button
             type="button"
@@ -209,14 +366,25 @@ export function MeetRoomClient({ sessionId }: Props) {
 
       <div className="flex min-h-0 flex-1">
         <main className="relative min-w-0 flex-1 bg-black">
-          {embedSrc ? (
-            <iframe
-              title="Etholys Meet"
-              src={embedSrc}
-              className="absolute inset-0 h-full w-full"
-              allow="camera; microphone; fullscreen; display-capture; autoplay"
+          {session.meetingUrl && canEmbedJitsiInIframe(session.meetingUrl) ? (
+            <MeetConferenceFrame
+              ref={conferenceRef}
+              meetingUrl={session.meetingUrl}
+              title={session.title}
+              locale={locale}
+              onTranscriptionChunk={handleTranscriptionChunk}
+              onRecordingStatus={(state) => {
+                if (state.transcription) {
+                  setTranscriptionOn(state.on);
+                  return;
+                }
+                setRecordingMode(
+                  state.on ? (state.mode === 'local' ? 'local' : 'cloud') : null,
+                );
+              }}
+              onError={setError}
             />
-          ) : session.meetingUrl ? (
+          ) : externalRoomUrl ? (
             <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
               <p className="max-w-md text-sm text-slate-400">
                 {t(
@@ -226,12 +394,12 @@ export function MeetRoomClient({ sessionId }: Props) {
                 )}
               </p>
               <a
-                href={session.meetingUrl}
+                href={externalRoomUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
               >
-                {t('Abrir Jitsi', 'Abrir Jitsi', 'Open Jitsi')}
+                {t('Abrir em nova janela', 'Abrir en nueva ventana', 'Open in new window')}
                 <ExternalLink className="h-4 w-4" />
               </a>
             </div>
@@ -246,73 +414,143 @@ export function MeetRoomClient({ sessionId }: Props) {
           <aside className="flex w-full max-w-sm shrink-0 flex-col border-l border-slate-800 bg-slate-900 sm:w-80">
             <div className="border-b border-slate-800 px-3 py-2">
               <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-sky-400">
-                <Sparkles className="h-3.5 w-3.5" />
-                {t('Alerta em curso', 'Alerta en curso', 'Live briefing')}
+                <FileText className="h-3.5 w-3.5" />
+                {t('Transcrição ao vivo', 'Transcripción en vivo', 'Live transcript')}
               </p>
               <p className="mt-0.5 text-[11px] text-slate-500">
                 {t(
-                  'Cole notas parciais durante a call. A IA sugere temas e próximos passos (sem criar tarefas ainda).',
-                  'Pega notas parciales durante la call. La IA sugiere temas y próximos pasos (sin crear tareas aún).',
-                  'Paste partial notes during the call. AI suggests themes and next steps (no tasks yet).',
+                  'O transcritor ouve a sala e atribui cada trecho ao nome usado pelo participante.',
+                  'El transcriptor escucha la sala y atribuye cada fragmento al nombre usado por el participante.',
+                  'The transcriber listens to the room and attributes each segment to the participant name.',
                 )}
               </p>
             </div>
-            <div className="flex min-h-0 flex-1 flex-col gap-2 p-3">
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={8}
-                className="min-h-[120px] flex-1 resize-none rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:ring-2 focus:ring-sky-600"
-                placeholder={t(
-                  'Notas da reunião…',
-                  'Notas de la reunión…',
-                  'Meeting notes…',
-                )}
-              />
-              <button
-                type="button"
-                onClick={() => void runBriefing()}
-                disabled={briefBusy || !notes.trim()}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-700 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-600 disabled:opacity-50"
-              >
-                {briefBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                {t('Gerar alerta', 'Generar alerta', 'Generate briefing')}
-              </button>
-              {briefing && (
-                <div className="space-y-2 overflow-y-auto rounded-lg border border-sky-900/50 bg-sky-950/40 p-3 text-xs">
-                  <p className="font-semibold text-sky-200">{briefing.alert}</p>
-                  {briefing.themes.length > 0 && (
-                    <div>
-                      <p className="font-medium text-slate-400">{t('Temas', 'Temas', 'Themes')}</p>
-                      <ul className="mt-1 list-inside list-disc text-slate-300">
-                        {briefing.themes.map((x) => (
-                          <li key={x}>{x}</li>
-                        ))}
-                      </ul>
-                    </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+              {error && (
+                <div className="rounded-lg border border-red-900/70 bg-red-950/50 px-3 py-2 text-[11px] text-red-200">
+                  {error}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={toggleTranscription}
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold ${
+                    transcriptionOn
+                      ? 'bg-red-700 text-white hover:bg-red-600'
+                      : 'bg-sky-700 text-white hover:bg-sky-600'
+                  }`}
+                >
+                  {transcriptionOn ? <Square className="h-3 w-3" /> : <Mic className="h-3.5 w-3.5" />}
+                  {transcriptionOn
+                    ? t('Parar', 'Detener', 'Stop')
+                    : t('Transcrever', 'Transcribir', 'Transcribe')}
+                </button>
+                <div className="relative">
+                  {recordingMode ? (
+                    <button
+                      type="button"
+                      onClick={stopRecording}
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-red-700 px-2 py-2 text-xs font-semibold text-white hover:bg-red-600"
+                    >
+                      <Square className="h-3 w-3" />
+                      {t('Parar gravação', 'Detener grabación', 'Stop recording')}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowRecordMenu((open) => !open)}
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-2 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                    >
+                      <Video className="h-3.5 w-3.5" />
+                      {t('Gravar', 'Grabar', 'Record')}
+                    </button>
                   )}
-                  {briefing.openDecisions.length > 0 && (
-                    <div>
-                      <p className="font-medium text-slate-400">{t('Decisões abertas', 'Decisiones abiertas', 'Open decisions')}</p>
-                      <ul className="mt-1 list-inside list-disc text-slate-300">
-                        {briefing.openDecisions.map((x) => (
-                          <li key={x}>{x}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {briefing.suggestedNextSteps.length > 0 && (
-                    <div>
-                      <p className="font-medium text-slate-400">{t('Próximos passos', 'Próximos pasos', 'Next steps')}</p>
-                      <ul className="mt-1 list-inside list-disc text-slate-300">
-                        {briefing.suggestedNextSteps.map((x) => (
-                          <li key={x}>{x}</li>
-                        ))}
-                      </ul>
+                  {showRecordMenu && (
+                    <div className="absolute right-0 top-full z-20 mt-1 w-52 rounded-lg border border-slate-700 bg-slate-900 p-1 shadow-xl">
+                      <button
+                        type="button"
+                        onClick={() => startRecording('local')}
+                        className="flex w-full items-start gap-2 rounded px-2 py-2 text-left text-xs text-slate-200 hover:bg-slate-800"
+                      >
+                        <HardDrive className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          <strong className="block">{t('Este computador', 'Este ordenador', 'This computer')}</strong>
+                          <span className="text-[10px] text-slate-500">
+                            {t('Descarrega ao parar', 'Descarga al detener', 'Downloads when stopped')}
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => startRecording('cloud')}
+                        className="flex w-full items-start gap-2 rounded px-2 py-2 text-left text-xs text-slate-200 hover:bg-slate-800"
+                      >
+                        <Cloud className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          <strong className="block">{t('Nuvem Etholys', 'Nube Etholys', 'Etholys cloud')}</strong>
+                          <span className="text-[10px] text-slate-500">
+                            {features.cloudRecordingEnabled
+                              ? 'R2'
+                              : t('Requer Jibri', 'Requiere Jibri', 'Requires Jibri')}
+                          </span>
+                        </span>
+                      </button>
                     </div>
                   )}
                 </div>
-              )}
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/60 p-2">
+                {segments.length === 0 ? (
+                  <div className="flex h-full min-h-32 items-center justify-center px-3 text-center text-[11px] text-slate-500">
+                    {features.liveTranscriptionEnabled
+                      ? t(
+                          'Clique em «Transcrever». Os trechos aparecerão aqui com o nome de quem falou.',
+                          'Haz clic en «Transcribir». Los fragmentos aparecerán con el nombre de quien habló.',
+                          'Click “Transcribe”. Segments will appear here with the speaker name.',
+                        )
+                      : t(
+                          'Transcrição real preparada na app; falta activar Jigasi no servidor.',
+                          'Transcripción real preparada en la app; falta activar Jigasi en el servidor.',
+                          'Real transcription is ready in the app; Jigasi still needs enabling on the server.',
+                        )}
+                  </div>
+                ) : (
+                  <ol className="space-y-2">
+                    {segments.map((row) => (
+                      <li
+                        key={row.messageId}
+                        className={row.final ? 'opacity-100' : 'opacity-60'}
+                      >
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="truncate text-[11px] font-semibold text-sky-300">
+                            {row.participantName}
+                          </span>
+                          <time className="shrink-0 text-[9px] text-slate-600">
+                            {new Date(row.startedAt).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </time>
+                        </div>
+                        <p className="mt-0.5 text-xs leading-relaxed text-slate-300">
+                          {row.text}
+                        </p>
+                      </li>
+                    ))}
+                    <div ref={transcriptEndRef} />
+                  </ol>
+                )}
+              </div>
+
+              <p className="text-[10px] leading-relaxed text-slate-600">
+                {t(
+                  'Avise os participantes antes de iniciar transcrição ou gravação.',
+                  'Avisa a los participantes antes de iniciar la transcripción o grabación.',
+                  'Notify participants before starting transcription or recording.',
+                )}
+              </p>
             </div>
           </aside>
         )}

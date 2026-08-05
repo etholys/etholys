@@ -76,11 +76,20 @@ set_env DISABLE_HTTPS "1"
 set_env ENABLE_LETSENCRYPT "0"
 set_env HTTP_PORT "8000"
 set_env HTTPS_PORT "8443"
-set_env ENABLE_RECORDING "0"
-set_env ENABLE_TRANSCRIPTIONS "0"
+set_env ENABLE_RECORDING "${MEET_ENABLE_RECORDING:-0}"
+set_env ENABLE_TRANSCRIPTIONS "${MEET_ENABLE_TRANSCRIPTIONS:-0}"
 set_env ENABLE_WELCOME_PAGE "0"
 set_env ENABLE_BREAKOUT_ROOMS "1"
 set_env TZ "America/Sao_Paulo"
+if [ "${MEET_ENABLE_TRANSCRIPTIONS:-0}" = "1" ]; then
+  set_env JIGASI_TRANSCRIBER_ENABLE_SAVING "1"
+  set_env JIGASI_TRANSCRIBER_ADVERTISE_URL "0"
+  set_env JIGASI_TRANSCRIBER_SEND_TXT "0"
+  set_env JIGASI_TRANSCRIBER_RECORD_AUDIO "1"
+  if [ -n "${JIGASI_TRANSCRIBER_WHISPER_URL:-}" ]; then
+    set_env JIGASI_TRANSCRIBER_WHISPER_URL "${JIGASI_TRANSCRIBER_WHISPER_URL}"
+  fi
+fi
 # Caminho absoluto — ~ quebra mounts e permissões uid 1000
 set_env CONFIG "/root/.jitsi-meet-cfg"
 
@@ -89,8 +98,15 @@ mkdir -p /root/.jitsi-meet-cfg/{web,transcripts,prosody/config,prosody/prosody-p
 chown -R 1000:1000 /root/.jitsi-meet-cfg
 
 echo "==> Subir stack Jitsi (primeira vez demora — imagens grandes)"
-docker compose pull
-docker compose up -d
+COMPOSE_FILES=(-f docker-compose.yml)
+if [ "${MEET_ENABLE_TRANSCRIPTIONS:-0}" = "1" ]; then
+  COMPOSE_FILES+=(-f transcriber.yml)
+fi
+if [ "${MEET_ENABLE_RECORDING:-0}" = "1" ]; then
+  COMPOSE_FILES+=(-f jibri.yml)
+fi
+docker compose "${COMPOSE_FILES[@]}" pull
+docker compose "${COMPOSE_FILES[@]}" up -d
 
 echo "==> Aguardar HTTP :8000"
 for i in $(seq 1 30); do
@@ -124,6 +140,16 @@ if grep -q '^NEXT_PUBLIC_JITSI_BASE_URL=' "$ETHOLYS_ENV"; then
   sed -i "s|^NEXT_PUBLIC_JITSI_BASE_URL=.*|NEXT_PUBLIC_JITSI_BASE_URL=${PUBLIC_URL}|" "$ETHOLYS_ENV"
 else
   echo "NEXT_PUBLIC_JITSI_BASE_URL=${PUBLIC_URL}" >> "$ETHOLYS_ENV"
+fi
+if grep -q '^MEET_LIVE_TRANSCRIPTION_ENABLED=' "$ETHOLYS_ENV"; then
+  sed -i "s|^MEET_LIVE_TRANSCRIPTION_ENABLED=.*|MEET_LIVE_TRANSCRIPTION_ENABLED=${MEET_ENABLE_TRANSCRIPTIONS:-0}|" "$ETHOLYS_ENV"
+else
+  echo "MEET_LIVE_TRANSCRIPTION_ENABLED=${MEET_ENABLE_TRANSCRIPTIONS:-0}" >> "$ETHOLYS_ENV"
+fi
+if grep -q '^MEET_CLOUD_RECORDING_ENABLED=' "$ETHOLYS_ENV"; then
+  sed -i "s|^MEET_CLOUD_RECORDING_ENABLED=.*|MEET_CLOUD_RECORDING_ENABLED=${MEET_ENABLE_RECORDING:-0}|" "$ETHOLYS_ENV"
+else
+  echo "MEET_CLOUD_RECORDING_ENABLED=${MEET_ENABLE_RECORDING:-0}" >> "$ETHOLYS_ENV"
 fi
 
 if [ -f "${ETHOLYS_ROOT}/infra/docker-compose.prod.yml" ]; then

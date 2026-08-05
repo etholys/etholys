@@ -5,7 +5,7 @@ import { isExpedicionOwnerUserId } from '@/lib/forge/expedicion-owner';
 import { seedExpedicionForOwner } from '@/lib/forge/seed-expedicion-for-owner';
 import { requireForgeTenant } from '@/lib/forge/tenant';
 
-/** Republica el curso en todas las empresas del titular (Tiago / Rural Commerce). */
+/** Republica el curso en todas las empresas del titular del programa. */
 export async function POST(req: NextRequest) {
   try {
     const tenant = await requireForgeTenant();

@@ -1,4 +1,4 @@
-import { geminiCompleteJsonText } from '@/lib/gemini-client';
+import { llmCompleteJsonText } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
 
 export type DonorFileValidation = {
@@ -202,7 +202,7 @@ ${guideBlock}
 ${textContent.slice(0, 120000)}
 --- FIN ---`;
 
-  const raw = await geminiCompleteJsonText(ANALYZE_PROMPT, userText, { maxOutputTokens: 8192 });
+  const raw = await llmCompleteJsonText(ANALYZE_PROMPT, userText, { maxOutputTokens: 8192 });
   const jsonStr = extractFirstJsonObject(raw);
   if (!jsonStr) {
     return buildFailedAnalysis(

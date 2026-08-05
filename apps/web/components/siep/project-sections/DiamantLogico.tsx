@@ -9,9 +9,6 @@ import {
   type ObjectiveNode,
 } from '@/lib/siep/objective-hierarchy';
 
-/* ================================================================
-   Types & Constants
-   ================================================================ */
 interface DNode {
   id: string;
   type: string;
@@ -95,9 +92,6 @@ function getColor(type: string) { return TYPE_COLORS[type] || '#6b7280'; }
 function getAbbr(type: string) { return TYPE_ABBR[type] || type.substring(0, 3).toUpperCase(); }
 function getLabel(type: string) { return TYPE_LABELS[type] || type; }
 
-/* ================================================================
-   Layout engine
-   ================================================================ */
 function buildLayeredChart(objectives: DNode[]): { nodes: LayoutNode[]; edges: Edge[]; width: number; height: number; usedLayers: number[] } {
   const flat: LayoutNode[] = [];
   const edges: Edge[] = [];
@@ -168,9 +162,6 @@ function buildLayeredChart(objectives: DNode[]): { nodes: LayoutNode[]; edges: E
   return { nodes: flat, edges, width: totalW, height: totalH, usedLayers };
 }
 
-/* ================================================================
-   Bezier connector
-   ================================================================ */
 function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
   const dy = y2 - y1;
   const cy = Math.abs(dy) * 0.4;
@@ -178,9 +169,6 @@ function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
   return `M${x1},${y1} C${x1},${y1 - cy} ${x2},${y2 + cy} ${x2},${y2}`;
 }
 
-/* ================================================================
-   Portal tooltip
-   ================================================================ */
 function TooltipPortal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -188,9 +176,6 @@ function TooltipPortal({ children }: { children: React.ReactNode }) {
   return ReactDOM.createPortal(children as any, document.body) as any;
 }
 
-/* ================================================================
-   Main component
-   ================================================================ */
 export default function DiamantLogico({
   objectives, onDelete, onCreate, onInlineSave, onReparent,
 }: {

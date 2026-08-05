@@ -4,8 +4,8 @@ import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
-import { callImportLlm, getGeminiImportModel } from '@/lib/import-llm';
-import { getGeminiModelCandidates } from '@/lib/gemini-client';
+import { callImportLlm, getLlmModel } from '@/lib/import-llm';
+import { getLlmModelCandidates } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
 import { collectActivitiesFromObjectives } from '@/lib/siep/import-activities';
 import { buildSourceLanguageInstruction } from '@/lib/siep/import-language';
@@ -360,23 +360,22 @@ ${hintParts.length ? `\nInstrucciones adicionales:\n- ${hintParts.join('\n- ')}`
     } catch (llmErr: any) {
       console.error('[Import] LLM error:', llmErr);
       const detail = String(llmErr?.message || llmErr);
-      const llmModel = getGeminiImportModel();
+      const llmModel = getLlmModel();
       return NextResponse.json(
         {
           error:
-            'Não foi possível processar os documentos com IA (Anthropic Claude). Veja o detalhe abaixo e confira ANTHROPIC_API_KEY e LLM_MODEL no .env.',
+            'Não foi possível processar os documentos com IA. Veja o detalhe abaixo e confira a chave LLM e LLM_MODEL no .env.',
           detail,
-          geminiModel: llmModel,
           llmModel,
           hint:
-            'Use LLM_MODEL=claude-sonnet-4-6 (ou claude-haiku-4-5). A app tenta fallbacks se houver 429/503. Reinicie o servidor após alterar o .env.',
-          modelsTried: getGeminiModelCandidates(),
+            'Defina LLM_MODEL no .env e reinicie o servidor. A app tenta fallbacks se houver 429/503.',
+          modelsTried: getLlmModelCandidates(),
         },
         { status: 502 }
       );
     }
 
-    // Parse JSON (Gemini pode envolver em markdown ou texto extra; JSON mode ajuda mas não garante 100 %)
+    // Parse JSON (o modelo pode envolver em markdown ou texto extra; JSON mode ajuda mas não garante 100 %)
     let extracted!: ImportExtractedPayload;
     try {
       const trimmed = rawContent.trim();

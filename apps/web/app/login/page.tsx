@@ -158,7 +158,9 @@ function LoginContent() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">ETHOLYS</h1>
-                <p className="text-xs text-teal-400 font-medium tracking-widest uppercase">Solutions Factory</p>
+                <p className="text-xs text-teal-400 font-medium tracking-widest uppercase">
+                  {locale === 'es' ? 'Fábrica de Soluciones' : locale === 'pt' ? 'Fábrica de Soluções' : 'Solutions Factory'}
+                </p>
               </div>
             </div>
           </div>

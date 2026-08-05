@@ -1,6 +1,6 @@
 /**
  * Gera ficheiro .ics mínimo para convite de calendário (Google / Outlook).
- * OAuth nativo fica para fase posterior (docs/architecture/etholys-meet.md F6).
+ * OAuth nativo: POST /api/meet/sessions/[id]/calendar (F6) quando GOOGLE_CALENDAR_ENABLED=1 ou Azure AD.
  */
 
 export type MeetIcsInput = {

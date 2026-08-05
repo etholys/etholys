@@ -4,6 +4,7 @@ Documentação detalhada para implementação. O mapa geral do ecossistema está
 
 | Sistema | Documento | Estado da spec |
 |---------|-----------|----------------|
+| **Etholys Tools** (faixa de ferramentas Hub) | [etholys-tools.md](./etholys-tools.md) | ✅ Nome + membros (ago/2026) |
 | **FORGE** (EAD, jogos, gamificação) | [forge-ead.md](./forge-ead.md) | ✅ Definida (mai/2026) — pronta para implementação |
 | **Meet** (reuniões, Jitsi, IA pós-call) | [etholys-meet.md](./etholys-meet.md) | ✅ Fundação v0.1 (jul/2026) — motor + espelhos |
 | **Studio** (documentos IA, ferramenta Hub) | [etholys-studio.md](./etholys-studio.md) | ✅ F0–F1 (jul/2026) — biblioteca, marca, export |

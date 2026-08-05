@@ -1,4 +1,4 @@
-/** Paleta visual V2 — material físico La Expedición Sostenible (Rural Commerce) */
+/** Paleta visual V2 — material físico La Expedición Sostenible */
 
 import type { ExpedicionStationSlug } from '@/lib/forge/expedicion-station-decks';
 import type { PostItType } from '@/lib/forge/expedicion-v2/types';
