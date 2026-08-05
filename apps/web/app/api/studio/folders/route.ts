@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { resolveStudioCompanyId } from '@/lib/studio/access';
+import { getFolderAccess } from '@/lib/studio/share';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
         companyId,
         parentId,
         name,
+        visibility: 'private',
         createdById: user.id,
       },
     });
@@ -47,6 +49,40 @@ export async function POST(req: NextRequest) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: 'Failed to create folder', detail: msg }, { status: 503 });
   }
+}
+
+/** PUT /api/studio/folders — renomear / mudar visibilidade (só dono) */
+export async function PUT(req: NextRequest) {
+  const user = await authUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const id = typeof body.id === 'string' ? body.id : '';
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+
+  const companyId = await resolveStudioCompanyId(
+    user.id,
+    typeof body.companyId === 'string' ? body.companyId : null,
+  );
+  if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
+
+  const folder = await prisma.studioFolder.findFirst({ where: { id, companyId } });
+  if (!folder) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if ((await getFolderAccess(user.id, folder)) !== 'owner') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const data: { name?: string; visibility?: string } = {};
+  if (typeof body.name === 'string' && body.name.trim()) data.name = body.name.trim();
+  if (body.visibility === 'private' || body.visibility === 'company') {
+    data.visibility = body.visibility;
+  }
+  if (!Object.keys(data).length) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+  }
+
+  const updated = await prisma.studioFolder.update({ where: { id: folder.id }, data });
+  return NextResponse.json({ folder: updated });
 }
 
 /** DELETE /api/studio/folders?id= */
@@ -65,6 +101,9 @@ export async function DELETE(req: NextRequest) {
 
   const folder = await prisma.studioFolder.findFirst({ where: { id, companyId } });
   if (!folder) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if ((await getFolderAccess(user.id, folder)) !== 'owner') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   await prisma.studioFolder.delete({ where: { id: folder.id } });
   return NextResponse.json({ ok: true });

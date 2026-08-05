@@ -111,6 +111,8 @@ model User {
   labAnvilSessionsCreated       LabAnvilSession[]            @relation("LabAnvilSessionCreator")
   studioFoldersCreated          StudioFolder[]               @relation("StudioFolderCreator")
   studioDocumentsCreated        StudioDocument[]             @relation("StudioDocumentCreator")
+  studioShares                  StudioShare[]                @relation("StudioShareUser")
+  studioSharesInvited           StudioShare[]                @relation("StudioShareInviter")
 }
 
 model Account {
@@ -221,6 +223,7 @@ model Company {
   studioFolders               StudioFolder[]
   studioDocuments             StudioDocument[]
   studioTemplates             StudioTemplate[]
+  studioShares                StudioShare[]
 }
 
 /// Autorização ao Hub /hub/workspace — espelho operacional: quais sistemas o utilizador vê e usa a partir dali (dados continuam nos sistemas de origem).
@@ -2624,6 +2627,8 @@ model StudioFolder {
   companyId   String
   parentId    String?
   name        String
+  /// company = todos os membros da empresa; private = só criador + partilhas
+  visibility  String           @default("private")
   createdById String?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
@@ -2631,6 +2636,7 @@ model StudioFolder {
   parent      StudioFolder?    @relation("StudioFolderTree", fields: [parentId], references: [id], onDelete: Cascade)
   children    StudioFolder[]   @relation("StudioFolderTree")
   documents   StudioDocument[]
+  shares      StudioShare[]
   createdBy   User?            @relation("StudioFolderCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([companyId])
@@ -2646,6 +2652,8 @@ model StudioDocument {
   /// report | proposal | brief | letter | presentation | diagram | other
   format      String        @default("report")
   status      String        @default("draft")
+  /// company = todos os membros; private = só criador + partilhas
+  visibility  String        @default("private")
   canvasState Json
   brandKitJson Json?
   templateKey String?
@@ -2655,11 +2663,50 @@ model StudioDocument {
   updatedAt   DateTime      @updatedAt
   company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   folder      StudioFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  shares      StudioShare[]
   createdBy   User?         @relation("StudioDocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([folderId])
   @@index([companyId, updatedAt])
+}
+
+/// Partilha de pasta ou documento — membro interno ou convidado externo (acesso isolado)
+model StudioShare {
+  id           String          @id @default(cuid())
+  companyId    String
+  /// folder | document
+  targetType   String
+  folderId     String?
+  documentId   String?
+  /// viewer | editor
+  role         String          @default("viewer")
+  email        String
+  userId       String?
+  /// company_member | external_guest
+  accessMode   String          @default("company_member")
+  token        String          @unique
+  magicLoginToken String?      @unique
+  magicLoginExpiresAt DateTime?
+  /// active | revoked
+  status       String          @default("active")
+  invitedById  String?
+  acceptedAt   DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  company      Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  folder       StudioFolder?   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  document     StudioDocument? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user         User?           @relation("StudioShareUser", fields: [userId], references: [id], onDelete: SetNull)
+  invitedBy    User?           @relation("StudioShareInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([email])
+  @@index([userId])
+  @@index([folderId])
+  @@index([documentId])
+  @@index([status])
 }
 
 /// Template de sistema (companyId null) ou da empresa

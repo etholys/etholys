@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { resolveStudioCompanyId } from '@/lib/studio/access';
 import type { StudioCanvasState } from '@/lib/studio/types';
+import { getDocumentAccess } from '@/lib/studio/share';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,47 +19,41 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const user = await authUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const companyId = await resolveStudioCompanyId(
-    user.id,
-    req.nextUrl.searchParams.get('companyId'),
-  );
-  if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
-
-  const doc = await prisma.studioDocument.findFirst({
-    where: { id: params.id, companyId },
-  });
+  const doc = await prisma.studioDocument.findFirst({ where: { id: params.id } });
   if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const access = await getDocumentAccess(user.id, doc);
+  if (access === 'none') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   return NextResponse.json({
     document: {
       ...doc,
       canvasState: doc.canvasState as StudioCanvasState,
     },
+    access,
   });
 }
 
-/** PUT /api/studio/documents/[id] — save title/canvas/folder */
+/** PUT /api/studio/documents/[id] — save title/canvas/folder/visibility */
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await authUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-  const companyId = await resolveStudioCompanyId(
-    user.id,
-    typeof body.companyId === 'string' ? body.companyId : null,
-  );
-  if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
-
-  const existing = await prisma.studioDocument.findFirst({
-    where: { id: params.id, companyId },
-  });
+  const existing = await prisma.studioDocument.findFirst({ where: { id: params.id } });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const access = await getDocumentAccess(user.id, existing);
+  if (access === 'none' || access === 'viewer') {
+    return NextResponse.json({ error: 'Sem permissão para editar' }, { status: 403 });
+  }
 
   const data: {
     title?: string;
     canvasState?: StudioCanvasState;
     folderId?: string | null;
     status?: string;
+    visibility?: string;
   } = {};
 
   if (typeof body.title === 'string' && body.title.trim()) data.title = body.title.trim();
@@ -69,13 +64,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     data.folderId = typeof body.folderId === 'string' && body.folderId ? body.folderId : null;
   }
   if (typeof body.status === 'string') data.status = body.status;
+  if ((body.visibility === 'company' || body.visibility === 'private') && access === 'owner') {
+    data.visibility = body.visibility;
+  }
 
   const updated = await prisma.studioDocument.update({
     where: { id: existing.id },
     data,
   });
 
-  return NextResponse.json({ document: updated });
+  return NextResponse.json({ document: updated, access });
 }
 
 /** DELETE /api/studio/documents/[id] */
@@ -87,12 +85,14 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     user.id,
     req.nextUrl.searchParams.get('companyId'),
   );
-  if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
 
   const existing = await prisma.studioDocument.findFirst({
-    where: { id: params.id, companyId },
+    where: companyId ? { id: params.id, companyId } : { id: params.id },
   });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const access = await getDocumentAccess(user.id, existing);
+  if (access !== 'owner') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   await prisma.studioDocument.delete({ where: { id: existing.id } });
   return NextResponse.json({ ok: true });

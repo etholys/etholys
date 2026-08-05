@@ -13,6 +13,7 @@ import {
   X,
   FileDown,
   FileType,
+  Share2,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
@@ -22,6 +23,7 @@ import type {
   StudioBlock,
 } from '@/lib/studio/types';
 import { StudioMermaidPreview } from '@/components/studio/StudioMermaidPreview';
+import { StudioShareDialog } from '@/components/studio/StudioShareDialog';
 
 type ChatMsg = { id: string; role: string; content: string };
 
@@ -44,21 +46,27 @@ export default function StudioDocumentPage() {
   const [consent, setConsent] = useState<StudioConsentRequest | null>(null);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [exporting, setExporting] = useState<'pdf' | 'docx' | null>(null);
+  const [access, setAccess] = useState<string>('owner');
+  const [shareOpen, setShareOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
-    if (!id || !companyId) return;
+    if (!id) return;
     setLoading(true);
     setError(null);
     try {
-      const r = await fetch(`/api/studio/documents/${id}?companyId=${encodeURIComponent(companyId)}`);
+      const q = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
+      const r = await fetch(`/api/studio/documents/${id}${q}`);
       const d = await r.json();
       if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
       setTitle(d.document.title);
       setCanvas(d.document.canvasState as StudioCanvasState);
+      setAccess(typeof d.access === 'string' ? d.access : 'owner');
       setDirty(false);
 
-      const mr = await fetch(`/api/studio/documents/${id}/copilot?companyId=${encodeURIComponent(companyId)}`);
+      const mr = await fetch(
+        `/api/studio/documents/${id}/copilot${companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''}`,
+      );
       if (mr.ok) {
         const md = await mr.json();
         setMessages(
@@ -262,6 +270,16 @@ export default function StudioDocumentPage() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {access === 'owner' && companyId && (
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Share2 className="h-4 w-4" />
+              {t('Partilhar', 'Compartir', 'Share')}
+            </button>
+          )}
           <button
             type="button"
             disabled={!!exporting}
@@ -409,6 +427,16 @@ export default function StudioDocumentPage() {
           </form>
         </aside>
       </div>
+
+      {shareOpen && companyId && (
+        <StudioShareDialog
+          companyId={companyId}
+          documentId={id}
+          title={title}
+          open
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   );
 }

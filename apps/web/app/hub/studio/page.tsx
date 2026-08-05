@@ -13,11 +13,13 @@ import {
   PenLine,
   ChevronRight,
   Palette,
+  Share2,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
+import { StudioShareDialog } from '@/components/studio/StudioShareDialog';
 
-type FolderRow = { id: string; name: string; parentId: string | null };
+type FolderRow = { id: string; name: string; parentId: string | null; visibility?: string; access?: string };
 type DocRow = {
   id: string;
   title: string;
@@ -25,6 +27,8 @@ type DocRow = {
   status: string;
   folderId: string | null;
   updatedAt: string;
+  visibility?: string;
+  access?: string;
 };
 type TemplateRow = {
   key: string;
@@ -58,6 +62,11 @@ export default function StudioHubPage() {
   const [brandLogo, setBrandLogo] = useState('');
   const [brandFooter, setBrandFooter] = useState('');
   const [brandSaving, setBrandSaving] = useState(false);
+  const [shareTarget, setShareTarget] = useState<null | {
+    folderId?: string;
+    documentId?: string;
+    title: string;
+  }>(null);
 
   const load = useCallback(async () => {
     if (!companyId) {
@@ -302,33 +311,62 @@ export default function StudioHubPage() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {folders.map((f) => (
-              <button
+              <div
                 key={f.id}
-                type="button"
-                onClick={() => setFolderId(f.id)}
-                className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-amber-300 hover:shadow-md"
+                className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-amber-300 hover:shadow-md"
               >
-                <Folder className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-                <div>
-                  <p className="font-semibold text-slate-900">{f.name}</p>
-                  <p className="text-xs text-slate-500">{t('Pasta', 'Carpeta', 'Folder')}</p>
-                </div>
-              </button>
+                <button type="button" onClick={() => setFolderId(f.id)} className="flex min-w-0 flex-1 items-start gap-3 text-left">
+                  <Folder className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                  <div>
+                    <p className="font-semibold text-slate-900">{f.name}</p>
+                    <p className="text-xs text-slate-500">
+                      {t('Pasta', 'Carpeta', 'Folder')}
+                      {f.visibility === 'company'
+                        ? ` · ${t('toda a empresa', 'toda la empresa', 'whole company')}`
+                        : ` · ${t('privada', 'privada', 'private')}`}
+                    </p>
+                  </div>
+                </button>
+                {(f.access === 'owner' || !f.access) && (
+                  <button
+                    type="button"
+                    title={t('Partilhar', 'Compartir', 'Share')}
+                    onClick={() => setShareTarget({ folderId: f.id, title: f.name })}
+                    className="rounded-lg p-2 text-slate-400 hover:bg-orange-50 hover:text-orange-700"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             ))}
             {documents.map((doc) => (
-              <Link
+              <div
                 key={doc.id}
-                href={`/hub/studio/${doc.id}`}
                 className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-300 hover:shadow-md"
               >
-                <FileText className="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-slate-900">{doc.title}</p>
-                  <p className="text-xs text-slate-500">
-                    {doc.format} · {new Date(doc.updatedAt).toLocaleString(locale === 'en' ? 'en' : locale)}
-                  </p>
-                </div>
-              </Link>
+                <Link href={`/hub/studio/${doc.id}`} className="flex min-w-0 flex-1 items-start gap-3">
+                  <FileText className="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-900">{doc.title}</p>
+                    <p className="text-xs text-slate-500">
+                      {doc.format} · {new Date(doc.updatedAt).toLocaleString(locale === 'en' ? 'en' : locale)}
+                      {doc.visibility === 'company'
+                        ? ` · ${t('toda a empresa', 'toda la empresa', 'whole company')}`
+                        : ` · ${t('privado', 'privado', 'private')}`}
+                    </p>
+                  </div>
+                </Link>
+                {(doc.access === 'owner' || !doc.access) && (
+                  <button
+                    type="button"
+                    title={t('Partilhar', 'Compartir', 'Share')}
+                    onClick={() => setShareTarget({ documentId: doc.id, title: doc.title })}
+                    className="rounded-lg p-2 text-slate-400 hover:bg-orange-50 hover:text-orange-700"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             ))}
             {folders.length === 0 && documents.length === 0 && (
               <p className="col-span-full text-sm text-slate-500">
@@ -342,6 +380,18 @@ export default function StudioHubPage() {
           </div>
         )}
       </main>
+
+      {shareTarget && companyId && (
+        <StudioShareDialog
+          companyId={companyId}
+          folderId={shareTarget.folderId}
+          documentId={shareTarget.documentId}
+          title={shareTarget.title}
+          open
+          onClose={() => setShareTarget(null)}
+          onVisibilityChange={() => void load()}
+        />
+      )}
 
       {showBrand && (
         <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 sm:items-center">

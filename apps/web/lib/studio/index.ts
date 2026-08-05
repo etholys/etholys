@@ -18,3 +18,9 @@ export {
   htmlToPdfViaAbacus,
   type StudioBrandKit,
 } from '@/lib/studio/export';
+export {
+  createStudioShare,
+  getDocumentAccess,
+  getFolderAccess,
+  resolveStudioJwtScope,
+} from '@/lib/studio/share';

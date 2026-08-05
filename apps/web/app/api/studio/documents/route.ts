@@ -6,6 +6,8 @@ import { resolveStudioCompanyId } from '@/lib/studio/access';
 import { STUDIO_SYSTEM_TEMPLATES, findSystemTemplate } from '@/lib/studio/templates';
 import { emptyStudioCanvas, isStudioFormat } from '@/lib/studio/types';
 import { prismaHasEnumValue } from '@/lib/prisma-has-field';
+import { getDocumentAccess, getFolderAccess } from '@/lib/studio/share';
+import { resolveStudioJwtScope } from '@/lib/studio/share';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +22,77 @@ export async function GET(req: NextRequest) {
   const user = await authUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const scope = await resolveStudioJwtScope(user.id);
+  if (scope.mode === 'none') {
+    return NextResponse.json({ error: 'Sem acesso ao Studio' }, { status: 403 });
+  }
+
+  // Convidado externo: só vê alvos partilhados
+  if (scope.mode === 'share_only') {
+    const folderIdParam = req.nextUrl.searchParams.get('folderId');
+    const folderTargets = scope.targets.filter((t) => t.type === 'folder').map((t) => t.id);
+    const docTargets = scope.targets.filter((t) => t.type === 'document').map((t) => t.id);
+    const folders = folderTargets.length
+      ? await prisma.studioFolder.findMany({
+          where: {
+            id: { in: folderTargets },
+            ...(folderIdParam ? { parentId: folderIdParam } : { parentId: null }),
+          },
+          orderBy: { name: 'asc' },
+        })
+      : [];
+    // Se pediu uma pasta específica partilhada, listar docs dessa pasta
+    const documents = await prisma.studioDocument.findMany({
+      where: folderIdParam
+        ? {
+            folderId: folderIdParam,
+            OR: [
+              ...(docTargets.length ? [{ id: { in: docTargets } }] : []),
+              ...(folderTargets.includes(folderIdParam) ? [{ folderId: folderIdParam }] : []),
+              ...(folderTargets.length ? [{ folderId: { in: folderTargets } }] : []),
+            ],
+          }
+        : {
+            OR: [
+              ...(docTargets.length ? [{ id: { in: docTargets } }] : []),
+              ...(folderTargets.length ? [{ folderId: { in: folderTargets } }] : []),
+            ],
+          },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        format: true,
+        status: true,
+        folderId: true,
+        templateKey: true,
+        visibility: true,
+        updatedAt: true,
+        createdAt: true,
+      },
+    });
+    const visibleDocs = folderIdParam
+      ? documents.filter((d) => d.folderId === folderIdParam)
+      : documents.filter((d) => !d.folderId || folderTargets.includes(d.folderId) || docTargets.includes(d.id));
+
+    const allFolders = folderTargets.length
+      ? await prisma.studioFolder.findMany({
+          where: { id: { in: folderTargets } },
+          select: { id: true, name: true, parentId: true },
+        })
+      : [];
+
+    return NextResponse.json({
+      companyId: null,
+      folderId: folderIdParam || null,
+      folders: folderIdParam ? [] : folders.length ? folders : allFolders,
+      allFolders,
+      documents: visibleDocs,
+      templates: [],
+      accessMode: 'share_only',
+    });
+  }
+
   const companyId = await resolveStudioCompanyId(
     user.id,
     req.nextUrl.searchParams.get('companyId'),
@@ -29,7 +102,7 @@ export async function GET(req: NextRequest) {
   const folderId = req.nextUrl.searchParams.get('folderId');
 
   try {
-    const [folders, documents] = await Promise.all([
+    const [rawFolders, rawDocuments, allFoldersRaw] = await Promise.all([
       prisma.studioFolder.findMany({
         where: { companyId, parentId: folderId || null },
         orderBy: { name: 'asc' },
@@ -37,24 +110,44 @@ export async function GET(req: NextRequest) {
       prisma.studioDocument.findMany({
         where: { companyId, folderId: folderId || null },
         orderBy: { updatedAt: 'desc' },
-        select: {
-          id: true,
-          title: true,
-          format: true,
-          status: true,
-          folderId: true,
-          templateKey: true,
-          updatedAt: true,
-          createdAt: true,
-        },
+      }),
+      prisma.studioFolder.findMany({
+        where: { companyId },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, parentId: true, createdById: true, visibility: true, companyId: true },
       }),
     ]);
 
-    const allFolders = await prisma.studioFolder.findMany({
-      where: { companyId },
-      orderBy: { name: 'asc' },
-      select: { id: true, name: true, parentId: true },
-    });
+    const folders = [];
+    for (const f of rawFolders) {
+      const access = await getFolderAccess(user.id, f);
+      if (access !== 'none') folders.push({ ...f, access });
+    }
+
+    const documents = [];
+    for (const d of rawDocuments) {
+      const access = await getDocumentAccess(user.id, d);
+      if (access !== 'none') {
+        documents.push({
+          id: d.id,
+          title: d.title,
+          format: d.format,
+          status: d.status,
+          folderId: d.folderId,
+          templateKey: d.templateKey,
+          visibility: d.visibility,
+          updatedAt: d.updatedAt,
+          createdAt: d.createdAt,
+          access,
+        });
+      }
+    }
+
+    const allFolders = [];
+    for (const f of allFoldersRaw) {
+      const access = await getFolderAccess(user.id, f);
+      if (access !== 'none') allFolders.push({ id: f.id, name: f.name, parentId: f.parentId });
+    }
 
     const templates = STUDIO_SYSTEM_TEMPLATES.map((t) => ({
       key: t.key,
@@ -76,6 +169,7 @@ export async function GET(req: NextRequest) {
       allFolders,
       documents,
       templates,
+      accessMode: 'member',
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -146,6 +240,7 @@ export async function POST(req: NextRequest) {
         folderId,
         title,
         format: canvas.format,
+        visibility: 'private',
         canvasState: canvas,
         templateKey: templateKey || null,
         aiSessionId,

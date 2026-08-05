@@ -9,6 +9,12 @@ import {
   isPageAllowedForCourseOnlyUser,
 } from '@/lib/forge/course-only-guard';
 import {
+  defaultStudioShareOnlyHome,
+  isApiAllowedForStudioShareOnly,
+  isPageAllowedForStudioShareOnly,
+  type StudioShareTargetRef,
+} from '@/lib/studio/share-guard';
+import {
   isHubShellPath,
   isPathAllowedForSystems,
   isPrecommercialMode,
@@ -38,6 +44,7 @@ const PAGE_PREFIXES = [
   '/chat',
   '/lab',
   '/acesso',
+  '/studio',
 ];
 
 function isProtectedPage(pathname: string): boolean {
@@ -55,6 +62,9 @@ type AccessToken = {
   allowedSystems?: string[];
   workspaceHomePath?: string;
   platformAdmin?: boolean;
+  studioAccessMode?: string;
+  studioTargets?: StudioShareTargetRef[];
+  studioHomePath?: string;
 };
 
 type ForgeScope = {
@@ -132,6 +142,62 @@ function courseOnlyRedirect(req: NextRequest, scope: ForgeScope) {
   return NextResponse.redirect(new URL(home, req.url));
 }
 
+async function enforceStudioShareOnlyScope(req: NextRequest): Promise<NextResponse | null> {
+  const pathname = req.nextUrl.pathname;
+  if (pathname === '/api/internal/studio-scope') return null;
+
+  const token = (await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+  })) as AccessToken | null;
+
+  if (!token?.sub && !token?.id) return null;
+
+  let mode = token.studioAccessMode;
+  let targets = Array.isArray(token.studioTargets) ? token.studioTargets : [];
+  let homePath = typeof token.studioHomePath === 'string' ? token.studioHomePath : '/studio/shared';
+
+  if (mode !== 'share_only') {
+    // Pode estar desatualizado no JWT — confirmar via API só se não for member explícito
+    if (mode === 'member') return null;
+    try {
+      const checkUrl = new URL('/api/internal/studio-scope', req.nextUrl.origin);
+      const res = await fetch(checkUrl.toString(), {
+        headers: { cookie: req.headers.get('cookie') ?? '' },
+        cache: 'no-store',
+      });
+      if (!res.ok) return null;
+      const scope = (await res.json()) as {
+        mode?: string;
+        targets?: StudioShareTargetRef[];
+        homePath?: string;
+      };
+      if (scope.mode !== 'share_only') return null;
+      mode = 'share_only';
+      targets = scope.targets || [];
+      homePath = scope.homePath || defaultStudioShareOnlyHome(targets);
+    } catch {
+      return null;
+    }
+  }
+
+  if (pathname.startsWith('/api/')) {
+    if (isApiAllowedForStudioShareOnly(pathname)) return null;
+    return NextResponse.json(
+      { error: 'Acesso restrito: apenas o conteúdo Studio partilhado consigo.', code: 'STUDIO_SHARE_ONLY' },
+      { status: 403 },
+    );
+  }
+
+  if (isPageAllowedForStudioShareOnly(pathname, targets)) return null;
+
+  if (isProtectedPage(pathname) || pathname === '/hub' || pathname.startsWith('/hub/')) {
+    return NextResponse.redirect(new URL(homePath || '/studio/shared', req.url));
+  }
+
+  return null;
+}
+
 async function enforceCourseOnlyScope(req: NextRequest): Promise<NextResponse | null> {
   const pathname = req.nextUrl.pathname;
   if (pathname === '/api/internal/forge-scope') return null;
@@ -179,6 +245,7 @@ async function enforceFunctionOnlyScope(req: NextRequest): Promise<NextResponse 
   if (
     pathname === '/api/internal/workspace-scope' ||
     pathname === '/api/internal/forge-scope' ||
+    pathname === '/api/internal/studio-scope' ||
     pathname.startsWith('/api/auth')
   ) {
     return null;
@@ -191,6 +258,7 @@ async function enforceFunctionOnlyScope(req: NextRequest): Promise<NextResponse 
 
   if (!token?.sub && !token?.id) return null;
   if (token.forgeAccessMode === 'course_only') return null;
+  if (token.studioAccessMode === 'share_only') return null;
 
   const scope = await resolveWorkspaceScope(req, token);
   if (!scope || scope.mode === 'full') return null;
@@ -295,6 +363,9 @@ export async function middleware(req: NextRequest) {
   const courseOnlyBlock = await enforceCourseOnlyScope(req);
   if (courseOnlyBlock) return courseOnlyBlock;
 
+  const studioShareBlock = await enforceStudioShareOnlyScope(req);
+  if (studioShareBlock) return studioShareBlock;
+
   const functionOnlyBlock = await enforceFunctionOnlyScope(req);
   if (functionOnlyBlock) return functionOnlyBlock;
 
@@ -347,5 +418,7 @@ export const config = {
     '/lab/:path*',
     '/acesso',
     '/acesso/:path*',
+    '/studio',
+    '/studio/:path*',
   ],
 };

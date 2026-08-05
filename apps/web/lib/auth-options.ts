@@ -55,10 +55,30 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
-        forgeMagicToken: { label: 'Forge Magic', type: 'text' },
-      },
-      async authorize(credentials) {
+          forgeMagicToken: { label: 'Forge Magic', type: 'text' },
+          studioMagicToken: { label: 'Studio Magic', type: 'text' },
+        },
+        async authorize(credentials) {
         try {
+          const studioMagic = (credentials as { studioMagicToken?: string })?.studioMagicToken?.trim();
+          if (studioMagic) {
+            const { findShareByMagicToken } = await import('@/lib/studio/share');
+            const share = await findShareByMagicToken(studioMagic);
+            const user = share?.user;
+            if (!user?.isActive || !user.email) return null;
+            if (credentials?.email && user.email.toLowerCase() !== credentials.email.trim().toLowerCase()) {
+              return null;
+            }
+            return {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role,
+              locale: user.locale,
+              image: user.avatar || user.image,
+            } as any;
+          }
+
           const magic = (credentials as { forgeMagicToken?: string })?.forgeMagicToken?.trim();
           if (magic) {
             const enrollment = await findEnrollmentByMagicToken(magic);
@@ -140,6 +160,21 @@ export const authOptions: NextAuthOptions = {
           console.error('[next-auth][jwt] workspace scope refresh failed', e);
         }
       }
+
+      const stCheckedAt = typeof token.studioScopeCheckedAt === 'number' ? token.studioScopeCheckedAt : 0;
+      const stStale = Date.now() - stCheckedAt > 5 * 60 * 1000;
+      if (userId && (user || stStale || !token.studioAccessMode)) {
+        try {
+          const { resolveStudioJwtScope } = await import('@/lib/studio/share');
+          const st = await resolveStudioJwtScope(userId);
+          token.studioAccessMode = st.mode;
+          token.studioTargets = st.targets;
+          token.studioHomePath = st.homePath;
+          token.studioScopeCheckedAt = Date.now();
+        } catch (e) {
+          console.error('[next-auth][jwt] studio scope refresh failed', e);
+        }
+      }
       return token;
     },
     async session({ session, token }: any) {
@@ -154,6 +189,9 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).allowedSystems = token.allowedSystems ?? [];
         (session.user as any).workspaceHomePath = token.workspaceHomePath;
         (session.user as any).platformAdmin = Boolean(token.platformAdmin);
+        (session.user as any).studioAccessMode = token.studioAccessMode;
+        (session.user as any).studioTargets = token.studioTargets ?? [];
+        (session.user as any).studioHomePath = token.studioHomePath;
       }
       return session;
     },

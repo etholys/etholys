@@ -34,6 +34,7 @@
 | **F0** | Spec + pastas + docs + templates seed + editor dual-pane + agente consent | ✅ |
 | **F1** | Kit de marca da empresa + export PDF/DOCX | ✅ |
 | **F2** | Diagramas editáveis + “ajusta o diagrama” no chat | ✅ preview Mermaid + patches via agente |
+| **F2.1** | Permissões / partilha pasta+doc (membros + email externo isolado) | ✅ |
 | **F3** | Pontes “Abrir no Studio” desde SIEP/FUNDHUB/Meet | Seguinte |
 | **F4** | Templates por domínio + colaboração/comentários | |
 
@@ -53,6 +54,7 @@ flowchart LR
   Doc --> Export
 ```
 
+- **Visibilidade:** `private` por omissão (dono + convidados explícitos). `company` é **opt-in manual** no diálogo de partilha — nunca automático, nem para conteúdo legado. Itens sem dono (conta apagada) ficam acessíveis a ADMIN da empresa para não ficarem órfãos.
 - **`StudioFolder`:** árvore por `companyId`  
 - **`StudioDocument`:** título, format, `canvasState` (páginas/blocos), `aiSessionId`  
 - **`StudioTemplate`:** sistema (`isSystem`) ou por empresa  

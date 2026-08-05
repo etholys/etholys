@@ -20,13 +20,15 @@ const HIDDEN_PREFIXES = [
  * Posição: canto inferior esquerdo, acima do espaço tipicamente usado pelo Advisor.
  */
 export function StudioHotButton() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const pathname = usePathname() || '';
   const { locale } = useApp();
 
   if (status !== 'authenticated') return null;
+  const studioMode = (session?.user as { studioAccessMode?: string } | undefined)?.studioAccessMode;
+  if (studioMode === 'share_only') return null;
   if (HIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
-  if (pathname === '/' || pathname.startsWith('/vitrine')) return null;
+  if (pathname === '/' || pathname.startsWith('/vitrine') || pathname.startsWith('/studio')) return null;
 
   const label =
     locale === 'es' ? 'Studio — documentos' : locale === 'pt' ? 'Studio — documentos' : 'Studio — documents';
