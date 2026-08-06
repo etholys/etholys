@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
 import { Loader2, PenLine, Shield } from 'lucide-react';
@@ -19,6 +19,7 @@ export default function StudioSharedAcceptPage() {
     magicLoginToken: string | null;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  const autoStarted = useRef(false);
 
   useEffect(() => {
     if (!token) return;
@@ -31,10 +32,7 @@ export default function StudioSharedAcceptPage() {
         if (cancelled) return;
         setInfo({
           companyName: d.share.companyName,
-          title:
-            d.share.document?.title ||
-            d.share.folder?.name ||
-            'Studio',
+          title: d.share.document?.title || d.share.folder?.name || 'Studio',
           accessMode: d.share.accessMode,
           email: d.share.email,
           magicLoginToken: d.share.magicLoginToken || null,
@@ -59,7 +57,7 @@ export default function StudioSharedAcceptPage() {
           email: info.email,
           studioMagicToken: info.magicLoginToken,
         });
-        if (res?.error) throw new Error(res.error);
+        if (res?.error) throw new Error(res.error || 'Não foi possível iniciar sessão com o convite');
       }
 
       const r = await fetch('/api/studio/shares/accept', {
@@ -77,6 +75,15 @@ export default function StudioSharedAcceptPage() {
     }
   }
 
+  // Abre automaticamente assim que o convite e o estado de sessão estão prontos
+  useEffect(() => {
+    if (!info || autoStarted.current) return;
+    if (status === 'loading') return;
+    autoStarted.current = true;
+    void openShare();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [info, status]);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-amber-50 to-white px-4">
       <div className="w-full max-w-md rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
@@ -85,10 +92,34 @@ export default function StudioSharedAcceptPage() {
           <span className="font-bold">Etholys Studio</span>
         </div>
         {error ? (
-          <p className="text-sm text-red-700">{error}</p>
-        ) : !info ? (
-          <div className="flex items-center gap-2 text-slate-500">
-            <Loader2 className="h-5 w-5 animate-spin" />A carregar partilha…
+          <>
+            <p className="text-sm text-red-700">{error}</p>
+            {info && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  autoStarted.current = false;
+                  void openShare();
+                }}
+                className="mt-4 w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Tentar novamente
+              </button>
+            )}
+          </>
+        ) : !info || busy || status === 'loading' ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 text-slate-500">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              {info ? 'A abrir o conteúdo partilhado…' : 'A carregar partilha…'}
+            </div>
+            {info && (
+              <>
+                <h1 className="text-xl font-bold text-slate-900">{info.title}</h1>
+                <p className="text-sm text-slate-600">{info.companyName}</p>
+              </>
+            )}
           </div>
         ) : (
           <>
@@ -107,7 +138,7 @@ export default function StudioSharedAcceptPage() {
               onClick={() => void openShare()}
               className="mt-6 w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {busy ? '…' : 'Abrir conteúdo'}
+              Abrir conteúdo
             </button>
           </>
         )}

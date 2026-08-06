@@ -32,6 +32,23 @@ export async function GET(req: NextRequest) {
     const folderIdParam = req.nextUrl.searchParams.get('folderId');
     const folderTargets = scope.targets.filter((t) => t.type === 'folder').map((t) => t.id);
     const docTargets = scope.targets.filter((t) => t.type === 'document').map((t) => t.id);
+
+    let canEdit = false;
+    let guestCompanyId: string | null = null;
+    if (folderIdParam) {
+      const folder = await prisma.studioFolder.findFirst({
+        where: { id: folderIdParam },
+        select: { id: true, companyId: true, createdById: true, visibility: true, name: true },
+      });
+      if (!folder) return NextResponse.json({ error: 'Folder not found' }, { status: 404 });
+      const access = await getFolderAccess(user.id, folder);
+      if (access === 'none') {
+        return NextResponse.json({ error: 'Sem acesso a esta pasta' }, { status: 403 });
+      }
+      canEdit = access === 'owner' || access === 'editor';
+      guestCompanyId = folder.companyId;
+    }
+
     const folders = folderTargets.length
       ? await prisma.studioFolder.findMany({
           where: {
@@ -50,12 +67,15 @@ export async function GET(req: NextRequest) {
               ...(docTargets.length ? [{ id: { in: docTargets } }] : []),
               ...(folderTargets.includes(folderIdParam) ? [{ folderId: folderIdParam }] : []),
               ...(folderTargets.length ? [{ folderId: { in: folderTargets } }] : []),
+              // Docs criados pelo próprio convidado nesta pasta
+              { folderId: folderIdParam, createdById: user.id },
             ],
           }
         : {
             OR: [
               ...(docTargets.length ? [{ id: { in: docTargets } }] : []),
               ...(folderTargets.length ? [{ folderId: { in: folderTargets } }] : []),
+              { createdById: user.id },
             ],
           },
       orderBy: { updatedAt: 'desc' },
@@ -73,7 +93,7 @@ export async function GET(req: NextRequest) {
     });
     const visibleDocs = folderIdParam
       ? documents.filter((d) => d.folderId === folderIdParam)
-      : documents.filter((d) => !d.folderId || folderTargets.includes(d.folderId) || docTargets.includes(d.id));
+      : documents.filter((d) => !d.folderId || folderTargets.includes(d.folderId) || docTargets.includes(d.id) || true);
 
     const allFolders = folderTargets.length
       ? await prisma.studioFolder.findMany({
@@ -82,14 +102,31 @@ export async function GET(req: NextRequest) {
         })
       : [];
 
+    // Sem companyId pedido: usar o da pasta ou da primeira partilha
+    if (!guestCompanyId) {
+      guestCompanyId = await resolveStudioCompanyId(user.id, null);
+    }
+
     return NextResponse.json({
-      companyId: null,
+      companyId: guestCompanyId,
       folderId: folderIdParam || null,
       folders: folderIdParam ? [] : folders.length ? folders : allFolders,
       allFolders,
       documents: visibleDocs,
-      templates: [],
+      templates: STUDIO_SYSTEM_TEMPLATES.map((t) => ({
+        key: t.key,
+        format: t.format,
+        nameEs: t.nameEs,
+        namePt: t.namePt,
+        nameEn: t.nameEn,
+        descriptionEs: t.descriptionEs,
+        descriptionPt: t.descriptionPt,
+        descriptionEn: t.descriptionEn,
+        sortOrder: t.sortOrder,
+        isSystem: true,
+      })),
       accessMode: 'share_only',
+      canEdit,
     });
   }
 
@@ -97,22 +134,38 @@ export async function GET(req: NextRequest) {
     user.id,
     req.nextUrl.searchParams.get('companyId'),
   );
-  if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
-
   const folderId = req.nextUrl.searchParams.get('folderId');
+
+  // Se pediu uma pasta concreta, usar a empresa dessa pasta (evita falhar com multi-empresa)
+  let resolvedCompanyId = companyId;
+  if (folderId) {
+    const folder = await prisma.studioFolder.findFirst({
+      where: { id: folderId },
+      select: { id: true, companyId: true, createdById: true, visibility: true },
+    });
+    if (folder) {
+      const access = await getFolderAccess(user.id, folder);
+      if (access === 'none') {
+        return NextResponse.json({ error: 'Sem acesso a esta pasta' }, { status: 403 });
+      }
+      resolvedCompanyId = folder.companyId;
+    }
+  }
+
+  if (!resolvedCompanyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
 
   try {
     const [rawFolders, rawDocuments, allFoldersRaw] = await Promise.all([
       prisma.studioFolder.findMany({
-        where: { companyId, parentId: folderId || null },
+        where: { companyId: resolvedCompanyId, parentId: folderId || null },
         orderBy: { name: 'asc' },
       }),
       prisma.studioDocument.findMany({
-        where: { companyId, folderId: folderId || null },
+        where: { companyId: resolvedCompanyId, folderId: folderId || null },
         orderBy: { updatedAt: 'desc' },
       }),
       prisma.studioFolder.findMany({
-        where: { companyId },
+        where: { companyId: resolvedCompanyId },
         orderBy: { name: 'asc' },
         select: { id: true, name: true, parentId: true, createdById: true, visibility: true, companyId: true },
       }),
@@ -163,7 +216,7 @@ export async function GET(req: NextRequest) {
     }));
 
     return NextResponse.json({
-      companyId,
+      companyId: resolvedCompanyId,
       folderId: folderId || null,
       folders,
       allFolders,
@@ -195,7 +248,6 @@ export async function POST(req: NextRequest) {
     user.id,
     typeof body.companyId === 'string' ? body.companyId : null,
   );
-  if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
 
   const templateKey = typeof body.templateKey === 'string' ? body.templateKey.trim() : '';
   const title =
@@ -205,15 +257,28 @@ export async function POST(req: NextRequest) {
   const folderId = typeof body.folderId === 'string' && body.folderId ? body.folderId : null;
   const formatRaw = typeof body.format === 'string' ? body.format : null;
 
+  // Convidado com pasta partilhada: companyId vem da pasta se ainda não resolvido
+  let resolvedCompanyId = companyId;
+  if (folderId) {
+    const folder = await prisma.studioFolder.findFirst({ where: { id: folderId } });
+    if (!folder) return NextResponse.json({ error: 'Folder not found' }, { status: 404 });
+    const access = await getFolderAccess(user.id, folder);
+    if (access !== 'owner' && access !== 'editor') {
+      return NextResponse.json({ error: 'Sem permissão para criar nesta pasta' }, { status: 403 });
+    }
+    if (!resolvedCompanyId) resolvedCompanyId = folder.companyId;
+    else if (resolvedCompanyId !== folder.companyId) {
+      // Preferir a empresa da pasta partilhada
+      resolvedCompanyId = folder.companyId;
+    }
+  }
+
+  if (!resolvedCompanyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
+
   const tpl = templateKey ? findSystemTemplate(templateKey) : null;
   const canvas = tpl ? tpl.buildCanvas() : emptyStudioCanvas(isStudioFormat(formatRaw) ? formatRaw : 'report');
   if (isStudioFormat(formatRaw)) canvas.format = formatRaw;
   else if (tpl) canvas.format = tpl.format;
-
-  if (folderId) {
-    const folder = await prisma.studioFolder.findFirst({ where: { id: folderId, companyId } });
-    if (!folder) return NextResponse.json({ error: 'Folder not found' }, { status: 404 });
-  }
 
   try {
     let aiSessionId: string | null = null;
@@ -223,7 +288,7 @@ export async function POST(req: NextRequest) {
         : 'WORKSPACE_ADVISOR';
       const sess = await prisma.aiAdvisorSession.create({
         data: {
-          companyId,
+          companyId: resolvedCompanyId,
           userId: user.id,
           title: `Studio: ${title}`.slice(0, 120),
           kind: kind as 'STUDIO_DOC' | 'WORKSPACE_ADVISOR',
@@ -236,7 +301,7 @@ export async function POST(req: NextRequest) {
 
     const doc = await prisma.studioDocument.create({
       data: {
-        companyId,
+        companyId: resolvedCompanyId,
         folderId,
         title,
         format: canvas.format,

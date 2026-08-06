@@ -47,8 +47,14 @@ const PAGE_PREFIXES = [
   '/studio',
 ];
 
+/** Landing de convite Studio — tem de ser pública em fase precommercial. */
+function isPublicStudioSharePath(pathname: string): boolean {
+  return pathname === '/studio/shared' || pathname.startsWith('/studio/shared/');
+}
+
 function isProtectedPage(pathname: string): boolean {
   if (isPublicForgePath(pathname) || isPublicFundhubPath(pathname)) return false;
+  if (isPublicStudioSharePath(pathname)) return false;
   return PAGE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
@@ -280,10 +286,12 @@ async function enforceFunctionOnlyScope(req: NextRequest): Promise<NextResponse 
 
   if (pathname === '/acesso' || pathname.startsWith('/acesso/')) return null;
 
-  // Studio = ferramenta transversal com atalho em todos os sistemas (não é Hub shell).
+  // Studio = ferramenta transversal (isenta de licença de sistema); disponível a autenticados.
   if (
-    (pathname === '/hub/studio' || pathname.startsWith('/hub/studio/')) &&
-    scope.allowedSystems.length > 0
+    pathname === '/hub/studio' ||
+    pathname.startsWith('/hub/studio/') ||
+    pathname === '/studio' ||
+    pathname.startsWith('/studio/')
   ) {
     return null;
   }

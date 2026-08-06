@@ -23,18 +23,12 @@ export function isPageAllowedForStudioShareOnly(
   // Lista das partilhas do convidado
   if (pathname === '/studio' || pathname === '/studio/') return true;
 
-  const docMatch = pathname.match(/^\/hub\/studio\/([^/]+)\/?$/);
-  if (docMatch) {
-    const id = docMatch[1];
-    if (id === 'shared') return true;
-    return targets.some((t) => t.type === 'document' && t.id === id);
-  }
+  // Documentos: a API valida acesso real (inclui docs criados dentro de pastas partilhadas)
+  if (/^\/hub\/studio\/[^/]+\/?$/.test(pathname)) return true;
 
   // Pastas: convidado usa /studio/shared ou /studio/f/[folderId]
-  const folderMatch = pathname.match(/^\/studio\/f\/([^/]+)\/?$/);
-  if (folderMatch) {
-    return targets.some((t) => t.type === 'folder' && t.id === folderMatch[1]);
-  }
+  // A API valida; permitir a rota para não bloquear docs/subpastas após o login.
+  if (/^\/studio\/f\/[^/]+\/?$/.test(pathname)) return true;
 
   return false;
 }

@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import type { StudioConsentSource } from '@/lib/studio/types';
 import { STUDIO_ECOSYSTEM_CATALOG } from '@/lib/studio/agent';
 
-/** Resolve companyId do pedido se o utilizador for membro. */
+/** Resolve companyId do pedido se o utilizador for membro — ou via partilha Studio activa. */
 export async function resolveStudioCompanyId(
   userId: string,
   requestedCompanyId?: string | null,
@@ -11,11 +11,39 @@ export async function resolveStudioCompanyId(
     where: { userId },
     select: { companyId: true, isDefault: true },
   });
-  if (memberships.length === 0) return null;
-  const ids = new Set(memberships.map((m) => m.companyId));
-  if (requestedCompanyId && ids.has(requestedCompanyId)) return requestedCompanyId;
-  const def = memberships.find((m) => m.isDefault);
-  return def?.companyId ?? memberships[0].companyId;
+  if (memberships.length > 0) {
+    const ids = new Set(memberships.map((m) => m.companyId));
+    if (requestedCompanyId && ids.has(requestedCompanyId)) return requestedCompanyId;
+    const def = memberships.find((m) => m.isDefault);
+    return def?.companyId ?? memberships[0].companyId;
+  }
+
+  // Convidado externo: empresa vem das partilhas activas
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  });
+  const email = user?.email?.toLowerCase();
+  const shares = await prisma.studioShare.findMany({
+    where: {
+      status: 'active',
+      OR: [{ userId }, ...(email ? [{ email }] : [])],
+    },
+    select: { companyId: true, expiresAt: true },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+  const now = Date.now();
+  const companyIds = [
+    ...new Set(
+      shares
+        .filter((s) => !s.expiresAt || s.expiresAt.getTime() > now)
+        .map((s) => s.companyId),
+    ),
+  ];
+  if (!companyIds.length) return null;
+  if (requestedCompanyId && companyIds.includes(requestedCompanyId)) return requestedCompanyId;
+  return companyIds[0];
 }
 
 export function studioCatalogForCompany(): StudioConsentSource[] {

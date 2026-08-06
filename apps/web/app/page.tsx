@@ -20,9 +20,15 @@ export default function HomePage() {
       platformAdmin?: boolean;
       forgeAccessMode?: string;
       forgeHomePath?: string;
+      studioAccessMode?: string;
+      studioHomePath?: string;
     };
     if (u?.forgeAccessMode === 'course_only' && u.forgeHomePath) {
       router.replace(u.forgeHomePath);
+      return;
+    }
+    if (u?.studioAccessMode === 'share_only' && u.studioHomePath) {
+      router.replace(u.studioHomePath);
       return;
     }
     if (u?.platformAdmin || u?.workspaceAccessMode === 'full') {

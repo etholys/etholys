@@ -2,18 +2,36 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { ArrowLeft, FileText, Folder, Loader2 } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeft, FilePlus2, FileText, Folder, Loader2 } from 'lucide-react';
+import { useApp } from '@/app/providers';
 
 type DocRow = { id: string; title: string; format: string };
+type TemplateRow = {
+  key: string;
+  nameEs: string;
+  namePt: string;
+  nameEn: string;
+  descriptionEs?: string;
+  descriptionPt?: string;
+  descriptionEn?: string;
+};
 
 /** Vista de pasta para convidado (ou atalho interno). */
 export default function StudioSharedFolderPage() {
   const params = useParams();
+  const router = useRouter();
+  const { locale } = useApp();
+  const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const folderId = String(params?.folderId || '');
   const [name, setName] = useState('Pasta');
   const [documents, setDocuments] = useState<DocRow[]>([]);
+  const [templates, setTemplates] = useState<TemplateRow[]>([]);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [canEdit, setCanEdit] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -32,6 +50,9 @@ export default function StudioSharedFolderPage() {
         if (af?.name) setName(af.name);
       }
       setDocuments(d.documents || []);
+      setTemplates(d.templates || []);
+      setCompanyId(d.companyId || null);
+      setCanEdit(d.canEdit === true || d.accessMode === 'member');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -43,15 +64,50 @@ export default function StudioSharedFolderPage() {
     void load();
   }, [load]);
 
+  async function createDoc(templateKey?: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await fetch('/api/studio/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: companyId || undefined,
+          folderId,
+          templateKey,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
+      router.push(`/hub/studio/${d.document.id}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro');
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white">
       <header className="border-b border-amber-200/60 bg-white px-4 py-3">
-        <div className="mx-auto flex max-w-3xl items-center gap-3">
-          <Link href="/studio/shared" className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <Folder className="h-5 w-5 text-amber-600" />
-          <span className="font-bold text-slate-900">{name}</span>
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link href="/studio/shared" className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+            <Folder className="h-5 w-5 shrink-0 text-amber-600" />
+            <span className="truncate font-bold text-slate-900">{name}</span>
+          </div>
+          {canEdit && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setShowTemplates(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              <FilePlus2 className="h-4 w-4" />
+              {t('Novo documento', 'Nuevo documento', 'New document')}
+            </button>
+          )}
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 py-8">
@@ -75,11 +131,63 @@ export default function StudioSharedFolderPage() {
               </Link>
             ))}
             {documents.length === 0 && (
-              <p className="text-sm text-slate-500">Pasta vazia ou sem documentos visíveis.</p>
+              <p className="text-sm text-slate-500">
+                {t(
+                  'Pasta vazia. Crie um documento para começar.',
+                  'Carpeta vacía. Cree un documento para empezar.',
+                  'Empty folder. Create a document to get started.',
+                )}
+              </p>
             )}
           </div>
         )}
       </main>
+
+      {showTemplates && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">
+                {t('Novo documento', 'Nuevo documento', 'New document')}
+              </h2>
+              <button type="button" onClick={() => setShowTemplates(false)} className="text-sm text-slate-500">
+                {t('Fechar', 'Cerrar', 'Close')}
+              </button>
+            </div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void createDoc()}
+              className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-semibold text-slate-800 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-50"
+            >
+              {t('Documento em branco', 'Documento en blanco', 'Blank document')}
+            </button>
+            <ul className="space-y-2">
+              {templates.map((tpl) => (
+                <li key={tpl.key}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void createDoc(tpl.key)}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left hover:border-orange-300 hover:bg-orange-50 disabled:opacity-50"
+                  >
+                    <p className="font-semibold text-slate-900">
+                      {locale === 'pt' ? tpl.namePt : locale === 'en' ? tpl.nameEn : tpl.nameEs}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {locale === 'pt'
+                        ? tpl.descriptionPt
+                        : locale === 'en'
+                          ? tpl.descriptionEn
+                          : tpl.descriptionEs}
+                    </p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
