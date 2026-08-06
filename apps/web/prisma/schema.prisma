@@ -379,6 +379,7 @@ model Project {
   activityReports            TaskActivityReport[]
   reportGuides               ProjectReportGuide[]
   meetSessions               MeetSession[]
+  invitations                Invitation[]
 }
 
 /// Manual / guía de reporte del financiador — referencia permanente para la IA.
@@ -414,10 +415,18 @@ model ProjectMember {
   dedicationPct Float    @default(100)
   monthlyCost   Float?
   updatedAt     DateTime @default(now()) @updatedAt
+  /// company_staff | project_guest — guest não precisa ser CompanyUser
+  accessMode    String   @default("company_staff")
+  /// active | invited | revoked
+  status        String   @default("active")
+  /// Permissões SIEP só neste projeto (array JSON de chaves)
+  permissions   Json?
   project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
+  @@index([userId])
+  @@index([accessMode, status])
 }
 
 model Task {
@@ -833,11 +842,21 @@ model Invitation {
   status     String    @default("pending")
   /// JSON: ["SIEP","ATLAS",…] — convite só a funções; null = legado
   systems    Json?
+  /// Se definido: convite só a este projeto (aliado / temporário)
+  projectId  String?
+  /// company | project_guest
+  accessMode String    @default("company")
+  /// Permissões SIEP do projeto (JSON array) — usado com project_guest
+  projectPermissions Json?
   expiresAt  DateTime?
   acceptedAt DateTime?
   createdAt  DateTime  @default(now())
   company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   inviter    User      @relation(fields: [invitedBy], references: [id], onDelete: Cascade)
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([email, status])
 }
 
 model Product {

@@ -7,14 +7,25 @@ import { SIEP_PERM_GROUP_I18N, SIEP_PERM_I18N, siepT } from '@/lib/siep/i18n';
 
 export type SiepPermissionKey =
   | 'siep.project.view'
+  | 'siep.project.edit'
   | 'siep.budget.view_lines'
   | 'siep.budget.view_amounts'
   | 'siep.budget.view_project_total'
+  | 'siep.budget.edit'
   | 'siep.transactions.view'
   | 'siep.transactions.view_amounts'
+  | 'siep.transactions.edit'
+  | 'siep.logframe.view'
+  | 'siep.logframe.edit'
+  | 'siep.tasks.view'
+  | 'siep.tasks.edit'
+  | 'siep.reports.view'
+  | 'siep.reports.edit'
   | 'siep.activities.report'
   | 'siep.activities.view_all_reports'
   | 'siep.activities.approve_reports'
+  | 'siep.team.view'
+  | 'siep.team.manage_members'
   | 'siep.team.manage_permissions';
 
 export type SiepPermissionGroup = {
@@ -24,14 +35,30 @@ export type SiepPermissionGroup = {
 };
 
 const SIEP_PERMISSION_STRUCTURE: { id: string; permissions: SiepPermissionKey[] }[] = [
-  { id: 'project', permissions: ['siep.project.view', 'siep.budget.view_project_total'] },
+  {
+    id: 'project',
+    permissions: ['siep.project.view', 'siep.project.edit', 'siep.budget.view_project_total'],
+  },
   {
     id: 'budget',
     permissions: [
       'siep.budget.view_lines',
       'siep.budget.view_amounts',
+      'siep.budget.edit',
       'siep.transactions.view',
       'siep.transactions.view_amounts',
+      'siep.transactions.edit',
+    ],
+  },
+  {
+    id: 'content',
+    permissions: [
+      'siep.logframe.view',
+      'siep.logframe.edit',
+      'siep.tasks.view',
+      'siep.tasks.edit',
+      'siep.reports.view',
+      'siep.reports.edit',
     ],
   },
   {
@@ -42,7 +69,10 @@ const SIEP_PERMISSION_STRUCTURE: { id: string; permissions: SiepPermissionKey[] 
       'siep.activities.approve_reports',
     ],
   },
-  { id: 'admin', permissions: ['siep.team.manage_permissions'] },
+  {
+    id: 'admin',
+    permissions: ['siep.team.view', 'siep.team.manage_members', 'siep.team.manage_permissions'],
+  },
 ];
 
 export function getSiepPermissionGroups(locale: Locale = 'es'): SiepPermissionGroup[] {
@@ -71,12 +101,26 @@ export const ALL_SIEP_PERMISSIONS: SiepPermissionKey[] = SIEP_PERMISSION_GROUPS.
 export const DEFAULT_FIELD_PERMISSIONS: SiepPermissionKey[] = [
   'siep.project.view',
   'siep.budget.view_lines',
+  'siep.logframe.view',
+  'siep.tasks.view',
+  'siep.reports.view',
+  'siep.team.view',
   'siep.activities.report',
 ];
 
 /** Perfil gestor de projecto. */
 export const DEFAULT_PM_PERMISSIONS: SiepPermissionKey[] = [
   ...ALL_SIEP_PERMISSIONS.filter((k) => k !== 'siep.team.manage_permissions'),
+];
+
+/** Perfil mínimo para convidado externo só de projecto. */
+export const DEFAULT_PROJECT_GUEST_PERMISSIONS: SiepPermissionKey[] = [
+  'siep.project.view',
+  'siep.logframe.view',
+  'siep.tasks.view',
+  'siep.reports.view',
+  'siep.team.view',
+  'siep.activities.report',
 ];
 
 export function parseSiepPermissions(raw: unknown): SiepPermissionKey[] {
@@ -104,8 +148,15 @@ export function permissionsToApi(perms: Set<SiepPermissionKey>) {
     canViewProjectTotal: perms.has('siep.budget.view_project_total'),
     canViewTransactions: perms.has('siep.transactions.view'),
     canViewTransactionAmounts: perms.has('siep.transactions.view_amounts'),
+    canEditBudget: perms.has('siep.budget.edit'),
+    canEditProject: perms.has('siep.project.edit'),
+    canEditLogframe: perms.has('siep.logframe.edit'),
+    canEditTasks: perms.has('siep.tasks.edit'),
+    canEditReports: perms.has('siep.reports.edit'),
     canReportActivities: perms.has('siep.activities.report'),
     canApproveReports: perms.has('siep.activities.approve_reports'),
     canViewAllReports: perms.has('siep.activities.view_all_reports'),
+    canManageMembers: perms.has('siep.team.manage_members'),
+    canManagePermissions: perms.has('siep.team.manage_permissions'),
   };
 }

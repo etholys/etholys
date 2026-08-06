@@ -2,13 +2,22 @@
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { permissionsToApi, resolveProjectAccess } from '@/lib/siep/permissions';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { permissionsToApi, resolveSiepPermissions } from '@/lib/siep/permissions';
 
 export async function GET(_req: Request, { params }: { params: { projectId: string } }) {
   try {
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+
+    const access = await resolveProjectAccess(tenant.userId, params.projectId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.reason === 'not_found' ? 'No encontrado' : 'No autorizado' },
+        { status: access.reason === 'not_found' ? 404 : 403 },
+      );
+    }
+
     const project = await prisma.project.findUnique({
       where: { id: params.projectId },
       include: {
@@ -41,14 +50,9 @@ export async function GET(_req: Request, { params }: { params: { projectId: stri
       return items.map(item => ({ ...item, children: buildTree(item.id) }));
     }
     (project as any).objectives = buildTree(null);
-
-    if (!tenant.companyIds.includes(project.companyId)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
-
-    const perms = await resolveSiepPermissions(tenant.userId, project.companyId);
+    (project as any).accessMode = access.mode;
     (project as { siepPermissions?: ReturnType<typeof permissionsToApi> }).siepPermissions =
-      permissionsToApi(perms);
+      permissionsToApi(access.permissions);
 
     return NextResponse.json({ project });
   } catch (error: any) {
@@ -61,9 +65,13 @@ export async function PUT(req: Request, { params }: { params: { projectId: strin
   try {
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    const existing = await prisma.project.findUnique({ where: { id: params.projectId }, select: { companyId: true } });
-    if (!existing || !tenant.companyIds.includes(existing.companyId)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+    const access = await resolveProjectAccess(tenant.userId, params.projectId);
+    if (!access.ok || !access.permissions.has('siep.project.edit')) {
+      // Company admins / PMs get edit via DEFAULT_PM; guests need explicit edit
+      if (!access.ok) return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+      if (access.mode === 'project_guest' && !access.permissions.has('siep.project.edit')) {
+        return NextResponse.json({ error: 'Sin permiso para editar' }, { status: 403 });
+      }
     }
     const body = await req.json();
     const project = await prisma.project.update({ where: { id: params.projectId }, data: body });
@@ -78,8 +86,8 @@ export async function DELETE(_req: Request, { params }: { params: { projectId: s
   try {
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    const existing = await prisma.project.findUnique({ where: { id: params.projectId }, select: { companyId: true } });
-    if (!existing || !tenant.companyIds.includes(existing.companyId)) {
+    const access = await resolveProjectAccess(tenant.userId, params.projectId);
+    if (!access.ok || access.mode === 'project_guest') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
     await prisma.project.update({ where: { id: params.projectId }, data: { isActive: false } });

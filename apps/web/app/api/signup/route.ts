@@ -60,17 +60,34 @@ export async function POST(req: Request) {
     });
 
     if (invitation) {
-      await prisma.companyUser.create({
-        data: {
-          userId: user.id,
-          companyId: invitation.companyId,
-          role: invitation.role as 'COLLABORATOR' | 'ADMIN' | 'PROJECT_MANAGER' | 'TECHNICIAN',
-        },
-      });
+      const inviteFull = await prisma.invitation.findUnique({ where: { id: invitation.id } });
+      const isProjectGuest =
+        inviteFull?.accessMode === 'project_guest' && Boolean(inviteFull.projectId);
 
-      const systems = normalizeSystemsInput(parseSystemsJson(invitation.systems));
-      if (systems.length > 0) {
-                await prisma.integratedWorkspaceAccess.create({
+      if (isProjectGuest && inviteFull?.projectId) {
+        // Project-only guest: no CompanyUser
+        await prisma.projectMember.upsert({
+          where: {
+            projectId_userId: { projectId: inviteFull.projectId, userId: user.id },
+          },
+          update: {
+            accessMode: 'project_guest',
+            status: 'active',
+            permissions: (inviteFull.projectPermissions as any) ?? undefined,
+          },
+          create: {
+            projectId: inviteFull.projectId,
+            userId: user.id,
+            role: 'aliado',
+            accessMode: 'project_guest',
+            status: 'active',
+            permissions: (inviteFull.projectPermissions as any) ?? undefined,
+          },
+        });
+
+        const systemsRaw = normalizeSystemsInput(parseSystemsJson(invitation.systems));
+        const systems = systemsRaw.length > 0 ? systemsRaw : ['SIEP'];
+        await prisma.integratedWorkspaceAccess.create({
           data: {
             companyId: invitation.companyId,
             userId: user.id,
@@ -78,16 +95,35 @@ export async function POST(req: Request) {
             enabled: true,
           },
         });
-      } else if (isPrecommercialMode()) {
-        // Convite sem sistemas em pré-comercial → sem hub (none)
-        await prisma.integratedWorkspaceAccess.create({
+      } else {
+        await prisma.companyUser.create({
           data: {
-            companyId: invitation.companyId,
             userId: user.id,
-            systems: [] as unknown as import('@prisma/client').Prisma.InputJsonValue,
-            enabled: false,
+            companyId: invitation.companyId,
+            role: invitation.role as 'COLLABORATOR' | 'ADMIN' | 'PROJECT_MANAGER' | 'TECHNICIAN',
           },
         });
+
+        const systems = normalizeSystemsInput(parseSystemsJson(invitation.systems));
+        if (systems.length > 0) {
+          await prisma.integratedWorkspaceAccess.create({
+            data: {
+              companyId: invitation.companyId,
+              userId: user.id,
+              systems: systems as unknown as import('@prisma/client').Prisma.InputJsonValue,
+              enabled: true,
+            },
+          });
+        } else if (isPrecommercialMode()) {
+          await prisma.integratedWorkspaceAccess.create({
+            data: {
+              companyId: invitation.companyId,
+              userId: user.id,
+              systems: [] as unknown as import('@prisma/client').Prisma.InputJsonValue,
+              enabled: false,
+            },
+          });
+        }
       }
 
       await prisma.invitation.update({

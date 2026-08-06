@@ -1,9 +1,11 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { getGuestCompanyIds } from '@/lib/siep/permissions';
 
 /**
  * Gets the current user's company IDs for multi-tenant data isolation.
+ * Inclui empresas onde o utilizador é só convidado de projeto (project_guest).
  * Returns null if not authenticated.
  */
 export async function getUserCompanyIds(): Promise<{ userId: string; companyIds: string[] } | null> {
@@ -25,9 +27,11 @@ export async function getUserCompanyIds(): Promise<{ userId: string; companyIds:
     where: { userId },
     select: { companyId: true },
   });
+  const memberIds = companyUsers.map((cu) => cu.companyId);
+  const guestIds = await getGuestCompanyIds(userId);
   return {
     userId,
-    companyIds: companyUsers.map(cu => cu.companyId),
+    companyIds: [...new Set([...memberIds, ...guestIds])],
   };
 }
 
