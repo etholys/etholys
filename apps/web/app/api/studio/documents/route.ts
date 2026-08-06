@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     if (folderIdParam) {
       const folder = await prisma.studioFolder.findFirst({
         where: { id: folderIdParam },
-        select: { id: true, companyId: true, createdById: true, visibility: true, name: true },
+        select: { id: true, companyId: true, createdById: true, visibility: true, name: true, parentId: true },
       });
       if (!folder) return NextResponse.json({ error: 'Folder not found' }, { status: 404 });
       access = await getFolderAccess(user.id, folder);
@@ -98,12 +98,33 @@ export async function GET(req: NextRequest) {
         if (a !== 'none') documents.push({ ...d, access: a });
       }
 
+      // Pais acessíveis (para botão voltar) + alvos partilhados
+      const crumbFolders: Array<{ id: string; name: string; parentId: string | null }> = [
+        { id: folder.id, name: folder.name, parentId: folder.parentId },
+      ];
+      if (folder.parentId) {
+        const parent = await prisma.studioFolder.findUnique({
+          where: { id: folder.parentId },
+          select: { id: true, name: true, parentId: true, companyId: true, createdById: true, visibility: true },
+        });
+        if (parent && (await getFolderAccess(user.id, parent)) !== 'none') {
+          crumbFolders.push({ id: parent.id, name: parent.name, parentId: parent.parentId });
+        }
+      }
+      for (const f of shared.folders) {
+        if (!crumbFolders.some((c) => c.id === f.id)) {
+          crumbFolders.push({ id: f.id, name: f.name, parentId: f.parentId });
+        }
+      }
+
       return NextResponse.json({
         companyId: guestCompanyId,
         folderId: folderIdParam,
         folderName: folder.name,
+        folderParentId:
+          folder.parentId && crumbFolders.some((c) => c.id === folder.parentId) ? folder.parentId : null,
         folders,
-        allFolders: shared.folders.map((f) => ({ id: f.id, name: f.name, parentId: f.parentId })),
+        allFolders: crumbFolders,
         documents,
         templates: STUDIO_SYSTEM_TEMPLATES.map((t) => ({
           key: t.key,
@@ -162,11 +183,19 @@ export async function GET(req: NextRequest) {
   // Se pediu uma pasta concreta, usar a empresa dessa pasta (evita falhar com multi-empresa)
   let resolvedCompanyId = companyId;
   let folderName: string | null = null;
+  let folderParentId: string | null = null;
   let folderAccess: AccessLevel = 'none';
   if (folderId) {
     const folder = await prisma.studioFolder.findFirst({
       where: { id: folderId },
-      select: { id: true, companyId: true, createdById: true, visibility: true, name: true },
+      select: {
+        id: true,
+        companyId: true,
+        createdById: true,
+        visibility: true,
+        name: true,
+        parentId: true,
+      },
     });
     if (folder) {
       const access = await getFolderAccess(user.id, folder);
@@ -175,6 +204,7 @@ export async function GET(req: NextRequest) {
       }
       resolvedCompanyId = folder.companyId;
       folderName = folder.name;
+      folderParentId = folder.parentId;
       folderAccess = access;
     }
   }
@@ -300,6 +330,7 @@ export async function GET(req: NextRequest) {
       companyId: resolvedCompanyId,
       folderId: folderId || null,
       folderName,
+      folderParentId,
       folders,
       allFolders,
       documents,

@@ -36,6 +36,7 @@ export default function StudioDocumentPage() {
 
   const [title, setTitle] = useState('');
   const [canvas, setCanvas] = useState<StudioCanvasState | null>(null);
+  const [docFolderId, setDocFolderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -61,6 +62,7 @@ export default function StudioDocumentPage() {
       if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
       setTitle(d.document.title);
       setCanvas(d.document.canvasState as StudioCanvasState);
+      setDocFolderId(typeof d.document.folderId === 'string' ? d.document.folderId : null);
       setAccess(typeof d.access === 'string' ? d.access : 'owner');
       setDirty(false);
 
@@ -232,6 +234,10 @@ export default function StudioDocumentPage() {
     ]);
   }
 
+  const libraryHref = docFolderId
+    ? `/hub/studio?folder=${encodeURIComponent(docFolderId)}`
+    : '/hub/studio';
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center gap-2 text-slate-500">
@@ -245,7 +251,7 @@ export default function StudioDocumentPage() {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
         <p className="text-red-700">{error || 'Not found'}</p>
-        <Link href="/hub/studio" className="mt-4 inline-block text-amber-800 underline">
+        <Link href={libraryHref} className="mt-4 inline-block text-amber-800 underline">
           Studio
         </Link>
       </div>
@@ -256,7 +262,7 @@ export default function StudioDocumentPage() {
     <div className="flex h-screen flex-col bg-slate-100">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4">
         <div className="flex min-w-0 items-center gap-2">
-          <Link href="/hub/studio" className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100">
+          <Link href={libraryHref} className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <PenLine className="hidden h-4 w-4 text-orange-600 sm:block" />

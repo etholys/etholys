@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -48,9 +48,10 @@ export default function StudioHubPage() {
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const companyId = activeCompanyId && isLikelyDbId(activeCompanyId) ? activeCompanyId : '';
 
-  const [folderId, setFolderId] = useState<string | null>(null);
+  /** Pilha de navegação (não o parentId da BD) — pastas partilhadas entram como raiz virtual. */
+  const [pathStack, setPathStack] = useState<FolderRow[]>([]);
+  const folderId = pathStack.length ? pathStack[pathStack.length - 1]!.id : null;
   const [folders, setFolders] = useState<FolderRow[]>([]);
-  const [allFolders, setAllFolders] = useState<FolderRow[]>([]);
   const [documents, setDocuments] = useState<DocRow[]>([]);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [resolvedCompanyId, setResolvedCompanyId] = useState<string>(companyId);
@@ -75,6 +76,25 @@ export default function StudioHubPage() {
 
   const effectiveCompanyId = companyId || resolvedCompanyId;
 
+  // Deep-link ?folder= — uma vez, como ponto de entrada
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (pathStack.length) return;
+    const fromUrl = new URLSearchParams(window.location.search).get('folder');
+    if (fromUrl && isLikelyDbId(fromUrl)) {
+      setPathStack([{ id: fromUrl, name: '…', parentId: null }]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só no mount / primeira entrada
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (folderId) url.searchParams.set('folder', folderId);
+    else url.searchParams.delete('folder');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}`);
+  }, [folderId]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -92,7 +112,6 @@ export default function StudioHubPage() {
           setActiveCompanyId(fromApi);
         }
       }
-      // Convidado só com partilhas: ir à vista de partilhados se a raiz estiver vazia
       if (d.accessMode === 'share_only' && !folderId) {
         const sharedFolders = d.folders || [];
         if (sharedFolders.length === 1) {
@@ -105,9 +124,16 @@ export default function StudioHubPage() {
         }
       }
       setFolders(d.folders || []);
-      setAllFolders(d.allFolders || []);
       setDocuments(d.documents || []);
       setTemplates(d.templates || []);
+      if (folderId && typeof d.folderName === 'string' && d.folderName) {
+        setPathStack((prev) => {
+          if (!prev.length) return prev;
+          const last = prev[prev.length - 1]!;
+          if (last.id !== folderId || last.name === d.folderName) return prev;
+          return [...prev.slice(0, -1), { ...last, name: d.folderName }];
+        });
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -119,17 +145,18 @@ export default function StudioHubPage() {
     void load();
   }, [load]);
 
-  const breadcrumb = useMemo(() => {
-    const trail: FolderRow[] = [];
-    let cur = folderId;
-    while (cur) {
-      const f = allFolders.find((x) => x.id === cur);
-      if (!f) break;
-      trail.unshift(f);
-      cur = f.parentId;
-    }
-    return trail;
-  }, [allFolders, folderId]);
+  function enterFolder(f: FolderRow) {
+    setPathStack((prev) => {
+      const row = { id: f.id, name: f.name, parentId: f.parentId ?? null };
+      // Na raiz (ou lista virtual de partilhas), a pasta aberta é o início do caminho
+      if (prev.length === 0) return [row];
+      return [...prev, row];
+    });
+  }
+
+  function goToPathIndex(index: number) {
+    setPathStack((prev) => (index < 0 ? [] : prev.slice(0, index + 1)));
+  }
 
   function openNewFolder() {
     setNewFolderName('');
@@ -301,17 +328,17 @@ export default function StudioHubPage() {
         <nav className="mb-4 flex flex-wrap items-center gap-1 text-sm text-slate-600">
           <button
             type="button"
-            onClick={() => setFolderId(null)}
+            onClick={() => goToPathIndex(-1)}
             className="rounded px-1.5 py-0.5 font-medium hover:bg-amber-50 hover:text-amber-900"
           >
             {t('Raiz', 'Raíz', 'Root')}
           </button>
-          {breadcrumb.map((f) => (
-            <span key={f.id} className="inline-flex items-center gap-1">
+          {pathStack.map((f, index) => (
+            <span key={`${f.id}-${index}`} className="inline-flex items-center gap-1">
               <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
               <button
                 type="button"
-                onClick={() => setFolderId(f.id)}
+                onClick={() => goToPathIndex(index)}
                 className="rounded px-1.5 py-0.5 font-medium hover:bg-amber-50 hover:text-amber-900"
               >
                 {f.name}
@@ -351,7 +378,7 @@ export default function StudioHubPage() {
                 key={f.id}
                 className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-amber-300 hover:shadow-md"
               >
-                <button type="button" onClick={() => setFolderId(f.id)} className="flex min-w-0 flex-1 items-start gap-3 text-left">
+                <button type="button" onClick={() => enterFolder(f)} className="flex min-w-0 flex-1 items-start gap-3 text-left">
                   <Folder className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                   <div>
                     <p className="font-semibold text-slate-900">{f.name}</p>
@@ -443,7 +470,7 @@ export default function StudioHubPage() {
                   </h2>
                   <p className="truncate text-xs text-slate-500">
                     {folderId
-                      ? `${t('Dentro de', 'Dentro de', 'Inside')} / ${breadcrumb.map((item) => item.name).join(' / ')}`
+                      ? `${t('Dentro de', 'Dentro de', 'Inside')} / ${pathStack.map((item) => item.name).join(' / ')}`
                       : t('Na raiz da biblioteca', 'En la raíz de la biblioteca', 'At the library root')}
                   </p>
                 </div>

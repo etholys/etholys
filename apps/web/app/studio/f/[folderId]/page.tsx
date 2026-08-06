@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, FilePlus2, FileText, Folder, FolderPlus, Loader2 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 
-type FolderRow = { id: string; name: string };
+type FolderRow = { id: string; name: string; parentId?: string | null };
 type DocRow = { id: string; title: string; format: string };
 type TemplateRow = {
   key: string;
@@ -26,6 +26,7 @@ export default function StudioSharedFolderPage() {
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const folderId = String(params?.folderId || '');
   const [name, setName] = useState('Pasta');
+  const [parentId, setParentId] = useState<string | null>(null);
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [documents, setDocuments] = useState<DocRow[]>([]);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
@@ -47,11 +48,13 @@ export default function StudioSharedFolderPage() {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+      const all = (d.allFolders || []) as FolderRow[];
       const folder =
         (d.folders || []).find((f: { id: string }) => f.id === folderId) ||
-        (d.allFolders || []).find((f: { id: string }) => f.id === folderId);
+        all.find((f) => f.id === folderId);
       if (folder?.name) setName(folder.name);
       else if (typeof d.folderName === 'string') setName(d.folderName);
+      setParentId(typeof d.folderParentId === 'string' ? d.folderParentId : null);
       setFolders((d.folders || []).filter((f: { id: string }) => f.id !== folderId));
       setDocuments(d.documents || []);
       setTemplates(d.templates || []);
@@ -122,7 +125,15 @@ export default function StudioSharedFolderPage() {
       <header className="border-b border-amber-200/60 bg-white px-4 py-3">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <Link href="/studio/shared" className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100">
+            <Link
+              href={parentId ? `/studio/f/${parentId}` : '/studio/shared'}
+              className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100"
+              title={
+                parentId
+                  ? t('Pasta anterior', 'Carpeta anterior', 'Previous folder')
+                  : t('Partilhados', 'Compartidos', 'Shared')
+              }
+            >
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <Folder className="h-5 w-5 shrink-0 text-amber-600" />
