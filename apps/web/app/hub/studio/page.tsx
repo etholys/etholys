@@ -43,7 +43,7 @@ type TemplateRow = {
 };
 
 export default function StudioHubPage() {
-  const { locale, activeCompanyId } = useApp();
+  const { locale, activeCompanyId, setActiveCompanyId } = useApp();
   const router = useRouter();
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const companyId = activeCompanyId && isLikelyDbId(activeCompanyId) ? activeCompanyId : '';
@@ -53,6 +53,7 @@ export default function StudioHubPage() {
   const [allFolders, setAllFolders] = useState<FolderRow[]>([]);
   const [documents, setDocuments] = useState<DocRow[]>([]);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
+  const [resolvedCompanyId, setResolvedCompanyId] = useState<string>(companyId);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -72,20 +73,37 @@ export default function StudioHubPage() {
     title: string;
   }>(null);
 
+  const effectiveCompanyId = companyId || resolvedCompanyId;
+
   const load = useCallback(async () => {
-    if (!companyId) {
-      setLoading(false);
-      setError(t('Selecione uma empresa no Hub.', 'Seleccione una empresa en el Hub.', 'Select a company in the Hub.'));
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
-      const q = new URLSearchParams({ companyId });
+      const q = new URLSearchParams();
+      if (companyId) q.set('companyId', companyId);
       if (folderId) q.set('folderId', folderId);
       const r = await fetch(`/api/studio/documents?${q}`, { cache: 'no-store' });
       const d = await r.json();
       if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
+      const fromApi = typeof d.companyId === 'string' ? d.companyId : '';
+      if (fromApi) {
+        setResolvedCompanyId(fromApi);
+        if (!companyId && isLikelyDbId(fromApi)) {
+          setActiveCompanyId(fromApi);
+        }
+      }
+      // Convidado só com partilhas: ir à vista de partilhados se a raiz estiver vazia
+      if (d.accessMode === 'share_only' && !folderId) {
+        const sharedFolders = d.folders || [];
+        if (sharedFolders.length === 1) {
+          router.replace(`/studio/f/${sharedFolders[0].id}`);
+          return;
+        }
+        if (sharedFolders.length === 0 && (d.documents || []).length === 0) {
+          router.replace('/studio/shared');
+          return;
+        }
+      }
       setFolders(d.folders || []);
       setAllFolders(d.allFolders || []);
       setDocuments(d.documents || []);
@@ -95,7 +113,7 @@ export default function StudioHubPage() {
     } finally {
       setLoading(false);
     }
-  }, [companyId, folderId, locale]);
+  }, [companyId, folderId, locale, router, setActiveCompanyId]);
 
   useEffect(() => {
     void load();
@@ -122,14 +140,14 @@ export default function StudioHubPage() {
   async function createFolder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = newFolderName.trim();
-    if (!name || !companyId) return;
+    if (!name || !effectiveCompanyId) return;
     setBusy(true);
     setNewFolderError(null);
     try {
       const r = await fetch('/api/studio/folders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, name, parentId: folderId }),
+        body: JSON.stringify({ companyId: effectiveCompanyId, name, parentId: folderId }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.detail || d.error);
@@ -144,13 +162,13 @@ export default function StudioHubPage() {
   }
 
   async function createDoc(templateKey?: string) {
-    if (!companyId) return;
+    if (!effectiveCompanyId) return;
     setBusy(true);
     try {
       const r = await fetch('/api/studio/documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, folderId, templateKey }),
+        body: JSON.stringify({ companyId: effectiveCompanyId, folderId, templateKey }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.detail || d.error);
@@ -162,10 +180,10 @@ export default function StudioHubPage() {
   }
 
   async function openBrand() {
-    if (!companyId) return;
+    if (!effectiveCompanyId) return;
     setShowBrand(true);
     try {
-      const r = await fetch(`/api/studio/brand?companyId=${encodeURIComponent(companyId)}`);
+      const r = await fetch(`/api/studio/brand?companyId=${encodeURIComponent(effectiveCompanyId)}`);
       const d = await r.json();
       if (r.ok && d.brand) {
         setBrandColor(d.brand.primaryColor || '#ea580c');
@@ -179,14 +197,14 @@ export default function StudioHubPage() {
   }
 
   async function saveBrand() {
-    if (!companyId) return;
+    if (!effectiveCompanyId) return;
     setBrandSaving(true);
     try {
       const r = await fetch('/api/studio/brand', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          companyId,
+          companyId: effectiveCompanyId,
           primaryColor: brandColor,
           orgName: brandOrg,
           logoUrl: brandLogo || null,
@@ -237,7 +255,7 @@ export default function StudioHubPage() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              disabled={!companyId}
+              disabled={!effectiveCompanyId}
               onClick={() => void openBrand()}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
@@ -246,7 +264,7 @@ export default function StudioHubPage() {
             </button>
             <button
               type="button"
-              disabled={busy || !companyId}
+              disabled={busy || !effectiveCompanyId}
               onClick={openNewFolder}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
@@ -255,7 +273,7 @@ export default function StudioHubPage() {
             </button>
             <button
               type="button"
-              disabled={busy || !companyId}
+              disabled={busy || !effectiveCompanyId}
               onClick={() => setShowTemplates(true)}
               className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-50"
             >
@@ -311,12 +329,19 @@ export default function StudioHubPage() {
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
             <p className="font-semibold">{t('Studio indisponível', 'Studio no disponible', 'Studio unavailable')}</p>
             <p className="mt-1">{error}</p>
-            <p className="mt-2 text-xs text-amber-800">
-              {t(
-                'Aplique manual_etholys_studio.sql e execute prisma generate.',
-                'Aplique manual_etholys_studio.sql y ejecute prisma generate.',
-                'Apply manual_etholys_studio.sql and run prisma generate.',
-              )}
+            {(error.includes('schema') || error.includes('prisma') || error.includes('Studio schema')) && (
+              <p className="mt-2 text-xs text-amber-800">
+                {t(
+                  'Aplique manual_etholys_studio.sql e execute prisma generate.',
+                  'Aplique manual_etholys_studio.sql y ejecute prisma generate.',
+                  'Apply manual_etholys_studio.sql and run prisma generate.',
+                )}
+              </p>
+            )}
+            <p className="mt-3">
+              <Link href="/studio/shared" className="font-semibold text-orange-700 underline">
+                {t('Ver conteúdos partilhados comigo', 'Ver contenidos compartidos conmigo', 'View content shared with me')}
+              </Link>
             </p>
           </div>
         ) : (
@@ -485,9 +510,9 @@ export default function StudioHubPage() {
         </div>
       )}
 
-      {shareTarget && companyId && (
+      {shareTarget && effectiveCompanyId && (
         <StudioShareDialog
-          companyId={companyId}
+          companyId={effectiveCompanyId}
           folderId={shareTarget.folderId}
           documentId={shareTarget.documentId}
           title={shareTarget.title}
