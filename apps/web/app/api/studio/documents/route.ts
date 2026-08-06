@@ -6,7 +6,7 @@ import { resolveStudioCompanyId } from '@/lib/studio/access';
 import { STUDIO_SYSTEM_TEMPLATES, findSystemTemplate } from '@/lib/studio/templates';
 import { emptyStudioCanvas, isStudioFormat } from '@/lib/studio/types';
 import { prismaHasEnumValue } from '@/lib/prisma-has-field';
-import { getDocumentAccess, getFolderAccess } from '@/lib/studio/share';
+import { getDocumentAccess, getFolderAccess, listActiveStudioShareTargets } from '@/lib/studio/share';
 import { resolveStudioJwtScope } from '@/lib/studio/share';
 
 export const dynamic = 'force-dynamic';
@@ -27,14 +27,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Sem acesso ao Studio' }, { status: 403 });
   }
 
-  // Convidado externo: só vê alvos partilhados
+  // Convidado externo: só vê alvos partilhados (+ conteúdo dentro das pastas partilhadas)
   if (scope.mode === 'share_only') {
     const folderIdParam = req.nextUrl.searchParams.get('folderId');
-    const folderTargets = scope.targets.filter((t) => t.type === 'folder').map((t) => t.id);
-    const docTargets = scope.targets.filter((t) => t.type === 'document').map((t) => t.id);
+    const shared = await listActiveStudioShareTargets(user.id);
+    const folderTargets = shared.folders.map((f) => f.id);
+    const docTargets = shared.documents.map((d) => d.id);
 
     let canEdit = false;
     let guestCompanyId: string | null = null;
+
     if (folderIdParam) {
       const folder = await prisma.studioFolder.findFirst({
         where: { id: folderIdParam },
@@ -47,86 +49,89 @@ export async function GET(req: NextRequest) {
       }
       canEdit = access === 'owner' || access === 'editor';
       guestCompanyId = folder.companyId;
-    }
 
-    const folders = folderTargets.length
-      ? await prisma.studioFolder.findMany({
-          where: {
-            id: { in: folderTargets },
-            ...(folderIdParam ? { parentId: folderIdParam } : { parentId: null }),
-          },
+      // Filhos e docs DENTRO da pasta partilhada (não só o alvo em si)
+      const [rawChildren, rawDocs] = await Promise.all([
+        prisma.studioFolder.findMany({
+          where: { parentId: folderIdParam },
           orderBy: { name: 'asc' },
-        })
-      : [];
-    // Se pediu uma pasta específica partilhada, listar docs dessa pasta
-    const documents = await prisma.studioDocument.findMany({
-      where: folderIdParam
-        ? {
-            folderId: folderIdParam,
-            OR: [
-              ...(docTargets.length ? [{ id: { in: docTargets } }] : []),
-              ...(folderTargets.includes(folderIdParam) ? [{ folderId: folderIdParam }] : []),
-              ...(folderTargets.length ? [{ folderId: { in: folderTargets } }] : []),
-              // Docs criados pelo próprio convidado nesta pasta
-              { folderId: folderIdParam, createdById: user.id },
-            ],
-          }
-        : {
-            OR: [
-              ...(docTargets.length ? [{ id: { in: docTargets } }] : []),
-              ...(folderTargets.length ? [{ folderId: { in: folderTargets } }] : []),
-              { createdById: user.id },
-            ],
+        }),
+        prisma.studioDocument.findMany({
+          where: { folderId: folderIdParam },
+          orderBy: { updatedAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            format: true,
+            status: true,
+            folderId: true,
+            templateKey: true,
+            visibility: true,
+            updatedAt: true,
+            createdAt: true,
+            createdById: true,
+            companyId: true,
           },
-      orderBy: { updatedAt: 'desc' },
-      select: {
-        id: true,
-        title: true,
-        format: true,
-        status: true,
-        folderId: true,
-        templateKey: true,
-        visibility: true,
-        updatedAt: true,
-        createdAt: true,
-      },
-    });
-    const visibleDocs = folderIdParam
-      ? documents.filter((d) => d.folderId === folderIdParam)
-      : documents.filter((d) => !d.folderId || folderTargets.includes(d.folderId) || docTargets.includes(d.id) || true);
+        }),
+      ]);
 
-    const allFolders = folderTargets.length
-      ? await prisma.studioFolder.findMany({
-          where: { id: { in: folderTargets } },
-          select: { id: true, name: true, parentId: true },
-        })
-      : [];
+      const folders = [];
+      for (const f of rawChildren) {
+        const a = await getFolderAccess(user.id, f);
+        if (a !== 'none') folders.push({ ...f, access: a });
+      }
+      const documents = [];
+      for (const d of rawDocs) {
+        const a = await getDocumentAccess(user.id, d);
+        if (a !== 'none') documents.push({ ...d, access: a });
+      }
 
-    // Sem companyId pedido: usar o da pasta ou da primeira partilha
-    if (!guestCompanyId) {
-      guestCompanyId = await resolveStudioCompanyId(user.id, null);
+      return NextResponse.json({
+        companyId: guestCompanyId,
+        folderId: folderIdParam,
+        folderName: folder.name,
+        folders,
+        allFolders: shared.folders.map((f) => ({ id: f.id, name: f.name, parentId: f.parentId })),
+        documents,
+        templates: STUDIO_SYSTEM_TEMPLATES.map((t) => ({
+          key: t.key,
+          format: t.format,
+          nameEs: t.nameEs,
+          namePt: t.namePt,
+          nameEn: t.nameEn,
+          descriptionEs: t.descriptionEs,
+          descriptionPt: t.descriptionPt,
+          descriptionEn: t.descriptionEn,
+          sortOrder: t.sortOrder,
+          isSystem: true,
+        })),
+        accessMode: 'share_only',
+        canEdit,
+      });
     }
 
+    // Raiz do convidado: pastas/docs explicitamente partilhados
+    guestCompanyId = await resolveStudioCompanyId(user.id, null);
     return NextResponse.json({
       companyId: guestCompanyId,
-      folderId: folderIdParam || null,
-      folders: folderIdParam ? [] : folders.length ? folders : allFolders,
-      allFolders,
-      documents: visibleDocs,
-      templates: STUDIO_SYSTEM_TEMPLATES.map((t) => ({
-        key: t.key,
-        format: t.format,
-        nameEs: t.nameEs,
-        namePt: t.namePt,
-        nameEn: t.nameEn,
-        descriptionEs: t.descriptionEs,
-        descriptionPt: t.descriptionPt,
-        descriptionEn: t.descriptionEn,
-        sortOrder: t.sortOrder,
-        isSystem: true,
+      folderId: null,
+      folders: shared.folders.map((f) => ({
+        id: f.id,
+        name: f.name,
+        parentId: f.parentId,
+        access: f.role === 'editor' ? 'editor' : 'viewer',
       })),
+      allFolders: shared.folders.map((f) => ({ id: f.id, name: f.name, parentId: f.parentId })),
+      documents: shared.documents.map((d) => ({
+        id: d.id,
+        title: d.title,
+        format: d.format,
+        folderId: d.folderId,
+        access: d.role === 'editor' ? 'editor' : 'viewer',
+      })),
+      templates: [],
       accessMode: 'share_only',
-      canEdit,
+      canEdit: false,
     });
   }
 
@@ -138,10 +143,12 @@ export async function GET(req: NextRequest) {
 
   // Se pediu uma pasta concreta, usar a empresa dessa pasta (evita falhar com multi-empresa)
   let resolvedCompanyId = companyId;
+  let folderName: string | null = null;
+  let folderAccess: 'none' | 'viewer' | 'editor' | 'owner' = 'none';
   if (folderId) {
     const folder = await prisma.studioFolder.findFirst({
       where: { id: folderId },
-      select: { id: true, companyId: true, createdById: true, visibility: true },
+      select: { id: true, companyId: true, createdById: true, visibility: true, name: true },
     });
     if (folder) {
       const access = await getFolderAccess(user.id, folder);
@@ -149,6 +156,8 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Sem acesso a esta pasta' }, { status: 403 });
       }
       resolvedCompanyId = folder.companyId;
+      folderName = folder.name;
+      folderAccess = access;
     }
   }
 
@@ -196,10 +205,64 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Na raiz: incluir pastas/docs partilhados mesmo que estejam aninhados (fora da raiz)
+    const shared = !folderId ? await listActiveStudioShareTargets(user.id) : { folders: [], documents: [] };
+    if (!folderId) {
+      const seenF = new Set(folders.map((f) => f.id));
+      const seenD = new Set(documents.map((d) => d.id));
+      for (const f of shared.folders) {
+        if (seenF.has(f.id)) continue;
+        folders.push({
+          id: f.id,
+          name: f.name,
+          parentId: f.parentId,
+          companyId: f.companyId,
+          visibility: 'private',
+          createdById: null as string | null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          access: f.role === 'editor' ? 'editor' : 'viewer',
+        });
+        seenF.add(f.id);
+      }
+      if (shared.documents.length) {
+        const sharedDocs = await prisma.studioDocument.findMany({
+          where: { id: { in: shared.documents.map((d) => d.id) } },
+          select: {
+            id: true,
+            title: true,
+            format: true,
+            status: true,
+            folderId: true,
+            templateKey: true,
+            visibility: true,
+            updatedAt: true,
+            createdAt: true,
+          },
+        });
+        const roleById = new Map(shared.documents.map((d) => [d.id, d.role]));
+        for (const d of sharedDocs) {
+          if (seenD.has(d.id)) continue;
+          documents.push({
+            ...d,
+            access: roleById.get(d.id) === 'editor' ? 'editor' : 'viewer',
+          });
+          seenD.add(d.id);
+        }
+      }
+    }
+
     const allFolders = [];
     for (const f of allFoldersRaw) {
       const access = await getFolderAccess(user.id, f);
       if (access !== 'none') allFolders.push({ id: f.id, name: f.name, parentId: f.parentId });
+    }
+    if (!folderId) {
+      const seen = new Set(allFolders.map((f) => f.id));
+      for (const f of shared.folders) {
+        if (seen.has(f.id)) continue;
+        allFolders.push({ id: f.id, name: f.name, parentId: f.parentId });
+      }
     }
 
     const templates = STUDIO_SYSTEM_TEMPLATES.map((t) => ({
@@ -218,11 +281,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       companyId: resolvedCompanyId,
       folderId: folderId || null,
+      folderName,
       folders,
       allFolders,
       documents,
       templates,
       accessMode: 'member',
+      canEdit: folderAccess === 'owner' || folderAccess === 'editor',
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

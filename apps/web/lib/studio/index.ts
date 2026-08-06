@@ -22,5 +22,6 @@ export {
   createStudioShare,
   getDocumentAccess,
   getFolderAccess,
+  listActiveStudioShareTargets,
   resolveStudioJwtScope,
 } from '@/lib/studio/share';

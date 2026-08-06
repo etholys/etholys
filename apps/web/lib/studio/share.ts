@@ -70,6 +70,70 @@ async function emailsForUser(userId: string): Promise<string[]> {
   return u?.email ? [u.email.toLowerCase()] : [];
 }
 
+/** Partilhas activas (internas ou externas) do utilizador — pastas e documentos. */
+export async function listActiveStudioShareTargets(userId: string): Promise<{
+  folders: Array<{ id: string; name: string; companyId: string; parentId: string | null; role: string }>;
+  documents: Array<{
+    id: string;
+    title: string;
+    format: string;
+    folderId: string | null;
+    companyId: string;
+    role: string;
+  }>;
+}> {
+  const emails = await emailsForUser(userId);
+  const shares = await prisma.studioShare.findMany({
+    where: {
+      status: 'active',
+      OR: [{ userId }, ...(emails.length ? [{ email: { in: emails } }] : [])],
+    },
+    select: {
+      role: true,
+      expiresAt: true,
+      targetType: true,
+      folder: { select: { id: true, name: true, companyId: true, parentId: true } },
+      document: {
+        select: { id: true, title: true, format: true, folderId: true, companyId: true },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const now = Date.now();
+  const folders: Array<{
+    id: string;
+    name: string;
+    companyId: string;
+    parentId: string | null;
+    role: string;
+  }> = [];
+  const documents: Array<{
+    id: string;
+    title: string;
+    format: string;
+    folderId: string | null;
+    companyId: string;
+    role: string;
+  }> = [];
+  const seenF = new Set<string>();
+  const seenD = new Set<string>();
+
+  for (const s of shares) {
+    if (s.expiresAt && s.expiresAt.getTime() < now) continue;
+    if (s.targetType === 'folder' && s.folder && !seenF.has(s.folder.id)) {
+      seenF.add(s.folder.id);
+      folders.push({ ...s.folder, role: s.role });
+    }
+    if (s.targetType === 'document' && s.document && !seenD.has(s.document.id)) {
+      seenD.add(s.document.id);
+      documents.push({ ...s.document, role: s.role });
+    }
+  }
+
+  return { folders, documents };
+}
+
 export async function isCompanyMember(userId: string, companyId: string): Promise<boolean> {
   const row = await prisma.companyUser.findUnique({
     where: { userId_companyId: { userId, companyId } },

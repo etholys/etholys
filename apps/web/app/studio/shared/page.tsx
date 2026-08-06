@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 import { FileText, Folder, Loader2, PenLine, LogOut } from 'lucide-react';
-import { signOut } from 'next-auth/react';
 
 type FolderRow = { id: string; name: string };
 type DocRow = { id: string; title: string; format: string; folderId: string | null };
 
-/** Lista isolada para convidados externos (share_only). */
+/** Lista isolada para convidados (e membros com partilhas activas). */
 export default function StudioSharedHomePage() {
   const { status } = useSession();
+  const router = useRouter();
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [documents, setDocuments] = useState<DocRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,9 +26,18 @@ export default function StudioSharedHomePage() {
         const r = await fetch('/api/studio/documents', { cache: 'no-store' });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
-        if (!cancelled) {
-          setFolders(d.folders || []);
-          setDocuments(d.documents || []);
+        if (cancelled) return;
+        const nextFolders = d.folders || [];
+        const nextDocs = d.documents || [];
+        setFolders(nextFolders);
+        setDocuments(nextDocs);
+        if (nextFolders.length === 1 && nextDocs.length === 0) {
+          router.replace(`/studio/f/${nextFolders[0].id}`);
+          return;
+        }
+        if (nextFolders.length === 0 && nextDocs.length === 1) {
+          router.replace(`/hub/studio/${nextDocs[0].id}`);
+          return;
         }
       } catch (e: unknown) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Erro');
@@ -38,7 +48,7 @@ export default function StudioSharedHomePage() {
     return () => {
       cancelled = true;
     };
-  }, [status]);
+  }, [status, router]);
 
   if (status === 'loading' || loading) {
     return (
@@ -98,6 +108,11 @@ export default function StudioSharedHomePage() {
               </div>
             </Link>
           ))}
+          {folders.length === 0 && documents.length === 0 && !error && (
+            <p className="col-span-full text-sm text-slate-500">
+              Ainda não há pastas ou documentos partilhados consigo.
+            </p>
+          )}
         </div>
       </main>
     </div>

@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, FilePlus2, FileText, Folder, Loader2 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 
+type FolderRow = { id: string; name: string };
 type DocRow = { id: string; title: string; format: string };
 type TemplateRow = {
   key: string;
@@ -25,6 +26,7 @@ export default function StudioSharedFolderPage() {
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const folderId = String(params?.folderId || '');
   const [name, setName] = useState('Pasta');
+  const [folders, setFolders] = useState<FolderRow[]>([]);
   const [documents, setDocuments] = useState<DocRow[]>([]);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [companyId, setCompanyId] = useState<string | null>(null);
@@ -43,16 +45,16 @@ export default function StudioSharedFolderPage() {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
-      const folder = (d.folders || d.allFolders || []).find((f: { id: string }) => f.id === folderId);
+      const folder =
+        (d.folders || []).find((f: { id: string }) => f.id === folderId) ||
+        (d.allFolders || []).find((f: { id: string }) => f.id === folderId);
       if (folder?.name) setName(folder.name);
-      else {
-        const af = (d.allFolders || []).find((f: { id: string }) => f.id === folderId);
-        if (af?.name) setName(af.name);
-      }
+      else if (typeof d.folderName === 'string') setName(d.folderName);
+      setFolders((d.folders || []).filter((f: { id: string }) => f.id !== folderId));
       setDocuments(d.documents || []);
       setTemplates(d.templates || []);
       setCompanyId(d.companyId || null);
-      setCanEdit(d.canEdit === true || d.accessMode === 'member');
+      setCanEdit(d.canEdit === true);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -117,6 +119,19 @@ export default function StudioSharedFolderPage() {
           <p className="text-sm text-red-700">{error}</p>
         ) : (
           <div className="grid gap-3">
+            {folders.map((f) => (
+              <Link
+                key={f.id}
+                href={`/studio/f/${f.id}`}
+                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 hover:border-amber-300"
+              >
+                <Folder className="h-5 w-5 text-amber-600" />
+                <div>
+                  <p className="font-semibold text-slate-900">{f.name}</p>
+                  <p className="text-xs text-slate-500">{t('Pasta', 'Carpeta', 'Folder')}</p>
+                </div>
+              </Link>
+            ))}
             {documents.map((d) => (
               <Link
                 key={d.id}
@@ -130,7 +145,7 @@ export default function StudioSharedFolderPage() {
                 </div>
               </Link>
             ))}
-            {documents.length === 0 && (
+            {folders.length === 0 && documents.length === 0 && (
               <p className="text-sm text-slate-500">
                 {t(
                   'Pasta vazia. Crie um documento para começar.',
