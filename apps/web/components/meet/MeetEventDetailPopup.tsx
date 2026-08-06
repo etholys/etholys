@@ -1,0 +1,442 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import {
+  Check,
+  Copy,
+  Loader2,
+  MapPin,
+  Pencil,
+  Trash2,
+  Users,
+  Video,
+  X,
+} from 'lucide-react';
+import { meetHubJoinPath } from '@/lib/meet/types';
+
+export type MeetEventParticipant = {
+  id: string;
+  userId?: string | null;
+  email?: string | null;
+  displayName?: string | null;
+  role: string;
+  joinedAt?: string | null;
+  user?: { id: string; name: string | null; email: string | null } | null;
+};
+
+export type MeetEventDetail = {
+  id: string;
+  title: string;
+  description?: string | null;
+  status: string;
+  scheduledAt: string | null;
+  endsAt: string | null;
+  meetingUrl: string | null;
+  roomSlug?: string;
+  projectId?: string | null;
+  createdById?: string | null;
+  createdBy?: { id: string; name: string | null; email: string | null } | null;
+  participants?: MeetEventParticipant[];
+  _count?: { participants: number; actionItems: number };
+};
+
+type Props = {
+  locale: string;
+  companyId: string;
+  session: MeetEventDetail;
+  currentUserId?: string | null;
+  onClose: () => void;
+  onUpdated: (session: MeetEventDetail) => void;
+  onDeleted: (sessionId: string) => void;
+};
+
+function localInputValue(date: Date): string {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+export function MeetEventDetailPopup({
+  locale,
+  companyId,
+  session,
+  currentUserId,
+  onClose,
+  onUpdated,
+  onDeleted,
+}: Props) {
+  const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
+  const intl = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
+
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [title, setTitle] = useState(session.title);
+  const [description, setDescription] = useState(session.description || '');
+  const [startsAt, setStartsAt] = useState(
+    session.scheduledAt ? localInputValue(new Date(session.scheduledAt)) : '',
+  );
+  const [endsAt, setEndsAt] = useState(
+    session.endsAt ? localInputValue(new Date(session.endsAt)) : '',
+  );
+
+  useEffect(() => {
+    setTitle(session.title);
+    setDescription(session.description || '');
+    setStartsAt(session.scheduledAt ? localInputValue(new Date(session.scheduledAt)) : '');
+    setEndsAt(session.endsAt ? localInputValue(new Date(session.endsAt)) : '');
+    setEditing(false);
+    setConfirmDelete(false);
+    setError(null);
+  }, [session]);
+
+  const isOwner = Boolean(
+    currentUserId &&
+      (session.createdById === currentUserId ||
+        session.participants?.some(
+          (p) => p.userId === currentUserId && (p.role === 'host' || p.role === 'cohost'),
+        )),
+  );
+
+  const whenLabel = useMemo(() => {
+    if (!session.scheduledAt) {
+      return t('Sem data marcada', 'Sin fecha programada', 'No scheduled date');
+    }
+    const start = new Date(session.scheduledAt);
+    const end = session.endsAt ? new Date(session.endsAt) : null;
+    const day = new Intl.DateTimeFormat(intl, {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    }).format(start);
+    const hour = new Intl.DateTimeFormat(intl, { hour: 'numeric', minute: '2-digit' });
+    return end ? `${day} · ${hour.format(start)} – ${hour.format(end)}` : `${day} · ${hour.format(start)}`;
+  }, [session.scheduledAt, session.endsAt, intl, locale]);
+
+  const guests = session.participants ?? [];
+  const guestCount = guests.length || session._count?.participants || 0;
+  const joinedCount = guests.filter((g) => g.joinedAt).length;
+
+  async function copyLink() {
+    if (!session.meetingUrl) return;
+    try {
+      await navigator.clipboard.writeText(session.meetingUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked */
+    }
+  }
+
+  async function saveEdits() {
+    if (!title.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/meet/sessions/${session.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          title: title.trim(),
+          description: description.trim() || null,
+          scheduledAt: startsAt ? new Date(startsAt).toISOString() : null,
+          endsAt: endsAt ? new Date(endsAt).toISOString() : null,
+        }),
+      });
+      const data = (await response.json()) as { session?: MeetEventDetail; error?: string };
+      if (!response.ok || !data.session) throw new Error(data.error || 'Error');
+      onUpdated(data.session);
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteSession() {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/meet/sessions/${session.id}?companyId=${encodeURIComponent(companyId)}`,
+        { method: 'DELETE' },
+      );
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error || 'Error');
+      onDeleted(session.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/35 p-0 sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-end gap-1 px-3 pt-3">
+          {isOwner && !editing && (
+            <>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                title={t('Editar', 'Editar', 'Edit')}
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="rounded-full p-2 text-slate-500 hover:bg-red-50 hover:text-red-700"
+                title={t('Apagar', 'Eliminar', 'Delete')}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+            aria-label={t('Fechar', 'Cerrar', 'Close')}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-5 px-5 pb-5 pt-1">
+          {editing ? (
+            <div className="space-y-3">
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                className="w-full border-b-2 border-sky-600 bg-transparent py-1 text-xl font-semibold text-slate-900 outline-none"
+              />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="text-xs font-medium text-slate-500">
+                  {t('Início', 'Inicio', 'Starts')}
+                  <input
+                    type="datetime-local"
+                    value={startsAt}
+                    onChange={(event) => setStartsAt(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="text-xs font-medium text-slate-500">
+                  {t('Fim', 'Fin', 'Ends')}
+                  <input
+                    type="datetime-local"
+                    value={endsAt}
+                    min={startsAt || undefined}
+                    onChange={(event) => setEndsAt(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+              </div>
+              <textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={3}
+                placeholder={t('Descrição', 'Descripción', 'Description')}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100"
+                >
+                  {t('Cancelar', 'Cancelar', 'Cancel')}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || !title.trim()}
+                  onClick={() => void saveEdits()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                >
+                  {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {t('Guardar', 'Guardar', 'Save')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex gap-3">
+                <span className="mt-1.5 h-4 w-4 shrink-0 rounded bg-sky-500" />
+                <div className="min-w-0">
+                  <h2 className="text-xl font-semibold leading-snug text-slate-900">{session.title}</h2>
+                  <p className="mt-1 capitalize text-sm text-slate-600">{whenLabel}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 text-sm text-slate-700">
+                <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">Etholys Meet</p>
+                  {session.meetingUrl && (
+                    <button
+                      type="button"
+                      onClick={() => void copyLink()}
+                      className="mt-1 inline-flex max-w-full items-center gap-1.5 truncate text-xs text-sky-700 hover:underline"
+                    >
+                      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      <span className="truncate">{session.meetingUrl}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {(session.description || '').trim() && (
+                <p className="whitespace-pre-wrap rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {session.description}
+                </p>
+              )}
+
+              <div className="flex items-start gap-3">
+                <Users className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-800">
+                    {guestCount}{' '}
+                    {guestCount === 1
+                      ? t('convidado', 'invitado', 'guest')
+                      : t('convidados', 'invitados', 'guests')}
+                    {joinedCount > 0 && (
+                      <span className="ml-2 font-normal text-slate-500">
+                        · {joinedCount} {t('já entraram', 'ya entraron', 'joined')}
+                      </span>
+                    )}
+                  </p>
+                  <ul className="mt-3 max-h-48 space-y-2.5 overflow-y-auto pr-1">
+                    {guests.map((guest) => {
+                      const name =
+                        guest.displayName ||
+                        guest.user?.name ||
+                        guest.email ||
+                        guest.user?.email ||
+                        t('Convidado', 'Invitado', 'Guest');
+                      const email = guest.email || guest.user?.email || '';
+                      const isOrganizer = guest.role === 'host' || guest.userId === session.createdById;
+                      return (
+                        <li key={guest.id} className="flex items-center gap-2.5">
+                          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-800">
+                            {initials(name)}
+                            {guest.joinedAt && (
+                              <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 text-white">
+                                <Check className="h-2.5 w-2.5" />
+                              </span>
+                            )}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-slate-800">
+                              {name}
+                              {email && email !== name && (
+                                <span className="font-normal text-slate-500"> ({email})</span>
+                              )}
+                            </p>
+                            {isOrganizer && (
+                              <p className="text-[11px] text-slate-500">
+                                {t('Organizador', 'Organizador', 'Organizer')}
+                              </p>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                    {!guests.length && session.createdBy && (
+                      <li className="flex items-center gap-2.5">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-800">
+                          {initials(session.createdBy.name || session.createdBy.email || 'O')}
+                        </span>
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">
+                            {session.createdBy.name || session.createdBy.email}
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            {t('Organizador', 'Organizador', 'Organizer')}
+                          </p>
+                        </div>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </>
+          )}
+
+          {error && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              {error}
+            </p>
+          )}
+
+          {confirmDelete && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-900">
+              <p className="font-medium">
+                {t('Apagar esta reunião?', '¿Eliminar esta reunión?', 'Delete this meeting?')}
+              </p>
+              <div className="mt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="rounded-lg px-3 py-1.5 text-slate-600 hover:bg-white"
+                >
+                  {t('Cancelar', 'Cancelar', 'Cancel')}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void deleteSession()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {t('Apagar', 'Eliminar', 'Delete')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!editing && session.status !== 'ended' && session.status !== 'cancelled' && (
+            <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+              <Link
+                href={meetHubJoinPath(session.id, companyId)}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+              >
+                <Video className="h-4 w-4" />
+                {t('Entrar na sala', 'Entrar a la sala', 'Join room')}
+              </Link>
+              {session.meetingUrl && (
+                <button
+                  type="button"
+                  onClick={() => void copyLink()}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {t('Copiar link', 'Copiar enlace', 'Copy link')}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

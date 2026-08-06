@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import {
   ArrowLeft,
   Video,
@@ -35,19 +35,15 @@ import {
   MeetCalendarView,
   type MeetCalendarScale,
 } from '@/components/meet/MeetCalendarView';
+import {
+  MeetEventDetailPopup,
+  type MeetEventDetail,
+} from '@/components/meet/MeetEventDetailPopup';
 import { meetHubJoinPath } from '@/lib/meet/types';
 
-type MeetSessionRow = {
-  id: string;
-  title: string;
+type MeetSessionRow = MeetEventDetail & {
   mirror: string;
-  status: string;
-  scheduledAt: string | null;
-  endsAt: string | null;
-  meetingUrl: string | null;
   roomSlug: string;
-  projectId?: string | null;
-  _count?: { participants: number; actionItems: number };
 };
 
 const DAY_MS = 86_400_000;
@@ -87,10 +83,12 @@ export default function MeetHubPage() {
 function MeetHubContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: authSession } = useSession();
   const { locale, activeCompanyId } = useApp();
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const intlLocale = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
   const companyId = activeCompanyId && isLikelyDbId(activeCompanyId) ? activeCompanyId : '';
+  const currentUserId = (authSession?.user as { id?: string } | undefined)?.id || null;
 
   const [sessions, setSessions] = useState<MeetSessionRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -104,6 +102,7 @@ function MeetHubContent() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [shareSession, setShareSession] = useState<{ id: string; meetingUrl: string } | null>(null);
   const [postSessionId, setPostSessionId] = useState<string | null>(null);
+  const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
   const [calBusyId, setCalBusyId] = useState<string | null>(null);
   const [jitsiStatus, setJitsiStatus] = useState<{ baseUrl: string; isDemo: boolean } | null>(null);
   const [connections, setConnections] = useState<{
@@ -389,6 +388,35 @@ function MeetHubContent() {
     day: 'numeric',
     month: 'short',
   }).format(selectedDate);
+
+  const detailSession = useMemo(
+    () => sessions.find((session) => session.id === detailSessionId) || null,
+    [sessions, detailSessionId],
+  );
+
+  function openSessionDetail(sessionId: string) {
+    setDetailSessionId(sessionId);
+  }
+
+  function handleDetailUpdated(session: MeetEventDetail) {
+    setSessions((prev) =>
+      prev.map((row) =>
+        row.id === session.id
+          ? {
+              ...row,
+              ...session,
+              mirror: row.mirror,
+              roomSlug: row.roomSlug,
+            }
+          : row,
+      ),
+    );
+  }
+
+  function handleDetailDeleted(sessionId: string) {
+    setSessions((prev) => prev.filter((row) => row.id !== sessionId));
+    setDetailSessionId(null);
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -703,6 +731,7 @@ function MeetHubContent() {
                   intlLocale={intlLocale}
                   copiedId={copiedId}
                   calBusyId={calBusyId}
+                  onOpen={openSessionDetail}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
                   onPost={setPostSessionId}
@@ -717,6 +746,7 @@ function MeetHubContent() {
                   intlLocale={intlLocale}
                   copiedId={copiedId}
                   calBusyId={calBusyId}
+                  onOpen={openSessionDetail}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
                   onPost={setPostSessionId}
@@ -731,6 +761,7 @@ function MeetHubContent() {
                   intlLocale={intlLocale}
                   copiedId={copiedId}
                   calBusyId={calBusyId}
+                  onOpen={openSessionDetail}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
                   onPost={setPostSessionId}
@@ -745,6 +776,7 @@ function MeetHubContent() {
                   intlLocale={intlLocale}
                   copiedId={copiedId}
                   calBusyId={calBusyId}
+                  onOpen={openSessionDetail}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
                   onPost={setPostSessionId}
@@ -764,6 +796,19 @@ function MeetHubContent() {
             scale={calendarScale}
             onAnchorChange={setSelectedDate}
             onScaleChange={setCalendarScale}
+            onSelectSession={openSessionDetail}
+          />
+        )}
+
+        {detailSession && companyId && (
+          <MeetEventDetailPopup
+            locale={locale}
+            companyId={companyId}
+            session={detailSession}
+            currentUserId={currentUserId}
+            onClose={() => setDetailSessionId(null)}
+            onUpdated={handleDetailUpdated}
+            onDeleted={handleDetailDeleted}
           />
         )}
 
@@ -885,6 +930,7 @@ type GroupProps = {
   intlLocale: string;
   copiedId: string | null;
   calBusyId: string | null;
+  onOpen: (sessionId: string) => void;
   onCopy: (url: string, id: string) => void;
   onCalendar: (sessionId: string, provider: 'google' | 'outlook') => void;
   onPost: (sessionId: string) => void;
@@ -899,6 +945,7 @@ function MeetingGroup({
   intlLocale,
   copiedId,
   calBusyId,
+  onOpen,
   onCopy,
   onCalendar,
   onPost,
@@ -926,11 +973,15 @@ function MeetingGroup({
               }`}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => onOpen(s.id)}
+                  className="min-w-0 flex-1 text-left"
+                >
                   {timeLabel && (
                     <p className="text-xs font-medium text-slate-500">{timeLabel}</p>
                   )}
-                  <p className="mt-0.5 truncate text-base font-semibold text-slate-900">
+                  <p className="mt-0.5 truncate text-base font-semibold text-slate-900 hover:text-sky-700">
                     {s.title}
                   </p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
@@ -958,9 +1009,16 @@ function MeetingGroup({
                       </span>
                     )}
                   </div>
-                </div>
+                </button>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpen(s.id)}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    {t('Detalhes', 'Detalles', 'Details')}
+                  </button>
                   {s.meetingUrl && companyId && s.status !== 'ended' && (
                     <Link
                       href={meetHubJoinPath(s.id, companyId)}
