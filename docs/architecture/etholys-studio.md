@@ -1,8 +1,8 @@
 # Etholys Studio — criação de documentos (ferramenta transversal)
 
-**Versão:** 0.2  
-**Data:** 2026-07-30  
-**Status:** F0–F2 em código (biblioteca, editor, consent, marca, export, preview Mermaid)  
+**Versão:** 0.3  
+**Data:** 2026-08-06  
+**Status:** F0–F2.1 em código (biblioteca, editor, consent, marca, export, preview Mermaid, papéis viewer/editor/admin)  
 **Público:** product, desenvolvedores, agentes de IA  
 
 **Fonte de verdade** para o estúdio de documentos com IA no Etholys.  
@@ -34,7 +34,7 @@
 | **F0** | Spec + pastas + docs + templates seed + editor dual-pane + agente consent | ✅ |
 | **F1** | Kit de marca da empresa + export PDF/DOCX | ✅ |
 | **F2** | Diagramas editáveis + “ajusta o diagrama” no chat | ✅ preview Mermaid + patches via agente |
-| **F2.1** | Permissões / partilha pasta+doc (membros + email externo isolado) | ✅ |
+| **F2.1** | Permissões / partilha pasta+doc (membros + email externo; papéis viewer/editor/admin) | ✅ |
 | **F3** | Pontes “Abrir no Studio” desde SIEP/FUNDHUB/Meet | Seguinte |
 | **F4** | Templates por domínio + colaboração/comentários | |
 
@@ -55,6 +55,16 @@ flowchart LR
 ```
 
 - **Visibilidade:** `private` por omissão (dono + convidados explícitos). `company` é **opt-in manual** no diálogo de partilha — nunca automático, nem para conteúdo legado. Itens sem dono (conta apagada) ficam acessíveis a ADMIN da empresa para não ficarem órfãos.
+- **Papéis de partilha** (`StudioShare.role`, TEXT — sem migração de coluna):
+
+| Papel | Código | Pode |
+|-------|--------|------|
+| **Dono** | `owner` (criador; não é share) | Tudo, incluindo apagar o item e mudar visibilidade |
+| **Admin de conteúdo** | `admin` | Ler, criar/editar pastas e docs, exportar, copilot, **partilhar**, **alterar papéis**, revogar acessos, renomear; apagar docs na pasta |
+| **Editor** | `editor` | Ler, criar/editar pastas e docs, exportar, copilot |
+| **Visualizador** | `viewer` | Só ler / exportar |
+
+  Default ao convidar: **`editor`**. Herança: partilha numa pasta ancestral aplica o mesmo papel aos filhos. Valores novos são aditivos (`viewer`/`editor` existentes mantêm-se).
 - **`StudioFolder`:** árvore por `companyId`  
 - **`StudioDocument`:** título, format, `canvasState` (páginas/blocos), `aiSessionId`  
 - **`StudioTemplate`:** sistema (`isSystem`) ou por empresa  

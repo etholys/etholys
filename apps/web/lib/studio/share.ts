@@ -4,8 +4,68 @@ import { prisma } from '@/lib/prisma';
 import { sendAuthHtmlEmail } from '@/lib/send-auth-email';
 import type { StudioShareTargetRef } from '@/lib/studio/share-guard';
 
-export type StudioShareRole = 'viewer' | 'editor';
+export type StudioShareRole = 'viewer' | 'editor' | 'admin';
 export type StudioVisibility = 'company' | 'private';
+export type AccessLevel = 'none' | 'viewer' | 'editor' | 'admin' | 'owner';
+
+export const STUDIO_SHARE_ROLES: StudioShareRole[] = ['viewer', 'editor', 'admin'];
+
+export function parseStudioShareRole(raw: unknown, fallback: StudioShareRole = 'editor'): StudioShareRole {
+  if (raw === 'viewer' || raw === 'editor' || raw === 'admin') return raw;
+  return fallback;
+}
+
+export function shareRoleToAccess(role: string): AccessLevel {
+  if (role === 'admin') return 'admin';
+  if (role === 'editor') return 'editor';
+  if (role === 'viewer') return 'viewer';
+  return 'viewer';
+}
+
+function better(a: AccessLevel, b: AccessLevel): AccessLevel {
+  const rank: Record<AccessLevel, number> = {
+    none: 0,
+    viewer: 1,
+    editor: 2,
+    admin: 3,
+    owner: 4,
+  };
+  return rank[a] >= rank[b] ? a : b;
+}
+
+export function canReadStudio(access: AccessLevel): boolean {
+  return access !== 'none';
+}
+
+export function canCreateStudioContent(access: AccessLevel): boolean {
+  return access === 'editor' || access === 'admin' || access === 'owner';
+}
+
+export function canEditStudioContent(access: AccessLevel): boolean {
+  return access === 'editor' || access === 'admin' || access === 'owner';
+}
+
+export function canManageStudioShares(access: AccessLevel): boolean {
+  return access === 'admin' || access === 'owner';
+}
+
+export function canRenameStudio(access: AccessLevel): boolean {
+  return access === 'admin' || access === 'owner';
+}
+
+export function canChangeStudioVisibility(access: AccessLevel): boolean {
+  return access === 'owner';
+}
+
+/** Pastas: só o dono. */
+export function canDeleteStudioItem(access: AccessLevel): boolean {
+  return access === 'owner';
+}
+
+/** Documentos: dono do doc ou admin (ex. admin/dono da pasta). */
+export function canDeleteStudioDocument(access: AccessLevel): boolean {
+  return access === 'owner' || access === 'admin';
+}
 
 export function generateStudioShareToken(): string {
   return randomBytes(24).toString('base64url');
@@ -163,13 +223,6 @@ export async function listCompanyMembersForShare(companyId: string) {
     }));
 }
 
-type AccessLevel = 'none' | 'viewer' | 'editor' | 'owner';
-
-function better(a: AccessLevel, b: AccessLevel): AccessLevel {
-  const rank = { none: 0, viewer: 1, editor: 2, owner: 3 };
-  return rank[a] >= rank[b] ? a : b;
-}
-
 /** Sem dono (conta apagada): admins da empresa recuperam o conteúdo — evita ficheiros órfãos. */
 async function isCompanyAdmin(userId: string, companyId: string): Promise<boolean> {
   const row = await prisma.companyUser.findUnique({
@@ -199,7 +252,7 @@ export async function getFolderAccess(
     select: { role: true, expiresAt: true },
   });
   if (share && (!share.expiresAt || share.expiresAt.getTime() > Date.now())) {
-    return share.role === 'editor' ? 'editor' : 'viewer';
+    return shareRoleToAccess(share.role);
   }
 
   // Partilha de pasta ancestral?
@@ -215,7 +268,7 @@ export async function getFolderAccess(
       select: { role: true, expiresAt: true },
     });
     if (parentShare && (!parentShare.expiresAt || parentShare.expiresAt.getTime() > Date.now())) {
-      return parentShare.role === 'editor' ? 'editor' : 'viewer';
+      return shareRoleToAccess(parentShare.role);
     }
   }
 
@@ -265,7 +318,7 @@ export async function getDocumentAccess(
     select: { role: true, expiresAt: true },
   });
   if (share && (!share.expiresAt || share.expiresAt.getTime() > Date.now())) {
-    level = better(level, share.role === 'editor' ? 'editor' : 'viewer');
+    level = better(level, shareRoleToAccess(share.role));
   }
 
   if (doc.folderId) {
@@ -275,7 +328,9 @@ export async function getDocumentAccess(
     });
     if (folder) {
       const fa = await getFolderAccess(userId, folder);
-      if (fa !== 'none') level = better(level, fa === 'owner' ? 'editor' : fa);
+      // Pasta: owner no folder → admin no doc (pode gerir partilhas do doc via pasta)
+      if (fa === 'owner') level = better(level, 'admin');
+      else if (fa !== 'none') level = better(level, fa);
     }
   }
 
@@ -346,7 +401,7 @@ export async function createStudioShare(opts: {
       targetType: opts.targetType,
       folderId: opts.targetType === 'folder' ? opts.folderId || null : null,
       documentId: opts.targetType === 'document' ? opts.documentId || null : null,
-      role: opts.role === 'editor' ? 'editor' : 'viewer',
+      role: parseStudioShareRole(opts.role, 'editor'),
       email,
       userId,
       accessMode,
@@ -395,6 +450,22 @@ export async function createStudioShare(opts: {
     inviteUrl,
     emailSent: mail.sent,
   };
+}
+
+export async function updateStudioShareRole(shareId: string, role: StudioShareRole) {
+  return prisma.studioShare.update({
+    where: { id: shareId },
+    data: { role: parseStudioShareRole(role) },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      accessMode: true,
+      status: true,
+      token: true,
+      user: { select: { id: true, name: true } },
+    },
+  });
 }
 
 export async function findShareByMagicToken(magic: string) {

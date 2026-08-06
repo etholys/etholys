@@ -338,7 +338,7 @@ export default function StudioHubPage() {
                     </p>
                   </div>
                 </button>
-                {(f.access === 'owner' || !f.access) && (
+                {(f.access === 'owner' || f.access === 'admin' || !f.access) && (
                   <button
                     type="button"
                     title={t('Compartilhar pasta', 'Compartir carpeta', 'Share folder')}
@@ -368,7 +368,7 @@ export default function StudioHubPage() {
                     </p>
                   </div>
                 </Link>
-                {(doc.access === 'owner' || !doc.access) && (
+                {(doc.access === 'owner' || doc.access === 'admin' || !doc.access) && (
                   <button
                     type="button"
                     title={t('Compartilhar documento', 'Compartir documento', 'Share document')}

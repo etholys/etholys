@@ -7,6 +7,13 @@ import { STUDIO_SYSTEM_TEMPLATES, findSystemTemplate } from '@/lib/studio/templa
 import { emptyStudioCanvas, isStudioFormat } from '@/lib/studio/types';
 import { prismaHasEnumValue } from '@/lib/prisma-has-field';
 import { getDocumentAccess, getFolderAccess, listActiveStudioShareTargets } from '@/lib/studio/share';
+import {
+  canCreateStudioContent,
+  canEditStudioContent,
+  canManageStudioShares,
+  shareRoleToAccess,
+  type AccessLevel,
+} from '@/lib/studio/share';
 import { resolveStudioJwtScope } from '@/lib/studio/share';
 
 export const dynamic = 'force-dynamic';
@@ -35,6 +42,9 @@ export async function GET(req: NextRequest) {
     const docTargets = shared.documents.map((d) => d.id);
 
     let canEdit = false;
+    let canCreate = false;
+    let canManageShares = false;
+    let access: AccessLevel = 'none';
     let guestCompanyId: string | null = null;
 
     if (folderIdParam) {
@@ -43,11 +53,13 @@ export async function GET(req: NextRequest) {
         select: { id: true, companyId: true, createdById: true, visibility: true, name: true },
       });
       if (!folder) return NextResponse.json({ error: 'Folder not found' }, { status: 404 });
-      const access = await getFolderAccess(user.id, folder);
+      access = await getFolderAccess(user.id, folder);
       if (access === 'none') {
         return NextResponse.json({ error: 'Sem acesso a esta pasta' }, { status: 403 });
       }
-      canEdit = access === 'owner' || access === 'editor';
+      canEdit = canEditStudioContent(access);
+      canCreate = canCreateStudioContent(access);
+      canManageShares = canManageStudioShares(access);
       guestCompanyId = folder.companyId;
 
       // Filhos e docs DENTRO da pasta partilhada (não só o alvo em si)
@@ -106,7 +118,10 @@ export async function GET(req: NextRequest) {
           isSystem: true,
         })),
         accessMode: 'share_only',
+        access,
         canEdit,
+        canCreate,
+        canManageShares,
       });
     }
 
@@ -119,7 +134,7 @@ export async function GET(req: NextRequest) {
         id: f.id,
         name: f.name,
         parentId: f.parentId,
-        access: f.role === 'editor' ? 'editor' : 'viewer',
+        access: shareRoleToAccess(f.role),
       })),
       allFolders: shared.folders.map((f) => ({ id: f.id, name: f.name, parentId: f.parentId })),
       documents: shared.documents.map((d) => ({
@@ -127,11 +142,14 @@ export async function GET(req: NextRequest) {
         title: d.title,
         format: d.format,
         folderId: d.folderId,
-        access: d.role === 'editor' ? 'editor' : 'viewer',
+        access: shareRoleToAccess(d.role),
       })),
       templates: [],
       accessMode: 'share_only',
+      access: 'none',
       canEdit: false,
+      canCreate: false,
+      canManageShares: false,
     });
   }
 
@@ -144,7 +162,7 @@ export async function GET(req: NextRequest) {
   // Se pediu uma pasta concreta, usar a empresa dessa pasta (evita falhar com multi-empresa)
   let resolvedCompanyId = companyId;
   let folderName: string | null = null;
-  let folderAccess: 'none' | 'viewer' | 'editor' | 'owner' = 'none';
+  let folderAccess: AccessLevel = 'none';
   if (folderId) {
     const folder = await prisma.studioFolder.findFirst({
       where: { id: folderId },
@@ -221,7 +239,7 @@ export async function GET(req: NextRequest) {
           createdById: null as string | null,
           createdAt: new Date(),
           updatedAt: new Date(),
-          access: f.role === 'editor' ? 'editor' : 'viewer',
+          access: shareRoleToAccess(f.role),
         });
         seenF.add(f.id);
       }
@@ -245,7 +263,7 @@ export async function GET(req: NextRequest) {
           if (seenD.has(d.id)) continue;
           documents.push({
             ...d,
-            access: roleById.get(d.id) === 'editor' ? 'editor' : 'viewer',
+            access: shareRoleToAccess(roleById.get(d.id) || 'viewer'),
           });
           seenD.add(d.id);
         }
@@ -287,7 +305,10 @@ export async function GET(req: NextRequest) {
       documents,
       templates,
       accessMode: 'member',
-      canEdit: folderAccess === 'owner' || folderAccess === 'editor',
+      access: folderAccess,
+      canEdit: canEditStudioContent(folderAccess),
+      canCreate: folderId ? canCreateStudioContent(folderAccess) : true,
+      canManageShares: canManageStudioShares(folderAccess),
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -328,7 +349,7 @@ export async function POST(req: NextRequest) {
     const folder = await prisma.studioFolder.findFirst({ where: { id: folderId } });
     if (!folder) return NextResponse.json({ error: 'Folder not found' }, { status: 404 });
     const access = await getFolderAccess(user.id, folder);
-    if (access !== 'owner' && access !== 'editor') {
+    if (!canCreateStudioContent(access)) {
       return NextResponse.json({ error: 'Sem permissão para criar nesta pasta' }, { status: 403 });
     }
     if (!resolvedCompanyId) resolvedCompanyId = folder.companyId;

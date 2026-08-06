@@ -19,9 +19,20 @@ export {
   type StudioBrandKit,
 } from '@/lib/studio/export';
 export {
+  canCreateStudioContent,
+  canDeleteStudioDocument,
+  canDeleteStudioItem,
+  canEditStudioContent,
+  canManageStudioShares,
+  canRenameStudio,
+  canReadStudio,
   createStudioShare,
   getDocumentAccess,
   getFolderAccess,
   listActiveStudioShareTargets,
+  parseStudioShareRole,
   resolveStudioJwtScope,
+  updateStudioShareRole,
+  type AccessLevel,
+  type StudioShareRole,
 } from '@/lib/studio/share';

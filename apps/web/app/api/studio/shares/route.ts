@@ -5,11 +5,14 @@ import { prisma } from '@/lib/prisma';
 import { resolveStudioCompanyId } from '@/lib/studio/access';
 import {
   buildStudioShareUrl,
+  canManageStudioShares,
   createStudioShare,
   getDocumentAccess,
   getFolderAccess,
   isCompanyMember,
   listCompanyMembersForShare,
+  parseStudioShareRole,
+  updateStudioShareRole,
 } from '@/lib/studio/share';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +21,45 @@ async function authUser() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return null;
   return prisma.user.findUnique({ where: { email: session.user.email } });
+}
+
+async function assertCanManageTarget(
+  userId: string,
+  companyId: string,
+  folderId: string | null,
+  documentId: string | null,
+): Promise<
+  | { ok: true; access: Awaited<ReturnType<typeof getFolderAccess>>; visibility: string }
+  | { ok: false; error: NextResponse }
+> {
+  if (folderId) {
+    const folder = await prisma.studioFolder.findFirst({ where: { id: folderId, companyId } });
+    if (!folder) return { ok: false, error: NextResponse.json({ error: 'Not found' }, { status: 404 }) };
+    const access = await getFolderAccess(userId, folder);
+    if (!canManageStudioShares(access)) {
+      return {
+        ok: false,
+        error: NextResponse.json({ error: 'Sem permissão para gerir partilhas' }, { status: 403 }),
+      };
+    }
+    return { ok: true, access, visibility: folder.visibility };
+  }
+  if (documentId) {
+    const doc = await prisma.studioDocument.findFirst({ where: { id: documentId, companyId } });
+    if (!doc) return { ok: false, error: NextResponse.json({ error: 'Not found' }, { status: 404 }) };
+    const access = await getDocumentAccess(userId, doc);
+    if (!canManageStudioShares(access)) {
+      return {
+        ok: false,
+        error: NextResponse.json({ error: 'Sem permissão para gerir partilhas' }, { status: 403 }),
+      };
+    }
+    return { ok: true, access, visibility: doc.visibility };
+  }
+  return {
+    ok: false,
+    error: NextResponse.json({ error: 'folderId or documentId required' }, { status: 400 }),
+  };
 }
 
 /** GET /api/studio/shares?companyId=&folderId=|&documentId=&members=1 */
@@ -42,25 +84,8 @@ export async function GET(req: NextRequest) {
   const folderId = req.nextUrl.searchParams.get('folderId');
   const documentId = req.nextUrl.searchParams.get('documentId');
 
-  let visibility = 'private';
-
-  if (folderId) {
-    const folder = await prisma.studioFolder.findFirst({ where: { id: folderId, companyId } });
-    if (!folder) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    if ((await getFolderAccess(user.id, folder)) !== 'owner') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-    visibility = folder.visibility;
-  } else if (documentId) {
-    const doc = await prisma.studioDocument.findFirst({ where: { id: documentId, companyId } });
-    if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    if ((await getDocumentAccess(user.id, doc)) !== 'owner') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-    visibility = doc.visibility;
-  } else {
-    return NextResponse.json({ error: 'folderId or documentId required' }, { status: 400 });
-  }
+  const gate = await assertCanManageTarget(user.id, companyId, folderId, documentId);
+  if (!gate.ok) return gate.error;
 
   const shares = await prisma.studioShare.findMany({
     where: {
@@ -83,13 +108,17 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  // O endpoint já é restrito ao dono, por isso pode devolver o link de cada convite.
   const withUrls = shares.map(({ token, ...rest }) => ({
     ...rest,
     inviteUrl: buildStudioShareUrl(token),
   }));
 
-  return NextResponse.json({ shares: withUrls, visibility });
+  return NextResponse.json({
+    shares: withUrls,
+    visibility: gate.visibility,
+    access: gate.access,
+    canChangeVisibility: gate.access === 'owner',
+  });
 }
 
 /** POST /api/studio/shares — create share */
@@ -105,7 +134,7 @@ export async function POST(req: NextRequest) {
   if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
 
   const email = typeof body.email === 'string' ? body.email.trim() : '';
-  const role = body.role === 'editor' ? 'editor' : 'viewer';
+  const role = parseStudioShareRole(body.role, 'editor');
   const forceExternal = body.forceExternal === true;
   const sendEmail = body.sendEmail !== false;
   const folderId = typeof body.folderId === 'string' ? body.folderId : null;
@@ -121,8 +150,8 @@ export async function POST(req: NextRequest) {
       const folder = await prisma.studioFolder.findFirst({ where: { id: folderId, companyId } });
       if (!folder) return NextResponse.json({ error: 'Folder not found' }, { status: 404 });
       const access = await getFolderAccess(user.id, folder);
-      if (access !== 'owner') {
-        return NextResponse.json({ error: 'Só o dono pode partilhar' }, { status: 403 });
+      if (!canManageStudioShares(access)) {
+        return NextResponse.json({ error: 'Sem permissão para partilhar' }, { status: 403 });
       }
 
       const result = await createStudioShare({
@@ -143,8 +172,8 @@ export async function POST(req: NextRequest) {
     });
     if (!doc) return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     const access = await getDocumentAccess(user.id, doc);
-    if (access !== 'owner') {
-      return NextResponse.json({ error: 'Só o dono pode partilhar' }, { status: 403 });
+    if (!canManageStudioShares(access)) {
+      return NextResponse.json({ error: 'Sem permissão para partilhar' }, { status: 403 });
     }
 
     const result = await createStudioShare({
@@ -165,6 +194,38 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/** PATCH /api/studio/shares — alterar papel { id, role } */
+export async function PATCH(req: NextRequest) {
+  const user = await authUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const id = typeof body.id === 'string' ? body.id : '';
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+
+  const companyId = await resolveStudioCompanyId(
+    user.id,
+    typeof body.companyId === 'string' ? body.companyId : null,
+  );
+  if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
+
+  const share = await prisma.studioShare.findFirst({ where: { id, companyId, status: 'active' } });
+  if (!share) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const gate = await assertCanManageTarget(user.id, companyId, share.folderId, share.documentId);
+  if (!gate.ok) return gate.error;
+
+  const role = parseStudioShareRole(body.role);
+  const updated = await updateStudioShareRole(share.id, role);
+  const { token, ...rest } = updated;
+  return NextResponse.json({
+    share: {
+      ...rest,
+      inviteUrl: buildStudioShareUrl(token),
+    },
+  });
+}
+
 /** DELETE /api/studio/shares?id= */
 export async function DELETE(req: NextRequest) {
   const user = await authUser();
@@ -181,17 +242,10 @@ export async function DELETE(req: NextRequest) {
 
   const share = await prisma.studioShare.findFirst({ where: { id, companyId } });
   if (!share) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
   if (share.invitedById !== user.id) {
-    // allow owner of target
-    if (share.folderId) {
-      const f = await prisma.studioFolder.findUnique({ where: { id: share.folderId } });
-      if (f?.createdById !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    } else if (share.documentId) {
-      const d = await prisma.studioDocument.findUnique({ where: { id: share.documentId } });
-      if (d?.createdById !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    } else {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const gate = await assertCanManageTarget(user.id, companyId, share.folderId, share.documentId);
+    if (!gate.ok) return gate.error;
   }
 
   await prisma.studioShare.update({ where: { id: share.id }, data: { status: 'revoked' } });

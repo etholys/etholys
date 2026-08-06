@@ -270,7 +270,7 @@ export default function StudioDocumentPage() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {access === 'owner' && companyId && (
+          {(access === 'owner' || access === 'admin') && companyId && (
             <button
               type="button"
               onClick={() => setShareOpen(true)}

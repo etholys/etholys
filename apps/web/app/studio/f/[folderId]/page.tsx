@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, FilePlus2, FileText, Folder, Loader2 } from 'lucide-react';
+import { ArrowLeft, FilePlus2, FileText, Folder, FolderPlus, Loader2 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 
 type FolderRow = { id: string; name: string };
@@ -30,8 +30,10 @@ export default function StudioSharedFolderPage() {
   const [documents, setDocuments] = useState<DocRow[]>([]);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [companyId, setCompanyId] = useState<string | null>(null);
-  const [canEdit, setCanEdit] = useState(false);
+  const [canCreate, setCanCreate] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export default function StudioSharedFolderPage() {
       setDocuments(d.documents || []);
       setTemplates(d.templates || []);
       setCompanyId(d.companyId || null);
-      setCanEdit(d.canEdit === true);
+      setCanCreate(d.canCreate === true || d.canEdit === true);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -65,6 +67,33 @@ export default function StudioSharedFolderPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function createFolder() {
+    const n = newFolderName.trim();
+    if (!n) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await fetch('/api/studio/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: companyId || undefined,
+          parentId: folderId,
+          name: n,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
+      setShowNewFolder(false);
+      setNewFolderName('');
+      await load();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function createDoc(templateKey?: string) {
     setBusy(true);
@@ -99,16 +128,27 @@ export default function StudioSharedFolderPage() {
             <Folder className="h-5 w-5 shrink-0 text-amber-600" />
             <span className="truncate font-bold text-slate-900">{name}</span>
           </div>
-          {canEdit && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setShowTemplates(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              <FilePlus2 className="h-4 w-4" />
-              {t('Novo documento', 'Nuevo documento', 'New document')}
-            </button>
+          {canCreate && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setShowNewFolder(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-900 disabled:opacity-50"
+              >
+                <FolderPlus className="h-4 w-4" />
+                {t('Nova pasta', 'Nueva carpeta', 'New folder')}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setShowTemplates(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                <FilePlus2 className="h-4 w-4" />
+                {t('Novo documento', 'Nuevo documento', 'New document')}
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -147,16 +187,62 @@ export default function StudioSharedFolderPage() {
             ))}
             {folders.length === 0 && documents.length === 0 && (
               <p className="text-sm text-slate-500">
-                {t(
-                  'Pasta vazia. Crie um documento para começar.',
-                  'Carpeta vacía. Cree un documento para empezar.',
-                  'Empty folder. Create a document to get started.',
-                )}
+                {canCreate
+                  ? t(
+                      'Pasta vazia. Crie uma pasta ou um documento para começar.',
+                      'Carpeta vacía. Cree una carpeta o un documento para empezar.',
+                      'Empty folder. Create a folder or document to get started.',
+                    )
+                  : t(
+                      'Pasta vazia.',
+                      'Carpeta vacía.',
+                      'Empty folder.',
+                    )}
               </p>
             )}
           </div>
         )}
       </main>
+
+      {showNewFolder && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h2 className="mb-3 text-lg font-bold text-slate-900">
+              {t('Nova pasta', 'Nueva carpeta', 'New folder')}
+            </h2>
+            <input
+              autoFocus
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void createFolder();
+              }}
+              placeholder={t('Nome da pasta', 'Nombre de la carpeta', 'Folder name')}
+              className="mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewFolder(false);
+                  setNewFolderName('');
+                }}
+                className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                {t('Cancelar', 'Cancelar', 'Cancel')}
+              </button>
+              <button
+                type="button"
+                disabled={busy || !newFolderName.trim()}
+                onClick={() => void createFolder()}
+                className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : t('Criar', 'Crear', 'Create')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showTemplates && (
         <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 sm:items-center">

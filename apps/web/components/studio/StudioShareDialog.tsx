@@ -41,15 +41,22 @@ export function StudioShareDialog({
   const [shares, setShares] = useState<ShareRow[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'viewer' | 'editor'>('viewer');
+  const [role, setRole] = useState<'viewer' | 'editor' | 'admin'>('editor');
   const [asExternal, setAsExternal] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
   const [visibility, setVisibility] = useState<'private' | 'company'>('private');
+  const [canChangeVisibility, setCanChangeVisibility] = useState(true);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+
+  function roleLabel(r: string) {
+    if (r === 'admin') return t('Admin de conteúdo', 'Admin de contenido', 'Content admin');
+    if (r === 'editor') return t('Editor', 'Editor', 'Editor');
+    return t('Visualizador', 'Visualizador', 'Viewer');
+  }
 
   const itemUrl =
     typeof window === 'undefined'
@@ -105,6 +112,7 @@ export function StudioShareDialog({
       if (sharesRes.value.ok) {
         setShares(data?.shares || []);
         setVisibility(data?.visibility === 'company' ? 'company' : 'private');
+        setCanChangeVisibility(data?.canChangeVisibility !== false);
       } else {
         problems.push(
           data?.error ||
@@ -225,6 +233,26 @@ export function StudioShareDialog({
     }
   }
 
+  async function changeRole(id: string, nextRole: 'viewer' | 'editor' | 'admin') {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await fetch('/api/studio/shares', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, companyId, role: nextRole }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+      setShares((prev) => prev.map((s) => (s.id === id ? { ...s, role: nextRole } : s)));
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : 'Erro');
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function revoke(id: string) {
     if (!confirm(t('Revogar acesso?', '¿Revocar acceso?', 'Revoke access?'))) return;
     setBusy(true);
@@ -264,6 +292,7 @@ export function StudioShareDialog({
         </div>
 
         <div className="space-y-4 p-5">
+          {canChangeVisibility && (
           <div className="rounded-xl border border-slate-200 p-3">
             <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <Lock className="h-3.5 w-3.5" />
@@ -314,6 +343,7 @@ export function StudioShareDialog({
               </label>
             </div>
           </div>
+          )}
 
           <div className="rounded-xl border border-slate-200 p-3">
             <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -348,11 +378,12 @@ export function StudioShareDialog({
           <div className="flex gap-2">
             <select
               value={role}
-              onChange={(e) => setRole(e.target.value as 'viewer' | 'editor')}
+              onChange={(e) => setRole(e.target.value as 'viewer' | 'editor' | 'admin')}
               className="rounded-lg border border-slate-200 px-2 py-2 text-sm"
             >
-              <option value="viewer">{t('Só ler', 'Solo leer', 'View only')}</option>
-              <option value="editor">{t('Editar', 'Editar', 'Edit')}</option>
+              <option value="viewer">{roleLabel('viewer')}</option>
+              <option value="editor">{roleLabel('editor')}</option>
+              <option value="admin">{roleLabel('admin')}</option>
             </select>
             <input
               type="email"
@@ -484,18 +515,31 @@ export function StudioShareDialog({
                 {shares.map((s) => (
                   <li
                     key={s.id}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2 text-sm"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-slate-900">
                         {s.user?.name || s.email}
                       </p>
                       <p className="text-[10px] text-slate-500">
-                        {s.role} · {s.accessMode === 'external_guest' ? 'externo' : 'empresa'}
+                        {s.accessMode === 'external_guest' ? 'externo' : 'empresa'}
                         {s.acceptedAt ? '' : ' · pendente'}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
+                      <select
+                        value={s.role === 'admin' || s.role === 'editor' ? s.role : 'viewer'}
+                        disabled={busy}
+                        onChange={(e) =>
+                          void changeRole(s.id, e.target.value as 'viewer' | 'editor' | 'admin')
+                        }
+                        className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                        title={roleLabel(s.role)}
+                      >
+                        <option value="viewer">{roleLabel('viewer')}</option>
+                        <option value="editor">{roleLabel('editor')}</option>
+                        <option value="admin">{roleLabel('admin')}</option>
+                      </select>
                       {s.inviteUrl && (
                         <button
                           type="button"

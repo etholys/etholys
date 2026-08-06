@@ -5,6 +5,11 @@ import { prisma } from '@/lib/prisma';
 import { resolveStudioCompanyId } from '@/lib/studio/access';
 import type { StudioCanvasState } from '@/lib/studio/types';
 import { getDocumentAccess } from '@/lib/studio/share';
+import {
+  canChangeStudioVisibility,
+  canDeleteStudioDocument,
+  canEditStudioContent,
+} from '@/lib/studio/share';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +49,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const access = await getDocumentAccess(user.id, existing);
-  if (access === 'none' || access === 'viewer') {
+  if (!canEditStudioContent(access)) {
     return NextResponse.json({ error: 'Sem permissão para editar' }, { status: 403 });
   }
 
@@ -64,7 +69,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     data.folderId = typeof body.folderId === 'string' && body.folderId ? body.folderId : null;
   }
   if (typeof body.status === 'string') data.status = body.status;
-  if ((body.visibility === 'company' || body.visibility === 'private') && access === 'owner') {
+  if (
+    (body.visibility === 'company' || body.visibility === 'private') &&
+    canChangeStudioVisibility(access)
+  ) {
     data.visibility = body.visibility;
   }
 
@@ -92,7 +100,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const access = await getDocumentAccess(user.id, existing);
-  if (access !== 'owner') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!canDeleteStudioDocument(access)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   await prisma.studioDocument.delete({ where: { id: existing.id } });
   return NextResponse.json({ ok: true });
