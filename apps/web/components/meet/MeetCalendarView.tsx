@@ -1,8 +1,6 @@
 'use client';
 
 import { ChevronLeft, ChevronRight, Video } from 'lucide-react';
-import Link from 'next/link';
-import { meetHubJoinPath } from '@/lib/meet/types';
 
 export type MeetCalendarSession = {
   id: string;
@@ -11,6 +9,8 @@ export type MeetCalendarSession = {
   scheduledAt: string | null;
   endsAt: string | null;
   projectId?: string | null;
+  meetingUrl?: string | null;
+  createdById?: string | null;
 };
 
 export type MeetCalendarScale = 'day' | 'week' | 'month' | 'year';
@@ -23,6 +23,7 @@ type Props = {
   scale: MeetCalendarScale;
   onAnchorChange: (date: Date) => void;
   onScaleChange: (scale: MeetCalendarScale) => void;
+  onSelectSession: (sessionId: string) => void;
 };
 
 const DAY = 86_400_000;
@@ -60,12 +61,12 @@ function sessionsForDay(sessions: MeetCalendarSession[], day: Date) {
 
 export function MeetCalendarView({
   locale,
-  companyId,
   sessions,
   anchor,
   scale,
   onAnchorChange,
   onScaleChange,
+  onSelectSession,
 }: Props) {
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const intl = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
@@ -81,7 +82,12 @@ export function MeetCalendarView({
 
   const title =
     scale === 'day'
-      ? new Intl.DateTimeFormat(intl, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(anchor)
+      ? new Intl.DateTimeFormat(intl, {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }).format(anchor)
       : scale === 'week'
         ? (() => {
             const start = weekStart(anchor);
@@ -120,12 +126,14 @@ export function MeetCalendarView({
           <h2 className="ml-2 capitalize text-base font-semibold text-slate-900 sm:text-lg">{title}</h2>
         </div>
         <div className="flex rounded-lg bg-slate-100 p-1">
-          {([
-            ['day', t('Dia', 'Día', 'Day')],
-            ['week', t('Semana', 'Semana', 'Week')],
-            ['month', t('Mês', 'Mes', 'Month')],
-            ['year', t('Ano', 'Año', 'Year')],
-          ] as [MeetCalendarScale, string][]).map(([value, label]) => (
+          {(
+            [
+              ['day', t('Dia', 'Día', 'Day')],
+              ['week', t('Semana', 'Semana', 'Week')],
+              ['month', t('Mês', 'Mes', 'Month')],
+              ['year', t('Ano', 'Año', 'Year')],
+            ] as [MeetCalendarScale, string][]
+          ).map(([value, label]) => (
             <button
               key={value}
               type="button"
@@ -142,31 +150,30 @@ export function MeetCalendarView({
 
       {scale === 'day' && (
         <DayAgenda
-          day={anchor}
           sessions={sessionsForDay(sessions, anchor)}
-          companyId={companyId}
           locale={intl}
           empty={t('Nenhuma reunião neste dia', 'Ninguna reunión este día', 'No meetings on this day')}
+          onSelectSession={onSelectSession}
         />
       )}
       {scale === 'week' && (
         <WeekGrid
           anchor={anchor}
           sessions={sessions}
-          companyId={companyId}
           locale={intl}
+          onSelectSession={onSelectSession}
         />
       )}
       {scale === 'month' && (
         <MonthGrid
           anchor={anchor}
           sessions={sessions}
-          companyId={companyId}
           locale={intl}
           onSelectDay={(day) => {
             onAnchorChange(day);
             onScaleChange('day');
           }}
+          onSelectSession={onSelectSession}
         />
       )}
       {scale === 'year' && (
@@ -185,17 +192,15 @@ export function MeetCalendarView({
 }
 
 function DayAgenda({
-  day,
   sessions,
-  companyId,
   locale,
   empty,
+  onSelectSession,
 }: {
-  day: Date;
   sessions: MeetCalendarSession[];
-  companyId: string;
   locale: string;
   empty: string;
+  onSelectSession: (sessionId: string) => void;
 }) {
   const hour = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' });
   if (!sessions.length) {
@@ -204,10 +209,11 @@ function DayAgenda({
   return (
     <div className="divide-y divide-slate-100 p-4 sm:p-6">
       {sessions.map((session) => (
-        <Link
+        <button
           key={session.id}
-          href={meetHubJoinPath(session.id, companyId)}
-          className="grid gap-2 py-4 hover:bg-slate-50 sm:grid-cols-[100px_1fr] sm:px-3"
+          type="button"
+          onClick={() => onSelectSession(session.id)}
+          className="grid w-full gap-2 py-4 text-left hover:bg-slate-50 sm:grid-cols-[100px_1fr] sm:px-3"
         >
           <span className="text-sm font-medium text-slate-500">
             {session.scheduledAt ? hour.format(new Date(session.scheduledAt)) : ''}
@@ -219,7 +225,7 @@ function DayAgenda({
               Etholys Meet
             </span>
           </span>
-        </Link>
+        </button>
       ))}
     </div>
   );
@@ -228,13 +234,13 @@ function DayAgenda({
 function WeekGrid({
   anchor,
   sessions,
-  companyId,
   locale,
+  onSelectSession,
 }: {
   anchor: Date;
   sessions: MeetCalendarSession[];
-  companyId: string;
   locale: string;
+  onSelectSession: (sessionId: string) => void;
 }) {
   const start = weekStart(anchor);
   const days = Array.from({ length: 7 }, (_, index) => new Date(start.getTime() + index * DAY));
@@ -244,21 +250,26 @@ function WeekGrid({
     <div className="grid min-w-[760px] grid-cols-7 overflow-x-auto">
       {days.map((day) => (
         <div key={day.toISOString()} className="min-h-[430px] border-r border-slate-100 p-2 last:border-r-0">
-          <p className={`mb-3 text-center text-xs font-semibold ${sameDay(day, new Date()) ? 'text-sky-700' : 'text-slate-500'}`}>
+          <p
+            className={`mb-3 text-center text-xs font-semibold ${
+              sameDay(day, new Date()) ? 'text-sky-700' : 'text-slate-500'
+            }`}
+          >
             {weekday.format(day)}
           </p>
           <div className="space-y-2">
             {sessionsForDay(sessions, day).map((session) => (
-              <Link
+              <button
                 key={session.id}
-                href={meetHubJoinPath(session.id, companyId)}
-                className="block rounded-lg border-l-4 border-sky-500 bg-sky-50 px-2 py-2 text-xs hover:bg-sky-100"
+                type="button"
+                onClick={() => onSelectSession(session.id)}
+                className="block w-full rounded-lg border-l-4 border-sky-500 bg-sky-50 px-2 py-2 text-left text-xs hover:bg-sky-100"
               >
                 <span className="block font-medium text-sky-900">{session.title}</span>
                 <span className="text-sky-700">
                   {session.scheduledAt ? hour.format(new Date(session.scheduledAt)) : ''}
                 </span>
-              </Link>
+              </button>
             ))}
           </div>
         </div>
@@ -270,15 +281,15 @@ function WeekGrid({
 function MonthGrid({
   anchor,
   sessions,
-  companyId,
   locale,
   onSelectDay,
+  onSelectSession,
 }: {
   anchor: Date;
   sessions: MeetCalendarSession[];
-  companyId: string;
   locale: string;
   onSelectDay: (day: Date) => void;
+  onSelectSession: (sessionId: string) => void;
 }) {
   const days = monthGrid(anchor);
   const weekdays = Array.from({ length: 7 }, (_, index) =>
@@ -289,7 +300,9 @@ function MonthGrid({
     <div>
       <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50">
         {weekdays.map((weekday) => (
-          <div key={weekday} className="px-2 py-2 text-center text-xs font-medium text-slate-500">{weekday}</div>
+          <div key={weekday} className="px-2 py-2 text-center text-xs font-medium text-slate-500">
+            {weekday}
+          </div>
         ))}
       </div>
       <div className="grid grid-cols-7">
@@ -305,23 +318,30 @@ function MonthGrid({
                 type="button"
                 onClick={() => onSelectDay(day)}
                 className={`mb-1 flex h-6 w-6 items-center justify-center rounded-full text-xs ${
-                  sameDay(day, new Date()) ? 'bg-sky-600 font-semibold text-white' : muted ? 'text-slate-300' : 'text-slate-600'
+                  sameDay(day, new Date())
+                    ? 'bg-sky-600 font-semibold text-white'
+                    : muted
+                      ? 'text-slate-300'
+                      : 'text-slate-600'
                 }`}
               >
                 {day.getDate()}
               </button>
               <div className="space-y-1">
                 {items.slice(0, 3).map((session) => (
-                  <Link
+                  <button
                     key={session.id}
-                    href={meetHubJoinPath(session.id, companyId)}
-                    className="block truncate rounded bg-sky-50 px-1.5 py-1 text-[10px] font-medium text-sky-800 hover:bg-sky-100 sm:text-xs"
+                    type="button"
+                    onClick={() => onSelectSession(session.id)}
+                    className="block w-full truncate rounded bg-sky-50 px-1.5 py-1 text-left text-[10px] font-medium text-sky-800 hover:bg-sky-100 sm:text-xs"
                   >
                     {session.scheduledAt ? `${hour.format(new Date(session.scheduledAt))} ` : ''}
                     {session.title}
-                  </Link>
+                  </button>
                 ))}
-                {items.length > 3 && <p className="text-[10px] text-slate-500">+{items.length - 3}</p>}
+                {items.length > 3 && (
+                  <p className="text-[10px] text-slate-500">+{items.length - 3}</p>
+                )}
               </div>
             </div>
           );

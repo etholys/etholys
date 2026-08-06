@@ -112,6 +112,19 @@ export async function listMeetSessions(
     orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }],
     take: limit,
     include: {
+      createdBy: { select: { id: true, name: true, email: true } },
+      participants: {
+        orderBy: { invitedAt: 'asc' },
+        select: {
+          id: true,
+          userId: true,
+          email: true,
+          displayName: true,
+          role: true,
+          joinedAt: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
+      },
       _count: { select: { participants: true, actionItems: true } },
     },
   });
@@ -122,7 +135,11 @@ export async function getMeetSessionForCompany(sessionId: string, companyId: str
   return prisma.meetSession.findFirst({
     where: { id: sessionId, companyId },
     include: {
-      participants: { orderBy: { invitedAt: 'asc' } },
+      createdBy: { select: { id: true, name: true, email: true } },
+      participants: {
+        orderBy: { invitedAt: 'asc' },
+        include: { user: { select: { id: true, name: true, email: true } } },
+      },
       actionItems: { orderBy: { sortOrder: 'asc' } },
     },
   });
