@@ -208,7 +208,7 @@ export function ForgeLiveStudio({
             </p>
             {jitsiSrc ? (
               <iframe
-                title="Jitsi"
+                title="Etholys Meet"
                 src={jitsiSrc}
                 className="flex-1 min-h-[280px] w-full bg-black"
                 allow="camera; microphone; fullscreen; display-capture"
@@ -291,7 +291,7 @@ export function ForgeLiveStudio({
               {ft('forge.studio.jitsiLearners')}
             </p>
             {jitsiSrc ? (
-              <iframe title="Jitsi alumnos" src={jitsiSrc} className="flex-1 min-h-[360px] w-full" allow="camera; microphone; fullscreen" />
+              <iframe title="Etholys Meet — alunos" src={jitsiSrc} className="flex-1 min-h-[360px] w-full" allow="camera; microphone; fullscreen" />
             ) : (
               <div className="p-6 text-sm text-slate-600">
                 <a href={learnerUrl ?? '#'} target="_blank" rel="noopener noreferrer" className="text-sky-700 font-bold underline">
@@ -306,7 +306,7 @@ export function ForgeLiveStudio({
             </p>
             {facilitatorEmbedSrc ? (
               <iframe
-                title="Jitsi facilitador"
+                title="Etholys Meet — facilitador"
                 src={facilitatorEmbedSrc}
                 className="flex-1 min-h-[360px] w-full"
                 allow="camera; microphone; fullscreen"

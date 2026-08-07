@@ -123,12 +123,21 @@ export function jitsiEmbedUrl(
     'desktopSharingFrameRate.max=30',
     'startWithAudioMuted=false',
     'startWithVideoMuted=false',
-    // Capacitações: host precisa de breakout rooms (Jitsi self-hosted)
+    // Capacitações: host precisa de breakout rooms (self-hosted)
     'breakoutRooms.hideAddRoomButton=false',
+    'defaultRemoteDisplayName="Participante"',
+    'defaultLogoUrl="https://app.etholys.com/meet-brand/etholys-mark.svg"',
+  ];
+  const iface = [
+    'SHOW_JITSI_WATERMARK=false',
+    'SHOW_WATERMARK_FOR_GUESTS=false',
+    'SHOW_POWERED_BY=false',
+    'MOBILE_APP_PROMO=false',
+    'PROVIDER_NAME="Etholys"',
   ];
   if (opts?.tileView) config.push('tileViewEnabled=true');
   if (opts?.filmstripOnly) config.push('filmStripOnly=true');
-  u.hash = `config.${config.join('&config.')}`;
+  u.hash = `config.${config.join('&config.')}&interfaceConfig.${iface.join('&interfaceConfig.')}`;
   return u.toString();
 }
 

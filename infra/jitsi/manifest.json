@@ -1,0 +1,30 @@
+{
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "short_name": "Etholys Meet",
+  "name": "Etholys Meet",
+  "description": "Videoconferência Etholys Meet",
+  "icons": [
+    {
+      "src": "static/pwa/icons/icon192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "static/pwa/icons/icon512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    },
+    {
+      "src": "static/pwa/icons/iconMask.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#0ea5e9"
+}

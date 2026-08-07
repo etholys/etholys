@@ -23,12 +23,15 @@ grep -q '^NEXT_PUBLIC_JITSI_BASE_URL=' "$ENVF" \
   && sed -i 's|^NEXT_PUBLIC_JITSI_BASE_URL=.*|NEXT_PUBLIC_JITSI_BASE_URL=https://meet.etholys.com|' "$ENVF" \
   || echo 'NEXT_PUBLIC_JITSI_BASE_URL=https://meet.etholys.com' >> "$ENVF"
 
-echo "==> Branding Jitsi Etholys"
-mkdir -p /root/.jitsi-meet-cfg/web
-cp -f infra/jitsi/custom-config.js /root/.jitsi-meet-cfg/web/custom-config.js
-cp -f infra/jitsi/custom-interface_config.js /root/.jitsi-meet-cfg/web/custom-interface_config.js
-chown -R 1000:1000 /root/.jitsi-meet-cfg
-cd /opt/jitsi-docker && docker compose restart web || true
+echo "==> Branding Etholys Meet (Jitsi web)"
+bash "$ROOT/scripts/apply-jitsi-branding.sh" || {
+  mkdir -p /root/.jitsi-meet-cfg/web
+  cp -f infra/jitsi/custom-config.js /root/.jitsi-meet-cfg/web/custom-config.js
+  cp -f infra/jitsi/custom-interface_config.js /root/.jitsi-meet-cfg/web/custom-interface_config.js
+  cp -f infra/jitsi/custom-meet.css /root/.jitsi-meet-cfg/web/custom-meet.css
+  chown -R 1000:1000 /root/.jitsi-meet-cfg
+  cd /opt/jitsi-docker && docker compose restart web || true
+}
 
 echo "==> Rebuild app web (pode demorar)"
 cd "$ROOT/infra"

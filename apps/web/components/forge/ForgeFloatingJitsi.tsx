@@ -131,7 +131,7 @@ export function ForgeFloatingJitsi({
           <>
             {embedSrc ? (
               <iframe
-                title="Jitsi"
+                title="Etholys Meet"
                 src={embedSrc}
                 className="h-[calc(100%-28px)] w-full bg-black"
                 allow="camera; microphone; fullscreen; display-capture; autoplay"

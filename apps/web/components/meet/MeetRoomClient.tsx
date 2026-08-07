@@ -4,18 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowLeft,
   Cloud,
   ExternalLink,
   FileText,
   HardDrive,
+  Info,
   Loader2,
   Mic,
-  PanelRightClose,
-  PanelRightOpen,
   PhoneOff,
   Square,
+  Users,
   Video,
+  X,
 } from 'lucide-react';
 import { meetEmbedUrl } from '@/lib/meet/room';
 import { canEmbedJitsiInIframe } from '@/lib/forge/jitsi-config';
@@ -49,6 +49,11 @@ type Props = {
   sessionId: string;
 };
 
+function formatMeetClock(locale: string, date: Date): string {
+  const tag = locale === 'pt' ? 'pt-BR' : locale === 'es' ? 'es' : 'en-US';
+  return date.toLocaleTimeString(tag, { hour: 'numeric', minute: '2-digit' });
+}
+
 export function MeetRoomClient({ sessionId }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -62,18 +67,31 @@ export function MeetRoomClient({ sessionId }: Props) {
   const [session, setSession] = useState<SessionRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [ending, setEnding] = useState(false);
   const [transcriptionOn, setTranscriptionOn] = useState(false);
   const [recordingMode, setRecordingMode] = useState<'local' | 'cloud' | null>(null);
   const [showRecordMenu, setShowRecordMenu] = useState(false);
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
+  const [participantCount, setParticipantCount] = useState(0);
+  const [dominantSpeaker, setDominantSpeaker] = useState<string | null>(null);
+  const [clock, setClock] = useState(() => formatMeetClock(locale, new Date()));
   const [features, setFeatures] = useState({
     liveTranscriptionEnabled: false,
     cloudRecordingEnabled: false,
   });
   const conferenceRef = useRef<MeetConferenceHandle>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const prev = document.title;
+    const label = session?.title?.trim();
+    document.title = label ? `Etholys Meet — ${label}` : 'Etholys Meet';
+    return () => {
+      document.title = prev;
+    };
+  }, [session?.title]);
 
   const load = useCallback(async () => {
     if (!companyId) {
@@ -101,6 +119,13 @@ export function MeetRoomClient({ sessionId }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const tick = () => setClock(formatMeetClock(locale, new Date()));
+    tick();
+    const id = window.setInterval(tick, 15_000);
+    return () => window.clearInterval(id);
+  }, [locale]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -294,17 +319,17 @@ export function MeetRoomClient({ sessionId }: Props) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950">
-        <Loader2 className="h-8 w-8 animate-spin text-sky-400" />
+      <div className="flex min-h-screen items-center justify-center bg-[#202124]">
+        <Loader2 className="h-8 w-8 animate-spin text-white/70" />
       </div>
     );
   }
 
   if (!session) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-4">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#f8f9fa] px-4">
         <p className="text-sm text-red-700">{error || t('Sessão não encontrada.', 'Sesión no encontrada.', 'Session not found.')}</p>
-        <Link href="/hub/meet" className="text-sm font-medium text-sky-700 hover:underline">
+        <Link href="/hub/meet" className="text-sm font-medium text-[#1a73e8] hover:underline">
           {t('Voltar ao Meet', 'Volver al Meet', 'Back to Meet')}
         </Link>
       </div>
@@ -315,119 +340,203 @@ export function MeetRoomClient({ sessionId }: Props) {
     ? `/siep/projects/${session.projectId}?tab=meetings`
     : '/hub/meet';
 
+  const speakerInitial = (dominantSpeaker || session.title).trim().charAt(0).toUpperCase() || 'E';
+
   return (
-    <div className="flex h-screen flex-col bg-slate-950 text-white">
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-900/95 px-3 py-2 sm:px-4">
-        <div className="flex min-w-0 items-center gap-2">
-          <Link
-            href={backHref}
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            {t('Sair', 'Salir', 'Leave')}
-          </Link>
-          <Video className="h-4 w-4 shrink-0 text-sky-400" />
-          <span className="truncate text-sm font-semibold">{session.title}</span>
-          <span className="rounded-full bg-sky-900 px-2 py-0.5 text-[10px] font-semibold uppercase text-sky-300">
-            {session.status}
+    <div className="relative flex h-screen flex-col overflow-hidden bg-[#202124] text-white">
+      {/* Top bar — estilo Google Meet */}
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 px-4 pb-2 pt-3 sm:px-5">
+        <div className="pointer-events-auto flex min-w-0 max-w-[min(100%,42rem)] items-center gap-2 text-[13px] text-white/90 sm:text-sm">
+          <time className="shrink-0 tabular-nums text-white/80">{clock}</time>
+          <span className="shrink-0 text-white/35" aria-hidden>
+            |
           </span>
+          <h1 className="truncate font-medium tracking-tight text-white">{session.title}</h1>
+          <button
+            type="button"
+            onClick={() => setInfoOpen((o) => !o)}
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"
+            aria-label={t('Informação da reunião', 'Información de la reunión', 'Meeting info')}
+            title={t('Informação', 'Información', 'Info')}
+          >
+            <Info className="h-4 w-4" strokeWidth={1.75} />
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          {externalRoomUrl && (
-            <a
-              href={externalRoomUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800"
-            >
-              {t('Nova janela', 'Nueva ventana', 'New window')}
-              <ExternalLink className="h-3 w-3" />
-            </a>
+
+        <div className="pointer-events-auto flex shrink-0 items-center gap-2">
+          {dominantSpeaker && (
+            <div className="hidden items-center gap-2 rounded-full bg-[#3c4043]/95 px-2.5 py-1.5 text-xs text-white/90 shadow-sm sm:flex">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#8ab4f8] text-[11px] font-semibold text-[#202124]">
+                {speakerInitial}
+              </span>
+              <span className="max-w-[12rem] truncate">
+                {dominantSpeaker}{' '}
+                <span className="text-white/55">
+                  ({t('a falar', 'hablando', 'speaking')})
+                </span>
+              </span>
+            </div>
           )}
-          <button
-            type="button"
-            onClick={() => setPanelOpen((o) => !o)}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800"
+          <div
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#3c4043]/95 px-2.5 py-1.5 text-xs text-white/90 shadow-sm"
+            title={t('Participantes', 'Participantes', 'Participants')}
           >
-            {panelOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
-            {t('Transcrição', 'Transcripción', 'Transcript')}
-          </button>
-          <button
-            type="button"
-            onClick={() => void endMeeting()}
-            disabled={ending || session.status === 'ended'}
-            className="inline-flex items-center gap-1 rounded-lg bg-red-700 px-3 py-1 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50"
-          >
-            {ending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PhoneOff className="h-3.5 w-3.5" />}
-            {t('Encerrar', 'Cerrar', 'End')}
-          </button>
+            <Users className="h-3.5 w-3.5 text-white/75" strokeWidth={1.75} />
+            <span className="min-w-[0.75rem] tabular-nums">{Math.max(participantCount, 0)}</span>
+          </div>
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
-        <main className="relative min-w-0 flex-1 bg-black">
-          {session.meetingUrl && canEmbedJitsiInIframe(session.meetingUrl) ? (
-            <MeetConferenceFrame
-              ref={conferenceRef}
-              meetingUrl={session.meetingUrl}
-              title={session.title}
-              locale={locale}
-              onTranscriptionChunk={handleTranscriptionChunk}
-              onRecordingStatus={(state) => {
-                if (state.transcription) {
-                  setTranscriptionOn(state.on);
-                  return;
-                }
-                setRecordingMode(
-                  state.on ? (state.mode === 'local' ? 'local' : 'cloud') : null,
-                );
-              }}
-              onError={setError}
-            />
-          ) : externalRoomUrl ? (
-            <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-              <p className="max-w-md text-sm text-slate-400">
-                {t(
-                  'Esta sala não pode ser incorporada neste ecrã. Abra numa nova janela.',
-                  'Esta sala no se puede incorporar en esta pantalla. Abre en una ventana nueva.',
-                  'This room cannot be embedded on this screen. Open it in a new window.',
-                )}
-              </p>
+      {infoOpen && (
+        <div className="absolute left-4 top-14 z-40 w-[min(100%-2rem,20rem)] rounded-2xl border border-white/10 bg-[#292a2d] p-4 shadow-2xl sm:left-5">
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <p className="text-sm font-medium text-white">{session.title}</p>
+            <button
+              type="button"
+              onClick={() => setInfoOpen(false)}
+              className="rounded-full p-1 text-white/60 hover:bg-white/10 hover:text-white"
+              aria-label={t('Fechar', 'Cerrar', 'Close')}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="text-xs leading-relaxed text-white/55">
+            Etholys Meet
+            {session.status === 'live'
+              ? ` · ${t('Ao vivo', 'En vivo', 'Live')}`
+              : ` · ${session.status}`}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={backHref}
+              className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90 hover:bg-white/15"
+            >
+              {t('Sair da sala', 'Salir de la sala', 'Leave room')}
+            </Link>
+            {externalRoomUrl && (
               <a
                 href={externalRoomUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
+                className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90 hover:bg-white/15"
               >
-                {t('Abrir em nova janela', 'Abrir en nueva ventana', 'Open in new window')}
-                <ExternalLink className="h-4 w-4" />
+                {t('Nova janela', 'Nueva ventana', 'New window')}
+                <ExternalLink className="h-3 w-3" />
               </a>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1">
+        <main className="relative min-w-0 flex-1 px-3 pb-3 pt-14 sm:px-4 sm:pb-4">
+          <div className="relative h-full w-full overflow-hidden rounded-2xl bg-[#131314]">
+            {session.meetingUrl && canEmbedJitsiInIframe(session.meetingUrl) ? (
+              <MeetConferenceFrame
+                ref={conferenceRef}
+                meetingUrl={session.meetingUrl}
+                title={session.title}
+                locale={locale}
+                onTranscriptionChunk={handleTranscriptionChunk}
+                onParticipantCountChange={setParticipantCount}
+                onDominantSpeakerChanged={setDominantSpeaker}
+                onRecordingStatus={(state) => {
+                  if (state.transcription) {
+                    setTranscriptionOn(state.on);
+                    return;
+                  }
+                  setRecordingMode(
+                    state.on ? (state.mode === 'local' ? 'local' : 'cloud') : null,
+                  );
+                }}
+                onError={setError}
+              />
+            ) : externalRoomUrl ? (
+              <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+                <p className="max-w-md text-sm text-white/55">
+                  {t(
+                    'Esta sala não pode ser incorporada neste ecrã. Abra numa nova janela.',
+                    'Esta sala no se puede incorporar en esta pantalla. Abre en una ventana nueva.',
+                    'This room cannot be embedded on this screen. Open it in a new window.',
+                  )}
+                </p>
+                <a
+                  href={externalRoomUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-[#8ab4f8] px-4 py-2 text-sm font-medium text-[#202124] hover:bg-[#aecbfa]"
+                >
+                  {t('Abrir em nova janela', 'Abrir en nueva ventana', 'Open in new window')}
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-white/40">
+                {t('Sala sem URL.', 'Sala sin URL.', 'Room has no URL.')}
+              </div>
+            )}
+          </div>
+
+          {/* Controles secundários Etholys — canto inferior direito (chat/atividades no Jitsi) */}
+          <div className="pointer-events-none absolute bottom-5 right-5 z-20 flex flex-col items-end gap-2 sm:bottom-6 sm:right-6">
+            <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-[#3c4043]/90 p-1 shadow-lg backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={() => setPanelOpen((o) => !o)}
+                className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
+                  panelOpen ? 'bg-white/20 text-white' : 'text-white/85 hover:bg-white/10'
+                }`}
+                title={t('Transcrição', 'Transcripción', 'Transcript')}
+                aria-pressed={panelOpen}
+              >
+                <FileText className="h-5 w-5" strokeWidth={1.6} />
+              </button>
+              <button
+                type="button"
+                onClick={() => void endMeeting()}
+                disabled={ending || session.status === 'ended'}
+                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-[#ea4335] px-3.5 text-xs font-medium text-white hover:bg-[#f28b82] disabled:opacity-50"
+                title={t('Encerrar reunião Etholys', 'Cerrar reunión Etholys', 'End Etholys meeting')}
+              >
+                {ending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <PhoneOff className="h-4 w-4" strokeWidth={1.75} />
+                )}
+                <span className="hidden sm:inline">{t('Encerrar', 'Cerrar', 'End')}</span>
+              </button>
             </div>
-          ) : (
-            <div className="flex h-full items-center justify-center text-sm text-slate-500">
-              {t('Sala sem URL.', 'Sala sin URL.', 'Room has no URL.')}
-            </div>
-          )}
+          </div>
         </main>
 
         {panelOpen && (
-          <aside className="flex w-full max-w-sm shrink-0 flex-col border-l border-slate-800 bg-slate-900 sm:w-80">
-            <div className="border-b border-slate-800 px-3 py-2">
-              <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-sky-400">
-                <FileText className="h-3.5 w-3.5" />
-                {t('Transcrição ao vivo', 'Transcripción en vivo', 'Live transcript')}
-              </p>
-              <p className="mt-0.5 text-[11px] text-slate-500">
-                {t(
-                  'O transcritor ouve a sala e atribui cada trecho ao nome usado pelo participante.',
-                  'El transcriptor escucha la sala y atribuye cada fragmento al nombre usado por el participante.',
-                  'The transcriber listens to the room and attributes each segment to the participant name.',
-                )}
-              </p>
+          <aside className="flex w-full max-w-sm shrink-0 flex-col border-l border-white/10 bg-[#292a2d] sm:w-[22rem]">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div>
+                <p className="flex items-center gap-1.5 text-sm font-medium text-white">
+                  <FileText className="h-4 w-4 text-white/70" strokeWidth={1.75} />
+                  {t('Transcrição ao vivo', 'Transcripción en vivo', 'Live transcript')}
+                </p>
+                <p className="mt-0.5 text-[11px] text-white/45">
+                  {t(
+                    'Trechos atribuídos ao nome de cada participante.',
+                    'Fragmentos atribuidos al nombre de cada participante.',
+                    'Segments attributed to each participant name.',
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPanelOpen(false)}
+                className="rounded-full p-1.5 text-white/55 hover:bg-white/10 hover:text-white"
+                aria-label={t('Fechar painel', 'Cerrar panel', 'Close panel')}
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
             <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
               {error && (
-                <div className="rounded-lg border border-red-900/70 bg-red-950/50 px-3 py-2 text-[11px] text-red-200">
+                <div className="rounded-xl border border-red-500/30 bg-red-950/40 px-3 py-2 text-[11px] text-red-200">
                   {error}
                 </div>
               )}
@@ -435,10 +544,10 @@ export function MeetRoomClient({ sessionId }: Props) {
                 <button
                   type="button"
                   onClick={toggleTranscription}
-                  className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold ${
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-full px-2 py-2.5 text-xs font-medium ${
                     transcriptionOn
-                      ? 'bg-red-700 text-white hover:bg-red-600'
-                      : 'bg-sky-700 text-white hover:bg-sky-600'
+                      ? 'bg-[#ea4335] text-white hover:bg-[#f28b82]'
+                      : 'bg-[#8ab4f8] text-[#202124] hover:bg-[#aecbfa]'
                   }`}
                 >
                   {transcriptionOn ? <Square className="h-3 w-3" /> : <Mic className="h-3.5 w-3.5" />}
@@ -451,7 +560,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                     <button
                       type="button"
                       onClick={stopRecording}
-                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-red-700 px-2 py-2 text-xs font-semibold text-white hover:bg-red-600"
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-[#ea4335] px-2 py-2.5 text-xs font-medium text-white hover:bg-[#f28b82]"
                     >
                       <Square className="h-3 w-3" />
                       {t('Parar gravação', 'Detener grabación', 'Stop recording')}
@@ -460,23 +569,23 @@ export function MeetRoomClient({ sessionId }: Props) {
                     <button
                       type="button"
                       onClick={() => setShowRecordMenu((open) => !open)}
-                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-2 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-white/10 px-2 py-2.5 text-xs font-medium text-white hover:bg-white/15"
                     >
-                      <Video className="h-3.5 w-3.5" />
+                      <Video className="h-3.5 w-3.5" strokeWidth={1.75} />
                       {t('Gravar', 'Grabar', 'Record')}
                     </button>
                   )}
                   {showRecordMenu && (
-                    <div className="absolute right-0 top-full z-20 mt-1 w-52 rounded-lg border border-slate-700 bg-slate-900 p-1 shadow-xl">
+                    <div className="absolute right-0 top-full z-20 mt-1 w-52 rounded-2xl border border-white/10 bg-[#3c4043] p-1 shadow-xl">
                       <button
                         type="button"
                         onClick={() => startRecording('local')}
-                        className="flex w-full items-start gap-2 rounded px-2 py-2 text-left text-xs text-slate-200 hover:bg-slate-800"
+                        className="flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left text-xs text-white/90 hover:bg-white/10"
                       >
                         <HardDrive className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                         <span>
-                          <strong className="block">{t('Este computador', 'Este ordenador', 'This computer')}</strong>
-                          <span className="text-[10px] text-slate-500">
+                          <strong className="block font-medium">{t('Este computador', 'Este ordenador', 'This computer')}</strong>
+                          <span className="text-[10px] text-white/45">
                             {t('Descarrega ao parar', 'Descarga al detener', 'Downloads when stopped')}
                           </span>
                         </span>
@@ -484,12 +593,12 @@ export function MeetRoomClient({ sessionId }: Props) {
                       <button
                         type="button"
                         onClick={() => startRecording('cloud')}
-                        className="flex w-full items-start gap-2 rounded px-2 py-2 text-left text-xs text-slate-200 hover:bg-slate-800"
+                        className="flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left text-xs text-white/90 hover:bg-white/10"
                       >
                         <Cloud className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                         <span>
-                          <strong className="block">{t('Nuvem Etholys', 'Nube Etholys', 'Etholys cloud')}</strong>
-                          <span className="text-[10px] text-slate-500">
+                          <strong className="block font-medium">{t('Nuvem Etholys', 'Nube Etholys', 'Etholys cloud')}</strong>
+                          <span className="text-[10px] text-white/45">
                             {features.cloudRecordingEnabled
                               ? 'R2'
                               : t('Em breve', 'Próximamente', 'Coming soon')}
@@ -501,9 +610,9 @@ export function MeetRoomClient({ sessionId }: Props) {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/60 p-2">
+              <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl bg-[#1f1f1f] p-3">
                 {segments.length === 0 ? (
-                  <div className="flex h-full min-h-32 items-center justify-center px-3 text-center text-[11px] text-slate-500">
+                  <div className="flex h-full min-h-32 items-center justify-center px-3 text-center text-[11px] text-white/40">
                     {features.liveTranscriptionEnabled
                       ? t(
                           'Clique em «Transcrever». Os trechos aparecerão aqui com o nome de quem falou.',
@@ -517,24 +626,24 @@ export function MeetRoomClient({ sessionId }: Props) {
                         )}
                   </div>
                 ) : (
-                  <ol className="space-y-2">
+                  <ol className="space-y-3">
                     {segments.map((row) => (
                       <li
                         key={row.messageId}
                         className={row.final ? 'opacity-100' : 'opacity-60'}
                       >
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className="truncate text-[11px] font-semibold text-sky-300">
+                          <span className="truncate text-[11px] font-medium text-[#8ab4f8]">
                             {row.participantName}
                           </span>
-                          <time className="shrink-0 text-[9px] text-slate-600">
+                          <time className="shrink-0 text-[9px] text-white/35">
                             {new Date(row.startedAt).toLocaleTimeString([], {
                               hour: '2-digit',
                               minute: '2-digit',
                             })}
                           </time>
                         </div>
-                        <p className="mt-0.5 text-xs leading-relaxed text-slate-300">
+                        <p className="mt-0.5 text-xs leading-relaxed text-white/80">
                           {row.text}
                         </p>
                       </li>
@@ -544,7 +653,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                 )}
               </div>
 
-              <p className="text-[10px] leading-relaxed text-slate-600">
+              <p className="text-[10px] leading-relaxed text-white/35">
                 {t(
                   'Avise os participantes antes de iniciar transcrição ou gravação.',
                   'Avisa a los participantes antes de iniciar la transcripción o grabación.',

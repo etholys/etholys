@@ -1,0 +1,81 @@
+/* Etholys Meet — chrome visual estilo Google Meet (inject no web Jitsi).
+ * Limites: ícones/layout interno do Jitsi ainda são os do produto upstream;
+ * isto só arredonda tiles, escurece o fundo e suaviza a toolbox.
+ */
+:root {
+  --etholys-meet-bg: #202124;
+  --etholys-meet-radius: 16px;
+  --etholys-meet-radius-sm: 12px;
+}
+
+html,
+body,
+#react,
+#videoconference_page,
+.welcome {
+  background: var(--etholys-meet-bg) !important;
+}
+
+#largeVideoContainer,
+#largeVideoWrapper,
+.large-video-wrapper,
+#videospace {
+  background: var(--etholys-meet-bg) !important;
+}
+
+/* Tiles / filmstrip */
+.videocontainer,
+#filmstripRemoteVideosContainer .videocontainer,
+.remote-videos-container .videocontainer,
+.filmstrip__videos .videocontainer,
+#localVideoContainer,
+.tile-view .videocontainer {
+  border-radius: var(--etholys-meet-radius) !important;
+  overflow: hidden !important;
+}
+
+#dominantSpeaker,
+#largeVideo,
+#largeVideoContainer video,
+#largeVideoWrapper video {
+  border-radius: var(--etholys-meet-radius) !important;
+}
+
+/* Toolbar flutuante */
+.new-toolbox,
+.toolbox-content,
+.toolbox-content-items {
+  border-radius: 28px !important;
+}
+
+.toolbox-content-items {
+  background: rgba(60, 64, 67, 0.92) !important;
+  padding: 6px 10px !important;
+  gap: 4px !important;
+}
+
+.toolbox-button,
+.toolbox-icon,
+.toolbox-content .button {
+  border-radius: 50% !important;
+}
+
+/* Hangup mais “pill” quando o tema permite */
+.hangup-button,
+.toolbox-button-wth-dialog.hangup-button,
+#toolbar_button_hangup {
+  border-radius: 999px !important;
+}
+
+/* Menos chrome de watermark / promo */
+.leftwatermark,
+.rightwatermark,
+.watermark,
+.poweredby {
+  display: none !important;
+}
+
+.subject-info-container,
+.subject {
+  opacity: 0.9;
+}

@@ -1,0 +1,8 @@
+# Overlay Etholys — branding no contentor web (imagem read-only).
+# Usado com: docker compose -f docker-compose.yml -f docker-compose.etholys.yml up -d web
+services:
+  web:
+    volumes:
+      - ${ETHOLYS_JITSI_BRANDING:-/opt/etholys/infra/jitsi}/manifest.json:/usr/share/jitsi-meet/manifest.json:ro
+      - ${ETHOLYS_JITSI_BRANDING:-/opt/etholys/infra/jitsi}/title.html:/usr/share/jitsi-meet/title.html:ro
+      - ${ETHOLYS_JITSI_BRANDING:-/opt/etholys/infra/jitsi}/custom-meet.css:/usr/share/jitsi-meet/css/etholys-meet.css:ro

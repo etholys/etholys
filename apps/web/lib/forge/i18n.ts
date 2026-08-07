@@ -482,7 +482,7 @@ const forge: Record<Locale, Record<string, string>> = {
     'forge.room.scriptOpen': 'Abrir guion',
     'forge.room.scriptMin': 'Minimizar',
     'forge.room.knowledgeCard': 'Teoría para el facilitador',
-    'forge.room.jitsiShareHint': 'Compartir pantalla: botón del monitor en la barra de Jitsi.',
+    'forge.room.jitsiShareHint': 'Compartir pantalla: botón del monitor en la barra de Etholys Meet.',
     'forge.room.emergency': 'Modo emergencia',
     'forge.room.yourTurn': '¡Es tu turno!',
     'forge.room.turnOf': 'Turno de {name}',
