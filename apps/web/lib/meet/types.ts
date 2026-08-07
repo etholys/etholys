@@ -40,3 +40,11 @@ export function isMeetMirror(v: unknown): v is MeetMirror {
 export function meetHubJoinPath(sessionId: string, companyId: string): string {
   return `/hub/meet/${sessionId}?companyId=${encodeURIComponent(companyId)}`;
 }
+
+/** Para ocorrências de série, abrir sempre a sessão mestre (mesmo link Jitsi). */
+export function meetJoinTargetId(session: {
+  id: string;
+  seriesParentId?: string | null;
+}): string {
+  return session.seriesParentId || session.id;
+}

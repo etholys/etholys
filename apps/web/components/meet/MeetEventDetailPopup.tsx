@@ -13,7 +13,7 @@ import {
   Video,
   X,
 } from 'lucide-react';
-import { meetHubJoinPath } from '@/lib/meet/types';
+import { meetHubJoinPath, meetJoinTargetId } from '@/lib/meet/types';
 
 export type MeetEventParticipant = {
   id: string;
@@ -39,6 +39,10 @@ export type MeetEventDetail = {
   createdBy?: { id: string; name: string | null; email: string | null } | null;
   participants?: MeetEventParticipant[];
   _count?: { participants: number; actionItems: number };
+  isPermanent?: boolean;
+  recurrence?: string | null;
+  seriesId?: string | null;
+  seriesParentId?: string | null;
 };
 
 type Props = {
@@ -80,6 +84,7 @@ export function MeetEventDetailPopup({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteScope, setDeleteScope] = useState<'this' | 'following' | 'series'>('this');
   const [title, setTitle] = useState(session.title);
   const [description, setDescription] = useState(session.description || '');
   const [startsAt, setStartsAt] = useState(
@@ -96,6 +101,7 @@ export function MeetEventDetailPopup({
     setEndsAt(session.endsAt ? localInputValue(new Date(session.endsAt)) : '');
     setEditing(false);
     setConfirmDelete(false);
+    setDeleteScope('this');
     setError(null);
   }, [session]);
 
@@ -106,6 +112,9 @@ export function MeetEventDetailPopup({
           (p) => p.userId === currentUserId && (p.role === 'host' || p.role === 'cohost'),
         )),
   );
+
+  const inSeries = Boolean(session.seriesId || session.seriesParentId || (session.recurrence && session.recurrence !== 'none'));
+  const joinId = meetJoinTargetId(session);
 
   const whenLabel = useMemo(() => {
     if (!session.scheduledAt) {
@@ -168,8 +177,15 @@ export function MeetEventDetailPopup({
     setBusy(true);
     setError(null);
     try {
+      const scope = session.isPermanent || (inSeries && deleteScope === 'series')
+        ? session.isPermanent
+          ? 'series'
+          : deleteScope
+        : inSeries
+          ? deleteScope
+          : 'this';
       const response = await fetch(
-        `/api/meet/sessions/${session.id}?companyId=${encodeURIComponent(companyId)}`,
+        `/api/meet/sessions/${session.id}?companyId=${encodeURIComponent(companyId)}&scope=${scope}`,
         { method: 'DELETE' },
       );
       const data = (await response.json()) as { error?: string };
@@ -391,8 +407,34 @@ export function MeetEventDetailPopup({
           {confirmDelete && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-900">
               <p className="font-medium">
-                {t('Apagar esta reunião?', '¿Eliminar esta reunión?', 'Delete this meeting?')}
+                {session.isPermanent
+                  ? t('Apagar esta sala permanente?', '¿Eliminar esta sala permanente?', 'Delete this permanent room?')
+                  : t('Apagar esta reunião?', '¿Eliminar esta reunión?', 'Delete this meeting?')}
               </p>
+              {inSeries && !session.isPermanent && (
+                <div className="mt-3 space-y-2">
+                  {(
+                    [
+                      ['this', t('Só esta ocorrência', 'Solo esta ocurrencia', 'Only this occurrence')],
+                      [
+                        'following',
+                        t('Esta e as seguintes', 'Esta y las siguientes', 'This and following'),
+                      ],
+                      ['series', t('Toda a série', 'Toda la serie', 'Entire series')],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <label key={value} className="flex items-center gap-2 text-xs">
+                      <input
+                        type="radio"
+                        name="deleteScope"
+                        checked={deleteScope === value}
+                        onChange={() => setDeleteScope(value)}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              )}
               <div className="mt-3 flex justify-end gap-2">
                 <button
                   type="button"
@@ -417,7 +459,7 @@ export function MeetEventDetailPopup({
           {!editing && session.status !== 'ended' && session.status !== 'cancelled' && (
             <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
               <Link
-                href={meetHubJoinPath(session.id, companyId)}
+                href={meetHubJoinPath(joinId, companyId)}
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
               >
                 <Video className="h-4 w-4" />

@@ -113,6 +113,7 @@ model User {
   studioDocumentsCreated        StudioDocument[]             @relation("StudioDocumentCreator")
   studioShares                  StudioShare[]                @relation("StudioShareUser")
   studioSharesInvited           StudioShare[]                @relation("StudioShareInviter")
+  studioContextAssetsCreated    StudioContextAsset[]         @relation("StudioContextAssetCreator")
 }
 
 model Account {
@@ -224,6 +225,7 @@ model Company {
   studioDocuments             StudioDocument[]
   studioTemplates             StudioTemplate[]
   studioShares                StudioShare[]
+  studioContextAssets         StudioContextAsset[]
 }
 
 /// Autorização ao Hub /hub/workspace — espelho operacional: quais sistemas o utilizador vê e usa a partir dali (dados continuam nos sistemas de origem).
@@ -2428,12 +2430,23 @@ model MeetSession {
   summaryText        String?           @db.Text
   projectId          String?
   forgeLiveSessionId String?
+  /// Sala permanente: mesmo link sempre, sem “passar” no calendário
+  isPermanent        Boolean           @default(false)
+  /// none | daily | weekly | weekdays | monthly
+  recurrence         String            @default("none")
+  recurrenceUntil    DateTime?
+  /// Id partilhado da série (mestre = próprio id)
+  seriesId           String?
+  /// Ocorrência filha → sessão mestre (sala Jitsi real)
+  seriesParentId     String?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
   company            Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdBy          User?             @relation("MeetSessionCreator", fields: [createdById], references: [id], onDelete: SetNull)
   project            Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
   forgeLiveSession   ForgeLiveSession? @relation(fields: [forgeLiveSessionId], references: [id], onDelete: SetNull)
+  seriesParent       MeetSession?      @relation("MeetSeries", fields: [seriesParentId], references: [id], onDelete: Cascade)
+  seriesChildren     MeetSession[]     @relation("MeetSeries")
   participants       MeetParticipant[]
   actionItems        MeetActionItem[]
   transcriptSegments MeetTranscriptSegment[]
@@ -2442,6 +2455,9 @@ model MeetSession {
   @@index([projectId])
   @@index([forgeLiveSessionId])
   @@index([status])
+  @@index([seriesId])
+  @@index([seriesParentId])
+  @@index([companyId, isPermanent])
 }
 
 model MeetParticipant {
@@ -2682,6 +2698,7 @@ model StudioFolder {
   children    StudioFolder[]   @relation("StudioFolderTree")
   documents   StudioDocument[]
   shares      StudioShare[]
+  contextAssets StudioContextAsset[]
   createdBy   User?            @relation("StudioFolderCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([companyId])
@@ -2709,6 +2726,7 @@ model StudioDocument {
   company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   folder      StudioFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
   shares      StudioShare[]
+  contextAssets StudioContextAsset[]
   createdBy   User?         @relation("StudioDocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([companyId])
@@ -2776,4 +2794,35 @@ model StudioTemplate {
   @@unique([companyId, key])
   @@index([companyId])
   @@index([isSystem, sortOrder])
+}
+
+/// Ficheiros de contexto para a IA (pasta = gerais do projeto/empresa; documento = anexos do chat/doc)
+model StudioContextAsset {
+  id            String          @id @default(cuid())
+  companyId     String
+  /// folder | document
+  scope         String
+  folderId      String?
+  documentId    String?
+  name          String
+  fileName      String
+  mimeType      String
+  sizeBytes     Int             @default(0)
+  storagePath   String
+  /// Texto extraído (txt/pdf/docx) para injectar no prompt
+  extractedText String?         @db.Text
+  /// Etiqueta opcional (ex. «perfil da empresa»)
+  label         String?
+  createdById   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  folder        StudioFolder?   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  document      StudioDocument? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy     User?           @relation("StudioContextAssetCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([folderId])
+  @@index([documentId])
+  @@index([scope])
 }

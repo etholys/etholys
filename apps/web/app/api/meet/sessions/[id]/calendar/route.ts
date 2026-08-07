@@ -5,6 +5,7 @@ import { getUserCompanyIds } from '@/lib/tenant';
 import { getMeetSessionForCompany } from '@/lib/meet/create-session';
 import { createGoogleCalendarEvent, getGoogleCalendarAccessToken } from '@/lib/meet/calendar-google';
 import { createOutlookCalendarEvent, getOutlookCalendarAccessToken } from '@/lib/meet/calendar-outlook';
+import { meetRecurrenceToRrule, isMeetRecurrenceFrequency } from '@/lib/meet/recurrence';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -74,6 +75,12 @@ export async function POST(req: Request, ctx: Ctx) {
       session.endsAt ??
       new Date(startsAt.getTime() + 60 * 60 * 1000);
 
+    const recurrence =
+      session.recurrence && isMeetRecurrenceFrequency(session.recurrence)
+        ? session.recurrence
+        : 'none';
+    const recurrenceRule = meetRecurrenceToRrule(recurrence, session.recurrenceUntil);
+
     const event = {
       title: session.title,
       description: [session.description, session.meetingUrl].filter(Boolean).join('\n\n'),
@@ -83,6 +90,7 @@ export async function POST(req: Request, ctx: Ctx) {
       attendeeEmails: session.participants
         .filter((participant) => participant.role !== 'host' && participant.email)
         .map((participant) => participant.email!),
+      recurrenceRule: provider === 'google' ? recurrenceRule : null,
     };
 
     const created =

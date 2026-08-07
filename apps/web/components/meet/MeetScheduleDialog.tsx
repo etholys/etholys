@@ -31,6 +31,9 @@ export type ScheduleDraft = {
   sendInvites: boolean;
   projectId: string | null;
   calendarProvider: CalendarProvider;
+  recurrence: 'none' | 'daily' | 'weekly' | 'weekdays' | 'monthly';
+  recurrenceUntil: string | null;
+  isPermanent: boolean;
 };
 
 type Props = {
@@ -77,6 +80,9 @@ export function MeetScheduleDialog({
       ? 'outlook'
       : 'none';
   const [calendarProvider, setCalendarProvider] = useState<CalendarProvider>(defaultProvider);
+  const [recurrence, setRecurrence] = useState<ScheduleDraft['recurrence']>('none');
+  const [recurrenceUntil, setRecurrenceUntil] = useState('');
+  const [isPermanent, setIsPermanent] = useState(false);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
   function updateStart(value: string) {
@@ -89,6 +95,27 @@ export function MeetScheduleDialog({
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (isPermanent) {
+      if (!title.trim()) return;
+      await onSave({
+        title: title.trim(),
+        description: description.trim(),
+        startsAt: new Date().toISOString(),
+        endsAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        timezone,
+        inviteEmails: inviteText
+          .split(/[,;\s]+/)
+          .map((email) => email.trim().toLowerCase())
+          .filter((email) => email.includes('@')),
+        sendInvites,
+        projectId: projectId || null,
+        calendarProvider: 'none',
+        recurrence: 'none',
+        recurrenceUntil: null,
+        isPermanent: true,
+      });
+      return;
+    }
     const start = new Date(startsAt);
     const end = new Date(endsAt);
     if (!title.trim() || !Number.isFinite(start.getTime()) || end <= start) return;
@@ -105,6 +132,11 @@ export function MeetScheduleDialog({
       sendInvites,
       projectId: projectId || null,
       calendarProvider,
+      recurrence,
+      recurrenceUntil: recurrence !== 'none' && recurrenceUntil
+        ? new Date(recurrenceUntil).toISOString()
+        : null,
+      isPermanent: false,
     });
   }
 
@@ -133,7 +165,11 @@ export function MeetScheduleDialog({
           />
           <button
             type="submit"
-            disabled={saving || !title.trim() || new Date(endsAt) <= new Date(startsAt)}
+            disabled={
+              saving ||
+              !title.trim() ||
+              (!isPermanent && new Date(endsAt) <= new Date(startsAt))
+            }
             className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -146,34 +182,104 @@ export function MeetScheduleDialog({
             <div className="grid gap-3 sm:grid-cols-[32px_1fr]">
               <Clock3 className="mt-2 h-5 w-5 text-slate-500" />
               <div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="text-xs font-medium text-slate-500">
-                    {t('Início', 'Inicio', 'Starts')}
-                    <input
-                      type="datetime-local"
-                      required
-                      value={startsAt}
-                      onChange={(event) => updateStart(event.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
-                    />
-                  </label>
-                  <label className="text-xs font-medium text-slate-500">
-                    {t('Fim', 'Fin', 'Ends')}
-                    <input
-                      type="datetime-local"
-                      required
-                      value={endsAt}
-                      min={startsAt}
-                      onChange={(event) => setEndsAt(event.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
-                    />
-                  </label>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                  <span>{timezone}</span>
-                  <span>·</span>
-                  <span>{t('Não se repete', 'No se repite', 'Does not repeat')}</span>
-                </div>
+                <label className="mb-3 flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={isPermanent}
+                    onChange={(event) => {
+                      setIsPermanent(event.target.checked);
+                      if (event.target.checked) setRecurrence('none');
+                    }}
+                    className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                  />
+                  {t(
+                    'Sala permanente (link sempre válido)',
+                    'Sala permanente (enlace siempre válido)',
+                    'Permanent room (always-on link)',
+                  )}
+                </label>
+                {!isPermanent && (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="text-xs font-medium text-slate-500">
+                        {t('Início', 'Inicio', 'Starts')}
+                        <input
+                          type="datetime-local"
+                          required
+                          value={startsAt}
+                          onChange={(event) => updateStart(event.target.value)}
+                          className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
+                        />
+                      </label>
+                      <label className="text-xs font-medium text-slate-500">
+                        {t('Fim', 'Fin', 'Ends')}
+                        <input
+                          type="datetime-local"
+                          required
+                          value={endsAt}
+                          min={startsAt}
+                          onChange={(event) => setEndsAt(event.target.value)}
+                          className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
+                        />
+                      </label>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                      <span>{timezone}</span>
+                    </div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <label className="text-xs font-medium text-slate-500">
+                        {t('Repetir', 'Repetir', 'Repeat')}
+                        <select
+                          value={recurrence}
+                          onChange={(event) =>
+                            setRecurrence(event.target.value as ScheduleDraft['recurrence'])
+                          }
+                          className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
+                        >
+                          <option value="none">
+                            {t('Não se repete', 'No se repite', 'Does not repeat')}
+                          </option>
+                          <option value="daily">{t('Diariamente', 'Diariamente', 'Daily')}</option>
+                          <option value="weekdays">
+                            {t('Dias úteis', 'Días laborables', 'Weekdays')}
+                          </option>
+                          <option value="weekly">{t('Semanalmente', 'Semanalmente', 'Weekly')}</option>
+                          <option value="monthly">{t('Mensalmente', 'Mensualmente', 'Monthly')}</option>
+                        </select>
+                      </label>
+                      {recurrence !== 'none' && (
+                        <label className="text-xs font-medium text-slate-500">
+                          {t('Repetir até', 'Repetir hasta', 'Repeat until')}
+                          <input
+                            type="date"
+                            value={recurrenceUntil}
+                            min={startsAt.slice(0, 10)}
+                            onChange={(event) => setRecurrenceUntil(event.target.value)}
+                            className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
+                          />
+                        </label>
+                      )}
+                    </div>
+                    {recurrence !== 'none' && (
+                      <p className="mt-2 text-xs text-slate-500">
+                        {t(
+                          'Até 52 ocorrências · o mesmo link da sala para toda a série.',
+                          'Hasta 52 ocurrencias · el mismo enlace de sala para toda la serie.',
+                          'Up to 52 occurrences · same room link for the whole series.',
+                        )}
+                      </p>
+                    )}
+                  </>
+                )}
+                {isPermanent && (
+                  <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
+                    {t(
+                      'Cria um link fixo que não “passa” no calendário. Ideal para salas de equipa.',
+                      'Crea un enlace fijo que no caduca en el calendario. Ideal para salas de equipo.',
+                      'Creates a fixed link that does not expire on the calendar. Ideal for team rooms.',
+                    )}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -360,9 +466,15 @@ function ProviderOption({
           <p className={`text-[11px] ${ready ? 'text-emerald-700' : 'text-slate-500'}`}>
             {ready
               ? t('Ligado permanentemente', 'Conectado permanentemente', 'Permanently connected')
-              : status?.connected
-                ? t('É preciso voltar a autorizar', 'Hay que volver a autorizar', 'Reconnect required')
-                : t('Não ligado', 'No conectado', 'Not connected')}
+              : !status?.configured
+                ? t(
+                    'Ainda não ativado no servidor (faltam credenciais OAuth)',
+                    'Aún no activado en el servidor (faltan credenciales OAuth)',
+                    'Not enabled on the server (OAuth credentials missing)',
+                  )
+                : status?.connected
+                  ? t('É preciso voltar a autorizar', 'Hay que volver a autorizar', 'Reconnect required')
+                  : t('Não ligado', 'No conectado', 'Not connected')}
           </p>
         </div>
         {!ready && status?.configured && (

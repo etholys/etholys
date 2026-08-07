@@ -3,6 +3,11 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { buildMeetRoomUrl } from '@/lib/meet/room';
 import { meetRoomSlug, isMeetMirror, type MeetMirror } from '@/lib/meet/types';
+import {
+  expandMeetOccurrences,
+  isMeetRecurrenceFrequency,
+  type MeetRecurrenceFrequency,
+} from '@/lib/meet/recurrence';
 
 export type CreateMeetSessionInput = {
   companyId: string;
@@ -16,6 +21,11 @@ export type CreateMeetSessionInput = {
   forgeLiveSessionId?: string | null;
   /** E-mails a pré-registar como convidados */
   inviteEmails?: string[];
+  /** Sala permanente (link estável, sem data obrigatória) */
+  isPermanent?: boolean;
+  /** Recorrência da série (só com scheduledAt) */
+  recurrence?: MeetRecurrenceFrequency;
+  recurrenceUntil?: Date | null;
 };
 
 function meetClientReady(): boolean {
@@ -28,6 +38,41 @@ export function assertMeetPrismaReady() {
       'MeetSession ausente no Prisma Client. Rode: npx prisma generate && aplique prisma/migrations/manual_etholys_meet.sql',
     );
   }
+}
+
+async function attachParticipants(
+  sessionId: string,
+  createdById: string | undefined,
+  inviteEmails: string[],
+) {
+  const emails = inviteEmails.map((e) => e.trim().toLowerCase()).filter((e) => e.includes('@'));
+  if (emails.length > 0) {
+    await prisma.meetParticipant.createMany({
+      data: emails.map((email) => ({
+        sessionId,
+        email,
+        role: 'guest',
+      })),
+    });
+  }
+  if (createdById) {
+    await prisma.meetParticipant.create({
+      data: {
+        sessionId,
+        userId: createdById,
+        role: 'host',
+      },
+    });
+  }
+}
+
+async function finalizeRoom(sessionId: string, masterMeetingUrl?: string | null) {
+  const roomSlug = meetRoomSlug(sessionId);
+  const meetingUrl = masterMeetingUrl || buildMeetRoomUrl(sessionId);
+  return prisma.meetSession.update({
+    where: { id: sessionId },
+    data: { roomSlug, meetingUrl },
+  });
 }
 
 export async function createMeetSession(input: CreateMeetSessionInput) {
@@ -45,6 +90,30 @@ export async function createMeetSession(input: CreateMeetSessionInput) {
     if (!project) throw new Error('projectId inválido');
   }
 
+  const isPermanent = Boolean(input.isPermanent);
+  const recurrence: MeetRecurrenceFrequency =
+    !isPermanent && input.recurrence && isMeetRecurrenceFrequency(input.recurrence)
+      ? input.recurrence
+      : 'none';
+
+  let scheduledAt: Date | null =
+    input.scheduledAt === undefined ? (isPermanent ? null : new Date()) : input.scheduledAt;
+  let endsAt: Date | null = input.endsAt ?? null;
+
+  if (isPermanent) {
+    scheduledAt = null;
+    endsAt = null;
+  }
+
+  if (recurrence !== 'none') {
+    if (!scheduledAt || !Number.isFinite(scheduledAt.getTime())) {
+      throw new Error('scheduledAt requerido para recorrência');
+    }
+    if (!endsAt || endsAt <= scheduledAt) {
+      endsAt = new Date(scheduledAt.getTime() + 60 * 60_000);
+    }
+  }
+
   const tmpSlug = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   const created = await prisma.meetSession.create({
@@ -55,47 +124,63 @@ export async function createMeetSession(input: CreateMeetSessionInput) {
       description: input.description?.trim() || null,
       mirror,
       status: 'scheduled',
-      scheduledAt: input.scheduledAt === undefined ? new Date() : input.scheduledAt,
-      endsAt: input.endsAt ?? null,
+      scheduledAt,
+      endsAt,
       projectId: input.projectId || null,
       forgeLiveSessionId: input.forgeLiveSessionId || null,
       roomSlug: tmpSlug,
+      isPermanent,
+      recurrence,
+      recurrenceUntil: recurrence !== 'none' ? input.recurrenceUntil ?? null : null,
     },
   });
 
-  const roomSlug = meetRoomSlug(created.id);
-  const meetingUrl = buildMeetRoomUrl(created.id);
+  const master = await finalizeRoom(created.id);
+  await prisma.meetSession.update({
+    where: { id: master.id },
+    data: { seriesId: master.id },
+  });
+  await attachParticipants(master.id, input.createdById, input.inviteEmails ?? []);
 
-  const session = await prisma.meetSession.update({
-    where: { id: created.id },
-    data: { roomSlug, meetingUrl },
+  if (recurrence === 'none' || !scheduledAt || !endsAt) {
+    return prisma.meetSession.findUniqueOrThrow({ where: { id: master.id } });
+  }
+
+  const slots = expandMeetOccurrences({
+    startsAt: scheduledAt,
+    endsAt,
+    frequency: recurrence,
+    until: input.recurrenceUntil,
   });
 
-  const emails = (input.inviteEmails ?? [])
-    .map((e) => e.trim().toLowerCase())
-    .filter((e) => e.includes('@'));
-
-  if (emails.length > 0) {
-    await prisma.meetParticipant.createMany({
-      data: emails.map((email) => ({
-        sessionId: session.id,
-        email,
-        role: 'guest',
-      })),
-    });
-  }
-
-  if (input.createdById) {
-    await prisma.meetParticipant.create({
+  // Primeira ocorrência já é o mestre; criar filhos para o resto
+  for (const slot of slots.slice(1)) {
+    const childTmp = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const child = await prisma.meetSession.create({
       data: {
-        sessionId: session.id,
-        userId: input.createdById,
-        role: 'host',
+        companyId: input.companyId,
+        createdById: input.createdById || null,
+        title,
+        description: input.description?.trim() || null,
+        mirror,
+        status: 'scheduled',
+        scheduledAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        projectId: input.projectId || null,
+        forgeLiveSessionId: input.forgeLiveSessionId || null,
+        roomSlug: childTmp,
+        isPermanent: false,
+        recurrence: 'none',
+        recurrenceUntil: null,
+        seriesId: master.id,
+        seriesParentId: master.id,
       },
     });
+    // Mesmo link externo da série; roomSlug único só para DB
+    await finalizeRoom(child.id, master.meetingUrl);
   }
 
-  return session;
+  return prisma.meetSession.findUniqueOrThrow({ where: { id: master.id } });
 }
 
 export async function listMeetSessions(
@@ -103,11 +188,12 @@ export async function listMeetSessions(
   opts?: { limit?: number; projectId?: string },
 ) {
   assertMeetPrismaReady();
-  const limit = Math.min(100, Math.max(1, opts?.limit ?? 30));
+  const limit = Math.min(250, Math.max(1, opts?.limit ?? 120));
   return prisma.meetSession.findMany({
     where: {
       companyId,
       ...(opts?.projectId ? { projectId: opts.projectId } : {}),
+      status: { not: 'cancelled' },
     },
     orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }],
     take: limit,
@@ -143,4 +229,59 @@ export async function getMeetSessionForCompany(sessionId: string, companyId: str
       actionItems: { orderBy: { sortOrder: 'asc' } },
     },
   });
+}
+
+/** Id da sala real a abrir no Hub (mestre da série se for ocorrência). */
+export function meetJoinSessionId(session: {
+  id: string;
+  seriesParentId?: string | null;
+}): string {
+  return session.seriesParentId || session.id;
+}
+
+export type MeetDeleteScope = 'this' | 'following' | 'series';
+
+export async function deleteMeetSessionScoped(input: {
+  sessionId: string;
+  companyId: string;
+  scope?: MeetDeleteScope;
+}) {
+  assertMeetPrismaReady();
+  const existing = await prisma.meetSession.findFirst({
+    where: { id: input.sessionId, companyId: input.companyId },
+  });
+  if (!existing) return { deleted: 0 };
+
+  const scope = input.scope || 'this';
+  const seriesId = existing.seriesId || existing.id;
+
+  if (scope === 'series' || existing.isPermanent) {
+    const result = await prisma.meetSession.deleteMany({
+      where: {
+        companyId: input.companyId,
+        OR: [{ id: seriesId }, { seriesId }],
+      },
+    });
+    return { deleted: result.count };
+  }
+
+  if (scope === 'following') {
+    const from = existing.scheduledAt ?? existing.createdAt;
+    const result = await prisma.meetSession.deleteMany({
+      where: {
+        companyId: input.companyId,
+        OR: [
+          { id: existing.id },
+          {
+            seriesId,
+            scheduledAt: { gte: from },
+          },
+        ],
+      },
+    });
+    return { deleted: result.count };
+  }
+
+  await prisma.meetSession.delete({ where: { id: existing.id } });
+  return { deleted: 1 };
 }

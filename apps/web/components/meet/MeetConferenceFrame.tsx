@@ -245,6 +245,25 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               disableTileEnlargement: false,
               defaultLogoUrl: 'https://app.etholys.com/meet-brand/etholys-mark.svg',
               defaultRemoteDisplayName: 'Participante',
+              disableVirtualBackground: false,
+              virtualBackgrounds: [
+                {
+                  id: 'etholys-ocean',
+                  src: 'https://app.etholys.com/meet-brand/backgrounds/soft-ocean.svg',
+                },
+                {
+                  id: 'etholys-studio',
+                  src: 'https://app.etholys.com/meet-brand/backgrounds/warm-studio.svg',
+                },
+                {
+                  id: 'etholys-forest',
+                  src: 'https://app.etholys.com/meet-brand/backgrounds/forest-mist.svg',
+                },
+                {
+                  id: 'etholys-office',
+                  src: 'https://app.etholys.com/meet-brand/backgrounds/office-soft.svg',
+                },
+              ],
               toolbarButtons: [...MEET_TOOLBAR_BUTTONS],
               filmstrip: {
                 disableResizable: false,

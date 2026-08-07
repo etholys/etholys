@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { getMeetSessionForCompany } from '@/lib/meet/create-session';
+import { getMeetSessionForCompany, deleteMeetSessionScoped } from '@/lib/meet/create-session';
 import { prisma } from '@/lib/prisma';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -174,8 +174,16 @@ export async function DELETE(req: Request, ctx: Ctx) {
       return NextResponse.json({ error: 'Só o organizador pode apagar' }, { status: 403 });
     }
 
-    await prisma.meetSession.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+    const scopeParam = new URL(req.url).searchParams.get('scope')?.trim() || 'this';
+    const scope =
+      scopeParam === 'following' || scopeParam === 'series' ? scopeParam : 'this';
+
+    const result = await deleteMeetSessionScoped({
+      sessionId: id,
+      companyId,
+      scope,
+    });
+    return NextResponse.json({ ok: true, ...result });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Error interno';
     return NextResponse.json({ error: msg }, { status: 500 });

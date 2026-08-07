@@ -33,6 +33,7 @@ type SessionRow = {
   meetingUrl: string | null;
   projectId: string | null;
   transcriptText?: string | null;
+  seriesParentId?: string | null;
 };
 
 type TranscriptSegment = {
@@ -107,6 +108,12 @@ export function MeetRoomClient({ sessionId }: Props) {
       );
       const d = (await r.json()) as { session?: SessionRow; error?: string };
       if (!r.ok) throw new Error(d.error || 'Error');
+      if (d.session?.seriesParentId && d.session.seriesParentId !== sessionId) {
+        router.replace(
+          `/hub/meet/${d.session.seriesParentId}?companyId=${encodeURIComponent(companyId)}`,
+        );
+        return;
+      }
       setSession(d.session ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
@@ -477,7 +484,7 @@ export function MeetRoomClient({ sessionId }: Props) {
             )}
           </div>
 
-          {/* Controles secundários Etholys — canto inferior direito (chat/atividades no Jitsi) */}
+          {/* Controles secundários Etholys — canto inferior direito */}
           <div className="pointer-events-none absolute bottom-5 right-5 z-20 flex flex-col items-end gap-2 sm:bottom-6 sm:right-6">
             <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-[#3c4043]/90 p-1 shadow-lg backdrop-blur-sm">
               <button

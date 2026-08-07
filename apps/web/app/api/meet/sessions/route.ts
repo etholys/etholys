@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { createMeetSession, listMeetSessions } from '@/lib/meet/create-session';
 import { isMeetMirror } from '@/lib/meet/types';
+import { isMeetRecurrenceFrequency } from '@/lib/meet/recurrence';
 import { sendMeetInviteEmail } from '@/lib/meet/send-meet-email';
 
 export async function GET(req: Request) {
@@ -17,10 +18,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'companyId inválido' }, { status: 400 });
     }
 
-    const limit = Number(searchParams.get('limit') || '30');
+    const limit = Number(searchParams.get('limit') || '120');
     const projectId = searchParams.get('projectId')?.trim() || undefined;
     const sessions = await listMeetSessions(companyId, {
-      limit: Number.isFinite(limit) ? limit : 30,
+      limit: Number.isFinite(limit) ? limit : 120,
       projectId,
     });
     return NextResponse.json({ sessions });
@@ -49,6 +50,9 @@ export async function POST(req: Request) {
       sendInvites?: boolean;
       locale?: string;
       unscheduled?: boolean;
+      isPermanent?: boolean;
+      recurrence?: string;
+      recurrenceUntil?: string | null;
     };
 
     const companyId = body.companyId?.trim();
@@ -59,21 +63,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'title requerido' }, { status: 400 });
     }
 
+    const isPermanent = Boolean(body.isPermanent) || Boolean(body.unscheduled);
+    const recurrence =
+      body.recurrence && isMeetRecurrenceFrequency(body.recurrence) ? body.recurrence : 'none';
+
     const session = await createMeetSession({
       companyId,
       createdById: tenant.userId,
       title: body.title,
       description: body.description,
       mirror: body.mirror && isMeetMirror(body.mirror) ? body.mirror : 'loose',
-      scheduledAt: body.unscheduled
+      scheduledAt: isPermanent
         ? null
         : body.scheduledAt
           ? new Date(body.scheduledAt)
           : new Date(),
-      endsAt: body.endsAt ? new Date(body.endsAt) : null,
+      endsAt: isPermanent ? null : body.endsAt ? new Date(body.endsAt) : null,
       projectId: body.projectId || null,
       forgeLiveSessionId: body.forgeLiveSessionId || null,
       inviteEmails: body.inviteEmails,
+      isPermanent,
+      recurrence: isPermanent ? 'none' : recurrence,
+      recurrenceUntil:
+        !isPermanent && body.recurrenceUntil ? new Date(body.recurrenceUntil) : null,
     });
 
     const inviteResults: { email: string; sent: boolean; error?: string }[] = [];

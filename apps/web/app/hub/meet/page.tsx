@@ -39,11 +39,15 @@ import {
   MeetEventDetailPopup,
   type MeetEventDetail,
 } from '@/components/meet/MeetEventDetailPopup';
-import { meetHubJoinPath } from '@/lib/meet/types';
+import { meetHubJoinPath, meetJoinTargetId } from '@/lib/meet/types';
 
 type MeetSessionRow = MeetEventDetail & {
   mirror: string;
   roomSlug: string;
+  isPermanent?: boolean;
+  recurrence?: string;
+  seriesId?: string | null;
+  seriesParentId?: string | null;
 };
 
 const DAY_MS = 86_400_000;
@@ -141,7 +145,7 @@ function MeetHubContent() {
     setError(null);
     try {
       const r = await fetch(
-        `/api/meet/sessions?companyId=${encodeURIComponent(companyId)}&limit=100`,
+        `/api/meet/sessions?companyId=${encodeURIComponent(companyId)}&limit=200`,
       );
       const d = (await r.json()) as { sessions?: MeetSessionRow[]; error?: string };
       if (!r.ok) throw new Error(d.error || 'Error');
@@ -211,8 +215,15 @@ function MeetHubContent() {
       return av - bv;
     });
     return {
+      permanent: sessions.filter(
+        (session) =>
+          Boolean(session.isPermanent) &&
+          session.status !== 'ended' &&
+          session.status !== 'cancelled',
+      ),
       unscheduled: sessions.filter(
         (session) =>
+          !session.isPermanent &&
           !session.scheduledAt &&
           session.status !== 'ended' &&
           session.status !== 'cancelled',
@@ -227,20 +238,21 @@ function MeetHubContent() {
       ),
       past: byTime.filter(
         (s) =>
-          s.status === 'ended' ||
-          s.status === 'cancelled' ||
-          (s.status !== 'live' && !!s.scheduledAt && new Date(s.scheduledAt).getTime() < now),
+          !s.isPermanent &&
+          (s.status === 'ended' ||
+            s.status === 'cancelled' ||
+            (s.status !== 'live' && !!s.scheduledAt && new Date(s.scheduledAt).getTime() < now)),
       ),
     };
   }, [sessions, selectedDate]);
 
-  async function createSession(mode: 'instant' | 'later' | 'scheduled', draft?: ScheduleDraft) {
+  async function createSession(mode: 'instant' | 'later' | 'scheduled' | 'permanent', draft?: ScheduleDraft) {
     if (!companyId) return;
     const finalTitle =
       mode === 'instant'
         ? t('Reunião agora', 'Reunión ahora', 'Meeting now')
-        : mode === 'later'
-          ? t('Reunião para mais tarde', 'Reunión para más tarde', 'Meeting for later')
+        : mode === 'later' || mode === 'permanent'
+          ? t('Sala permanente', 'Sala permanente', 'Permanent room')
           : draft?.title || '';
     if (!finalTitle.trim()) return;
 
@@ -249,6 +261,7 @@ function MeetHubContent() {
     try {
       const emails = draft?.inviteEmails ?? [];
       const linkedProject = draft?.projectId ?? null;
+      const isPermanent = mode === 'permanent' || Boolean(draft?.isPermanent) || mode === 'later';
       const r = await fetch('/api/meet/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -262,7 +275,10 @@ function MeetHubContent() {
           sendInvites: Boolean(draft?.sendInvites && emails.length),
           scheduledAt: draft?.startsAt,
           endsAt: draft?.endsAt,
-          unscheduled: mode === 'later',
+          unscheduled: isPermanent,
+          isPermanent,
+          recurrence: isPermanent ? 'none' : draft?.recurrence || 'none',
+          recurrenceUntil: isPermanent ? null : draft?.recurrenceUntil,
           locale,
         }),
       });
@@ -276,7 +292,7 @@ function MeetHubContent() {
 
       if (mode === 'scheduled' && d.session?.id && draft) {
         let calendarSyncError: string | null = null;
-        if (draft.calendarProvider !== 'none') {
+        if (draft.calendarProvider !== 'none' && !draft.isPermanent) {
           const calendarResponse = await fetch(`/api/meet/sessions/${d.session.id}/calendar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -295,14 +311,18 @@ function MeetHubContent() {
           }
         }
         setScheduleOpen(false);
-        setSelectedDate(new Date(draft.startsAt));
-        setMainView('calendar');
+        if (draft.isPermanent) {
+          setShareSession({ id: d.session.id, meetingUrl: d.session.meetingUrl || '' });
+        } else {
+          setSelectedDate(new Date(draft.startsAt));
+          setMainView('calendar');
+        }
         await load();
         if (calendarSyncError) setError(calendarSyncError);
         return;
       }
 
-      if (mode === 'later' && d.session?.id && d.session.meetingUrl) {
+      if ((mode === 'later' || mode === 'permanent') && d.session?.id && d.session.meetingUrl) {
         setShareSession({ id: d.session.id, meetingUrl: d.session.meetingUrl });
         await load();
         return;
@@ -485,7 +505,7 @@ function MeetHubContent() {
                   <div className="absolute right-0 top-full z-20 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
                     <button
                       type="button"
-                      onClick={() => void createSession('later')}
+                      onClick={() => void createSession('permanent')}
                       disabled={saving}
                       className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 disabled:opacity-60"
                     >
@@ -493,13 +513,17 @@ function MeetHubContent() {
                       <span>
                         <span className="block text-sm font-medium text-slate-900">
                           {t(
-                            'Criar uma reunião para mais tarde',
-                            'Crear una reunión para más tarde',
-                            'Create a meeting for later',
+                            'Criar sala permanente',
+                            'Crear sala permanente',
+                            'Create permanent room',
                           )}
                         </span>
                         <span className="block text-xs text-slate-500">
-                          {t('Cria um link para partilhar', 'Crea un enlace para compartir', 'Creates a link to share')}
+                          {t(
+                            'Link fixo para a equipa, sempre válido',
+                            'Enlace fijo para el equipo, siempre válido',
+                            'Fixed team link, always valid',
+                          )}
                         </span>
                       </span>
                     </button>
@@ -706,7 +730,12 @@ function MeetHubContent() {
             <div className="flex justify-center py-16">
               <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
             </div>
-          ) : dayGroups.unscheduled.length + dayGroups.live.length + dayGroups.upcoming.length + dayGroups.past.length === 0 ? (
+          ) : dayGroups.permanent.length +
+              dayGroups.unscheduled.length +
+              dayGroups.live.length +
+              dayGroups.upcoming.length +
+              dayGroups.past.length ===
+            0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 py-16 text-center">
               <Video className="mx-auto h-9 w-9 text-slate-300" />
               <p className="mt-3 text-sm font-medium text-slate-700">
@@ -722,6 +751,21 @@ function MeetHubContent() {
             </div>
           ) : (
             <div className="space-y-8">
+              {dayGroups.permanent.length > 0 && (
+                <MeetingGroup
+                  label={t('Salas permanentes', 'Salas permanentes', 'Permanent rooms')}
+                  sessions={dayGroups.permanent}
+                  companyId={companyId}
+                  intlLocale={intlLocale}
+                  copiedId={copiedId}
+                  calBusyId={calBusyId}
+                  onOpen={openSessionDetail}
+                  onCopy={copyUrl}
+                  onCalendar={syncCalendar}
+                  onPost={setPostSessionId}
+                  t={t}
+                />
+              )}
               {dayGroups.live.length > 0 && (
                 <MeetingGroup
                   label={t('A decorrer', 'En curso', 'Happening now')}
@@ -966,6 +1010,16 @@ function MeetingGroup({
                         SIEP
                       </span>
                     )}
+                    {s.isPermanent && (
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+                        {t('Permanente', 'Permanente', 'Permanent')}
+                      </span>
+                    )}
+                    {(s.recurrence && s.recurrence !== 'none') || s.seriesParentId ? (
+                      <span className="rounded-full bg-violet-50 px-2 py-0.5 font-medium text-violet-700">
+                        {t('Série', 'Serie', 'Series')}
+                      </span>
+                    ) : null}
                     {s.mirror !== 'loose' && s.mirror !== 'siep' && (
                       <span className="rounded-full bg-slate-200 px-2 py-0.5 font-medium uppercase text-slate-600">
                         {s.mirror}
@@ -997,7 +1051,7 @@ function MeetingGroup({
                   </button>
                   {s.meetingUrl && companyId && s.status !== 'ended' && (
                     <Link
-                      href={meetHubJoinPath(s.id, companyId)}
+                      href={meetHubJoinPath(meetJoinTargetId(s), companyId)}
                       className="rounded-full bg-sky-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-sky-700"
                     >
                       {t('Entrar', 'Unirse', 'Join')}

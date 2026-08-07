@@ -5,21 +5,31 @@ export type {
   MeetSessionSummary,
 } from '@/lib/meet/types';
 export {
+  createMeetSession,
+  listMeetSessions,
+  getMeetSessionForCompany,
+  deleteMeetSessionScoped,
+  meetJoinSessionId,
+  assertMeetPrismaReady,
+} from '@/lib/meet/create-session';
+export {
+  expandMeetOccurrences,
+  meetRecurrenceToRrule,
+  isMeetRecurrenceFrequency,
+  MEET_RECURRENCE_FREQUENCIES,
+  type MeetRecurrenceFrequency,
+} from '@/lib/meet/recurrence';
+export {
   MEET_MIRRORS,
   MEET_STATUSES,
   MEET_ACTION_STATUSES,
   meetRoomSlug,
   isMeetMirror,
   meetHubJoinPath,
+  meetJoinTargetId,
 } from '@/lib/meet/types';
 export { buildMeetRoomUrl, meetEmbedUrl } from '@/lib/meet/room';
 export { buildMeetIcs, toIcsUtc, type MeetIcsInput } from '@/lib/meet/ics';
-export {
-  createMeetSession,
-  listMeetSessions,
-  getMeetSessionForCompany,
-  assertMeetPrismaReady,
-} from '@/lib/meet/create-session';
 export {
   sendMeetInviteEmail,
   buildMeetInviteEmailHtml,

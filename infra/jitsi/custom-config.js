@@ -38,6 +38,15 @@ config.transcription.enabled = true;
 config.transcription.autoCaptionOnTranscribe = true;
 config.transcription.useAppLanguage = true;
 
+// Fundos virtuais Etholys (além do blur nativo fraco do browser)
+config.disableVirtualBackground = false;
+config.virtualBackgrounds = [
+  { id: 'etholys-ocean', src: 'https://app.etholys.com/meet-brand/backgrounds/soft-ocean.svg' },
+  { id: 'etholys-studio', src: 'https://app.etholys.com/meet-brand/backgrounds/warm-studio.svg' },
+  { id: 'etholys-forest', src: 'https://app.etholys.com/meet-brand/backgrounds/forest-mist.svg' },
+  { id: 'etholys-office', src: 'https://app.etholys.com/meet-brand/backgrounds/office-soft.svg' },
+];
+
 config.toolbarButtons = [
   'microphone',
   'camera',

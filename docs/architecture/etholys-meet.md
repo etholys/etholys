@@ -39,6 +39,7 @@ Ver [etholys-tools.md](./etholys-tools.md) para a faixa de ferramentas.
 | **F4** | Tarefas pré-criadas + validação → Task SIEP | ✅ |
 | **F5** | Transcrição real + atribuição por participante | App/API estruturadas; requer Jigasi + STT no servidor |
 | **F6** | Agenda dia/semana/mês/ano + OAuth Google / Outlook | ✅ API + UI; ligação persistente em `Account`; requer `GOOGLE_CALENDAR_ENABLED=1` / Azure AD |
+| **F7** | Salas permanentes + recorrência (diária/semanal/dias úteis/mensal) | ✅ materializa ocorrências; mesmo link da série; apagar esta / seguintes / série |
 
 ### Breakouts
 
@@ -102,6 +103,18 @@ apps/web/
 - **Advisor** = alerta `meet_actions_pending` quando há rascunhos por validar (+ notificação ao host no finalize)
 
 Não fundir os três produtos.
+
+---
+
+## 5b. Visual in-call (estilo Google Meet)
+
+| Camada | O quê | Limite |
+|--------|--------|--------|
+| **Chrome Etholys** (`MeetRoomClient`) | Top bar (hora + título + info), contagem de participantes, painel de transcrição, fundo `#202124`, iframe com cantos arredondados | Não controla ícones/tiles *dentro* do iframe |
+| **External API** (`MeetConferenceFrame`) | `configOverwrite` / `interfaceConfigOverwrite`: sem watermark Jitsi, filmstrip vertical, toolbar ordenada, fundo charcoal | Algumas opções dependem da versão do web Jitsi |
+| **Servidor** (`infra/jitsi/*` + `apply-jitsi-branding.sh`) | `custom-config.js`, `custom-interface_config.js`, `custom-meet.css` (raio nos tiles/toolbox) | CSS/patches estáticos somem se o contentor web for **recriado** sem rerun do script |
+
+Deploy branding só Jitsi (sem rebuild app): `bash scripts/apply-jitsi-branding.sh` no Contabo.
 
 ---
 

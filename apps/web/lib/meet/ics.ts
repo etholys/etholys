@@ -11,6 +11,8 @@ export type MeetIcsInput = {
   startsAt: Date;
   endsAt: Date;
   organizerEmail?: string;
+  /** Ex.: FREQ=WEEKLY;COUNT=12 */
+  rrule?: string | null;
 };
 
 function pad(n: number) {
@@ -45,6 +47,7 @@ export function buildMeetIcs(input: MeetIcsInput): string {
   ];
   if (input.description) lines.push(`DESCRIPTION:${escapeIcsText(input.description)}`);
   if (input.locationUrl) lines.push(`LOCATION:${escapeIcsText(input.locationUrl)}`);
+  if (input.rrule) lines.push(`RRULE:${input.rrule}`);
   if (input.organizerEmail) {
     lines.push(`ORGANIZER:mailto:${escapeIcsText(input.organizerEmail)}`);
   }

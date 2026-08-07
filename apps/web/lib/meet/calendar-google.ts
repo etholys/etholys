@@ -83,6 +83,8 @@ export type MeetCalendarEventInput = {
   startsAt: Date;
   endsAt: Date;
   attendeeEmails?: string[];
+  /** RRULE sem prefixo RRULE: — ex. FREQ=WEEKLY;COUNT=12 */
+  recurrenceRule?: string | null;
 };
 
 export async function createGoogleCalendarEvent(
@@ -96,7 +98,7 @@ export async function createGoogleCalendarEvent(
     );
   }
 
-  const body = {
+  const body: Record<string, unknown> = {
     summary: event.title,
     description: event.description || undefined,
     location: event.locationUrl || undefined,
@@ -104,6 +106,9 @@ export async function createGoogleCalendarEvent(
     end: { dateTime: event.endsAt.toISOString() },
     attendees: event.attendeeEmails?.map((email) => ({ email })),
   };
+  if (event.recurrenceRule) {
+    body.recurrence = [`RRULE:${event.recurrenceRule}`];
+  }
 
   const url = new URL(GOOGLE_CALENDAR_EVENTS);
   if (event.attendeeEmails?.length) url.searchParams.set('sendUpdates', 'all');
