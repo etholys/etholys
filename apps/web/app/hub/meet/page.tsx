@@ -45,7 +45,7 @@ type MeetSessionRow = MeetEventDetail & {
   mirror: string;
   roomSlug: string;
   isPermanent?: boolean;
-  recurrence?: string;
+  recurrence?: string | null;
   seriesId?: string | null;
   seriesParentId?: string | null;
 };
