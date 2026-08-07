@@ -218,9 +218,9 @@ export function MeetRoomClient({ sessionId }: Props) {
     if (!features.liveTranscriptionEnabled) {
       setError(
         t(
-          'A transcrição ao vivo ainda não está activa no servidor Jitsi (Jigasi).',
-          'La transcripción en vivo aún no está activa en el servidor Jitsi (Jigasi).',
-          'Live transcription is not enabled on the Jitsi server yet (Jigasi).',
+          'A transcrição ao vivo ainda não está activa no Etholys Meet.',
+          'La transcripción en vivo aún no está activa en Etholys Meet.',
+          'Live transcription is not enabled on Etholys Meet yet.',
         ),
       );
       return;
@@ -234,9 +234,9 @@ export function MeetRoomClient({ sessionId }: Props) {
     if (destination === 'cloud' && !features.cloudRecordingEnabled) {
       setError(
         t(
-          'A gravação na nuvem requer o Jibri no VPS. Escolha «Este computador» por agora.',
-          'La grabación en la nube requiere Jibri en el VPS. Elige «Este ordenador» por ahora.',
-          'Cloud recording requires Jibri on the VPS. Choose “This computer” for now.',
+          'A gravação na nuvem Etholys ainda não está disponível. Escolha «Este computador» por agora.',
+          'La grabación en la nube Etholys aún no está disponible. Elige «Este ordenador» por ahora.',
+          'Etholys cloud recording is not available yet. Choose “This computer” for now.',
         ),
       );
       return;
@@ -388,9 +388,9 @@ export function MeetRoomClient({ sessionId }: Props) {
             <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
               <p className="max-w-md text-sm text-slate-400">
                 {t(
-                  'Este Jitsi não permite embed (ex.: meet.jit.si). Abra numa nova janela.',
-                  'Este Jitsi no permite embed (ej.: meet.jit.si). Abre en una ventana nueva.',
-                  'This Jitsi host does not allow embed (e.g. meet.jit.si). Open in a new window.',
+                  'Esta sala não pode ser incorporada neste ecrã. Abra numa nova janela.',
+                  'Esta sala no se puede incorporar en esta pantalla. Abre en una ventana nueva.',
+                  'This room cannot be embedded on this screen. Open it in a new window.',
                 )}
               </p>
               <a
@@ -492,7 +492,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                           <span className="text-[10px] text-slate-500">
                             {features.cloudRecordingEnabled
                               ? 'R2'
-                              : t('Requer Jibri', 'Requiere Jibri', 'Requires Jibri')}
+                              : t('Em breve', 'Próximamente', 'Coming soon')}
                           </span>
                         </span>
                       </button>
@@ -511,9 +511,9 @@ export function MeetRoomClient({ sessionId }: Props) {
                           'Click “Transcribe”. Segments will appear here with the speaker name.',
                         )
                       : t(
-                          'Transcrição real preparada na app; falta activar Jigasi no servidor.',
-                          'Transcripción real preparada en la app; falta activar Jigasi en el servidor.',
-                          'Real transcription is ready in the app; Jigasi still needs enabling on the server.',
+                          'A transcrição ao vivo ainda está a ser activada no Etholys Meet.',
+                          'La transcripción en vivo aún se está activando en Etholys Meet.',
+                          'Live transcription is still being activated on Etholys Meet.',
                         )}
                   </div>
                 ) : (

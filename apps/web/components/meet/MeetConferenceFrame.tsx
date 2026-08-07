@@ -79,7 +79,7 @@ function loadExternalApi(origin: string): Promise<void> {
     );
     if (existing) {
       existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error('Jitsi API indisponível')), {
+      existing.addEventListener('error', () => reject(new Error('API de vídeo do Meet indisponível')), {
         once: true,
       });
       return;
@@ -89,7 +89,7 @@ function loadExternalApi(origin: string): Promise<void> {
     script.async = true;
     script.dataset.etholysJitsiApi = origin;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Não foi possível carregar a API do Jitsi'));
+    script.onerror = () => reject(new Error('Não foi possível carregar a sala de vídeo do Meet'));
     document.head.appendChild(script);
   });
   return externalApiLoader;

@@ -567,9 +567,9 @@ function MeetHubContent() {
         {jitsiStatus?.isDemo && (
           <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {t(
-              'Servidor de vídeo em modo demo (meet.jit.si): as chamadas cortam a ~5 minutos.',
-              'Servidor de vídeo en modo demo (meet.jit.si): las llamadas se cortan a ~5 minutos.',
-              'Video server in demo mode (meet.jit.si): calls cut off at ~5 minutes.',
+              'Servidor de vídeo em modo demo: as chamadas cortam a cerca de 5 minutos.',
+              'Servidor de vídeo en modo demo: las llamadas se cortan a unos 5 minutos.',
+              'Video server in demo mode: calls cut off after about 5 minutes.',
             )}
           </p>
         )}

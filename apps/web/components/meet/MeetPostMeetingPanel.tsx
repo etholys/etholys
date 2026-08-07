@@ -293,9 +293,9 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
       <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 space-y-2">
         <p>
           {t(
-            'Gravação: upload para R2/S3, webhook Jibri, ou gravação local no Jitsi. Com OPENAI_API_KEY, pode transcrever automaticamente.',
-            'Grabación: sube a R2/S3, webhook Jibri, o grabación local en Jitsi. Con OPENAI_API_KEY puedes transcribir automáticamente.',
-            'Recording: upload to R2/S3, Jibri webhook, or local Jitsi record. With OPENAI_API_KEY you can auto-transcribe.',
+            'Gravação: envie um ficheiro, use a gravação na nuvem Etholys, ou grave neste computador. Depois pode pedir a transcrição automática.',
+            'Grabación: sube un archivo, usa la grabación en la nube Etholys, o graba en este ordenador. Después puedes pedir la transcripción automática.',
+            'Recording: upload a file, use Etholys cloud recording, or record on this computer. You can then request automatic transcription.',
           )}
         </p>
         <div className="flex flex-wrap items-center gap-2">

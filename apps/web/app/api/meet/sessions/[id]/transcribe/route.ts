@@ -45,7 +45,7 @@ export async function POST(req: Request, ctx: Ctx) {
     if (!session) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
     if (!session.recordingUrl) {
       return NextResponse.json(
-        { error: 'Sem recordingUrl — faça upload ou aguarde o webhook Jibri' },
+        { error: 'Sem recordingUrl — faça upload da gravação ou aguarde a gravação na nuvem Etholys' },
         { status: 400 },
       );
     }
