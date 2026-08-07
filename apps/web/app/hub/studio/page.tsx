@@ -14,11 +14,13 @@ import {
   ChevronRight,
   Palette,
   Share2,
+  BookMarked,
   X,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
 import { StudioShareDialog } from '@/components/studio/StudioShareDialog';
+import { StudioContextPanel } from '@/components/studio/StudioContextPanel';
 
 type FolderRow = { id: string; name: string; parentId: string | null; visibility?: string; access?: string };
 type DocRow = {
@@ -73,6 +75,7 @@ export default function StudioHubPage() {
     documentId?: string;
     title: string;
   }>(null);
+  const [showFolderContext, setShowFolderContext] = useState(false);
 
   const effectiveCompanyId = companyId || resolvedCompanyId;
 
@@ -280,6 +283,16 @@ export default function StudioHubPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={!effectiveCompanyId || !folderId}
+              onClick={() => setShowFolderContext(true)}
+              title={t('Contexto IA desta pasta', 'Contexto IA de esta carpeta', 'AI context for this folder')}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <BookMarked className="h-4 w-4" />
+              {t('Contexto IA', 'Contexto IA', 'AI context')}
+            </button>
             <button
               type="button"
               disabled={!effectiveCompanyId}
@@ -546,6 +559,16 @@ export default function StudioHubPage() {
           open
           onClose={() => setShareTarget(null)}
           onVisibilityChange={() => void load()}
+        />
+      )}
+
+      {showFolderContext && folderId && (
+        <StudioContextPanel
+          companyId={effectiveCompanyId}
+          folderId={folderId}
+          canEdit
+          open
+          onClose={() => setShowFolderContext(false)}
         />
       )}
 

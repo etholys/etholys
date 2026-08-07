@@ -45,6 +45,8 @@ export function buildStudioSystemPrompt(opts: {
   canvas: StudioCanvasState;
   catalog: StudioConsentSource[];
   approvedContext?: string | null;
+  /** Ficheiros da pasta / anexos do chat — usar sem consentRequest */
+  userUploadedContext?: string | null;
 }): string {
   const loc = opts.locale === 'en' ? 'en' : opts.locale === 'es' ? 'es' : 'pt';
   const lang =
@@ -69,23 +71,30 @@ Idioma da resposta ao utilizador: ${lang}.
 
 Documento atual: «${opts.documentTitle}» (formato: ${opts.canvas.format}).
 
-## Regras de contexto da empresa (obrigatórias)
+## Regras de contexto
 1. Conheces o *catálogo* de fontes disponíveis no ecossistema Etholys da empresa.
-2. **Nunca** uses dados concretos da empresa (números, nomes de projetos, orçamentos, etc.) sem consentimento explícito neste turno.
-3. Se precisares de dados da empresa para melhorar o documento, devolve \`consentRequest\` com pergunta clara e lista de \`sources\` (ids do catálogo). Não inventes factos da empresa.
-4. Se o utilizador já aprovou fontes e te foram fornecidas em «Contexto aprovado», podes usá-las só nessa resposta.
-5. Foca em construir o documento: clareza, estrutura, tom institucional, marca se pedida.
+2. **Nunca** uses dados concretos do catálogo Etholys (números ATLAS/SIEP, etc.) sem consentimento explícito neste turno (\`consentRequest\`).
+3. **Excepção:** o bloco «Contexto fornecido pelo utilizador» (ficheiros da pasta / anexos do chat) foi carregado de propósito — **podes e deves usá-lo** sem pedir consentimento.
+4. Se precisares de dados do catálogo Etholys, devolve \`consentRequest\` com pergunta clara e lista de \`sources\` (ids do catálogo). Não inventes factos.
+5. Se o utilizador já aprovou fontes em «Contexto aprovado», podes usá-las só nessa resposta.
+6. Foca em construir o documento: clareza, estrutura, tom institucional, marca se pedida.
 
-## Catálogo (só nomes — sem dados)
+## Catálogo Etholys (só nomes — sem dados)
 ${catalogLines}
 
 ## Canvas atual
 ${canvasSummary}
 
 ${
+  opts.userUploadedContext
+    ? `## Contexto fornecido pelo utilizador (usar livremente)\n${opts.userUploadedContext}`
+    : '## Contexto fornecido pelo utilizador\n(nenhum)'
+}
+
+${
   opts.approvedContext
-    ? `## Contexto aprovado pelo utilizador (usar só se fizer sentido)\n${opts.approvedContext}`
-    : '## Contexto aprovado\n(nenhum neste turno)'
+    ? `## Contexto aprovado do catálogo Etholys (usar só se fizer sentido)\n${opts.approvedContext}`
+    : '## Contexto aprovado do catálogo\n(nenhum neste turno)'
 }
 
 ## Formato de saída
@@ -100,7 +109,8 @@ Responde **apenas** com JSON válido (sem markdown):
 - Usa canvasPatches para editar blocos existentes (ids do canvas).
 - Se pedires consentimento, canvasPatches pode ficar vazio ou só com ajustes estruturais sem dados sensíveis.
 - Para diagramas (kind diagram), o campo text deve ser Mermaid válido quando aplicável.
-- Se o utilizador pedir ajustes a um diagrama («torna isto horizontal», «adiciona nó X»), atualiza o bloco diagram correspondente com Mermaid completo e válido (flowchart/sequence/erDiagram conforme o pedido).`;
+- Se o utilizador pedir ajustes a um diagrama («torna isto horizontal», «adiciona nó X»), atualiza o bloco diagram correspondente com Mermaid completo e válido (flowchart/sequence/erDiagram conforme o pedido).
+- Preferência: incorporar o contexto do utilizador no texto do documento.`;
 }
 
 function truncate(s: string, n: number) {

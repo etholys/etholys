@@ -14,6 +14,8 @@ import {
   FileDown,
   FileType,
   Share2,
+  Paperclip,
+  BookMarked,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
@@ -24,13 +26,17 @@ import type {
 } from '@/lib/studio/types';
 import { StudioMermaidPreview } from '@/components/studio/StudioMermaidPreview';
 import { StudioShareDialog } from '@/components/studio/StudioShareDialog';
+import {
+  StudioContextPanel,
+  uploadStudioChatAttachment,
+} from '@/components/studio/StudioContextPanel';
 
 type ChatMsg = { id: string; role: string; content: string };
 
 export default function StudioDocumentPage() {
   const params = useParams();
   const id = String(params?.id || '');
-  const { locale, activeCompanyId } = useApp();
+  const { locale, activeCompanyId, setActiveCompanyId } = useApp();
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const companyId = activeCompanyId && isLikelyDbId(activeCompanyId) ? activeCompanyId : '';
 
@@ -49,7 +55,11 @@ export default function StudioDocumentPage() {
   const [exporting, setExporting] = useState<'pdf' | 'docx' | null>(null);
   const [access, setAccess] = useState<string>('owner');
   const [shareOpen, setShareOpen] = useState(false);
+  const [showFolderContext, setShowFolderContext] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [folderContextCount, setFolderContextCount] = useState(0);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -63,8 +73,25 @@ export default function StudioDocumentPage() {
       setTitle(d.document.title);
       setCanvas(d.document.canvasState as StudioCanvasState);
       setDocFolderId(typeof d.document.folderId === 'string' ? d.document.folderId : null);
+      if (typeof d.document.companyId === 'string' && isLikelyDbId(d.document.companyId) && !companyId) {
+        setActiveCompanyId(d.document.companyId);
+      }
       setAccess(typeof d.access === 'string' ? d.access : 'owner');
       setDirty(false);
+
+      if (typeof d.document.folderId === 'string' && d.document.folderId) {
+        const cq = new URLSearchParams({ folderId: d.document.folderId });
+        if (companyId) cq.set('companyId', companyId);
+        fetch(`/api/studio/context?${cq}`, { cache: 'no-store' })
+          .then(async (cr) => {
+            if (!cr.ok) return;
+            const cd = await cr.json();
+            setFolderContextCount(Array.isArray(cd.assets) ? cd.assets.length : 0);
+          })
+          .catch(() => {});
+      } else {
+        setFolderContextCount(0);
+      }
 
       const mr = await fetch(
         `/api/studio/documents/${id}/copilot${companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''}`,
@@ -84,7 +111,7 @@ export default function StudioDocumentPage() {
     } finally {
       setLoading(false);
     }
-  }, [id, companyId]);
+  }, [id, companyId, setActiveCompanyId]);
 
   useEffect(() => {
     void load();
@@ -133,23 +160,40 @@ export default function StudioDocumentPage() {
 
   async function sendChat(opts?: { text?: string; approvedSources?: string[] }) {
     const text = (opts?.text ?? input).trim();
-    if (!text || !canvas || !companyId || chatBusy) return;
+    if (!text || !canvas || chatBusy) return;
     setChatBusy(true);
     setConsent(null);
     setInput('');
+    const filesToSend = [...pendingFiles];
+    setPendingFiles([]);
     const tempId = `local-${Date.now()}`;
-    setMessages((m) => [...m, { id: tempId, role: 'user', content: text }]);
+    const attachNote =
+      filesToSend.length > 0
+        ? `\n\n[${filesToSend.length} anexo(s): ${filesToSend.map((f) => f.name).join(', ')}]`
+        : '';
+    setMessages((m) => [...m, { id: tempId, role: 'user', content: text + attachNote }]);
 
     try {
+      const attachmentIds: string[] = [];
+      for (const file of filesToSend) {
+        const asset = await uploadStudioChatAttachment({
+          companyId: companyId || undefined,
+          documentId: id,
+          file,
+        });
+        attachmentIds.push(asset.id);
+      }
+
       const r = await fetch(`/api/studio/documents/${id}/copilot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          companyId,
+          companyId: companyId || undefined,
           locale,
           message: text,
           canvasState: canvas,
           approvedSources: opts?.approvedSources || [],
+          attachmentIds,
         }),
       });
       const d = await r.json();
@@ -355,6 +399,15 @@ export default function StudioDocumentPage() {
                 'Asks consent before using company data.',
               )}
             </p>
+            {folderContextCount > 0 && (
+              <p className="mt-1 text-[11px] font-medium text-amber-800">
+                {t(
+                  `${folderContextCount} ficheiro(s) de contexto da pasta activos.`,
+                  `${folderContextCount} archivo(s) de contexto de la carpeta activos.`,
+                  `${folderContextCount} folder context file(s) active.`,
+                )}
+              </p>
+            )}
           </div>
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
             {messages.length === 0 && (
@@ -410,26 +463,80 @@ export default function StudioDocumentPage() {
             <div ref={chatEndRef} />
           </div>
           <form
-            className="flex gap-2 border-t border-slate-100 p-3"
+            className="border-t border-slate-100 p-3"
             onSubmit={(e) => {
               e.preventDefault();
               void sendChat();
             }}
           >
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={chatBusy}
-              placeholder={t('Pedir ao agente…', 'Pedir al agente…', 'Ask the agent…')}
-              className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-orange-400"
-            />
-            <button
-              type="submit"
-              disabled={chatBusy || !input.trim()}
-              className="rounded-lg bg-orange-600 p-2 text-white disabled:opacity-40"
-            >
-              {chatBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-            </button>
+            {pendingFiles.length > 0 && (
+              <ul className="mb-2 flex flex-wrap gap-1.5">
+                {pendingFiles.map((f, i) => (
+                  <li
+                    key={`${f.name}-${i}`}
+                    className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-950"
+                  >
+                    <Paperclip className="h-3 w-3" />
+                    <span className="max-w-[9rem] truncate">{f.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
+                      className="text-amber-700 hover:text-red-600"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                multiple
+                accept=".pdf,.txt,.md,.csv,.json,.docx,image/png,image/jpeg,image/webp,image/gif"
+                onChange={(e) => {
+                  const list = e.target.files ? Array.from(e.target.files) : [];
+                  e.target.value = '';
+                  if (list.length) setPendingFiles((prev) => [...prev, ...list].slice(0, 6));
+                }}
+              />
+              <button
+                type="button"
+                disabled={chatBusy || access === 'viewer'}
+                onClick={() => fileInputRef.current?.click()}
+                title={t('Anexar contexto', 'Adjuntar contexto', 'Attach context')}
+                className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+              >
+                <Paperclip className="h-5 w-5" />
+              </button>
+              {docFolderId && (
+                <button
+                  type="button"
+                  disabled={chatBusy}
+                  onClick={() => setShowFolderContext(true)}
+                  title={t('Contexto da pasta', 'Contexto de la carpeta', 'Folder context')}
+                  className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                >
+                  <BookMarked className="h-5 w-5" />
+                </button>
+              )}
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                disabled={chatBusy || access === 'viewer'}
+                placeholder={t('Pedir ao agente…', 'Pedir al agente…', 'Ask the agent…')}
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-orange-400"
+              />
+              <button
+                type="submit"
+                disabled={chatBusy || !input.trim() || access === 'viewer'}
+                className="rounded-lg bg-orange-600 p-2 text-white disabled:opacity-40"
+              >
+                {chatBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+              </button>
+            </div>
           </form>
         </aside>
       </div>
@@ -441,6 +548,27 @@ export default function StudioDocumentPage() {
           title={title}
           open
           onClose={() => setShareOpen(false)}
+        />
+      )}
+
+      {showFolderContext && docFolderId && (
+        <StudioContextPanel
+          companyId={companyId || undefined}
+          folderId={docFolderId}
+          canEdit={access === 'owner' || access === 'admin' || access === 'editor'}
+          open
+          onClose={() => {
+            setShowFolderContext(false);
+            const cq = new URLSearchParams({ folderId: docFolderId });
+            if (companyId) cq.set('companyId', companyId);
+            fetch(`/api/studio/context?${cq}`, { cache: 'no-store' })
+              .then(async (cr) => {
+                if (!cr.ok) return;
+                const cd = await cr.json();
+                setFolderContextCount(Array.isArray(cd.assets) ? cd.assets.length : 0);
+              })
+              .catch(() => {});
+          }}
         />
       )}
     </div>

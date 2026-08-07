@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import { llmCompleteJsonText } from '@/lib/llm-client';
+import { llmGenerateContent } from '@/lib/llm-client';
 import {
   loadApprovedStudioContext,
   resolveStudioCompanyId,
@@ -14,6 +14,11 @@ import {
   type StudioCanvasState,
 } from '@/lib/studio/types';
 import { prismaHasEnumValue } from '@/lib/prisma-has-field';
+import {
+  buildStudioContextLlmParts,
+  loadStudioUserContextText,
+} from '@/lib/studio/context-assets';
+import { canEditStudioContent, getDocumentAccess } from '@/lib/studio/share';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -27,11 +32,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-  const companyId = await resolveStudioCompanyId(
-    user.id,
-    typeof body.companyId === 'string' ? body.companyId : null,
-  );
-  if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
+
+  const doc = await prisma.studioDocument.findFirst({
+    where: { id: params.id },
+  });
+  if (!doc) return NextResponse.json({ error: 'Document not found' }, { status: 404 });
+
+  const access = await getDocumentAccess(user.id, doc);
+  if (!canEditStudioContent(access)) {
+    return NextResponse.json({ error: 'Sem permissão para editar' }, { status: 403 });
+  }
+  const effectiveCompanyId = doc.companyId;
 
   const message = typeof body.message === 'string' ? body.message.trim() : '';
   if (!message) return NextResponse.json({ error: 'Message required' }, { status: 400 });
@@ -40,11 +51,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const approvedSources = Array.isArray(body.approvedSources)
     ? body.approvedSources.filter((s): s is string => typeof s === 'string')
     : [];
-
-  const doc = await prisma.studioDocument.findFirst({
-    where: { id: params.id, companyId },
-  });
-  if (!doc) return NextResponse.json({ error: 'Document not found' }, { status: 404 });
+  const attachmentIds = Array.isArray(body.attachmentIds)
+    ? body.attachmentIds.filter((s): s is string => typeof s === 'string')
+    : [];
 
   let canvas = doc.canvasState as StudioCanvasState;
   if (body.canvasState && typeof body.canvasState === 'object') {
@@ -58,7 +67,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       : 'WORKSPACE_ADVISOR';
     const sess = await prisma.aiAdvisorSession.create({
       data: {
-        companyId,
+        companyId: effectiveCompanyId,
         userId: user.id,
         title: `Studio: ${doc.title}`.slice(0, 120),
         kind: kind as 'STUDIO_DOC' | 'WORKSPACE_ADVISOR',
@@ -78,23 +87,51 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       content: message,
       context: {
         approvedSources,
+        attachmentIds,
         documentId: doc.id,
       },
     },
   });
 
-  const approvedContext = await loadApprovedStudioContext(companyId, approvedSources);
+  const [approvedContext, userUploadedContext, multimodalParts] = await Promise.all([
+    loadApprovedStudioContext(effectiveCompanyId, approvedSources),
+    loadStudioUserContextText({
+      companyId: effectiveCompanyId,
+      folderId: doc.folderId,
+      documentId: doc.id,
+      extraAssetIds: attachmentIds,
+    }),
+    buildStudioContextLlmParts(attachmentIds, effectiveCompanyId),
+  ]);
+
   const system = buildStudioSystemPrompt({
     locale,
     documentTitle: doc.title,
     canvas,
     catalog: studioCatalogForCompany(),
     approvedContext: approvedContext || null,
+    userUploadedContext: userUploadedContext || null,
   });
 
   let raw: string;
   try {
-    raw = await llmCompleteJsonText(system, message, { maxOutputTokens: 8000 });
+    const { text, finishReason } = await llmGenerateContent({
+      systemInstruction: system,
+      userText: multimodalParts.length ? undefined : message,
+      userParts: multimodalParts.length
+        ? [{ text: message }, ...multimodalParts]
+        : undefined,
+      maxOutputTokens: 8000,
+      temperature: 0.1,
+      responseMimeType: 'application/json',
+    });
+    if (finishReason === 'MAX_TOKENS') {
+      return NextResponse.json(
+        { error: 'LLM truncated', detail: 'Resposta cortada — tente um pedido mais curto.' },
+        { status: 502 },
+      );
+    }
+    raw = text;
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: 'LLM failed', detail: msg }, { status: 502 });
@@ -151,13 +188,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     user.id,
     req.nextUrl.searchParams.get('companyId'),
   );
-  if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
 
   const doc = await prisma.studioDocument.findFirst({
-    where: { id: params.id, companyId },
-    select: { aiSessionId: true },
+    where: companyId ? { id: params.id, companyId } : { id: params.id },
+    select: { id: true, companyId: true, createdById: true, folderId: true, visibility: true, aiSessionId: true },
   });
   if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const access = await getDocumentAccess(user.id, doc);
+  if (access === 'none') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   if (!doc.aiSessionId) return NextResponse.json({ messages: [] });
 
   const messages = await prisma.aiAdvisorMessage.findMany({

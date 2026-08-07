@@ -1,8 +1,8 @@
 # Etholys Studio — criação de documentos (ferramenta transversal)
 
-**Versão:** 0.3  
-**Data:** 2026-08-06  
-**Status:** F0–F2.1 em código (biblioteca, editor, consent, marca, export, preview Mermaid, papéis viewer/editor/admin)  
+**Versão:** 0.4  
+**Data:** 2026-08-07  
+**Status:** F0–F2.2 em código (biblioteca, editor, consent, marca, export, Mermaid, papéis, contexto IA pasta/chat)  
 **Público:** product, desenvolvedores, agentes de IA  
 
 **Fonte de verdade** para o estúdio de documentos com IA no Etholys.  
@@ -35,6 +35,7 @@
 | **F1** | Kit de marca da empresa + export PDF/DOCX | ✅ |
 | **F2** | Diagramas editáveis + “ajusta o diagrama” no chat | ✅ preview Mermaid + patches via agente |
 | **F2.1** | Permissões / partilha pasta+doc (membros + email externo; papéis viewer/editor/admin) | ✅ |
+| **F2.2** | Contexto IA: ficheiros na pasta + anexos no chat | ✅ |
 | **F3** | Pontes “Abrir no Studio” desde SIEP/FUNDHUB/Meet | Seguinte |
 | **F4** | Templates por domínio + colaboração/comentários | |
 
@@ -68,6 +69,7 @@ flowchart LR
 - **`StudioFolder`:** árvore por `companyId`  
 - **`StudioDocument`:** título, format, `canvasState` (páginas/blocos), `aiSessionId`  
 - **`StudioTemplate`:** sistema (`isSystem`) ou por empresa  
+- **`StudioContextAsset`:** ficheiros de contexto para a IA — `scope=folder` (gerais da pasta, herdam para docs filhos) ou `scope=document` (anexos do chat/doc). Texto extraído (PDF/DOCX/txt) injectado no prompt; imagens/PDF também como multimodal no turno. **Não** passam pelo gate de consentimento do catálogo Etholys (o utilizador carregou-os de propósito).
 - **Brand kit:** `AiCompanyMemory` category `studio_brand` + fallback `Company.logo` / `Company.color`
 
 Distinto do modelo `Document` (blob S3).
@@ -102,7 +104,7 @@ API: `POST /api/studio/documents/[id]/export` com `{ format: "pdf" | "docx" }`.
 | Hot button | `apps/web/components/studio/StudioHotButton.tsx` |
 | APIs | `apps/web/app/api/studio/` |
 | Lib | `apps/web/lib/studio/` |
-| Prisma | `StudioFolder`, `StudioDocument`, `StudioTemplate` |
+| Prisma | `StudioFolder`, `StudioDocument`, `StudioTemplate`, `StudioContextAsset` |
 | SQL manual | `apps/web/prisma/migrations/manual_etholys_studio.sql` |
 | Deploy | `scripts/apply-studio-deploy.sh` |
 

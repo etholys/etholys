@@ -100,3 +100,48 @@ DO $$ BEGIN
   ALTER TABLE "StudioTemplate" ADD CONSTRAINT "StudioTemplate_companyId_fkey"
     FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Contexto IA (pastas + documentos) — additive
+CREATE TABLE IF NOT EXISTS "StudioContextAsset" (
+  "id" TEXT NOT NULL,
+  "companyId" TEXT NOT NULL,
+  "scope" TEXT NOT NULL,
+  "folderId" TEXT,
+  "documentId" TEXT,
+  "name" TEXT NOT NULL,
+  "fileName" TEXT NOT NULL,
+  "mimeType" TEXT NOT NULL,
+  "sizeBytes" INT NOT NULL DEFAULT 0,
+  "storagePath" TEXT NOT NULL,
+  "extractedText" TEXT,
+  "label" TEXT,
+  "createdById" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "StudioContextAsset_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "StudioContextAsset_companyId_idx" ON "StudioContextAsset"("companyId");
+CREATE INDEX IF NOT EXISTS "StudioContextAsset_folderId_idx" ON "StudioContextAsset"("folderId");
+CREATE INDEX IF NOT EXISTS "StudioContextAsset_documentId_idx" ON "StudioContextAsset"("documentId");
+CREATE INDEX IF NOT EXISTS "StudioContextAsset_scope_idx" ON "StudioContextAsset"("scope");
+
+DO $$ BEGIN
+  ALTER TABLE "StudioContextAsset" ADD CONSTRAINT "StudioContextAsset_companyId_fkey"
+    FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "StudioContextAsset" ADD CONSTRAINT "StudioContextAsset_folderId_fkey"
+    FOREIGN KEY ("folderId") REFERENCES "StudioFolder"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "StudioContextAsset" ADD CONSTRAINT "StudioContextAsset_documentId_fkey"
+    FOREIGN KEY ("documentId") REFERENCES "StudioDocument"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "StudioContextAsset" ADD CONSTRAINT "StudioContextAsset_createdById_fkey"
+    FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
