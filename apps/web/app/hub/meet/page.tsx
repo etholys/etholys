@@ -825,30 +825,6 @@ function MeetHubContent() {
         )}
       </main>
 
-      <footer className="border-t border-slate-200 px-4 py-4 sm:px-6">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500">
-          <span>
-            {t('Espelhos:', 'Espejos:', 'Mirrors:')}{' '}
-            <Link href="/hub/forge" className="text-sky-700 hover:underline">
-              FORGE
-            </Link>
-            {' · '}
-            <Link href="/siep" className="text-sky-700 hover:underline">
-              SIEP
-            </Link>
-            {' · '}
-            <Link href="/hub/nexus" className="text-sky-700 hover:underline">
-              NEXUS
-            </Link>
-          </span>
-          {jitsiStatus && !jitsiStatus.isDemo && jitsiStatus.baseUrl && (
-            <span>
-              {t('Vídeo:', 'Vídeo:', 'Video:')} {jitsiStatus.baseUrl.replace(/^https?:\/\//, '')}
-            </span>
-          )}
-        </div>
-      </footer>
-
       {scheduleOpen && (
         <MeetScheduleDialog
           locale={locale}

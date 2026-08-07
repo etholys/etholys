@@ -10,6 +10,7 @@ const HIDDEN_PREFIXES = [
   '/login',
   '/acesso',
   '/hub/studio',
+  '/hub/meet',
   '/lab',
   '/expedicion',
   '/verificar-forge',
