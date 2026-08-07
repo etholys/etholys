@@ -55,6 +55,8 @@ export async function POST(req: Request, ctx: Ctx) {
     const body = (await req.json()) as {
       companyId?: string;
       provider?: 'google' | 'outlook';
+      /** Se false, cria o evento sem e-mail de convite do Google/Outlook. Default: true. */
+      notifyAttendees?: boolean;
     };
 
     const companyId = body.companyId?.trim();
@@ -81,15 +83,21 @@ export async function POST(req: Request, ctx: Ctx) {
         : 'none';
     const recurrenceRule = meetRecurrenceToRrule(recurrence, session.recurrenceUntil);
 
+    const organizerEmail = (session.createdBy?.email || '').trim().toLowerCase();
+    const notifyAttendees = body.notifyAttendees !== false;
+    const attendeeEmails = session.participants
+      .filter((participant) => participant.role !== 'host' && participant.email)
+      .map((participant) => participant.email!.trim().toLowerCase())
+      .filter((email) => email.includes('@') && email !== organizerEmail);
+
     const event = {
       title: session.title,
       description: [session.description, session.meetingUrl].filter(Boolean).join('\n\n'),
       locationUrl: session.meetingUrl || undefined,
       startsAt,
       endsAt,
-      attendeeEmails: session.participants
-        .filter((participant) => participant.role !== 'host' && participant.email)
-        .map((participant) => participant.email!),
+      attendeeEmails: notifyAttendees ? attendeeEmails : [],
+      notifyAttendees,
       recurrenceRule: provider === 'google' ? recurrenceRule : null,
     };
 

@@ -368,11 +368,17 @@ export function MeetScheduleDialog({
                   className="mt-0.5 rounded border-slate-300"
                 />
                 <span>
-                  {t(
-                    'Enviar convite com botões Google/Outlook e ficheiro .ics',
-                    'Enviar invitación con botones Google/Outlook y archivo .ics',
-                    'Send invite with Google/Outlook buttons and an .ics file',
-                  )}
+                  {calendarProvider !== 'none'
+                    ? t(
+                        'Notificar convidados pelo calendário (1 e-mail). Sem e-mail Etholys extra.',
+                        'Notificar invitados por el calendario (1 correo). Sin email Etholys extra.',
+                        'Notify guests via calendar (1 email). No extra Etholys email.',
+                      )
+                    : t(
+                        'Enviar convite Etholys por e-mail (com .ics)',
+                        'Enviar invitación Etholys por email (con .ics)',
+                        'Send Etholys invite by email (with .ics)',
+                      )}
                 </span>
               </label>
             </section>

@@ -83,6 +83,8 @@ export type MeetCalendarEventInput = {
   startsAt: Date;
   endsAt: Date;
   attendeeEmails?: string[];
+  /** Enviar e-mail de convite do Google aos attendees (sendUpdates=all). */
+  notifyAttendees?: boolean;
   /** RRULE sem prefixo RRULE: — ex. FREQ=WEEKLY;COUNT=12 */
   recurrenceRule?: string | null;
 };
@@ -111,7 +113,10 @@ export async function createGoogleCalendarEvent(
   }
 
   const url = new URL(GOOGLE_CALENDAR_EVENTS);
-  if (event.attendeeEmails?.length) url.searchParams.set('sendUpdates', 'all');
+  const shouldNotify =
+    event.notifyAttendees !== false && Boolean(event.attendeeEmails?.length);
+  if (shouldNotify) url.searchParams.set('sendUpdates', 'all');
+  else url.searchParams.set('sendUpdates', 'none');
   const res = await fetch(url, {
     method: 'POST',
     headers: {

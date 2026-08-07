@@ -262,6 +262,11 @@ function MeetHubContent() {
       const emails = draft?.inviteEmails ?? [];
       const linkedProject = draft?.projectId ?? null;
       const isPermanent = mode === 'permanent' || Boolean(draft?.isPermanent) || mode === 'later';
+      // Com Google/Outlook: o calendário notifica os convidados — evita 2 e-mails (Resend + Google).
+      const usesCalendarInvite =
+        mode === 'scheduled' &&
+        !isPermanent &&
+        Boolean(draft?.calendarProvider && draft.calendarProvider !== 'none');
       const r = await fetch('/api/meet/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -272,7 +277,7 @@ function MeetHubContent() {
           mirror: linkedProject ? 'siep' : 'loose',
           projectId: linkedProject,
           inviteEmails: emails,
-          sendInvites: Boolean(draft?.sendInvites && emails.length),
+          sendInvites: Boolean(draft?.sendInvites && emails.length && !usesCalendarInvite),
           scheduledAt: draft?.startsAt,
           endsAt: draft?.endsAt,
           unscheduled: isPermanent,
@@ -292,11 +297,15 @@ function MeetHubContent() {
 
       if (mode === 'scheduled' && d.session?.id && draft) {
         let calendarSyncError: string | null = null;
-        if (draft.calendarProvider !== 'none' && !draft.isPermanent) {
+        if (usesCalendarInvite) {
           const calendarResponse = await fetch(`/api/meet/sessions/${d.session.id}/calendar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ companyId, provider: draft.calendarProvider }),
+            body: JSON.stringify({
+              companyId,
+              provider: draft.calendarProvider,
+              notifyAttendees: Boolean(draft.sendInvites),
+            }),
           });
           const calendarData = (await calendarResponse.json()) as {
             error?: string;
