@@ -38,7 +38,20 @@ export async function saveLocalSiepFile(
 
 export async function loadFileBuffer(cloudStoragePath: string): Promise<Buffer> {
   if (isLocalStoragePath(cloudStoragePath)) {
-    return fs.readFile(localStorageAbsPath(cloudStoragePath));
+    try {
+      return await fs.readFile(localStorageAbsPath(cloudStoragePath));
+    } catch (err: unknown) {
+      const code = err && typeof err === 'object' && 'code' in err ? String((err as { code?: string }).code) : '';
+      if (code === 'ENOENT') {
+        // Mesmo nome noutro upload do projecto (ficheiros locais perdidos em rebuilds)
+        const fallback = await findLocalFallbackByFileName(cloudStoragePath);
+        if (fallback) return fallback;
+        throw new Error(
+          'Ficheiro do modelo não encontrado no servidor (foi perdido num deploy). Reenvie o .docx/.xlsx do modelo.',
+        );
+      }
+      throw err;
+    }
   }
   if (!isS3Configured()) {
     throw new Error('Almacenamiento S3 no configurado');
@@ -49,6 +62,39 @@ export async function loadFileBuffer(cloudStoragePath: string): Promise<Buffer> 
     new GetObjectCommand({ Bucket: bucketName, Key: cloudStoragePath }),
   );
   return Buffer.from(await resp.Body!.transformToByteArray());
+}
+
+async function findLocalFallbackByFileName(cloudStoragePath: string): Promise<Buffer | null> {
+  const base = path.basename(cloudStoragePath).replace(/^\d+-/, '');
+  if (!base) return null;
+  // uploads/siep/{projectId}/reports|guides/...
+  const parts = cloudStoragePath.split('/');
+  const projectIdx = parts.indexOf('siep');
+  if (projectIdx < 0 || !parts[projectIdx + 1]) return null;
+  const projectId = parts[projectIdx + 1];
+  const root = path.join(process.cwd(), 'public', 'uploads', 'siep', projectId);
+  try {
+    const categories = await fs.readdir(root);
+    for (const cat of categories) {
+      const dir = path.join(root, cat);
+      let entries: string[];
+      try {
+        entries = await fs.readdir(dir);
+      } catch {
+        continue;
+      }
+      const match = entries
+        .filter((e) => e.endsWith(base) || e.replace(/^\d+-/, '') === base)
+        .sort()
+        .reverse()[0];
+      if (match) {
+        return fs.readFile(path.join(dir, match));
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 export async function presignSiepUpload(fileName: string, contentType: string) {

@@ -10,6 +10,7 @@ import type { ReportCanvasState } from '@/lib/siep/report-canvas-types';
 import type { InformeTemplateRow } from '@/lib/siep/informe-template-store';
 import type { InformeDomain } from '@/lib/siep/informe-domains';
 import { createBlankCanvas } from '@/lib/siep/report-canvas-builder';
+import { apiErrorMessage, readApiJson } from '@/lib/siep/read-api-json';
 
 type Props = {
   projectId: string;
@@ -75,9 +76,9 @@ export function SiepInformeWizard({ projectId, domain, onClose, onCreated }: Pro
   const loadTemplates = useCallback(() => {
     setTemplatesLoading(true);
     fetch(`/api/siep/informes/templates?projectId=${projectId}&domain=${activeDomain}`)
-      .then((r) => r.json())
-      .then((d) => {
-        const list = (d.templates ?? []) as InformeTemplateRow[];
+      .then(async (r) => {
+        const { data } = await readApiJson<{ templates?: InformeTemplateRow[] }>(r);
+        const list = (data.templates ?? []) as InformeTemplateRow[];
         setTemplates(list);
         const first = list.find((t) => t.validated) || list[0];
         if (first) {
@@ -137,7 +138,8 @@ export function SiepInformeWizard({ projectId, domain, onClose, onCreated }: Pro
         templateId = tpl.id;
         format = tpl.canvasFormat || 'docx';
         setSavedTemplateId(tpl.id);
-        initialCanvas = null;
+        // Prefer canvas já validado — evita reparse de ficheiros locais perdidos após deploy
+        initialCanvas = tpl.canvasState;
       } else if (templateMode === 'blank') {
         initialCanvas = createBlankCanvas(st('siep.informe.structure.customFormat'));
         format = 'markdown';
@@ -169,10 +171,21 @@ export function SiepInformeWizard({ projectId, domain, onClose, onCreated }: Pro
             mimeType: mime,
           }),
         });
-        const parseData = await parseRes.json();
-        if (!parseRes.ok) throw new Error(String(parseData.error || 'Erro ao ler modelo'));
+        const { data: parseData } = await readApiJson<{
+          canvasState?: ReportCanvasState;
+          canvasFormat?: string;
+          error?: string;
+        }>(parseRes);
+        if (!parseRes.ok) throw new Error(apiErrorMessage(parseData, 'Erro ao ler modelo'));
         initialCanvas = parseData.canvasState as ReportCanvasState;
         format = parseData.canvasFormat || format;
+        setChatMessages([{
+          role: 'assistant',
+          content: st('siep.informe.preview.parseDone')
+            .replace('{n}', String(initialCanvas.regions.length))
+            .replace('{s}', String(initialCanvas.sections?.length ?? 0)),
+        }]);
+      } else if (templateMode === 'existing') {
         setChatMessages([{
           role: 'assistant',
           content: st('siep.informe.preview.parseDone')
@@ -202,7 +215,7 @@ export function SiepInformeWizard({ projectId, domain, onClose, onCreated }: Pro
             blankTemplate: templateMode === 'blank',
           }),
         });
-        const saveData = await saveRes.json();
+        const { data: saveData } = await readApiJson<{ template?: { id?: string } }>(saveRes);
         if (saveRes.ok && saveData.template?.id) {
           setSavedTemplateId(saveData.template.id);
         }
@@ -248,9 +261,9 @@ export function SiepInformeWizard({ projectId, domain, onClose, onCreated }: Pro
           history: chatMessages.slice(-8),
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(String(data.error || 'Erro'));
-      setChatMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+      const { data } = await readApiJson<{ reply?: string; canvasState?: ReportCanvasState; error?: string }>(res);
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Erro'));
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: data.reply || '' }]);
       if (data.canvasState) setCanvas(data.canvasState as ReportCanvasState);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro no chat');
@@ -281,9 +294,9 @@ export function SiepInformeWizard({ projectId, domain, onClose, onCreated }: Pro
           history: [],
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(String(data.error || 'Erro'));
-      setChatMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+      const { data } = await readApiJson<{ reply?: string; canvasState?: ReportCanvasState; error?: string }>(res);
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Erro'));
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: data.reply || '' }]);
       if (data.canvasState) setCanvas(data.canvasState as ReportCanvasState);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro no chat');
@@ -332,8 +345,8 @@ export function SiepInformeWizard({ projectId, domain, onClose, onCreated }: Pro
           canvasFormat: canvas.format || canvasFormat,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(String(data.error || `Erro (${res.status})`));
+      const { data } = await readApiJson<{ reportId?: string; error?: string }>(res);
+      if (!res.ok || !data.reportId) throw new Error(apiErrorMessage(data, `Erro (${res.status})`));
       setProgressPct(100);
       onCreated(data.reportId);
     } catch (e: unknown) {

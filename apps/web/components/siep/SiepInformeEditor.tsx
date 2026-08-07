@@ -8,6 +8,7 @@ import type { InformeCanvasSelection } from '@/lib/siep/informe-canvas-selection
 import { SiepInformeChatPanel } from '@/components/siep/SiepInformeChatPanel';
 import { SiepInformeCanvas } from '@/components/siep/SiepInformeCanvas';
 import type { ReportCanvasState } from '@/lib/siep/report-canvas-types';
+import { apiErrorMessage, readApiJson } from '@/lib/siep/read-api-json';
 
 type Props = {
   reportId: string;
@@ -40,8 +41,14 @@ export function SiepInformeEditor({ reportId, onClose, onSaved }: Props) {
     setError(null);
     try {
       const r = await fetch(`/api/siep/informes/${reportId}`);
-      const data = await r.json();
-      if (!r.ok) throw new Error(String(data.error || `Erro (${r.status})`));
+      const { data } = await readApiJson<{
+        report?: EditorMeta & { aiSessionId: string | null };
+        canvasState?: ReportCanvasState;
+        templateFile?: { fileName?: string };
+        error?: string;
+      }>(r);
+      if (!r.ok) throw new Error(apiErrorMessage(data, `Erro (${r.status})`));
+      if (!data.report || !data.canvasState) throw new Error('Informe incompleto');
       setMeta({
         title: data.report.title,
         period: data.report.period,
@@ -75,8 +82,8 @@ export function SiepInformeEditor({ reportId, onClose, onSaved }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ canvasState: canvas }),
       });
-      const data = await r.json();
-      if (!r.ok) throw new Error(String(data.error || 'Erro ao guardar'));
+      const { data } = await readApiJson<{ error?: string }>(r);
+      if (!r.ok) throw new Error(apiErrorMessage(data, 'Erro ao guardar'));
       setDirty(false);
       onSaved?.();
     } catch (e: unknown) {
@@ -95,10 +102,17 @@ export function SiepInformeEditor({ reportId, onClose, onSaved }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'export' }),
       });
-      const data = await r.json();
-      if (!r.ok) throw new Error(String(data.error || 'Erro ao exportar'));
+      const { data } = await readApiJson<{
+        base64?: string;
+        mimeType?: string;
+        fileName?: string;
+        error?: string;
+      }>(r);
+      if (!r.ok || !data.base64 || !data.fileName) {
+        throw new Error(apiErrorMessage(data, 'Erro ao exportar'));
+      }
       const blob = Uint8Array.from(atob(data.base64), (c) => c.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([blob], { type: data.mimeType }));
+      const url = URL.createObjectURL(new Blob([blob], { type: data.mimeType || 'application/octet-stream' }));
       const a = document.createElement('a');
       a.href = url;
       a.download = data.fileName;

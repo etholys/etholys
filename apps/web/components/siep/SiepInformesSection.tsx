@@ -7,6 +7,7 @@ import { SiepInformeEditor } from '@/components/siep/SiepInformeEditor';
 import { useSiepT, useSiepLocale } from '@/lib/siep/use-siep-t';
 import { siepT } from '@/lib/siep/i18n';
 import { INFORME_DOMAINS, type InformeDomain } from '@/lib/siep/informe-domains';
+import { apiErrorMessage, readApiJson } from '@/lib/siep/read-api-json';
 
 type Props = {
   projectId: string;
@@ -57,10 +58,10 @@ export function SiepInformesSection({ projectId, domain }: Props) {
     if (!silent) setLoading(true);
     fetch(`/api/siep/informes?projectId=${projectId}&domain=${domain}`)
       .then(async (r) => {
-        const d = await r.json();
+        const { data: d } = await readApiJson<{ informes?: InformeRow[]; error?: string }>(r);
         if (requestId !== requestIdRef.current) return;
         if (!r.ok) {
-          setLoadError(typeof d.error === 'string' ? d.error : siepT('siep.informe.loadError', locale));
+          setLoadError(apiErrorMessage(d, siepT('siep.informe.loadError', locale)));
           setInformes([]);
         } else {
           setLoadError(null);
@@ -69,9 +70,9 @@ export function SiepInformesSection({ projectId, domain }: Props) {
         hasLoadedRef.current = true;
         setLoading(false);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
         if (requestId !== requestIdRef.current) return;
-        setLoadError(siepT('siep.informe.loadError', locale));
+        setLoadError(e instanceof Error ? e.message : siepT('siep.informe.loadError', locale));
         setInformes([]);
         setLoading(false);
       });

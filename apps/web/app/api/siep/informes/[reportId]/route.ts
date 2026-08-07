@@ -151,24 +151,36 @@ export async function POST(req: Request, ctx: RouteCtx) {
       });
     }
 
-    const buffer = await loadFileBuffer(templateFile.cloudStoragePath);
-    let exportCanvas = canvas;
-    if (canvas.format === 'docx') {
-      const freshTemplate = await parseReportTemplate(
-        buffer,
-        templateFile.fileName,
-        templateFile.id,
-        templateFile.mimeType,
-      );
-      exportCanvas = reconcileCanvasDocxCoords(freshTemplate, canvas);
-    }
-    const exported = await exportReportFromCanvas(buffer, exportCanvas, templateFile.fileName);
+    try {
+      const buffer = await loadFileBuffer(templateFile.cloudStoragePath);
+      let exportCanvas = canvas;
+      if (canvas.format === 'docx') {
+        const freshTemplate = await parseReportTemplate(
+          buffer,
+          templateFile.fileName,
+          templateFile.id,
+          templateFile.mimeType,
+        );
+        exportCanvas = reconcileCanvasDocxCoords(freshTemplate, canvas);
+      }
+      const exported = await exportReportFromCanvas(buffer, exportCanvas, templateFile.fileName);
 
-    return NextResponse.json({
-      fileName: exported.fileName,
-      mimeType: exported.mimeType,
-      base64: exported.buffer.toString('base64'),
-    });
+      return NextResponse.json({
+        fileName: exported.fileName,
+        mimeType: exported.mimeType,
+        base64: exported.buffer.toString('base64'),
+      });
+    } catch (fileErr: unknown) {
+      const fileMsg = fileErr instanceof Error ? fileErr.message : 'Erro ao ler modelo';
+      console.error('[siep/informes/[reportId] POST export file]', fileErr);
+      const text = canvasStateToPlainText(canvas);
+      return NextResponse.json({
+        fileName: `${report.title.replace(/[^\w\s-]/g, '')}.txt`,
+        mimeType: 'text/plain; charset=utf-8',
+        base64: Buffer.from(text, 'utf-8').toString('base64'),
+        warning: fileMsg,
+      });
+    }
   } catch (error: unknown) {
     console.error('[siep/informes/[reportId] POST export]', error);
     const msg = error instanceof Error ? error.message : 'Error interno';

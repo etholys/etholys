@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import { inferReportOutputLanguage, type ReportOutputLanguage } from '@/lib/siep/report-copilot-prompts';
 import type { InformeCanvasSelection } from '@/lib/siep/informe-canvas-selection';
 import type { ReportCanvasState } from '@/lib/siep/report-canvas-types';
+import { apiErrorMessage, readApiJson } from '@/lib/siep/read-api-json';
 
 export type SiepInformeMsg = {
   id: string;
@@ -33,8 +34,8 @@ export function useSiepInformeSession(
     setErr(null);
     try {
       const r = await fetch(`${API}/${sid}`, { cache: 'no-store' });
-      if (!r.ok) throw new Error(`Erro ao carregar chat (${r.status})`);
-      const data = await r.json();
+      const { data } = await readApiJson<{ messages?: SiepInformeMsg[]; error?: string }>(r);
+      if (!r.ok) throw new Error(apiErrorMessage(data, `Erro ao carregar chat (${r.status})`));
       setMessages((data?.messages ?? []) as SiepInformeMsg[]);
       loadedRef.current = sid;
     } catch (e: unknown) {
@@ -69,8 +70,8 @@ export function useSiepInformeSession(
           selection: selection ?? undefined,
         }),
       });
-      const data = await r.json();
-      if (!r.ok) throw new Error(String(data.error || `Erro (${r.status})`));
+      const { data } = await readApiJson<{ canvasState?: unknown; error?: string }>(r);
+      if (!r.ok) throw new Error(apiErrorMessage(data, `Erro (${r.status})`));
       await loadMessages(sessionId);
       return { canvasState: data.canvasState };
     } catch (e: unknown) {
