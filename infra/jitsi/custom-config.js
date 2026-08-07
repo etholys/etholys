@@ -47,6 +47,15 @@ config.virtualBackgrounds = [
   { id: 'etholys-office', src: 'https://app.etholys.com/meet-brand/backgrounds/office-soft.svg' },
 ];
 
+// Botão Etholys na toolbar (painel de transcrição na app) — não via configOverwrite só.
+config.customToolbarButtons = [
+  {
+    id: 'etholys-transcript',
+    text: 'Transcripción',
+    icon: 'https://app.etholys.com/meet-brand/transcript.svg',
+  },
+];
+
 config.toolbarButtons = [
   'microphone',
   'camera',
@@ -55,6 +64,7 @@ config.toolbarButtons = [
   'reactions',
   'chat',
   'closedcaptions',
+  'etholys-transcript',
   'participants-pane',
   'tileview',
   'hangup',

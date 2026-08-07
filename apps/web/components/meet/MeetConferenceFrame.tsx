@@ -48,6 +48,8 @@ declare global {
   }
 }
 
+const ETHOLYS_TRANSCRIPT_BUTTON_ID = 'etholys-transcript';
+
 /** Toolbar order aproximado ao Google Meet (mic → cam → share → … → hangup). */
 const MEET_TOOLBAR_BUTTONS = [
   'microphone',
@@ -57,6 +59,7 @@ const MEET_TOOLBAR_BUTTONS = [
   'reactions',
   'chat',
   'closedcaptions',
+  ETHOLYS_TRANSCRIPT_BUTTON_ID,
   'participants-pane',
   'tileview',
   'hangup',
@@ -92,6 +95,8 @@ type Props = {
   onParticipantCountChange?: (count: number) => void;
   onDominantSpeakerChanged?: (name: string | null) => void;
   onConferenceLeft?: () => void;
+  /** Clique no botão Etholys da toolbar Jitsi (abrir/fechar painel de transcrição). */
+  onTranscriptToolbarClick?: () => void;
   onError?: (message: string) => void;
 };
 
@@ -147,6 +152,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       onParticipantCountChange,
       onDominantSpeakerChanged,
       onConferenceLeft,
+      onTranscriptToolbarClick,
       onError,
     },
     ref,
@@ -162,6 +168,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       onParticipantCountChange,
       onDominantSpeakerChanged,
       onConferenceLeft,
+      onTranscriptToolbarClick,
       onError,
     });
     const [loading, setLoading] = useState(true);
@@ -175,6 +182,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       onParticipantCountChange,
       onDominantSpeakerChanged,
       onConferenceLeft,
+      onTranscriptToolbarClick,
       onError,
     };
 
@@ -262,6 +270,13 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
                 {
                   id: 'etholys-office',
                   src: 'https://app.etholys.com/meet-brand/backgrounds/office-soft.svg',
+                },
+              ],
+              customToolbarButtons: [
+                {
+                  id: ETHOLYS_TRANSCRIPT_BUTTON_ID,
+                  text: locale === 'pt' ? 'Transcrição' : locale === 'en' ? 'Transcript' : 'Transcripción',
+                  icon: 'https://app.etholys.com/meet-brand/transcript.svg',
                 },
               ],
               toolbarButtons: [...MEET_TOOLBAR_BUTTONS],
@@ -391,6 +406,12 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               callbacksRef.current.onDominantSpeakerChanged?.(name);
             } catch {
               callbacksRef.current.onDominantSpeakerChanged?.(null);
+            }
+          });
+          api.addListener('toolbarButtonClicked', (payload: { key?: string; id?: string }) => {
+            const key = payload?.key || payload?.id;
+            if (key === ETHOLYS_TRANSCRIPT_BUTTON_ID) {
+              callbacksRef.current.onTranscriptToolbarClick?.();
             }
           });
           api.addListener('videoConferenceLeft', () => {

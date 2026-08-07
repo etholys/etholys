@@ -11,7 +11,6 @@ import {
   Info,
   Loader2,
   Mic,
-  PhoneOff,
   Square,
   Users,
   Video,
@@ -282,8 +281,11 @@ export function MeetRoomClient({ sessionId }: Props) {
     conferenceRef.current?.stopRecording(recordingMode);
   }
 
-  async function endMeeting() {
-    if (!companyId) return;
+  const endInFlight = useRef(false);
+
+  async function endMeeting(opts?: { skipHangup?: boolean }) {
+    if (!companyId || endInFlight.current || session?.status === 'ended') return;
+    endInFlight.current = true;
     setEnding(true);
     try {
       if (transcriptionOn) conferenceRef.current?.stopTranscription();
@@ -316,9 +318,10 @@ export function MeetRoomClient({ sessionId }: Props) {
         const data = (await response.json().catch(() => ({}))) as { error?: string };
         throw new Error(data.error || 'Falha ao encerrar reunião');
       }
-      conferenceRef.current?.hangup();
+      if (!opts?.skipHangup) conferenceRef.current?.hangup();
       router.push(`/hub/meet?post=${sessionId}`);
     } catch (e) {
+      endInFlight.current = false;
       setError(e instanceof Error ? e.message : 'Error');
       setEnding(false);
     }
@@ -447,6 +450,10 @@ export function MeetRoomClient({ sessionId }: Props) {
                 onTranscriptionChunk={handleTranscriptionChunk}
                 onParticipantCountChange={setParticipantCount}
                 onDominantSpeakerChanged={setDominantSpeaker}
+                onTranscriptToolbarClick={() => setPanelOpen((open) => !open)}
+                onConferenceLeft={() => {
+                  void endMeeting({ skipHangup: true });
+                }}
                 onRecordingStatus={(state) => {
                   if (state.transcription) {
                     setTranscriptionOn(state.on);
@@ -482,37 +489,6 @@ export function MeetRoomClient({ sessionId }: Props) {
                 {t('Sala sem URL.', 'Sala sin URL.', 'Room has no URL.')}
               </div>
             )}
-          </div>
-
-          {/* Controles secundários Etholys — canto inferior direito */}
-          <div className="pointer-events-none absolute bottom-5 right-5 z-20 flex flex-col items-end gap-2 sm:bottom-6 sm:right-6">
-            <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-[#3c4043]/90 p-1 shadow-lg backdrop-blur-sm">
-              <button
-                type="button"
-                onClick={() => setPanelOpen((o) => !o)}
-                className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
-                  panelOpen ? 'bg-white/20 text-white' : 'text-white/85 hover:bg-white/10'
-                }`}
-                title={t('Transcrição', 'Transcripción', 'Transcript')}
-                aria-pressed={panelOpen}
-              >
-                <FileText className="h-5 w-5" strokeWidth={1.6} />
-              </button>
-              <button
-                type="button"
-                onClick={() => void endMeeting()}
-                disabled={ending || session.status === 'ended'}
-                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-[#ea4335] px-3.5 text-xs font-medium text-white hover:bg-[#f28b82] disabled:opacity-50"
-                title={t('Encerrar reunião Etholys', 'Cerrar reunión Etholys', 'End Etholys meeting')}
-              >
-                {ending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <PhoneOff className="h-4 w-4" strokeWidth={1.75} />
-                )}
-                <span className="hidden sm:inline">{t('Encerrar', 'Cerrar', 'End')}</span>
-              </button>
-            </div>
           </div>
         </main>
 
