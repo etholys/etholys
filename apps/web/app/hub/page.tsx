@@ -490,7 +490,7 @@ export default function HubPage() {
             <Link href="/hub/admin" className="px-3 py-1.5 text-xs rounded-lg hover:bg-slate-100 transition text-slate-600 hidden sm:inline-flex">
               {locale === 'es' ? 'Administración' : locale === 'pt' ? 'Administração' : 'Admin'}
             </Link>
-            <Link href="/" className="px-3 py-1.5 text-xs rounded-lg hover:bg-slate-100 transition text-slate-600 flex items-center gap-1">
+            <Link href="https://etholys.com" className="px-3 py-1.5 text-xs rounded-lg hover:bg-slate-100 transition text-slate-600 flex items-center gap-1">
               <ExternalLink className="w-3 h-3" />
               {locale === 'es' ? 'Vitrina' : locale === 'pt' ? 'Vitrine' : 'Showcase'}
             </Link>

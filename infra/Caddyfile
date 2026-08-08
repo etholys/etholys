@@ -1,13 +1,39 @@
-# Produção Contabo — app + Etholys Meet (Jitsi)
-# APP_DOMAIN e MEET_DOMAIN vêm de infra/.env (docker compose)
+# Produção Contabo — site institucional + app + Etholys Meet (Jitsi)
+# Variáveis em infra/.env (docker compose):
+#   SITE_DOMAIN  → etholys.com (marca / vitrine)
+#   APP_DOMAIN   → app.etholys.com (Hub / login / sistemas)
+#   MEET_DOMAIN  → meet.etholys.com (Jitsi)
 #
 # Com Cloudflare proxy (nuvem laranja): SSL/TLS "Full" no painel.
 # Para WebRTC do Jitsi, preferir DNS only (cinza) em meet.* se houver problemas de áudio/vídeo.
 
-{$APP_DOMAIN} {
+# Site institucional (apex)
+{$SITE_DOMAIN} {
 	reverse_proxy web:3000 {
 		transport http {
 			# Informes / copiloto LLM podem demorar vários minutos
+			read_timeout 10m
+			write_timeout 10m
+			dial_timeout 30s
+		}
+	}
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
+
+# www → apex
+www.{$SITE_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}
+
+# App (Hub / SSO / sistemas)
+{$APP_DOMAIN} {
+	reverse_proxy web:3000 {
+		transport http {
 			read_timeout 10m
 			write_timeout 10m
 			dial_timeout 30s

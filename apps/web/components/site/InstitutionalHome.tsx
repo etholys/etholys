@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useApp } from '@/app/providers';
 import type { Locale } from '@/lib/i18n';
 
@@ -195,6 +196,14 @@ export default function InstitutionalHome() {
   const { locale, setLocale } = useApp();
   const t = copy(locale);
   const nextLocale: Locale = locale === 'es' ? 'pt' : locale === 'pt' ? 'en' : 'es';
+  const [loginHref, setLoginHref] = useState('/login');
+
+  useEffect(() => {
+    const host = window.location.hostname;
+    if (host === 'etholys.com' || host === 'www.etholys.com') {
+      setLoginHref('https://app.etholys.com/login');
+    }
+  }, []);
 
   return (
     <div className="etholys-site min-h-screen bg-[#07111A] text-[#E8EEF2]">
@@ -234,7 +243,7 @@ export default function InstitutionalHome() {
               {nextLocale}
             </button>
             <Link
-              href="/login"
+              href={loginHref}
               className="rounded-md px-3 py-1.5 text-sm font-medium text-white/80 transition hover:text-white"
             >
               {t.enter}
@@ -447,7 +456,7 @@ export default function InstitutionalHome() {
               {t.demo}
             </a>
             <Link
-              href="/login"
+              href={loginHref}
               className="inline-flex rounded-md border border-white/20 px-5 py-2.5 text-sm font-semibold text-white transition hover:border-white/40"
             >
               {t.enter}

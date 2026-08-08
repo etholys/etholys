@@ -7,7 +7,9 @@ PG_PASS="$1"
 NA_SECRET="$2"
 DOMAIN="${3:-app.etholys.com}"
 MEET_DOMAIN="${4:-meet.etholys.com}"
+SITE_DOMAIN="${5:-etholys.com}"
 cat > infra/.env <<EOF
+SITE_DOMAIN=${SITE_DOMAIN}
 APP_DOMAIN=${DOMAIN}
 MEET_DOMAIN=${MEET_DOMAIN}
 POSTGRES_USER=etholys
