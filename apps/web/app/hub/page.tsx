@@ -262,8 +262,29 @@ export default function HubPage() {
   const [moduleHints, setModuleHints] = useState<ModuleHintCode[]>([]);
   const [hasMeaningfulSetup, setHasMeaningfulSetup] = useState(false);
   const [setupNudge, setSetupNudge] = useState<null | 'missing' | 'currency-mismatch'>(null);
+  /** Atalho Lab no Hub = só system admin Etholys (allowlist). LabInvite entra por /lab, não aqui. */
+  const [showLabShortcut, setShowLabShortcut] = useState(false);
 
   const companyId = activeCompanyId && isLikelyDbId(activeCompanyId) ? activeCompanyId : '';
+
+  useEffect(() => {
+    if (status !== 'authenticated') {
+      setShowLabShortcut(false);
+      return;
+    }
+    let cancelled = false;
+    fetch('/api/lab/access')
+      .then((r) => r.json())
+      .then((d: { isSystemAdmin?: boolean }) => {
+        if (!cancelled) setShowLabShortcut(Boolean(d.isSystemAdmin));
+      })
+      .catch(() => {
+        if (!cancelled) setShowLabShortcut(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [status, session?.user?.email]);
 
   useEffect(() => {
     let cancelled = false;
@@ -346,9 +367,6 @@ export default function HubPage() {
   }
 
   const firstName = session?.user?.name?.split(' ')?.[0] || '';
-  const isSystemAdmin = Boolean(
-    (session?.user as { platformAdmin?: boolean } | undefined)?.platformAdmin,
-  );
   const hintSet = new Set(moduleHints);
   const visibleSystems = systems.filter((sys) => {
     if (isEtholysTool(sys)) return true;
@@ -526,7 +544,7 @@ export default function HubPage() {
           </p>
         </div>
 
-        {isSystemAdmin && (
+        {showLabShortcut && (
           <Link
             href="/lab"
             className="mb-8 flex items-start gap-4 rounded-2xl border-2 border-violet-300 bg-gradient-to-r from-slate-950 to-violet-950 p-5 shadow-md shadow-violet-200/40 transition hover:border-violet-400 hover:shadow-lg"

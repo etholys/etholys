@@ -11,11 +11,12 @@
 import type { WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
 import { LICENSE_KEY_TO_HREF } from '@/lib/hub-system-license';
 
-/** Default hardcoded + env. Única fonte do system admin. */
-const DEFAULT_SYSTEM_ADMINS = [
-  'etholys@gmail.com',
-  'tiagorezende@ruralcommerceglobal.com',
-];
+/**
+ * Bootstrap mínimo se o env estiver vazio.
+ * NÃO meter aqui emails de admins de empresas clientes (ex.: Rural Commerce) —
+ * system admin ≠ CompanyUser.role=ADMIN. Fonte de verdade: ETHOLYS_PLATFORM_ADMIN_EMAILS.
+ */
+const DEFAULT_SYSTEM_ADMINS = ['etholys@gmail.com'];
 
 export function isPrecommercialMode(): boolean {
   const v = (process.env.ETHOLYS_PRECOMMERCIAL ?? process.env.NEXT_PUBLIC_ETHOLYS_PRECOMMERCIAL ?? '')
@@ -32,7 +33,9 @@ export function parseSystemAdminEmails(): string[] {
     .split(/[,;\s]+/)
     .map((e) => e.trim().toLowerCase())
     .filter((e) => e.includes('@'));
-  return [...new Set([...DEFAULT_SYSTEM_ADMINS, ...fromEnv])];
+  // Env definido → só env (evita elevar emails de cliente por default hardcoded).
+  if (fromEnv.length > 0) return [...new Set(fromEnv)];
+  return [...DEFAULT_SYSTEM_ADMINS];
 }
 
 /** @deprecated use parseSystemAdminEmails */
