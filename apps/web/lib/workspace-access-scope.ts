@@ -18,6 +18,8 @@ export type WorkspaceJwtScope = {
   mode: WorkspaceAccessMode;
   allowedSystems: WorkspaceSystemKey[];
   homePath: string;
+  /** System admin Etholys (allowlist) — NÃO admin de empresa. */
+  isSystemAdmin: boolean;
 };
 
 /**
@@ -30,8 +32,10 @@ export async function resolveWorkspaceJwtScope(userId: string): Promise<Workspac
     select: { email: true, role: true },
   });
 
-  if (isPlatformFullAccess({ email: user?.email, role: user?.role })) {
-    return { mode: 'full', allowedSystems: [], homePath: '/hub' };
+  const systemAdmin = isPlatformFullAccess({ email: user?.email, role: user?.role });
+
+  if (systemAdmin) {
+    return { mode: 'full', allowedSystems: [], homePath: '/hub', isSystemAdmin: true };
   }
 
   const memberships = await prisma.companyUser.findMany({
@@ -40,15 +44,15 @@ export async function resolveWorkspaceJwtScope(userId: string): Promise<Workspac
   });
 
   if (memberships.some((m) => m.role === 'ADMIN')) {
-    return { mode: 'full', allowedSystems: [], homePath: '/hub' };
+    return { mode: 'full', allowedSystems: [], homePath: '/hub', isSystemAdmin: false };
   }
 
   // FORGE course_only sem empresa — tratado no forge scope; aqui none se pré-comercial
   if (memberships.length === 0) {
     if (!isPrecommercialMode()) {
-      return { mode: 'full', allowedSystems: [], homePath: '/hub' };
+      return { mode: 'full', allowedSystems: [], homePath: '/hub', isSystemAdmin: false };
     }
-    return { mode: 'none', allowedSystems: [], homePath: '/acesso' };
+    return { mode: 'none', allowedSystems: [], homePath: '/acesso', isSystemAdmin: false };
   }
 
   // Agregar grants de todas as empresas
@@ -67,24 +71,25 @@ export async function resolveWorkspaceJwtScope(userId: string): Promise<Workspac
     } else {
       // no_record: em modo aberto = full; pré-comercial = sem acesso a essa empresa
       if (!isPrecommercialMode()) {
-        return { mode: 'full', allowedSystems: [], homePath: '/hub' };
+        return { mode: 'full', allowedSystems: [], homePath: '/hub', isSystemAdmin: false };
       }
     }
   }
 
   if (!isPrecommercialMode() && !hasAnyGrant) {
-    return { mode: 'full', allowedSystems: [], homePath: '/hub' };
+    return { mode: 'full', allowedSystems: [], homePath: '/hub', isSystemAdmin: false };
   }
 
   const list = [...systems];
   if (!hasEnabledGrant || list.length === 0) {
-    return { mode: 'none', allowedSystems: [], homePath: '/acesso' };
+    return { mode: 'none', allowedSystems: [], homePath: '/acesso', isSystemAdmin: false };
   }
 
   return {
     mode: 'function_only',
     allowedSystems: list,
     homePath: homePathForSystems(list),
+    isSystemAdmin: false,
   };
 }
 

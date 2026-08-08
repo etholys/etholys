@@ -48,8 +48,7 @@ const tools = [
 export default function LabPage() {
   const { locale } = useApp();
   const { data: session } = useSession() || {};
-  const userRole = (session?.user as any)?.role;
-  const isAdmin = userRole === 'ADMIN';
+  const isSystemAdmin = Boolean((session?.user as { platformAdmin?: boolean } | undefined)?.platformAdmin);
   const [showInvites, setShowInvites] = useState(false);
   const [invites, setInvites] = useState<any[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -57,12 +56,12 @@ export default function LabPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fetchInvites = () => {
-    fetch('/api/lab/invite').then(r => r.json()).then(d => setInvites(d.invites || []));
+    fetch('/api/lab/invite').then((r) => r.json()).then((d) => setInvites(d.invites || []));
   };
 
   useEffect(() => {
-    if (isAdmin) fetchInvites();
-  }, [isAdmin]);
+    if (isSystemAdmin) fetchInvites();
+  }, [isSystemAdmin]);
 
   const createInvite = async () => {
     if (!inviteEmail.trim()) return;
@@ -115,7 +114,7 @@ export default function LabPage() {
                 : 'Internal tools from the solutions factory.'}
           </p>
         </div>
-        {isAdmin && (
+        {isSystemAdmin && (
           <button
             onClick={() => setShowInvites(!showInvites)}
             className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition ${
@@ -128,7 +127,7 @@ export default function LabPage() {
         )}
       </div>
 
-      {isAdmin && showInvites && (
+      {isSystemAdmin && showInvites && (
         <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
           <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
             <Mail className="w-4 h-4 text-violet-400" />

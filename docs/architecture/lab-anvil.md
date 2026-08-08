@@ -1,8 +1,8 @@
 # ETHOLYS Lab — ANVIL (agente de engenharia interno)
 
-**Versão:** 0.2  
-**Data:** 2026-08-05  
-**Status:** F0–F1 feito · F2 sandbox+preview em código · ponte MUSE → ANVIL  
+**Status:** F0–F2 feito · F3 webhook Contabo/custom · ponte MUSE → ANVIL  
+**Versão:** 0.3  
+**Data:** 2026-08-07  
 **Público:** admin Etholys / agentes de IA  
 
 **Fonte de verdade** para o desenvolvedor de código interno (estilo Cursor/Abacus), exclusivo do Lab.  
@@ -46,11 +46,15 @@ ANVIL não é produto licenciado aos clientes. Vive em `/lab/anvil`, atrás de a
 
 ## 3. Acesso
 
-1. **Owners** — emails em `LAB_ANVIL_OWNER_EMAILS` (CSV). Criam projetos, convidam/revogam users, veem tudo.
-2. **Membros** — `LabAnvilMember` (convite). Acedem a Anvil e só aos projetos onde são `LabAnvilProjectMember`.
-3. Sem `LAB_ANVIL_OWNER_EMAILS`: bootstrap — `User.role === ADMIN` conta como owner (definir env em produção).
+| Papel | Quem | Vê |
+|-------|------|-----|
+| **System admin** | Emails em `ETHOLYS_PLATFORM_ADMIN_EMAILS` | Hub completo + Lab + MUSE + ANVIL (owner) |
+| **Convidado Lab** | `LabInvite` aceite | `/lab` + MUSE; ANVIL só com convite ANVIL |
+| **Admin de empresa** | `CompanyUser.role=ADMIN` | Só a **sua** empresa — **não** Lab |
 
-Lab geral (`/lab`) continua com o seu próprio gate. Anvil exige **acesso Anvil** adicional.
+`User.role=ADMIN` **não** é system admin. Login normal (`/login`); o system admin vê o atalho **Lab** no Hub.
+
+Owners ANVIL = mesma allowlist (`isSystemAdmin`). Convites de projeto: `LabAnvilProjectMember`.
 
 ---
 
@@ -80,7 +84,7 @@ Campos-chave do projeto: `visibility`, `relation`, `workspaceKind`, `repoUrl`, `
 | **F0** | Spec + Prisma + access + CRUD projetos/targets/membros | ✅ |
 | **F1** | Chat por agente + system prompt com política + planos/artefactos | ✅ |
 | **F2** | Sandbox de ficheiros + preview URL estático | ✅ (MVP) |
-| **F3** | Deploy Contabo / custom por target | Pendente |
+| **F3** | Deploy Contabo / custom por webhook | ✅ (MVP webhook) |
 | **F4** | Git branch/PR no monorepo Etholys | Pendente |
 | **F5** | Extração assistida “para OSS” (sugerir API/pacote) | Pendente |
 
@@ -88,11 +92,17 @@ Campos-chave do projeto: `visibility`, `relation`, `workspaceKind`, `repoUrl`, `
 
 | Rota | Papel |
 |------|--------|
-| `GET/PUT/DELETE /api/lab/anvil/projects/[id]/files` | Listar / ler / gravar / apagar; `PUT action=apply` para batch |
+| `GET/PUT/DELETE /api/lab/anvil/projects/[id]/files` | Listar / ler / gravar / apagar; `PUT action=apply` (+ `messageId`) |
 | `POST /api/lab/anvil/projects/[id]/preview` | Gera token no target `preview`, status `live` |
 | `GET /api/lab/anvil/preview/[token]/[[...path]]` | Serve ficheiros do sandbox (público via token) |
 
-Sandbox só para `workspaceKind=sandbox`. Artefactos do chat com `content` → botão “Aplicar ao sandbox”.
+### F3 — Deploy
+
+| Rota | Papel |
+|------|--------|
+| `POST /api/lab/anvil/projects/[id]/deploy` | Body `{ targetId }` — POST webhook com manifest dos ficheiros |
+
+`configJson.webhookUrl` (+ opcional `webhookSecret`) no target `contabo` / `custom` / `staging`.
 
 ### Ponte MUSE
 
@@ -119,5 +129,7 @@ apps/web/
 ## 7. Env
 
 ```
-LAB_ANVIL_OWNER_EMAILS="admin@etholys.com"
+ETHOLYS_PLATFORM_ADMIN_EMAILS="tiago@…,outro@…"
 ```
+
+(única allowlist de system admin / owners Lab+ANVIL)

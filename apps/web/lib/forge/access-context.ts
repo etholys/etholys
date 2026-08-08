@@ -24,9 +24,19 @@ export type ForgeJwtScope = {
 
 /**
  * Resolve âmbito FORGE para um userId (login mágico / refresh JWT).
+ * Platform admin / User.role=ADMIN → organization (Hub completo, Lab, …).
  * Sem CompanyUser → course_only; com org → organization.
  */
 export async function resolveForgeJwtScope(userId: string): Promise<ForgeJwtScope> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, role: true },
+  });
+  const { isSystemAdmin } = await import('@/lib/platform-access');
+  if (isSystemAdmin(user?.email)) {
+    return { mode: 'organization', allowedCourseIds: [], homePath: '/hub' };
+  }
+
   const companyUsers = await prisma.companyUser.findMany({
     where: { userId },
     select: { companyId: true },

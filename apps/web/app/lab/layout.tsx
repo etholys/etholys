@@ -19,14 +19,10 @@ export default function LabLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (status !== 'authenticated') return;
-    const role = (session?.user as any)?.role;
-    if (role === 'ADMIN') {
-      setAccessState('granted');
-      return;
-    }
+    // Sempre via API: system admin OU LabInvite (nunca User.role=ADMIN de empresa)
     fetch('/api/lab/access')
-      .then(r => r.json())
-      .then(d => {
+      .then((r) => r.json())
+      .then((d) => {
         setAccessState(d.hasAccess ? 'granted' : 'invite');
       })
       .catch(() => setAccessState('denied'));

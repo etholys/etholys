@@ -10,6 +10,7 @@ import Link from 'next/link';
 import {
   Layers, BarChart3, Sprout, HandCoins, GraduationCap, Cpu, Target, LayoutGrid, Scale,
   LogOut, Globe, ArrowRight, Lock, ExternalLink, BrainCircuit, Video, PenLine, CheckSquare,
+  FlaskConical,
 } from 'lucide-react';
 import {
   deriveModuleHints,
@@ -345,6 +346,9 @@ export default function HubPage() {
   }
 
   const firstName = session?.user?.name?.split(' ')?.[0] || '';
+  const isSystemAdmin = Boolean(
+    (session?.user as { platformAdmin?: boolean } | undefined)?.platformAdmin,
+  );
   const hintSet = new Set(moduleHints);
   const visibleSystems = systems.filter((sys) => {
     if (isEtholysTool(sys)) return true;
@@ -521,6 +525,36 @@ export default function HubPage() {
                 : 'Choose a system or an Etholys Tools item.'}
           </p>
         </div>
+
+        {isSystemAdmin && (
+          <Link
+            href="/lab"
+            className="mb-8 flex items-start gap-4 rounded-2xl border-2 border-violet-300 bg-gradient-to-r from-slate-950 to-violet-950 p-5 shadow-md shadow-violet-200/40 transition hover:border-violet-400 hover:shadow-lg"
+          >
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-700 text-white">
+              <FlaskConical className="h-6 w-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-bold text-white">Etholys Lab</h2>
+                <span className="rounded-full bg-violet-500/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-200">
+                  {locale === 'pt' ? 'Interno' : locale === 'es' ? 'Interno' : 'Internal'}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-violet-100/80">
+                {locale === 'pt'
+                  ? 'Fábrica interna: MUSE (inovação) e ANVIL (engenharia). Só system admin Etholys — não aparece para clientes.'
+                  : locale === 'es'
+                    ? 'Fábrica interna: MUSE (innovación) y ANVIL (ingeniería). Solo system admin Etholys — no visible para clientes.'
+                    : 'Internal factory: MUSE (innovation) and ANVIL (engineering). Etholys system admin only — hidden from clients.'}
+              </p>
+              <span className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-violet-200">
+                {locale === 'pt' ? 'Abrir Lab' : locale === 'es' ? 'Abrir Lab' : 'Open Lab'}{' '}
+                <ArrowRight className="h-4 w-4" />
+              </span>
+            </div>
+          </Link>
+        )}
 
         {showIntegratedWorkspace && (
         <Link

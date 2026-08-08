@@ -4,9 +4,10 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { isSystemAdmin } from '@/lib/platform-access';
 
 function generateCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
   for (let i = 0; i < 6; i++) {
     code += chars[Math.floor(Math.random() * chars.length)];
@@ -14,20 +15,22 @@ function generateCode(): string {
   return code;
 }
 
-// GET: List all invites (Admin only)
+async function requireSystemAdmin() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) return null;
+  if (!isSystemAdmin(session.user.email)) return null;
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    select: { id: true, email: true },
+  });
+  return user;
+}
+
+// GET: List invites (system admin only)
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ invites: [] }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { role: true },
-    });
-
-    if (user?.role !== 'ADMIN') {
+    const admin = await requireSystemAdmin();
+    if (!admin) {
       return NextResponse.json({ invites: [] }, { status: 403 });
     }
 
@@ -46,21 +49,12 @@ export async function GET() {
   }
 }
 
-// POST: Create a new invite (Admin only)
+// POST: Create invite (system admin only)
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const admin = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true, role: true },
-    });
-
-    if (admin?.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo administradores' }, { status: 403 });
+    const admin = await requireSystemAdmin();
+    if (!admin) {
+      return NextResponse.json({ error: 'Solo system admin Etholys' }, { status: 403 });
     }
 
     const { email } = await req.json();
@@ -68,15 +62,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Email requerido' }, { status: 400 });
     }
 
-    // Check if there is already a pending invite for this email
     const existing = await prisma.labInvite.findFirst({
       where: { email: email.toLowerCase(), status: 'PENDING' },
     });
     if (existing) {
-      return NextResponse.json({ error: 'Ya existe una invitaci\u00f3n pendiente para este correo', invite: existing });
+      return NextResponse.json({
+        error: 'Ya existe una invitación pendiente para este correo',
+        invite: existing,
+      });
     }
 
-    // Generate unique code
     let code = generateCode();
     let attempts = 0;
     while (attempts < 10) {
@@ -91,7 +86,7 @@ export async function POST(req: Request) {
         email: email.toLowerCase(),
         code,
         invitedById: admin.id,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
 
@@ -102,21 +97,12 @@ export async function POST(req: Request) {
   }
 }
 
-// DELETE: Revoke an invite (Admin only)
+// DELETE: Revoke invite (system admin only)
 export async function DELETE(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const admin = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { role: true },
-    });
-
-    if (admin?.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo administradores' }, { status: 403 });
+    const admin = await requireSystemAdmin();
+    if (!admin) {
+      return NextResponse.json({ error: 'Solo system admin Etholys' }, { status: 403 });
     }
 
     const { id } = await req.json();

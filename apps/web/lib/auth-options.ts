@@ -127,6 +127,9 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role || 'COLLABORATOR';
         token.locale = user.locale || 'es';
         token.forgeScopeCheckedAt = 0;
+        // Forçar reavaliação do system admin no login (Google / credentials)
+        token.workspaceScopeCheckedAt = 0;
+        if (typeof user.email === 'string') token.email = user.email;
       }
 
       const userId = (token.id as string) || (token.sub as string);
@@ -155,7 +158,8 @@ export const authOptions: NextAuthOptions = {
           token.allowedSystems = ws.allowedSystems;
           token.workspaceHomePath = ws.homePath;
           token.workspaceScopeCheckedAt = Date.now();
-          token.platformAdmin = ws.mode === 'full';
+          // System admin Etholys (allowlist) — NÃO confundir com Hub full via admin de empresa
+          token.platformAdmin = Boolean(ws.isSystemAdmin);
         } catch (e) {
           console.error('[next-auth][jwt] workspace scope refresh failed', e);
         }
@@ -196,18 +200,25 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async signIn({ user }) {
-      const { isPrecommercialMode, isPlatformAdminEmail } = await import('@/lib/platform-access');
+      const { isPrecommercialMode, isSystemAdmin } = await import('@/lib/platform-access');
       if (!isPrecommercialMode()) return true;
       const email = user?.email?.trim().toLowerCase();
-      if (!email) return false;
-      if (isPlatformAdminEmail(email)) return true;
+      if (!email) {
+        console.warn('[next-auth][signIn] blocked: no email');
+        return false;
+      }
+      // System admin Etholys — sempre permitido (mesmo conta Google nova)
+      if (isSystemAdmin(email)) return true;
+
       const existing = await prisma.user.findUnique({
         where: { email },
         select: { id: true, role: true },
       });
-      if (existing?.role === 'ADMIN') return true;
-      // Contas novas (ex.: Google) sem convite prévio → bloquear
-      if (!existing) return false;
+      // Contas novas sem allowlist / convite → bloquear em pré-comercial
+      if (!existing) {
+        console.warn('[next-auth][signIn] blocked (precommercial, unknown email):', email);
+        return false;
+      }
       return true;
     },
     async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {

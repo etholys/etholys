@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { isSystemAdmin } from '@/lib/platform-access';
 
 export type AnvilAccess = {
   userId: string;
@@ -8,22 +9,16 @@ export type AnvilAccess = {
   hasAccess: boolean;
 };
 
-function ownerEmailsFromEnv(): string[] {
-  return (process.env.LAB_ANVIL_OWNER_EMAILS || '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+/** Owner ANVIL = system admin Etholys (mesma allowlist). */
+export function isAnvilOwnerEmail(email: string, _userRole?: string): boolean {
+  return isSystemAdmin(email);
 }
 
-export function isAnvilOwnerEmail(email: string, userRole?: string): boolean {
-  const owners = ownerEmailsFromEnv();
-  const normalized = email.trim().toLowerCase();
-  if (owners.length > 0) return owners.includes(normalized);
-  // Bootstrap: sem env, ADMIN conta como owner
-  return userRole === 'ADMIN';
-}
-
-export async function resolveAnvilAccess(userId: string, email: string, role: string): Promise<AnvilAccess> {
+export async function resolveAnvilAccess(
+  userId: string,
+  email: string,
+  role: string,
+): Promise<AnvilAccess> {
   const isOwner = isAnvilOwnerEmail(email, role);
   if (isOwner) {
     return { userId, email, role, isOwner: true, hasAccess: true };
@@ -51,17 +46,13 @@ export async function requireAnvilAccess(): Promise<AnvilAccess | null> {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return null;
 
-  let userId = session.user.id as string | undefined;
-  const email = session.user.email;
-
   const user = await prisma.user.findUnique({
-    where: { email },
+    where: { email: session.user.email },
     select: { id: true, role: true, email: true },
   });
   if (!user) return null;
-  userId = user.id;
 
-  return resolveAnvilAccess(userId, user.email, user.role);
+  return resolveAnvilAccess(user.id, user.email, user.role);
 }
 
 export async function canAccessProject(

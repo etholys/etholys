@@ -1,14 +1,21 @@
 /**
- * Acesso pré-comercial Etholys (edge-safe — sem Prisma).
- * Em produção: só platform admins vêem hub/home completa;
- * convidados entram só nas funções (sistemas) concedidas.
+ * Identidade de acesso Etholys (edge-safe — sem Prisma).
+ *
+ * Duas camadas:
+ * 1) Empresa cliente (+ CompanyUser) — admin da empresa ≠ dono da plataforma
+ * 2) System admin — allowlist ETHOLYS_PLATFORM_ADMIN_EMAILS (master do master)
+ *
+ * Lab / MUSE / ANVIL = só system admin (+ convites Lab/ANVIL).
  */
 
 import type { WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
 import { LICENSE_KEY_TO_HREF } from '@/lib/hub-system-license';
 
-/** Default: tiago + emails em ETHOLYS_PLATFORM_ADMIN_EMAILS */
-const DEFAULT_PLATFORM_ADMINS = ['tiagorezende@ruralcommerceglobal.com'];
+/** Default hardcoded + env. Única fonte do system admin. */
+const DEFAULT_SYSTEM_ADMINS = [
+  'etholys@gmail.com',
+  'tiagorezende@ruralcommerceglobal.com',
+];
 
 export function isPrecommercialMode(): boolean {
   const v = (process.env.ETHOLYS_PRECOMMERCIAL ?? process.env.NEXT_PUBLIC_ETHOLYS_PRECOMMERCIAL ?? '')
@@ -16,32 +23,44 @@ export function isPrecommercialMode(): boolean {
     .toLowerCase();
   if (v === '0' || v === 'false' || v === 'off' || v === 'no') return false;
   if (v === '1' || v === 'true' || v === 'on' || v === 'yes') return true;
-  // Sem flag: fechar em produção, abrir em local
   return process.env.NODE_ENV === 'production';
 }
 
-export function parsePlatformAdminEmails(): string[] {
+export function parseSystemAdminEmails(): string[] {
   const raw = process.env.ETHOLYS_PLATFORM_ADMIN_EMAILS?.trim() || '';
   const fromEnv = raw
     .split(/[,;\s]+/)
     .map((e) => e.trim().toLowerCase())
     .filter((e) => e.includes('@'));
-  const set = new Set([...DEFAULT_PLATFORM_ADMINS, ...fromEnv]);
-  return [...set];
+  return [...new Set([...DEFAULT_SYSTEM_ADMINS, ...fromEnv])];
 }
 
-export function isPlatformAdminEmail(email: string | null | undefined): boolean {
+/** @deprecated use parseSystemAdminEmails */
+export function parsePlatformAdminEmails(): string[] {
+  return parseSystemAdminEmails();
+}
+
+/** Administrador do sistema Etholys (master). Só email allowlist — NÃO User.role. */
+export function isSystemAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
-  return parsePlatformAdminEmails().includes(email.trim().toLowerCase());
+  return parseSystemAdminEmails().includes(email.trim().toLowerCase());
 }
 
-/** User.role global ADMIN ou email allowlist. */
+/** @deprecated use isSystemAdmin */
+export function isPlatformAdminEmail(email: string | null | undefined): boolean {
+  return isSystemAdmin(email);
+}
+
+/**
+ * Acesso completo de plataforma (Hub sem restrição pré-comercial, Lab factory, …).
+ * Apenas system admin por email. User.role=ADMIN = admin de *alguma* conta, não isto.
+ */
 export function isPlatformFullAccess(opts: {
   email?: string | null;
+  /** Ignorado — mantido por compat de call sites. */
   role?: string | null;
 }): boolean {
-  if (opts.role === 'ADMIN') return true;
-  return isPlatformAdminEmail(opts.email);
+  return isSystemAdmin(opts.email);
 }
 
 export type WorkspaceAccessMode = 'full' | 'function_only' | 'none';
@@ -52,7 +71,6 @@ export function homePathForSystems(systems: WorkspaceSystemKey[]): string {
   return '/acesso';
 }
 
-/** Prefixos de página permitidos por sistema (function_only). */
 export function pagePrefixesForSystem(system: WorkspaceSystemKey): string[] {
   switch (system) {
     case 'ATLAS':
@@ -103,7 +121,6 @@ export function isPathAllowedForSystems(pathname: string, systems: WorkspaceSyst
   return false;
 }
 
-/** Hub root e cartões isentos (Meet/Carta/Advisor). Studio tem regra própria no middleware (atalho). */
 export function isHubShellPath(pathname: string): boolean {
   if (pathname === '/hub' || pathname === '/hub/') return true;
   if (pathname === '/hub/workspace' || pathname.startsWith('/hub/workspace/')) return true;

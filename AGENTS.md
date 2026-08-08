@@ -14,6 +14,7 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 | **Etholys Studio — documentos com IA (ferramenta)** | [docs/architecture/etholys-studio.md](./docs/architecture/etholys-studio.md) | `/hub/studio`, pastas, templates, canvas+chat, agente com consentimento, atalho hot |
 | **Lab MUSE — inovação / I+D+i interno** | [docs/architecture/lab-muse.md](./docs/architecture/lab-muse.md) | `/lab/muse` — sugestões estratégicas, observatório; pipeline → ANVIL (não fundir) |
 | **Lab ANVIL — agente de engenharia interno** | [docs/architecture/lab-anvil.md](./docs/architecture/lab-anvil.md) | `/lab/anvil` — 1 agente/projeto, OSS vs Etholys, deploy targets, owners+convites |
+| **System admin vs empresa** | [docs/architecture/system-admin.md](./docs/architecture/system-admin.md) | Master Etholys (`ETHOLYS_PLATFORM_ADMIN_EMAILS`) ≠ admin de cliente |
 | **Jitsi no Contabo (ops)** | [docs/MEET-JITSI-CONTABO.md](./docs/MEET-JITSI-CONTABO.md) | Subir `meet.etholys.com` — sem isto a app usa meet.jit.si |
 | **Meet VPS + Jibri (ops)** | [docs/MEET-VPS-JIBRI.md](./docs/MEET-VPS-JIBRI.md) | VPS dedicado, gravação → R2, webhook |
 | **Índice de toda a documentação** | [docs/README.md](./docs/README.md) | Encontrar outros guias em `docs/` |

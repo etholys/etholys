@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { hasLabAccess } from '@/lib/lab/access';
+import { isSystemAdmin } from '@/lib/platform-access';
 
 // GET: Check if current user has Lab access
 export async function GET() {
@@ -20,22 +22,11 @@ export async function GET() {
 
     if (!user) return NextResponse.json({ hasAccess: false });
 
-    // ADMIN always has access
-    if (user.role === 'ADMIN') {
-      return NextResponse.json({ hasAccess: true });
-    }
-
-    // Check for accepted invite
-    const invite = await prisma.labInvite.findFirst({
-      where: {
-        OR: [
-          { userId: user.id, status: 'ACCEPTED' },
-          { email: user.email, status: 'ACCEPTED' },
-        ],
-      },
+    const ok = await hasLabAccess({ userId: user.id, email: user.email });
+    return NextResponse.json({
+      hasAccess: ok,
+      isSystemAdmin: isSystemAdmin(user.email),
     });
-
-    return NextResponse.json({ hasAccess: !!invite });
   } catch (error) {
     console.error('Lab access check error:', error);
     return NextResponse.json({ hasAccess: false }, { status: 500 });
@@ -52,7 +43,7 @@ export async function POST(req: Request) {
 
     const { code } = await req.json();
     if (!code) {
-      return NextResponse.json({ success: false, error: 'C\u00f3digo requerido' });
+      return NextResponse.json({ success: false, error: 'Código requerido' });
     }
 
     const user = await prisma.user.findUnique({
@@ -67,23 +58,17 @@ export async function POST(req: Request) {
     const invite = await prisma.labInvite.findUnique({ where: { code: code.toUpperCase() } });
 
     if (!invite) {
-      return NextResponse.json({ success: false, error: 'C\u00f3digo no v\u00e1lido' });
+      return NextResponse.json({ success: false, error: 'Código no válido' });
     }
 
     if (invite.status !== 'PENDING') {
-      return NextResponse.json({ success: false, error: 'Invitaci\u00f3n ya utilizada o revocada' });
+      return NextResponse.json({ success: false, error: 'Invitación ya utilizada o revocada' });
     }
 
     if (new Date() > invite.expiresAt) {
-      return NextResponse.json({ success: false, error: 'Invitaci\u00f3n expirada' });
+      return NextResponse.json({ success: false, error: 'Invitación expirada' });
     }
 
-    // Check email matches
-    if (invite.email.toLowerCase() !== user.email.toLowerCase()) {
-      return NextResponse.json({ success: false, error: 'Este c\u00f3digo no corresponde a tu correo' });
-    }
-
-    // Accept the invite
     await prisma.labInvite.update({
       where: { id: invite.id },
       data: { status: 'ACCEPTED', userId: user.id },
@@ -91,7 +76,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Lab access code error:', error);
-    return NextResponse.json({ success: false, error: 'Error del servidor' }, { status: 500 });
+    console.error('Lab access POST error:', error);
+    return NextResponse.json({ success: false, error: 'Error interno' }, { status: 500 });
   }
 }
