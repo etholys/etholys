@@ -228,7 +228,16 @@ export async function buildProjectContextBlock(projectId: string, domain: Inform
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { name: true, goal: true, budget: true, currency: true, startDate: true, endDate: true },
+    select: {
+      name: true,
+      goal: true,
+      budget: true,
+      currency: true,
+      startDate: true,
+      endDate: true,
+      donorName: true,
+      description: true,
+    },
   });
 
   const tasks = await prisma.task.findMany({
@@ -240,11 +249,15 @@ export async function buildProjectContextBlock(projectId: string, domain: Inform
 
   return [
     `Projecto: ${project?.name || projectId}`,
+    project?.donorName ? `Financiador / donante: ${project.donorName}` : '',
     project?.goal ? `Objectivo geral: ${project.goal}` : '',
+    project?.description?.trim() ? `Descrição: ${project.description.trim().slice(0, 800)}` : '',
     project?.startDate && project?.endDate
       ? `Período do projecto: ${project.startDate.toISOString().slice(0, 10)} – ${project.endDate.toISOString().slice(0, 10)}`
       : '',
     project?.budget != null ? `Orçamento: ${project.budget} ${project.currency || ''}` : '',
+    '',
+    'Instrução de redacção: o texto do canvas deve servir para o financiador avaliar progresso e justificar reembolso — tom profissional, factos, vínculo ao marco lógico.',
     '',
     meScope,
     guide ? `\n--- MANUAL / GUIA DO FINANCIADOR ---\n${guide.slice(0, 25000)}\n--- FIM ---` : '',

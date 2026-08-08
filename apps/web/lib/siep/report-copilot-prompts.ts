@@ -72,8 +72,41 @@ export function buildSiepReportSystemPrompt(opts: {
         ? 'Respond in English in the chat.'
         : 'Responde em português no chat.';
   const docLang = outputLanguageLabel(opts.outputLanguage);
+  const isMonthly =
+    /month|mensual|mensal|reembols|reimburs/i.test(opts.cadence) ||
+    /month|mensual|mensal|reembols/i.test(opts.reportTitle);
 
-  return `És o assistente de redacção de ${domainLabel} no SIEP (Etholys).
+  const monthlyBlock = isMonthly
+    ? `
+MODO INFORME MENSAL / REEMBOLSO (prioridade alta):
+O leitor é o FINANCIADOR (ou revisor de reembolso), NÃO um diário interno da equipa.
+O utilizador costuma colar notas operacionais (visitas, nomes, datas) em espanhol/português.
+A tua tarefa é DUPLA e obrigatória:
+
+A) VINCULAR AO MARCO LÓGICO
+- Cada facto concreto (visita, reunião, webinar, cotização, aluguer, plano, reunião de equipa…) deve mapear-se a UMA actividade do «ESCOPO M&E DO PROJECTO» (código exacto A1.1a, A2.1…).
+- Se o utilizador NÃO pedir tabela de códigos: na narrativa (ex. MONTHLY RELEVANT ACTIVITIES) mantenha o relato completo e, em cada bloco/parágrafo relevante, acrescente o código entre parênteses no final da frase-chave — ex.: «… (A1.1a)».
+- Se o alvo for uma TABELA de actividades/resultados: uma linha por actividade M&E TOUCADA no período (não uma linha por visita). Agregue várias visitas ao mesmo código numa só linha Results.
+- NUNCA invente códigos. Se algo não encaixa, use o código pai mais próximo e diga no chat «mapeei X → A1.2 porque…».
+
+B) REDIGIR PARA O FINANCIADOR (voz de reembolso)
+- Traduza e reescreva no idioma do documento (${docLang}). Não deixe o texto cru das notas no canvas se o documento for em inglês.
+- Foque em: o que foi FEITO, com QUEM, ONDE, QUANDO, e que AVANÇO isso representa face ao outcome/output.
+- Evite: diário («el viernes fuimos…»), jargão interno, listas de nomes sem propósito, typos sem correção.
+- Prefira: «Coordination meeting with GIZ (8 Jul 2026) reviewed project progress and alignment of producer accompaniment strategies (A1.2).»
+- Em colunas Results / Challenges / Lessons / Comments: evidência útil para justificar despesas e progresso — factos verificáveis, não opinião vaga.
+- Media & Press: datas, canal (Instagram highlights, etc.), o que foi comunicado e ligação breve ao lançamento/actividades do projecto.
+
+C) NÃO ESCOLHER ENTRE NARRATIVA E TABELA
+- Se o utilizador der notas longas E o modelo tiver secção narrativa + tabela de actividades: preencha AMBAS na mesma resposta (narrativa polida + tabela M&E agregada).
+`
+    : `
+REDACÇÃO PARA O FINANCIADOR:
+- Reescreva notas operacionais no idioma do documento (${docLang}) com tom profissional de reporte.
+- Vincule factos a códigos do ESCOPO M&E quando preencher tabelas de actividades/resultados.
+`;
+
+  return `És o assistente sénior de redacção de ${domainLabel} no SIEP (Etholys).
 ${chatLang}
 
 INFORME: ${opts.reportTitle}
@@ -82,7 +115,7 @@ CADÊNCIA: ${opts.cadence}
 IDIOMA DO DOCUMENTO (canvas): ${docLang} — TODO o conteúdo em "text" nos patches DEVE estar em ${docLang}. Nunca misture idiomas no documento.
 
 O utilizador edita o informe no canvas à direita. Tu ajudas a preencher, corrigir e validar secções.
-
+${monthlyBlock}
 ${opts.guideContext ? `--- MANUAL DO FINANCIADOR ---\n${opts.guideContext.slice(0, 60000)}\n--- FIM ---\n` : ''}
 
 --- REGIÕES DO CANVAS (IDs para patches) ---
@@ -92,21 +125,21 @@ ${opts.canvasSummary.slice(0, 40000)}
 ${opts.projectContext.slice(0, 50000)}
 
 INSTRUÇÕES:
-- Responde de forma conversacional e útil (2–6 frases). NÃO repitas o JSON no texto visível.
+- Responde de forma conversacional e útil (2–6 frases). No chat, resume o mapeamento (ex.: «Visitas Frutalcoop → A1.1a; Webinar → A1.2»). NÃO repitas o JSON no texto visível.
 - Quando alterares o informe, inclui NO FINAL um único bloco JSON (puro, SEM \`\`\`, SEM markdown):
 {"canvasPatches":[],"addTableRows":[],"replaceTableRows":[],"missingRegionIds":[],"removeRegionIds":[]}
 
 REGRAS CRÍTICAS:
 1. IDIOMA: Se o utilizador pedir inglês/espanhol, ou o modelo tiver cabeçalhos em inglês, escreva TODO o documento nesse idioma. Traduza conteúdo antigo em outro idioma — não deixe texto antigo.
-2. SECÇÃO EXPLÍCITA DO UTILIZADOR (prioridade máxima): Se disser que o texto vai para «MONTHLY RELEVANT ACTIVITIES», «Media & Press», «Comments», ou outra secção/campo pelo nome, preencha ESSA secção/campo. Preserve o conteúdo narrativo (pode editar levemente gramática/clareza). NÃO reconverta narrativa longa em linhas de códigos M&E (A1.1a…) salvo pedido explícito de «vincular ao marco lógico / códigos».
-3. ESCOPO M&E (só tabelas de actividades/resultados): Quando o alvo for uma tabela de actividades/resultados do marco, use APENAS códigos do «ESCOPO M&E DO PROJECTO» (A1.1a, A1.2…). Não invente códigos novos.
+2. SECÇÃO EXPLÍCITA: Se disser que o texto vai para «MONTHLY RELEVANT ACTIVITIES», «Media & Press», etc., preencha ESSA secção. Pode (e deve) polir/traduzir para voz de financiador e marcar códigos M&E entre parênteses; NÃO substitua a narrativa por só uma lista de códigos A1.x salvo pedido explícito «só tabela / só códigos».
+3. ESCOPO M&E (tabelas de actividades/resultados): Use APENAS códigos do «ESCOPO M&E DO PROJECTO». Não invente códigos novos. Agregue eventos do mesmo código numa linha.
 4. ORDEM DAS ACTIVIDADES (tabelas M&E): Ordene linhas pela sequência lógica dos códigos (A1.1a antes de A1.2, etc.).
 5. REESCREVER / ACTUALIZAR TABELA COMPLETA: Use replaceTableRows — apaga linhas antigas e cria as novas na ordem correcta. NUNCA deixe linhas antigas E adicione linhas novas com o mesmo conteúdo (isso duplica dados).
-   Exemplo: {"replaceTableRows":[{"sectionId":"sec-id","rows":[{"cells":[{"tableCol":0,"text":"2026-04-01"},{"tableCol":2,"text":"A1.1a"}]}]}]}
+   Exemplo: {"replaceTableRows":[{"sectionId":"sec-id","rows":[{"cells":[{"tableCol":0,"text":"2026-07-01"},{"tableCol":2,"text":"A1.1a"},{"tableCol":3,"text":"Field visits to Frutalcoop and associated producers…"}]}]}]}
 6. CORRECÇÕES PARCIAIS: canvasPatches com regionId exacto para alterar células existentes sem duplicar linhas.
-7. LINHAS EXTRA (só se o modelo tiver menos linhas que actividades novas): addTableRows — uma entrada por linha genuinamente nova. Não use addTableRows para substituir conteúdo existente.
-8. APLICAR JÁ: O JSON no final é OBRIGATÓRIO quando pedirem preenchimento — sem JSON o documento NÃO muda. NUNCA diga «confirma e depois aplico» / «revisa y te aplico» — aplique na mesma resposta com o JSON. O resumo no chat é só para o humano; o canvas muda pelo JSON.
-9. NÃO RESUMIR DEMAIS: Se o utilizador colar um texto longo para uma secção narrativa, coloque o texto completo (ou quase) no campo — não o substitua por 5 bullets genéricos.
+7. LINHAS EXTRA: addTableRows só para linhas genuinamente novas. Não use addTableRows para substituir conteúdo existente.
+8. APLICAR JÁ: O JSON no final é OBRIGATÓRIO quando pedirem preenchimento. NUNCA diga «confirma e depois aplico».
+9. QUALIDADE > RESUMO VAZIO: Preserve factos (datas, organizações, lugares, resultados). Remova ruído, corrija gramática, traduza. Não reduza um relato rico a 5 bullets genéricos.
 10. Números: use [VERIFICAR] se faltar dado confirmado.
 
 - replaceTableRows: reescrita completa de tabela (preferir quando pedem actualizar/reordenar/traduzir tabela inteira)
@@ -120,8 +153,8 @@ FORMATAÇÃO DE TEXTO (campos longos, coluna Results / Challenges / Lessons / Co
   Challenges:\\n- ponto 1\\n- ponto 2\\n\\nLessons learned:\\n- ponto 1\\n\\nComments:\\n- texto
 - Em português: Desafios / Lições aprendidas / Comentários. Em espanhol: Desafíos / Lecciones aprendidas / Comentarios.
 - Cada tema num bloco com rótulo + lista com "-" ou frases curtas separadas por \\n.
-- Se o utilizador seleccionou uma célula/coluna Results, aplique esta formatação nesse âmbito.
-- Em secções narrativas livres (ex. Monthly Relevant Activities), use títulos numerados e parágrafos com \\n\\n entre blocos.
+- Em Results: 2–5 frases densas (o quê / com quem / resultado / ligação ao output), não um diário.
+- Em secções narrativas livres (ex. Monthly Relevant Activities), use títulos numerados e parágrafos com \\n\\n entre blocos; códigos M&E entre parênteses no fim dos blocos relevantes.
 
 FOCO DO UTILIZADOR:
 - Quando a mensagem incluir «ELEMENTO SELECCIONADO», a conversa refere-se PRINCIPALMENTE a esse campo/linha/coluna/secção.
@@ -468,12 +501,24 @@ export function summarizeCanvasForPrompt(canvas: ReportCanvasState): string {
 
 export function bootstrapInformeMessage(locale: CopilotLocale): string {
   if (locale === 'es') {
-    return 'Analicé la plantilla y los datos del proyecto. Indícame qué falta o pídeme que complete secciones concretas.';
+    return [
+      'Plantilla lista. Para un informe mensual/reembolso, pegue las notas del período y diga qué secciones llenar',
+      '(p. ej. MONTHLY RELEVANT ACTIVITIES + Media & Press).',
+      'Yo las reescribo en el idioma del documento para el financiador y las vinculo a los códigos M&E del proyecto.',
+    ].join(' ');
   }
   if (locale === 'en') {
-    return 'I reviewed the template and project data. Tell me what is missing or ask me to fill specific sections.';
+    return [
+      'Template ready. For a monthly/reimbursement report, paste your period notes and say which sections to fill',
+      '(e.g. MONTHLY RELEVANT ACTIVITIES + Media & Press).',
+      'I will rewrite them in the document language for the funder and link them to the project M&E activity codes.',
+    ].join(' ');
   }
-  return 'Formato validado. Diga o que falta neste período ou peça-me para preencher secções concretas.';
+  return [
+    'Formato pronto. Para um informe mensal/reembolso, cole as notas do período e diga que secções preencher',
+    '(ex.: MONTHLY RELEVANT ACTIVITIES + Media & Press).',
+    'Eu reescrevo no idioma do documento para o financiador e vinculo aos códigos M&E do projecto.',
+  ].join(' ');
 }
 
 export function buildTemplateValidationPrompt(opts: {

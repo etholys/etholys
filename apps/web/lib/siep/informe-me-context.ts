@@ -19,6 +19,7 @@ function objectiveTreeFromFlat(
     code: string | null;
     title: string;
     description: string | null;
+    indicator: string | null;
     order: number;
   }>,
 ): ObjectiveNode[] {
@@ -57,6 +58,31 @@ function objectiveTreeFromFlat(
   return roots;
 }
 
+/** Palavras-chave simples para ajudar a IA a mapear notas do período → actividades. */
+function mappingHintsForActivity(title: string, description: string | null): string {
+  const blob = `${title} ${description || ''}`.toLowerCase();
+  const hints: string[] = [];
+  if (/visita|field|finca|producer|productor|msme|enrollment|selecci/.test(blob)) {
+    hints.push('visitas a productores/fincas, enrollment MSME, recorrido de campo');
+  }
+  if (/capacit|train|taller|webinar|formaci|curric|programa/.test(blob)) {
+    hints.push('capacitaciones, talleres, webinars, diseño de currículo');
+  }
+  if (/maquila|agroindust|proces|planta|equipo|cotiz|automat|digital/.test(blob)) {
+    hints.push('diseño técnico, equipos, cotizaciones, maquila/planta');
+  }
+  if (/coordina|giz|aliad|reuni|partner|instituc/.test(blob)) {
+    hints.push('reuniones de coordinación con aliados/donantes');
+  }
+  if (/mapeo|flujo|diagnóst|plan de intervenci|baseline/.test(blob)) {
+    hints.push('planes de intervención, mapeos, diagnósticos');
+  }
+  if (/comunic|prensa|media|press|difusi/.test(blob)) {
+    hints.push('comunicación / prensa (si aplica a esta actividad)');
+  }
+  return hints.length ? hints.join('; ') : '';
+}
+
 /** Escopo M&E (marco lógico) para a IA preencher informes com actividades reais do projecto. */
 export async function buildMeScopeBlockForInforme(projectId: string): Promise<string> {
   const rows = await prisma.objective.findMany({
@@ -68,6 +94,7 @@ export async function buildMeScopeBlockForInforme(projectId: string): Promise<st
       code: true,
       title: true,
       description: true,
+      indicator: true,
       order: true,
     },
     orderBy: { order: 'asc' },
@@ -83,11 +110,13 @@ export async function buildMeScopeBlockForInforme(projectId: string): Promise<st
   const tree = objectiveTreeFromFlat(rows);
   const flat = flattenObjectives(tree);
   const { byId } = indexObjectives(flat);
+  const descById = new Map(rows.map((r) => [r.id, r]));
 
   const lines: string[] = [
     'ESCOPO M&E DO PROJECTO (fonte autoritativa — usar APENAS estas entradas)',
     'Regra: tabelas de actividades do informe devem referenciar estes códigos/títulos.',
-    'O utilizador pode descrever sub-tarefas do período; vincule-as à actividade pai abaixo, NÃO crie actividades novas.',
+    'O utilizador descreve o mês em linguagem operacional; VOCÊ mapeia cada facto à actividade pai abaixo.',
+    'NÃO crie actividades novas nem códigos novos.',
     '',
   ];
 
@@ -98,8 +127,16 @@ export async function buildMeScopeBlockForInforme(projectId: string): Promise<st
       const code = o.code?.trim() ? `${o.code.trim()}: ` : '';
       lines.push(`${indent}• [${typeLabel}] ${code}${o.title || '(sem título)'}`);
 
-      if (o.type === 'activity' && o.description?.trim()) {
-        lines.push(`${indent}  ↳ ${o.description.trim().slice(0, 280)}`);
+      const raw = descById.get(o.id);
+      if (o.description?.trim()) {
+        lines.push(`${indent}  ↳ ${o.description.trim().slice(0, 420)}`);
+      }
+      if (o.type === 'activity') {
+        const hints = mappingHintsForActivity(o.title || '', o.description);
+        if (hints) lines.push(`${indent}  ≈ mapear notas sobre: ${hints}`);
+      }
+      if (raw?.indicator?.trim() && (o.type === 'activity' || o.type === 'output' || o.type === 'outcome')) {
+        lines.push(`${indent}  ○ indicador: ${raw.indicator.trim().slice(0, 160)}`);
       }
 
       if (o.type === 'activity' || o.type === 'output') {
@@ -121,10 +158,11 @@ export async function buildMeScopeBlockForInforme(projectId: string): Promise<st
   const activities = flat.filter((o) => o.type === 'activity');
   if (activities.length) {
     lines.push('');
-    lines.push('ÍNDICE RÁPIDO DE ACTIVIDADES (usar estes IDs/códigos nas tabelas):');
+    lines.push('ÍNDICE RÁPIDO DE ACTIVIDADES (códigos oficiais para tabelas e tags na narrativa):');
     for (const a of activities) {
       const code = a.code?.trim() ? `${a.code.trim()} — ` : '';
-      lines.push(`  - ${code}${a.title}`);
+      const hints = mappingHintsForActivity(a.title || '', a.description);
+      lines.push(`  - ${code}${a.title}${hints ? ` [${hints}]` : ''}`);
     }
   }
 

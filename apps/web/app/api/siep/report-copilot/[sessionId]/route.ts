@@ -255,7 +255,11 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
 
     if (action === 'regenerate') {
       fullUserText +=
-        '\n\n(O utilizador pediu uma NOVA resposta a esta mesma mensagem — aplique de novo ao canvas conforme as instruções actualizadas.)';
+        '\n\n(O utilizador pediu uma NOVA resposta. Reescreva para o FINANCIADOR no idioma do documento, vincule cada facto a códigos M&E do escopo, aplique já no canvas — narrativa polida + tabela de actividades se existir. Não peça confirmação.)';
+    }
+    if (action === 'edit') {
+      fullUserText +=
+        '\n\n(Mensagem editada pelo utilizador. Ignore a resposta anterior. Preencha de novo com voz de reembolso/financiador e mapeamento M&E correcto.)';
     }
 
     if (selectionBlock) {
