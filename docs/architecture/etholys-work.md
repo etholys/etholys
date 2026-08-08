@@ -16,7 +16,8 @@
 
 | Superfície | Entrada | Filtro | Papel |
 |------------|---------|--------|-------|
-| **ATLAS / Work** | `/tasks` (hoje); futuro `/hub/work` | `companyId` ± `projectId` | Inbox e ops da equipa |
+| **Work (Tools)** | `/hub/work` + atalho flutuante cyan | `companyId` ± `projectId` | Inbox e ops da equipa |
+| **ATLAS** | `/tasks` | idem | Espelho ERP |
 | **SIEP** | Secção atividades do projeto | `projectId` obrigatório | Execução do projeto |
 | **Hub workspace** | `/hub/workspace` | Tarefas abertas | Espelho rápido |
 | **Meet** | Pós-reunião → convert | Cria `Task` | Rascunho → tarefa |
@@ -42,8 +43,8 @@
 | Fase | Entrega | Estado |
 |------|---------|--------|
 | **F0** | GET detalhe da tarefa; tags UI; subtarefas; comentários fiáveis; time log via detalhe | ✅ Base (ago/2026) |
-| **F1** | Grupos/secções tipo Monday (`TaskGroup` + ordem); filtro por grupo | Pendente |
-| **F2** | Entrada Hub `/hub/work` + cartão Etholys Tools; deep-links ATLAS/SIEP | Pendente |
+| **F1** | Grupos/secções tipo Monday (`TaskGroup` + ordem); filtro por grupo | ✅ Base (ago/2026) |
+| **F2** | Entrada Hub `/hub/work` + cartão Etholys Tools + hot button; deep-links ATLAS | ✅ (ago/2026) |
 | **F3** | @menções em comentários → notificação | Pendente |
 | **F4** | Solicitar aprovação → CARTA / notificação ao aprovador | Pendente |
 | **F5** | Templates de projeto (além de packs de tarefas) | Pendente |
@@ -62,11 +63,13 @@ Novos campos só quando F1 (grupos) o exigir — preferir additive migrations.
 
 | Área | Path |
 |------|------|
-| UI ATLAS | `apps/web/app/(dashboard)/tasks/page.tsx` |
+| UI ATLAS | `apps/web/app/(dashboard)/tasks/page.tsx` → `TasksBoard` |
+| UI Hub Work | `apps/web/app/hub/work/page.tsx` |
+| Hot button | `apps/web/components/work/WorkHotButton.tsx` |
+| Board partilhado | `apps/web/components/work/TasksBoard.tsx` |
 | Templates | `apps/web/app/(dashboard)/templates/page.tsx` |
-| APIs | `apps/web/app/api/tasks/`, `checklist/`, `comments/`, `time-entries/` |
-| SIEP | `apps/web/components/siep/project-sections/TasksSection.tsx` |
-| Workspace | `apps/web/app/hub/workspace/` |
+| APIs | `apps/web/app/api/tasks/`, `task-groups/`, `checklist/`, `comments/`, `time-entries/` |
+| SQL grupos | `apps/web/prisma/migrations/manual_etholys_work_groups.sql` |
 
 ---
 

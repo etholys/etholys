@@ -112,5 +112,6 @@ export function isHubShellPath(pathname: string): boolean {
   if (pathname === '/hub/meet' || pathname.startsWith('/hub/meet/')) return true;
   if (pathname === '/hub/carta' || pathname.startsWith('/hub/carta/')) return true;
   if (pathname === '/hub/advisor' || pathname.startsWith('/hub/advisor/')) return true;
+  if (pathname === '/hub/work' || pathname.startsWith('/hub/work/')) return true;
   return false;
 }

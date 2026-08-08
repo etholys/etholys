@@ -20,6 +20,7 @@ const detailInclude = {
   creator: true,
   project: { include: { company: true } },
   department: true,
+  group: true,
   checklist: { orderBy: { order: 'asc' as const } },
   comments: {
     include: { user: { select: { id: true, name: true, email: true } } },
@@ -101,6 +102,17 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
         const parent = await assertTaskAccess(String(body.parentId), tenant);
         if (!parent) return NextResponse.json({ error: 'Tarea padre no encontrada' }, { status: 404 });
         data.parentId = body.parentId;
+      }
+    }
+    if (body.groupId !== undefined) {
+      if (body.groupId === null || body.groupId === '') {
+        data.groupId = null;
+      } else {
+        const group = await prisma.taskGroup.findFirst({
+          where: { id: String(body.groupId), isActive: true, companyId: { in: tenant.companyIds } },
+        });
+        if (!group) return NextResponse.json({ error: 'Grupo no encontrado' }, { status: 404 });
+        data.groupId = group.id;
       }
     }
     if (body.status === 'DONE') data.completedAt = new Date();

@@ -9,7 +9,7 @@ import type { Locale } from '@/lib/i18n';
 import Link from 'next/link';
 import {
   Layers, BarChart3, Sprout, HandCoins, GraduationCap, Cpu, Target, LayoutGrid, Scale,
-  LogOut, Globe, ArrowRight, Lock, ExternalLink, BrainCircuit, Video, PenLine,
+  LogOut, Globe, ArrowRight, Lock, ExternalLink, BrainCircuit, Video, PenLine, CheckSquare,
 } from 'lucide-react';
 import {
   deriveModuleHints,
@@ -75,6 +75,27 @@ const systems: Array<{
     borderColor: 'border-orange-300',
     bgHover: 'hover:border-orange-400 hover:shadow-orange-100',
     href: '/hub/studio',
+    active: true,
+    productTier: 'tool',
+  },
+  {
+    id: 'work',
+    name: 'Etholys Work',
+    tagline: {
+      es: 'Tareas del equipo',
+      pt: 'Tarefas da equipa',
+      en: 'Team tasks',
+    },
+    description: {
+      es: 'Herramienta transversal: kanban, lista, grupos, subtareas y tiempo — mismo motor Task que ATLAS y SIEP. Atajo cyan en todos los sistemas.',
+      pt: 'Ferramenta transversal: kanban, lista, grupos, subtarefas e tempo — mesmo motor Task que ATLAS e SIEP. Atalho cyan em todos os sistemas.',
+      en: 'Cross-cutting tool: kanban, list, groups, subtasks & time — same Task engine as ATLAS and SIEP. Cyan shortcut on every system.',
+    },
+    icon: CheckSquare,
+    color: 'from-cyan-500 to-teal-700',
+    borderColor: 'border-cyan-300',
+    bgHover: 'hover:border-cyan-400 hover:shadow-cyan-100',
+    href: '/hub/work',
     active: true,
     productTier: 'tool',
   },
@@ -222,7 +243,7 @@ const systems: Array<{
   },
 ];
 
-const TOOLS_IDS = new Set(['advisor', 'studio', 'meet', 'carta']);
+const TOOLS_IDS = new Set(['advisor', 'studio', 'meet', 'carta', 'work']);
 
 function isEtholysTool(sys: (typeof systems)[number]): boolean {
   return TOOLS_IDS.has(sys.id) || sys.productTier === 'advisor' || sys.productTier === 'tool';
@@ -304,9 +325,13 @@ export default function HubPage() {
 
   useEffect(() => {
     if (status !== 'authenticated') return;
-    const mode = (session?.user as { forgeAccessMode?: string } | undefined)?.forgeAccessMode;
-    const home = (session?.user as { forgeHomePath?: string } | undefined)?.forgeHomePath;
-    if (mode === 'course_only') {
+    const u = session?.user as
+      | { forgeAccessMode?: string; forgeHomePath?: string; platformAdmin?: boolean; role?: string }
+      | undefined;
+    // Platform / User.role ADMIN nunca deve ficar preso no shell de aluno FORGE
+    if (u?.platformAdmin || u?.role === 'ADMIN') return;
+    if (u?.forgeAccessMode === 'course_only') {
+      const home = u.forgeHomePath;
       router.replace(home && home.startsWith('/') ? home : '/hub/forge/mis-cursos');
     }
   }, [status, session, router]);
@@ -601,16 +626,19 @@ export default function HubPage() {
             <p className="mt-4 text-center text-sm text-slate-500">
               {locale === 'pt' ? (
                 <>
+                  <strong className="text-cyan-800">Work</strong> (botão cyan) = tarefas.{' '}
                   <strong className="text-orange-800">Studio</strong> (botão laranja) = documentos com IA.{' '}
                   <strong className="text-violet-800">Advisor</strong> = alertas multi-sistema. O <strong>chat teal</strong> = diálogo (Core).
                 </>
               ) : locale === 'es' ? (
                 <>
+                  <strong className="text-cyan-800">Work</strong> (botón cyan) = tareas.{' '}
                   <strong className="text-orange-800">Studio</strong> (botón naranja) = documentos con IA.{' '}
                   <strong className="text-violet-800">Advisor</strong> = alertas. El <strong>chat teal</strong> = diálogo (Core).
                 </>
               ) : (
                 <>
+                  <strong className="text-cyan-800">Work</strong> (cyan button) = tasks.{' '}
                   <strong className="text-orange-800">Studio</strong> (orange button) = AI documents.{' '}
                   <strong className="text-violet-800">Advisor</strong> = alerts. The <strong>teal chat</strong> = dialogue (Core).
                 </>

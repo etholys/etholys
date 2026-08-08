@@ -41,6 +41,7 @@ export async function GET(req: Request) {
         creator: true,
         project: { include: { company: true } },
         department: true,
+        group: true,
         checklist: { orderBy: { order: 'asc' } },
         _count: { select: { comments: true, subtasks: true, attachments: true } },
       },
@@ -77,6 +78,7 @@ export async function POST(req: Request) {
     if (!taskData.departmentId) delete taskData.departmentId;
     if (!taskData.projectId) delete taskData.projectId;
     if (!taskData.parentId) delete taskData.parentId;
+    if (!taskData.groupId) delete taskData.groupId;
     if (taskData.dueDate) taskData.dueDate = new Date(String(taskData.dueDate));
     if (taskData.startDate) taskData.startDate = new Date(String(taskData.startDate));
     if (taskData.estimatedHours !== undefined && taskData.estimatedHours !== '') {

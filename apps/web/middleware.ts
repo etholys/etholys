@@ -86,6 +86,10 @@ type WorkspaceScope = {
 };
 
 async function resolveForgeScope(req: NextRequest, token: AccessToken): Promise<ForgeScope | null> {
+  // Platform admin / full workspace never entra em course_only
+  if (token.platformAdmin || token.workspaceAccessMode === 'full') {
+    return { mode: 'organization', allowedCourseIds: [], homePath: '/hub' };
+  }
   if (token.forgeAccessMode === 'organization') {
     return { mode: 'organization', allowedCourseIds: [], homePath: '/hub' };
   }
@@ -286,12 +290,14 @@ async function enforceFunctionOnlyScope(req: NextRequest): Promise<NextResponse 
 
   if (pathname === '/acesso' || pathname.startsWith('/acesso/')) return null;
 
-  // Studio = ferramenta transversal (isenta de licença de sistema); disponível a autenticados.
+  // Studio / Work = ferramentas transversais (isentas de licença de sistema); disponíveis a autenticados.
   if (
     pathname === '/hub/studio' ||
     pathname.startsWith('/hub/studio/') ||
     pathname === '/studio' ||
-    pathname.startsWith('/studio/')
+    pathname.startsWith('/studio/') ||
+    pathname === '/hub/work' ||
+    pathname.startsWith('/hub/work/')
   ) {
     return null;
   }

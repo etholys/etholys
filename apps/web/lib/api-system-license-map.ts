@@ -36,7 +36,6 @@ const API_LICENSE_RULES: Array<{
   },
   {
     match: (p) =>
-      p.startsWith('/api/tasks') ||
       p.startsWith('/api/transactions') ||
       p.startsWith('/api/invoices') ||
       p.startsWith('/api/inventory') ||
@@ -48,12 +47,7 @@ const API_LICENSE_RULES: Array<{
       p.startsWith('/api/suppliers') ||
       p.startsWith('/api/clients') ||
       p.startsWith('/api/hr') ||
-      p.startsWith('/api/time-entries') ||
-      p.startsWith('/api/leave-requests') ||
-      p.startsWith('/api/checklist') ||
-      p.startsWith('/api/comments') ||
-      p.startsWith('/api/task-templates') ||
-      p.startsWith('/api/task-dependencies'),
+      p.startsWith('/api/leave-requests'),
     system: 'ATLAS',
   },
 ];
@@ -121,6 +115,13 @@ export function isApiLicenseExempt(pathname: string): boolean {
     pathname.startsWith('/api/notifications') ||
     pathname.startsWith('/api/chat') ||
     pathname.startsWith('/api/studio') ||
+    pathname.startsWith('/api/tasks') ||
+    pathname.startsWith('/api/task-groups') ||
+    pathname.startsWith('/api/task-templates') ||
+    pathname.startsWith('/api/task-dependencies') ||
+    pathname.startsWith('/api/time-entries') ||
+    pathname.startsWith('/api/checklist') ||
+    pathname.startsWith('/api/comments') ||
     pathname.startsWith('/api/users/me') ||
     pathname.startsWith('/api/public/') ||
     pathname === '/api/health'
