@@ -98,14 +98,16 @@ INSTRUÇÕES:
 
 REGRAS CRÍTICAS:
 1. IDIOMA: Se o utilizador pedir inglês/espanhol, ou o modelo tiver cabeçalhos em inglês, escreva TODO o documento nesse idioma. Traduza conteúdo antigo em outro idioma — não deixe texto antigo.
-2. ESCOPO M&E: Use APENAS actividades/outcomes do «ESCOPO M&E DO PROJECTO» com código exacto (A1.1a, A1.2…). Não invente códigos novos.
-3. ORDEM DAS ACTIVIDADES: Ordene linhas pela sequência lógica dos códigos (A1.1a antes de A1.2, antes de A1.6, etc.). A primeira linha de dados deve ser a actividade de menor código reportada no período.
-4. REESCREVER / ACTUALIZAR TABELA COMPLETA: Use replaceTableRows — apaga linhas antigas e cria as novas na ordem correcta. NUNCA deixe linhas antigas E adicione linhas novas com o mesmo conteúdo (isso duplica dados).
+2. SECÇÃO EXPLÍCITA DO UTILIZADOR (prioridade máxima): Se disser que o texto vai para «MONTHLY RELEVANT ACTIVITIES», «Media & Press», «Comments», ou outra secção/campo pelo nome, preencha ESSA secção/campo. Preserve o conteúdo narrativo (pode editar levemente gramática/clareza). NÃO reconverta narrativa longa em linhas de códigos M&E (A1.1a…) salvo pedido explícito de «vincular ao marco lógico / códigos».
+3. ESCOPO M&E (só tabelas de actividades/resultados): Quando o alvo for uma tabela de actividades/resultados do marco, use APENAS códigos do «ESCOPO M&E DO PROJECTO» (A1.1a, A1.2…). Não invente códigos novos.
+4. ORDEM DAS ACTIVIDADES (tabelas M&E): Ordene linhas pela sequência lógica dos códigos (A1.1a antes de A1.2, etc.).
+5. REESCREVER / ACTUALIZAR TABELA COMPLETA: Use replaceTableRows — apaga linhas antigas e cria as novas na ordem correcta. NUNCA deixe linhas antigas E adicione linhas novas com o mesmo conteúdo (isso duplica dados).
    Exemplo: {"replaceTableRows":[{"sectionId":"sec-id","rows":[{"cells":[{"tableCol":0,"text":"2026-04-01"},{"tableCol":2,"text":"A1.1a"}]}]}]}
-5. CORRECÇÕES PARCIAIS: canvasPatches com regionId exacto para alterar células existentes sem duplicar linhas.
-6. LINHAS EXTRA (só se o modelo tiver menos linhas que actividades novas): addTableRows — uma entrada por linha genuinamente nova. Não use addTableRows para substituir conteúdo existente.
-7. APLICAR: O JSON no final é OBRIGATÓRIO quando pedirem preenchimento — sem JSON o documento NÃO muda.
-8. Números: use [VERIFICAR] se faltar dado confirmado.
+6. CORRECÇÕES PARCIAIS: canvasPatches com regionId exacto para alterar células existentes sem duplicar linhas.
+7. LINHAS EXTRA (só se o modelo tiver menos linhas que actividades novas): addTableRows — uma entrada por linha genuinamente nova. Não use addTableRows para substituir conteúdo existente.
+8. APLICAR JÁ: O JSON no final é OBRIGATÓRIO quando pedirem preenchimento — sem JSON o documento NÃO muda. NUNCA diga «confirma e depois aplico» / «revisa y te aplico» — aplique na mesma resposta com o JSON. O resumo no chat é só para o humano; o canvas muda pelo JSON.
+9. NÃO RESUMIR DEMAIS: Se o utilizador colar um texto longo para uma secção narrativa, coloque o texto completo (ou quase) no campo — não o substitua por 5 bullets genéricos.
+10. Números: use [VERIFICAR] se faltar dado confirmado.
 
 - replaceTableRows: reescrita completa de tabela (preferir quando pedem actualizar/reordenar/traduzir tabela inteira)
 - canvasPatches: alterações pontuais em regionIds existentes
@@ -119,10 +121,12 @@ FORMATAÇÃO DE TEXTO (campos longos, coluna Results / Challenges / Lessons / Co
 - Em português: Desafios / Lições aprendidas / Comentários. Em espanhol: Desafíos / Lecciones aprendidas / Comentarios.
 - Cada tema num bloco com rótulo + lista com "-" ou frases curtas separadas por \\n.
 - Se o utilizador seleccionou uma célula/coluna Results, aplique esta formatação nesse âmbito.
+- Em secções narrativas livres (ex. Monthly Relevant Activities), use títulos numerados e parágrafos com \\n\\n entre blocos.
 
 FOCO DO UTILIZADOR:
 - Quando a mensagem incluir «ELEMENTO SELECCIONADO», a conversa refere-se PRINCIPALMENTE a esse campo/linha/coluna/secção.
-- Priorize patches nos regionIds listados no foco. Não altere outras partes do documento salvo pedido explícito.`;
+- Priorize patches nos regionIds listados no foco. Não altere outras partes do documento salvo pedido explícito.
+- Se o utilizador nomear duas secções na mesma mensagem (ex. actividades + Media & Press), preencha ambas na mesma resposta.`;
 }
 
 function unescapeJsonString(s: string): string {
