@@ -1,5 +1,6 @@
 #!/bin/bash
-# Deploy Etholys Work (Tools) — migração ADDITIVE TaskGroup + rebuild web.
+# Deploy Etholys Work (Etholys Tools — NÃO é o produto FORGE).
+# Migração ADDITIVE TaskGroup + rebuild da app web Contabo (app.etholys.com).
 # Uso no servidor:
 #   bash /opt/etholys/scripts/apply-work-deploy.sh
 set -eu
@@ -43,6 +44,6 @@ for i in $(seq 1 36); do
   sleep 5
 done
 
-curl -s -o /dev/null -w "hub_work_http=%{http_code}\n" https://forge.etholys.com/hub/work || true
-curl -s -o /dev/null -w "forge_health_http=%{http_code}\n" https://forge.etholys.com/api/forge/health || true
+curl -s -o /dev/null -w "hub_work_http=%{http_code}\n" https://app.etholys.com/hub/work || true
+curl -s -o /dev/null -w "app_health_http=%{http_code}\n" https://app.etholys.com/api/forge/health || true
 echo DONE
