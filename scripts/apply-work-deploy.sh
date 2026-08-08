@@ -19,13 +19,16 @@ git fetch origin
 git reset --hard origin/main
 echo "HEAD $(git rev-parse --short HEAD)"
 
-echo "==> Prisma TaskGroup (CREATE IF NOT EXISTS — sem perda de dados)"
+echo "==> Prisma TaskGroup + approvals (CREATE IF NOT EXISTS — sem perda de dados)"
 if [ -f apps/web/prisma/migrations/manual_etholys_work_groups.sql ]; then
   docker compose -f "infra/$COMPOSE_FILE" exec -T postgres \
     psql -U etholys -d etholys < apps/web/prisma/migrations/manual_etholys_work_groups.sql \
-    && echo "SQL Work groups ok (ou já aplicado)" || echo "SQL Work skip/partial — ok se já existe"
-else
-  echo "AVISO: manual_etholys_work_groups.sql em falta"
+    && echo "SQL Work groups ok (ou já aplicado)" || echo "SQL Work groups skip/partial"
+fi
+if [ -f apps/web/prisma/migrations/manual_etholys_work_approvals.sql ]; then
+  docker compose -f "infra/$COMPOSE_FILE" exec -T postgres \
+    psql -U etholys -d etholys < apps/web/prisma/migrations/manual_etholys_work_approvals.sql \
+    && echo "SQL Work approvals ok (ou já aplicado)" || echo "SQL Work approvals skip/partial"
 fi
 
 echo "==> Rebuild web (pode demorar 10–20 min)"

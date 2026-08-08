@@ -1,8 +1,8 @@
 # Etholys Work — motor de tarefas (Etholys Tools)
 
-**Versão:** 0.1  
-**Data:** 2026-08-05  
-**Status:** F0 em consolidação (ATLAS `/tasks` + APIs)  
+**Versão:** 0.2  
+**Data:** 2026-08-08  
+**Status:** F0–F4 em código (Tools `/hub/work` + CARTA inbox)  
 **Público:** product, desenvolvedores, agentes de IA  
 
 **Fonte de verdade** para o motor único de tarefas da equipa.  
@@ -45,8 +45,8 @@
 | **F0** | GET detalhe da tarefa; tags UI; subtarefas; comentários fiáveis; time log via detalhe | ✅ Base (ago/2026) |
 | **F1** | Grupos/secções tipo Monday (`TaskGroup` + ordem); filtro por grupo | ✅ Base (ago/2026) |
 | **F2** | Entrada Hub `/hub/work` + cartão Etholys Tools + hot button; deep-links ATLAS | ✅ (ago/2026) |
-| **F3** | @menções em comentários → notificação | Pendente |
-| **F4** | Solicitar aprovação → CARTA / notificação ao aprovador | Pendente |
+| **F3** | @menções em comentários → notificação | ✅ (ago/2026) |
+| **F4** | Solicitar aprovação → CARTA inbox + notificação ao aprovador | ✅ (ago/2026) |
 | **F5** | Templates de projeto (além de packs de tarefas) | Pendente |
 
 ---
@@ -68,8 +68,10 @@ Novos campos só quando F1 (grupos) o exigir — preferir additive migrations.
 | Hot button | `apps/web/components/work/WorkHotButton.tsx` |
 | Board partilhado | `apps/web/components/work/TasksBoard.tsx` |
 | Templates | `apps/web/app/(dashboard)/templates/page.tsx` |
-| APIs | `apps/web/app/api/tasks/`, `task-groups/`, `checklist/`, `comments/`, `time-entries/` |
-| SQL grupos | `apps/web/prisma/migrations/manual_etholys_work_groups.sql` |
+| APIs | `apps/web/app/api/tasks/`, `task-groups/`, `task-approvals/`, `checklist/`, `comments/`, `time-entries/` |
+| SQL | `manual_etholys_work_groups.sql`, `manual_etholys_work_approvals.sql` |
+| CARTA inbox | `apps/web/app/hub/carta/page.tsx` |
+| Mentions | `apps/web/lib/work/mentions.ts` |
 
 ---
 

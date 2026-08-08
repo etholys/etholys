@@ -116,6 +116,12 @@ model User {
   studioContextAssetsCreated    StudioContextAsset[]         @relation("StudioContextAssetCreator")
   studioDocumentVersionsCreated StudioDocumentVersion[]      @relation("StudioDocumentVersionCreator")
   studioPageMoldsCreated        StudioPageMold[]             @relation("StudioPageMoldCreator")
+  studioDocumentsUpdated        StudioDocument[]             @relation("StudioDocumentUpdater")
+  studioDocumentActivities      StudioDocumentActivity[]     @relation("StudioDocumentActivityActor")
+  studioDocumentComments        StudioDocumentComment[]      @relation("StudioDocumentCommentAuthor")
+  studioDocumentCommentsResolved StudioDocumentComment[]     @relation("StudioDocumentCommentResolver")
+  taskApprovalsRequested        TaskApprovalRequest[]        @relation("TaskApprovalRequester")
+  taskApprovalsToDecide         TaskApprovalRequest[]        @relation("TaskApprovalApprover")
 }
 
 model Account {
@@ -229,7 +235,10 @@ model Company {
   studioShares                StudioShare[]
   studioContextAssets         StudioContextAsset[]
   studioPageMolds             StudioPageMold[]
+  studioDocumentActivities    StudioDocumentActivity[]
+  studioDocumentComments      StudioDocumentComment[]
   taskGroups                  TaskGroup[]
+  taskApprovalRequests        TaskApprovalRequest[]
 }
 
 /// Autorização ao Hub /hub/workspace — espelho operacional: quais sistemas o utilizador vê e usa a partir dali (dados continuam nos sistemas de origem).
@@ -475,6 +484,7 @@ model Task {
   meetActionItems  MeetActionItem[]
   timeEntries      TimeEntry[]
   activityReports  TaskActivityReport[]
+  approvalRequests TaskApprovalRequest[]
 
   @@index([groupId])
   @@index([companyId])
@@ -493,6 +503,29 @@ model TaskGroup {
   tasks     Task[]
 
   @@index([companyId, order])
+}
+
+/// Pedido de aprovação de entrega de tarefa (Work → CARTA)
+model TaskApprovalRequest {
+  id           String    @id @default(cuid())
+  taskId       String
+  companyId    String
+  requesterId  String
+  approverId   String
+  /// PENDING | APPROVED | REJECTED
+  status       String    @default("PENDING")
+  note         String?
+  decisionNote String?
+  createdAt    DateTime  @default(now())
+  decidedAt    DateTime?
+  task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  requester    User      @relation("TaskApprovalRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  approver     User      @relation("TaskApprovalApprover", fields: [approverId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+  @@index([approverId, status])
+  @@index([taskId])
 }
 
 model TaskDependency {
@@ -538,6 +571,8 @@ model Comment {
   taskId    String
   userId    String
   content   String
+  /// IDs de utilizadores mencionados, separados por vírgula (padrão chat)
+  mentions  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -2745,6 +2780,8 @@ model StudioDocument {
   templateKey String?
   aiSessionId String?
   createdById String?
+  /// Último utilizador que guardou / aplicou edição (humana ou via IA)
+  updatedById String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -2752,11 +2789,15 @@ model StudioDocument {
   shares      StudioShare[]
   contextAssets StudioContextAsset[]
   versions    StudioDocumentVersion[]
+  activities  StudioDocumentActivity[]
+  comments    StudioDocumentComment[]
   createdBy   User?         @relation("StudioDocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy   User?         @relation("StudioDocumentUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([folderId])
   @@index([companyId, updatedAt])
+  @@index([updatedById])
 }
 
 /// Partilha de pasta ou documento — membro interno ou convidado externo (acesso isolado)
@@ -2865,6 +2906,50 @@ model StudioDocumentVersion {
   createdBy   User?          @relation("StudioDocumentVersionCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([documentId, createdAt])
+}
+
+/// Trilha de auditoria: quem falou com a IA / quem alterou o documento e quando
+model StudioDocumentActivity {
+  id          String         @id @default(cuid())
+  documentId  String
+  companyId   String
+  /// created | saved | restored | version | ai_prompt | ai_response | ai_edit | imported | shared
+  kind        String
+  summary     String
+  meta        Json?
+  actorUserId String?
+  createdAt   DateTime       @default(now())
+  document    StudioDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  company     Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  actor       User?          @relation("StudioDocumentActivityActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([documentId, createdAt])
+  @@index([companyId, createdAt])
+  @@index([actorUserId])
+}
+
+/// Comentários colaborativos no documento (F4) — opcionalmente ligados a um bloco
+model StudioDocumentComment {
+  id           String         @id @default(cuid())
+  documentId   String
+  companyId    String
+  /// Bloco do canvas (opcional — null = comentário geral do documento)
+  blockId      String?
+  body         String         @db.Text
+  authorId     String?
+  resolvedAt   DateTime?
+  resolvedById String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  document     StudioDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  author       User?          @relation("StudioDocumentCommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  resolvedBy   User?          @relation("StudioDocumentCommentResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([documentId, createdAt])
+  @@index([documentId, resolvedAt])
+  @@index([companyId])
+  @@index([authorId])
 }
 
 /// Molde / template visual de folha (imagem de fundo + metadados)

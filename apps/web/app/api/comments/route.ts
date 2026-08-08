@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
+import { createNotification } from '@/lib/notify';
+import { resolveTaskCommentMentions } from '@/lib/work/mentions';
 
 async function assertTaskAccess(taskId: string, companyIds: string[]) {
   const task = await prisma.task.findFirst({
@@ -12,7 +14,7 @@ async function assertTaskAccess(taskId: string, companyIds: string[]) {
   if (!task) return null;
   const companyId = task.project?.companyId || task.companyId;
   if (!companyId || !companyIds.includes(companyId)) return null;
-  return task;
+  return { ...task, resolvedCompanyId: companyId };
 }
 
 export async function GET(req: Request) {
@@ -51,10 +53,33 @@ export async function POST(req: Request) {
     const access = await assertTaskAccess(taskId, tenant.companyIds);
     if (!access) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
 
+    const text = String(content).trim();
+    const { mentionIds } = await resolveTaskCommentMentions(text, tenant.companyIds, tenant.userId);
+
     const comment = await prisma.comment.create({
-      data: { taskId, userId: tenant.userId, content: String(content).trim() },
+      data: {
+        taskId,
+        userId: tenant.userId,
+        content: text,
+        mentions: mentionIds.length ? mentionIds.join(',') : null,
+      },
       include: { user: { select: { id: true, name: true, email: true } } },
     });
+
+    const link = `/hub/work`;
+    const authorName = comment.user?.name || 'Alguien';
+    await Promise.all(
+      mentionIds.map((userId) =>
+        createNotification({
+          userId,
+          type: 'task_mention',
+          title: 'Te mencionaron en una tarea',
+          message: `${authorName} te mencionó en: ${access.title}`,
+          link,
+        }),
+      ),
+    );
+
     return NextResponse.json({ comment });
   } catch (error: unknown) {
     console.error('Comment error:', error);

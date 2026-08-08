@@ -36,6 +36,14 @@ const detailInclude = {
     orderBy: { order: 'asc' as const },
   },
   parent: { select: { id: true, title: true } },
+  approvalRequests: {
+    orderBy: { createdAt: 'desc' as const },
+    take: 10,
+    include: {
+      requester: { select: { id: true, name: true } },
+      approver: { select: { id: true, name: true } },
+    },
+  },
   _count: { select: { comments: true, subtasks: true, attachments: true } },
 };
 

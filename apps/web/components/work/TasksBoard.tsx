@@ -42,6 +42,10 @@ export default function TasksBoard({ variant = 'atlas' }: TasksBoardProps) {
   const [showDetail, setShowDetail] = useState<any>(null);
   const [form, setForm] = useState<any>({ title: '', description: '', projectId: '', departmentId: '', groupId: '', assigneeId: '', priority: 'MEDIUM', status: 'TODO', dueDate: '', tags: '', isRecurring: false, recurrenceMonths: '1', recurrenceCount: '1' });
   const [newComment, setNewComment] = useState('');
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [approvalApproverId, setApprovalApproverId] = useState('');
+  const [approvalNote, setApprovalNote] = useState('');
+  const [approvalBusy, setApprovalBusy] = useState(false);
   const [taskDetail, setTaskDetail] = useState<any>(null);
   const [editingTask, setEditingTask] = useState(false);
   const [taskEditForm, setTaskEditForm] = useState<any>({});
@@ -135,7 +139,71 @@ export default function TasksBoard({ variant = 'atlas' }: TasksBoardProps) {
     if (!newComment.trim() || !taskDetail?.id) return;
     await fetch('/api/comments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskId: taskDetail.id, content: newComment }) });
     setNewComment('');
+    setMentionQuery(null);
     openTaskDetail(taskDetail.id);
+  };
+
+  const onCommentChange = (val: string) => {
+    setNewComment(val);
+    const lastAt = val.lastIndexOf('@');
+    if (lastAt >= 0 && !val.slice(lastAt + 1).includes(' ')) {
+      setMentionQuery(val.slice(lastAt + 1).toLowerCase());
+    } else {
+      setMentionQuery(null);
+    }
+  };
+
+  const pickMention = (user: { id: string; name: string }) => {
+    const lastAt = newComment.lastIndexOf('@');
+    if (lastAt < 0) return;
+    setNewComment(`${newComment.slice(0, lastAt)}@${user.name} `);
+    setMentionQuery(null);
+  };
+
+  const mentionSuggestions =
+    mentionQuery == null
+      ? []
+      : (users ?? [])
+          .filter((u: any) => (u?.name ?? '').toLowerCase().includes(mentionQuery))
+          .slice(0, 6);
+
+  const requestApproval = async () => {
+    if (!taskDetail?.id || !approvalApproverId) return;
+    setApprovalBusy(true);
+    try {
+      const r = await fetch('/api/task-approvals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: taskDetail.id,
+          approverId: approvalApproverId,
+          note: approvalNote || null,
+        }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        alert(d?.error || L(ml('Could not request approval', 'No se pudo solicitar', 'Não foi possível solicitar')));
+        return;
+      }
+      setApprovalNote('');
+      setApprovalApproverId('');
+      openTaskDetail(taskDetail.id);
+    } finally {
+      setApprovalBusy(false);
+    }
+  };
+
+  const renderCommentBody = (content: string) => {
+    const parts = String(content || '').split(/(@[^\s@][^@]*?)(?=\s|$|@)/g);
+    return parts.map((part, i) =>
+      part.startsWith('@') ? (
+        <span key={i} className="rounded bg-cyan-100 px-1 font-medium text-cyan-800">
+          {part}
+        </span>
+      ) : (
+        <span key={i}>{part}</span>
+      ),
+    );
   };
 
   const toggleChecklist = async (itemId: string, completed: boolean) => {
@@ -753,6 +821,74 @@ export default function TasksBoard({ variant = 'atlas' }: TasksBoardProps) {
                 </div>
               </div>
 
+              {/* Approval */}
+              <div>
+                <h4 className="mb-2 flex items-center gap-1 text-sm font-medium text-gray-700">
+                  {L(ml('Delivery approval', 'Aprobación de entrega', 'Aprovação de entrega'))}
+                </h4>
+                <div className="mb-3 space-y-2">
+                  {(taskDetail?.approvalRequests ?? []).slice(0, 5).map((a: any) => (
+                    <div key={a.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                      <span>
+                        {a.requester?.name} → {a.approver?.name}
+                        {a.note ? ` · ${a.note}` : ''}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 font-semibold ${
+                          a.status === 'APPROVED'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : a.status === 'REJECTED'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        {a.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {!(taskDetail?.approvalRequests ?? []).some((a: any) => a.status === 'PENDING') && (
+                  <div className="space-y-2 rounded-lg border border-slate-200 p-3">
+                    <select
+                      value={approvalApproverId}
+                      onChange={(e) => setApprovalApproverId(e.target.value)}
+                      className="w-full rounded-lg border px-3 py-2 text-sm"
+                    >
+                      <option value="">{L(ml('Select approver…', 'Elegir aprobador…', 'Escolher aprovador…'))}</option>
+                      {(users ?? [])
+                        .filter((u: any) => u?.id)
+                        .map((u: any) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name}
+                          </option>
+                        ))}
+                    </select>
+                    <input
+                      value={approvalNote}
+                      onChange={(e) => setApprovalNote(e.target.value)}
+                      placeholder={L(ml('Optional note', 'Nota opcional', 'Nota opcional'))}
+                      className="w-full rounded-lg border px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="button"
+                      disabled={approvalBusy || !approvalApproverId}
+                      onClick={requestApproval}
+                      className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-50"
+                    >
+                      {L(ml('Request approval', 'Solicitar aprobación', 'Solicitar aprovação'))}
+                    </button>
+                    <p className="text-[11px] text-slate-400">
+                      {L(
+                        ml('Approver decides in CARTA (Etholys Tools).', 'El aprobador decide en CARTA (Etholys Tools).', 'O aprovador decide em CARTA (Etholys Tools).'),
+                      )}{' '}
+                      <a href="/hub/carta" className="text-cyan-700 underline">
+                        CARTA
+                      </a>
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* Comments */}
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1"><MessageSquare className="w-4 h-4" />{tr('task.comments')}</h4>
@@ -764,13 +900,40 @@ export default function TasksBoard({ variant = 'atlas' }: TasksBoardProps) {
                         <span className="text-sm font-medium">{c?.user?.name ?? ''}</span>
                         <span className="text-xs text-gray-400">{formatDate(c?.createdAt)}</span>
                       </div>
-                      <p className="text-sm text-gray-600">{c?.content ?? ''}</p>
+                      <p className="text-sm text-gray-600">{renderCommentBody(c?.content ?? '')}</p>
                     </div>
                   ))}
                 </div>
-                <div className="flex gap-2">
-                  <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder={`${tr('task.comments')}...`} className="flex-1 px-3 py-2 rounded-lg border text-sm" onKeyDown={e => e.key === 'Enter' && addComment()} />
-                  <button onClick={addComment} className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm hover:bg-teal-700">{tr('general.save')}</button>
+                <div className="relative space-y-2">
+                  {mentionSuggestions.length > 0 && (
+                    <div className="absolute bottom-full left-0 z-10 mb-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                      {mentionSuggestions.map((u: any) => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => pickMention(u)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-cyan-50"
+                        >
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-100 text-[10px] font-bold text-cyan-700">
+                            {getInitials(u.name)}
+                          </span>
+                          {u.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      value={newComment}
+                      onChange={(e) => onCommentChange(e.target.value)}
+                      placeholder={`${tr('task.comments')}… (@${L(ml('mention', 'mención', 'menção'))})`}
+                      className="flex-1 px-3 py-2 rounded-lg border text-sm"
+                      onKeyDown={(e) => e.key === 'Enter' && addComment()}
+                    />
+                    <button onClick={addComment} className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm hover:bg-teal-700">
+                      {tr('general.save')}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
