@@ -17,8 +17,8 @@ const HIDDEN_PREFIXES = [
 ];
 
 /**
- * Atalho flutuante Studio — visível em todos os sistemas autenticados.
- * Posição: canto inferior esquerdo, acima do espaço tipicamente usado pelo Advisor.
+ * Atalho flutuante Studio — canto inferior esquerdo.
+ * Work fica acima (`bottom-[4.75rem]`); Studio permanece em `bottom-6`.
  */
 export function StudioHotButton() {
   const { data: session, status } = useSession();

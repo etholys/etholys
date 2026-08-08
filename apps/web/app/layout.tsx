@@ -1,6 +1,19 @@
 import './globals.css';
 import Providers from './providers';
 import type { Metadata, Viewport } from 'next';
+import { Figtree, Syne } from 'next/font/google';
+
+const figtree = Figtree({
+  subsets: ['latin'],
+  variable: '--font-etholys-sans',
+  display: 'swap',
+});
+
+const syne = Syne({
+  subsets: ['latin'],
+  variable: '--font-etholys-display',
+  display: 'swap',
+});
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -20,7 +33,8 @@ function metadataBaseUrl(): URL {
 
 export const metadata: Metadata = {
   title: 'ETHOLYS — Fábrica de Soluciones | Laboratorio I+D+i',
-  description: 'Soluciones integradas de software, hardware y metodologías para la gestión institucional, el desarrollo empresarial y la innovación productiva.',
+  description:
+    'Ecosistema de soluciones para gestionar, financiar, ejecutar, aprender y decidir mejor. Seis sistemas independientes y herramientas transversales.',
   metadataBase: metadataBaseUrl(),
   icons: { icon: '/favicon.svg' },
   openGraph: { images: ['/og-image.png'] },
@@ -29,7 +43,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body className="min-h-screen font-sans antialiased">
+      <body className={`${figtree.variable} ${syne.variable} min-h-screen font-[family-name:var(--font-etholys-sans)] antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>
