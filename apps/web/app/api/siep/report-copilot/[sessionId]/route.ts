@@ -15,9 +15,7 @@ import {
   type CopilotLocale,
   type ReportOutputLanguage,
 } from '@/lib/siep/report-copilot-prompts';
-import {
-  applyCopilotCanvasUpdate,
-} from '@/lib/siep/report-canvas-merge';
+import { applyCopilotCanvasUpdate } from '@/lib/siep/report-canvas-merge';
 import {
   buildProjectContextBlock,
   loadInformeEditorState,
@@ -32,6 +30,7 @@ import {
   formatSelectionFocusForPrompt,
   parseInformeSelection,
 } from '@/lib/siep/informe-canvas-selection';
+import { getGuestCompanyIds } from '@/lib/siep/permissions';
 
 function detectOutputLanguageFromMessage(
   message: string,
@@ -65,9 +64,14 @@ async function resolveUser() {
     include: { companyUsers: { where: { isDefault: true }, take: 1 } },
   });
   if (!user) return null;
-  const companyId = user.companyUsers[0]?.companyId
-    ?? (await prisma.companyUser.findFirst({ where: { userId: user.id } }))?.companyId;
-  if (!companyId) return null;
+  const companyId =
+    user.companyUsers[0]?.companyId ??
+    (await prisma.companyUser.findFirst({ where: { userId: user.id } }))?.companyId;
+  if (!companyId) {
+    const guestIds = await getGuestCompanyIds(user.id);
+    if (!guestIds.length) return null;
+    return { user, companyId: guestIds[0] };
+  }
   return { user, companyId };
 }
 
@@ -76,10 +80,7 @@ async function findInformeSession(sessionId: string, userId: string, companyId?:
   const base = {
     id: sessionId,
     userId,
-    OR: [
-      { kind: { in: kinds } },
-      { title: { startsWith: 'SIEP Informe' } },
-    ],
+    OR: [{ kind: { in: kinds } }, { title: { startsWith: 'SIEP Informe' } }],
   };
 
   let session = companyId
@@ -114,6 +115,12 @@ export async function GET(_req: NextRequest, ctx: RouteCtx) {
   }
 }
 
+/**
+ * action:
+ * - send (default): nova mensagem
+ * - edit: altera mensagem do utilizador (fromUserMessageId) e regenera a partir daí
+ * - regenerate: mantém o texto do utilizador e pede nova resposta da IA
+ */
 export async function POST(req: NextRequest, ctx: RouteCtx) {
   try {
     const auth = await resolveUser();
@@ -121,14 +128,13 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
     const { sessionId } = await ctx.params;
 
     const body = await req.json();
-    const userMessage = String(body.message || '').trim();
     const reportId = String(body.reportId || '').trim();
     const rawLoc = String(body.locale || 'pt');
     const locale: CopilotLocale = rawLoc === 'es' || rawLoc === 'en' ? rawLoc : 'pt';
+    const actionRaw = String(body.action || 'send');
+    const action = actionRaw === 'edit' || actionRaw === 'regenerate' ? actionRaw : 'send';
+    const fromUserMessageId = body.fromUserMessageId ? String(body.fromUserMessageId) : '';
 
-    if (!userMessage) {
-      return NextResponse.json({ error: 'Escreva uma mensagem.' }, { status: 400 });
-    }
     if (!reportId) {
       return NextResponse.json({ error: 'reportId requerido' }, { status: 400 });
     }
@@ -140,7 +146,8 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
       where: { userId: auth.user.id },
       select: { companyId: true },
     });
-    const companyIds = [...new Set(tenantRows.map((r) => r.companyId))];
+    const guestIds = await getGuestCompanyIds(auth.user.id);
+    const companyIds = [...new Set([...tenantRows.map((r) => r.companyId), ...guestIds])];
 
     const loaded = await loadInformeEditorState(reportId, companyIds);
     if (!loaded || !(await reportUsesAiSession(reportId, sessionId))) {
@@ -150,6 +157,64 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
     let canvas = (loaded.canvasState || loaded.report.canvasState) as ReportCanvasState;
     if (!canvas?.regions?.length) {
       return NextResponse.json({ error: 'Canvas inválido' }, { status: 400 });
+    }
+
+    let userMessage = String(body.message || '').trim();
+    let history: Array<{ role: string; content: string }> = [];
+
+    if (action === 'edit' || action === 'regenerate') {
+      if (!fromUserMessageId) {
+        return NextResponse.json({ error: 'fromUserMessageId requerido' }, { status: 400 });
+      }
+      const target = await prisma.aiAdvisorMessage.findFirst({
+        where: { id: fromUserMessageId, sessionId, role: 'user' },
+      });
+      if (!target) {
+        return NextResponse.json({ error: 'Mensagem não encontrada' }, { status: 404 });
+      }
+
+      if (action === 'edit') {
+        if (!userMessage) {
+          return NextResponse.json({ error: 'Escreva uma mensagem.' }, { status: 400 });
+        }
+        await prisma.aiAdvisorMessage.update({
+          where: { id: target.id },
+          data: { content: userMessage },
+        });
+      } else {
+        userMessage = target.content;
+      }
+
+      // Apaga respostas (e mensagens posteriores) a partir desta
+      const allMsgs = await prisma.aiAdvisorMessage.findMany({
+        where: { sessionId },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        select: { id: true, role: true, content: true },
+      });
+      const targetIdx = allMsgs.findIndex((m) => m.id === target.id);
+      const toDelete = targetIdx >= 0 ? allMsgs.slice(targetIdx + 1).map((m) => m.id) : [];
+      if (toDelete.length) {
+        await prisma.aiAdvisorMessage.deleteMany({
+          where: { id: { in: toDelete } },
+        });
+      }
+      history = (targetIdx > 0 ? allMsgs.slice(Math.max(0, targetIdx - 12), targetIdx) : []).map(
+        ({ role, content }) => ({ role, content }),
+      );
+    } else {
+      if (!userMessage) {
+        return NextResponse.json({ error: 'Escreva uma mensagem.' }, { status: 400 });
+      }
+      const historyDesc = await prisma.aiAdvisorMessage.findMany({
+        where: { sessionId },
+        orderBy: { createdAt: 'desc' },
+        take: 12,
+        select: { role: true, content: true },
+      });
+      history = historyDesc.slice().reverse();
+      await prisma.aiAdvisorMessage.create({
+        data: { sessionId, role: 'user', content: userMessage },
+      });
     }
 
     const domain = normalizeInformeDomain(loaded.report.package?.domain);
@@ -162,8 +227,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
 
     const outputLanguage = detectOutputLanguageFromMessage(
       userMessage,
-      (body.outputLanguage as ReportOutputLanguage) ||
-        inferReportOutputLanguage(canvas),
+      (body.outputLanguage as ReportOutputLanguage) || inferReportOutputLanguage(canvas),
     );
 
     const systemPrompt = buildSiepReportSystemPrompt({
@@ -178,18 +242,6 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
       projectContext,
     });
 
-    const historyDesc = await prisma.aiAdvisorMessage.findMany({
-      where: { sessionId },
-      orderBy: { createdAt: 'desc' },
-      take: 12,
-      select: { role: true, content: true },
-    });
-    const history = historyDesc.slice().reverse();
-
-    await prisma.aiAdvisorMessage.create({
-      data: { sessionId, role: 'user', content: userMessage },
-    });
-
     const historyText = history
       .map((m) => `${m.role === 'user' ? 'Utilizador' : 'Assistente'}: ${m.content}`)
       .join('\n\n');
@@ -201,6 +253,11 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
       ? `HISTÓRICO:\n${historyText}\n\nNOVA MENSAGEM:\n${userMessage}`
       : userMessage;
 
+    if (action === 'regenerate') {
+      fullUserText +=
+        '\n\n(O utilizador pediu uma NOVA resposta a esta mesma mensagem — aplique de novo ao canvas conforme as instruções actualizadas.)';
+    }
+
     if (selectionBlock) {
       fullUserText = `══ ELEMENTO SELECCIONADO PELO UTILIZADOR ══\n${selectionBlock}\n\nA mensagem seguinte refere-se PRINCIPALMENTE a este elemento.\n\n${fullUserText}`;
     }
@@ -210,7 +267,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
       userText: fullUserText,
       maxOutputTokens: 16384,
       model: SIEP_REPORT_LLM_MODEL,
-      temperature: 0.2,
+      temperature: action === 'regenerate' ? 0.35 : 0.2,
     });
     const rawReply = result.text;
     const { visibleText, patches, missingRegionIds, removeRegionIds, addTableRows, replaceTableRows } =
@@ -255,6 +312,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
       rowsAdded: addTableRows.length,
       tablesReplaced: replaceTableRows.length,
       patchesSkipped: removeRegionIds.length - safeRemoveIds.length,
+      action,
     });
   } catch (error: unknown) {
     console.error('[siep/report-copilot POST]', error);

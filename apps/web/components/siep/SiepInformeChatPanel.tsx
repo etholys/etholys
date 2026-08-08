@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
-import { Bot, Loader2, Send, Sparkles, X } from 'lucide-react';
-import { useSiepInformeSession } from '@/hooks/useSiepInformeSession';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Bot, Check, Loader2, Pencil, RefreshCw, Send, Sparkles, X } from 'lucide-react';
+import { useSiepInformeSession, type SiepInformeMsg } from '@/hooks/useSiepInformeSession';
 import { useSiepLocale } from '@/lib/siep/use-siep-t';
 import { siepT } from '@/lib/siep/i18n';
 import { describeInformeSelection, type InformeCanvasSelection } from '@/lib/siep/informe-canvas-selection';
@@ -17,6 +17,18 @@ type Props = {
   onCanvasUpdate: (canvas: ReportCanvasState) => void;
 };
 
+function findPrecedingUserMessage(
+  messages: SiepInformeMsg[],
+  assistantId: string,
+): SiepInformeMsg | null {
+  const idx = messages.findIndex((m) => m.id === assistantId);
+  if (idx <= 0) return null;
+  for (let i = idx - 1; i >= 0; i -= 1) {
+    if (messages[i].role === 'user') return messages[i];
+  }
+  return null;
+}
+
 export function SiepInformeChatPanel({
   reportId,
   sessionId,
@@ -27,10 +39,26 @@ export function SiepInformeChatPanel({
 }: Props) {
   const locale = useSiepLocale();
   const st = (key: string) => siepT(key, locale);
-  const { messages, sending, loading, err, input, setInput, send, loadMessages, loadedRef } =
-    useSiepInformeSession(reportId, sessionId, canvas, locale, selection);
+  const {
+    messages,
+    sending,
+    loading,
+    err,
+    input,
+    setInput,
+    send,
+    editAndResend,
+    regenerate,
+    loadMessages,
+    loadedRef,
+  } = useSiepInformeSession(reportId, sessionId, canvas, locale, selection);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editRef = useRef<HTMLTextAreaElement>(null);
+
+  const [selectedMsgId, setSelectedMsgId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
 
   const selectionLabel = useMemo(
     () => (selection ? describeInformeSelection(canvas, selection) : null),
@@ -47,11 +75,59 @@ export function SiepInformeChatPanel({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, sending]);
 
-  const handleSend = async () => {
-    const result = await send();
+  useEffect(() => {
+    if (editingId && editRef.current) {
+      editRef.current.focus();
+      editRef.current.style.height = 'auto';
+      editRef.current.style.height = `${Math.min(280, Math.max(80, editRef.current.scrollHeight))}px`;
+    }
+  }, [editingId, editDraft]);
+
+  const applyResult = (result: { canvasState?: unknown } | null) => {
     if (result?.canvasState) {
       onCanvasUpdate(result.canvasState as ReportCanvasState);
     }
+  };
+
+  const handleSend = async () => {
+    const result = await send();
+    applyResult(result);
+    setSelectedMsgId(null);
+    setEditingId(null);
+  };
+
+  const startEdit = (m: SiepInformeMsg) => {
+    setSelectedMsgId(m.id);
+    setEditingId(m.id);
+    setEditDraft(m.content);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDraft('');
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !editDraft.trim() || sending) return;
+    const result = await editAndResend(editingId, editDraft.trim());
+    applyResult(result);
+    setEditingId(null);
+    setEditDraft('');
+    setSelectedMsgId(null);
+  };
+
+  const handleRegenerateFromUser = async (userMsgId: string) => {
+    if (sending) return;
+    const result = await regenerate(userMsgId);
+    applyResult(result);
+    setSelectedMsgId(null);
+    setEditingId(null);
+  };
+
+  const handleRegenerateAssistant = async (assistantId: string) => {
+    const userMsg = findPrecedingUserMessage(messages, assistantId);
+    if (!userMsg) return;
+    await handleRegenerateFromUser(userMsg.id);
   };
 
   const resizeTextarea = () => {
@@ -82,27 +158,135 @@ export function SiepInformeChatPanel({
           </div>
         )}
         {!loading &&
-          messages.map((m) => (
-            <div
-              key={m.id}
-              className={`flex gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {m.role !== 'user' && (
-                <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-4 h-4 text-indigo-700" />
-                </div>
-              )}
+          messages.map((m) => {
+            const isUser = m.role === 'user';
+            const isSelected = selectedMsgId === m.id;
+            const isEditing = editingId === m.id;
+            const isTemp = m.id.startsWith('tmp-');
+
+            return (
               <div
-                className={`max-w-[90%] rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
-                  m.role === 'user'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-white border border-slate-200 text-slate-800'
-                }`}
+                key={m.id}
+                className={`flex gap-2 group ${isUser ? 'justify-end' : 'justify-start'}`}
               >
-                {m.content}
+                {!isUser && (
+                  <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-4 h-4 text-indigo-700" />
+                  </div>
+                )}
+                <div className={`max-w-[90%] flex flex-col gap-1 ${isUser ? 'items-end' : 'items-start'}`}>
+                  {isEditing ? (
+                    <div className="w-full min-w-[220px] rounded-xl border border-indigo-300 bg-white p-2 shadow-sm">
+                      <textarea
+                        ref={editRef}
+                        value={editDraft}
+                        onChange={(e) => setEditDraft(e.target.value)}
+                        rows={4}
+                        className="w-full text-sm rounded-lg border border-slate-200 px-2 py-1.5 resize-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            e.preventDefault();
+                            cancelEdit();
+                          }
+                          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                            e.preventDefault();
+                            void saveEdit();
+                          }
+                        }}
+                      />
+                      <div className="mt-1.5 flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          disabled={sending}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          <X className="w-3 h-3" />
+                          {st('siep.informe.chat.cancelEdit')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void saveEdit()}
+                          disabled={sending || !editDraft.trim()}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {sending ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Check className="w-3 h-3" />
+                          )}
+                          {st('siep.informe.chat.saveAndResend')}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={sending || isTemp}
+                      onClick={() => setSelectedMsgId(isSelected ? null : m.id)}
+                      className={`text-left rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap transition ${
+                        isUser
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white border border-slate-200 text-slate-800'
+                      } ${
+                        isSelected
+                          ? 'ring-2 ring-offset-1 ring-amber-400'
+                          : 'hover:opacity-95'
+                      } disabled:opacity-70`}
+                    >
+                      {m.content}
+                    </button>
+                  )}
+
+                  {!isEditing && isSelected && !isTemp && (
+                    <div
+                      className={`flex flex-wrap gap-1 ${isUser ? 'justify-end' : 'justify-start'}`}
+                    >
+                      {isUser && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={sending}
+                            onClick={() => startEdit(m)}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            {st('siep.informe.chat.edit')}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={sending}
+                            onClick={() => void handleRegenerateFromUser(m.id)}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 disabled:opacity-50"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            {st('siep.informe.chat.regenerate')}
+                          </button>
+                        </>
+                      )}
+                      {!isUser && (
+                        <button
+                          type="button"
+                          disabled={sending}
+                          onClick={() => void handleRegenerateAssistant(m.id)}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 disabled:opacity-50"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          {st('siep.informe.chat.regenerate')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
+        {sending && (
+          <div className="flex items-center gap-2 text-xs text-slate-500 px-1">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+            {st('siep.informe.chat.thinking')}
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -162,7 +346,9 @@ export function SiepInformeChatPanel({
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
-        <p className="mt-1.5 text-[10px] text-slate-400">{st('siep.informe.chat.sendHint')}</p>
+        <p className="mt-1.5 text-[10px] text-slate-400">
+          {st('siep.informe.chat.sendHint')} · {st('siep.informe.chat.selectHint')}
+        </p>
       </div>
     </div>
   );
