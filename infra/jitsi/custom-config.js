@@ -52,7 +52,8 @@ config.customToolbarButtons = [
   {
     id: 'etholys-transcript',
     text: 'Transcripción',
-    icon: 'https://app.etholys.com/meet-brand/transcript.svg',
+    // data-URI: não depende do deploy do ficheiro estático na app
+    icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIj48cmVjdCB4PSI0IiB5PSIzIiB3aWR0aD0iMTYiIGhlaWdodD0iMTgiIHJ4PSIyIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjEuNzUiLz48cGF0aCBkPSJNOCA4aDhNOCAxMmg4TTggMTZoNSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIxLjc1IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=',
   },
 ];
 
