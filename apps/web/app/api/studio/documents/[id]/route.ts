@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { resolveStudioCompanyId } from '@/lib/studio/access';
 import type { StudioCanvasState } from '@/lib/studio/types';
+import { normalizeStudioCanvas } from '@/lib/studio/types';
 import { getDocumentAccess } from '@/lib/studio/share';
 import {
   canChangeStudioVisibility,
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json({
     document: {
       ...doc,
-      canvasState: doc.canvasState as StudioCanvasState,
+      canvasState: normalizeStudioCanvas(doc.canvasState),
     },
     access,
   });
@@ -63,7 +64,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   if (typeof body.title === 'string' && body.title.trim()) data.title = body.title.trim();
   if (body.canvasState && typeof body.canvasState === 'object') {
-    data.canvasState = body.canvasState as StudioCanvasState;
+    data.canvasState = normalizeStudioCanvas(body.canvasState);
   }
   if ('folderId' in body) {
     data.folderId = typeof body.folderId === 'string' && body.folderId ? body.folderId : null;
@@ -76,12 +77,32 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     data.visibility = body.visibility;
   }
 
+  // Snapshot antes de guardar canvas (histórico)
+  if (data.canvasState && body.createVersion !== false) {
+    try {
+      await prisma.studioDocumentVersion.create({
+        data: {
+          documentId: existing.id,
+          title: existing.title,
+          canvasState: existing.canvasState as object,
+          label: typeof body.versionLabel === 'string' ? body.versionLabel : 'Antes de guardar',
+          createdById: user.id,
+        },
+      });
+    } catch (e) {
+      console.warn('[studio] version snapshot skipped', e);
+    }
+  }
+
   const updated = await prisma.studioDocument.update({
     where: { id: existing.id },
     data,
   });
 
-  return NextResponse.json({ document: updated, access });
+  return NextResponse.json({
+    document: { ...updated, canvasState: normalizeStudioCanvas(updated.canvasState) },
+    access,
+  });
 }
 
 /** DELETE /api/studio/documents/[id] */

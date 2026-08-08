@@ -145,3 +145,46 @@ DO $$ BEGIN
   ALTER TABLE "StudioContextAsset" ADD CONSTRAINT "StudioContextAsset_createdById_fkey"
     FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS "StudioDocumentVersion" (
+  "id" TEXT NOT NULL,
+  "documentId" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "canvasState" JSONB NOT NULL,
+  "label" TEXT,
+  "createdById" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "StudioDocumentVersion_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "StudioDocumentVersion_documentId_createdAt_idx" ON "StudioDocumentVersion"("documentId", "createdAt");
+
+CREATE TABLE IF NOT EXISTS "StudioPageMold" (
+  "id" TEXT NOT NULL,
+  "companyId" TEXT NOT NULL,
+  "name" TEXT NOT NULL,
+  "pageSize" TEXT NOT NULL DEFAULT 'A4',
+  "imagePath" TEXT NOT NULL,
+  "notes" TEXT,
+  "createdById" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "StudioPageMold_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "StudioPageMold_companyId_idx" ON "StudioPageMold"("companyId");
+
+DO $$ BEGIN
+  ALTER TABLE "StudioDocumentVersion" ADD CONSTRAINT "StudioDocumentVersion_documentId_fkey"
+    FOREIGN KEY ("documentId") REFERENCES "StudioDocument"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE "StudioDocumentVersion" ADD CONSTRAINT "StudioDocumentVersion_createdById_fkey"
+    FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE "StudioPageMold" ADD CONSTRAINT "StudioPageMold_companyId_fkey"
+    FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE "StudioPageMold" ADD CONSTRAINT "StudioPageMold_createdById_fkey"
+    FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

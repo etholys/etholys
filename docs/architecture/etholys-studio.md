@@ -36,6 +36,7 @@
 | **F2** | Diagramas editáveis + “ajusta o diagrama” no chat | ✅ preview Mermaid + patches via agente |
 | **F2.1** | Permissões / partilha pasta+doc (membros + email externo; papéis viewer/editor/admin) | ✅ |
 | **F2.2** | Contexto IA: ficheiros na pasta + anexos no chat | ✅ |
+| **F2.3** | Editor: chat esquerdo redimensionável, undo/versões, folhas A4/A3, moldes | ✅ |
 | **F3** | Pontes “Abrir no Studio” desde SIEP/FUNDHUB/Meet | Seguinte |
 | **F4** | Templates por domínio + colaboração/comentários | |
 

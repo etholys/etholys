@@ -55,7 +55,7 @@ export function buildStudioSystemPrompt(opts: {
   const canvasSummary = opts.canvas.pages
     .map((p) => {
       const blocks = p.blocks
-        .map((b) => `  - [${b.id}] ${b.kind}${b.title ? ` «${b.title}»` : ''}: ${truncate(b.text, 180)}`)
+        .map((b) => `  - [${b.id}] ${b.kind}${b.title ? ` «${b.title}»` : ''}: ${truncate(b.text, 400)}`)
         .join('\n');
       return `Página ${p.id} «${p.title}»:\n${blocks}`;
     })
@@ -70,6 +70,14 @@ export function buildStudioSystemPrompt(opts: {
 Idioma da resposta ao utilizador: ${lang}.
 
 Documento atual: «${opts.documentTitle}» (formato: ${opts.canvas.format}).
+
+## Regras de edição do documento (críticas)
+1. **Cirúrgico:** altera **apenas** o que o utilizador pediu. Não reescrevas, não «melhores» nem apagues blocos que não foram pedidos.
+2. Em \`canvasPatches\`, inclui **só** os \`blockId\` que precisam de mudar. Omissões = blocos intactos.
+3. Se o pedido for acrescentar informação a um bloco, **preserva** o texto existente e acrescenta (não substituas o bloco inteiro a menos que peçam reescrever).
+4. Nunca esvazies um bloco (\`text: ""\`) salvo pedido explícito de apagar.
+5. Se não tiveres a certeza de qual bloco editar, pergunta na \`message\` e devolve \`canvasPatches: []\`.
+6. Não mudes \`suggestedTitle\` salvo o utilizador pedir novo título.
 
 ## Regras de contexto
 1. Conheces o *catálogo* de fontes disponíveis no ecossistema Etholys da empresa.
@@ -106,11 +114,12 @@ Responde **apenas** com JSON válido (sem markdown):
   "suggestedTitle": null | "novo título"
 }
 
-- Usa canvasPatches para editar blocos existentes (ids do canvas).
+- Usa canvasPatches **só** para os blocos que mudam (ids do canvas). Menos patches = melhor.
 - Se pedires consentimento, canvasPatches pode ficar vazio ou só com ajustes estruturais sem dados sensíveis.
 - Para diagramas (kind diagram), o campo text deve ser Mermaid válido quando aplicável.
 - Se o utilizador pedir ajustes a um diagrama («torna isto horizontal», «adiciona nó X»), atualiza o bloco diagram correspondente com Mermaid completo e válido (flowchart/sequence/erDiagram conforme o pedido).
-- Preferência: incorporar o contexto do utilizador no texto do documento.`;
+- Preferência: incorporar o contexto do utilizador no texto do documento.
+- **Proibido:** reescrever o documento inteiro quando o pedido é pontual (ex. «acrescenta X»).`;
 }
 
 function truncate(s: string, n: number) {

@@ -114,6 +114,8 @@ model User {
   studioShares                  StudioShare[]                @relation("StudioShareUser")
   studioSharesInvited           StudioShare[]                @relation("StudioShareInviter")
   studioContextAssetsCreated    StudioContextAsset[]         @relation("StudioContextAssetCreator")
+  studioDocumentVersionsCreated StudioDocumentVersion[]      @relation("StudioDocumentVersionCreator")
+  studioPageMoldsCreated        StudioPageMold[]             @relation("StudioPageMoldCreator")
 }
 
 model Account {
@@ -226,6 +228,7 @@ model Company {
   studioTemplates             StudioTemplate[]
   studioShares                StudioShare[]
   studioContextAssets         StudioContextAsset[]
+  studioPageMolds             StudioPageMold[]
 }
 
 /// Autorização ao Hub /hub/workspace — espelho operacional: quais sistemas o utilizador vê e usa a partir dali (dados continuam nos sistemas de origem).
@@ -2727,6 +2730,7 @@ model StudioDocument {
   folder      StudioFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
   shares      StudioShare[]
   contextAssets StudioContextAsset[]
+  versions    StudioDocumentVersion[]
   createdBy   User?         @relation("StudioDocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([companyId])
@@ -2825,4 +2829,37 @@ model StudioContextAsset {
   @@index([folderId])
   @@index([documentId])
   @@index([scope])
+}
+
+/// Snapshot de versão do documento Studio (histórico / restaurar)
+model StudioDocumentVersion {
+  id          String         @id @default(cuid())
+  documentId  String
+  title       String
+  canvasState Json
+  label       String?
+  createdById String?
+  createdAt   DateTime       @default(now())
+  document    StudioDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy   User?          @relation("StudioDocumentVersionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([documentId, createdAt])
+}
+
+/// Molde / template visual de folha (imagem de fundo + metadados)
+model StudioPageMold {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  /// A4 | A3 | …
+  pageSize    String   @default("A4")
+  imagePath   String
+  notes       String?  @db.Text
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy   User?    @relation("StudioPageMoldCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
 }
