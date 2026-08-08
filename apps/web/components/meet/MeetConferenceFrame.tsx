@@ -190,13 +190,41 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       ref,
       () => ({
         startTranscription() {
-          apiRef.current?.executeCommand('startRecording', {
-            mode: 'file',
-            transcription: true,
-          });
+          const api = apiRef.current;
+          if (!api) return;
+          // 1) Pedido nativo de legendas → convida o transcriber (Jigasi/Vosk)
+          try {
+            api.executeCommand('setSubtitles', true, true, 'es');
+          } catch {
+            try {
+              api.executeCommand('toggleSubtitles');
+            } catch {
+              /* ignore */
+            }
+          }
+          // 2) Caminho clássico External API (alguns builds só reagem a isto)
+          try {
+            api.executeCommand('startRecording', {
+              mode: 'file',
+              transcription: true,
+            });
+          } catch {
+            /* ignore — sem Jibri pode falhar; setSubtitles basta para STT */
+          }
         },
         stopTranscription() {
-          apiRef.current?.executeCommand('stopRecording', 'file', true);
+          const api = apiRef.current;
+          if (!api) return;
+          try {
+            api.executeCommand('setSubtitles', false);
+          } catch {
+            /* ignore */
+          }
+          try {
+            api.executeCommand('stopRecording', 'file', true);
+          } catch {
+            /* ignore */
+          }
         },
         startRecording(destination) {
           apiRef.current?.executeCommand('startRecording', {
@@ -253,6 +281,16 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               disableTileEnlargement: false,
               defaultLogoUrl: 'https://app.etholys.com/meet-brand/etholys-mark.svg',
               defaultRemoteDisplayName: 'Participante',
+              fileRecordingsEnabled: true,
+              liveStreamingEnabled: false,
+              transcription: {
+                enabled: true,
+                autoCaptionOnTranscribe: true,
+                // Servidor usa Vosk ES — pedir legendas em espanhol
+                useAppLanguage: false,
+                preferredLanguage: 'es',
+                disableStartForAll: false,
+              },
               disableVirtualBackground: false,
               virtualBackgrounds: [
                 {

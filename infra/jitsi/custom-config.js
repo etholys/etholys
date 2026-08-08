@@ -14,8 +14,10 @@ config.localRecording = {
   disableSelfRecording: false,
 };
 
-// Sem gravação em nuvem ainda
-config.fileRecordingsEnabled = false;
+// Jibri (gravação ficheiro) ainda não está no VPS — mas tem de ficar `true`
+// para o cliente poder pedir transcrição ao vivo (convidar o transcriber/Vosk).
+// Sem isto, «CC» / startRecording({transcription:true}) falha em silêncio.
+config.fileRecordingsEnabled = true;
 config.liveStreamingEnabled = false;
 
 config.disableInviteFunctions = false;
@@ -32,11 +34,13 @@ config.filmstrip = config.filmstrip || {};
 config.filmstrip.disableResizable = false;
 config.filmstrip.disableStageFilmstrip = false;
 
-// Transcrição ao vivo
+// Transcrição ao vivo (Vosk ES no contentor transcriber)
 config.transcription = config.transcription || {};
 config.transcription.enabled = true;
 config.transcription.autoCaptionOnTranscribe = true;
 config.transcription.useAppLanguage = true;
+config.transcription.preferredLanguage = 'es';
+config.transcription.disableStartForAll = false;
 
 // Fundos virtuais Etholys (além do blur nativo fraco do browser)
 config.disableVirtualBackground = false;

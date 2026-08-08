@@ -256,8 +256,15 @@ export function MeetRoomClient({ sessionId }: Props) {
       );
       return;
     }
-    if (transcriptionOn) conferenceRef.current?.stopTranscription();
-    else conferenceRef.current?.startTranscription();
+    if (transcriptionOn) {
+      conferenceRef.current?.stopTranscription();
+      setTranscriptionOn(false);
+      return;
+    }
+    setPanelOpen(true);
+    conferenceRef.current?.startTranscription();
+    // Feedback imediato; o evento recordingStatusChanged confirma depois
+    setTranscriptionOn(true);
   }
 
   function startRecording(destination: 'local' | 'cloud') {
@@ -450,7 +457,16 @@ export function MeetRoomClient({ sessionId }: Props) {
                 onTranscriptionChunk={handleTranscriptionChunk}
                 onParticipantCountChange={setParticipantCount}
                 onDominantSpeakerChanged={setDominantSpeaker}
-                onTranscriptToolbarClick={() => setPanelOpen((open) => !open)}
+                onTranscriptToolbarClick={() => {
+                  setPanelOpen((open) => {
+                    const next = !open;
+                    // Ao abrir o painel, arranca STT se ainda não estiver activo
+                    if (next && !transcriptionOn && features.liveTranscriptionEnabled) {
+                      window.setTimeout(() => conferenceRef.current?.startTranscription(), 0);
+                    }
+                    return next;
+                  });
+                }}
                 onConferenceLeft={() => {
                   void endMeeting({ skipHangup: true });
                 }}
