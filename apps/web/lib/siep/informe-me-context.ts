@@ -132,7 +132,7 @@ export async function buildMeScopeBlockForInforme(projectId: string): Promise<st
         lines.push(`${indent}  ↳ ${o.description.trim().slice(0, 420)}`);
       }
       if (o.type === 'activity') {
-        const hints = mappingHintsForActivity(o.title || '', o.description);
+        const hints = mappingHintsForActivity(o.title || '', o.description ?? null);
         if (hints) lines.push(`${indent}  ≈ mapear notas sobre: ${hints}`);
       }
       if (raw?.indicator?.trim() && (o.type === 'activity' || o.type === 'output' || o.type === 'outcome')) {
@@ -161,7 +161,7 @@ export async function buildMeScopeBlockForInforme(projectId: string): Promise<st
     lines.push('ÍNDICE RÁPIDO DE ACTIVIDADES (códigos oficiais para tabelas e tags na narrativa):');
     for (const a of activities) {
       const code = a.code?.trim() ? `${a.code.trim()} — ` : '';
-      const hints = mappingHintsForActivity(a.title || '', a.description);
+      const hints = mappingHintsForActivity(a.title || '', a.description ?? null);
       lines.push(`  - ${code}${a.title}${hints ? ` [${hints}]` : ''}`);
     }
   }
