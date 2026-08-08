@@ -48,9 +48,29 @@ type MeetSessionRow = MeetEventDetail & {
   recurrence?: string | null;
   seriesId?: string | null;
   seriesParentId?: string | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
 };
 
 const DAY_MS = 86_400_000;
+const STALE_LIVE_MAX_MS = 4 * 60 * 60 * 1000;
+const STALE_AFTER_END_GRACE_MS = 15 * 60 * 1000;
+
+/** `live` no DB mas já fora da janela da reunião → tratar como passada no hub. */
+function isActivelyLive(session: MeetSessionRow, now: number): boolean {
+  if (session.status !== 'live') return false;
+  if (session.isPermanent) return true;
+  if (session.endsAt) {
+    const end = new Date(session.endsAt).getTime();
+    if (Number.isFinite(end) && now > end + STALE_AFTER_END_GRACE_MS) return false;
+  }
+  const startRaw = session.startedAt || session.scheduledAt;
+  if (startRaw) {
+    const start = new Date(startRaw).getTime();
+    if (Number.isFinite(start) && now > start + STALE_LIVE_MAX_MS) return false;
+  }
+  return true;
+}
 
 function startOfDay(date: Date): Date {
   const copy = new Date(date);
@@ -228,20 +248,23 @@ function MeetHubContent() {
           session.status !== 'ended' &&
           session.status !== 'cancelled',
       ),
-      live: byTime.filter((s) => s.status === 'live'),
+      live: byTime.filter((s) => isActivelyLive(s, now)),
       upcoming: byTime.filter(
         (s) =>
-          s.status !== 'live' &&
+          !isActivelyLive(s, now) &&
           s.status !== 'ended' &&
           s.status !== 'cancelled' &&
+          s.status !== 'live' &&
           (!s.scheduledAt || new Date(s.scheduledAt).getTime() >= now),
       ),
       past: byTime.filter(
         (s) =>
           !s.isPermanent &&
+          !isActivelyLive(s, now) &&
           (s.status === 'ended' ||
             s.status === 'cancelled' ||
-            (s.status !== 'live' && !!s.scheduledAt && new Date(s.scheduledAt).getTime() < now)),
+            s.status === 'live' ||
+            (!!s.scheduledAt && new Date(s.scheduledAt).getTime() < now)),
       ),
     };
   }, [sessions, selectedDate]);

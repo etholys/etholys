@@ -9,6 +9,7 @@ export {
   listMeetSessions,
   getMeetSessionForCompany,
   deleteMeetSessionScoped,
+  reconcileStaleLiveMeetSessions,
   meetJoinSessionId,
   assertMeetPrismaReady,
 } from '@/lib/meet/create-session';

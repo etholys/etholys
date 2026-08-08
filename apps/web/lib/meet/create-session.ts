@@ -183,11 +183,43 @@ export async function createMeetSession(input: CreateMeetSessionInput) {
   return prisma.meetSession.findUniqueOrThrow({ where: { id: master.id } });
 }
 
+/** Sessões `live` que já passaram do fim (ou >4h) — limpa o hub «En curso». */
+const STALE_LIVE_MAX_MS = 4 * 60 * 60 * 1000;
+const STALE_AFTER_END_GRACE_MS = 15 * 60 * 1000;
+
+export async function reconcileStaleLiveMeetSessions(companyId: string): Promise<number> {
+  assertMeetPrismaReady();
+  const now = Date.now();
+  const live = await prisma.meetSession.findMany({
+    where: { companyId, status: 'live', isPermanent: false },
+    select: { id: true, endsAt: true, startedAt: true, scheduledAt: true },
+    take: 200,
+  });
+  const staleIds = live
+    .filter((session) => {
+      if (session.endsAt && now > session.endsAt.getTime() + STALE_AFTER_END_GRACE_MS) {
+        return true;
+      }
+      const start = session.startedAt ?? session.scheduledAt;
+      return Boolean(start && now > start.getTime() + STALE_LIVE_MAX_MS);
+    })
+    .map((session) => session.id);
+
+  if (staleIds.length === 0) return 0;
+
+  await prisma.meetSession.updateMany({
+    where: { companyId, id: { in: staleIds }, status: 'live' },
+    data: { status: 'ended', endedAt: new Date() },
+  });
+  return staleIds.length;
+}
+
 export async function listMeetSessions(
   companyId: string,
   opts?: { limit?: number; projectId?: string },
 ) {
   assertMeetPrismaReady();
+  await reconcileStaleLiveMeetSessions(companyId).catch(() => 0);
   const limit = Math.min(250, Math.max(1, opts?.limit ?? 120));
   return prisma.meetSession.findMany({
     where: {
