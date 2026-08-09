@@ -31,6 +31,10 @@ import {
   parseInformeSelection,
 } from '@/lib/siep/informe-canvas-selection';
 import { getGuestCompanyIds } from '@/lib/siep/permissions';
+import {
+  applyStructuredMonthlyFill,
+  looksLikeStructuredMonthlyNotes,
+} from '@/lib/siep/monthly-structured-notes';
 
 function detectOutputLanguageFromMessage(
   message: string,
@@ -264,6 +268,60 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
 
     if (selectionBlock) {
       fullUserText = `══ ELEMENTO SELECCIONADO PELO UTILIZADOR ══\n${selectionBlock}\n\nA mensagem seguinte refere-se PRINCIPALMENTE a este elemento.\n\n${fullUserText}`;
+    }
+
+    // Notas já organizadas (Descripción / Resultados / …): preencher Activity de forma
+    // determinística — o chat livre costumava preencher só Results e fingir que actualizou.
+    const complaintAboutTable =
+      /no\s+(se\s+)?actualiz|sin\s+(estar|descripci)|falta\s+(una\s+)?descripci|limpia\s+toda|no\s+colocaste|sigue\s+sin|não\s+atualiz|sem\s+descri/i.test(
+        userMessage,
+      );
+    const structuredSource =
+      looksLikeStructuredMonthlyNotes(userMessage)
+        ? userMessage
+        : complaintAboutTable
+          ? [...history]
+              .reverse()
+              .find((m) => m.role === 'user' && looksLikeStructuredMonthlyNotes(m.content))?.content
+          : undefined;
+
+    if (structuredSource) {
+      const structured = await applyStructuredMonthlyFill({
+        canvas,
+        userMessage: structuredSource,
+        outputLanguage,
+        locale,
+        model: SIEP_REPORT_LLM_MODEL,
+      });
+      if (structured?.applied) {
+        canvas = structured.canvas;
+        await prisma.aiAdvisorMessage.create({
+          data: {
+            sessionId,
+            role: 'assistant',
+            content: structured.reply,
+          },
+        });
+        const plainContent = canvasStateToPlainText(canvas);
+        await prisma.mEReport.update({
+          where: { id: reportId },
+          data: { content: plainContent },
+        });
+        await patchInformeMeta(reportId, {
+          canvasState: canvas,
+          canvasFormat: canvas.format,
+        });
+        return NextResponse.json({
+          reply: structured.reply,
+          canvasState: canvas,
+          patchesApplied: structured.patchesApplied,
+          rowsAdded: 0,
+          tablesReplaced: structured.tablesReplaced,
+          patchesSkipped: 0,
+          action,
+          structuredFill: true,
+        });
+      }
     }
 
     const result = await llmGenerateContent({

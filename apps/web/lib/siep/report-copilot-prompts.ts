@@ -83,26 +83,31 @@ O leitor é o FINANCIADOR (ou revisor de reembolso), NÃO um diário interno da 
 O utilizador costuma colar notas operacionais (visitas, nomes, datas) em espanhol/português.
 A tua tarefa é DUPLA e obrigatória:
 
-A) VINCULAR AO MARCO LÓGICO
-- Cada facto concreto (visita, reunião, webinar, cotização, aluguer, plano, reunião de equipa…) deve mapear-se a UMA actividade do «ESCOPO M&E DO PROJECTO» (código exacto A1.1a, A2.1…).
-- Se o utilizador NÃO pedir tabela de códigos: na narrativa (ex. MONTHLY RELEVANT ACTIVITIES) mantenha o relato completo e, em cada bloco/parágrafo relevante, acrescente o código entre parênteses no final da frase-chave — ex.: «… (A1.1a)».
-- Se o alvo for uma TABELA de actividades/resultados: uma linha por actividade M&E TOUCADA no período (não uma linha por visita). Agregue várias visitas ao mesmo código numa só linha Results.
-- NUNCA invente códigos. Se algo não encaixa, use o código pai mais próximo e diga no chat «mapeei X → A1.2 porque…».
+A) COLUNAS DA TABELA MONTHLY RELEVANT ACTIVITIES (erro mais comum — NÃO REPETIR)
+- Coluna **Activity** = descrição NARRATIVA completa do que foi feito (quê, com quem, onde, quando). Mínimo ~3–6 frases. O código M&E vai no FIM entre parênteses ou na coluna Outcome — NUNCA substitua a descrição pelo código ou pelo título curto.
+- Coluna **Results** = Results / Challenges / Lessons learned / Comments (blocos com \\n). NÃO ponha aqui a descrição do «o que se fez» se existir coluna Activity.
+- ERRADO na Activity: «A1.1a» ou só «Field diagnosis (A1.1b)».
+- CERTO na Activity: «From 9–10 July, diagnostic visits were conducted at Frutalcoop and with producers Orlando Fallas (La Pastora de Tarrazú), Fernando Chacón (San Gerardo de Dota) and Beatriz (Bajo Canet). Based on the information collected, a first version of the Agricultural and Technological Intervention Plans was designed (A1.1b, A1.4, A3.1).»
+- Se o utilizador enviar blocos «Descripción de lo que se hizo / Resultados / Desafíos / Lecciones / Comentarios», copie a Descripción (traduzida) para Activity e o resto para Results.
 
-B) REDIGIR PARA O FINANCIADOR (voz de reembolso)
-- Traduza e reescreva no idioma do documento (${docLang}). Não deixe o texto cru das notas no canvas se o documento for em inglês.
-- Foque em: o que foi FEITO, com QUEM, ONDE, QUANDO, e que AVANÇO isso representa face ao outcome/output.
-- Evite: diário («el viernes fuimos…»), jargão interno, listas de nomes sem propósito, typos sem correção.
-- Prefira: «Coordination meeting with GIZ (8 Jul 2026) reviewed project progress and alignment of producer accompaniment strategies (A1.2).»
-- Em colunas Results / Challenges / Lessons / Comments: evidência útil para justificar despesas e progresso — factos verificáveis, não opinião vaga.
-- Media & Press: datas, canal (Instagram highlights, etc.), o que foi comunicado e ligação breve ao lançamento/actividades do projecto.
+B) VINCULAR AO MARCO LÓGICO
+- Cada facto concreto deve mapear-se a actividades do «ESCOPO M&E DO PROJECTO». Se o utilizador já indicar códigos no título (ex. Actividades 1.1b, 1.4 y 3.1), RESPEITE esses códigos (normalize para A1.1b…).
+- NUNCA invente códigos. Se algo não encaixa, diga no chat o mapeamento.
 
-C) NÃO ESCOLHER ENTRE NARRATIVA E TABELA
-- Se o utilizador der notas longas E o modelo tiver secção narrativa + tabela de actividades: preencha AMBAS na mesma resposta (narrativa polida + tabela M&E agregada).
+C) REDIGIR PARA O FINANCIADOR (voz de reembolso)
+- Traduza e reescreva no idioma do documento (${docLang}).
+- Foque em: o que foi FEITO, com QUEM, ONDE, QUANDO, e o avanço face ao outcome/output.
+- Media & Press: datas, canal, o que foi comunicado.
+- Payment Justification Summary: o parágrafo introdutório do período (não deixe só a tabela preenchida).
+
+D) APLICAR DE VERDADE
+- O JSON final é obrigatório. Não diga «voy a actualizar» sem incluir replaceTableRows/canvasPatches.
+- Se pedir limpar/reescrever a tabela: replaceTableRows com TODAS as colunas preenchidas, Activity com narrativa longa.
 `
     : `
 REDACÇÃO PARA O FINANCIADOR:
 - Reescreva notas operacionais no idioma do documento (${docLang}) com tom profissional de reporte.
+- Em tabelas com coluna Activity: a célula Activity é a descrição do que foi feito, NÃO só o código M&E.
 - Vincule factos a códigos do ESCOPO M&E quando preencher tabelas de actividades/resultados.
 `;
 
@@ -135,7 +140,8 @@ REGRAS CRÍTICAS:
 3. ESCOPO M&E (tabelas de actividades/resultados): Use APENAS códigos do «ESCOPO M&E DO PROJECTO». Não invente códigos novos. Agregue eventos do mesmo código numa linha.
 4. ORDEM DAS ACTIVIDADES (tabelas M&E): Ordene linhas pela sequência lógica dos códigos (A1.1a antes de A1.2, etc.).
 5. REESCREVER / ACTUALIZAR TABELA COMPLETA: Use replaceTableRows — apaga linhas antigas e cria as novas na ordem correcta. NUNCA deixe linhas antigas E adicione linhas novas com o mesmo conteúdo (isso duplica dados).
-   Exemplo: {"replaceTableRows":[{"sectionId":"sec-id","rows":[{"cells":[{"tableCol":0,"text":"2026-07-01"},{"tableCol":2,"text":"A1.1a"},{"tableCol":3,"text":"Field visits to Frutalcoop and associated producers…"}]}]}]}
+   Exemplo (Activity = narrativa; Results = resultados/desafios; código no Outcome ou no fim da Activity):
+   {"replaceTableRows":[{"sectionId":"sec-id","rows":[{"cells":[{"tableCol":0,"text":"2026-07-09"},{"tableCol":1,"text":"A1.1b / A3.1"},{"tableCol":2,"text":"From 9–10 July, diagnostic visits were conducted at Frutalcoop and with producers Orlando Fallas (La Pastora de Tarrazú), Fernando Chacón (San Gerardo de Dota) and Beatriz (Bajo Canet). A first version of the Agricultural and Technological Intervention Plans was designed (A1.1b, A1.4, A3.1)."},{"tableCol":3,"text":"Results:\\nDirect links with key producers; discard fruit volumes documented.\\n\\nChallenges:\\n- Aligning extensive visit logistics with producers' farm schedules.\\n\\nLessons learned:\\n- Many producers do not reside on-farm, creating connectivity gaps.\\n\\nComments:\\nDiagnosis confirmed feedstock availability for the bio-refinery."}]}]}]}
 6. CORRECÇÕES PARCIAIS: canvasPatches com regionId exacto para alterar células existentes sem duplicar linhas.
 7. LINHAS EXTRA: addTableRows só para linhas genuinamente novas. Não use addTableRows para substituir conteúdo existente.
 8. APLICAR JÁ: O JSON no final é OBRIGATÓRIO quando pedirem preenchimento. NUNCA diga «confirma e depois aplico».
@@ -153,8 +159,8 @@ FORMATAÇÃO DE TEXTO (campos longos, coluna Results / Challenges / Lessons / Co
   Challenges:\\n- ponto 1\\n- ponto 2\\n\\nLessons learned:\\n- ponto 1\\n\\nComments:\\n- texto
 - Em português: Desafios / Lições aprendidas / Comentários. Em espanhol: Desafíos / Lecciones aprendidas / Comentarios.
 - Cada tema num bloco com rótulo + lista com "-" ou frases curtas separadas por \\n.
-- Em Results: 2–5 frases densas (o quê / com quem / resultado / ligação ao output), não um diário.
-- Em secções narrativas livres (ex. Monthly Relevant Activities), use títulos numerados e parágrafos com \\n\\n entre blocos; códigos M&E entre parênteses no fim dos blocos relevantes.
+- Em Results: evidência de resultados/desafios/lições/comentários — NÃO substitua a coluna Activity.
+- Em secções narrativas livres, use títulos numerados e parágrafos com \\n\\n; códigos M&E entre parênteses no fim dos blocos relevantes.
 
 FOCO DO UTILIZADOR:
 - Quando a mensagem incluir «ELEMENTO SELECCIONADO», a conversa refere-se PRINCIPALMENTE a esse campo/linha/coluna/secção.
@@ -468,13 +474,18 @@ export function summarizeCanvasForPrompt(canvas: ReportCanvasState): string {
         for (const c of cells.sort((a, b) => (a.tableCol ?? 0) - (b.tableCol ?? 0))) {
           const colIdx = c.tableCol ?? 0;
           const colName = c.columnLabel || cols[colIdx] || `col${colIdx}`;
-          const fmtHint = isResultsLikeColumn(colName) ? ' [usar \\n + Challenges/Lessons/Comments]' : '';
+          const resultsHint = isResultsLikeColumn(colName)
+            ? ' [Results/Challenges/Lessons/Comments com \\n — NÃO a descrição do que se fez]'
+            : '';
+          const activityHint = /activit|actividad|descripci/i.test(colName)
+            ? ' [OBRIGATÓRIO: narrativa completa do que foi feito (quê/quem/onde/quando) — NUNCA só código A1.x ou título curto]'
+            : '';
           const val = c.text.trim() ? `"${c.text.slice(0, 100)}"` : '(vazio — preencher com patch text)';
-          parts.push(`    regionId="${c.id}" col${colIdx} (${colName})${fmtHint}: ${val}`);
+          parts.push(`    regionId="${c.id}" col${colIdx} (${colName})${activityHint}${resultsHint}: ${val}`);
         }
       }
       parts.push(
-        `  → Linhas existentes: canvasPatches. Reescrita completa (actualizar/ordenar/traduzir): replaceTableRows com sectionId="${s.id}". Linhas extra: addTableRows.`,
+        `  → Linhas existentes: canvasPatches. Reescrita completa (actualizar/ordenar/traduzir): replaceTableRows com sectionId="${s.id}" — cada linha DEVE preencher Activity com descrição longa + Results. Linhas extra: addTableRows.`,
       );
     } else {
       parts.push(`\n── Secção [${s.id}] ${s.kind} · ${s.title} ──`);
