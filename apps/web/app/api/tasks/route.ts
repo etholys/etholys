@@ -45,7 +45,7 @@ export async function GET(req: Request) {
         checklist: { orderBy: { order: 'asc' } },
         _count: { select: { comments: true, subtasks: true, attachments: true } },
       },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [{ order: 'asc' }, { updatedAt: 'desc' }],
     });
     return NextResponse.json({ tasks });
   } catch (error: any) {

@@ -123,6 +123,10 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
         data.groupId = group.id;
       }
     }
+    if (body.order !== undefined) {
+      const n = parseInt(String(body.order), 10);
+      if (!Number.isNaN(n)) data.order = n;
+    }
     if (body.status === 'DONE') data.completedAt = new Date();
     else if (body.status !== undefined) data.completedAt = null;
 

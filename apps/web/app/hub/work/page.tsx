@@ -10,9 +10,9 @@ export default function HubWorkPage() {
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-cyan-50/40">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-50 via-slate-50 to-white">
+      <header className="sticky top-0 z-30 shrink-0 border-b border-slate-200/80 bg-white/85 backdrop-blur-md">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <Link
               href="/hub"
@@ -26,16 +26,16 @@ export default function HubWorkPage() {
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="truncate text-lg font-bold text-slate-900">Etholys Work</h1>
-                <span className="hidden rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-800 sm:inline">
+                <h1 className="truncate text-lg font-bold tracking-tight text-slate-900">Etholys Work</h1>
+                <span className="hidden rounded-md bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-800 sm:inline">
                   Etholys Tools
                 </span>
               </div>
               <p className="truncate text-xs text-slate-500">
                 {t(
-                  'Tarefas da equipa — mesmo motor que ATLAS e SIEP',
-                  'Tareas del equipo — mismo motor que ATLAS y SIEP',
-                  'Team tasks — same engine as ATLAS and SIEP',
+                  'Quadro de tarefas da equipa',
+                  'Tablero de tareas del equipo',
+                  'Team task board',
                 )}
               </p>
             </div>
@@ -50,7 +50,7 @@ export default function HubWorkPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="flex min-h-0 flex-1 flex-col px-3 py-4 sm:px-6 lg:px-8">
         <TasksBoard variant="hub" />
       </main>
     </div>
