@@ -18,10 +18,11 @@ import {
   type CompanyContextSetup,
   type ModuleHintCode,
 } from '@/lib/company-context-setup';
-import { isLikelyDbId } from '@/lib/utils';
 import { StateLoading } from '@/components/ui/StateBlocks';
 import { useLicensedSystems } from '@/hooks/useLicensedSystems';
 import { resolveHubCardAccess } from '@/lib/hub-system-license';
+import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
+import { CompanyPicker } from '@/components/hub/CompanyPicker';
 
 const systems: Array<{
   id: string;
@@ -258,14 +259,14 @@ export default function HubPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { locale, setLocale, activeCompanyId } = useApp();
+  const { companies, companiesReady, companiesLoadError, companyId, setActiveCompanyId, reloadCompanies } =
+    useEnsureActiveCompany();
   const { licensedSystems, showIntegratedWorkspace } = useLicensedSystems(activeCompanyId);
   const [moduleHints, setModuleHints] = useState<ModuleHintCode[]>([]);
   const [hasMeaningfulSetup, setHasMeaningfulSetup] = useState(false);
   const [setupNudge, setSetupNudge] = useState<null | 'missing' | 'currency-mismatch'>(null);
   /** Atalho Lab no Hub = só system admin Etholys (allowlist). LabInvite entra por /lab, não aqui. */
   const [showLabShortcut, setShowLabShortcut] = useState(false);
-
-  const companyId = activeCompanyId && isLikelyDbId(activeCompanyId) ? activeCompanyId : '';
 
   useEffect(() => {
     if (status !== 'authenticated') {
@@ -494,16 +495,26 @@ export default function HubPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center shrink-0">
               <Layers className="w-5 h-5 text-white" />
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="font-bold text-slate-800 text-lg">ETHOLYS</span>
               <span className="text-xs text-slate-400 ml-2 hidden sm:inline">Hub</span>
             </div>
+            <CompanyPicker
+              companies={companies}
+              activeCompanyId={companyId}
+              onSelect={setActiveCompanyId}
+              ready={companiesReady}
+              error={companiesLoadError}
+              onRetry={() => void reloadCompanies()}
+              locale={locale}
+              className="ml-1 max-w-[9.5rem] sm:ml-2 sm:max-w-none"
+            />
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setLocale(locale === 'es' ? 'pt' : locale === 'pt' ? 'en' : 'es')} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-100 transition text-slate-600">

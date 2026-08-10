@@ -18,6 +18,8 @@ const syne = Syne({
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#ffffff',
 };
 
 /** Sem force-dynamic no root: login e vitrine respondem mais depressa. Rotas que precisam de dados dinâmicos marcam-se a nível de segmento. */

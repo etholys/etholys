@@ -25,7 +25,9 @@ import {
   CalendarRange,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
-import { isLikelyDbId } from '@/lib/utils';
+import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
+import { CompanyPicker } from '@/components/hub/CompanyPicker';
+import { CompanyRequiredPanel } from '@/components/hub/CompanyRequiredPanel';
 import { MeetPostMeetingPanel } from '@/components/meet/MeetPostMeetingPanel';
 import {
   MeetScheduleDialog,
@@ -108,10 +110,18 @@ function MeetHubContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: authSession } = useSession();
-  const { locale, activeCompanyId } = useApp();
+  const { locale } = useApp();
+  const {
+    companies,
+    companiesReady,
+    companiesLoadError,
+    companiesHttpStatus,
+    companyId,
+    setActiveCompanyId,
+    reloadCompanies,
+  } = useEnsureActiveCompany();
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const intlLocale = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
-  const companyId = activeCompanyId && isLikelyDbId(activeCompanyId) ? activeCompanyId : '';
   const currentUserId = (authSession?.user as { id?: string } | undefined)?.id || null;
 
   const [sessions, setSessions] = useState<MeetSessionRow[]>([]);
@@ -471,28 +481,39 @@ function MeetHubContent() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <div className="flex min-h-dvh flex-col bg-white pb-[env(safe-area-inset-bottom)]">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Link
             href="/hub"
-            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            className="inline-flex touch-manipulation items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
           >
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Hub</span>
           </Link>
 
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-600">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-600">
               <Video className="h-4 w-4 text-white" />
             </span>
-            <span className="text-lg font-semibold tracking-tight text-slate-900">
+            <span className="truncate text-lg font-semibold tracking-tight text-slate-900">
               Etholys Meet
             </span>
           </div>
 
+          <CompanyPicker
+            companies={companies}
+            activeCompanyId={companyId}
+            onSelect={setActiveCompanyId}
+            ready={companiesReady}
+            error={companiesLoadError}
+            onRetry={() => void reloadCompanies()}
+            locale={locale}
+            className="ml-auto sm:ml-0"
+          />
+
           <div className="order-last flex w-full items-center gap-2 sm:order-none sm:ml-auto sm:w-auto">
-            <div className="flex flex-1 items-center gap-2 rounded-full bg-slate-100 px-3 py-2 sm:w-72">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-slate-100 px-3 py-2.5 sm:w-72 sm:py-2">
               <Keyboard className="h-4 w-4 shrink-0 text-slate-500" />
               <input
                 value={joinInput}
@@ -505,14 +526,17 @@ function MeetHubContent() {
                   'Ingresa un código o enlace',
                   'Enter a code or link',
                 )}
-                className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-500"
+                className="w-full bg-transparent text-base text-slate-800 outline-none placeholder:text-slate-500 sm:text-sm"
+                enterKeyHint="go"
+                autoCapitalize="off"
+                autoCorrect="off"
               />
             </div>
             <button
               type="button"
               onClick={joinByCode}
               disabled={!joinInput.trim()}
-              className="rounded-full px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 disabled:text-slate-400 disabled:hover:bg-transparent"
+              className="touch-manipulation rounded-full px-3 py-2.5 text-sm font-semibold text-sky-700 hover:bg-sky-50 disabled:text-slate-400 disabled:hover:bg-transparent sm:py-2"
             >
               {t('Entrar', 'Unirse', 'Join')}
             </button>
@@ -522,7 +546,7 @@ function MeetHubContent() {
                 type="button"
                 onClick={() => setNewMenuOpen((open) => !open)}
                 disabled={!companyId}
-                className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                className="inline-flex touch-manipulation items-center gap-2 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50 sm:py-2"
               >
                 <Plus className="h-4 w-4" />
                 {t('Nova', 'Nueva', 'New')}
@@ -530,16 +554,22 @@ function MeetHubContent() {
               {newMenuOpen && (
                 <>
                   <div
-                    className="fixed inset-0 z-10"
+                    className="fixed inset-0 z-40 bg-slate-950/40 sm:bg-transparent"
                     onClick={() => setNewMenuOpen(false)}
                     aria-hidden
                   />
-                  <div className="absolute right-0 top-full z-20 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                  <div className="fixed inset-x-0 bottom-0 z-50 overflow-hidden rounded-t-2xl border border-slate-200 bg-white py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:w-72 sm:rounded-xl sm:pb-1 sm:shadow-xl">
+                    <div className="mb-1 flex justify-center sm:hidden">
+                      <span className="h-1 w-10 rounded-full bg-slate-200" />
+                    </div>
+                    <p className="px-4 pb-1 pt-1 text-xs font-semibold uppercase tracking-wide text-slate-400 sm:hidden">
+                      {t('Nova reunião', 'Nueva reunión', 'New meeting')}
+                    </p>
                     <button
                       type="button"
                       onClick={() => void createSession('permanent')}
                       disabled={saving}
-                      className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 disabled:opacity-60"
+                      className="flex w-full touch-manipulation items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 disabled:opacity-60 sm:py-3"
                     >
                       <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
                       <span>
@@ -563,7 +593,7 @@ function MeetHubContent() {
                       type="button"
                       onClick={() => void createSession('instant')}
                       disabled={saving}
-                      className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 disabled:opacity-60"
+                      className="flex w-full touch-manipulation items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 disabled:opacity-60 sm:py-3"
                     >
                       <Zap className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
                       <span>
@@ -581,7 +611,7 @@ function MeetHubContent() {
                         setNewMenuOpen(false);
                         setScheduleOpen(true);
                       }}
-                      className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-slate-50"
+                      className="flex w-full touch-manipulation items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 sm:py-3"
                     >
                       <CalendarPlus className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
                       <span>
@@ -611,13 +641,16 @@ function MeetHubContent() {
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
         {!companyId && (
-          <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            {t(
-              'Selecione uma empresa no Hub para criar ou ver reuniões.',
-              'Selecciona una empresa en el Hub para crear o ver reuniones.',
-              'Select a company in the Hub to create or view meetings.',
-            )}
-          </p>
+          <CompanyRequiredPanel
+            locale={locale}
+            companies={companies}
+            ready={companiesReady}
+            error={companiesLoadError}
+            httpStatus={companiesHttpStatus}
+            activeCompanyId={companyId}
+            onSelect={setActiveCompanyId}
+            onRetry={() => void reloadCompanies()}
+          />
         )}
 
         {jitsiStatus?.isDemo && (

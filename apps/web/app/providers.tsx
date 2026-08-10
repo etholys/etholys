@@ -7,6 +7,7 @@ import type { Locale } from '@/lib/i18n';
 import { t } from '@/lib/i18n';
 import { StudioHotButton } from '@/components/studio/StudioHotButton';
 import { WorkHotButton } from '@/components/work/WorkHotButton';
+import { ActiveCompanyBootstrap } from '@/components/hub/ActiveCompanyBootstrap';
 
 interface AppContextType {
   locale: Locale;
@@ -71,6 +72,7 @@ export default function Providers({
   return (
     <SessionProvider session={session ?? undefined}>
       <AppContext.Provider value={{ locale, setLocale: handleSetLocale, activeCompanyId, setActiveCompanyId: handleSetCompany, tr }}>
+        <ActiveCompanyBootstrap />
         {children}
         <WorkHotButton />
         <StudioHotButton />
