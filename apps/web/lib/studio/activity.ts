@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 
 export const STUDIO_ACTIVITY_KINDS = [
   'created',
@@ -21,7 +22,7 @@ export type RecordStudioActivityInput = {
   kind: StudioActivityKind;
   summary: string;
   actorUserId?: string | null;
-  meta?: Record<string, unknown> | null;
+  meta?: Prisma.InputJsonValue | null;
 };
 
 /** Regista evento na trilha (best-effort — nunca quebra o fluxo principal). */
