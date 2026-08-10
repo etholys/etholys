@@ -1,4 +1,4 @@
--- Etholys Studio (ferramenta transversal) — aplicar manualmente se prisma migrate não estiver disponível
+-- Etholys Studio (ferramenta transversal) � aplicar manualmente se prisma migrate n�o estiver dispon�vel
 -- Spec: docs/architecture/etholys-studio.md
 
 DO $$ BEGIN
@@ -101,7 +101,7 @@ DO $$ BEGIN
     FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- Contexto IA (pastas + documentos) � additive
+-- Contexto IA (pastas + documentos) � additive
 CREATE TABLE IF NOT EXISTS "StudioContextAsset" (
   "id" TEXT NOT NULL,
   "companyId" TEXT NOT NULL,
@@ -187,4 +187,121 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   ALTER TABLE "StudioPageMold" ADD CONSTRAINT "StudioPageMold_createdById_fkey"
     FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Rastreabilidade: �ltimo editor + trilha de atividade (IA + edi��es)
+DO $$ BEGIN
+  ALTER TABLE "StudioDocument" ADD COLUMN "updatedById" TEXT;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+CREATE INDEX IF NOT EXISTS "StudioDocument_updatedById_idx" ON "StudioDocument"("updatedById");
+
+DO $$ BEGIN
+  ALTER TABLE "StudioDocument" ADD CONSTRAINT "StudioDocument_updatedById_fkey"
+    FOREIGN KEY ("updatedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS "StudioDocumentActivity" (
+  "id" TEXT NOT NULL,
+  "documentId" TEXT NOT NULL,
+  "companyId" TEXT NOT NULL,
+  "kind" TEXT NOT NULL,
+  "summary" TEXT NOT NULL,
+  "meta" JSONB,
+  "actorUserId" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "StudioDocumentActivity_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "StudioDocumentActivity_documentId_createdAt_idx"
+  ON "StudioDocumentActivity"("documentId", "createdAt");
+CREATE INDEX IF NOT EXISTS "StudioDocumentActivity_companyId_createdAt_idx"
+  ON "StudioDocumentActivity"("companyId", "createdAt");
+CREATE INDEX IF NOT EXISTS "StudioDocumentActivity_actorUserId_idx"
+  ON "StudioDocumentActivity"("actorUserId");
+
+DO $$ BEGIN
+  ALTER TABLE "StudioDocumentActivity" ADD CONSTRAINT "StudioDocumentActivity_documentId_fkey"
+    FOREIGN KEY ("documentId") REFERENCES "StudioDocument"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE "StudioDocumentActivity" ADD CONSTRAINT "StudioDocumentActivity_companyId_fkey"
+    FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE "StudioDocumentActivity" ADD CONSTRAINT "StudioDocumentActivity_actorUserId_fkey"
+    FOREIGN KEY ("actorUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Coment�rios colaborativos (F4)
+CREATE TABLE IF NOT EXISTS "StudioDocumentComment" (
+  "id" TEXT NOT NULL,
+  "documentId" TEXT NOT NULL,
+  "companyId" TEXT NOT NULL,
+  "blockId" TEXT,
+  "body" TEXT NOT NULL,
+  "authorId" TEXT,
+  "resolvedAt" TIMESTAMP(3),
+  "resolvedById" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "StudioDocumentComment_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "StudioDocumentComment_documentId_createdAt_idx"
+  ON "StudioDocumentComment"("documentId", "createdAt");
+CREATE INDEX IF NOT EXISTS "StudioDocumentComment_documentId_resolvedAt_idx"
+  ON "StudioDocumentComment"("documentId", "resolvedAt");
+CREATE INDEX IF NOT EXISTS "StudioDocumentComment_companyId_idx"
+  ON "StudioDocumentComment"("companyId");
+CREATE INDEX IF NOT EXISTS "StudioDocumentComment_authorId_idx"
+  ON "StudioDocumentComment"("authorId");
+
+DO $$ BEGIN
+  ALTER TABLE "StudioDocumentComment" ADD CONSTRAINT "StudioDocumentComment_documentId_fkey"
+    FOREIGN KEY ("documentId") REFERENCES "StudioDocument"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE "StudioDocumentComment" ADD CONSTRAINT "StudioDocumentComment_companyId_fkey"
+    FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE "StudioDocumentComment" ADD CONSTRAINT "StudioDocumentComment_authorId_fkey"
+    FOREIGN KEY ("authorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE "StudioDocumentComment" ADD CONSTRAINT "StudioDocumentComment_resolvedById_fkey"
+    FOREIGN KEY ("resolvedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Presen�a colaborativa (F5) � heartbeat
+CREATE TABLE IF NOT EXISTS "StudioDocumentPresence" (
+  "id" TEXT NOT NULL,
+  "documentId" TEXT NOT NULL,
+  "companyId" TEXT NOT NULL,
+  "userId" TEXT NOT NULL,
+  "status" TEXT NOT NULL DEFAULT 'viewing',
+  "clientId" TEXT NOT NULL,
+  "lastSeenAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "StudioDocumentPresence_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "StudioDocumentPresence_documentId_userId_clientId_key"
+  ON "StudioDocumentPresence"("documentId", "userId", "clientId");
+CREATE INDEX IF NOT EXISTS "StudioDocumentPresence_documentId_lastSeenAt_idx"
+  ON "StudioDocumentPresence"("documentId", "lastSeenAt");
+CREATE INDEX IF NOT EXISTS "StudioDocumentPresence_companyId_idx"
+  ON "StudioDocumentPresence"("companyId");
+
+DO $$ BEGIN
+  ALTER TABLE "StudioDocumentPresence" ADD CONSTRAINT "StudioDocumentPresence_documentId_fkey"
+    FOREIGN KEY ("documentId") REFERENCES "StudioDocument"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE "StudioDocumentPresence" ADD CONSTRAINT "StudioDocumentPresence_companyId_fkey"
+    FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE "StudioDocumentPresence" ADD CONSTRAINT "StudioDocumentPresence_userId_fkey"
+    FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;

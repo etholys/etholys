@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { resolveStudioCompanyId } from '@/lib/studio/access';
+import { recordStudioActivity } from '@/lib/studio/activity';
 import {
   buildStudioShareUrl,
   canManageStudioShares,
@@ -185,6 +186,14 @@ export async function POST(req: NextRequest) {
       role,
       forceExternal,
       sendEmail,
+    });
+    await recordStudioActivity({
+      documentId: doc.id,
+      companyId,
+      kind: 'shared',
+      summary: `${user.name?.trim() || user.email} partilhou com ${email} (${role})`,
+      actorUserId: user.id,
+      meta: { email, role },
     });
     return NextResponse.json(result, { status: 201 });
   } catch (e: unknown) {

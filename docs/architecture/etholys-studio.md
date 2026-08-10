@@ -1,8 +1,8 @@
 # Etholys Studio — criação de documentos (ferramenta transversal)
 
-**Versão:** 0.4  
-**Data:** 2026-08-07  
-**Status:** F0–F2.2 em código (biblioteca, editor, consent, marca, export, Mermaid, papéis, contexto IA pasta/chat)  
+**Versão:** 0.8  
+**Data:** 2026-08-08  
+**Status:** F0–F6 em código (auto-save, sync suave, presença, comentários, templates por domínio)  
 **Público:** product, desenvolvedores, agentes de IA  
 
 **Fonte de verdade** para o estúdio de documentos com IA no Etholys.  
@@ -37,8 +37,12 @@
 | **F2.1** | Permissões / partilha pasta+doc (membros + email externo; papéis viewer/editor/admin) | ✅ |
 | **F2.2** | Contexto IA: ficheiros na pasta + anexos no chat | ✅ |
 | **F2.3** | Editor: chat esquerdo redimensionável, undo/versões, folhas A4/A3, moldes | ✅ |
-| **F3** | Pontes “Abrir no Studio” desde SIEP/FUNDHUB/Meet | Seguinte |
-| **F4** | Templates por domínio + colaboração/comentários | |
+| **F3** | Pontes “Abrir no Studio” desde SIEP/FUNDHUB/Meet | ✅ one-shot via `POST /api/studio/import` |
+| **F3.1** | Rastreabilidade: quem/quando falou com IA e editou o doc | ✅ `StudioDocumentActivity` + painel |
+| **F4** | Templates por domínio + colaboração/comentários | ✅ filtros SIEP/FUNDHUB/Meet/… + `StudioDocumentComment` |
+| **F5** | Presença colaborativa + aviso de edição remota | ✅ heartbeat Postgres + avatars + reload |
+| **F6** | Sync suave + auto-save + gestão de blocos | ✅ pull remoto se limpo; autosave 8s; mover/apagar |
+| **F7** | OT / CRDT (Yjs) para edição simultânea no mesmo bloco | Seguinte |
 
 ---
 
@@ -71,6 +75,11 @@ flowchart LR
 - **`StudioDocument`:** título, format, `canvasState` (páginas/blocos), `aiSessionId`  
 - **`StudioTemplate`:** sistema (`isSystem`) ou por empresa  
 - **`StudioContextAsset`:** ficheiros de contexto para a IA — `scope=folder` (gerais da pasta, herdam para docs filhos) ou `scope=document` (anexos do chat/doc). Texto extraído (PDF/DOCX/txt) injectado no prompt; imagens/PDF também como multimodal no turno. **Não** passam pelo gate de consentimento do catálogo Etholys (o utilizador carregou-os de propósito).
+- **`StudioDocumentVersion`:** snapshots restauráveis (quem + quando)  
+- **`StudioDocumentActivity`:** trilha unificada — `ai_prompt` / `ai_response` / `ai_edit` / `saved` / `restored` / `created` / `imported` / `comment` (ator + timestamp + resumo). API `GET /api/studio/documents/[id]/activity`. Campo `updatedById` no documento = último editor.  
+- **`StudioDocumentComment`:** comentários no documento ou num bloco (`blockId`); resolver/reabrir; API `/api/studio/documents/[id]/comments`.  
+- **`StudioDocumentPresence`:** quem está a ver/editar (heartbeat ~12s, TTL 45s). API `/api/studio/documents/[id]/presence`. Sync suave: se o doc local não está dirty, aplica a versão remota; senão mostra banner. Auto-guardar silencioso aos 8s (`quiet` + sem snapshot).  
+- **Templates por domínio:** `domain` em `STUDIO_SYSTEM_TEMPLATES` (general/siep/fundhub/meet/forge/atlas/nexus) — filtro na biblioteca.  
 - **Brand kit:** `AiCompanyMemory` category `studio_brand` + fallback `Company.logo` / `Company.color`
 
 Distinto do modelo `Document` (blob S3).
@@ -105,6 +114,7 @@ API: `POST /api/studio/documents/[id]/export` com `{ format: "pdf" | "docx" }`.
 | Hot button | `apps/web/components/studio/StudioHotButton.tsx` |
 | APIs | `apps/web/app/api/studio/` |
 | Lib | `apps/web/lib/studio/` |
+| Import F3 | `apps/web/lib/studio/import-from.ts`, `POST /api/studio/import` |
 | Prisma | `StudioFolder`, `StudioDocument`, `StudioTemplate`, `StudioContextAsset` |
 | SQL manual | `apps/web/prisma/migrations/manual_etholys_studio.sql` |
 | Deploy | `scripts/apply-studio-deploy.sh` |

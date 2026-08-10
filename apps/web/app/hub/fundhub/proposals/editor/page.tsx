@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -12,6 +12,8 @@ import {
   MessageCircle,
   Paperclip,
   Lightbulb,
+  PenLine,
+  Loader2,
 } from 'lucide-react';
 
 interface Fund {
@@ -51,6 +53,7 @@ interface SectionData {
 }
 
 export default function FundHubProposalEditorPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const workspaceId = searchParams.get('workspace') || searchParams.get('workspaceId');
   const fundId = searchParams.get('fundId');
@@ -74,6 +77,7 @@ export default function FundHubProposalEditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [openingStudio, setOpeningStudio] = useState(false);
 
   const sectionTabs = useMemo(() => {
     const baseTabs = [
@@ -437,6 +441,34 @@ export default function FundHubProposalEditorPage() {
     URL.revokeObjectURL(url);
   }, [exportAsMarkdown, fund, editalLink, intakeNotes, proposalSections]);
 
+  const openInStudio = useCallback(async () => {
+    const contentSections = proposalSections.filter((s) => s.title.trim() || s.content.trim());
+    if (!contentSections.length) {
+      setError('Adicione conteúdo às seções antes de abrir no Studio.');
+      return;
+    }
+    setOpeningStudio(true);
+    setError(null);
+    try {
+      const r = await fetch('/api/studio/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: 'fundhub_proposal',
+          title: fund?.name ? `Proposta · ${fund.name}` : 'Proposta FUNDHUB',
+          sections: contentSections.map((s) => ({ title: s.title, content: s.content })),
+        }),
+      });
+      const d = (await r.json()) as { document?: { id: string }; error?: string };
+      if (!r.ok || !d.document?.id) throw new Error(d.error || 'Falha ao abrir no Studio');
+      router.push(`/hub/studio/${d.document.id}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro ao abrir no Studio');
+    } finally {
+      setOpeningStudio(false);
+    }
+  }, [proposalSections, fund, router]);
+
   const submitProposal = useCallback(async () => {
     if (proposalSections.length === 0 || proposalSections.some(s => !s.content?.trim())) {
       setError('Todas as seções devem ser preenchidas antes de enviar.');
@@ -530,6 +562,16 @@ export default function FundHubProposalEditorPage() {
                   </div>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={() => void openInStudio()}
+                disabled={openingStudio || proposalSections.length === 0}
+                className="inline-flex items-center gap-2 rounded-lg border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+                title="Cria uma cópia editável no Etholys Studio"
+              >
+                {openingStudio ? <Loader2 className="w-4 h-4 animate-spin" /> : <PenLine className="w-4 h-4" />}
+                Abrir no Studio
+              </button>
               <button
                 onClick={submitProposal}
                 disabled={isSubmitting || proposalSections.length === 0}

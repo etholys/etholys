@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { recordStudioActivity } from '@/lib/studio/activity';
 import {
   canEditStudioContent,
   canReadStudio,
@@ -15,6 +16,10 @@ async function authUser() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return null;
   return prisma.user.findUnique({ where: { email: session.user.email } });
+}
+
+function actorLabel(u: { name: string | null; email: string }) {
+  return u.name?.trim() || u.email;
 }
 
 /** GET /api/studio/documents/[id]/versions */
@@ -37,6 +42,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       label: true,
       createdAt: true,
       createdById: true,
+      createdBy: { select: { id: true, name: true, email: true } },
     },
   });
   return NextResponse.json({ versions });
@@ -76,10 +82,28 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     });
 
     const canvas = normalizeStudioCanvas(ver.canvasState);
-    const updated = await prisma.studioDocument.update({
-      where: { id: doc.id },
-      data: { title: ver.title, canvasState: canvas },
+    let updated;
+    try {
+      updated = await prisma.studioDocument.update({
+        where: { id: doc.id },
+        data: { title: ver.title, canvasState: canvas, updatedById: user.id },
+      });
+    } catch {
+      updated = await prisma.studioDocument.update({
+        where: { id: doc.id },
+        data: { title: ver.title, canvasState: canvas },
+      });
+    }
+
+    await recordStudioActivity({
+      documentId: doc.id,
+      companyId: doc.companyId,
+      kind: 'restored',
+      summary: `${actorLabel(user)} restaurou versão «${ver.label || ver.title}»`,
+      actorUserId: user.id,
+      meta: { versionId: ver.id, label: ver.label },
     });
+
     return NextResponse.json({
       document: { id: updated.id, title: updated.title, canvasState: canvas },
       restoredFrom: ver.id,
@@ -104,7 +128,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       label: label || 'Snapshot',
       createdById: user.id,
     },
-    select: { id: true, title: true, label: true, createdAt: true },
+    select: {
+      id: true,
+      title: true,
+      label: true,
+      createdAt: true,
+      createdBy: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  await recordStudioActivity({
+    documentId: doc.id,
+    companyId: doc.companyId,
+    kind: 'version',
+    summary: `${actorLabel(user)} criou snapshot «${ver.label || ver.title}»`,
+    actorUserId: user.id,
+    meta: { versionId: ver.id },
   });
 
   return NextResponse.json({ version: ver }, { status: 201 });

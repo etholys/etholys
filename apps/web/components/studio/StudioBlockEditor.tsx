@@ -1,0 +1,473 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Bold,
+  Italic,
+  List,
+  Heading2,
+  Code2,
+  Pencil,
+  Eye,
+  GitBranch,
+  MessageSquare,
+  ChevronUp,
+  ChevronDown,
+  Trash2,
+  Type,
+} from 'lucide-react';
+import type { StudioBlock, StudioBlockKind } from '@/lib/studio/types';
+import { StudioMarkdown } from '@/lib/studio/markdown-lite';
+import { StudioMermaidPreview } from '@/components/studio/StudioMermaidPreview';
+
+const DIAGRAM_TEMPLATES: Array<{ id: string; label: string; source: string }> = [
+  {
+    id: 'flow',
+    label: 'Fluxo',
+    source: `flowchart TD
+  A[Início] --> B{Decisão}
+  B -->|Sim| C[Ação]
+  B -->|Não| D[Fim]
+  C --> D`,
+  },
+  {
+    id: 'seq',
+    label: 'Sequência',
+    source: `sequenceDiagram
+  participant U as Utilizador
+  participant S as Sistema
+  U->>S: Pedido
+  S-->>U: Resposta`,
+  },
+  {
+    id: 'mind',
+    label: 'Mapa',
+    source: `mindmap
+  root((Tema))
+    Ramo A
+      Ideia 1
+      Ideia 2
+    Ramo B
+      Ideia 3`,
+  },
+  {
+    id: 'pie',
+    label: 'Pizza',
+    source: `pie title Distribuição
+  "A" : 40
+  "B" : 30
+  "C" : 30`,
+  },
+];
+
+function wrapSelection(
+  value: string,
+  start: number,
+  end: number,
+  before: string,
+  after: string,
+): { next: string; selStart: number; selEnd: number } {
+  const selected = value.slice(start, end);
+  if (selected) {
+    const next = value.slice(0, start) + before + selected + after + value.slice(end);
+    return {
+      next,
+      selStart: start + before.length,
+      selEnd: start + before.length + selected.length,
+    };
+  }
+  const placeholder = 'texto';
+  const next = value.slice(0, start) + before + placeholder + after + value.slice(end);
+  return {
+    next,
+    selStart: start + before.length,
+    selEnd: start + before.length + placeholder.length,
+  };
+}
+
+function prefixLines(value: string, start: number, end: number, prefix: string): string {
+  const before = value.slice(0, start);
+  const mid = value.slice(start, end) || value;
+  const after = value.slice(end);
+  const rangeStart = before.lastIndexOf('\n') + 1;
+  const rangeEnd = end + (after.indexOf('\n') === -1 ? after.length : after.indexOf('\n'));
+  const block = value.slice(rangeStart, rangeEnd || value.length);
+  const lines = block.split('\n').map((l) => {
+    const t = l.trim();
+    if (!t) return l;
+    if (t.startsWith(prefix.trim())) return l;
+    return `${prefix}${t}`;
+  });
+  return value.slice(0, rangeStart) + lines.join('\n') + value.slice(rangeEnd || value.length);
+}
+
+type Props = {
+  block: StudioBlock;
+  onChange: (text: string) => void;
+  onKindChange?: (kind: StudioBlockKind) => void;
+  onComment?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onDelete?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  canDelete?: boolean;
+  disabled?: boolean;
+  labels: {
+    edit: string;
+    preview: string;
+    bold: string;
+    italic: string;
+    list: string;
+    heading: string;
+    code: string;
+    empty: string;
+    editSource: string;
+    templates: string;
+    asHeading: string;
+    asText: string;
+    asList: string;
+  };
+};
+
+export function StudioBlockEditor({
+  block,
+  onChange,
+  onKindChange,
+  onComment,
+  onMoveUp,
+  onMoveDown,
+  onDelete,
+  canMoveUp,
+  canMoveDown,
+  canDelete,
+  disabled,
+  labels,
+}: Props) {
+  const isDiagram = block.kind === 'diagram';
+  const [editing, setEditing] = useState(false);
+  const [diagramSourceOpen, setDiagramSourceOpen] = useState(!block.text.trim());
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    const el = taRef.current;
+    if (!el) return;
+    el.focus();
+    const len = el.value.length;
+    el.setSelectionRange(len, len);
+    el.style.height = '0px';
+    el.style.height = `${Math.max(el.scrollHeight, 72)}px`;
+  }, [editing]);
+
+  useEffect(() => {
+    if (!editing) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setEditing(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [editing]);
+
+  const applyWrap = useCallback(
+    (before: string, after: string) => {
+      const el = taRef.current;
+      if (!el) return;
+      const { next, selStart, selEnd } = wrapSelection(
+        el.value,
+        el.selectionStart,
+        el.selectionEnd,
+        before,
+        after,
+      );
+      onChange(next);
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(selStart, selEnd);
+        el.style.height = '0px';
+        el.style.height = `${Math.max(el.scrollHeight, 72)}px`;
+      });
+    },
+    [onChange],
+  );
+
+  const applyList = useCallback(() => {
+    const el = taRef.current;
+    if (!el) return;
+    const next = prefixLines(el.value, el.selectionStart, el.selectionEnd, '- ');
+    onChange(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.style.height = '0px';
+      el.style.height = `${Math.max(el.scrollHeight, 72)}px`;
+    });
+  }, [onChange]);
+
+  const applyHeadingLine = useCallback(() => {
+    const el = taRef.current;
+    if (!el) return;
+    const next = prefixLines(el.value, el.selectionStart, el.selectionEnd, '## ');
+    onChange(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.style.height = '0px';
+      el.style.height = `${Math.max(el.scrollHeight, 72)}px`;
+    });
+  }, [onChange]);
+
+  const toolbar = !disabled && editing && !isDiagram && (
+    <div className="mb-2 flex flex-wrap items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-1">
+      <button
+        type="button"
+        title={labels.bold}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => applyWrap('**', '**')}
+        className="rounded p-1.5 text-slate-600 hover:bg-white hover:text-slate-900"
+      >
+        <Bold className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        title={labels.italic}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => applyWrap('*', '*')}
+        className="rounded p-1.5 text-slate-600 hover:bg-white hover:text-slate-900"
+      >
+        <Italic className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        title={labels.heading}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => applyHeadingLine()}
+        className="rounded p-1.5 text-slate-600 hover:bg-white hover:text-slate-900"
+      >
+        <Heading2 className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        title={labels.list}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => applyList()}
+        className="rounded p-1.5 text-slate-600 hover:bg-white hover:text-slate-900"
+      >
+        <List className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        title={labels.code}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => applyWrap('`', '`')}
+        className="rounded p-1.5 text-slate-600 hover:bg-white hover:text-slate-900"
+      >
+        <Code2 className="h-3.5 w-3.5" />
+      </button>
+      <span className="mx-1 h-4 w-px bg-slate-200" />
+      {onKindChange && (
+        <>
+          <button
+            type="button"
+            title={labels.asHeading}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onKindChange('heading')}
+            className={`rounded px-1.5 py-1 text-[10px] font-semibold ${
+              block.kind === 'heading' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-white'
+            }`}
+          >
+            H
+          </button>
+          <button
+            type="button"
+            title={labels.asText}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onKindChange('paragraph')}
+            className={`rounded p-1.5 ${
+              block.kind === 'paragraph' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-white'
+            }`}
+          >
+            <Type className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            title={labels.asList}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onKindChange('bullets')}
+            className={`rounded p-1.5 ${
+              block.kind === 'bullets' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-white'
+            }`}
+          >
+            <List className="h-3.5 w-3.5" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+
+  const chrome = !disabled && (
+    <div className="absolute -right-1 -top-1 z-10 flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white/95 p-0.5 opacity-0 shadow-sm transition group-hover:opacity-100 group-focus-within:opacity-100">
+      {onMoveUp && (
+        <button
+          type="button"
+          disabled={!canMoveUp}
+          onClick={onMoveUp}
+          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30"
+        >
+          <ChevronUp className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {onMoveDown && (
+        <button
+          type="button"
+          disabled={!canMoveDown}
+          onClick={onMoveDown}
+          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30"
+        >
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {onComment && (
+        <button
+          type="button"
+          onClick={onComment}
+          className="rounded p-1 text-slate-300 hover:bg-violet-50 hover:text-violet-700"
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {onDelete && canDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-600"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
+
+  if (isDiagram) {
+    return (
+      <div ref={rootRef} className="group relative w-full">
+        {chrome}
+        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            <GitBranch className="h-3 w-3" />
+            Mermaid
+          </span>
+          {!disabled && (
+            <>
+              <button
+                type="button"
+                onClick={() => setDiagramSourceOpen((v) => !v)}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:border-orange-300"
+              >
+                {diagramSourceOpen ? (
+                  <>
+                    <Eye className="h-3 w-3" /> {labels.preview}
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="h-3 w-3" /> {labels.editSource}
+                  </>
+                )}
+              </button>
+              <span className="text-[10px] text-slate-400">{labels.templates}:</span>
+              {DIAGRAM_TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(tpl.source);
+                    setDiagramSourceOpen(false);
+                  }}
+                  className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:border-orange-300 hover:bg-orange-50"
+                >
+                  {tpl.label}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+        {diagramSourceOpen && !disabled && (
+          <textarea
+            value={block.text}
+            onChange={(e) => onChange(e.target.value)}
+            spellCheck={false}
+            rows={8}
+            className="mb-3 w-full resize-y rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-800 outline-none focus:border-orange-400"
+          />
+        )}
+        <StudioMermaidPreview source={block.text} />
+      </div>
+    );
+  }
+
+  const mdVariant =
+    block.kind === 'heading'
+      ? 'heading'
+      : block.kind === 'bullets'
+        ? 'bullets'
+        : block.kind === 'callout'
+          ? 'callout'
+          : 'body';
+
+  return (
+    <div ref={rootRef} className="group relative w-full">
+      {chrome}
+      {editing && !disabled ? (
+        <div>
+          {toolbar}
+          <textarea
+            ref={taRef}
+            value={block.text}
+            onChange={(e) => {
+              onChange(e.target.value);
+              const el = e.target;
+              el.style.height = '0px';
+              el.style.height = `${Math.max(el.scrollHeight, 72)}px`;
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                setEditing(false);
+              }
+              if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
+                e.preventDefault();
+                applyWrap('**', '**');
+              }
+              if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'i') {
+                e.preventDefault();
+                applyWrap('*', '*');
+              }
+            }}
+            disabled={disabled}
+            placeholder={labels.empty}
+            className={`w-full resize-none overflow-hidden border-0 bg-transparent p-0 outline-none focus:ring-0 ${
+              block.kind === 'heading'
+                ? 'text-2xl font-bold leading-snug text-slate-900'
+                : 'text-[15px] leading-[1.7] text-slate-800'
+            }`}
+          />
+          <p className="mt-1 text-[10px] text-slate-400">
+            Esc · {labels.preview} · Ctrl+B / Ctrl+I
+          </p>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => {
+            if (!disabled) setEditing(true);
+          }}
+          className={`w-full rounded-md text-left outline-none transition hover:bg-slate-50/80 focus-visible:ring-2 focus-visible:ring-orange-300 ${
+            disabled ? 'cursor-default' : 'cursor-text'
+          }`}
+        >
+          <StudioMarkdown text={block.text} variant={mdVariant} emptyHint={labels.empty} />
+        </button>
+      )}
+    </div>
+  );
+}

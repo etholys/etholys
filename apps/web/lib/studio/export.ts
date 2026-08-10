@@ -1,4 +1,5 @@
 import type { StudioCanvasState, StudioBlock } from '@/lib/studio/types';
+import { markdownLiteToHtml } from '@/lib/studio/markdown-lite';
 
 export type StudioBrandKit = {
   primaryColor: string;
@@ -24,28 +25,49 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/** Remove marcadores markdown simples para texto plano (DOCX). */
+function stripMdMarkers(s: string): string {
+  return String(s || '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^#{1,3}\s+/, '');
+}
+
+function inlineMdHtml(s: string): string {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/_([^_]+)_/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
 function blockHtml(block: StudioBlock): string {
-  const title = block.title ? `<div class="block-label">${esc(block.title)}</div>` : '';
   const text = block.text || '';
   switch (block.kind) {
     case 'heading':
-      return `${title}<h2>${esc(text) || '&nbsp;'}</h2>`;
+      return `<h2>${inlineMdHtml(text.replace(/^#+\s*/, '')) || '&nbsp;'}</h2>`;
     case 'bullets': {
       const items = text
         .split(/\r?\n/)
         .map((l) => l.replace(/^[-*•]\s*/, '').trim())
         .filter(Boolean);
-      if (!items.length) return `${title}<p class="muted">—</p>`;
-      return `${title}<ul>${items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>`;
+      if (!items.length) return `<p class="muted">—</p>`;
+      return `<ul>${items.map((i) => `<li>${inlineMdHtml(i)}</li>`).join('')}</ul>`;
     }
     case 'callout':
-      return `${title}<div class="callout">${esc(text).replace(/\n/g, '<br/>')}</div>`;
+      return `<div class="callout">${markdownLiteToHtml(text)}</div>`;
     case 'diagram':
-      return `${title}<pre class="diagram">${esc(text)}</pre>`;
+      return `<pre class="diagram">${esc(text)}</pre>`;
     case 'table':
-      return `${title}<pre class="table-raw">${esc(text)}</pre>`;
+      return `<pre class="table-raw">${esc(text)}</pre>`;
     default:
-      return `${title}<p>${esc(text).replace(/\n/g, '<br/>') || '&nbsp;'}</p>`;
+      return markdownLiteToHtml(text);
   }
 }
 
@@ -123,22 +145,24 @@ export async function studioCanvasToDocxBuffer(
   for (const page of canvas.pages.slice().sort((a, b) => a.order - b.order)) {
     paras.push(wParagraph(wRun(page.title, { bold: true, size: 18, color: '94A3B8' })));
     for (const block of page.blocks.slice().sort((a, b) => a.order - b.order)) {
-      if (block.title) {
-        paras.push(wParagraph(wRun(block.title.toUpperCase(), { size: 16, color: '94A3B8' })));
-      }
       if (block.kind === 'heading') {
-        paras.push(wParagraph(wRun(block.text || ' ', { bold: true, size: 28 })));
+        paras.push(wParagraph(wRun(stripMdMarkers(block.text) || ' ', { bold: true, size: 28 })));
       } else if (block.kind === 'bullets') {
         const items = (block.text || '')
           .split(/\r?\n/)
           .map((l) => l.replace(/^[-*•]\s*/, '').trim())
           .filter(Boolean);
         for (const item of items) {
-          paras.push(wParagraph(wRun(`• ${item}`, { size: 22 })));
+          paras.push(wParagraph(wRun(`• ${stripMdMarkers(item)}`, { size: 22 })));
+        }
+      } else if (block.kind === 'diagram') {
+        paras.push(wParagraph(wRun('[Diagrama Mermaid]', { size: 18, color: '94A3B8' })));
+        for (const line of (block.text || '').split(/\r?\n/)) {
+          paras.push(wParagraph(wRun(line || ' ', { size: 18 })));
         }
       } else {
         for (const line of (block.text || ' ').split(/\r?\n/)) {
-          paras.push(wParagraph(wRun(line || ' ', { size: 22 })));
+          paras.push(wParagraph(wRun(stripMdMarkers(line) || ' ', { size: 22 })));
         }
       }
     }

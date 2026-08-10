@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  X, Save, Download, Loader2, CheckCircle2, FileText, LayoutTemplate,
+  X, Save, Download, Loader2, CheckCircle2, FileText, LayoutTemplate, PenLine,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import type { InformeCanvasSelection } from '@/lib/siep/informe-canvas-selection';
 import { SiepInformeChatPanel } from '@/components/siep/SiepInformeChatPanel';
 import { SiepInformeCanvas } from '@/components/siep/SiepInformeCanvas';
@@ -26,9 +27,11 @@ type EditorMeta = {
 };
 
 export function SiepInformeEditor({ reportId, onClose, onSaved }: Props) {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [openingStudio, setOpeningStudio] = useState(false);
   const [meta, setMeta] = useState<EditorMeta | null>(null);
   const [canvas, setCanvas] = useState<ReportCanvasState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -135,6 +138,25 @@ export function SiepInformeEditor({ reportId, onClose, onSaved }: Props) {
     onSaved?.();
   };
 
+  const openInStudio = async () => {
+    setOpeningStudio(true);
+    try {
+      if (dirty && canvas) await save();
+      const r = await fetch('/api/studio/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 'siep_informe', reportId }),
+      });
+      const data = (await r.json()) as { document?: { id: string }; error?: string };
+      if (!r.ok || !data.document?.id) throw new Error(data.error || 'Falha ao abrir no Studio');
+      router.push(`/hub/studio/${data.document.id}`);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro ao abrir no Studio');
+    } finally {
+      setOpeningStudio(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 z-[70] bg-white flex items-center justify-center">
@@ -173,6 +195,16 @@ export function SiepInformeEditor({ reportId, onClose, onSaved }: Props) {
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             Guardar
+          </button>
+          <button
+            type="button"
+            onClick={() => void openInStudio()}
+            disabled={openingStudio}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs border border-violet-200 text-violet-800 bg-violet-50 rounded-lg hover:bg-violet-100 disabled:opacity-50"
+            title="Cria uma cópia editável no Etholys Studio"
+          >
+            {openingStudio ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PenLine className="w-3.5 h-3.5" />}
+            Abrir no Studio
           </button>
           <button
             type="button"

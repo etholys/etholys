@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Sparkles, Check, X, ListTodo } from 'lucide-react';
+import { Loader2, Sparkles, Check, X, ListTodo, PenLine } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type ActionItem = {
   id: string;
@@ -33,12 +34,14 @@ type Props = {
 };
 
 export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, onUpdated }: Props) {
+  const router = useRouter();
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [briefBusy, setBriefBusy] = useState(false);
+  const [studioBusy, setStudioBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [briefing, setBriefing] = useState<{
@@ -131,6 +134,30 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
       setError(e instanceof Error ? e.message : 'Error');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function openInStudio() {
+    setStudioBusy(true);
+    setError(null);
+    try {
+      const r = await fetch('/api/studio/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: 'meet_session',
+          sessionId,
+          companyId,
+          notes: notes.trim() || undefined,
+        }),
+      });
+      const d = (await r.json()) as { document?: { id: string }; error?: string };
+      if (!r.ok || !d.document?.id) throw new Error(d.error || 'Error');
+      router.push(`/hub/studio/${d.document.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setStudioBusy(false);
     }
   }
 
@@ -385,6 +412,23 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           {t('Encerrar + gerar resumo e tarefas', 'Cerrar + generar resumen y tareas', 'End + generate summary & tasks')}
+        </button>
+        <button
+          type="button"
+          disabled={
+            studioBusy ||
+            (!detail?.summaryText && notes.trim().length < 20 && !detail?.transcriptText)
+          }
+          onClick={() => void openInStudio()}
+          className="inline-flex items-center gap-2 rounded-lg border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+          title={t(
+            'Cria um documento no Studio com resumo, notas e tarefas',
+            'Crea un documento en Studio con resumen, notas y tareas',
+            'Creates a Studio document with summary, notes and tasks',
+          )}
+        >
+          {studioBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+          {t('Abrir no Studio', 'Abrir en Studio', 'Open in Studio')}
         </button>
       </div>
 

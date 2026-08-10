@@ -21,9 +21,13 @@ import {
   History,
   Plus,
   LayoutTemplate,
+  MessageSquare,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
+import { useSpeechDictation } from '@/hooks/useSpeechDictation';
 import type {
   StudioBlock,
   StudioCanvasState,
@@ -36,15 +40,35 @@ import {
   normalizeStudioCanvas,
   studioPageCssSize,
 } from '@/lib/studio/types';
-import { StudioMermaidPreview } from '@/components/studio/StudioMermaidPreview';
 import { StudioShareDialog } from '@/components/studio/StudioShareDialog';
 import {
   StudioContextPanel,
   uploadStudioChatAttachment,
 } from '@/components/studio/StudioContextPanel';
+import { StudioCommentsPanel } from '@/components/studio/StudioCommentsPanel';
+import { StudioBlockEditor } from '@/components/studio/StudioBlockEditor';
 
-type ChatMsg = { id: string; role: string; content: string };
-type VersionRow = { id: string; title: string; label: string | null; createdAt: string };
+type ChatMsg = {
+  id: string;
+  role: string;
+  content: string;
+  createdAt?: string;
+  actorName?: string | null;
+};
+type VersionRow = {
+  id: string;
+  title: string;
+  label: string | null;
+  createdAt: string;
+  createdBy?: { id: string; name: string | null; email: string } | null;
+};
+type ActivityRow = {
+  id: string;
+  kind: string;
+  summary: string;
+  createdAt: string;
+  actor?: { id: string; name: string | null; email: string } | null;
+};
 type MoldRow = {
   id: string;
   name: string;
@@ -84,16 +108,80 @@ export default function StudioDocumentPage() {
   const [undoStack, setUndoStack] = useState<StudioCanvasState[]>([]);
   const [redoStack, setRedoStack] = useState<StudioCanvasState[]>([]);
   const [versions, setVersions] = useState<VersionRow[]>([]);
-  const [showVersions, setShowVersions] = useState(false);
+  const [activities, setActivities] = useState<ActivityRow[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyTab, setHistoryTab] = useState<'activity' | 'versions'>('activity');
+  const [lastEditedBy, setLastEditedBy] = useState<string | null>(null);
+  const [lastEditedAt, setLastEditedAt] = useState<string | null>(null);
   const [molds, setMolds] = useState<MoldRow[]>([]);
   const [showMolds, setShowMolds] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [commentBlockId, setCommentBlockId] = useState<string | null>(null);
+  const [openCommentCount, setOpenCommentCount] = useState(0);
   const [activePageId, setActivePageId] = useState<string | null>(null);
+  const [presence, setPresence] = useState<
+    Array<{
+      userId: string;
+      status: string;
+      name: string | null;
+      email: string;
+      initials: string;
+      isSelf: boolean;
+    }>
+  >([]);
+  const [remoteUpdate, setRemoteUpdate] = useState<{
+    at: string;
+    by: string;
+  } | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const moldFileRef = useRef<HTMLInputElement | null>(null);
   const dragging = useRef(false);
   const skipHistory = useRef(false);
+  const clientIdRef = useRef(
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  );
+  const knownUpdatedAt = useRef<string | null>(null);
+  const selfUserIdRef = useRef<string | null>(null);
+  const dirtyRef = useRef(false);
+  const canvasRef = useRef<StudioCanvasState | null>(null);
+  const titleRef = useRef('');
+  const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [dictationInterim, setDictationInterim] = useState('');
+
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
+  useEffect(() => {
+    canvasRef.current = canvas;
+  }, [canvas]);
+  useEffect(() => {
+    titleRef.current = title;
+  }, [title]);
+
+  const appendDictation = useCallback((text: string) => {
+    const chunk = text.trim();
+    if (!chunk) return;
+    setInput((prev) => {
+      const base = prev.trimEnd();
+      return base ? `${base} ${chunk}` : chunk;
+    });
+  }, []);
+
+  const {
+    supported: dictationSupported,
+    listening: dictating,
+    toggle: toggleDictation,
+    stop: stopDictation,
+  } = useSpeechDictation(locale === 'es' || locale === 'en' ? locale : 'pt', {
+    onCommittedText: appendDictation,
+    onInterim: setDictationInterim,
+  });
+
+  useEffect(() => () => stopDictation(), [stopDictation]);
 
   const canEdit = access !== 'viewer' && access !== 'none';
 
@@ -147,6 +235,26 @@ export default function StudioDocumentPage() {
     setVersions(d.versions || []);
   }, [id]);
 
+  const loadActivity = useCallback(async () => {
+    const r = await fetch(`/api/studio/documents/${id}/activity`, { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    setActivities(d.activities || []);
+    const ub = d.document?.updatedBy;
+    if (ub) setLastEditedBy(ub.name?.trim() || ub.email || null);
+    if (d.document?.updatedAt) setLastEditedAt(d.document.updatedAt);
+  }, [id]);
+
+  const openHistory = useCallback(
+    (tab: 'activity' | 'versions' = 'activity') => {
+      setHistoryTab(tab);
+      setShowHistory(true);
+      void loadActivity();
+      void loadVersions();
+    },
+    [loadActivity, loadVersions],
+  );
+
   const loadMolds = useCallback(async () => {
     if (!companyId) return;
     const r = await fetch(`/api/studio/molds?companyId=${encodeURIComponent(companyId)}`, {
@@ -178,6 +286,12 @@ export default function StudioDocumentPage() {
       }
       setAccess(typeof d.access === 'string' ? d.access : 'owner');
       setDirty(false);
+      const ub = d.document.updatedBy;
+      setLastEditedBy(ub ? ub.name?.trim() || ub.email || null : null);
+      setLastEditedAt(typeof d.document.updatedAt === 'string' ? d.document.updatedAt : null);
+      if (typeof d.document.updatedAt === 'string') {
+        knownUpdatedAt.current = d.document.updatedAt;
+      }
 
       if (typeof d.document.folderId === 'string' && d.document.folderId) {
         const cq = new URLSearchParams({ folderId: d.document.folderId });
@@ -197,21 +311,43 @@ export default function StudioDocumentPage() {
       if (mr.ok) {
         const md = await mr.json();
         setMessages(
-          (md.messages || []).map((m: { id: string; role: string; content: string }) => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-          })),
+          (md.messages || []).map(
+            (m: {
+              id: string;
+              role: string;
+              content: string;
+              createdAt?: string;
+              actor?: { name?: string | null; email?: string | null } | null;
+            }) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              createdAt: m.createdAt,
+              actorName: m.actor?.name?.trim() || m.actor?.email || null,
+            }),
+          ),
         );
       }
       void loadVersions();
+      void loadActivity();
       void loadMolds();
+      fetch(`/api/studio/documents/${id}/comments`, { cache: 'no-store' })
+        .then(async (cr) => {
+          if (!cr.ok) return;
+          const cd = await cr.json();
+          setOpenCommentCount(
+            typeof cd.openCount === 'number'
+              ? cd.openCount
+              : (cd.comments || []).filter((c: { resolvedAt?: string | null }) => !c.resolvedAt).length,
+          );
+        })
+        .catch(() => {});
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro');
     } finally {
       setLoading(false);
     }
-  }, [id, companyId, setActiveCompanyId, loadVersions, loadMolds]);
+  }, [id, companyId, setActiveCompanyId, loadVersions, loadActivity, loadMolds]);
 
   useEffect(() => {
     void load();
@@ -220,6 +356,139 @@ export default function StudioDocumentPage() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, consent]);
+
+  // Presença + deteção de edição remota (F5)
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    const clientId = clientIdRef.current;
+
+    async function beat(status: 'viewing' | 'editing', leave = false) {
+      try {
+        await fetch(`/api/studio/documents/${id}/presence`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientId, status, leave }),
+          keepalive: leave,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+
+    async function poll() {
+      try {
+        await beat(dirty && canEdit ? 'editing' : 'viewing');
+        const r = await fetch(`/api/studio/documents/${id}/presence`, { cache: 'no-store' });
+        if (!r.ok || cancelled) return;
+        const d = await r.json();
+        if (typeof d.selfUserId === 'string') selfUserIdRef.current = d.selfUserId;
+        setPresence(Array.isArray(d.presence) ? d.presence : []);
+        const remoteAt = d.document?.updatedAt as string | undefined;
+        const remoteById = d.document?.updatedById as string | null | undefined;
+        if (
+          remoteAt &&
+          knownUpdatedAt.current &&
+          remoteAt !== knownUpdatedAt.current &&
+          remoteById &&
+          remoteById !== selfUserIdRef.current
+        ) {
+          const by =
+            d.document?.updatedBy?.name?.trim() ||
+            d.document?.updatedBy?.email ||
+            t('outro utilizador', 'otro usuario', 'another user');
+
+          // Sync suave: se não há edições locais, aplicar automaticamente
+          if (!dirtyRef.current) {
+            try {
+              const q = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
+              const gr = await fetch(`/api/studio/documents/${id}${q}`, { cache: 'no-store' });
+              if (gr.ok && !cancelled && !dirtyRef.current) {
+                const gd = await gr.json();
+                skipHistory.current = true;
+                setCanvas(normalizeStudioCanvas(gd.document.canvasState));
+                if (typeof gd.document.title === 'string') setTitle(gd.document.title);
+                skipHistory.current = false;
+                setDirty(false);
+                knownUpdatedAt.current = remoteAt;
+                setLastEditedAt(remoteAt);
+                setLastEditedBy(by);
+                setRemoteUpdate(null);
+                return;
+              }
+            } catch {
+              /* fall through to banner */
+            }
+          }
+          setRemoteUpdate({ at: remoteAt, by });
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    void poll();
+    const timer = window.setInterval(() => void poll(), 12_000);
+
+    function onLeave() {
+      void beat('viewing', true);
+    }
+    window.addEventListener('pagehide', onLeave);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('pagehide', onLeave);
+      void beat('viewing', true);
+    };
+  }, [id, dirty, canEdit, locale, companyId]);
+
+  // Auto-guardar (F6) — 8s após a última alteração local
+  useEffect(() => {
+    if (!dirty || !canEdit || !id) {
+      setAutoSaveState('idle');
+      return;
+    }
+    setAutoSaveState('idle');
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const snap = canvasRef.current;
+        if (!snap || !dirtyRef.current) return;
+        setAutoSaveState('saving');
+        setSaving(true);
+        try {
+          const r = await fetch(`/api/studio/documents/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              companyId: companyId || undefined,
+              title: titleRef.current,
+              canvasState: snap,
+              createVersion: false,
+              quiet: true,
+            }),
+          });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.detail || d.error);
+          // Só limpar dirty se o canvas não mudou entretanto
+          if (canvasRef.current === snap) setDirty(false);
+          if (d.document?.updatedAt) {
+            knownUpdatedAt.current = d.document.updatedAt;
+            setLastEditedAt(d.document.updatedAt);
+          }
+          if (d.document?.updatedBy) {
+            setLastEditedBy(d.document.updatedBy.name?.trim() || d.document.updatedBy.email || null);
+          }
+          setAutoSaveState('saved');
+          window.setTimeout(() => setAutoSaveState('idle'), 2500);
+        } catch {
+          setAutoSaveState('idle');
+        } finally {
+          setSaving(false);
+        }
+      })();
+    }, 8000);
+    return () => window.clearTimeout(timer);
+  }, [dirty, canvas, title, canEdit, id, companyId]);
 
   useEffect(() => {
     function onMove(e: MouseEvent) {
@@ -256,7 +525,11 @@ export default function StudioDocumentPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [undo, redo]);
 
-  function updateBlock(pageId: string, blockId: string, text: string) {
+  function updateBlock(
+    pageId: string,
+    blockId: string,
+    patch: { text?: string; kind?: StudioBlock['kind'] },
+  ) {
     applyCanvas((prev) => ({
       ...prev,
       pages: prev.pages.map((p) =>
@@ -264,7 +537,22 @@ export default function StudioDocumentPage() {
           ? p
           : {
               ...p,
-              blocks: p.blocks.map((b) => (b.id === blockId ? { ...b, text } : b)),
+              blocks: p.blocks.map((b) =>
+                b.id === blockId
+                  ? {
+                      ...b,
+                      ...(patch.text !== undefined ? { text: patch.text } : {}),
+                      ...(patch.kind !== undefined
+                        ? {
+                            kind: patch.kind,
+                            ...(patch.kind === 'diagram'
+                              ? { diagramLang: 'mermaid' as const }
+                              : {}),
+                          }
+                        : {}),
+                    }
+                  : b,
+              ),
             },
       ),
     }));
@@ -282,7 +570,16 @@ export default function StudioDocumentPage() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.detail || d.error);
       setDirty(false);
+      if (d.document?.updatedBy) {
+        setLastEditedBy(d.document.updatedBy.name?.trim() || d.document.updatedBy.email || null);
+      }
+      if (d.document?.updatedAt) {
+        setLastEditedAt(d.document.updatedAt);
+        knownUpdatedAt.current = d.document.updatedAt;
+        setRemoteUpdate(null);
+      }
       void loadVersions();
+      void loadActivity();
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -336,7 +633,15 @@ export default function StudioDocumentPage() {
         setDirty(false);
       }
       if (typeof d.title === 'string' && d.title) setTitle(d.title);
-      setMessages((m) => [...m, { id: `a-${Date.now()}`, role: 'assistant', content: d.message || '…' }]);
+      setMessages((m) => [
+        ...m,
+        {
+          id: `a-${Date.now()}`,
+          role: 'assistant',
+          content: d.message || '…',
+          createdAt: new Date().toISOString(),
+        },
+      ]);
 
       if (d.consentRequest?.question && Array.isArray(d.consentRequest.sources)) {
         setConsent(d.consentRequest as StudioConsentRequest);
@@ -344,6 +649,8 @@ export default function StudioDocumentPage() {
       } else {
         setPendingPrompt(null);
       }
+      void loadActivity();
+      void loadVersions();
     } catch (e: unknown) {
       setMessages((m) => [
         ...m,
@@ -403,8 +710,9 @@ export default function StudioDocumentPage() {
       if (typeof d.document.title === 'string') setTitle(d.document.title);
       setDirty(false);
     }
-    setShowVersions(false);
+    setShowHistory(false);
     void loadVersions();
+    void loadActivity();
   }
 
   async function uploadMold(file: File) {
@@ -444,7 +752,6 @@ export default function StudioDocumentPage() {
           {
             id: `block-${Date.now()}`,
             kind: 'paragraph',
-            title: t('Corpo', 'Cuerpo', 'Body'),
             text: '',
             order: 0,
           },
@@ -453,6 +760,78 @@ export default function StudioDocumentPage() {
       setActivePageId(page.id);
       return { ...prev, pages: [...prev.pages, page] };
     });
+  }
+
+  function addBlock(
+    pageId: string,
+    kind: StudioBlock['kind'] = 'paragraph',
+  ) {
+    applyCanvas((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) => {
+        if (p.id !== pageId) return p;
+        const order = p.blocks.length;
+        return {
+          ...p,
+          blocks: [
+            ...p.blocks,
+            {
+              id: `block-${Date.now()}-${order}`,
+              kind,
+              text:
+                kind === 'diagram'
+                  ? 'flowchart TD\n  A[Início] --> B[Fim]'
+                  : kind === 'bullets'
+                    ? '- '
+                    : kind === 'heading'
+                      ? ''
+                      : '',
+              order,
+              ...(kind === 'diagram' ? { diagramLang: 'mermaid' as const } : {}),
+            },
+          ],
+        };
+      }),
+    }));
+  }
+
+  function moveBlock(pageId: string, blockId: string, dir: -1 | 1) {
+    applyCanvas((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) => {
+        if (p.id !== pageId) return p;
+        const blocks = p.blocks.slice().sort((a, b) => a.order - b.order);
+        const idx = blocks.findIndex((b) => b.id === blockId);
+        const swap = idx + dir;
+        if (idx < 0 || swap < 0 || swap >= blocks.length) return p;
+        const next = blocks.slice();
+        const tmp = next[idx]!;
+        next[idx] = next[swap]!;
+        next[swap] = tmp;
+        return { ...p, blocks: next.map((b, i) => ({ ...b, order: i })) };
+      }),
+    }));
+  }
+
+  function removeBlock(pageId: string, blockId: string) {
+    applyCanvas((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) => {
+        if (p.id !== pageId) return p;
+        if (p.blocks.length <= 1) return p;
+        return {
+          ...p,
+          blocks: p.blocks
+            .filter((b) => b.id !== blockId)
+            .map((b, i) => ({ ...b, order: i })),
+        };
+      }),
+    }));
+  }
+
+  async function reloadFromServer() {
+    setRemoteUpdate(null);
+    await load();
   }
 
   function setPageLayout(pageId: string, mode: 'blank' | 'mold', moldId?: string | null) {
@@ -499,21 +878,52 @@ export default function StudioDocumentPage() {
   return (
     <div className="flex h-screen flex-col bg-slate-200/80">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2 sm:px-4">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Link href={libraryHref} className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <PenLine className="hidden h-4 w-4 text-orange-600 sm:block" />
-          <input
-            value={title}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              setDirty(true);
-            }}
-            disabled={!canEdit}
-            className="min-w-0 flex-1 border-0 bg-transparent text-base font-semibold text-slate-900 outline-none focus:ring-0 sm:text-lg"
-          />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <Link href={libraryHref} className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+            <PenLine className="hidden h-4 w-4 text-orange-600 sm:block" />
+            <input
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setDirty(true);
+              }}
+              disabled={!canEdit}
+              className="min-w-0 flex-1 border-0 bg-transparent text-base font-semibold text-slate-900 outline-none focus:ring-0 sm:text-lg"
+            />
+          </div>
+          {(lastEditedBy || lastEditedAt) && (
+            <p className="truncate pl-9 text-[10px] text-slate-500">
+              {t('Última edição', 'Última edición', 'Last edit')}
+              {lastEditedBy ? `: ${lastEditedBy}` : ''}
+              {lastEditedAt
+                ? ` · ${new Date(lastEditedAt).toLocaleString(locale === 'en' ? 'en' : locale)}`
+                : ''}
+            </p>
+          )}
         </div>
+        {presence.filter((p) => !p.isSelf).length > 0 && (
+          <div className="flex items-center -space-x-1.5 pr-1" title={t('Online agora', 'En línea ahora', 'Online now')}>
+            {presence
+              .filter((p) => !p.isSelf)
+              .slice(0, 5)
+              .map((p) => (
+                <span
+                  key={p.userId}
+                  title={`${p.name || p.email} · ${p.status === 'editing' ? t('a editar', 'editando', 'editing') : t('a ver', 'viendo', 'viewing')}`}
+                  className={`inline-flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold ${
+                    p.status === 'editing'
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-slate-500 text-white'
+                  }`}
+                >
+                  {p.initials}
+                </span>
+              ))}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-1.5">
           <select
             value={pageSize}
@@ -548,14 +958,27 @@ export default function StudioDocumentPage() {
           </button>
           <button
             type="button"
-            onClick={() => {
-              setShowVersions(true);
-              void loadVersions();
-            }}
-            title={t('Versões', 'Versiones', 'Versions')}
+            onClick={() => openHistory('activity')}
+            title={t('Atividade e versões', 'Actividad y versiones', 'Activity & versions')}
             className="rounded-lg border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50"
           >
             <History className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCommentBlockId(null);
+              setShowComments(true);
+            }}
+            title={t('Comentários', 'Comentarios', 'Comments')}
+            className="relative rounded-lg border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50"
+          >
+            <MessageSquare className="h-4 w-4" />
+            {openCommentCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-600 px-1 text-[9px] font-bold text-white">
+                {openCommentCount}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -605,8 +1028,43 @@ export default function StudioDocumentPage() {
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             {t('Guardar', 'Guardar', 'Save')}
           </button>
+          {autoSaveState !== 'idle' && (
+            <span className="text-[10px] font-medium text-slate-500">
+              {autoSaveState === 'saving'
+                ? t('A guardar…', 'Guardando…', 'Saving…')
+                : t('Guardado', 'Guardado', 'Saved')}
+            </span>
+          )}
         </div>
       </header>
+
+      {remoteUpdate && (
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-950">
+          <p>
+            {t(
+              `${remoteUpdate.by} guardou uma versão mais recente.`,
+              `${remoteUpdate.by} guardó una versión más reciente.`,
+              `${remoteUpdate.by} saved a newer version.`,
+            )}
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setRemoteUpdate(null)}
+              className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold"
+            >
+              {t('Ignorar', 'Ignorar', 'Dismiss')}
+            </button>
+            <button
+              type="button"
+              onClick={() => void reloadFromServer()}
+              className="rounded-lg bg-amber-700 px-2.5 py-1 text-xs font-semibold text-white"
+            >
+              {t('Recarregar', 'Recargar', 'Reload')}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {/* Chat — esquerda */}
@@ -645,11 +1103,23 @@ export default function StudioDocumentPage() {
             {messages.map((m) => (
               <div
                 key={m.id}
-                className={`whitespace-pre-wrap rounded-xl px-3 py-2 text-sm ${
+                className={`rounded-xl px-3 py-2 text-sm ${
                   m.role === 'user' ? 'ml-4 bg-orange-50 text-slate-900' : 'mr-2 bg-slate-50 text-slate-800'
                 }`}
               >
-                {m.content}
+                <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                  <span>
+                    {m.role === 'user'
+                      ? m.actorName || t('Utilizador', 'Usuario', 'User')
+                      : t('Assistente IA', 'Asistente IA', 'AI assistant')}
+                  </span>
+                  {m.createdAt && (
+                    <span className="font-normal normal-case tracking-normal">
+                      {new Date(m.createdAt).toLocaleString(locale === 'en' ? 'en' : locale)}
+                    </span>
+                  )}
+                </div>
+                <div className="whitespace-pre-wrap">{m.content}</div>
               </div>
             ))}
             {consent && (
@@ -740,28 +1210,62 @@ export default function StudioDocumentPage() {
                   <BookMarked className="h-5 w-5" />
                 </button>
               )}
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={chatBusy || !canEdit}
-                rows={4}
-                placeholder={t(
-                  'Escreva instruções… (Enter = parágrafo)',
-                  'Escriba instrucciones… (Enter = párrafo)',
-                  'Write instructions… (Enter = paragraph)',
-                )}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                    e.preventDefault();
-                    void sendChat();
+              {dictationSupported && (
+                <button
+                  type="button"
+                  disabled={chatBusy || !canEdit}
+                  onClick={() => toggleDictation()}
+                  title={
+                    dictating
+                      ? t('Parar ditado', 'Detener dictado', 'Stop dictation')
+                      : t('Ditar (microfone)', 'Dictar (micrófono)', 'Dictate (microphone)')
                   }
-                }}
-                className="min-h-[96px] min-w-0 flex-1 resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed outline-none focus:border-orange-400"
-              />
+                  className={`rounded-lg border p-2 disabled:opacity-40 ${
+                    dictating
+                      ? 'border-red-300 bg-red-50 text-red-700 animate-pulse'
+                      : 'border-slate-200 text-slate-600 hover:border-orange-300 hover:bg-orange-50'
+                  }`}
+                >
+                  {dictating ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                </button>
+              )}
+              <div className="relative min-w-0 flex-1">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  disabled={chatBusy || !canEdit}
+                  rows={4}
+                  placeholder={
+                    dictating
+                      ? t('A ouvir… fale agora', 'Escuchando… hable ahora', 'Listening… speak now')
+                      : t(
+                          'Escreva ou dite instruções… (Enter = parágrafo)',
+                          'Escriba o dicte instrucciones… (Enter = párrafo)',
+                          'Write or dictate instructions… (Enter = paragraph)',
+                        )
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      if (dictating) stopDictation();
+                      void sendChat();
+                    }
+                  }}
+                  className="min-h-[96px] w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed outline-none focus:border-orange-400"
+                />
+                {dictating && dictationInterim && (
+                  <p className="pointer-events-none absolute bottom-2 left-3 right-3 truncate text-[11px] italic text-orange-700/80">
+                    {dictationInterim}
+                  </p>
+                )}
+              </div>
               <button
                 type="button"
                 disabled={chatBusy || !input.trim() || !canEdit}
-                onClick={() => void sendChat()}
+                onClick={() => {
+                  if (dictating) stopDictation();
+                  void sendChat();
+                }}
                 className="rounded-lg bg-orange-600 p-2.5 text-white disabled:opacity-40"
                 title="Ctrl+Enter"
               >
@@ -850,32 +1354,84 @@ export default function StudioDocumentPage() {
                       </div>
                     </div>
                     <div
-                      className="relative overflow-hidden bg-white shadow-lg ring-1 ring-slate-300"
+                      className="relative bg-white shadow-lg ring-1 ring-slate-300"
                       style={{
                         width,
                         minHeight: height,
                         backgroundImage: bg ? `url(${bg})` : undefined,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
+                        backgroundSize: '100% 100%',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'top center',
                       }}
                     >
+                      {/* Área útil tipo margem de página — o texto flui e a folha cresce se precisar */}
                       <div
-                        className={`relative z-10 space-y-5 px-10 py-12 ${
-                          bg ? 'bg-white/85 backdrop-blur-[1px]' : ''
+                        className={`relative z-10 box-border flex w-full flex-col gap-6 px-[12%] py-[10%] ${
+                          bg ? 'bg-white/80 backdrop-blur-[0.5px]' : ''
                         }`}
-                        style={{ minHeight: height - 8 }}
+                        style={{ minHeight: height }}
                       >
                         {page.blocks
                           .slice()
                           .sort((a, b) => a.order - b.order)
-                          .map((block) => (
-                            <BlockEditor
+                          .map((block, blockIdx, arr) => (
+                            <StudioBlockEditor
                               key={block.id}
                               block={block}
                               disabled={!canEdit}
-                              onChange={(text) => updateBlock(page.id, block.id, text)}
+                              canMoveUp={blockIdx > 0}
+                              canMoveDown={blockIdx < arr.length - 1}
+                              canDelete={arr.length > 1}
+                              onChange={(text) => updateBlock(page.id, block.id, { text })}
+                              onKindChange={(kind) => updateBlock(page.id, block.id, { kind })}
+                              onMoveUp={() => moveBlock(page.id, block.id, -1)}
+                              onMoveDown={() => moveBlock(page.id, block.id, 1)}
+                              onDelete={() => removeBlock(page.id, block.id)}
+                              onComment={() => {
+                                setCommentBlockId(block.id);
+                                setShowComments(true);
+                              }}
+                              labels={{
+                                edit: t('Editar', 'Editar', 'Edit'),
+                                preview: t('Ver documento', 'Ver documento', 'Preview'),
+                                bold: t('Negrito', 'Negrita', 'Bold'),
+                                italic: t('Itálico', 'Cursiva', 'Italic'),
+                                list: t('Lista', 'Lista', 'List'),
+                                heading: t('Subtítulo', 'Subtítulo', 'Subheading'),
+                                code: t('Código', 'Código', 'Code'),
+                                empty: t('Clique para escrever…', 'Clic para escribir…', 'Click to write…'),
+                                editSource: t('Editar código', 'Editar código', 'Edit source'),
+                                templates: t('Modelos', 'Plantillas', 'Templates'),
+                                asHeading: t('Como título', 'Como título', 'As heading'),
+                                asText: t('Como texto', 'Como texto', 'As text'),
+                                asList: t('Como lista', 'Como lista', 'As list'),
+                              }}
                             />
                           ))}
+                        {canEdit && (
+                          <div className="flex flex-wrap gap-1.5 border-t border-dashed border-slate-200 pt-4">
+                            {(
+                              [
+                                ['paragraph', t('+ Texto', '+ Texto', '+ Text')],
+                                ['heading', t('+ Título', '+ Título', '+ Heading')],
+                                ['bullets', t('+ Lista', '+ Lista', '+ List')],
+                                ['callout', t('+ Destaque', '+ Destacado', '+ Callout')],
+                                ['diagram', t('+ Diagrama', '+ Diagrama', '+ Diagram')],
+                              ] as const
+                            ).map(([kind, label]) => (
+                              <button
+                                key={kind}
+                                type="button"
+                                onClick={() => addBlock(page.id, kind)}
+                                className="rounded-lg border border-slate-200 bg-white/80 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:border-orange-300 hover:bg-orange-50"
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {/* Espaço residual da folha A4 quando o conteúdo é curto */}
+                        <div className="min-h-0 flex-1" aria-hidden />
                       </div>
                     </div>
                   </section>
@@ -905,16 +1461,94 @@ export default function StudioDocumentPage() {
         />
       )}
 
-      {showVersions && (
+      {showHistory && (
         <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-bold text-slate-900">{t('Versões', 'Versiones', 'Versions')}</h3>
-              <button type="button" onClick={() => setShowVersions(false)}>
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="font-bold text-slate-900">
+                {t('Rastreabilidade', 'Trazabilidad', 'Traceability')}
+              </h3>
+              <button type="button" onClick={() => setShowHistory(false)}>
                 <X className="h-4 w-4" />
               </button>
             </div>
-            {versions.length === 0 ? (
+            <div className="mb-4 flex gap-1 rounded-lg bg-slate-100 p-1">
+              <button
+                type="button"
+                onClick={() => setHistoryTab('activity')}
+                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold ${
+                  historyTab === 'activity' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'
+                }`}
+              >
+                {t('Atividade', 'Actividad', 'Activity')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistoryTab('versions')}
+                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold ${
+                  historyTab === 'versions' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'
+                }`}
+              >
+                {t('Versões', 'Versiones', 'Versions')}
+              </button>
+            </div>
+
+            {historyTab === 'activity' ? (
+              activities.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  {t(
+                    'Ainda sem eventos. Guardar ou falar com a IA cria o histórico.',
+                    'Aún sin eventos. Guardar o hablar con la IA crea el historial.',
+                    'No events yet. Saving or chatting with AI creates the trail.',
+                  )}
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {activities.map((a) => {
+                    const who = a.actor?.name?.trim() || a.actor?.email || '—';
+                    const kindLabel =
+                      a.kind === 'ai_prompt'
+                        ? t('IA · pedido', 'IA · pedido', 'AI · prompt')
+                        : a.kind === 'ai_response'
+                          ? t('IA · resposta', 'IA · respuesta', 'AI · reply')
+                          : a.kind === 'ai_edit'
+                            ? t('IA · edição', 'IA · edición', 'AI · edit')
+                            : a.kind === 'saved'
+                              ? t('Guardado', 'Guardado', 'Saved')
+                              : a.kind === 'restored'
+                                ? t('Restaurado', 'Restaurado', 'Restored')
+                                : a.kind === 'imported'
+                                  ? t('Importado', 'Importado', 'Imported')
+                                  : a.kind === 'created'
+                                    ? t('Criado', 'Creado', 'Created')
+                                    : a.kind === 'shared'
+                                      ? t('Partilha', 'Compartido', 'Shared')
+                                      : a.kind === 'comment'
+                                        ? t('Comentário', 'Comentario', 'Comment')
+                                        : a.kind;
+                    return (
+                      <li
+                        key={a.id}
+                        className="rounded-lg border border-slate-100 px-3 py-2 text-sm"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                            {kindLabel}
+                          </span>
+                          <span className="text-[10px] text-slate-500">
+                            {new Date(a.createdAt).toLocaleString(locale === 'en' ? 'en' : locale)}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-slate-800">{a.summary}</p>
+                        <p className="mt-0.5 text-[11px] text-slate-500">
+                          {t('Por', 'Por', 'By')} {who}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )
+            ) : versions.length === 0 ? (
               <p className="text-sm text-slate-500">
                 {t(
                   'Ainda sem snapshots. Guarde o documento para criar histórico.',
@@ -933,6 +1567,9 @@ export default function StudioDocumentPage() {
                       <p className="truncate font-medium">{v.label || v.title}</p>
                       <p className="text-[10px] text-slate-500">
                         {new Date(v.createdAt).toLocaleString(locale === 'en' ? 'en' : locale)}
+                        {v.createdBy
+                          ? ` · ${v.createdBy.name?.trim() || v.createdBy.email}`
+                          : ''}
                       </p>
                     </div>
                     {canEdit && (
@@ -950,6 +1587,25 @@ export default function StudioDocumentPage() {
             )}
           </div>
         </div>
+      )}
+
+      {showComments && (
+        <StudioCommentsPanel
+          documentId={id}
+          locale={locale}
+          open
+          focusBlockId={commentBlockId}
+          blockTitles={Object.fromEntries(
+            (canvas?.pages || []).flatMap((p) =>
+              p.blocks.map((b) => [b.id, b.title || b.kind] as [string, string]),
+            ),
+          )}
+          onCountChange={setOpenCommentCount}
+          onClose={() => {
+            setShowComments(false);
+            setCommentBlockId(null);
+          }}
+        />
       )}
 
       {showMolds && (
@@ -1033,51 +1689,3 @@ export default function StudioDocumentPage() {
   );
 }
 
-function BlockEditor({
-  block,
-  onChange,
-  disabled,
-}: {
-  block: StudioBlock;
-  onChange: (text: string) => void;
-  disabled?: boolean;
-}) {
-  const isHeading = block.kind === 'heading';
-  const isDiagram = block.kind === 'diagram';
-
-  return (
-    <div>
-      {block.title && (
-        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-          {block.title}
-        </label>
-      )}
-      {isDiagram ? (
-        <div className="space-y-2">
-          <textarea
-            value={block.text}
-            onChange={(e) => onChange(e.target.value)}
-            disabled={disabled}
-            rows={8}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50/80 p-3 font-mono text-xs text-slate-800 outline-none focus:border-orange-400 disabled:opacity-60"
-            spellCheck={false}
-          />
-          <StudioMermaidPreview source={block.text} />
-        </div>
-      ) : (
-        <textarea
-          value={block.text}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          rows={isHeading ? 2 : block.kind === 'bullets' ? 5 : 4}
-          className={`w-full resize-y border-0 bg-transparent p-0 outline-none focus:ring-0 disabled:opacity-60 ${
-            isHeading
-              ? 'text-2xl font-bold leading-snug text-slate-900'
-              : 'text-[15px] leading-relaxed text-slate-800'
-          }`}
-          placeholder={block.title || '…'}
-        />
-      )}
-    </div>
-  );
-}

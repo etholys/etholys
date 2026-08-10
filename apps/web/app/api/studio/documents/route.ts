@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import { resolveStudioCompanyId } from '@/lib/studio/access';
-import { STUDIO_SYSTEM_TEMPLATES, findSystemTemplate } from '@/lib/studio/templates';
-import { emptyStudioCanvas, isStudioFormat } from '@/lib/studio/types';
-import { prismaHasEnumValue } from '@/lib/prisma-has-field';
+import { STUDIO_SYSTEM_TEMPLATES, serializeStudioTemplate } from '@/lib/studio/templates';
+import { createStudioDocument } from '@/lib/studio/create-document';
+import { normalizeStudioCanvas } from '@/lib/studio/types';
 import { getDocumentAccess, getFolderAccess, listActiveStudioShareTargets } from '@/lib/studio/share';
 import {
   canCreateStudioContent,
@@ -15,6 +14,7 @@ import {
   type AccessLevel,
 } from '@/lib/studio/share';
 import { resolveStudioJwtScope } from '@/lib/studio/share';
+import { resolveStudioCompanyId } from '@/lib/studio/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -126,18 +126,7 @@ export async function GET(req: NextRequest) {
         folders,
         allFolders: crumbFolders,
         documents,
-        templates: STUDIO_SYSTEM_TEMPLATES.map((t) => ({
-          key: t.key,
-          format: t.format,
-          nameEs: t.nameEs,
-          namePt: t.namePt,
-          nameEn: t.nameEn,
-          descriptionEs: t.descriptionEs,
-          descriptionPt: t.descriptionPt,
-          descriptionEn: t.descriptionEn,
-          sortOrder: t.sortOrder,
-          isSystem: true,
-        })),
+        templates: STUDIO_SYSTEM_TEMPLATES.map(serializeStudioTemplate),
         accessMode: 'share_only',
         access,
         canEdit,
@@ -220,6 +209,19 @@ export async function GET(req: NextRequest) {
       prisma.studioDocument.findMany({
         where: { companyId: resolvedCompanyId, folderId: folderId || null },
         orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true,
+          title: true,
+          format: true,
+          status: true,
+          folderId: true,
+          templateKey: true,
+          visibility: true,
+          updatedAt: true,
+          createdAt: true,
+          createdById: true,
+          companyId: true,
+        },
       }),
       prisma.studioFolder.findMany({
         where: { companyId: resolvedCompanyId },
@@ -248,9 +250,31 @@ export async function GET(req: NextRequest) {
           visibility: d.visibility,
           updatedAt: d.updatedAt,
           createdAt: d.createdAt,
+          updatedBy: null as { id: string; name: string | null; email: string } | null,
           access,
         });
       }
+    }
+
+    // Enriquecer com updatedBy se a coluna já existir (migração F3.1+)
+    try {
+      const ids = documents.map((d) => d.id);
+      if (ids.length) {
+        const withEditors = await prisma.studioDocument.findMany({
+          where: { id: { in: ids } },
+          select: {
+            id: true,
+            updatedBy: { select: { id: true, name: true, email: true } },
+          },
+        });
+        const byId = new Map(withEditors.map((x) => [x.id, x.updatedBy]));
+        for (const d of documents) {
+          const ub = byId.get(d.id);
+          if (ub) d.updatedBy = ub;
+        }
+      }
+    } catch {
+      /* coluna updatedById ainda não aplicada */
     }
 
     // Na raiz: incluir pastas/docs partilhados mesmo que estejam aninhados (fora da raiz)
@@ -313,18 +337,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const templates = STUDIO_SYSTEM_TEMPLATES.map((t) => ({
-      key: t.key,
-      format: t.format,
-      nameEs: t.nameEs,
-      namePt: t.namePt,
-      nameEn: t.nameEn,
-      descriptionEs: t.descriptionEs,
-      descriptionPt: t.descriptionPt,
-      descriptionEn: t.descriptionEn,
-      sortOrder: t.sortOrder,
-      isSystem: true,
-    }));
+    const templates = STUDIO_SYSTEM_TEMPLATES.map(serializeStudioTemplate);
 
     return NextResponse.json({
       companyId: resolvedCompanyId,
@@ -355,85 +368,29 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** POST /api/studio/documents — create document (optional folder) */
+/** POST /api/studio/documents — create document (optional folder / canvasState) */
 export async function POST(req: NextRequest) {
   const user = await authUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-  const companyId = await resolveStudioCompanyId(
-    user.id,
-    typeof body.companyId === 'string' ? body.companyId : null,
-  );
+  const canvasState =
+    body.canvasState && typeof body.canvasState === 'object'
+      ? normalizeStudioCanvas(body.canvasState)
+      : null;
 
-  const templateKey = typeof body.templateKey === 'string' ? body.templateKey.trim() : '';
-  const title =
-    (typeof body.title === 'string' && body.title.trim()) ||
-    (templateKey ? findSystemTemplate(templateKey)?.namePt : null) ||
-    'Novo documento';
-  const folderId = typeof body.folderId === 'string' && body.folderId ? body.folderId : null;
-  const formatRaw = typeof body.format === 'string' ? body.format : null;
+  const created = await createStudioDocument({
+    userId: user.id,
+    companyId: typeof body.companyId === 'string' ? body.companyId : null,
+    folderId: typeof body.folderId === 'string' && body.folderId ? body.folderId : null,
+    title: typeof body.title === 'string' ? body.title : undefined,
+    templateKey: typeof body.templateKey === 'string' ? body.templateKey : undefined,
+    format: typeof body.format === 'string' ? body.format : null,
+    canvasState,
+  });
 
-  // Convidado com pasta partilhada: companyId vem da pasta se ainda não resolvido
-  let resolvedCompanyId = companyId;
-  if (folderId) {
-    const folder = await prisma.studioFolder.findFirst({ where: { id: folderId } });
-    if (!folder) return NextResponse.json({ error: 'Folder not found' }, { status: 404 });
-    const access = await getFolderAccess(user.id, folder);
-    if (!canCreateStudioContent(access)) {
-      return NextResponse.json({ error: 'Sem permissão para criar nesta pasta' }, { status: 403 });
-    }
-    if (!resolvedCompanyId) resolvedCompanyId = folder.companyId;
-    else if (resolvedCompanyId !== folder.companyId) {
-      // Preferir a empresa da pasta partilhada
-      resolvedCompanyId = folder.companyId;
-    }
+  if (!created.ok) {
+    return NextResponse.json({ error: created.error }, { status: created.status });
   }
-
-  if (!resolvedCompanyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
-
-  const tpl = templateKey ? findSystemTemplate(templateKey) : null;
-  const canvas = tpl ? tpl.buildCanvas() : emptyStudioCanvas(isStudioFormat(formatRaw) ? formatRaw : 'report');
-  if (isStudioFormat(formatRaw)) canvas.format = formatRaw;
-  else if (tpl) canvas.format = tpl.format;
-
-  try {
-    let aiSessionId: string | null = null;
-    try {
-      const kind = prismaHasEnumValue('AiAdvisorSessionKind', 'STUDIO_DOC')
-        ? 'STUDIO_DOC'
-        : 'WORKSPACE_ADVISOR';
-      const sess = await prisma.aiAdvisorSession.create({
-        data: {
-          companyId: resolvedCompanyId,
-          userId: user.id,
-          title: `Studio: ${title}`.slice(0, 120),
-          kind: kind as 'STUDIO_DOC' | 'WORKSPACE_ADVISOR',
-        },
-      });
-      aiSessionId = sess.id;
-    } catch (e) {
-      console.warn('[studio] ai session create skipped', e);
-    }
-
-    const doc = await prisma.studioDocument.create({
-      data: {
-        companyId: resolvedCompanyId,
-        folderId,
-        title,
-        format: canvas.format,
-        visibility: 'private',
-        canvasState: canvas,
-        templateKey: templateKey || null,
-        aiSessionId,
-        createdById: user.id,
-      },
-    });
-
-    return NextResponse.json({ document: doc }, { status: 201 });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error('[POST /api/studio/documents]', e);
-    return NextResponse.json({ error: 'Failed to create document', detail: msg }, { status: 503 });
-  }
+  return NextResponse.json({ document: created.document }, { status: 201 });
 }

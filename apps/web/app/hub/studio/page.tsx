@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -21,6 +21,11 @@ import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
 import { StudioShareDialog } from '@/components/studio/StudioShareDialog';
 import { StudioContextPanel } from '@/components/studio/StudioContextPanel';
+import {
+  STUDIO_TEMPLATE_DOMAINS,
+  domainLabel,
+  type StudioTemplateDomain,
+} from '@/lib/studio/templates';
 
 type FolderRow = { id: string; name: string; parentId: string | null; visibility?: string; access?: string };
 type DocRow = {
@@ -32,10 +37,12 @@ type DocRow = {
   updatedAt: string;
   visibility?: string;
   access?: string;
+  updatedBy?: { id: string; name: string | null; email: string } | null;
 };
 type TemplateRow = {
   key: string;
   format: string;
+  domain?: string;
   nameEs: string;
   namePt: string;
   nameEn: string;
@@ -64,6 +71,7 @@ export default function StudioHubPage() {
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderError, setNewFolderError] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [templateDomain, setTemplateDomain] = useState<'all' | StudioTemplateDomain>('all');
   const [showBrand, setShowBrand] = useState(false);
   const [brandColor, setBrandColor] = useState('#ea580c');
   const [brandOrg, setBrandOrg] = useState('');
@@ -258,6 +266,11 @@ export default function StudioHubPage() {
     return locale === 'pt' ? tpl.descriptionPt : locale === 'es' ? tpl.descriptionEs : tpl.descriptionEn;
   }
 
+  const filteredTemplates = useMemo(() => {
+    if (templateDomain === 'all') return templates;
+    return templates.filter((tpl) => (tpl.domain || 'general') === templateDomain);
+  }, [templates, templateDomain]);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50/80 via-white to-slate-50">
       <header className="border-b border-amber-200/60 bg-white/90 backdrop-blur">
@@ -427,6 +440,9 @@ export default function StudioHubPage() {
                     <p className="truncate font-semibold text-slate-900">{doc.title}</p>
                     <p className="text-xs text-slate-500">
                       {doc.format} · {new Date(doc.updatedAt).toLocaleString(locale === 'en' ? 'en' : locale)}
+                      {doc.updatedBy
+                        ? ` · ${doc.updatedBy.name?.trim() || doc.updatedBy.email}`
+                        : ''}
                       {doc.visibility === 'company'
                         ? ` · ${t('toda a empresa', 'toda la empresa', 'whole company')}`
                         : ` · ${t('privado', 'privado', 'private')}`}
@@ -645,33 +661,77 @@ export default function StudioHubPage() {
       {showTemplates && (
         <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 sm:items-center">
           <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl">
-            <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
-              <h2 className="text-lg font-bold text-slate-900">
-                {t('Escolher template', 'Elegir plantilla', 'Choose template')}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowTemplates(false)}
-                className="text-sm text-slate-500 hover:text-slate-800"
-              >
-                {t('Fechar', 'Cerrar', 'Close')}
-              </button>
+            <div className="sticky top-0 z-10 border-b border-slate-200 bg-white px-5 py-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-900">
+                  {t('Escolher template', 'Elegir plantilla', 'Choose template')}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowTemplates(false)}
+                  className="text-sm text-slate-500 hover:text-slate-800"
+                >
+                  {t('Fechar', 'Cerrar', 'Close')}
+                </button>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setTemplateDomain('all')}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                    templateDomain === 'all'
+                      ? 'bg-orange-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {t('Todos', 'Todos', 'All')}
+                </button>
+                {STUDIO_TEMPLATE_DOMAINS.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setTemplateDomain(d)}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                      templateDomain === d
+                        ? 'bg-orange-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {domainLabel(d, locale)}
+                  </button>
+                ))}
+              </div>
             </div>
             <ul className="space-y-2 p-4">
-              {templates.map((tpl) => (
-                <li key={tpl.key}>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void createDoc(tpl.key)}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-orange-300 hover:bg-orange-50/50 disabled:opacity-50"
-                  >
-                    <p className="font-semibold text-slate-900">{templateName(tpl)}</p>
-                    <p className="mt-0.5 text-sm text-slate-600">{templateDesc(tpl)}</p>
-                    <p className="mt-1 text-[10px] uppercase tracking-wide text-slate-400">{tpl.format}</p>
-                  </button>
+              {filteredTemplates.length === 0 ? (
+                <li className="px-2 py-6 text-center text-sm text-slate-500">
+                  {t(
+                    'Nenhum template neste domínio.',
+                    'Ninguna plantilla en este dominio.',
+                    'No templates in this domain.',
+                  )}
                 </li>
-              ))}
+              ) : (
+                filteredTemplates.map((tpl) => (
+                  <li key={tpl.key}>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void createDoc(tpl.key)}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-orange-300 hover:bg-orange-50/50 disabled:opacity-50"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-semibold text-slate-900">{templateName(tpl)}</p>
+                        <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                          {domainLabel((tpl.domain as StudioTemplateDomain) || 'general', locale)}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-sm text-slate-600">{templateDesc(tpl)}</p>
+                      <p className="mt-1 text-[10px] uppercase tracking-wide text-slate-400">{tpl.format}</p>
+                    </button>
+                  </li>
+                ))
+              )}
             </ul>
           </div>
         </div>
