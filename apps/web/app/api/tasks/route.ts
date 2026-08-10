@@ -53,6 +53,8 @@ export async function GET(req: Request) {
     // Department filter
     const departmentId = searchParams.get('departmentId');
     if (departmentId) where.departmentId = departmentId;
+    const folderId = searchParams.get('folderId');
+    if (folderId) where.folderId = folderId;
     // No-project filter (company tasks only) — guests cannot list company-wide tasks
     const noProject = searchParams.get('noProject');
     if (noProject === '1') {
@@ -68,6 +70,7 @@ export async function GET(req: Request) {
         project: { include: { company: true } },
         department: true,
         group: true,
+        folder: true,
         checklist: { orderBy: { order: 'asc' } },
         _count: { select: { comments: true, subtasks: true, attachments: true } },
       },

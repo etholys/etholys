@@ -21,6 +21,7 @@ const detailInclude = {
   project: { include: { company: true } },
   department: true,
   group: true,
+  folder: true,
   checklist: { orderBy: { order: 'asc' as const } },
   comments: {
     include: { user: { select: { id: true, name: true, email: true } } },
@@ -121,6 +122,25 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
         });
         if (!group) return NextResponse.json({ error: 'Grupo no encontrado' }, { status: 404 });
         data.groupId = group.id;
+      }
+    }
+    if (body.folderId !== undefined) {
+      if (body.folderId === null || body.folderId === '') {
+        data.folderId = null;
+      } else {
+        const folder = await prisma.workFolder.findFirst({
+          where: {
+            id: String(body.folderId),
+            isActive: true,
+            companyId: { in: tenant.companyIds },
+            OR: [
+              { ownerId: tenant.userId },
+              { visibility: 'SHARED' },
+            ],
+          },
+        });
+        if (!folder) return NextResponse.json({ error: 'Carpeta no encontrada' }, { status: 404 });
+        data.folderId = folder.id;
       }
     }
     if (body.order !== undefined) {

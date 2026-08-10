@@ -117,6 +117,7 @@ export function isApiLicenseExempt(pathname: string): boolean {
     pathname.startsWith('/api/studio') ||
     pathname.startsWith('/api/tasks') ||
     pathname.startsWith('/api/task-groups') ||
+    pathname.startsWith('/api/work-folders') ||
     pathname.startsWith('/api/task-approvals') ||
     pathname.startsWith('/api/task-templates') ||
     pathname.startsWith('/api/task-dependencies') ||

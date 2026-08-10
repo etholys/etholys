@@ -9,7 +9,8 @@ import { WorkSidebar, type WorkNav } from './WorkSidebar';
 import { WorkDashboard } from './WorkDashboard';
 import { WorkGantt } from './WorkGantt';
 import { WorkTaskPanel } from './WorkTaskPanel';
-import { CalendarRange, LayoutGrid, List } from 'lucide-react';
+import { CalendarRange, LayoutGrid, List, Settings } from 'lucide-react';
+import Link from 'next/link';
 
 type ML = { es: string; pt: string; en: string };
 const ml = (en: string, es: string, pt: string): ML => ({ en, es, pt });
@@ -27,6 +28,7 @@ export default function WorkShell() {
   const [deps, setDeps] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [folders, setFolders] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -45,6 +47,17 @@ export default function WorkShell() {
         setLoadingDash(false);
       })
       .catch(() => setLoadingDash(false));
+  };
+
+  const fetchFolders = () => {
+    if (!activeCompanyId) {
+      setFolders([]);
+      return;
+    }
+    fetch(`/api/work-folders?companyId=${encodeURIComponent(activeCompanyId)}`)
+      .then((r) => r.json())
+      .then((data) => setFolders(data?.folders ?? []))
+      .catch(() => setFolders([]));
   };
 
   useEffect(() => {
@@ -68,6 +81,7 @@ export default function WorkShell() {
       .then((r) => r.json())
       .then((data) => setUsers(data?.users ?? []))
       .catch(() => {});
+    fetchFolders();
   }, [activeCompanyId]);
 
   useEffect(() => {
@@ -97,6 +111,7 @@ export default function WorkShell() {
     if (nav.kind === 'company') return top.filter((t: any) => !t.projectId);
     if (nav.kind === 'department') return top.filter((t: any) => t.departmentId === nav.id);
     if (nav.kind === 'project') return top.filter((t: any) => t.projectId === nav.id);
+    if (nav.kind === 'folder') return top.filter((t: any) => t.folderId === nav.id);
     return top;
   }, [tasks, nav]);
 
@@ -118,19 +133,42 @@ export default function WorkShell() {
     if (nav.kind === 'company') return t3('Company operations', 'Operaciones de empresa', 'Operações da empresa');
     if (nav.kind === 'department') return nav.name;
     if (nav.kind === 'project') return nav.name;
+    if (nav.kind === 'folder') return nav.name;
     return 'Work';
   })();
 
+  const createFolder = async (input: { name: string; visibility: 'PERSONAL' | 'SHARED' }) => {
+    if (!activeCompanyId) return;
+    const res = await fetch('/api/work-folders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyId: activeCompanyId,
+        name: input.name,
+        visibility: input.visibility,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return;
+    fetchFolders();
+    if (data.folder?.id) {
+      setNav({ kind: 'folder', id: data.folder.id, name: data.folder.name });
+      setBoardView('table');
+    }
+  };
+
   const scopeProps =
     nav.kind === 'company'
-      ? { taskScope: 'company' as const, projectId: '', departmentId: '' }
+      ? { taskScope: 'company' as const, projectId: '', departmentId: '', folderId: '' }
       : nav.kind === 'department'
-        ? { taskScope: '' as const, projectId: '', departmentId: nav.id }
+        ? { taskScope: '' as const, projectId: '', departmentId: nav.id, folderId: '' }
         : nav.kind === 'project'
-          ? { taskScope: '' as const, projectId: nav.id, departmentId: '' }
-          : nav.kind === 'all'
-            ? { taskScope: '' as const, projectId: '', departmentId: '' }
-            : null;
+          ? { taskScope: '' as const, projectId: nav.id, departmentId: '', folderId: '' }
+          : nav.kind === 'folder'
+            ? { taskScope: '' as const, projectId: '', departmentId: '', folderId: nav.id }
+            : nav.kind === 'all'
+              ? { taskScope: '' as const, projectId: '', departmentId: '', folderId: '' }
+              : null;
 
   return (
     <div className="flex min-h-[calc(100vh-7.5rem)] overflow-hidden rounded-2xl border border-slate-200/80 bg-white/50 shadow-sm">
@@ -143,9 +181,12 @@ export default function WorkShell() {
         }}
         departments={departments}
         projects={projects}
+        folders={folders}
+        currentUserId={currentUserId}
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
         counts={counts}
+        onCreateFolder={createFolder}
         t={t3}
       />
 
@@ -157,6 +198,15 @@ export default function WorkShell() {
             </p>
             <h2 className="truncate text-lg font-bold tracking-tight text-slate-900">{contextTitle}</h2>
           </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/hub/work/settings"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              title={t3('Settings', 'Ajustes', 'Definições')}
+            >
+              <Settings className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{t3('Settings', 'Ajustes', 'Definições')}</span>
+            </Link>
           {nav.kind !== 'dashboard' && (
             <div className="flex rounded-lg bg-slate-100 p-0.5">
               <button
@@ -194,6 +244,7 @@ export default function WorkShell() {
               </button>
             </div>
           )}
+          </div>
         </div>
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -229,6 +280,7 @@ export default function WorkShell() {
                 initialProjectId={scopeProps?.projectId || ''}
                 initialDepartmentId={scopeProps?.departmentId || ''}
                 initialTaskScope={scopeProps?.taskScope || ''}
+                initialFolderId={scopeProps?.folderId || ''}
                 onTasksChanged={() => fetchAllTasks({ silent: true })}
                 externalSelectedId={selectedId}
                 onExternalSelect={setSelectedId}
@@ -241,6 +293,7 @@ export default function WorkShell() {
               taskId={selectedId}
               users={users}
               groups={groups}
+              folders={folders}
               activeCompanyId={activeCompanyId}
               onClose={() => setSelectedId(null)}
               onChanged={() => fetchAllTasks({ silent: true })}
@@ -252,6 +305,7 @@ export default function WorkShell() {
               taskId={selectedId}
               users={users}
               groups={groups}
+              folders={folders}
               activeCompanyId={activeCompanyId}
               onClose={() => setSelectedId(null)}
               onChanged={() => fetchAllTasks({ silent: true })}

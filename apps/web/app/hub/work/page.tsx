@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, CheckSquare, Layers } from 'lucide-react';
+import { ArrowLeft, CheckSquare, Layers, Settings } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import WorkShell from '@/components/work/WorkShell';
 
@@ -40,13 +40,22 @@ export default function HubWorkPage() {
               </p>
             </div>
           </div>
-          <Link
-            href="/hub"
-            className="hidden items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 sm:inline-flex"
-          >
-            <Layers className="h-3.5 w-3.5" />
-            Etholys Tools
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/hub/work/settings"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{t('Definições', 'Ajustes', 'Settings')}</span>
+            </Link>
+            <Link
+              href="/hub"
+              className="hidden items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 sm:inline-flex"
+            >
+              <Layers className="h-3.5 w-3.5" />
+              Etholys Tools
+            </Link>
+          </div>
         </div>
       </header>
 

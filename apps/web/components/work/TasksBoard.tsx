@@ -20,6 +20,7 @@ export type TasksBoardProps = {
   initialProjectId?: string;
   initialDepartmentId?: string;
   initialTaskScope?: string;
+  initialFolderId?: string;
   onTasksChanged?: () => void;
   externalSelectedId?: string | null;
   onExternalSelect?: (id: string | null) => void;
@@ -31,6 +32,7 @@ const emptyForm = {
   projectId: '',
   departmentId: '',
   groupId: '',
+  folderId: '',
   assigneeId: '',
   priority: 'MEDIUM',
   status: 'TODO',
@@ -50,6 +52,7 @@ export default function TasksBoard({
   initialProjectId = '',
   initialDepartmentId = '',
   initialTaskScope = '',
+  initialFolderId = '',
   onTasksChanged,
   externalSelectedId,
   onExternalSelect,
@@ -63,6 +66,7 @@ export default function TasksBoard({
   const [users, setUsers] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
+  const [folders, setFolders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'table' | 'kanban'>(forcedView || 'table');
   const [selectedIdInternal, setSelectedIdInternal] = useState<string | null>(null);
@@ -87,6 +91,7 @@ export default function TasksBoard({
   const [dateToFilter, setDateToFilter] = useState('');
   const [showAdvFilters, setShowAdvFilters] = useState(false);
   const [departmentFilter, setDepartmentFilter] = useState(initialDepartmentId);
+  const [folderFilter, setFolderFilter] = useState(initialFolderId);
   const [taskScopeFilter, setTaskScopeFilter] = useState(initialTaskScope);
 
   useEffect(() => {
@@ -97,7 +102,8 @@ export default function TasksBoard({
     setProjectFilter(initialProjectId);
     setDepartmentFilter(initialDepartmentId);
     setTaskScopeFilter(initialTaskScope);
-  }, [initialProjectId, initialDepartmentId, initialTaskScope]);
+    setFolderFilter(initialFolderId);
+  }, [initialProjectId, initialDepartmentId, initialTaskScope, initialFolderId]);
 
   const fetchTasks = (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -105,6 +111,7 @@ export default function TasksBoard({
     if (activeCompanyId) params.set('companyId', activeCompanyId);
     if (projectFilter) params.set('projectId', projectFilter);
     if (departmentFilter) params.set('departmentId', departmentFilter);
+    if (folderFilter) params.set('folderId', folderFilter);
     if (taskScopeFilter === 'company') params.set('noProject', '1');
     fetch(`/api/tasks?${params}`)
       .then((r) => r.json())
@@ -126,12 +133,24 @@ export default function TasksBoard({
       .catch(() => setGroups([]));
   };
 
+  const fetchFolders = () => {
+    if (!activeCompanyId) {
+      setFolders([]);
+      return;
+    }
+    fetch(`/api/work-folders?companyId=${encodeURIComponent(activeCompanyId)}`)
+      .then((r) => r.json())
+      .then((d) => setFolders(d?.folders ?? []))
+      .catch(() => setFolders([]));
+  };
+
   useEffect(() => {
     fetchTasks();
-  }, [activeCompanyId, projectFilter, departmentFilter, taskScopeFilter]);
+  }, [activeCompanyId, projectFilter, departmentFilter, taskScopeFilter, folderFilter]);
 
   useEffect(() => {
     fetchGroups();
+    fetchFolders();
   }, [activeCompanyId]);
 
   useEffect(() => {
@@ -186,6 +205,10 @@ export default function TasksBoard({
     if (!body.assigneeId) delete body.assigneeId;
     if (!body.departmentId) delete body.departmentId;
     if (!body.groupId) delete body.groupId;
+    if (!body.folderId) {
+      if (folderFilter) body.folderId = folderFilter;
+      else delete body.folderId;
+    }
     if (!body.projectId) {
       delete body.projectId;
       if (activeCompanyId) body.companyId = activeCompanyId;
@@ -207,6 +230,7 @@ export default function TasksBoard({
       status: 'TODO',
       priority: 'MEDIUM',
       groupId: groupId || undefined,
+      folderId: folderFilter || undefined,
     };
     if (projectFilter) body.projectId = projectFilter;
     else if (activeCompanyId) body.companyId = activeCompanyId;
@@ -396,6 +420,7 @@ export default function TasksBoard({
                 ...emptyForm,
                 projectId: projectFilter || '',
                 departmentId: departmentFilter || '',
+                folderId: folderFilter || '',
               });
               setShowForm(true);
             }}
@@ -675,6 +700,7 @@ export default function TasksBoard({
             taskId={selectedId}
             users={users}
             groups={groups}
+            folders={folders}
             activeCompanyId={activeCompanyId}
             onClose={() => setSelectedId(null)}
             onChanged={() => {

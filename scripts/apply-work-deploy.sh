@@ -30,6 +30,11 @@ if [ -f apps/web/prisma/migrations/manual_etholys_work_approvals.sql ]; then
     psql -U etholys -d etholys < apps/web/prisma/migrations/manual_etholys_work_approvals.sql \
     && echo "SQL Work approvals ok (ou já aplicado)" || echo "SQL Work approvals skip/partial"
 fi
+if [ -f apps/web/prisma/migrations/manual_etholys_work_folders.sql ]; then
+  docker compose -f "infra/$COMPOSE_FILE" exec -T postgres \
+    psql -U etholys -d etholys < apps/web/prisma/migrations/manual_etholys_work_folders.sql \
+    && echo "SQL Work folders ok (ou já aplicado)" || echo "SQL Work folders skip/partial"
+fi
 
 echo "==> Rebuild web (pode demorar 10–20 min)"
 cd "$ROOT/infra"

@@ -78,6 +78,8 @@ model User {
   sessions                      Session[]
   assignedTasks                 Task[]                       @relation("TaskAssignee")
   createdTasks                  Task[]                       @relation("TaskCreator")
+  workFoldersOwned              WorkFolder[]                 @relation("WorkFolderOwner")
+  workFolderMemberships         WorkFolderMember[]
   taskTemplates                 TaskTemplate[]               @relation("TemplateCreator")
   taxFilings                    TaxFiling[]
   timeEntries                   TimeEntry[]
@@ -241,6 +243,7 @@ model Company {
   studioDocumentPresences     StudioDocumentPresence[]
   taskGroups                  TaskGroup[]
   taskApprovalRequests        TaskApprovalRequest[]
+  workFolders                 WorkFolder[]
 }
 
 /// Autorização ao Hub /hub/workspace — espelho operacional: quais sistemas o utilizador vê e usa a partir dali (dados continuam nos sistemas de origem).
@@ -471,6 +474,7 @@ model Task {
   updatedAt        DateTime         @updatedAt
   departmentId     String?
   groupId          String?
+  folderId         String?
   attachments      Attachment[]
   checklist        ChecklistItem[]
   comments         Comment[]
@@ -478,6 +482,7 @@ model Task {
   creator          User             @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
   department       Department?      @relation(fields: [departmentId], references: [id])
   group            TaskGroup?       @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  folder           WorkFolder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
   parent           Task?            @relation("SubTasks", fields: [parentId], references: [id])
   subtasks         Task[]           @relation("SubTasks")
   project          Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -489,7 +494,44 @@ model Task {
   approvalRequests TaskApprovalRequest[]
 
   @@index([groupId])
+  @@index([folderId])
   @@index([companyId])
+}
+
+/// Pasta Work — pessoal ou partilhada; qualquer membro da empresa pode criar (não só admin).
+model WorkFolder {
+  id         String             @id @default(cuid())
+  companyId  String
+  name       String
+  color      String?
+  /// PERSONAL | SHARED
+  visibility String             @default("PERSONAL")
+  ownerId    String
+  order      Int                @default(0)
+  isActive   Boolean            @default(true)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  company    Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner      User               @relation("WorkFolderOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members    WorkFolderMember[]
+  tasks      Task[]
+
+  @@index([companyId, ownerId])
+  @@index([companyId, visibility])
+}
+
+model WorkFolderMember {
+  id        String     @id @default(cuid())
+  folderId  String
+  userId    String
+  /// member | editor
+  role      String     @default("member")
+  createdAt DateTime   @default(now())
+  folder    WorkFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([folderId, userId])
+  @@index([userId])
 }
 
 model TaskGroup {

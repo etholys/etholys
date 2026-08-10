@@ -16,6 +16,7 @@ type Detail = {
   tags: unknown;
   assigneeId: string | null;
   groupId?: string | null;
+  folderId?: string | null;
   projectId: string | null;
   companyId?: string | null;
   departmentId?: string | null;
@@ -24,6 +25,7 @@ type Detail = {
   assignee?: UserOpt | null;
   creator?: UserOpt | null;
   group?: { id: string; name: string; color: string | null } | null;
+  folder?: { id: string; name: string; color: string | null } | null;
   checklist?: Array<{ id: string; text: string; completed: boolean }>;
   subtasks?: Array<{ id: string; title: string; status: string; assignee?: UserOpt | null }>;
   comments?: Array<{
@@ -53,6 +55,7 @@ export function WorkTaskPanel({
   taskId,
   users,
   groups,
+  folders = [],
   activeCompanyId,
   onClose,
   onChanged,
@@ -61,6 +64,7 @@ export function WorkTaskPanel({
   taskId: string;
   users: UserOpt[];
   groups: GroupOpt[];
+  folders?: GroupOpt[];
   activeCompanyId?: string | null;
   onClose: () => void;
   onChanged: () => void;
@@ -366,6 +370,23 @@ export function WorkTaskPanel({
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="col-span-2 space-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                {t('Folder', 'Carpeta', 'Pasta')}
+              </span>
+              <select
+                value={task.folderId || ''}
+                onChange={(e) => void patch({ folderId: e.target.value || null })}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs"
+              >
+                <option value="">{t('No folder', 'Sin carpeta', 'Sem pasta')}</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
                   </option>
                 ))}
               </select>
