@@ -48,6 +48,7 @@
 | **F3** | @menções em comentários → notificação | ✅ (ago/2026) |
 | **F4** | Solicitar aprovação → CARTA inbox + notificação ao aprovador | ✅ (ago/2026) |
 | **F5** | Templates de projeto (além de packs de tarefas) | Pendente |
+| **F6** | Organizador: sidebar Setor/Projeto, dashboard de carga, vista Timeline/Gantt | Em curso (ago/2026) |
 
 ---
 
@@ -64,7 +65,8 @@ Novos campos só quando F1 (grupos) o exigir — preferir additive migrations.
 | Área | Path |
 |------|------|
 | UI ATLAS | `apps/web/app/(dashboard)/tasks/page.tsx` → `TasksBoard` |
-| UI Hub Work | `apps/web/app/hub/work/page.tsx` |
+| UI Hub Work | `apps/web/app/hub/work/page.tsx` → `WorkShell` |
+| Shell / sidebar / dashboard / gantt | `components/work/WorkShell.tsx`, `WorkSidebar.tsx`, `WorkDashboard.tsx`, `WorkGantt.tsx` |
 | Hot button | `apps/web/components/work/WorkHotButton.tsx` |
 | Board partilhado | `apps/web/components/work/TasksBoard.tsx` |
 | Templates | `apps/web/app/(dashboard)/templates/page.tsx` |

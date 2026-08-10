@@ -13,6 +13,16 @@ const ml = (en: string, es: string, pt: string): ML => ({ en, es, pt });
 
 export type TasksBoardProps = {
   variant?: 'atlas' | 'hub';
+  embedded?: boolean;
+  forcedView?: 'table' | 'kanban';
+  hideViewToggle?: boolean;
+  hideScopeFilters?: boolean;
+  initialProjectId?: string;
+  initialDepartmentId?: string;
+  initialTaskScope?: string;
+  onTasksChanged?: () => void;
+  externalSelectedId?: string | null;
+  onExternalSelect?: (id: string | null) => void;
 };
 
 const emptyForm = {
@@ -31,7 +41,19 @@ const emptyForm = {
   recurrenceCount: '1',
 };
 
-export default function TasksBoard({ variant = 'atlas' }: TasksBoardProps) {
+export default function TasksBoard({
+  variant = 'atlas',
+  embedded = false,
+  forcedView,
+  hideViewToggle = false,
+  hideScopeFilters = false,
+  initialProjectId = '',
+  initialDepartmentId = '',
+  initialTaskScope = '',
+  onTasksChanged,
+  externalSelectedId,
+  onExternalSelect,
+}: TasksBoardProps) {
   const { tr, activeCompanyId, locale } = useApp();
   const L = (m: ML) => m[locale] || m.en;
   const t3 = (en: string, es: string, pt: string) => L(ml(en, es, pt));
@@ -42,8 +64,13 @@ export default function TasksBoard({ variant = 'atlas' }: TasksBoardProps) {
   const [departments, setDepartments] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'table' | 'kanban'>('table');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<'table' | 'kanban'>(forcedView || 'table');
+  const [selectedIdInternal, setSelectedIdInternal] = useState<string | null>(null);
+  const selectedId = onExternalSelect ? (externalSelectedId ?? null) : selectedIdInternal;
+  const setSelectedId = (id: string | null) => {
+    if (onExternalSelect) onExternalSelect(id);
+    else setSelectedIdInternal(id);
+  };
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [seedingStarter, setSeedingStarter] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -52,15 +79,25 @@ export default function TasksBoard({ variant = 'atlas' }: TasksBoardProps) {
   const [kanbanDropCol, setKanbanDropCol] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
-  const [projectFilter, setProjectFilter] = useState('');
+  const [projectFilter, setProjectFilter] = useState(initialProjectId);
   const [priorityFilter, setPriorityFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [dateFromFilter, setDateFromFilter] = useState('');
   const [dateToFilter, setDateToFilter] = useState('');
   const [showAdvFilters, setShowAdvFilters] = useState(false);
-  const [departmentFilter, setDepartmentFilter] = useState('');
-  const [taskScopeFilter, setTaskScopeFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState(initialDepartmentId);
+  const [taskScopeFilter, setTaskScopeFilter] = useState(initialTaskScope);
+
+  useEffect(() => {
+    if (forcedView) setView(forcedView);
+  }, [forcedView]);
+
+  useEffect(() => {
+    setProjectFilter(initialProjectId);
+    setDepartmentFilter(initialDepartmentId);
+    setTaskScopeFilter(initialTaskScope);
+  }, [initialProjectId, initialDepartmentId, initialTaskScope]);
 
   const fetchTasks = (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -112,6 +149,8 @@ export default function TasksBoard({ variant = 'atlas' }: TasksBoardProps) {
       .catch(() => {});
   }, []);
 
+  const notifyChanged = () => onTasksChanged?.();
+
   const patchTask = async (taskId: string, body: Record<string, unknown>) => {
     setTasks((prev) =>
       prev.map((task) => {
@@ -131,6 +170,7 @@ export default function TasksBoard({ variant = 'atlas' }: TasksBoardProps) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    notifyChanged();
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -300,9 +340,15 @@ export default function TasksBoard({ variant = 'atlas' }: TasksBoardProps) {
   const pageTitle = variant === 'hub' ? t3('Team tasks', 'Tareas del equipo', 'Tarefas da equipa') : tr('nav.tasks');
 
   return (
-    <div className={cn('flex min-h-[70vh] flex-col', variant === 'hub' && 'min-h-[calc(100vh-7.5rem)]')}>
+    <div
+      className={cn(
+        'flex flex-col',
+        embedded ? 'min-h-0' : 'min-h-[70vh]',
+        variant === 'hub' && !embedded && 'min-h-[calc(100vh-7.5rem)]',
+      )}
+    >
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {variant === 'hub' ? (
+        {variant === 'hub' || embedded ? (
           <p className="text-sm tabular-nums text-slate-500">
             {filtered.length} {tr('nav.tasks').toLowerCase()}
           </p>
@@ -315,35 +361,44 @@ export default function TasksBoard({ variant = 'atlas' }: TasksBoardProps) {
           </div>
         )}
         <div className="flex items-center gap-2">
-          <div className="flex rounded-lg bg-slate-100 p-0.5">
-            <button
-              type="button"
-              onClick={() => setView('table')}
-              title={t3('Table', 'Tabla', 'Tabela')}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
-                view === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
-              )}
-            >
-              <List className="h-4 w-4" />
-              <span className="hidden sm:inline">{t3('Board', 'Tablero', 'Quadro')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('kanban')}
-              title="Kanban"
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
-                view === 'kanban' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
-              )}
-            >
-              <LayoutGrid className="h-4 w-4" />
-              <span className="hidden sm:inline">Kanban</span>
-            </button>
-          </div>
+          {!hideViewToggle && (
+            <div className="flex rounded-lg bg-slate-100 p-0.5">
+              <button
+                type="button"
+                onClick={() => setView('table')}
+                title={t3('Table', 'Tabla', 'Tabela')}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
+                  view === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+                )}
+              >
+                <List className="h-4 w-4" />
+                <span className="hidden sm:inline">{t3('Board', 'Tablero', 'Quadro')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('kanban')}
+                title="Kanban"
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
+                  view === 'kanban' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+                )}
+              >
+                <LayoutGrid className="h-4 w-4" />
+                <span className="hidden sm:inline">Kanban</span>
+              </button>
+            </div>
+          )}
           <button
             type="button"
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              setForm({
+                ...emptyForm,
+                projectId: projectFilter || '',
+                departmentId: departmentFilter || '',
+              });
+              setShowForm(true);
+            }}
             className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-cyan-500"
           >
             <Plus className="h-4 w-4" />
@@ -363,48 +418,50 @@ export default function TasksBoard({ variant = 'atlas' }: TasksBoardProps) {
               className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
             />
           </div>
-          <select
-            value={taskScopeFilter}
-            onChange={(e) => {
-              setTaskScopeFilter(e.target.value);
-              if (e.target.value === 'company') setProjectFilter('');
-            }}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm"
-          >
-            <option value="">{t3('All tasks', 'Todas las tareas', 'Todas as tarefas')}</option>
-            <option value="project">{t3('Project tasks', 'De proyecto', 'De projeto')}</option>
-            <option value="company">
-              {t3('Company tasks', 'De empresa', 'Da empresa')}
-            </option>
-          </select>
-          {taskScopeFilter !== 'company' && (
-            <select
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm"
-            >
-              <option value="">
-                {tr('general.all')} {tr('nav.projects')}
-              </option>
-              {(projects ?? []).map((p: any) => (
-                <option key={p?.id} value={p?.id}>
-                  {p?.name}
-                </option>
-              ))}
-            </select>
+          {!hideScopeFilters && (
+            <>
+              <select
+                value={taskScopeFilter}
+                onChange={(e) => {
+                  setTaskScopeFilter(e.target.value);
+                  if (e.target.value === 'company') setProjectFilter('');
+                }}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm"
+              >
+                <option value="">{t3('All tasks', 'Todas las tareas', 'Todas as tarefas')}</option>
+                <option value="project">{t3('Project tasks', 'De proyecto', 'De projeto')}</option>
+                <option value="company">{t3('Company tasks', 'De empresa', 'Da empresa')}</option>
+              </select>
+              {taskScopeFilter !== 'company' && (
+                <select
+                  value={projectFilter}
+                  onChange={(e) => setProjectFilter(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                >
+                  <option value="">
+                    {tr('general.all')} {tr('nav.projects')}
+                  </option>
+                  {(projects ?? []).map((p: any) => (
+                    <option key={p?.id} value={p?.id}>
+                      {p?.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <select
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm"
+              >
+                <option value="">{t3('All departments', 'Todos los sectores', 'Todos os setores')}</option>
+                {(departments ?? []).map((d: any) => (
+                  <option key={d?.id} value={d?.id}>
+                    {d?.name}
+                  </option>
+                ))}
+              </select>
+            </>
           )}
-          <select
-            value={departmentFilter}
-            onChange={(e) => setDepartmentFilter(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm"
-          >
-            <option value="">{t3('All departments', 'Todos los sectores', 'Todos os setores')}</option>
-            {(departments ?? []).map((d: any) => (
-              <option key={d?.id} value={d?.id}>
-                {d?.name}
-              </option>
-            ))}
-          </select>
           <button
             type="button"
             onClick={() => setShowAdvFilters(!showAdvFilters)}
@@ -620,7 +677,10 @@ export default function TasksBoard({ variant = 'atlas' }: TasksBoardProps) {
             groups={groups}
             activeCompanyId={activeCompanyId}
             onClose={() => setSelectedId(null)}
-            onChanged={() => fetchTasks({ silent: true })}
+            onChanged={() => {
+              fetchTasks({ silent: true });
+              notifyChanged();
+            }}
             t={t3}
           />
         ) : null}

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ArrowLeft, CheckSquare, Layers } from 'lucide-react';
 import { useApp } from '@/app/providers';
-import TasksBoard from '@/components/work/TasksBoard';
+import WorkShell from '@/components/work/WorkShell';
 
 export default function HubWorkPage() {
   const { locale } = useApp();
@@ -33,9 +33,9 @@ export default function HubWorkPage() {
               </div>
               <p className="truncate text-xs text-slate-500">
                 {t(
-                  'Quadro de tarefas da equipa',
-                  'Tablero de tareas del equipo',
-                  'Team task board',
+                  'Organizador: setores, projetos, dashboard e timeline',
+                  'Organizador: sectores, proyectos, panel y timeline',
+                  'Organizer: departments, projects, dashboard and timeline',
                 )}
               </p>
             </div>
@@ -51,7 +51,7 @@ export default function HubWorkPage() {
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col px-3 py-4 sm:px-6 lg:px-8">
-        <TasksBoard variant="hub" />
+        <WorkShell />
       </main>
     </div>
   );
