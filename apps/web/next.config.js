@@ -37,7 +37,8 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   typescript: {
-    ignoreBuildErrors: false,
+    // Contabo OOM no typecheck do `next build`; CI/local `tsc` cobre tipos.
+    ignoreBuildErrors: process.env.SKIP_TYPECHECK === '1',
   },
   images: { unoptimized: true },
 };
