@@ -18,6 +18,19 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const requestedCompanyId = String(url.searchParams.get('companyId') ?? '').trim();
 
+  // Convidado SIEP puro — só projetos convidados (antes de qualquer Hub)
+  {
+    const { resolveSiepJwtScope } = await import('@/lib/siep/permissions');
+    const siep = await resolveSiepJwtScope(userId);
+    if (siep.mode === 'project_guest') {
+      return NextResponse.json({
+        href: siep.homePath,
+        reason: 'siep_project_guest',
+        projectIds: siep.allowedProjectIds,
+      });
+    }
+  }
+
   // Convidados FORGE sem empresa: nunca mandar para /hub do ecossistema
   if (tenant.companyIds.length === 0) {
     const { getForgeAccessContext, defaultRedirectForCourseOnly } = await import(

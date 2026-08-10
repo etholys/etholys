@@ -17,10 +17,16 @@ export {
   DEFAULT_FIELD_PERMISSIONS,
   DEFAULT_PM_PERMISSIONS,
   DEFAULT_PROJECT_GUEST_PERMISSIONS,
+  FIELD_TECHNICIAN_PERMISSIONS,
   getSiepPermissionGroups,
   hasSiepPermission,
   parseSiepPermissions,
   permissionsToApi,
+  canViewInformeDomain,
+  canViewAnyDonorInforme,
+  canAccessReportsTab,
+  INFORME_DOMAIN_VIEW_PERMISSION,
+  ALL_INFORME_DOMAIN_VIEW_PERMISSIONS,
   SIEP_PERMISSION_GROUPS,
 } from '@/lib/siep/permissions-shared';
 
@@ -143,4 +149,68 @@ export async function getGuestCompanyIds(userId: string): Promise<string[]> {
     select: { project: { select: { companyId: true } } },
   });
   return [...new Set(rows.map((r) => r.project.companyId))];
+}
+
+export type SiepJwtScope = {
+  mode: 'organization' | 'project_guest';
+  allowedProjectIds: string[];
+  homePath: string;
+};
+
+/**
+ * Convidado puro (sem CompanyUser) → project_guest.
+ * Qualquer membro de empresa → organization (sem lockdown de convidado).
+ */
+export async function resolveSiepJwtScope(userId: string): Promise<SiepJwtScope> {
+  const companyUserCount = await prisma.companyUser.count({ where: { userId } });
+  if (companyUserCount > 0) {
+    return { mode: 'organization', allowedProjectIds: [], homePath: '/hub' };
+  }
+
+  const allowedProjectIds = await getGuestProjectIds(userId);
+  if (allowedProjectIds.length > 0) {
+    const homePath =
+      allowedProjectIds.length === 1
+        ? `/siep/projects/${allowedProjectIds[0]}`
+        : '/siep/projects';
+    return { mode: 'project_guest', allowedProjectIds, homePath };
+  }
+
+  return { mode: 'organization', allowedProjectIds: [], homePath: '/hub' };
+}
+
+/** True se o utilizador só tem acesso via ProjectMember project_guest (sem empresa). */
+export async function isProjectGuestOnly(userId: string): Promise<boolean> {
+  const scope = await resolveSiepJwtScope(userId);
+  return scope.mode === 'project_guest';
+}
+
+/**
+ * Gate padrão para rotas SIEP com projectId: acesso ao projeto + permissão(ões).
+ * Aceita qualquer uma das permissões se receber um array.
+ */
+export async function requireProjectPermission(
+  userId: string,
+  projectId: string,
+  permission: SiepPermissionKey | SiepPermissionKey[],
+): Promise<
+  | { ok: true; access: Extract<ProjectAccess, { ok: true }> }
+  | { ok: false; status: 403 | 404; error: string }
+> {
+  const access = await resolveProjectAccess(userId, projectId);
+  if (!access.ok) {
+    return {
+      ok: false,
+      status: access.reason === 'not_found' ? 404 : 403,
+      error: access.reason === 'not_found' ? 'Proyecto no encontrado' : 'No autorizado',
+    };
+  }
+
+  const needed = Array.isArray(permission) ? permission : [permission];
+  const allowed = needed.some((k) => access.permissions.has(k));
+  if (!allowed) {
+    return { ok: false, status: 403, error: 'Sin permiso para esta función' };
+  }
+
+  return { ok: true, access };
 }

@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { hasSiepPermission, resolveSiepPermissions } from '@/lib/siep/permissions';
+import { hasSiepPermission, requireProjectPermission } from '@/lib/siep/permissions';
 
 const reportInclude = {
   task: { select: { id: true, title: true, status: true } },
@@ -18,17 +18,18 @@ export async function GET(_req: Request, { params }: { params: { projectId: stri
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const project = await prisma.project.findUnique({
-      where: { id: params.projectId },
-      select: { companyId: true },
-    });
-    if (!project || !tenant.companyIds.includes(project.companyId)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    const gate = await requireProjectPermission(tenant.userId, params.projectId, [
+      'siep.activities.report',
+      'siep.activities.view_all_reports',
+      'siep.activities.approve_reports',
+      'siep.tasks.view',
+      'siep.project.view',
+    ]);
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
-    const perms = await resolveSiepPermissions(tenant.userId, project.companyId);
-    const canViewAll = hasSiepPermission(perms, 'siep.activities.view_all_reports')
-      || hasSiepPermission(perms, 'siep.activities.approve_reports');
+    const canViewAll =
+      hasSiepPermission(gate.access.permissions, 'siep.activities.view_all_reports') ||
+      hasSiepPermission(gate.access.permissions, 'siep.activities.approve_reports');
 
     const reports = await prisma.taskActivityReport.findMany({
       where: {
@@ -52,18 +53,12 @@ export async function POST(req: Request, { params }: { params: { projectId: stri
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const project = await prisma.project.findUnique({
-      where: { id: params.projectId },
-      select: { companyId: true },
-    });
-    if (!project || !tenant.companyIds.includes(project.companyId)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
-
-    const perms = await resolveSiepPermissions(tenant.userId, project.companyId);
-    if (!hasSiepPermission(perms, 'siep.activities.report')) {
-      return NextResponse.json({ error: 'Sem permissão para reportar actividades' }, { status: 403 });
-    }
+    const gate = await requireProjectPermission(
+      tenant.userId,
+      params.projectId,
+      'siep.activities.report',
+    );
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
     const body = await req.json();
     if (!body.taskId) return NextResponse.json({ error: 'taskId requerido' }, { status: 400 });

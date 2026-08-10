@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { hasSiepPermission, resolveSiepPermissions } from '@/lib/siep/permissions';
+import { hasSiepPermission, resolveProjectAccess } from '@/lib/siep/permissions';
 
 export async function POST(_req: Request, { params }: { params: { reportId: string } }) {
   try {
@@ -14,7 +14,7 @@ export async function POST(_req: Request, { params }: { params: { reportId: stri
       where: { id: params.reportId, isActive: true },
       include: { project: { select: { companyId: true } }, mileage: true },
     });
-    if (!report || !tenant.companyIds.includes(report.project.companyId)) {
+    if (!report) {
       return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
     }
     if (report.authorId !== tenant.userId) {
@@ -24,13 +24,16 @@ export async function POST(_req: Request, { params }: { params: { reportId: stri
       return NextResponse.json({ error: 'Reporte já submetido' }, { status: 400 });
     }
 
-    const perms = await resolveSiepPermissions(tenant.userId, report.project.companyId);
-    if (!hasSiepPermission(perms, 'siep.activities.report')) {
+    const access = await resolveProjectAccess(tenant.userId, report.projectId);
+    if (!access.ok || !hasSiepPermission(access.permissions, 'siep.activities.report')) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
 
     if (report.includesTravel && !report.mileage) {
-      return NextResponse.json({ error: 'Preencha os dados de viagem/combustível antes de submeter' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Preencha os dados de viagem/combustível antes de submeter' },
+        { status: 400 },
+      );
     }
 
     const updated = await prisma.taskActivityReport.update({

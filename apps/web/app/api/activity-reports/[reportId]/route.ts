@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { hasSiepPermission, resolveSiepPermissions } from '@/lib/siep/permissions';
+import { hasSiepPermission, resolveProjectAccess } from '@/lib/siep/permissions';
 import {
   calcDistanceKm,
   calcReimbursementUsd,
@@ -32,12 +32,16 @@ export async function GET(_req: Request, { params }: { params: { reportId: strin
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
     const report = await loadReport(params.reportId);
-    if (!report || !tenant.companyIds.includes(report.project.companyId)) {
+    if (!report) {
       return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
     }
 
-    const perms = await resolveSiepPermissions(tenant.userId, report.project.companyId);
-    const canViewAll = hasSiepPermission(perms, 'siep.activities.view_all_reports');
+    const access = await resolveProjectAccess(tenant.userId, report.projectId);
+    if (!access.ok) {
+      return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+    }
+
+    const canViewAll = hasSiepPermission(access.permissions, 'siep.activities.view_all_reports');
     if (!canViewAll && report.authorId !== tenant.userId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
@@ -54,15 +58,23 @@ export async function PUT(req: Request, { params }: { params: { reportId: string
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
     const existing = await loadReport(params.reportId);
-    if (!existing || !tenant.companyIds.includes(existing.project.companyId)) {
+    if (!existing) {
       return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
     }
 
-    const perms = await resolveSiepPermissions(tenant.userId, existing.project.companyId);
+    const access = await resolveProjectAccess(tenant.userId, existing.projectId);
+    if (!access.ok) {
+      return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+    }
+
     const isAuthor = existing.authorId === tenant.userId;
-    const canApprove = hasSiepPermission(perms, 'siep.activities.approve_reports');
+    const canApprove = hasSiepPermission(access.permissions, 'siep.activities.approve_reports');
+    const canReport = hasSiepPermission(access.permissions, 'siep.activities.report');
 
     if (!isAuthor && !canApprove) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+    }
+    if (isAuthor && !canReport && !canApprove) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
@@ -198,10 +210,11 @@ export async function DELETE(_req: Request, { params }: { params: { reportId: st
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
     const existing = await loadReport(params.reportId);
-    if (!existing || !tenant.companyIds.includes(existing.project.companyId)) {
+    if (!existing) {
       return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
     }
-    if (existing.authorId !== tenant.userId || existing.status !== 'draft') {
+    const access = await resolveProjectAccess(tenant.userId, existing.projectId);
+    if (!access.ok || existing.authorId !== tenant.userId || existing.status !== 'draft') {
       return NextResponse.json({ error: 'Só rascunhos próprios podem ser apagados' }, { status: 403 });
     }
 

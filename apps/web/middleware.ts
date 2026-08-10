@@ -15,6 +15,11 @@ import {
   type StudioShareTargetRef,
 } from '@/lib/studio/share-guard';
 import {
+  defaultProjectGuestHome,
+  isApiAllowedForProjectGuest,
+  isPageAllowedForProjectGuest,
+} from '@/lib/siep/project-guest-guard';
+import {
   isHubShellPath,
   isPathAllowedForSystems,
   isPrecommercialMode,
@@ -71,6 +76,9 @@ type AccessToken = {
   studioAccessMode?: string;
   studioTargets?: StudioShareTargetRef[];
   studioHomePath?: string;
+  siepAccessMode?: string;
+  allowedProjectIds?: string[];
+  siepHomePath?: string;
 };
 
 type ForgeScope = {
@@ -208,6 +216,88 @@ async function enforceStudioShareOnlyScope(req: NextRequest): Promise<NextRespon
   return null;
 }
 
+async function resolveSiepGuestScope(
+  req: NextRequest,
+  token: AccessToken,
+): Promise<{ mode: 'project_guest'; allowedProjectIds: string[]; homePath: string } | null> {
+  if (token.siepAccessMode === 'organization') return null;
+  if (token.siepAccessMode === 'project_guest') {
+    return {
+      mode: 'project_guest',
+      allowedProjectIds: Array.isArray(token.allowedProjectIds) ? token.allowedProjectIds : [],
+      homePath:
+        typeof token.siepHomePath === 'string'
+          ? token.siepHomePath
+          : defaultProjectGuestHome(
+              Array.isArray(token.allowedProjectIds) ? token.allowedProjectIds : [],
+            ),
+    };
+  }
+
+  try {
+    const checkUrl = new URL('/api/internal/siep-scope', req.nextUrl.origin);
+    const res = await fetch(checkUrl.toString(), {
+      headers: { cookie: req.headers.get('cookie') ?? '' },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const scope = (await res.json()) as {
+      mode?: string;
+      allowedProjectIds?: string[];
+      homePath?: string;
+    };
+    if (scope.mode !== 'project_guest') return null;
+    const ids = Array.isArray(scope.allowedProjectIds) ? scope.allowedProjectIds : [];
+    return {
+      mode: 'project_guest',
+      allowedProjectIds: ids,
+      homePath: scope.homePath || defaultProjectGuestHome(ids),
+    };
+  } catch (e) {
+    console.error('[middleware] siep-scope check failed', e);
+    return null;
+  }
+}
+
+/** Convidado só de projeto: nada do Hub / outros sistemas Etholys. */
+async function enforceProjectGuestScope(req: NextRequest): Promise<NextResponse | null> {
+  const pathname = req.nextUrl.pathname;
+  if (pathname === '/api/internal/siep-scope') return null;
+
+  const token = (await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+  })) as AccessToken | null;
+
+  if (!token?.sub && !token?.id) return null;
+  // Outros modos restritos têm prioridade própria
+  if (token.forgeAccessMode === 'course_only') return null;
+  if (token.studioAccessMode === 'share_only') return null;
+  if (token.platformAdmin) return null;
+
+  const scope = await resolveSiepGuestScope(req, token);
+  if (!scope) return null;
+
+  if (pathname.startsWith('/api/')) {
+    if (isApiAllowedForProjectGuest(pathname)) return null;
+    return NextResponse.json(
+      {
+        error: 'Acceso restringido: solo el proyecto SIEP al que fue invitado.',
+        code: 'SIEP_PROJECT_GUEST',
+      },
+      { status: 403 },
+    );
+  }
+
+  if (isPageAllowedForProjectGuest(pathname, scope.allowedProjectIds)) return null;
+
+  if (isProtectedPage(pathname) || pathname === '/hub' || pathname.startsWith('/hub/') || pathname.startsWith('/siep')) {
+    return NextResponse.redirect(new URL(scope.homePath || '/siep/projects', req.url));
+  }
+
+  return null;
+}
+
 async function enforceCourseOnlyScope(req: NextRequest): Promise<NextResponse | null> {
   const pathname = req.nextUrl.pathname;
   if (pathname === '/api/internal/forge-scope') return null;
@@ -256,6 +346,7 @@ async function enforceFunctionOnlyScope(req: NextRequest): Promise<NextResponse 
     pathname === '/api/internal/workspace-scope' ||
     pathname === '/api/internal/forge-scope' ||
     pathname === '/api/internal/studio-scope' ||
+    pathname === '/api/internal/siep-scope' ||
     pathname.startsWith('/api/auth')
   ) {
     return null;
@@ -269,6 +360,7 @@ async function enforceFunctionOnlyScope(req: NextRequest): Promise<NextResponse 
   if (!token?.sub && !token?.id) return null;
   if (token.forgeAccessMode === 'course_only') return null;
   if (token.studioAccessMode === 'share_only') return null;
+  if (token.siepAccessMode === 'project_guest') return null;
 
   const scope = await resolveWorkspaceScope(req, token);
   if (!scope || scope.mode === 'full') return null;
@@ -379,6 +471,9 @@ export async function middleware(req: NextRequest) {
 
   const studioShareBlock = await enforceStudioShareOnlyScope(req);
   if (studioShareBlock) return studioShareBlock;
+
+  const projectGuestBlock = await enforceProjectGuestScope(req);
+  if (projectGuestBlock) return projectGuestBlock;
 
   const functionOnlyBlock = await enforceFunctionOnlyScope(req);
   if (functionOnlyBlock) return functionOnlyBlock;

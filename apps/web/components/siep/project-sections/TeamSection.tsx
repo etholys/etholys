@@ -20,15 +20,18 @@ import {
 } from 'lucide-react';
 import {
   DEFAULT_PROJECT_GUEST_PERMISSIONS,
+  FIELD_TECHNICIAN_PERMISSIONS,
   getSiepPermissionGroups,
   type SiepPermissionKey,
 } from '@/lib/siep/permissions-shared';
 import { useApp } from '@/app/providers';
+import { useSiepT } from '@/lib/siep/use-siep-t';
 
 type AddMode = 'company' | 'guest';
 
 export function TeamSection({ project, onRefresh, tr }: SectionProps) {
   const { locale } = useApp();
+  const st = useSiepT();
   const [showForm, setShowForm] = useState(false);
   const [addMode, setAddMode] = useState<AddMode>('company');
   const [form, setForm] = useState<any>({
@@ -198,28 +201,40 @@ export function TeamSection({ project, onRefresh, tr }: SectionProps) {
     value: SiepPermissionKey[];
     onChange: (next: SiepPermissionKey[]) => void;
   }) => (
-    <div className="max-h-56 space-y-3 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3">
-      {permGroups.map((group) => (
-        <div key={group.id}>
-          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">{group.label}</p>
-          <div className="space-y-1.5">
-            {group.permissions.map((p) => (
-              <label key={p.key} className="flex cursor-pointer items-start gap-2 text-sm text-gray-800">
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={value.includes(p.key)}
-                  onChange={() => togglePerm(p.key, value, onChange)}
-                />
-                <span>
-                  <span className="font-medium">{p.label}</span>
-                  {p.description ? <span className="block text-xs text-gray-500">{p.description}</span> : null}
-                </span>
-              </label>
-            ))}
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onChange([...FIELD_TECHNICIAN_PERMISSIONS])}
+          className="rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-900 hover:bg-emerald-100"
+          title={st('siep.perm.preset.fieldTechDesc')}
+        >
+          {st('siep.perm.preset.fieldTech')}
+        </button>
+      </div>
+      <div className="max-h-56 space-y-3 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3">
+        {permGroups.map((group) => (
+          <div key={group.id}>
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">{group.label}</p>
+            <div className="space-y-1.5">
+              {group.permissions.map((p) => (
+                <label key={p.key} className="flex cursor-pointer items-start gap-2 text-sm text-gray-800">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={value.includes(p.key)}
+                    onChange={() => togglePerm(p.key, value, onChange)}
+                  />
+                  <span>
+                    <span className="font-medium">{p.label}</span>
+                    {p.description ? <span className="block text-xs text-gray-500">{p.description}</span> : null}
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 

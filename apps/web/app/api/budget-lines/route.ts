@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { computeLineTotal } from '@/lib/siep/budget-line-calc';
 import { normalizeBudgetLineInput, recalculateProjectBudgetLines } from '@/lib/siep/budget-line-sync';
+import { requireProjectPermission } from '@/lib/siep/permissions';
 
 export async function GET(req: Request) {
   try {
@@ -13,16 +14,37 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get('projectId');
     if (!projectId) return NextResponse.json({ error: 'projectId requerido' }, { status: 400 });
-    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { companyId: true } });
-    if (!project || !tenant.companyIds.includes(project.companyId)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+
+    const gate = await requireProjectPermission(tenant.userId, projectId, [
+      'siep.budget.view_lines',
+      'siep.budget.view_amounts',
+      'siep.budget.edit',
+      'siep.project.view',
+    ]);
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+
     const lines = await prisma.budgetLine.findMany({
       where: { projectId, isActive: true },
       orderBy: [{ category: 'asc' }, { order: 'asc' }],
       include: { transactions: { orderBy: { date: 'desc' } } },
     });
-    return NextResponse.json({ lines });
+
+    const canSeeAmounts =
+      gate.access.permissions.has('siep.budget.view_amounts') ||
+      gate.access.permissions.has('siep.budget.edit');
+    const safeLines = canSeeAmounts
+      ? lines
+      : lines.map((l) => ({
+          ...l,
+          unitCost: null,
+          total: null,
+          transactions: (l.transactions || []).map((t) => ({
+            ...t,
+            amount: gate.access.permissions.has('siep.transactions.view_amounts') ? t.amount : null,
+          })),
+        }));
+
+    return NextResponse.json({ lines: safeLines });
   } catch (error: unknown) {
     console.error('BudgetLine GET error:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
@@ -38,10 +60,8 @@ export async function POST(req: Request) {
     if (!projectId || !body.category || !description) {
       return NextResponse.json({ error: 'projectId, category, description requeridos' }, { status: 400 });
     }
-    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { companyId: true } });
-    if (!project || !tenant.companyIds.includes(project.companyId)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    const gate = await requireProjectPermission(tenant.userId, projectId, 'siep.budget.edit');
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
     const normalized = normalizeBudgetLineInput(body);
     const existingLines = await prisma.budgetLine.findMany({

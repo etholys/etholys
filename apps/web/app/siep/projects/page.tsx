@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { useApp } from '@/app/providers';
 import { formatCurrency, formatDate, getStatusColor, formatPercent } from '@/lib/utils';
 import { Plus, Search, FolderKanban, Calendar, DollarSign, Users, X, MapPin, Sparkles, Trash2 } from 'lucide-react';
@@ -8,6 +9,9 @@ import Link from 'next/link';
 
 export default function ProjectsPage() {
   const { tr, activeCompanyId, locale } = useApp();
+  const { data: session } = useSession() || {};
+  const isProjectGuest =
+    (session?.user as { siepAccessMode?: string } | undefined)?.siepAccessMode === 'project_guest';
   type ML = { es: string; pt: string; en: string };
   const ml = (en: string, es: string, pt: string): ML => ({ en, es, pt });
   const L = (m: ML) => m[locale] || m.en;
@@ -96,12 +100,16 @@ export default function ProjectsPage() {
           <p className="text-gray-500 text-sm">{filtered?.length ?? 0} {tr('nav.projects').toLowerCase()}</p>
         </div>
         <div className="flex items-center gap-2">
+          {!isProjectGuest && (
           <Link href="/siep/import" className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-lg hover:from-violet-700 hover:to-indigo-700 transition font-medium text-sm shadow-sm">
             <Sparkles className="w-4 h-4" />Importar
           </Link>
+          )}
+          {!isProjectGuest && (
           <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium text-sm">
             <Plus className="w-4 h-4" />{tr('project.new')}
           </button>
+          )}
         </div>
       </div>
 

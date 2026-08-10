@@ -6,6 +6,7 @@ import { getUserCompanyIds } from '@/lib/tenant';
 import { createInforme } from '@/lib/siep/informe-service';
 import { normalizeInformeDomain } from '@/lib/siep/informe-domains';
 import { displayMeasurementPeriod } from '@/lib/siep/measurement-period';
+import { canViewInformeDomain, resolveProjectAccess } from '@/lib/siep/permissions';
 
 export async function GET(req: Request) {
   try {
@@ -19,17 +20,18 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'projectId requerido' }, { status: 400 });
     }
 
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { companyId: true },
-    });
-    if (!project || !tenant.companyIds.includes(project.companyId)) {
+    const access = await resolveProjectAccess(tenant.userId, projectId);
+    if (!access.ok) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
     const domainParam = searchParams.get('domain') || 'all';
     const domainFilter =
       domainParam === 'all' || !domainParam ? undefined : normalizeInformeDomain(domainParam);
+
+    if (domainFilter && !canViewInformeDomain(access.permissions, domainFilter)) {
+      return NextResponse.json({ error: 'Sin permiso para este tipo de informe' }, { status: 403 });
+    }
 
     const legacyOr =
       domainFilter === 'budget'
@@ -67,18 +69,28 @@ export async function GET(req: Request) {
       take: 100,
     });
 
-    const informes = reports.map((r) => ({
-      id: r.id,
-      title: r.title,
-      status: r.status,
-      cadence: r.cadence || r.package?.cadence,
-      period: r.period ? displayMeasurementPeriod(r.period, 'pt') : r.period,
-      periodRaw: r.period,
-      domain: r.package?.domain || (r.component === 'financial' ? 'budget' : r.component === 'narrative' ? 'narrative' : r.component === 'field' ? 'field' : 'me'),
-      canvasFormat: r.canvasFormat,
-      updatedAt: r.updatedAt,
-      aiSessionId: r.aiSessionId,
-    }));
+    const informes = reports
+      .map((r) => ({
+        id: r.id,
+        title: r.title,
+        status: r.status,
+        cadence: r.cadence || r.package?.cadence,
+        period: r.period ? displayMeasurementPeriod(r.period, 'pt') : r.period,
+        periodRaw: r.period,
+        domain:
+          r.package?.domain ||
+          (r.component === 'financial'
+            ? 'budget'
+            : r.component === 'narrative'
+              ? 'narrative'
+              : r.component === 'field'
+                ? 'field'
+                : 'me'),
+        canvasFormat: r.canvasFormat,
+        updatedAt: r.updatedAt,
+        aiSessionId: r.aiSessionId,
+      }))
+      .filter((r) => canViewInformeDomain(access.permissions, r.domain));
 
     return NextResponse.json({ informes });
   } catch (error: unknown) {
@@ -119,19 +131,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Campos obrigatórios em falta' }, { status: 400 });
     }
 
+    const access = await resolveProjectAccess(tenant.userId, projectId);
+    if (!access.ok) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+    }
+    if (!access.permissions.has('siep.reports.edit')) {
+      return NextResponse.json({ error: 'Sin permiso para crear informes' }, { status: 403 });
+    }
+
+    const normalizedDomain = normalizeInformeDomain(domain);
+    if (!canViewInformeDomain(access.permissions, normalizedDomain)) {
+      return NextResponse.json({ error: 'Sin permiso para este tipo de informe' }, { status: 403 });
+    }
+
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       select: { companyId: true },
     });
-    if (!project || !tenant.companyIds.includes(project.companyId)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+    if (!project) {
+      return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 });
     }
 
     const result = await createInforme({
       projectId,
       companyId: project.companyId,
       userId: tenant.userId,
-      domain: normalizeInformeDomain(domain),
+      domain: normalizedDomain,
       cadence,
       periodStart,
       periodEnd,

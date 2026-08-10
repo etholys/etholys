@@ -84,36 +84,47 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
     return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-3 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin" /></div>;
   }
 
-  const topItems = [
-    { href: '/siep', icon: LayoutDashboard, label: tr('nav.dashboard') },
-  ];
+  const isProjectGuest = (session?.user as { siepAccessMode?: string } | undefined)?.siepAccessMode === 'project_guest';
 
-  const navGroups: NavGroup[] = [
-    {
-      key: 'projects',
-      label: st('siep.nav.projects'),
-      icon: FolderKanban,
-      items: [
-        { href: '/siep/projects', icon: FolderKanban, label: tr('nav.projects') },
-        { href: '/siep/import', icon: Sparkles, label: st('siep.nav.import') },
-        { href: '/siep/portfolio', icon: PieChart, label: st('siep.nav.portfolio') },
-      ],
-    },
-    {
-      key: 'execution',
-      label: st('siep.nav.execution'),
-      icon: Sprout,
-      items: [
-        { href: '/siep/stakeholders', icon: Handshake, label: st('siep.nav.alliances') },
-      ],
-    },
-  ];
+  const topItems = isProjectGuest
+    ? []
+    : [{ href: '/siep', icon: LayoutDashboard, label: tr('nav.dashboard') }];
 
-  const bottomItems = [
-    { href: '/siep/chat', icon: MessageCircle, label: 'Chat', badge: chatUnread > 0 ? chatUnread : undefined },
-    { href: '/siep/reports', icon: BarChart3, label: tr('nav.reports') },
-    { href: '/siep/settings', icon: Settings, label: tr('nav.settings') },
-  ];
+  const navGroups: NavGroup[] = isProjectGuest
+    ? [
+        {
+          key: 'projects',
+          label: st('siep.nav.projects'),
+          icon: FolderKanban,
+          items: [{ href: '/siep/projects', icon: FolderKanban, label: tr('nav.projects') }],
+        },
+      ]
+    : [
+        {
+          key: 'projects',
+          label: st('siep.nav.projects'),
+          icon: FolderKanban,
+          items: [
+            { href: '/siep/projects', icon: FolderKanban, label: tr('nav.projects') },
+            { href: '/siep/import', icon: Sparkles, label: st('siep.nav.import') },
+            { href: '/siep/portfolio', icon: PieChart, label: st('siep.nav.portfolio') },
+          ],
+        },
+        {
+          key: 'execution',
+          label: st('siep.nav.execution'),
+          icon: Sprout,
+          items: [{ href: '/siep/stakeholders', icon: Handshake, label: st('siep.nav.alliances') }],
+        },
+      ];
+
+  const bottomItems = isProjectGuest
+    ? []
+    : [
+        { href: '/siep/chat', icon: MessageCircle, label: 'Chat', badge: chatUnread > 0 ? chatUnread : undefined },
+        { href: '/siep/reports', icon: BarChart3, label: tr('nav.reports') },
+        { href: '/siep/settings', icon: Settings, label: tr('nav.settings') },
+      ];
 
   const activeCompany = companies?.find((c: any) => c?.id === activeCompanyId);
 
@@ -146,16 +157,25 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
               <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
           </div>
-          {!collapsed && (
+          {!collapsed && !isProjectGuest && (
             <Link href="/hub" className="mt-2 flex items-center gap-1.5 px-2 py-1 text-xs text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition">
               <ChevronDown className="w-3 h-3 rotate-90" />
               {locale === 'es' ? 'Volver al Hub' : locale === 'pt' ? 'Voltar ao Hub' : 'Back to Hub'}
             </Link>
           )}
+          {!collapsed && isProjectGuest && (
+            <p className="mt-2 px-2 text-[11px] text-slate-500">
+              {locale === 'es'
+                ? 'Acceso limitado al proyecto invitado'
+                : locale === 'pt'
+                  ? 'Acesso limitado ao projeto convidado'
+                  : 'Limited access to invited project'}
+            </p>
+          )}
         </div>
 
-        {/* Company selector */}
-        {!collapsed && companies.length > 0 && (<div className="p-3 border-b border-gray-100 flex-shrink-0">
+        {/* Company selector — oculto para convidados de projeto */}
+        {!collapsed && !isProjectGuest && companies.length > 0 && (<div className="p-3 border-b border-gray-100 flex-shrink-0">
           <div className="relative">
             <button onClick={() => setCompanyMenuOpen(!companyMenuOpen)} className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition text-sm">
               <div className="flex items-center gap-2">

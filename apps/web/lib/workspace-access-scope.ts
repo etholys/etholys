@@ -47,10 +47,21 @@ export async function resolveWorkspaceJwtScope(userId: string): Promise<Workspac
     return { mode: 'full', allowedSystems: [], homePath: '/hub', isSystemAdmin: false };
   }
 
-  // FORGE course_only sem empresa — tratado no forge scope; aqui none se pré-comercial
+  // Sem CompanyUser: NUNCA dar Hub full (isso abriria a plataforma a project_guest).
+  // FORGE course_only / Studio share_only / SIEP project_guest tratam-se nos respectivos scopes.
   if (memberships.length === 0) {
+    const { getGuestProjectIds } = await import('@/lib/siep/permissions');
+    const guestProjects = await getGuestProjectIds(userId);
+    if (guestProjects.length > 0) {
+      const home =
+        guestProjects.length === 1
+          ? `/siep/projects/${guestProjects[0]}`
+          : '/siep/projects';
+      return { mode: 'none', allowedSystems: [], homePath: home, isSystemAdmin: false };
+    }
     if (!isPrecommercialMode()) {
-      return { mode: 'full', allowedSystems: [], homePath: '/hub', isSystemAdmin: false };
+      // Sem empresa e sem convite de projeto: sem acesso ao hub
+      return { mode: 'none', allowedSystems: [], homePath: '/acesso', isSystemAdmin: false };
     }
     return { mode: 'none', allowedSystems: [], homePath: '/acesso', isSystemAdmin: false };
   }

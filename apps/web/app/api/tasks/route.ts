@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { createNotification } from '@/lib/notify';
+import { getGuestProjectIds, requireProjectPermission } from '@/lib/siep/permissions';
 
 export async function GET(req: Request) {
   try {
@@ -18,21 +19,46 @@ export async function GET(req: Request) {
     if (projectId) where.projectId = projectId;
     if (status) where.status = status;
     if (assigneeId) where.assigneeId = assigneeId;
-    // Tenant isolation: tasks from projects in user's companies OR direct companyId tasks
-    if (companyId && tenant.companyIds.includes(companyId)) {
+
+    const companyMemberIds = (
+      await prisma.companyUser.findMany({
+        where: { userId: tenant.userId },
+        select: { companyId: true },
+      })
+    ).map((r) => r.companyId);
+    const guestProjectIds = await getGuestProjectIds(tenant.userId);
+
+    if (projectId) {
+      const gate = await requireProjectPermission(tenant.userId, projectId, [
+        'siep.tasks.view',
+        'siep.tasks.edit',
+        'siep.project.view',
+        'siep.activities.report',
+      ]);
+      if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+    } else if (companyId && companyMemberIds.includes(companyId)) {
       where.OR = [{ project: { companyId } }, { companyId }];
-    } else if (!projectId) {
+    } else if (companyMemberIds.length) {
       where.OR = [
-        { project: { companyId: { in: tenant.companyIds } } },
-        { companyId: { in: tenant.companyIds } },
+        { project: { companyId: { in: companyMemberIds } } },
+        { companyId: { in: companyMemberIds } },
+        ...(guestProjectIds.length ? [{ projectId: { in: guestProjectIds } }] : []),
       ];
+    } else if (guestProjectIds.length) {
+      where.projectId = { in: guestProjectIds };
+    } else {
+      return NextResponse.json({ tasks: [] });
     }
+
     // Department filter
     const departmentId = searchParams.get('departmentId');
     if (departmentId) where.departmentId = departmentId;
-    // No-project filter (company tasks only)
+    // No-project filter (company tasks only) — guests cannot list company-wide tasks
     const noProject = searchParams.get('noProject');
-    if (noProject === '1') where.projectId = null;
+    if (noProject === '1') {
+      if (!companyMemberIds.length) return NextResponse.json({ tasks: [] });
+      where.projectId = null;
+    }
 
     const tasks = await prisma.task.findMany({
       where,
@@ -60,6 +86,19 @@ export async function POST(req: Request) {
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     const body = await req.json();
     const { recurrenceCount, ...rawTaskData } = body;
+
+    if (rawTaskData.projectId) {
+      const gate = await requireProjectPermission(tenant.userId, String(rawTaskData.projectId), [
+        'siep.tasks.edit',
+      ]);
+      if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+    } else {
+      // Tarefas sem projeto = Work/ATLAS — convidados SIEP não podem
+      const cu = await prisma.companyUser.findFirst({ where: { userId: tenant.userId } });
+      if (!cu) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+      }
+    }
 
     const normalizeTags = (tags: unknown): string | null => {
       if (tags == null || tags === '') return null;

@@ -4,6 +4,7 @@
 
 import type { Locale } from '@/lib/i18n';
 import { SIEP_PERM_GROUP_I18N, SIEP_PERM_I18N, siepT } from '@/lib/siep/i18n';
+import type { BuiltInInformeDomain, InformeDomain } from '@/lib/siep/informe-domains';
 
 export type SiepPermissionKey =
   | 'siep.project.view'
@@ -19,7 +20,12 @@ export type SiepPermissionKey =
   | 'siep.logframe.edit'
   | 'siep.tasks.view'
   | 'siep.tasks.edit'
+  /** @deprecated Use view_narrative / view_me / view_budget / view_field — expandido em parseSiepPermissions */
   | 'siep.reports.view'
+  | 'siep.reports.view_narrative'
+  | 'siep.reports.view_me'
+  | 'siep.reports.view_budget'
+  | 'siep.reports.view_field'
   | 'siep.reports.edit'
   | 'siep.activities.report'
   | 'siep.activities.view_all_reports'
@@ -33,6 +39,20 @@ export type SiepPermissionGroup = {
   label: string;
   permissions: { key: SiepPermissionKey; label: string; description?: string }[];
 };
+
+export const INFORME_DOMAIN_VIEW_PERMISSION: Record<BuiltInInformeDomain, SiepPermissionKey> = {
+  narrative: 'siep.reports.view_narrative',
+  me: 'siep.reports.view_me',
+  budget: 'siep.reports.view_budget',
+  field: 'siep.reports.view_field',
+};
+
+export const ALL_INFORME_DOMAIN_VIEW_PERMISSIONS: SiepPermissionKey[] = [
+  'siep.reports.view_narrative',
+  'siep.reports.view_me',
+  'siep.reports.view_budget',
+  'siep.reports.view_field',
+];
 
 const SIEP_PERMISSION_STRUCTURE: { id: string; permissions: SiepPermissionKey[] }[] = [
   {
@@ -57,7 +77,10 @@ const SIEP_PERMISSION_STRUCTURE: { id: string; permissions: SiepPermissionKey[] 
       'siep.logframe.edit',
       'siep.tasks.view',
       'siep.tasks.edit',
-      'siep.reports.view',
+      'siep.reports.view_narrative',
+      'siep.reports.view_me',
+      'siep.reports.view_budget',
+      'siep.reports.view_field',
       'siep.reports.edit',
     ],
   },
@@ -93,42 +116,53 @@ export function getSiepPermissionGroups(locale: Locale = 'es'): SiepPermissionGr
 /** @deprecated Use getSiepPermissionGroups(locale) — defaults to Spanish */
 export const SIEP_PERMISSION_GROUPS: SiepPermissionGroup[] = getSiepPermissionGroups('es');
 
-export const ALL_SIEP_PERMISSIONS: SiepPermissionKey[] = SIEP_PERMISSION_GROUPS.flatMap((g) =>
-  g.permissions.map((p) => p.key),
-);
+export const ALL_SIEP_PERMISSIONS: SiepPermissionKey[] = [
+  ...SIEP_PERMISSION_GROUPS.flatMap((g) => g.permissions.map((p) => p.key)),
+  // legado (não aparece na UI, mas parseia e expande)
+  'siep.reports.view',
+];
 
-/** Perfil por defeito para colaborador de campo. */
-export const DEFAULT_FIELD_PERMISSIONS: SiepPermissionKey[] = [
+/** Perfil técnico de terreno: M&E + actividades + reportes de avance (sem finanzas / informes al donante). */
+export const FIELD_TECHNICIAN_PERMISSIONS: SiepPermissionKey[] = [
   'siep.project.view',
-  'siep.budget.view_lines',
   'siep.logframe.view',
   'siep.tasks.view',
-  'siep.reports.view',
-  'siep.team.view',
   'siep.activities.report',
+];
+
+/** Perfil por defeito para colaborador de campo (empresa). */
+export const DEFAULT_FIELD_PERMISSIONS: SiepPermissionKey[] = [
+  ...FIELD_TECHNICIAN_PERMISSIONS,
+  'siep.team.view',
 ];
 
 /** Perfil gestor de projecto. */
 export const DEFAULT_PM_PERMISSIONS: SiepPermissionKey[] = [
-  ...ALL_SIEP_PERMISSIONS.filter((k) => k !== 'siep.team.manage_permissions'),
+  ...ALL_SIEP_PERMISSIONS.filter(
+    (k) => k !== 'siep.team.manage_permissions' && k !== 'siep.reports.view',
+  ),
 ];
 
-/** Perfil mínimo para convidado externo só de projecto. */
+/** Perfil mínimo para convidado externo só de projecto (técnico). */
 export const DEFAULT_PROJECT_GUEST_PERMISSIONS: SiepPermissionKey[] = [
-  'siep.project.view',
-  'siep.logframe.view',
-  'siep.tasks.view',
-  'siep.reports.view',
-  'siep.team.view',
-  'siep.activities.report',
+  ...FIELD_TECHNICIAN_PERMISSIONS,
 ];
+
+function expandLegacyKeys(keys: SiepPermissionKey[]): SiepPermissionKey[] {
+  const set = new Set(keys);
+  if (set.has('siep.reports.view')) {
+    for (const k of ALL_INFORME_DOMAIN_VIEW_PERMISSIONS) set.add(k);
+  }
+  return [...set];
+}
 
 export function parseSiepPermissions(raw: unknown): SiepPermissionKey[] {
   if (!raw) return [];
   if (Array.isArray(raw)) {
-    return raw.filter((k): k is SiepPermissionKey =>
+    const filtered = raw.filter((k): k is SiepPermissionKey =>
       typeof k === 'string' && ALL_SIEP_PERMISSIONS.includes(k as SiepPermissionKey),
     );
+    return expandLegacyKeys(filtered);
   }
   return [];
 }
@@ -138,7 +172,46 @@ export function hasSiepPermission(
   key: SiepPermissionKey,
 ): boolean {
   const set = permissions instanceof Set ? permissions : new Set(permissions);
-  return set.has(key);
+  if (set.has(key)) return true;
+  // Legado: siep.reports.view cobre qualquer domínio
+  if (
+    key.startsWith('siep.reports.view_') &&
+    set.has('siep.reports.view')
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function canViewInformeDomain(
+  permissions: Set<string> | string[],
+  domain: InformeDomain | string,
+): boolean {
+  const set = permissions instanceof Set ? permissions : new Set(permissions);
+  if (set.has('siep.reports.view') || set.has('siep.reports.edit')) return true;
+  if (typeof domain === 'string' && domain.startsWith('custom:')) {
+    // Tipos custom: qualquer visão de informe ao doador (excepto só field-tech sem reports.*)
+    return ALL_INFORME_DOMAIN_VIEW_PERMISSIONS.some((k) => set.has(k));
+  }
+  const builtIn = domain as BuiltInInformeDomain;
+  const key = INFORME_DOMAIN_VIEW_PERMISSION[builtIn];
+  return key ? set.has(key) : false;
+}
+
+export function canViewAnyDonorInforme(permissions: Set<string> | string[]): boolean {
+  const set = permissions instanceof Set ? permissions : new Set(permissions);
+  if (set.has('siep.reports.view') || set.has('siep.reports.edit')) return true;
+  return ALL_INFORME_DOMAIN_VIEW_PERMISSIONS.some((k) => set.has(k));
+}
+
+export function canAccessReportsTab(permissions: Set<string> | string[]): boolean {
+  const set = permissions instanceof Set ? permissions : new Set(permissions);
+  return (
+    canViewAnyDonorInforme(set) ||
+    set.has('siep.activities.report') ||
+    set.has('siep.activities.view_all_reports') ||
+    set.has('siep.activities.approve_reports')
+  );
 }
 
 export function permissionsToApi(perms: Set<SiepPermissionKey>) {
@@ -153,6 +226,12 @@ export function permissionsToApi(perms: Set<SiepPermissionKey>) {
     canEditLogframe: perms.has('siep.logframe.edit'),
     canEditTasks: perms.has('siep.tasks.edit'),
     canEditReports: perms.has('siep.reports.edit'),
+    canViewReportNarrative: canViewInformeDomain(perms, 'narrative'),
+    canViewReportMe: canViewInformeDomain(perms, 'me'),
+    canViewReportBudget: canViewInformeDomain(perms, 'budget'),
+    canViewReportField: canViewInformeDomain(perms, 'field'),
+    canViewAnyDonorInforme: canViewAnyDonorInforme(perms),
+    canAccessReportsTab: canAccessReportsTab(perms),
     canReportActivities: perms.has('siep.activities.report'),
     canApproveReports: perms.has('siep.activities.approve_reports'),
     canViewAllReports: perms.has('siep.activities.view_all_reports'),

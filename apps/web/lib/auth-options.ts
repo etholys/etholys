@@ -179,6 +179,21 @@ export const authOptions: NextAuthOptions = {
           console.error('[next-auth][jwt] studio scope refresh failed', e);
         }
       }
+
+      const siepCheckedAt = typeof token.siepScopeCheckedAt === 'number' ? token.siepScopeCheckedAt : 0;
+      const siepStale = Date.now() - siepCheckedAt > 5 * 60 * 1000;
+      if (userId && (user || siepStale || !token.siepAccessMode)) {
+        try {
+          const { resolveSiepJwtScope } = await import('@/lib/siep/permissions');
+          const siep = await resolveSiepJwtScope(userId);
+          token.siepAccessMode = siep.mode;
+          token.allowedProjectIds = siep.allowedProjectIds;
+          token.siepHomePath = siep.homePath;
+          token.siepScopeCheckedAt = Date.now();
+        } catch (e) {
+          console.error('[next-auth][jwt] siep scope refresh failed', e);
+        }
+      }
       return token;
     },
     async session({ session, token }: any) {
@@ -196,6 +211,9 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).studioAccessMode = token.studioAccessMode;
         (session.user as any).studioTargets = token.studioTargets ?? [];
         (session.user as any).studioHomePath = token.studioHomePath;
+        (session.user as any).siepAccessMode = token.siepAccessMode;
+        (session.user as any).allowedProjectIds = token.allowedProjectIds ?? [];
+        (session.user as any).siepHomePath = token.siepHomePath;
       }
       return session;
     },

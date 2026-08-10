@@ -170,6 +170,147 @@ export default function ProjectDetailPage() {
     setEditing(true);
   };
 
+  const perms = useMemo(
+    () =>
+      new Set<string>(
+        Array.isArray(project?.siepPermissions?.permissions)
+          ? project.siepPermissions.permissions
+          : [],
+      ),
+    [project?.siepPermissions?.permissions],
+  );
+  const isGuest = project?.accessMode === 'project_guest';
+  const can = useCallback(
+    (key: string) => (perms.size === 0 && !isGuest ? true : perms.has(key)),
+    [perms, isGuest],
+  );
+
+  const tabs: TabDef[] = useMemo(() => {
+    const all: TabDef[] = [
+      { id: 'overview', label: siepTr('siep.project.tab.overview'), icon: Gauge },
+      { id: 'sow', label: siepTr('siep.project.tab.sow'), icon: FileText },
+      {
+        id: 'marco',
+        label: siepTr('siep.project.tab.logframe'),
+        icon: GitBranch,
+        badge: (p: any) => {
+          const count = (p?.objectives ?? []).length;
+          return count > 0 ? String(count) : null;
+        },
+      },
+      {
+        id: 'budget',
+        label: L(ml('Budget', 'Presupuesto', 'Orçamento')),
+        icon: DollarSign,
+        badge: (p: any) => {
+          const spent = (p?.transactions ?? [])
+            .filter((t: any) => t?.type === 'EXPENSE')
+            .reduce((s: number, t: any) => s + (t?.amount ?? 0), 0);
+          const pct = p?.budget > 0 ? Math.round((spent / p.budget) * 100) : 0;
+          return pct > 0 ? `${pct}%` : null;
+        },
+      },
+      {
+        id: 'activities',
+        label: siepTr('siep.project.tab.activities'),
+        icon: ListChecks,
+        badge: (p: any) => {
+          const tasks = (p?.tasks ?? []).length;
+          const milestones = (p?.milestones ?? []).length;
+          const total = tasks + milestones;
+          if (total === 0) return null;
+          const done =
+            (p?.tasks ?? []).filter((t: any) => t?.status === 'DONE').length +
+            (p?.milestones ?? []).filter((m: any) => m?.completed).length;
+          return `${done}/${total}`;
+        },
+      },
+      { id: 'meetings', label: L(ml('Meetings', 'Reuniones', 'Reuniões')), icon: Video },
+      {
+        id: 'reports',
+        label: siepTr('siep.project.tab.reports'),
+        icon: FileText,
+        badge: (p: any) => {
+          const reps = (p?.meReports ?? []).length;
+          return reps > 0 ? String(reps) : null;
+        },
+      },
+      {
+        id: 'risks',
+        label: siepTr('siep.project.tab.risks'),
+        icon: Shield,
+        badge: (p: any) => {
+          const open = (p?.risks ?? []).filter((r: any) => r?.status === 'open').length;
+          return open > 0 ? String(open) : null;
+        },
+      },
+      {
+        id: 'team',
+        label: L(ml('Team', 'Equipo', 'Equipe')),
+        icon: Users,
+        badge: (p: any) => {
+          const count = (p?.members ?? []).length;
+          return count > 0 ? String(count) : null;
+        },
+      },
+      {
+        id: 'monitoring',
+        label: siepTr('siep.project.tab.monitoring'),
+        icon: BarChart3,
+        badge: (p: any) => {
+          const meas = (p?.indicatorMeasurements ?? []).length;
+          return meas > 0 ? String(meas) : null;
+        },
+      },
+    ];
+    return all.filter((tab) => {
+      switch (tab.id) {
+        case 'overview':
+        case 'sow':
+        case 'risks':
+          return can('siep.project.view');
+        case 'marco':
+        case 'monitoring':
+          return can('siep.logframe.view') || can('siep.project.view');
+        case 'budget':
+          return (
+            can('siep.budget.view_lines') ||
+            can('siep.budget.view_amounts') ||
+            can('siep.budget.edit')
+          );
+        case 'activities':
+          return can('siep.tasks.view') || can('siep.tasks.edit') || can('siep.activities.report');
+        case 'meetings':
+          return !isGuest && can('siep.project.view');
+        case 'reports':
+          return (
+            can('siep.reports.view') ||
+            can('siep.reports.edit') ||
+            can('siep.reports.view_narrative') ||
+            can('siep.reports.view_me') ||
+            can('siep.reports.view_budget') ||
+            can('siep.reports.view_field') ||
+            can('siep.activities.report') ||
+            can('siep.activities.view_all_reports') ||
+            can('siep.activities.approve_reports')
+          );
+        case 'team':
+          return can('siep.team.view') || can('siep.team.manage_members');
+        default:
+          return true;
+      }
+    });
+  }, [can, isGuest, siepTr, locale]);
+
+  useEffect(() => {
+    if (!project || !tabs.length) return;
+    if (!tabs.some((t) => t.id === activeTab)) {
+      selectTab(tabs[0].id as TabId);
+    }
+  }, [project, tabs, activeTab, selectTab]);
+
+  const canEditProject = can('siep.project.edit');
+
   if (!mounted || (loading && !project)) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -178,45 +319,6 @@ export default function ProjectDetailPage() {
     );
   }
   if (!project) return <div className="text-center py-12 text-gray-400">{tr('general.noData')}</div>;
-
-  const tabs: TabDef[] = [
-    { id: 'overview', label: siepTr('siep.project.tab.overview'), icon: Gauge },
-    { id: 'sow', label: siepTr('siep.project.tab.sow'), icon: FileText },
-    { id: 'marco', label: siepTr('siep.project.tab.logframe'), icon: GitBranch, badge: (p: any) => {
-      const count = (p?.objectives ?? []).length;
-      return count > 0 ? String(count) : null;
-    } },
-    { id: 'budget', label: L(ml('Budget', 'Presupuesto', 'Orçamento')), icon: DollarSign, badge: (p: any) => {
-      const spent = (p?.transactions ?? []).filter((t: any) => t?.type === 'EXPENSE').reduce((s: number, t: any) => s + (t?.amount ?? 0), 0);
-      const pct = p?.budget > 0 ? Math.round((spent / p.budget) * 100) : 0;
-      return pct > 0 ? `${pct}%` : null;
-    } },
-    { id: 'activities', label: siepTr('siep.project.tab.activities'), icon: ListChecks, badge: (p: any) => {
-      const tasks = (p?.tasks ?? []).length;
-      const milestones = (p?.milestones ?? []).length;
-      const total = tasks + milestones;
-      if (total === 0) return null;
-      const done = (p?.tasks ?? []).filter((t: any) => t?.status === 'DONE').length + (p?.milestones ?? []).filter((m: any) => m?.completed).length;
-      return `${done}/${total}`;
-    } },
-    { id: 'meetings', label: L(ml('Meetings', 'Reuniones', 'Reuniões')), icon: Video },
-    { id: 'reports', label: siepTr('siep.project.tab.reports'), icon: FileText, badge: (p: any) => {
-      const reps = (p?.meReports ?? []).length;
-      return reps > 0 ? String(reps) : null;
-    } },
-    { id: 'risks', label: siepTr('siep.project.tab.risks'), icon: Shield, badge: (p: any) => {
-      const open = (p?.risks ?? []).filter((r: any) => r?.status === 'open').length;
-      return open > 0 ? String(open) : null;
-    } },
-    { id: 'team', label: L(ml('Team', 'Equipo', 'Equipe')), icon: Users, badge: (p: any) => {
-      const count = (p?.members ?? []).length;
-      return count > 0 ? String(count) : null;
-    } },
-    { id: 'monitoring', label: siepTr('siep.project.tab.monitoring'), icon: BarChart3, badge: (p: any) => {
-      const meas = (p?.indicatorMeasurements ?? []).length;
-      return meas > 0 ? String(meas) : null;
-    } },
-  ];
 
   const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
     DRAFT: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Borrador' },
@@ -272,14 +374,19 @@ export default function ProjectDetailPage() {
               {refreshing && (
                 <span className="hidden sm:inline text-[10px] text-indigo-500 animate-pulse">A actualizar…</span>
               )}
+              {can('siep.tasks.view') && (
               <Link href={`/siep/projects/${project?.id}/gantt`} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">
                 <GanttChart className="w-4 h-4" />
                 Gantt
               </Link>
+              )}
+              {canEditProject && (
               <button onClick={openEdit} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 transition">
                 <Edit2 className="w-4 h-4" />
                 <span className="hidden sm:inline">Editar</span>
               </button>
+              )}
+              {canEditProject && (
               <button
                 onClick={async () => {
                   if (!confirm(`¿Eliminar el proyecto "${project?.name}"?\n\nSe desactivará el proyecto y todo su contenido.`)) return;
@@ -291,6 +398,7 @@ export default function ProjectDetailPage() {
               >
                 <Trash2 className="w-4 h-4" />
               </button>
+              )}
             </div>
           </div>
         </div>
