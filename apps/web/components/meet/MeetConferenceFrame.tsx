@@ -50,6 +50,20 @@ declare global {
 
 const ETHOLYS_TRANSCRIPT_BUTTON_ID = 'etholys-transcript';
 
+/**
+ * Chrome 116+ exige allow com `*` (ou origem explícita) em iframes cross-origin.
+ * Sem isto o browser bloqueia getUserMedia e o mic/câmara “não ligam”.
+ */
+export const MEET_IFRAME_ALLOW =
+  'camera *; microphone *; display-capture *; autoplay *; clipboard-write *; hid *; screen-wake-lock *; fullscreen *; speaker-selection *';
+
+function applyMeetIframeMediaPermissions(iframe: HTMLIFrameElement) {
+  iframe.setAttribute('allow', MEET_IFRAME_ALLOW);
+  iframe.setAttribute('allowfullscreen', 'true');
+  // Atributo legado — alguns Chromium ainda consultam
+  iframe.setAttribute('allowusermedia', 'true');
+}
+
 /** Toolbar order aproximado ao Google Meet (mic → cam → share → … → hangup). */
 const MEET_TOOLBAR_BUTTONS = [
   'microphone',
@@ -98,6 +112,11 @@ type Props = {
   /** Clique no botão Etholys da toolbar Jitsi (abrir/fechar painel de transcrição). */
   onTranscriptToolbarClick?: () => void;
   onError?: (message: string) => void;
+  /** Mic/câmara indisponíveis ou bloqueados pelo browser (iframe / permissões). */
+  onMediaBlocked?: (payload: {
+    kind: 'microphone' | 'camera' | 'both';
+    message: string;
+  }) => void;
 };
 
 let externalApiLoader: Promise<void> | null = null;
@@ -154,6 +173,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       onConferenceLeft,
       onTranscriptToolbarClick,
       onError,
+      onMediaBlocked,
     },
     ref,
   ) {
@@ -170,6 +190,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       onConferenceLeft,
       onTranscriptToolbarClick,
       onError,
+      onMediaBlocked,
     });
     const [loading, setLoading] = useState(true);
 
@@ -184,6 +205,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       onConferenceLeft,
       onTranscriptToolbarClick,
       onError,
+      onMediaBlocked,
     };
 
     useImperativeHandle(
@@ -272,9 +294,18 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             configOverwrite: {
               subject: title,
               disableDeepLinking: true,
-              prejoinConfig: { enabled: true },
+              prejoinConfig: {
+                enabled: true,
+                // Força ecrã de dispositivos antes de entrar — menos “mic morto” na call
+                hideDisplayName: false,
+              },
               breakoutRooms: { hideAddRoomButton: false },
               startWithAudioMuted: false,
+              startWithVideoMuted: false,
+              startSilent: false,
+              disableInitialGUM: false,
+              enableNoAudioDetection: true,
+              enableNoisyMicDetection: true,
               hideConferenceSubject: true,
               hideConferenceTimer: true,
               disableResponsiveTiles: false,
@@ -399,20 +430,72 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             },
           });
           apiRef.current = api;
-          api.getIFrame().setAttribute(
-            'allow',
-            'camera; microphone; fullscreen; display-capture; autoplay',
-          );
+          const iframe = api.getIFrame();
+          applyMeetIframeMediaPermissions(iframe);
           // Cantos arredondados no iframe (chrome Etholys à volta).
-          api.getIFrame().style.border = '0';
-          api.getIFrame().style.borderRadius = '16px';
-          api.getIFrame().style.background = '#202124';
+          iframe.style.border = '0';
+          iframe.style.borderRadius = '16px';
+          iframe.style.background = '#202124';
+          // Reaplicar se o External API recriar atributos ao carregar.
+          const allowWatch = window.setInterval(() => {
+            if (disposed || !apiRef.current) {
+              window.clearInterval(allowWatch);
+              return;
+            }
+            try {
+              const frame = apiRef.current.getIFrame();
+              if (frame.getAttribute('allow') !== MEET_IFRAME_ALLOW) {
+                applyMeetIframeMediaPermissions(frame);
+              }
+            } catch {
+              window.clearInterval(allowWatch);
+            }
+          }, 1500);
+          window.setTimeout(() => window.clearInterval(allowWatch), 30_000);
 
           api.addListener('videoConferenceJoined', () => {
             setLoading(false);
             emitCount();
             callbacksRef.current.onReady?.();
           });
+          api.addListener('micError', (payload: { type?: string; message?: string }) => {
+            callbacksRef.current.onMediaBlocked?.({
+              kind: 'microphone',
+              message:
+                payload?.message ||
+                'O browser bloqueou o microfone nesta janela embutida.',
+            });
+          });
+          api.addListener('cameraError', (payload: { type?: string; message?: string }) => {
+            callbacksRef.current.onMediaBlocked?.({
+              kind: 'camera',
+              message:
+                payload?.message ||
+                'O browser bloqueou a câmara nesta janela embutida.',
+            });
+          });
+          api.addListener(
+            'audioAvailabilityChanged',
+            (payload: { available?: boolean }) => {
+              if (payload?.available === false) {
+                callbacksRef.current.onMediaBlocked?.({
+                  kind: 'microphone',
+                  message: 'Microfone indisponível nesta sessão.',
+                });
+              }
+            },
+          );
+          api.addListener(
+            'videoAvailabilityChanged',
+            (payload: { available?: boolean }) => {
+              if (payload?.available === false) {
+                callbacksRef.current.onMediaBlocked?.({
+                  kind: 'camera',
+                  message: 'Câmara indisponível nesta sessão.',
+                });
+              }
+            },
+          );
           api.addListener('transcriptionChunkReceived', (chunk: TranscriptionChunk) => {
             callbacksRef.current.onTranscriptionChunk?.(chunk);
           });

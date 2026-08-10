@@ -134,7 +134,7 @@ export function ForgeFloatingJitsi({
                 title="Etholys Meet"
                 src={embedSrc}
                 className="h-[calc(100%-28px)] w-full bg-black"
-                allow="camera; microphone; fullscreen; display-capture; autoplay"
+                allow="camera *; microphone *; display-capture *; autoplay *; clipboard-write *; fullscreen *"
               />
             ) : (
               <div className="flex h-[calc(100%-28px)] items-center justify-center p-3">

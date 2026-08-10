@@ -223,7 +223,7 @@ export function ForgeLivePanel({
               <iframe
                 title="Videollamada"
                 src={iframeSrc}
-                allow="camera; microphone; fullscreen; display-capture"
+                allow="camera *; microphone *; display-capture *; autoplay *; clipboard-write *; fullscreen *"
                 className="w-full aspect-video min-h-[240px] bg-slate-900"
               />
             </div>

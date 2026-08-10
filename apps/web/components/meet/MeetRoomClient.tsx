@@ -81,6 +81,7 @@ export function MeetRoomClient({ sessionId }: Props) {
     liveTranscriptionEnabled: false,
     cloudRecordingEnabled: false,
   });
+  const [mediaBlocked, setMediaBlocked] = useState<string | null>(null);
   const conferenceRef = useRef<MeetConferenceHandle>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
@@ -448,6 +449,38 @@ export function MeetRoomClient({ sessionId }: Props) {
       <div className="flex min-h-0 flex-1">
         <main className="relative min-w-0 flex-1 px-3 pb-3 pt-14 sm:px-4 sm:pb-4">
           <div className="relative h-full w-full overflow-hidden rounded-2xl bg-[#131314]">
+            {mediaBlocked && externalRoomUrl && (
+              <div className="absolute inset-x-3 top-3 z-40 sm:inset-x-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-400/40 bg-[#3c2f00]/95 px-3 py-2.5 text-xs text-amber-50 shadow-lg backdrop-blur">
+                  <p className="min-w-0 flex-1 leading-snug">
+                    {t(
+                      'Microfone ou câmara bloqueados nesta janela. Abra a reunião numa nova janela e permita acesso ao dispositivo.',
+                      'Micrófono o cámara bloqueados en esta ventana. Abre la reunión en una ventana nueva y permite el acceso al dispositivo.',
+                      'Microphone or camera blocked in this window. Open the meeting in a new window and allow device access.',
+                    )}
+                  </p>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <a
+                      href={externalRoomUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded-full bg-[#fdd663] px-3 py-1.5 text-xs font-semibold text-[#202124] hover:bg-[#fde293]"
+                    >
+                      {t('Abrir nova janela', 'Abrir ventana nueva', 'Open new window')}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setMediaBlocked(null)}
+                      className="rounded-full p-1 text-amber-100/70 hover:bg-white/10 hover:text-white"
+                      aria-label={t('Fechar', 'Cerrar', 'Close')}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             {session.meetingUrl && canEmbedJitsiInIframe(session.meetingUrl) ? (
               <MeetConferenceFrame
                 ref={conferenceRef}
@@ -457,6 +490,9 @@ export function MeetRoomClient({ sessionId }: Props) {
                 onTranscriptionChunk={handleTranscriptionChunk}
                 onParticipantCountChange={setParticipantCount}
                 onDominantSpeakerChanged={setDominantSpeaker}
+                onMediaBlocked={(payload) => {
+                  setMediaBlocked(payload.message || payload.kind);
+                }}
                 onTranscriptToolbarClick={() => {
                   setPanelOpen((open) => {
                     const next = !open;
