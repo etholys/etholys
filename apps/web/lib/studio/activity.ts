@@ -22,7 +22,7 @@ export type RecordStudioActivityInput = {
   kind: StudioActivityKind;
   summary: string;
   actorUserId?: string | null;
-  meta?: Prisma.InputJsonValue | null;
+  meta?: Record<string, unknown> | null;
 };
 
 /** Regista evento na trilha (best-effort — nunca quebra o fluxo principal). */
@@ -35,7 +35,10 @@ export async function recordStudioActivity(input: RecordStudioActivityInput): Pr
         kind: input.kind,
         summary: input.summary.slice(0, 500),
         actorUserId: input.actorUserId || null,
-        meta: input.meta ?? undefined,
+        meta:
+          input.meta == null
+            ? undefined
+            : (JSON.parse(JSON.stringify(input.meta)) as Prisma.InputJsonValue),
       },
     });
   } catch (e) {
