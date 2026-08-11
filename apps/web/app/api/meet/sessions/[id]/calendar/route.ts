@@ -57,6 +57,8 @@ export async function POST(req: Request, ctx: Ctx) {
       provider?: 'google' | 'outlook';
       /** Se false, cria o evento sem e-mail de convite do Google/Outlook. Default: true. */
       notifyAttendees?: boolean;
+      /** IANA timezone do organizador / UI (ex. America/Sao_Paulo). */
+      timeZone?: string;
     };
 
     const companyId = body.companyId?.trim();
@@ -96,6 +98,7 @@ export async function POST(req: Request, ctx: Ctx) {
       locationUrl: session.meetingUrl || undefined,
       startsAt,
       endsAt,
+      timeZone: body.timeZone?.trim() || 'UTC',
       attendeeEmails: notifyAttendees ? attendeeEmails : [],
       notifyAttendees,
       recurrenceRule: provider === 'google' ? recurrenceRule : null,

@@ -338,6 +338,11 @@ function MeetHubContent() {
               companyId,
               provider: draft.calendarProvider,
               notifyAttendees: Boolean(draft.sendInvites),
+              // Obrigatório para séries recorrentes na Google Calendar API
+              timeZone:
+                draft.timezone ||
+                Intl.DateTimeFormat().resolvedOptions().timeZone ||
+                'UTC',
             }),
           });
           const calendarData = (await calendarResponse.json()) as {
@@ -433,7 +438,11 @@ function MeetHubContent() {
       const r = await fetch(`/api/meet/sessions/${sessionId}/calendar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, provider }),
+        body: JSON.stringify({
+          companyId,
+          provider,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        }),
       });
       const d = (await r.json()) as { error?: string; event?: { htmlLink?: string } };
       if (!r.ok) throw new Error(d.error || 'Error');

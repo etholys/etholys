@@ -82,12 +82,37 @@ export type MeetCalendarEventInput = {
   locationUrl?: string;
   startsAt: Date;
   endsAt: Date;
+  /** IANA timezone, ex. America/Sao_Paulo — obrigatório para a API Google. */
+  timeZone?: string;
   attendeeEmails?: string[];
   /** Enviar e-mail de convite do Google aos attendees (sendUpdates=all). */
   notifyAttendees?: boolean;
   /** RRULE sem prefixo RRULE: — ex. FREQ=WEEKLY;COUNT=12 */
   recurrenceRule?: string | null;
 };
+
+/** Formata instante como data/hora local da zona (sem offset), para Google Calendar. */
+export function formatGoogleCalendarDateTime(
+  date: Date,
+  timeZone: string,
+): { dateTime: string; timeZone: string } {
+  const zone = timeZone.trim() || 'UTC';
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: zone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  });
+  const parts = formatter.formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value || '00';
+  const dateTime = `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`;
+  return { dateTime, timeZone: zone };
+}
 
 export async function createGoogleCalendarEvent(
   userId: string,
@@ -100,12 +125,13 @@ export async function createGoogleCalendarEvent(
     );
   }
 
+  const timeZone = event.timeZone?.trim() || 'UTC';
   const body: Record<string, unknown> = {
     summary: event.title,
     description: event.description || undefined,
     location: event.locationUrl || undefined,
-    start: { dateTime: event.startsAt.toISOString() },
-    end: { dateTime: event.endsAt.toISOString() },
+    start: formatGoogleCalendarDateTime(event.startsAt, timeZone),
+    end: formatGoogleCalendarDateTime(event.endsAt, timeZone),
     attendees: event.attendeeEmails?.map((email) => ({ email })),
   };
   if (event.recurrenceRule) {

@@ -51,6 +51,27 @@ function localInputValue(date: Date): string {
   return local.toISOString().slice(0, 16);
 }
 
+const MEET_TIMEZONE_OPTIONS = [
+  'UTC',
+  'America/Sao_Paulo',
+  'America/Argentina/Buenos_Aires',
+  'America/Santiago',
+  'America/Bogota',
+  'America/Mexico_City',
+  'America/Lima',
+  'America/New_York',
+  'America/Chicago',
+  'America/Los_Angeles',
+  'Europe/Lisbon',
+  'Europe/Madrid',
+  'Europe/London',
+  'Europe/Paris',
+] as const;
+
+function browserTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+}
+
 export function MeetScheduleDialog({
   locale,
   projects,
@@ -83,7 +104,12 @@ export function MeetScheduleDialog({
   const [recurrence, setRecurrence] = useState<ScheduleDraft['recurrence']>('none');
   const [recurrenceUntil, setRecurrenceUntil] = useState('');
   const [isPermanent, setIsPermanent] = useState(false);
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const detectedTz = browserTimeZone();
+  const [timezone, setTimezone] = useState(detectedTz);
+  const timezoneOptions = useMemo(() => {
+    const set = new Set<string>([...MEET_TIMEZONE_OPTIONS, detectedTz, timezone]);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [detectedTz, timezone]);
 
   function updateStart(value: string) {
     setStartsAt(value);
@@ -223,9 +249,20 @@ export function MeetScheduleDialog({
                         />
                       </label>
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                      <span>{timezone}</span>
-                    </div>
+                    <label className="mt-2 block text-xs font-medium text-slate-500">
+                      {t('Fuso horário', 'Zona horaria', 'Time zone')}
+                      <select
+                        value={timezone}
+                        onChange={(event) => setTimezone(event.target.value)}
+                        className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
+                      >
+                        {timezoneOptions.map((zone) => (
+                          <option key={zone} value={zone}>
+                            {zone}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
                       <label className="text-xs font-medium text-slate-500">
                         {t('Repetir', 'Repetir', 'Repeat')}
