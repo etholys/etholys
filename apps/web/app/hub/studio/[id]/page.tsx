@@ -26,6 +26,7 @@ import {
   MicOff,
   Crosshair,
   Sparkles,
+  ImagePlus,
   AlignLeft,
   AlignCenter,
   AlignRight,
