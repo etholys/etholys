@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
+  ArrowLeft,
   ExternalLink,
   FileText,
   HardDrive,
@@ -79,6 +80,7 @@ export function MeetRoomClient({ sessionId }: Props) {
   });
   const conferenceRef = useRef<MeetConferenceHandle>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const leaveQuietRef = useRef(false);
 
   useEffect(() => {
     const prev = document.title;
@@ -340,15 +342,40 @@ export function MeetRoomClient({ sessionId }: Props) {
 
   const backHref = session.projectId
     ? `/siep/projects/${session.projectId}?tab=meetings`
+    : companyId
+      ? `/hub/meet?companyId=${encodeURIComponent(companyId)}`
+      : '/hub/meet';
+  const meetHomeHref = companyId
+    ? `/hub/meet?companyId=${encodeURIComponent(companyId)}`
     : '/hub/meet';
 
   const speakerInitial = (dominantSpeaker || session.title).trim().charAt(0).toUpperCase() || 'E';
+
+  function leaveToMeetHome() {
+    // Sai da UI sem encerrar a reunião para os outros participantes
+    leaveQuietRef.current = true;
+    try {
+      conferenceRef.current?.hangup();
+    } catch {
+      /* ignore */
+    }
+    router.push(meetHomeHref);
+  }
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-[#202124] text-white">
       {/* Top bar — estilo Google Meet */}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 px-4 pb-2 pt-3 sm:px-5">
-        <div className="pointer-events-auto flex min-w-0 max-w-[min(100%,42rem)] items-center gap-2 text-[13px] text-white/90 sm:text-sm">
+        <div className="pointer-events-auto flex min-w-0 max-w-[min(100%,48rem)] items-center gap-2 text-[13px] text-white/90 sm:text-sm">
+          <button
+            type="button"
+            onClick={leaveToMeetHome}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#3c4043]/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm hover:bg-[#4a4d51]"
+            title={t('Voltar ao Meet', 'Volver a Meet', 'Back to Meet')}
+          >
+            <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} />
+            <span className="hidden sm:inline">Meet</span>
+          </button>
           <time className="shrink-0 tabular-nums text-white/80">{clock}</time>
           <span className="shrink-0 text-white/35" aria-hidden>
             |
@@ -432,23 +459,22 @@ export function MeetRoomClient({ sessionId }: Props) {
               ? ` · ${t('Ao vivo', 'En vivo', 'Live')}`
               : ` · ${session.status}`}
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link
-              href={backHref}
-              className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90 hover:bg-white/15"
+          <div className="mt-3 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={leaveToMeetHome}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#8ab4f8] px-3 py-2 text-xs font-semibold text-[#202124] hover:bg-[#aecbfa]"
             >
-              {t('Sair da sala', 'Salir de la sala', 'Leave room')}
-            </Link>
-            {externalRoomUrl && (
-              <a
-                href={externalRoomUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90 hover:bg-white/15"
+              <ArrowLeft className="h-3.5 w-3.5" />
+              {t('Voltar ao Meet', 'Volver a Meet', 'Back to Meet')}
+            </button>
+            {session.projectId && (
+              <Link
+                href={backHref}
+                className="inline-flex w-full items-center justify-center rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90 hover:bg-white/15"
               >
-                {t('Nova janela', 'Nueva ventana', 'New window')}
-                <ExternalLink className="h-3 w-3" />
-              </a>
+                {t('Voltar ao projeto', 'Volver al proyecto', 'Back to project')}
+              </Link>
             )}
           </div>
         </div>
@@ -486,6 +512,10 @@ export function MeetRoomClient({ sessionId }: Props) {
                   });
                 }}
                 onConferenceLeft={() => {
+                  if (leaveQuietRef.current) {
+                    leaveQuietRef.current = false;
+                    return;
+                  }
                   void endMeeting({ skipHangup: true });
                 }}
                 onRecordingStatus={(state) => {
