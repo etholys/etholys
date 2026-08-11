@@ -23,6 +23,7 @@ import {
   X,
   Link2,
   CalendarRange,
+  MonitorUp,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
@@ -640,6 +641,33 @@ function MeetHubContent() {
                         </span>
                       </span>
                     </button>
+                    <Link
+                      href={
+                        companyId
+                          ? `/hub/meet/capture?companyId=${encodeURIComponent(companyId)}`
+                          : '/hub/meet/capture'
+                      }
+                      onClick={() => setNewMenuOpen(false)}
+                      className="flex w-full touch-manipulation items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 sm:py-3"
+                    >
+                      <MonitorUp className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+                      <span>
+                        <span className="block text-sm font-medium text-slate-900">
+                          {t(
+                            'Captura externa (Zoom/Teams)',
+                            'Captura externa (Zoom/Teams)',
+                            'External capture (Zoom/Teams)',
+                          )}
+                        </span>
+                        <span className="block text-xs text-slate-500">
+                          {t(
+                            'Gravar ecrã + transcrever reuniões fora do Etholys',
+                            'Grabar pantalla + transcribir reuniones fuera de Etholys',
+                            'Record screen + transcribe meetings outside Etholys',
+                          )}
+                        </span>
+                      </span>
+                    </Link>
                   </div>
                 </>
               )}

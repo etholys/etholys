@@ -281,6 +281,8 @@ export function MeetRoomClient({ sessionId }: Props) {
       return;
     }
     conferenceRef.current?.startRecording(destination);
+    // Feedback imediato — o evento recordingStatusChanged confirma
+    setRecordingMode(destination);
     setShowRecordMenu(false);
   }
 
@@ -487,6 +489,15 @@ export function MeetRoomClient({ sessionId }: Props) {
                 meetingUrl={session.meetingUrl}
                 title={session.title}
                 locale={locale}
+                onReady={() => {
+                  if (!features.liveTranscriptionEnabled) return;
+                  // Arranque automático do STT ao vivo (Vosk) — evita “esquecer” o botão
+                  setPanelOpen(true);
+                  window.setTimeout(() => {
+                    conferenceRef.current?.startTranscription();
+                    setTranscriptionOn(true);
+                  }, 800);
+                }}
                 onTranscriptionChunk={handleTranscriptionChunk}
                 onParticipantCountChange={setParticipantCount}
                 onDominantSpeakerChanged={setDominantSpeaker}

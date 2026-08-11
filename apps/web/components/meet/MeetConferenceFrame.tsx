@@ -313,6 +313,11 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               defaultLogoUrl: 'https://app.etholys.com/meet-brand/etholys-mark.svg',
               defaultRemoteDisplayName: 'Participante',
               fileRecordingsEnabled: true,
+              localRecording: {
+                disable: false,
+                notifyAllParticipants: true,
+                disableSelfRecording: false,
+              },
               liveStreamingEnabled: false,
               transcription: {
                 enabled: true,
