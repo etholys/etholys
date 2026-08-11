@@ -42,6 +42,21 @@ const nextConfig = {
   },
   images: { unoptimized: true },
   transpilePackages: ['@excalidraw/excalidraw'],
+  async headers() {
+    // Permite mic/câmara no iframe Meet (meet.etholys.com) embutido no Hub.
+    return [
+      {
+        source: '/hub/meet/:path*',
+        headers: [
+          {
+            key: 'Permissions-Policy',
+            value:
+              'camera=*, microphone=*, display-capture=*, autoplay=*, fullscreen=*',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

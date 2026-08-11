@@ -112,11 +112,6 @@ type Props = {
   /** Clique no botão Etholys da toolbar Jitsi (abrir/fechar painel de transcrição). */
   onTranscriptToolbarClick?: () => void;
   onError?: (message: string) => void;
-  /** Mic/câmara indisponíveis ou bloqueados pelo browser (iframe / permissões). */
-  onMediaBlocked?: (payload: {
-    kind: 'microphone' | 'camera' | 'both';
-    message: string;
-  }) => void;
 };
 
 let externalApiLoader: Promise<void> | null = null;
@@ -173,7 +168,6 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       onConferenceLeft,
       onTranscriptToolbarClick,
       onError,
-      onMediaBlocked,
     },
     ref,
   ) {
@@ -190,7 +184,6 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       onConferenceLeft,
       onTranscriptToolbarClick,
       onError,
-      onMediaBlocked,
     });
     const [loading, setLoading] = useState(true);
 
@@ -205,7 +198,6 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       onConferenceLeft,
       onTranscriptToolbarClick,
       onError,
-      onMediaBlocked,
     };
 
     useImperativeHandle(
@@ -466,44 +458,6 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             emitCount();
             callbacksRef.current.onReady?.();
           });
-          api.addListener('micError', (payload: { type?: string; message?: string }) => {
-            callbacksRef.current.onMediaBlocked?.({
-              kind: 'microphone',
-              message:
-                payload?.message ||
-                'O browser bloqueou o microfone nesta janela embutida.',
-            });
-          });
-          api.addListener('cameraError', (payload: { type?: string; message?: string }) => {
-            callbacksRef.current.onMediaBlocked?.({
-              kind: 'camera',
-              message:
-                payload?.message ||
-                'O browser bloqueou a câmara nesta janela embutida.',
-            });
-          });
-          api.addListener(
-            'audioAvailabilityChanged',
-            (payload: { available?: boolean }) => {
-              if (payload?.available === false) {
-                callbacksRef.current.onMediaBlocked?.({
-                  kind: 'microphone',
-                  message: 'Microfone indisponível nesta sessão.',
-                });
-              }
-            },
-          );
-          api.addListener(
-            'videoAvailabilityChanged',
-            (payload: { available?: boolean }) => {
-              if (payload?.available === false) {
-                callbacksRef.current.onMediaBlocked?.({
-                  kind: 'camera',
-                  message: 'Câmara indisponível nesta sessão.',
-                });
-              }
-            },
-          );
           api.addListener('transcriptionChunkReceived', (chunk: TranscriptionChunk) => {
             callbacksRef.current.onTranscriptionChunk?.(chunk);
           });
