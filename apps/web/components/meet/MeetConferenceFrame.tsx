@@ -26,6 +26,7 @@ type RecordingState = {
   on: boolean;
   mode: 'local' | 'file' | 'stream' | string;
   transcription?: boolean;
+  error?: string | null;
 };
 
 type JitsiApi = {
@@ -240,15 +241,20 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             /* ignore */
           }
         },
-        startRecording(destination) {
-          // Só gravação local (browser → disco do utilizador). Sem Jibri/nuvem.
+        startRecording(_destination) {
+          // Gravação local fiável é feita no Etholys (MediaRecorder top-level).
+          // Mantemos o comando Jitsi apenas como fallback legado — preferir MeetRoomClient.
           apiRef.current?.executeCommand('startRecording', {
             mode: 'local',
             onlySelf: false,
           });
         },
         stopRecording(_destination) {
-          apiRef.current?.executeCommand('stopRecording', 'local');
+          try {
+            apiRef.current?.executeCommand('stopRecording', 'local');
+          } catch {
+            /* ignore */
+          }
         },
         hangup() {
           apiRef.current?.executeCommand('hangup');
@@ -462,7 +468,13 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             callbacksRef.current.onTranscriptionChunk?.(chunk);
           });
           api.addListener('recordingStatusChanged', (state: RecordingState) => {
-            callbacksRef.current.onRecordingStatus?.(state);
+            // Ignorar “file” usado só para convidar o transcriber — não é gravação no PC.
+            callbacksRef.current.onRecordingStatus?.({
+              on: Boolean(state?.on),
+              mode: state?.mode || 'file',
+              transcription: Boolean(state?.transcription),
+              error: state?.error ?? null,
+            });
           });
           api.addListener('participantJoined', (participant) => {
             emitCount();
