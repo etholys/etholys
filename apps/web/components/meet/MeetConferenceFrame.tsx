@@ -249,16 +249,14 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
           }
         },
         startRecording(destination) {
+          // Só gravação local (browser → disco do utilizador). Sem Jibri/nuvem.
           apiRef.current?.executeCommand('startRecording', {
-            mode: destination === 'local' ? 'local' : 'file',
-            ...(destination === 'local' ? { onlySelf: false } : { shouldShare: false }),
+            mode: 'local',
+            onlySelf: false,
           });
         },
-        stopRecording(destination) {
-          apiRef.current?.executeCommand(
-            'stopRecording',
-            destination === 'local' ? 'local' : 'file',
-          );
+        stopRecording(_destination) {
+          apiRef.current?.executeCommand('stopRecording', 'local');
         },
         hangup() {
           apiRef.current?.executeCommand('hangup');
@@ -313,6 +311,11 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               defaultLogoUrl: 'https://app.etholys.com/meet-brand/etholys-mark.svg',
               defaultRemoteDisplayName: 'Participante',
               fileRecordingsEnabled: true,
+              // Sem serviço de gravação na nuvem (Jibri) — só local no browser
+              recordingService: {
+                enabled: false,
+                hideStorageWarning: true,
+              },
               localRecording: {
                 disable: false,
                 notifyAllParticipants: true,

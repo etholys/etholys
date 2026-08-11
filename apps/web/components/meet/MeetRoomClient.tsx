@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Cloud,
   ExternalLink,
   FileText,
   HardDrive,
@@ -13,7 +12,6 @@ import {
   Mic,
   Square,
   Users,
-  Video,
   X,
 } from 'lucide-react';
 import { meetEmbedUrl } from '@/lib/meet/room';
@@ -71,15 +69,13 @@ export function MeetRoomClient({ sessionId }: Props) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [ending, setEnding] = useState(false);
   const [transcriptionOn, setTranscriptionOn] = useState(false);
-  const [recordingMode, setRecordingMode] = useState<'local' | 'cloud' | null>(null);
-  const [showRecordMenu, setShowRecordMenu] = useState(false);
+  const [recordingMode, setRecordingMode] = useState<'local' | null>(null);
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [participantCount, setParticipantCount] = useState(0);
   const [dominantSpeaker, setDominantSpeaker] = useState<string | null>(null);
   const [clock, setClock] = useState(() => formatMeetClock(locale, new Date()));
   const [features, setFeatures] = useState({
     liveTranscriptionEnabled: false,
-    cloudRecordingEnabled: false,
   });
   const [mediaBlocked, setMediaBlocked] = useState<string | null>(null);
   const conferenceRef = useRef<MeetConferenceHandle>(null);
@@ -142,7 +138,6 @@ export function MeetRoomClient({ sessionId }: Props) {
         .then((d) =>
           setFeatures({
             liveTranscriptionEnabled: Boolean(d.liveTranscriptionEnabled),
-            cloudRecordingEnabled: Boolean(d.cloudRecordingEnabled),
           }),
         ),
       fetch(
@@ -268,22 +263,10 @@ export function MeetRoomClient({ sessionId }: Props) {
     setTranscriptionOn(true);
   }
 
-  function startRecording(destination: 'local' | 'cloud') {
+  function startLocalRecording() {
     setError(null);
-    if (destination === 'cloud' && !features.cloudRecordingEnabled) {
-      setError(
-        t(
-          'A gravação na nuvem Etholys ainda não está disponível. Escolha «Este computador» por agora.',
-          'La grabación en la nube Etholys aún no está disponible. Elige «Este ordenador» por ahora.',
-          'Etholys cloud recording is not available yet. Choose “This computer” for now.',
-        ),
-      );
-      return;
-    }
-    conferenceRef.current?.startRecording(destination);
-    // Feedback imediato — o evento recordingStatusChanged confirma
-    setRecordingMode(destination);
-    setShowRecordMenu(false);
+    conferenceRef.current?.startRecording('local');
+    setRecordingMode('local');
   }
 
   function stopRecording() {
@@ -404,6 +387,30 @@ export function MeetRoomClient({ sessionId }: Props) {
             <Users className="h-3.5 w-3.5 text-white/75" strokeWidth={1.75} />
             <span className="min-w-[0.75rem] tabular-nums">{Math.max(participantCount, 0)}</span>
           </div>
+          {recordingMode ? (
+            <button
+              type="button"
+              onClick={stopRecording}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#ea4335] px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#f28b82]"
+            >
+              <Square className="h-3 w-3" />
+              {t('Parar gravação', 'Detener grabación', 'Stop recording')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={startLocalRecording}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#3c4043]/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm hover:bg-[#4a4d51]"
+              title={t(
+                'Grava e guarda no teu computador ao parar',
+                'Graba y guarda en tu ordenador al detener',
+                'Records and saves to your computer when stopped',
+              )}
+            >
+              <HardDrive className="h-3.5 w-3.5 text-white/75" strokeWidth={1.75} />
+              {t('Gravar', 'Grabar', 'Record')}
+            </button>
+          )}
         </div>
       </header>
 
@@ -522,9 +529,8 @@ export function MeetRoomClient({ sessionId }: Props) {
                     setTranscriptionOn(state.on);
                     return;
                   }
-                  setRecordingMode(
-                    state.on ? (state.mode === 'local' ? 'local' : 'cloud') : null,
-                  );
+                  // Só gravação local neste PC
+                  setRecordingMode(state.on && state.mode === 'local' ? 'local' : state.on ? 'local' : null);
                 }}
                 onError={setError}
               />
@@ -607,51 +613,29 @@ export function MeetRoomClient({ sessionId }: Props) {
                       type="button"
                       onClick={stopRecording}
                       className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-[#ea4335] px-2 py-2.5 text-xs font-medium text-white hover:bg-[#f28b82]"
+                      title={t(
+                        'Para e descarrega o ficheiro no teu computador',
+                        'Detiene y descarga el archivo en tu ordenador',
+                        'Stops and downloads the file to your computer',
+                      )}
                     >
                       <Square className="h-3 w-3" />
-                      {t('Parar gravação', 'Detener grabación', 'Stop recording')}
+                      {t('Parar e guardar', 'Detener y guardar', 'Stop and save')}
                     </button>
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setShowRecordMenu((open) => !open)}
+                      onClick={startLocalRecording}
                       className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-white/10 px-2 py-2.5 text-xs font-medium text-white hover:bg-white/15"
+                      title={t(
+                        'Grava no browser e guarda no teu disco (Downloads / pasta que escolheres)',
+                        'Graba en el navegador y guarda en tu disco (Descargas / carpeta que elijas)',
+                        'Records in the browser and saves to your disk (Downloads / folder you choose)',
+                      )}
                     >
-                      <Video className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      {t('Gravar', 'Grabar', 'Record')}
+                      <HardDrive className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      {t('Gravar neste PC', 'Grabar en este PC', 'Record to this PC')}
                     </button>
-                  )}
-                  {showRecordMenu && (
-                    <div className="absolute right-0 top-full z-20 mt-1 w-52 rounded-2xl border border-white/10 bg-[#3c4043] p-1 shadow-xl">
-                      <button
-                        type="button"
-                        onClick={() => startRecording('local')}
-                        className="flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left text-xs text-white/90 hover:bg-white/10"
-                      >
-                        <HardDrive className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        <span>
-                          <strong className="block font-medium">{t('Este computador', 'Este ordenador', 'This computer')}</strong>
-                          <span className="text-[10px] text-white/45">
-                            {t('Descarrega ao parar', 'Descarga al detener', 'Downloads when stopped')}
-                          </span>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => startRecording('cloud')}
-                        className="flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left text-xs text-white/90 hover:bg-white/10"
-                      >
-                        <Cloud className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        <span>
-                          <strong className="block font-medium">{t('Nuvem Etholys', 'Nube Etholys', 'Etholys cloud')}</strong>
-                          <span className="text-[10px] text-white/45">
-                            {features.cloudRecordingEnabled
-                              ? 'R2'
-                              : t('Em breve', 'Próximamente', 'Coming soon')}
-                          </span>
-                        </span>
-                      </button>
-                    </div>
                   )}
                 </div>
               </div>

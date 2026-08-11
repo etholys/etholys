@@ -35,7 +35,7 @@ Ver [etholys-tools.md](./etholys-tools.md) para a faixa de ferramentas.
 | **F0** | Spec + modelos + Hub stub | ✅ |
 | **F1** | Sala Jitsi + convite e-mail + `.ics` + breakouts (host UI) | ✅ |
 | **F2** | Espelho Hub + vínculo SIEP + espelho FORGE live | ✅ |
-| **F3** | Pós-reunião IA + gravação | ✅ resumo/tarefas; **gravação local** no browser; nuvem Jibri→R2 **pendente** (sem Jibri no Contabo) |
+| **F3** | Pós-reunião IA + gravação | ✅ resumo/tarefas; **gravação local** no browser → ficheiro no PC/disco do utilizador (sem nuvem Etholys) |
 | **F4** | Tarefas pré-criadas + validação → Task SIEP | ✅ |
 | **F5** | Transcrição real + atribuição por participante | ✅ Vosk ES + painel Hub; arranque automático ao entrar |
 | **F6** | Agenda dia/semana/mês/ano + OAuth Google / Outlook | ✅ API + UI; ligação persistente em `Account`; requer `GOOGLE_CALENDAR_ENABLED=1` / Azure AD |

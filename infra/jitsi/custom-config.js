@@ -14,6 +14,11 @@ config.localRecording = {
   disableSelfRecording: false,
 };
 
+// Sem Jibri / nuvem — gravação = ficheiro no computador do utilizador
+config.recordingService = config.recordingService || {};
+config.recordingService.enabled = false;
+config.recordingService.hideStorageWarning = true;
+
 // Jibri (gravação ficheiro) ainda não está no VPS — mas tem de ficar `true`
 // para o cliente poder pedir transcrição ao vivo (convidar o transcriber/Vosk).
 // Sem isto, «CC» / startRecording({transcription:true}) falha em silêncio.
