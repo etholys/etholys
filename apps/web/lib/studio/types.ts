@@ -1,5 +1,7 @@
 /** Etholys Studio — tipos partilhados (cliente + servidor). Spec: docs/architecture/etholys-studio.md */
 
+import { normalizeStudioBlockStyle } from '@/lib/studio/block-style';
+
 export const STUDIO_FORMATS = [
   'report',
   'proposal',
@@ -35,6 +37,14 @@ export type StudioBlockKind =
   | 'callout'
   | 'image';
 
+export type StudioBlockStyle = {
+  align?: 'left' | 'center' | 'right' | 'justify';
+  /** Escala tipográfica relativa */
+  textScale?: 'sm' | 'md' | 'lg' | 'xl';
+  /** Moldura visual do bloco */
+  frame?: 'none' | 'subtle' | 'card' | 'accent';
+};
+
 export type StudioBlock = {
   id: string;
   kind: StudioBlockKind;
@@ -43,6 +53,7 @@ export type StudioBlock = {
   /** mermaid = código; draw = quadro visual (Excalidraw JSON); text = legado */
   diagramLang?: 'mermaid' | 'draw' | 'text';
   imageUrl?: string | null;
+  style?: StudioBlockStyle;
   order: number;
 };
 
@@ -71,6 +82,7 @@ export type StudioCanvasPatch = {
   title?: string;
   kind?: StudioBlockKind;
   diagramLang?: StudioBlock['diagramLang'];
+  style?: StudioBlockStyle;
 };
 
 export type StudioConsentSource = {
@@ -165,6 +177,7 @@ export function normalizeStudioCanvas(raw: unknown): StudioCanvasState {
                     ? b.diagramLang
                     : undefined,
                 imageUrl: b.imageUrl ?? null,
+                style: normalizeStudioBlockStyle((b as { style?: unknown }).style),
                 order: typeof b.order === 'number' ? b.order : j,
               }))
             : [],
@@ -191,6 +204,7 @@ export function applyStudioCanvasPatches(
         title: patch.title !== undefined ? patch.title : block.title,
         kind: patch.kind ?? block.kind,
         diagramLang: patch.diagramLang !== undefined ? patch.diagramLang : block.diagramLang,
+        style: patch.style !== undefined ? patch.style : block.style,
       };
     }),
   }));

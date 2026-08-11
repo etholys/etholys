@@ -26,7 +26,10 @@ import {
   MicOff,
   Crosshair,
   Sparkles,
-  ImagePlus,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
@@ -543,6 +546,7 @@ export default function StudioDocumentPage() {
       text?: string;
       kind?: StudioBlock['kind'];
       diagramLang?: StudioBlock['diagramLang'];
+      style?: StudioBlock['style'];
     },
   ) {
     applyCanvas((prev) => ({
@@ -568,11 +572,29 @@ export default function StudioDocumentPage() {
                       ...(patch.diagramLang !== undefined
                         ? { diagramLang: patch.diagramLang }
                         : {}),
+                      ...(patch.style !== undefined
+                        ? { style: { ...(b.style || {}), ...patch.style } }
+                        : {}),
                     }
                   : b,
               ),
             },
       ),
+    }));
+  }
+
+  function patchSelectedStyles(partial: NonNullable<StudioBlock['style']>) {
+    if (!canvas || !aiTargetBlockIds.length) return;
+    applyCanvas((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) => ({
+        ...p,
+        blocks: p.blocks.map((b) =>
+          aiTargetBlockIds.includes(b.id)
+            ? { ...b, style: { ...(b.style || {}), ...partial } }
+            : b,
+        ),
+      })),
     }));
   }
 
@@ -1476,11 +1498,71 @@ export default function StudioDocumentPage() {
               />
               <span className="ml-auto px-1 text-[10px] text-slate-400">
                 {t(
-                  'Mira num bloco = âmbito da IA',
-                  'Mira en un bloque = ámbito de la IA',
-                  'Crosshair on a block = AI scope',
+                  'Mira / Shift+clique = âmbito IA',
+                  'Mira / Shift+clic = ámbito IA',
+                  'Crosshair / Shift+click = AI scope',
                 )}
               </span>
+              {aiTargetBlockIds.length > 0 && (
+                <>
+                  <span className="mx-1 h-4 w-px bg-slate-200" />
+                  <span className="px-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    {t('Estilo', 'Estilo', 'Style')}
+                  </span>
+                  {(
+                    [
+                      ['left', AlignLeft],
+                      ['center', AlignCenter],
+                      ['right', AlignRight],
+                      ['justify', AlignJustify],
+                    ] as const
+                  ).map(([align, Icon]) => (
+                    <button
+                      key={align}
+                      type="button"
+                      title={align}
+                      onClick={() => patchSelectedStyles({ align })}
+                      className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:border-orange-300 hover:bg-orange-50"
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                    </button>
+                  ))}
+                  {(
+                    [
+                      ['sm', 'S'],
+                      ['md', 'M'],
+                      ['lg', 'L'],
+                      ['xl', 'XL'],
+                    ] as const
+                  ).map(([textScale, label]) => (
+                    <button
+                      key={textScale}
+                      type="button"
+                      onClick={() => patchSelectedStyles({ textScale })}
+                      className="rounded-md border border-slate-200 px-1.5 py-1 text-[10px] font-bold text-slate-600 hover:border-orange-300 hover:bg-orange-50"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  {(
+                    [
+                      ['none', t('Sem moldura', 'Sin marco', 'No frame')],
+                      ['subtle', t('Suave', 'Suave', 'Subtle')],
+                      ['card', 'Card'],
+                      ['accent', t('Destaque', 'Acento', 'Accent')],
+                    ] as const
+                  ).map(([frame, label]) => (
+                    <button
+                      key={frame}
+                      type="button"
+                      onClick={() => patchSelectedStyles({ frame })}
+                      className="rounded-md border border-slate-200 px-1.5 py-1 text-[10px] font-semibold text-slate-600 hover:border-orange-300 hover:bg-orange-50"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           )}
 
@@ -1574,6 +1656,7 @@ export default function StudioDocumentPage() {
                               onDiagramLangChange={(diagramLang) =>
                                 updateBlock(page.id, block.id, { diagramLang })
                               }
+                              onStyleChange={(style) => updateBlock(page.id, block.id, { style })}
                               onMoveUp={() => moveBlock(page.id, block.id, -1)}
                               onMoveDown={() => moveBlock(page.id, block.id, 1)}
                               onDelete={() => removeBlock(page.id, block.id)}

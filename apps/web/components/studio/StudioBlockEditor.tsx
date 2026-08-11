@@ -17,7 +17,7 @@ import {
   Crosshair,
   Sparkles,
 } from 'lucide-react';
-import type { StudioBlock, StudioBlockKind } from '@/lib/studio/types';
+import type { StudioBlock, StudioBlockKind, StudioBlockStyle } from '@/lib/studio/types';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import { StudioMermaidPreview } from '@/components/studio/StudioMermaidPreview';
 import { StudioDrawingEditor } from '@/components/studio/StudioDrawingEditor';
@@ -26,6 +26,11 @@ import {
   isStudioDrawBlock,
   serializeStudioDrawScene,
 } from '@/lib/studio/draw-scene';
+import {
+  studioBlockAlignClass,
+  studioBlockFrameClass,
+  studioBlockScaleClass,
+} from '@/lib/studio/block-style';
 
 const DIAGRAM_TEMPLATES: Array<{ id: string; label: string; source: string }> = [
   {
@@ -113,6 +118,7 @@ type Props = {
   onChange: (text: string) => void;
   onKindChange?: (kind: StudioBlockKind) => void;
   onDiagramLangChange?: (lang: 'draw' | 'mermaid') => void;
+  onStyleChange?: (style: StudioBlockStyle) => void;
   /** Selecionado como alvo da IA */
   aiSelected?: boolean;
   onToggleAiSelect?: () => void;
@@ -153,6 +159,7 @@ export function StudioBlockEditor({
   onChange,
   onKindChange,
   onDiagramLangChange,
+  onStyleChange,
   aiSelected,
   onToggleAiSelect,
   onComment,
@@ -165,6 +172,9 @@ export function StudioBlockEditor({
   disabled,
   labels,
 }: Props) {
+  const styleWrap = `${studioBlockAlignClass(block.style)} ${studioBlockFrameClass(block.style)}`.trim();
+  const scaleCls = studioBlockScaleClass(block.style, block.kind);
+
   const isDiagram = block.kind === 'diagram';
   const isDraw = isDiagram && isStudioDrawBlock(block);
   const isImage = block.kind === 'image';
@@ -405,7 +415,7 @@ export function StudioBlockEditor({
           <img
             src={block.imageUrl}
             alt={block.text || 'image'}
-            className="mx-auto max-h-[480px] w-auto max-w-full rounded-lg object-contain shadow-sm"
+            className={`mx-auto max-h-[480px] w-auto max-w-full rounded-lg object-contain shadow-sm ${styleWrap}`}
           />
         ) : (
           <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
@@ -502,18 +512,20 @@ export function StudioBlockEditor({
           )}
         </div>
         {isDraw ? (
-          <StudioDrawingEditor
-            value={block.text}
-            onChange={onChange}
-            disabled={disabled}
-            labels={{
-              expand: labels.expandDraw,
-              collapse: labels.collapseDraw,
-              hint: labels.drawHint,
-            }}
-          />
+          <div className={styleWrap || undefined}>
+            <StudioDrawingEditor
+              value={block.text}
+              onChange={onChange}
+              disabled={disabled}
+              labels={{
+                expand: labels.expandDraw,
+                collapse: labels.collapseDraw,
+                hint: labels.drawHint,
+              }}
+            />
+          </div>
         ) : (
-          <>
+          <div className={styleWrap || undefined}>
             {diagramSourceOpen && !disabled && (
               <textarea
                 value={block.text}
@@ -524,7 +536,7 @@ export function StudioBlockEditor({
               />
             )}
             <StudioMermaidPreview source={block.text} />
-          </>
+          </div>
         )}
       </div>
     );
@@ -553,7 +565,7 @@ export function StudioBlockEditor({
       )}
       {chrome}
       {editing && !disabled ? (
-        <div>
+        <div className={styleWrap || undefined}>
           {toolbar}
           <textarea
             ref={taRef}
@@ -582,8 +594,8 @@ export function StudioBlockEditor({
             placeholder={labels.empty}
             className={`w-full resize-none overflow-hidden border-0 bg-transparent p-0 outline-none focus:ring-0 ${
               block.kind === 'heading'
-                ? 'text-2xl font-bold leading-snug text-slate-900'
-                : 'text-[15px] leading-[1.7] text-slate-800'
+                ? `${scaleCls} font-bold leading-snug text-slate-900`
+                : `${scaleCls} leading-[1.7] text-slate-800`
             }`}
           />
           <p className="mt-1 text-[10px] text-slate-400">
@@ -594,14 +606,21 @@ export function StudioBlockEditor({
         <button
           type="button"
           disabled={disabled}
-          onClick={() => {
+          onClick={(e) => {
+            if (onToggleAiSelect && (e.shiftKey || e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              onToggleAiSelect();
+              return;
+            }
             if (!disabled) setEditing(true);
           }}
           className={`w-full rounded-md text-left outline-none transition hover:bg-slate-50/80 focus-visible:ring-2 focus-visible:ring-orange-300 ${
             disabled ? 'cursor-default' : 'cursor-text'
-          }`}
+          } ${styleWrap}`}
         >
-          <StudioMarkdown text={block.text} variant={mdVariant} emptyHint={labels.empty} />
+          <div className={scaleCls}>
+            <StudioMarkdown text={block.text} variant={mdVariant} emptyHint={labels.empty} />
+          </div>
         </button>
       )}
     </div>

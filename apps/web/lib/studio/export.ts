@@ -1,6 +1,7 @@
 import type { StudioCanvasState, StudioBlock } from '@/lib/studio/types';
 import { markdownLiteToHtml } from '@/lib/studio/markdown-lite';
 import { parseStudioDrawScene } from '@/lib/studio/draw-scene';
+import { studioBlockStyleToInlineCss } from '@/lib/studio/block-style';
 
 export type StudioBrandKit = {
   primaryColor: string;
@@ -50,34 +51,40 @@ function inlineMdHtml(s: string): string {
 
 function blockHtml(block: StudioBlock): string {
   const text = block.text || '';
+  const wrapStyle = studioBlockStyleToInlineCss(block.style);
+  const wrap = (inner: string) =>
+    wrapStyle ? `<div style="${wrapStyle}">${inner}</div>` : inner;
+
   switch (block.kind) {
     case 'heading':
-      return `<h2>${inlineMdHtml(text.replace(/^#+\s*/, '')) || '&nbsp;'}</h2>`;
+      return wrap(`<h2>${inlineMdHtml(text.replace(/^#+\s*/, '')) || '&nbsp;'}</h2>`);
     case 'bullets': {
       const items = text
         .split(/\r?\n/)
         .map((l) => l.replace(/^[-*•]\s*/, '').trim())
         .filter(Boolean);
-      if (!items.length) return `<p class="muted">—</p>`;
-      return `<ul>${items.map((i) => `<li>${inlineMdHtml(i)}</li>`).join('')}</ul>`;
+      if (!items.length) return wrap(`<p class="muted">—</p>`);
+      return wrap(`<ul>${items.map((i) => `<li>${inlineMdHtml(i)}</li>`).join('')}</ul>`);
     }
     case 'callout':
-      return `<div class="callout">${markdownLiteToHtml(text)}</div>`;
+      return wrap(`<div class="callout">${markdownLiteToHtml(text)}</div>`);
     case 'image':
-      return block.imageUrl
-        ? `<figure class="studio-image"><img src="${esc(block.imageUrl)}" alt="${esc(block.text || '')}" /></figure>`
-        : `<p class="muted">${esc(block.text || '—')}</p>`;
+      return wrap(
+        block.imageUrl
+          ? `<figure class="studio-image"><img src="${esc(block.imageUrl)}" alt="${esc(block.text || '')}" /></figure>`
+          : `<p class="muted">${esc(block.text || '—')}</p>`,
+      );
     case 'diagram': {
       const draw = parseStudioDrawScene(text);
       if (draw?.svgPreview) {
-        return `<div class="diagram-visual">${draw.svgPreview}</div>`;
+        return wrap(`<div class="diagram-visual">${draw.svgPreview}</div>`);
       }
-      return `<pre class="diagram">${esc(text)}</pre>`;
+      return wrap(`<pre class="diagram">${esc(text)}</pre>`);
     }
     case 'table':
-      return `<pre class="table-raw">${esc(text)}</pre>`;
+      return wrap(`<pre class="table-raw">${esc(text)}</pre>`);
     default:
-      return markdownLiteToHtml(text);
+      return wrap(markdownLiteToHtml(text));
   }
 }
 
