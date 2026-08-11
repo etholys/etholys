@@ -74,28 +74,35 @@ export async function POST(req: Request, ctx: Ctx) {
     const session = await getMeetSessionForCompany(id, companyId);
     if (!session) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
 
-    const startsAt = session.scheduledAt ?? new Date();
+    // Séries: sincronizar sempre o mestre (tem RRULE). Filhos têm recurrence=none.
+    const masterId = session.seriesParentId || session.id;
+    const syncSession =
+      masterId === session.id
+        ? session
+        : (await getMeetSessionForCompany(masterId, companyId)) || session;
+
+    const startsAt = syncSession.scheduledAt ?? new Date();
     const endsAt =
-      session.endsAt ??
+      syncSession.endsAt ??
       new Date(startsAt.getTime() + 60 * 60 * 1000);
 
     const recurrence =
-      session.recurrence && isMeetRecurrenceFrequency(session.recurrence)
-        ? session.recurrence
+      syncSession.recurrence && isMeetRecurrenceFrequency(syncSession.recurrence)
+        ? syncSession.recurrence
         : 'none';
-    const recurrenceRule = meetRecurrenceToRrule(recurrence, session.recurrenceUntil);
+    const recurrenceRule = meetRecurrenceToRrule(recurrence, syncSession.recurrenceUntil);
 
-    const organizerEmail = (session.createdBy?.email || '').trim().toLowerCase();
+    const organizerEmail = (syncSession.createdBy?.email || '').trim().toLowerCase();
     const notifyAttendees = body.notifyAttendees !== false;
-    const attendeeEmails = session.participants
+    const attendeeEmails = syncSession.participants
       .filter((participant) => participant.role !== 'host' && participant.email)
       .map((participant) => participant.email!.trim().toLowerCase())
       .filter((email) => email.includes('@') && email !== organizerEmail);
 
     const event = {
-      title: session.title,
-      description: [session.description, session.meetingUrl].filter(Boolean).join('\n\n'),
-      locationUrl: session.meetingUrl || undefined,
+      title: syncSession.title,
+      description: [syncSession.description, syncSession.meetingUrl].filter(Boolean).join('\n\n'),
+      locationUrl: syncSession.meetingUrl || undefined,
       startsAt,
       endsAt,
       timeZone: body.timeZone?.trim() || 'UTC',

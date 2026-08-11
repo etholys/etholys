@@ -272,6 +272,114 @@ export function meetJoinSessionId(session: {
 }
 
 export type MeetDeleteScope = 'this' | 'following' | 'series';
+export type MeetEditScope = MeetDeleteScope;
+
+/** Propaga edições a uma ocorrência, às seguintes, ou a toda a série. */
+export async function updateMeetSessionScoped(input: {
+  sessionId: string;
+  companyId: string;
+  scope?: MeetEditScope;
+  title?: string;
+  description?: string | null;
+  scheduledAt?: Date | null;
+  endsAt?: Date | null;
+}) {
+  assertMeetPrismaReady();
+  const existing = await prisma.meetSession.findFirst({
+    where: { id: input.sessionId, companyId: input.companyId },
+  });
+  if (!existing) return null;
+
+  const scope = input.scope || 'this';
+  const seriesId = existing.seriesId || existing.id;
+  const inSeries = Boolean(
+    existing.seriesId ||
+      existing.seriesParentId ||
+      (existing.recurrence && existing.recurrence !== 'none'),
+  );
+
+  const oldStart = existing.scheduledAt?.getTime() ?? null;
+  const oldEnd = existing.endsAt?.getTime() ?? null;
+  const newStart =
+    input.scheduledAt === undefined ? undefined : (input.scheduledAt?.getTime() ?? null);
+  const newEnd = input.endsAt === undefined ? undefined : (input.endsAt?.getTime() ?? null);
+  const startDelta = oldStart != null && newStart != null ? newStart - oldStart : 0;
+  const durationMs =
+    newStart != null && newEnd != null
+      ? Math.max(15 * 60_000, newEnd - newStart)
+      : oldStart != null && oldEnd != null
+        ? Math.max(15 * 60_000, oldEnd - oldStart)
+        : 60 * 60_000;
+
+  const baseData: {
+    title?: string;
+    description?: string | null;
+    scheduledAt?: Date | null;
+    endsAt?: Date | null;
+  } = {};
+  if (input.title !== undefined) baseData.title = input.title;
+  if (input.description !== undefined) baseData.description = input.description;
+
+  const include = {
+    createdBy: { select: { id: true, name: true, email: true } },
+    participants: {
+      orderBy: { invitedAt: 'asc' as const },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    },
+  };
+
+  if (!inSeries || scope === 'this') {
+    if (input.scheduledAt !== undefined) baseData.scheduledAt = input.scheduledAt;
+    if (input.endsAt !== undefined) baseData.endsAt = input.endsAt;
+    return prisma.meetSession.update({
+      where: { id: existing.id },
+      data: baseData,
+      include,
+    });
+  }
+
+  const targets = await prisma.meetSession.findMany({
+    where:
+      scope === 'following'
+        ? {
+            companyId: input.companyId,
+            OR: [
+              { id: existing.id },
+              {
+                seriesId,
+                scheduledAt: { gte: existing.scheduledAt ?? existing.createdAt },
+              },
+            ],
+          }
+        : {
+            companyId: input.companyId,
+            OR: [{ id: seriesId }, { seriesId }],
+          },
+    select: { id: true, scheduledAt: true },
+  });
+
+  await prisma.$transaction(
+    targets.map((row) => {
+      const data: typeof baseData = { ...baseData };
+      if (input.scheduledAt !== undefined || input.endsAt !== undefined) {
+        if (row.id === existing.id) {
+          if (input.scheduledAt !== undefined) data.scheduledAt = input.scheduledAt;
+          if (input.endsAt !== undefined) data.endsAt = input.endsAt;
+        } else if (row.scheduledAt && (startDelta !== 0 || input.endsAt !== undefined)) {
+          const shiftedStart = new Date(row.scheduledAt.getTime() + startDelta);
+          data.scheduledAt = shiftedStart;
+          data.endsAt = new Date(shiftedStart.getTime() + durationMs);
+        }
+      }
+      return prisma.meetSession.update({ where: { id: row.id }, data });
+    }),
+  );
+
+  return prisma.meetSession.findFirst({
+    where: { id: existing.id, companyId: input.companyId },
+    include,
+  });
+}
 
 export async function deleteMeetSessionScoped(input: {
   sessionId: string;

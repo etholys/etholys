@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   Check,
   Copy,
+  Calendar,
   Loader2,
   MapPin,
   Pencil,
@@ -50,6 +51,7 @@ type Props = {
   companyId: string;
   session: MeetEventDetail;
   currentUserId?: string | null;
+  googleCalendarReady?: boolean;
   onClose: () => void;
   onUpdated: (session: MeetEventDetail) => void;
   onDeleted: (sessionId: string) => void;
@@ -72,6 +74,7 @@ export function MeetEventDetailPopup({
   companyId,
   session,
   currentUserId,
+  googleCalendarReady,
   onClose,
   onUpdated,
   onDeleted,
@@ -81,10 +84,12 @@ export function MeetEventDetailPopup({
 
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [calBusy, setCalBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteScope, setDeleteScope] = useState<'this' | 'following' | 'series'>('this');
+  const [editScope, setEditScope] = useState<'this' | 'following' | 'series'>('series');
   const [title, setTitle] = useState(session.title);
   const [description, setDescription] = useState(session.description || '');
   const [startsAt, setStartsAt] = useState(
@@ -102,6 +107,7 @@ export function MeetEventDetailPopup({
     setEditing(false);
     setConfirmDelete(false);
     setDeleteScope('this');
+    setEditScope('series');
     setError(null);
   }, [session]);
 
@@ -160,6 +166,7 @@ export function MeetEventDetailPopup({
           description: description.trim() || null,
           scheduledAt: startsAt ? new Date(startsAt).toISOString() : null,
           endsAt: endsAt ? new Date(endsAt).toISOString() : null,
+          editScope: inSeries ? editScope : 'this',
         }),
       });
       const data = (await response.json()) as { session?: MeetEventDetail; error?: string };
@@ -170,6 +177,34 @@ export function MeetEventDetailPopup({
       setError(err instanceof Error ? err.message : 'Error');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function syncGoogleCalendar() {
+    setCalBusy(true);
+    setError(null);
+    try {
+      // Sempre o mestre da série (API resolve seriesParentId)
+      const syncId = session.seriesParentId || session.id;
+      const response = await fetch(`/api/meet/sessions/${syncId}/calendar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          provider: 'google',
+          notifyAttendees: true,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        }),
+      });
+      const data = (await response.json()) as { error?: string; event?: { htmlLink?: string } };
+      if (!response.ok) throw new Error(data.error || 'Error');
+      if (data.event?.htmlLink) {
+        window.open(data.event.htmlLink, '_blank', 'noopener,noreferrer');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error');
+    } finally {
+      setCalBusy(false);
     }
   }
 
@@ -275,6 +310,35 @@ export function MeetEventDetailPopup({
                 placeholder={t('Descrição', 'Descripción', 'Description')}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
               />
+              {inSeries && !session.isPermanent && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800">
+                  <p className="mb-2 text-xs font-medium text-slate-600">
+                    {t('Aplicar alterações a', 'Aplicar cambios a', 'Apply changes to')}
+                  </p>
+                  <div className="space-y-2">
+                    {(
+                      [
+                        ['this', t('Só esta ocorrência', 'Solo esta ocurrencia', 'Only this occurrence')],
+                        [
+                          'following',
+                          t('Esta e as seguintes', 'Esta y las siguientes', 'This and following'),
+                        ],
+                        ['series', t('Toda a série', 'Toda la serie', 'Entire series')],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <label key={value} className="flex items-center gap-2 text-xs">
+                        <input
+                          type="radio"
+                          name="editScope"
+                          checked={editScope === value}
+                          onChange={() => setEditScope(value)}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
@@ -473,6 +537,31 @@ export function MeetEventDetailPopup({
                 >
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   {t('Copiar link', 'Copiar enlace', 'Copy link')}
+                </button>
+              )}
+              {isOwner && googleCalendarReady && (
+                <button
+                  type="button"
+                  disabled={calBusy}
+                  onClick={() => void syncGoogleCalendar()}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {calBusy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Calendar className="h-4 w-4" />
+                  )}
+                  {inSeries
+                    ? t(
+                        'Enviar série ao Google Calendar',
+                        'Enviar serie a Google Calendar',
+                        'Send series to Google Calendar',
+                      )
+                    : t(
+                        'Enviar ao Google Calendar',
+                        'Enviar a Google Calendar',
+                        'Send to Google Calendar',
+                      )}
                 </button>
               )}
             </div>

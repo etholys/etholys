@@ -2,8 +2,9 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { getMeetSessionForCompany, deleteMeetSessionScoped } from '@/lib/meet/create-session';
+import { getMeetSessionForCompany, deleteMeetSessionScoped, updateMeetSessionScoped } from '@/lib/meet/create-session';
 import { prisma } from '@/lib/prisma';
+import type { MeetEditScope } from '@/lib/meet/create-session';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -51,6 +52,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
       endsAt?: string | null;
       recordingUrl?: string | null;
       transcriptText?: string | null;
+      /** this | following | series — para editar recorrências */
+      editScope?: MeetEditScope;
     };
     const companyId = body.companyId?.trim();
     if (!companyId || !tenant.companyIds.includes(companyId)) {
@@ -138,6 +141,49 @@ export async function PATCH(req: Request, ctx: Ctx) {
       return NextResponse.json({ error: 'Nada para actualizar' }, { status: 400 });
     }
 
+    const editScope: MeetEditScope =
+      body.editScope === 'following' || body.editScope === 'series' ? body.editScope : 'this';
+    const editingScheduleOrMeta =
+      data.title !== undefined ||
+      data.description !== undefined ||
+      data.scheduledAt !== undefined ||
+      data.endsAt !== undefined;
+
+    if (editingScheduleOrMeta) {
+      const scoped = await updateMeetSessionScoped({
+        sessionId: id,
+        companyId,
+        scope: editScope,
+        title: data.title,
+        description: data.description,
+        scheduledAt: data.scheduledAt,
+        endsAt: data.endsAt,
+      });
+      if (!scoped) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+
+      if (data.status || data.recordingUrl !== undefined || data.transcriptText !== undefined) {
+        const session = await prisma.meetSession.update({
+          where: { id },
+          data: {
+            ...(data.status
+              ? { status: data.status, startedAt: data.startedAt, endedAt: data.endedAt }
+              : {}),
+            ...(data.recordingUrl !== undefined ? { recordingUrl: data.recordingUrl } : {}),
+            ...(data.transcriptText !== undefined ? { transcriptText: data.transcriptText } : {}),
+          },
+          include: {
+            createdBy: { select: { id: true, name: true, email: true } },
+            participants: {
+              orderBy: { invitedAt: 'asc' },
+              include: { user: { select: { id: true, name: true, email: true } } },
+            },
+          },
+        });
+        return NextResponse.json({ session, editScope });
+      }
+      return NextResponse.json({ session: scoped, editScope });
+    }
+
     const session = await prisma.meetSession.update({
       where: { id },
       data,
@@ -149,7 +195,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
         },
       },
     });
-    return NextResponse.json({ session });
+    return NextResponse.json({ session, editScope: 'this' as const });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Error interno';
     return NextResponse.json({ error: msg }, { status: 500 });

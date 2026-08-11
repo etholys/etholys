@@ -483,6 +483,10 @@ function MeetHubContent() {
           : row,
       ),
     );
+    // Séries: recarregar lista para reflectir horários propagados
+    if (session.seriesId || session.seriesParentId || (session.recurrence && session.recurrence !== 'none')) {
+      void load();
+    }
   }
 
   function handleDetailDeleted(sessionId: string) {
@@ -952,6 +956,7 @@ function MeetHubContent() {
             companyId={companyId}
             session={detailSession}
             currentUserId={currentUserId}
+            googleCalendarReady={Boolean(connections?.google.ready)}
             onClose={() => setDetailSessionId(null)}
             onUpdated={handleDetailUpdated}
             onDeleted={handleDetailDeleted}
