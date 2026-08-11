@@ -14,11 +14,18 @@ import {
   ChevronUp,
   ChevronDown,
   Trash2,
-  Type,
+  Crosshair,
+  Sparkles,
 } from 'lucide-react';
 import type { StudioBlock, StudioBlockKind } from '@/lib/studio/types';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import { StudioMermaidPreview } from '@/components/studio/StudioMermaidPreview';
+import { StudioDrawingEditor } from '@/components/studio/StudioDrawingEditor';
+import {
+  emptyStudioDrawScene,
+  isStudioDrawBlock,
+  serializeStudioDrawScene,
+} from '@/lib/studio/draw-scene';
 
 const DIAGRAM_TEMPLATES: Array<{ id: string; label: string; source: string }> = [
   {
@@ -105,6 +112,10 @@ type Props = {
   block: StudioBlock;
   onChange: (text: string) => void;
   onKindChange?: (kind: StudioBlockKind) => void;
+  onDiagramLangChange?: (lang: 'draw' | 'mermaid') => void;
+  /** Selecionado como alvo da IA */
+  aiSelected?: boolean;
+  onToggleAiSelect?: () => void;
   onComment?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -127,6 +138,13 @@ type Props = {
     asHeading: string;
     asText: string;
     asList: string;
+    visual: string;
+    mermaid: string;
+    drawHint: string;
+    expandDraw: string;
+    collapseDraw: string;
+    selectForAi: string;
+    selectedForAi: string;
   };
 };
 
@@ -134,6 +152,9 @@ export function StudioBlockEditor({
   block,
   onChange,
   onKindChange,
+  onDiagramLangChange,
+  aiSelected,
+  onToggleAiSelect,
   onComment,
   onMoveUp,
   onMoveDown,
@@ -145,8 +166,12 @@ export function StudioBlockEditor({
   labels,
 }: Props) {
   const isDiagram = block.kind === 'diagram';
+  const isDraw = isDiagram && isStudioDrawBlock(block);
+  const isImage = block.kind === 'image';
   const [editing, setEditing] = useState(false);
-  const [diagramSourceOpen, setDiagramSourceOpen] = useState(!block.text.trim());
+  const [diagramSourceOpen, setDiagramSourceOpen] = useState(
+    () => isDiagram && !isDraw && !block.text.trim(),
+  );
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -306,6 +331,20 @@ export function StudioBlockEditor({
 
   const chrome = !disabled && (
     <div className="absolute -right-1 -top-1 z-10 flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white/95 p-0.5 opacity-0 shadow-sm transition group-hover:opacity-100 group-focus-within:opacity-100">
+      {onToggleAiSelect && (
+        <button
+          type="button"
+          onClick={onToggleAiSelect}
+          title={aiSelected ? labels.selectedForAi : labels.selectForAi}
+          className={`rounded p-1 ${
+            aiSelected
+              ? 'bg-orange-100 text-orange-700'
+              : 'text-slate-400 hover:bg-orange-50 hover:text-orange-700'
+          }`}
+        >
+          <Crosshair className="h-3.5 w-3.5" />
+        </button>
+      )}
       {onMoveUp && (
         <button
           type="button"
@@ -347,16 +386,88 @@ export function StudioBlockEditor({
     </div>
   );
 
+  if (isImage) {
+    return (
+      <div
+        ref={rootRef}
+        className={`group relative w-full rounded-lg transition ${
+          aiSelected ? 'ring-2 ring-orange-400 ring-offset-2 bg-orange-50/40' : ''
+        }`}
+      >
+        {aiSelected && (
+          <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+            <Sparkles className="h-3 w-3" /> {labels.selectedForAi}
+          </div>
+        )}
+        {chrome}
+        {block.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={block.imageUrl}
+            alt={block.text || 'image'}
+            className="mx-auto max-h-[480px] w-auto max-w-full rounded-lg object-contain shadow-sm"
+          />
+        ) : (
+          <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
+            {labels.empty}
+          </p>
+        )}
+        {block.text ? <p className="mt-2 text-center text-xs text-slate-500">{block.text}</p> : null}
+      </div>
+    );
+  }
+
   if (isDiagram) {
     return (
-      <div ref={rootRef} className="group relative w-full">
+      <div
+        ref={rootRef}
+        className={`group relative w-full rounded-lg transition ${
+          aiSelected ? 'ring-2 ring-orange-400 ring-offset-2 bg-orange-50/40' : ''
+        }`}
+      >
+        {aiSelected && (
+          <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+            <Sparkles className="h-3 w-3" /> {labels.selectedForAi}
+          </div>
+        )}
         {chrome}
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
           <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             <GitBranch className="h-3 w-3" />
-            Mermaid
+            {isDraw ? labels.visual : labels.mermaid}
           </span>
-          {!disabled && (
+          {onDiagramLangChange && !disabled && (
+            <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isDraw) return;
+                  onDiagramLangChange('draw');
+                  onChange(serializeStudioDrawScene(emptyStudioDrawScene()));
+                }}
+                className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
+                  isDraw ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                }`}
+              >
+                {labels.visual}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isDraw) return;
+                  onDiagramLangChange('mermaid');
+                  onChange('flowchart TD\n  A[Início] --> B[Fim]');
+                  setDiagramSourceOpen(true);
+                }}
+                className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
+                  !isDraw ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                }`}
+              >
+                {labels.mermaid}
+              </button>
+            </div>
+          )}
+          {!isDraw && !disabled && (
             <>
               <button
                 type="button"
@@ -390,16 +501,31 @@ export function StudioBlockEditor({
             </>
           )}
         </div>
-        {diagramSourceOpen && !disabled && (
-          <textarea
+        {isDraw ? (
+          <StudioDrawingEditor
             value={block.text}
-            onChange={(e) => onChange(e.target.value)}
-            spellCheck={false}
-            rows={8}
-            className="mb-3 w-full resize-y rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-800 outline-none focus:border-orange-400"
+            onChange={onChange}
+            disabled={disabled}
+            labels={{
+              expand: labels.expandDraw,
+              collapse: labels.collapseDraw,
+              hint: labels.drawHint,
+            }}
           />
+        ) : (
+          <>
+            {diagramSourceOpen && !disabled && (
+              <textarea
+                value={block.text}
+                onChange={(e) => onChange(e.target.value)}
+                spellCheck={false}
+                rows={8}
+                className="mb-3 w-full resize-y rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-800 outline-none focus:border-orange-400"
+              />
+            )}
+            <StudioMermaidPreview source={block.text} />
+          </>
         )}
-        <StudioMermaidPreview source={block.text} />
       </div>
     );
   }
@@ -414,7 +540,17 @@ export function StudioBlockEditor({
           : 'body';
 
   return (
-    <div ref={rootRef} className="group relative w-full">
+    <div
+      ref={rootRef}
+      className={`group relative w-full rounded-lg transition ${
+        aiSelected ? 'ring-2 ring-orange-400 ring-offset-2 bg-orange-50/40' : ''
+      }`}
+    >
+      {aiSelected && (
+        <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+          <Sparkles className="h-3 w-3" /> {labels.selectedForAi}
+        </div>
+      )}
       {chrome}
       {editing && !disabled ? (
         <div>

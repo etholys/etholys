@@ -1,5 +1,6 @@
 import type { StudioCanvasState, StudioBlock } from '@/lib/studio/types';
 import { markdownLiteToHtml } from '@/lib/studio/markdown-lite';
+import { parseStudioDrawScene } from '@/lib/studio/draw-scene';
 
 export type StudioBrandKit = {
   primaryColor: string;
@@ -62,8 +63,17 @@ function blockHtml(block: StudioBlock): string {
     }
     case 'callout':
       return `<div class="callout">${markdownLiteToHtml(text)}</div>`;
-    case 'diagram':
+    case 'image':
+      return block.imageUrl
+        ? `<figure class="studio-image"><img src="${esc(block.imageUrl)}" alt="${esc(block.text || '')}" /></figure>`
+        : `<p class="muted">${esc(block.text || '—')}</p>`;
+    case 'diagram': {
+      const draw = parseStudioDrawScene(text);
+      if (draw?.svgPreview) {
+        return `<div class="diagram-visual">${draw.svgPreview}</div>`;
+      }
       return `<pre class="diagram">${esc(text)}</pre>`;
+    }
     case 'table':
       return `<pre class="table-raw">${esc(text)}</pre>`;
     default:
@@ -110,6 +120,10 @@ export function studioCanvasToHtml(
   li { margin: 4px 0; }
   .callout { background: #fff7ed; border-left: 4px solid ${color}; padding: 12px 14px; margin: 10px 0; border-radius: 0 8px 8px 0; }
   .diagram, .table-raw { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; font-size: 10px; white-space: pre-wrap; overflow-wrap: break-word; }
+  .diagram-visual { margin: 12px 0; text-align: center; }
+  .diagram-visual svg { max-width: 100%; height: auto; }
+  .studio-image { margin: 14px 0; text-align: center; }
+  .studio-image img { max-width: 100%; height: auto; border-radius: 6px; }
   .muted { color: #94a3b8; }
   .footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 9px; color: #94a3b8; text-align: center; }
 </style></head><body>
@@ -156,9 +170,14 @@ export async function studioCanvasToDocxBuffer(
           paras.push(wParagraph(wRun(`• ${stripMdMarkers(item)}`, { size: 22 })));
         }
       } else if (block.kind === 'diagram') {
-        paras.push(wParagraph(wRun('[Diagrama Mermaid]', { size: 18, color: '94A3B8' })));
-        for (const line of (block.text || '').split(/\r?\n/)) {
-          paras.push(wParagraph(wRun(line || ' ', { size: 18 })));
+        const draw = parseStudioDrawScene(block.text || '');
+        if (draw?.svgPreview) {
+          paras.push(wParagraph(wRun('[Diagrama visual]', { size: 18, color: '94A3B8' })));
+        } else {
+          paras.push(wParagraph(wRun('[Diagrama]', { size: 18, color: '94A3B8' })));
+          for (const line of (block.text || '').split(/\r?\n/).slice(0, 40)) {
+            paras.push(wParagraph(wRun(line || ' ', { size: 18 })));
+          }
         }
       } else {
         for (const line of (block.text || ' ').split(/\r?\n/)) {

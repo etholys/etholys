@@ -33,7 +33,8 @@
 |------|---------|--------|
 | **F0** | Spec + pastas + docs + templates seed + editor dual-pane + agente consent | ✅ |
 | **F1** | Kit de marca da empresa + export PDF/DOCX | ✅ |
-| **F2** | Diagramas editáveis + “ajusta o diagrama” no chat | ✅ preview Mermaid + patches via agente |
+| **F2** | Diagramas editáveis + “ajusta o diagrama” no chat | ✅ Mermaid + quadro visual Excalidraw |
+| **F2.4** | Âmbito IA por secção + anti-wipe | ✅ seleção de blocos (mira) + filtro servidor |
 | **F2.1** | Permissões / partilha pasta+doc (membros + email externo; papéis viewer/editor/admin) | ✅ |
 | **F2.2** | Contexto IA: ficheiros na pasta + anexos no chat | ✅ |
 | **F2.3** | Editor: chat esquerdo redimensionável, undo/versões, folhas A4/A3, moldes | ✅ |
@@ -92,6 +93,7 @@ Distinto do modelo `Document` (blob S3).
 - Conhece o **catálogo** do ecossistema (o que existe), mas **não injeta dados** sem consentimento explícito no turno  
 - Resposta estruturada: mensagem + `canvasPatches` e/ou `consentRequest`  
 - UI: se `consentRequest`, mostrar fontes e botões Sim/Não; só depois reenvia com `approvedSources`
+- **Âmbito:** o utilizador pode selecionar blocos (mira) → `targetBlockIds` no copiloto; o servidor **filtra** patches fora do âmbito e **bloqueia** reescritas do documento inteiro
 
 ---
 

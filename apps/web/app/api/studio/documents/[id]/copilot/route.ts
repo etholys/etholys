@@ -12,6 +12,7 @@ import { recordStudioActivity, truncatePreview } from '@/lib/studio/activity';
 import { buildStudioSystemPrompt, parseStudioCopilotJson } from '@/lib/studio/agent';
 import {
   applyStudioCanvasPatches,
+  sanitizeStudioCanvasPatches,
   type StudioCanvasState,
 } from '@/lib/studio/types';
 import { prismaHasEnumValue } from '@/lib/prisma-has-field';
@@ -59,6 +60,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const attachmentIds = Array.isArray(body.attachmentIds)
     ? body.attachmentIds.filter((s): s is string => typeof s === 'string')
     : [];
+  const targetBlockIds = Array.isArray(body.targetBlockIds)
+    ? body.targetBlockIds.filter((s): s is string => typeof s === 'string').slice(0, 40)
+    : typeof body.targetBlockId === 'string' && body.targetBlockId
+      ? [body.targetBlockId]
+      : [];
 
   let canvas = doc.canvasState as StudioCanvasState;
   if (body.canvasState && typeof body.canvasState === 'object') {
@@ -95,6 +101,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       context: {
         approvedSources,
         attachmentIds,
+        targetBlockIds,
         documentId: doc.id,
         userId: user.id,
         userName: user.name,
@@ -134,15 +141,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     catalog: studioCatalogForCompany(),
     approvedContext: approvedContext || null,
     userUploadedContext: userUploadedContext || null,
+    targetBlockIds: targetBlockIds.length ? targetBlockIds : null,
   });
+
+  const scopedUserText =
+    targetBlockIds.length > 0
+      ? `[Âmbito de edição — só estes blockId: ${targetBlockIds.join(', ')}]\n\n${message}`
+      : message;
 
   let raw: string;
   try {
     const { text, finishReason } = await llmGenerateContent({
       systemInstruction: system,
-      userText: multimodalParts.length ? undefined : message,
+      userText: multimodalParts.length ? undefined : scopedUserText,
       userParts: multimodalParts.length
-        ? [{ text: message }, ...multimodalParts]
+        ? [{ text: scopedUserText }, ...multimodalParts]
         : undefined,
       maxOutputTokens: 8000,
       temperature: 0.1,
@@ -161,11 +174,34 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const payload = parseStudioCopilotJson(raw);
-  const nextCanvas = applyStudioCanvasPatches(canvas, payload.canvasPatches || []);
-  const patchCount = payload.canvasPatches?.length || 0;
+  const sanitized = sanitizeStudioCanvasPatches(canvas, payload.canvasPatches || [], {
+    targetBlockIds,
+  });
+  const safePatches = sanitized.patches;
+  const nextCanvas = applyStudioCanvasPatches(canvas, safePatches);
+  const patchCount = safePatches.length;
+
+  let assistantMessage = payload.message || 'Pronto.';
+  if (sanitized.blockedFullRewrite) {
+    assistantMessage +=
+      locale === 'es'
+        ? '\n\n⚠️ Bloqueé una reescritura completa del documento. Selecciona la sección (bloque) a ajustar e inténtalo de nuevo.'
+        : locale === 'en'
+          ? '\n\n⚠️ Blocked a full-document rewrite. Select the section (block) to adjust and try again.'
+          : '\n\n⚠️ Bloqueei uma reescrita completa do documento. Seleciona a secção (bloco) a ajustar e tenta de novo.';
+  } else if (sanitized.dropped > 0 && targetBlockIds.length) {
+    assistantMessage +=
+      locale === 'es'
+        ? `\n\n(Se ignoraron ${sanitized.dropped} cambio(s) fuera del ámbito seleccionado.)`
+        : locale === 'en'
+          ? `\n\n(Ignored ${sanitized.dropped} change(s) outside the selected scope.)`
+          : `\n\n(Ignorei ${sanitized.dropped} alteração(ões) fora do âmbito selecionado.)`;
+  }
 
   const titleUpdate =
-    payload.suggestedTitle && payload.suggestedTitle.length > 2
+    !targetBlockIds.length &&
+    payload.suggestedTitle &&
+    payload.suggestedTitle.length > 2
       ? payload.suggestedTitle.slice(0, 200)
       : undefined;
 
@@ -206,15 +242,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     data: {
       sessionId: aiSessionId,
       role: 'assistant',
-      content: payload.message,
+      content: assistantMessage,
       context: {
-        canvasPatches: payload.canvasPatches,
+        canvasPatches: safePatches,
         consentRequest: payload.consentRequest,
         suggestedTitle: payload.suggestedTitle,
         triggeredByUserId: user.id,
         triggeredByName: user.name,
         triggeredByEmail: user.email,
         patchCount,
+        targetBlockIds,
+        droppedPatches: sanitized.dropped,
+        blockedFullRewrite: sanitized.blockedFullRewrite,
       },
     },
   });
@@ -223,12 +262,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     documentId: doc.id,
     companyId: effectiveCompanyId,
     kind: 'ai_response',
-    summary: `IA respondeu a ${who}: «${truncatePreview(payload.message)}»`,
+    summary: `IA respondeu a ${who}: «${truncatePreview(assistantMessage)}»`,
     actorUserId: user.id,
     meta: {
-      messagePreview: truncatePreview(payload.message, 240),
+      messagePreview: truncatePreview(assistantMessage, 240),
       patchCount,
       suggestedTitle: titleUpdate || null,
+      targetBlockIds,
     },
   });
 
@@ -241,13 +281,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       actorUserId: user.id,
       meta: {
         patchCount,
-        blockIds: (payload.canvasPatches || []).map((p) => p.blockId).slice(0, 40),
+        blockIds: safePatches.map((p) => p.blockId).slice(0, 40),
+        targetBlockIds,
       },
     });
   }
 
   return NextResponse.json({
-    message: payload.message,
+    message: assistantMessage,
     canvasState: nextCanvas,
     consentRequest: payload.consentRequest ?? null,
     suggestedTitle: titleUpdate ?? null,

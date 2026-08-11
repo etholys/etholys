@@ -24,6 +24,9 @@ import {
   MessageSquare,
   Mic,
   MicOff,
+  Crosshair,
+  Sparkles,
+  ImagePlus,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
@@ -47,6 +50,10 @@ import {
 } from '@/components/studio/StudioContextPanel';
 import { StudioCommentsPanel } from '@/components/studio/StudioCommentsPanel';
 import { StudioBlockEditor } from '@/components/studio/StudioBlockEditor';
+import {
+  emptyStudioDrawScene,
+  serializeStudioDrawScene,
+} from '@/lib/studio/draw-scene';
 
 type ChatMsg = {
   id: string;
@@ -151,6 +158,10 @@ export default function StudioDocumentPage() {
   const titleRef = useRef('');
   const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [dictationInterim, setDictationInterim] = useState('');
+  /** Blocos selecionados como âmbito da IA (anti-wipe) */
+  const [aiTargetBlockIds, setAiTargetBlockIds] = useState<string[]>([]);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const [imageTargetPageId, setImageTargetPageId] = useState<string | null>(null);
 
   useEffect(() => {
     dirtyRef.current = dirty;
@@ -528,7 +539,11 @@ export default function StudioDocumentPage() {
   function updateBlock(
     pageId: string,
     blockId: string,
-    patch: { text?: string; kind?: StudioBlock['kind'] },
+    patch: {
+      text?: string;
+      kind?: StudioBlock['kind'];
+      diagramLang?: StudioBlock['diagramLang'];
+    },
   ) {
     applyCanvas((prev) => ({
       ...prev,
@@ -545,10 +560,13 @@ export default function StudioDocumentPage() {
                       ...(patch.kind !== undefined
                         ? {
                             kind: patch.kind,
-                            ...(patch.kind === 'diagram'
-                              ? { diagramLang: 'mermaid' as const }
+                            ...(patch.kind === 'diagram' && !patch.diagramLang
+                              ? { diagramLang: 'draw' as const }
                               : {}),
                           }
+                        : {}),
+                      ...(patch.diagramLang !== undefined
+                        ? { diagramLang: patch.diagramLang }
                         : {}),
                     }
                   : b,
@@ -587,6 +605,23 @@ export default function StudioDocumentPage() {
     }
   }
 
+  function toggleAiTarget(blockId: string) {
+    setAiTargetBlockIds((prev) =>
+      prev.includes(blockId) ? prev.filter((id) => id !== blockId) : [...prev, blockId],
+    );
+  }
+
+  function blockLabel(blockId: string): string {
+    if (!canvas) return blockId;
+    for (const page of canvas.pages) {
+      const b = page.blocks.find((x) => x.id === blockId);
+      if (!b) continue;
+      const raw = (b.title || b.text || b.kind).replace(/\s+/g, ' ').trim();
+      return raw.slice(0, 48) || b.kind;
+    }
+    return blockId;
+  }
+
   async function sendChat(opts?: { text?: string; approvedSources?: string[] }) {
     const text = (opts?.text ?? input).trim();
     if (!text || !canvas || chatBusy) return;
@@ -600,7 +635,11 @@ export default function StudioDocumentPage() {
       filesToSend.length > 0
         ? `\n\n[${filesToSend.length} anexo(s): ${filesToSend.map((f) => f.name).join(', ')}]`
         : '';
-    setMessages((m) => [...m, { id: tempId, role: 'user', content: text + attachNote }]);
+    const scopeNote =
+      aiTargetBlockIds.length > 0
+        ? `\n\n[${t('Âmbito', 'Ámbito', 'Scope')}: ${aiTargetBlockIds.map(blockLabel).join(' · ')}]`
+        : '';
+    setMessages((m) => [...m, { id: tempId, role: 'user', content: text + attachNote + scopeNote }]);
 
     try {
       const attachmentIds: string[] = [];
@@ -623,6 +662,7 @@ export default function StudioDocumentPage() {
           canvasState: canvas,
           approvedSources: opts?.approvedSources || [],
           attachmentIds,
+          targetBlockIds: aiTargetBlockIds,
         }),
       });
       const d = await r.json();
@@ -780,14 +820,15 @@ export default function StudioDocumentPage() {
               kind,
               text:
                 kind === 'diagram'
-                  ? 'flowchart TD\n  A[Início] --> B[Fim]'
+                  ? serializeStudioDrawScene(emptyStudioDrawScene())
                   : kind === 'bullets'
                     ? '- '
-                    : kind === 'heading'
+                    : kind === 'image'
                       ? ''
                       : '',
               order,
-              ...(kind === 'diagram' ? { diagramLang: 'mermaid' as const } : {}),
+              ...(kind === 'diagram' ? { diagramLang: 'draw' as const } : {}),
+              ...(kind === 'image' ? { imageUrl: null } : {}),
             },
           ],
         };
@@ -827,6 +868,7 @@ export default function StudioDocumentPage() {
         };
       }),
     }));
+    setAiTargetBlockIds((ids) => ids.filter((id) => id !== blockId));
   }
 
   async function reloadFromServer() {
@@ -1078,11 +1120,44 @@ export default function StudioDocumentPage() {
             </h2>
             <p className="mt-0.5 text-xs text-slate-500">
               {t(
-                'Enter = nova linha · Ctrl+Enter = enviar. Pedidos pontuais não reescrevem o resto.',
-                'Enter = nueva línea · Ctrl+Enter = enviar. Pedidos puntuales no reescriben el resto.',
-                'Enter = new line · Ctrl+Enter = send. Small asks won’t rewrite the rest.',
+                'Seleciona secções na folha (mira) e pede ajustes só aí. Enter = linha · Ctrl+Enter = enviar.',
+                'Selecciona secciones en la hoja (mira) y pide ajustes solo ahí. Enter = línea · Ctrl+Enter = enviar.',
+                'Select sections on the page (crosshair) and ask for edits only there. Enter = line · Ctrl+Enter = send.',
               )}
             </p>
+            {aiTargetBlockIds.length > 0 && (
+              <div className="mt-2 rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-2">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <p className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-orange-800">
+                    <Crosshair className="h-3 w-3" />
+                    {t('Âmbito IA', 'Ámbito IA', 'AI scope')}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setAiTargetBlockIds([])}
+                    className="text-[11px] font-semibold text-orange-700 underline"
+                  >
+                    {t('Limpar', 'Limpiar', 'Clear')}
+                  </button>
+                </div>
+                <ul className="flex flex-wrap gap-1">
+                  {aiTargetBlockIds.map((bid) => (
+                    <li key={bid}>
+                      <button
+                        type="button"
+                        onClick={() => toggleAiTarget(bid)}
+                        className="inline-flex max-w-[12rem] items-center gap-1 truncate rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-orange-900 ring-1 ring-orange-200"
+                        title={bid}
+                      >
+                        <Sparkles className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{blockLabel(bid)}</span>
+                        <X className="h-3 w-3 shrink-0 opacity-60" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {folderContextCount > 0 && (
               <p className="mt-1 text-[11px] font-medium text-amber-800">
                 {folderContextCount}{' '}
@@ -1094,9 +1169,9 @@ export default function StudioDocumentPage() {
             {messages.length === 0 && (
               <p className="text-sm text-slate-500">
                 {t(
-                  'Ex.: «Acrescenta o prazo no resumo» (só muda o necessário).',
-                  'Ej.: «Añade el plazo en el resumen» (solo cambia lo necesario).',
-                  'E.g. “Add the deadline to the summary” (only changes what’s needed).',
+                  'Dica: passa o rato num bloco → mira → «usar na IA». Ex.: «reescreve só isto com tom mais formal».',
+                  'Tip: pasa el ratón por un bloque → mira → «usar en IA». Ej.: «reescribe solo esto con tono más formal».',
+                  'Tip: hover a block → crosshair → “use for AI”. E.g. “rewrite only this more formally”.',
                 )}
               </p>
             )}
@@ -1302,7 +1377,112 @@ export default function StudioDocumentPage() {
               {canvas.pages.length}{' '}
               {t('folha(s)', 'hoja(s)', 'page(s)')} · {pageSize}
             </span>
+            {aiTargetBlockIds.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-900">
+                <Crosshair className="h-3 w-3" />
+                {aiTargetBlockIds.length}{' '}
+                {t('secção(ões) para IA', 'sección(es) para IA', 'section(s) for AI')}
+              </span>
+            )}
           </div>
+
+          {/* Faixa de design (Docs + Canva) */}
+          {canEdit && (
+            <div className="sticky top-0 z-20 mx-auto mb-4 flex w-full max-w-[720px] flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white/95 px-2 py-1.5 shadow-sm backdrop-blur">
+              <span className="px-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                {t('Inserir', 'Insertar', 'Insert')}
+              </span>
+              {(
+                [
+                  ['paragraph', t('Texto', 'Texto', 'Text')],
+                  ['heading', t('Título', 'Título', 'Heading')],
+                  ['bullets', t('Lista', 'Lista', 'List')],
+                  ['callout', t('Destaque', 'Destacado', 'Callout')],
+                  ['diagram', t('Diagrama', 'Diagrama', 'Diagram')],
+                ] as const
+              ).map(([kind, label]) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => {
+                    const pageId = activePageId || canvas.pages[0]?.id;
+                    if (pageId) addBlock(pageId, kind);
+                  }}
+                  className="rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-orange-300 hover:bg-orange-50"
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  const pageId = activePageId || canvas.pages[0]?.id;
+                  if (!pageId) return;
+                  setImageTargetPageId(pageId);
+                  imageInputRef.current?.click();
+                }}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-orange-300 hover:bg-orange-50"
+              >
+                <ImagePlus className="h-3.5 w-3.5" />
+                {t('Imagem', 'Imagen', 'Image')}
+              </button>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  const pageId = imageTargetPageId || activePageId || canvas.pages[0]?.id;
+                  if (!file || !pageId) return;
+                  if (file.size > 2_500_000) {
+                    alert(
+                      t(
+                        'Imagem demasiado grande (máx. ~2,5 MB).',
+                        'Imagen demasiado grande (máx. ~2,5 MB).',
+                        'Image too large (max ~2.5 MB).',
+                      ),
+                    );
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+                    if (!dataUrl) return;
+                    applyCanvas((prev) => ({
+                      ...prev,
+                      pages: prev.pages.map((p) => {
+                        if (p.id !== pageId) return p;
+                        const order = p.blocks.length;
+                        return {
+                          ...p,
+                          blocks: [
+                            ...p.blocks,
+                            {
+                              id: `block-${Date.now()}-${order}`,
+                              kind: 'image' as const,
+                              text: file.name,
+                              imageUrl: dataUrl,
+                              order,
+                            },
+                          ],
+                        };
+                      }),
+                    }));
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+              <span className="ml-auto px-1 text-[10px] text-slate-400">
+                {t(
+                  'Mira num bloco = âmbito da IA',
+                  'Mira en un bloque = ámbito de la IA',
+                  'Crosshair on a block = AI scope',
+                )}
+              </span>
+            </div>
+          )}
 
           <div className="mx-auto flex flex-col items-center gap-10 pb-16">
             {canvas.pages
@@ -1317,7 +1497,12 @@ export default function StudioDocumentPage() {
                     ? mold.imageUrl
                     : null;
                 return (
-                  <section key={page.id} className="relative">
+                  <section
+                    key={page.id}
+                    className="relative"
+                    onFocusCapture={() => setActivePageId(page.id)}
+                    onMouseDown={() => setActivePageId(page.id)}
+                  >
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2" style={{ width }}>
                       <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         {page.title || `${t('Folha', 'Hoja', 'Sheet')} ${idx + 1}`} · {size}
@@ -1379,11 +1564,16 @@ export default function StudioDocumentPage() {
                               key={block.id}
                               block={block}
                               disabled={!canEdit}
+                              aiSelected={aiTargetBlockIds.includes(block.id)}
+                              onToggleAiSelect={() => toggleAiTarget(block.id)}
                               canMoveUp={blockIdx > 0}
                               canMoveDown={blockIdx < arr.length - 1}
                               canDelete={arr.length > 1}
                               onChange={(text) => updateBlock(page.id, block.id, { text })}
                               onKindChange={(kind) => updateBlock(page.id, block.id, { kind })}
+                              onDiagramLangChange={(diagramLang) =>
+                                updateBlock(page.id, block.id, { diagramLang })
+                              }
                               onMoveUp={() => moveBlock(page.id, block.id, -1)}
                               onMoveDown={() => moveBlock(page.id, block.id, 1)}
                               onDelete={() => removeBlock(page.id, block.id)}
@@ -1405,6 +1595,17 @@ export default function StudioDocumentPage() {
                                 asHeading: t('Como título', 'Como título', 'As heading'),
                                 asText: t('Como texto', 'Como texto', 'As text'),
                                 asList: t('Como lista', 'Como lista', 'As list'),
+                                visual: t('Visual', 'Visual', 'Visual'),
+                                mermaid: 'Mermaid',
+                                drawHint: t(
+                                  'Formas, setas, texto e lápis — estilo quadro branco',
+                                  'Formas, flechas, texto y lápiz — estilo pizarra',
+                                  'Shapes, arrows, text and pen — whiteboard style',
+                                ),
+                                expandDraw: t('Ecrã completo', 'Pantalla completa', 'Full screen'),
+                                collapseDraw: t('Fechar', 'Cerrar', 'Close'),
+                                selectForAi: t('Usar na IA', 'Usar en la IA', 'Use for AI'),
+                                selectedForAi: t('No âmbito da IA', 'En ámbito de IA', 'In AI scope'),
                               }}
                             />
                           ))}
@@ -1416,13 +1617,22 @@ export default function StudioDocumentPage() {
                                 ['heading', t('+ Título', '+ Título', '+ Heading')],
                                 ['bullets', t('+ Lista', '+ Lista', '+ List')],
                                 ['callout', t('+ Destaque', '+ Destacado', '+ Callout')],
-                                ['diagram', t('+ Diagrama', '+ Diagrama', '+ Diagram')],
+                                ['diagram', t('+ Diagrama visual', '+ Diagrama visual', '+ Visual diagram')],
+                                ['image', t('+ Imagem', '+ Imagen', '+ Image')],
                               ] as const
                             ).map(([kind, label]) => (
                               <button
                                 key={kind}
                                 type="button"
-                                onClick={() => addBlock(page.id, kind)}
+                                onClick={() => {
+                                  if (kind === 'image') {
+                                    setImageTargetPageId(page.id);
+                                    setActivePageId(page.id);
+                                    imageInputRef.current?.click();
+                                    return;
+                                  }
+                                  addBlock(page.id, kind);
+                                }}
                                 className="rounded-lg border border-slate-200 bg-white/80 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:border-orange-300 hover:bg-orange-50"
                               >
                                 {label}

@@ -40,7 +40,8 @@ export type StudioBlock = {
   kind: StudioBlockKind;
   title?: string;
   text: string;
-  diagramLang?: 'mermaid' | 'text';
+  /** mermaid = código; draw = quadro visual (Excalidraw JSON); text = legado */
+  diagramLang?: 'mermaid' | 'draw' | 'text';
   imageUrl?: string | null;
   order: number;
 };
@@ -69,6 +70,7 @@ export type StudioCanvasPatch = {
   text?: string;
   title?: string;
   kind?: StudioBlockKind;
+  diagramLang?: StudioBlock['diagramLang'];
 };
 
 export type StudioConsentSource = {
@@ -158,7 +160,10 @@ export function normalizeStudioCanvas(raw: unknown): StudioCanvasState {
                 kind: (b.kind as StudioBlockKind) || 'paragraph',
                 title: b.title,
                 text: typeof b.text === 'string' ? b.text : '',
-                diagramLang: b.diagramLang,
+                diagramLang:
+                  b.diagramLang === 'draw' || b.diagramLang === 'mermaid' || b.diagramLang === 'text'
+                    ? b.diagramLang
+                    : undefined,
                 imageUrl: b.imageUrl ?? null,
                 order: typeof b.order === 'number' ? b.order : j,
               }))
@@ -185,10 +190,57 @@ export function applyStudioCanvasPatches(
         text: patch.text !== undefined ? patch.text : block.text,
         title: patch.title !== undefined ? patch.title : block.title,
         kind: patch.kind ?? block.kind,
+        diagramLang: patch.diagramLang !== undefined ? patch.diagramLang : block.diagramLang,
       };
     }),
   }));
   return { ...canvas, pages };
+}
+
+/** Conta blocos no canvas. */
+export function countStudioBlocks(canvas: StudioCanvasState): number {
+  return canvas.pages.reduce((n, p) => n + (p.blocks?.length || 0), 0);
+}
+
+/**
+ * Filtra patches da IA: âmbito explícito + anti-wipe (não deixar substituir o doc inteiro).
+ */
+export function sanitizeStudioCanvasPatches(
+  canvas: StudioCanvasState,
+  patches: StudioCanvasPatch[],
+  opts?: { targetBlockIds?: string[] | null },
+): { patches: StudioCanvasPatch[]; dropped: number; blockedFullRewrite: boolean } {
+  const raw = Array.isArray(patches) ? patches : [];
+  const known = new Set(
+    canvas.pages.flatMap((p) => p.blocks.map((b) => b.id)),
+  );
+  let next = raw.filter((p) => p && typeof p.blockId === 'string' && known.has(p.blockId));
+
+  const targets = (opts?.targetBlockIds || []).filter((id) => known.has(id));
+  if (targets.length) {
+    const allow = new Set(targets);
+    next = next.filter((p) => allow.has(p.blockId));
+  }
+
+  // Nunca aplicar text vazio (apaga conteúdo) salvo o patch ser só title
+  next = next.filter((p) => {
+    if (p.text === undefined) return true;
+    if (p.text.trim().length > 0) return true;
+    return false;
+  });
+
+  const total = countStudioBlocks(canvas);
+  let blockedFullRewrite = false;
+  if (!targets.length && total > 2 && next.length >= total) {
+    blockedFullRewrite = true;
+    next = [];
+  }
+
+  return {
+    patches: next,
+    dropped: Math.max(0, raw.length - next.length),
+    blockedFullRewrite,
+  };
 }
 
 /** Largura CSS da folha no ecrã (px), altura proporcional. */

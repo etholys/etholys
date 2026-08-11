@@ -41,6 +41,7 @@ const nextConfig = {
     ignoreBuildErrors: process.env.SKIP_TYPECHECK === '1',
   },
   images: { unoptimized: true },
+  transpilePackages: ['@excalidraw/excalidraw'],
 };
 
 module.exports = nextConfig;
