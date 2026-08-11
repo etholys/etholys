@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Bold,
   Italic,
+  Underline,
   List,
   Heading2,
   Code2,
@@ -16,6 +17,10 @@ import {
   Trash2,
   Crosshair,
   Sparkles,
+  Type,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from 'lucide-react';
 import type { StudioBlock, StudioBlockKind, StudioBlockStyle } from '@/lib/studio/types';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
@@ -251,14 +256,17 @@ export function StudioBlockEditor({
     });
   }, [onChange]);
 
+  const toolBtn =
+    'rounded p-1.5 text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-40';
+
   const toolbar = !disabled && editing && !isDiagram && (
-    <div className="mb-2 flex flex-wrap items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-1">
+    <div className="mb-2 flex flex-wrap items-center gap-0.5 rounded-xl border border-slate-200/90 bg-white px-1.5 py-1 shadow-sm">
       <button
         type="button"
         title={labels.bold}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => applyWrap('**', '**')}
-        className="rounded p-1.5 text-slate-600 hover:bg-white hover:text-slate-900"
+        className={toolBtn}
       >
         <Bold className="h-3.5 w-3.5" />
       </button>
@@ -267,16 +275,25 @@ export function StudioBlockEditor({
         title={labels.italic}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => applyWrap('*', '*')}
-        className="rounded p-1.5 text-slate-600 hover:bg-white hover:text-slate-900"
+        className={toolBtn}
       >
         <Italic className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        title="Underline"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => applyWrap('<u>', '</u>')}
+        className={toolBtn}
+      >
+        <Underline className="h-3.5 w-3.5" />
       </button>
       <button
         type="button"
         title={labels.heading}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => applyHeadingLine()}
-        className="rounded p-1.5 text-slate-600 hover:bg-white hover:text-slate-900"
+        className={toolBtn}
       >
         <Heading2 className="h-3.5 w-3.5" />
       </button>
@@ -285,7 +302,7 @@ export function StudioBlockEditor({
         title={labels.list}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => applyList()}
-        className="rounded p-1.5 text-slate-600 hover:bg-white hover:text-slate-900"
+        className={toolBtn}
       >
         <List className="h-3.5 w-3.5" />
       </button>
@@ -294,7 +311,7 @@ export function StudioBlockEditor({
         title={labels.code}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => applyWrap('`', '`')}
-        className="rounded p-1.5 text-slate-600 hover:bg-white hover:text-slate-900"
+        className={toolBtn}
       >
         <Code2 className="h-3.5 w-3.5" />
       </button>
@@ -307,7 +324,7 @@ export function StudioBlockEditor({
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onKindChange('heading')}
             className={`rounded px-1.5 py-1 text-[10px] font-semibold ${
-              block.kind === 'heading' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-white'
+              block.kind === 'heading' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'
             }`}
           >
             H
@@ -318,7 +335,7 @@ export function StudioBlockEditor({
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onKindChange('paragraph')}
             className={`rounded p-1.5 ${
-              block.kind === 'paragraph' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-white'
+              block.kind === 'paragraph' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'
             }`}
           >
             <Type className="h-3.5 w-3.5" />
@@ -329,11 +346,43 @@ export function StudioBlockEditor({
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onKindChange('bullets')}
             className={`rounded p-1.5 ${
-              block.kind === 'bullets' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-white'
+              block.kind === 'bullets' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'
             }`}
           >
             <List className="h-3.5 w-3.5" />
           </button>
+        </>
+      )}
+      {onStyleChange && (
+        <>
+          <span className="mx-1 h-4 w-px bg-slate-200" />
+          {(
+            [
+              ['left', AlignLeft],
+              ['center', AlignCenter],
+              ['right', AlignRight],
+            ] as const
+          ).map(([align, Icon]) => (
+            <button
+              key={align}
+              type="button"
+              title={align}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() =>
+                onStyleChange({
+                  ...(block.style || {}),
+                  align,
+                })
+              }
+              className={`rounded p-1.5 ${
+                (block.style?.align || 'left') === align
+                  ? 'bg-slate-800 text-white'
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+            </button>
+          ))}
         </>
       )}
     </div>
@@ -415,7 +464,7 @@ export function StudioBlockEditor({
           <img
             src={block.imageUrl}
             alt={block.text || 'image'}
-            className={`mx-auto max-h-[480px] w-auto max-w-full rounded-lg object-contain shadow-sm ${styleWrap}`}
+            className={`mx-auto max-h-[200px] w-auto max-w-full rounded-lg object-contain shadow-sm ${styleWrap}`}
           />
         ) : (
           <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
@@ -517,10 +566,13 @@ export function StudioBlockEditor({
               value={block.text}
               onChange={onChange}
               disabled={disabled}
+              previewMaxHeight={200}
               labels={{
                 expand: labels.expandDraw,
                 collapse: labels.collapseDraw,
                 hint: labels.drawHint,
+                edit: labels.edit,
+                preview: labels.preview,
               }}
             />
           </div>
@@ -565,7 +617,9 @@ export function StudioBlockEditor({
       )}
       {chrome}
       {editing && !disabled ? (
-        <div className={styleWrap || undefined}>
+        <div
+          className={`rounded-lg ring-2 ring-orange-200/80 ring-offset-2 ${styleWrap || ''}`}
+        >
           {toolbar}
           <textarea
             ref={taRef}
@@ -589,17 +643,21 @@ export function StudioBlockEditor({
                 e.preventDefault();
                 applyWrap('*', '*');
               }
+              if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'u') {
+                e.preventDefault();
+                applyWrap('<u>', '</u>');
+              }
             }}
             disabled={disabled}
             placeholder={labels.empty}
-            className={`w-full resize-none overflow-hidden border-0 bg-transparent p-0 outline-none focus:ring-0 ${
+            className={`w-full resize-none overflow-hidden border-0 bg-transparent p-0.5 outline-none focus:ring-0 ${
               block.kind === 'heading'
-                ? `${scaleCls} font-bold leading-snug text-slate-900`
-                : `${scaleCls} leading-[1.7] text-slate-800`
+                ? `${scaleCls} font-bold leading-snug tracking-tight text-slate-900 [font-family:var(--font-etholys-display),ui-sans-serif,system-ui,sans-serif]`
+                : `${scaleCls} leading-[1.75] text-slate-800`
             }`}
           />
-          <p className="mt-1 text-[10px] text-slate-400">
-            Esc · {labels.preview} · Ctrl+B / Ctrl+I
+          <p className="mt-1.5 text-[10px] text-slate-400">
+            Esc · {labels.preview} · Ctrl+B / I / U
           </p>
         </div>
       ) : (
@@ -614,7 +672,7 @@ export function StudioBlockEditor({
             }
             if (!disabled) setEditing(true);
           }}
-          className={`w-full rounded-md text-left outline-none transition hover:bg-slate-50/80 focus-visible:ring-2 focus-visible:ring-orange-300 ${
+          className={`w-full rounded-md text-left outline-none transition hover:bg-orange-50/40 focus-visible:ring-2 focus-visible:ring-orange-300 ${
             disabled ? 'cursor-default' : 'cursor-text'
           } ${styleWrap}`}
         >

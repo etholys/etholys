@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 
-/** Inline: **bold**, *italic*, _italic_, `code` */
+/** Inline: **bold**, *italic*, _italic_, `code`, <u>underline</u> */
 export function renderInlineMarkdown(text: string): ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_|`[^`]+`)/g);
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_|`[^`]+`|<u>[\s\S]*?<\/u>)/gi);
   return parts.map((p, i) => {
     if (p.startsWith('**') && p.endsWith('**') && p.length > 4) {
       return (
@@ -10,6 +10,9 @@ export function renderInlineMarkdown(text: string): ReactNode[] {
           {p.slice(2, -2)}
         </strong>
       );
+    }
+    if (/^<u>/i.test(p) && /<\/u>$/i.test(p)) {
+      return <u key={i}>{p.replace(/^<u>/i, '').replace(/<\/u>$/i, '')}</u>;
     }
     if (
       ((p.startsWith('*') && p.endsWith('*')) || (p.startsWith('_') && p.endsWith('_'))) &&
@@ -43,7 +46,8 @@ export function markdownLiteToHtml(text: string): string {
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/\*([^*]+)\*/g, '<em>$1</em>')
       .replace(/_([^_]+)_/g, '<em>$1</em>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>');
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/&lt;u&gt;([\s\S]*?)&lt;\/u&gt;/gi, '<u>$1</u>');
 
   const lines = (text || '').split(/\r?\n/);
   const out: string[] = [];
@@ -107,7 +111,9 @@ export function StudioMarkdown({
 
   if (variant === 'heading') {
     return (
-      <h2 className={`text-2xl font-bold leading-snug text-slate-900 ${className || ''}`}>
+      <h2
+        className={`text-[1.65rem] font-bold leading-snug tracking-tight text-slate-900 [font-family:var(--font-etholys-display),ui-sans-serif,system-ui,sans-serif] ${className || ''}`}
+      >
         {renderInlineMarkdown(raw.replace(/^#+\s*/, ''))}
       </h2>
     );
@@ -119,7 +125,9 @@ export function StudioMarkdown({
       .map((l) => l.replace(/^[-*•]\s*/, '').trim())
       .filter(Boolean);
     return (
-      <ul className={`list-disc space-y-1.5 pl-5 text-[15px] leading-[1.7] text-slate-800 ${className || ''}`}>
+      <ul
+        className={`list-disc space-y-2 pl-5 text-[15px] leading-[1.75] text-slate-800 marker:text-slate-400 ${className || ''}`}
+      >
         {items.map((item, i) => (
           <li key={i}>{renderInlineMarkdown(item)}</li>
         ))}

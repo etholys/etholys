@@ -44,6 +44,7 @@ import type {
 } from '@/lib/studio/types';
 import {
   STUDIO_PAGE_SIZES,
+  STUDIO_PAGE_SIZE_MM,
   normalizeStudioCanvas,
   studioPageCssSize,
 } from '@/lib/studio/types';
@@ -54,6 +55,7 @@ import {
 } from '@/components/studio/StudioContextPanel';
 import { StudioCommentsPanel } from '@/components/studio/StudioCommentsPanel';
 import { StudioBlockEditor } from '@/components/studio/StudioBlockEditor';
+import { StudioSheet } from '@/components/studio/StudioSheet';
 import {
   emptyStudioDrawScene,
   serializeStudioDrawScene,
@@ -894,6 +896,65 @@ export default function StudioDocumentPage() {
     setAiTargetBlockIds((ids) => ids.filter((id) => id !== blockId));
   }
 
+  /** Move blocos que excedem a folha para a folha seguinte (cria se preciso). */
+  function overflowBlocksToNextPage(fromPageId: string, blockIds: string[]) {
+    if (!blockIds.length) return;
+    applyCanvas((prev) => {
+      const pages = prev.pages.slice().sort((a, b) => a.order - b.order);
+      const fromIdx = pages.findIndex((p) => p.id === fromPageId);
+      if (fromIdx < 0) return prev;
+      const from = pages[fromIdx]!;
+      let moving = from.blocks
+        .slice()
+        .sort((a, b) => a.order - b.order)
+        .filter((b) => blockIds.includes(b.id));
+      if (!moving.length) return prev;
+      if (moving.length >= from.blocks.length) {
+        moving = moving.slice(1);
+        if (!moving.length) return prev;
+      }
+      const moveSet = new Set(moving.map((b) => b.id));
+      const kept = from.blocks
+        .filter((b) => !moveSet.has(b.id))
+        .map((b, i) => ({ ...b, order: i }));
+
+      const existingNext = pages[fromIdx + 1];
+      if (existingNext) {
+        const prepended = [
+          ...moving.map((b, i) => ({ ...b, order: i })),
+          ...existingNext.blocks
+            .slice()
+            .sort((a, b) => a.order - b.order)
+            .map((b, i) => ({ ...b, order: moving.length + i })),
+        ];
+        return {
+          ...prev,
+          pages: pages.map((p, i) => {
+            if (i === fromIdx) return { ...p, blocks: kept };
+            if (i === fromIdx + 1) return { ...p, blocks: prepended };
+            return p;
+          }),
+        };
+      }
+
+      const newPage: StudioPage = {
+        id: `page-${Date.now()}`,
+        title: `${t('Página', 'Página', 'Page')} ${pages.length + 1}`,
+        order: pages.length,
+        pageSize: prev.pageSize || 'A4',
+        layoutMode: 'blank',
+        blocks: moving.map((b, i) => ({ ...b, order: i })),
+      };
+      return {
+        ...prev,
+        pages: [
+          ...pages.map((p, i) => (i === fromIdx ? { ...p, blocks: kept } : p)),
+          newPage,
+        ].map((p, i) => ({ ...p, order: i })),
+      };
+    });
+  }
+
   async function reloadFromServer() {
     setRemoteUpdate(null);
     await load();
@@ -1384,8 +1445,16 @@ export default function StudioDocumentPage() {
           title={t('Arrastar para redimensionar', 'Arrastrar para redimensionar', 'Drag to resize')}
         />
 
-        {/* Documento — direita, folhas */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+        {/* Documento — direita, folhas de tamanho fixo */}
+        <div
+          className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
+          style={{
+            backgroundColor: '#e8e4dc',
+            backgroundImage:
+              'radial-gradient(circle at 1px 1px, rgba(15,23,42,0.04) 1px, transparent 0)',
+            backgroundSize: '18px 18px',
+          }}
+        >
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -1588,7 +1657,9 @@ export default function StudioDocumentPage() {
                   >
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2" style={{ width }}>
                       <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                        {page.title || `${t('Folha', 'Hoja', 'Sheet')} ${idx + 1}`} · {size}
+                        {page.title || `${t('Folha', 'Hoja', 'Sheet')} ${idx + 1}`} · {size} ·{' '}
+                        {Math.round(STUDIO_PAGE_SIZE_MM[size].w)}×{Math.round(STUDIO_PAGE_SIZE_MM[size].h)}
+                        mm
                       </p>
                       <div className="flex gap-1">
                         <button
@@ -1621,30 +1692,25 @@ export default function StudioDocumentPage() {
                         </button>
                       </div>
                     </div>
-                    <div
-                      className="relative bg-white shadow-lg ring-1 ring-slate-300"
-                      style={{
-                        width,
-                        minHeight: height,
-                        backgroundImage: bg ? `url(${bg})` : undefined,
-                        backgroundSize: '100% 100%',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundPosition: 'top center',
-                      }}
+                    <StudioSheet
+                      width={width}
+                      height={height}
+                      pageLabel={`${idx + 1} / ${canvas.pages.length}`}
+                      backgroundImage={bg}
+                      canEdit={canEdit}
+                      overflowHint={t(
+                        'Folha cheia — a passar conteúdo para a folha seguinte…',
+                        'Hoja llena — pasando contenido a la siguiente…',
+                        'Sheet full — moving content to the next sheet…',
+                      )}
+                      onOverflowBlocks={(ids) => overflowBlocksToNextPage(page.id, ids)}
                     >
-                      {/* Área útil tipo margem de página — o texto flui e a folha cresce se precisar */}
-                      <div
-                        className={`relative z-10 box-border flex w-full flex-col gap-6 px-[12%] py-[10%] ${
-                          bg ? 'bg-white/80 backdrop-blur-[0.5px]' : ''
-                        }`}
-                        style={{ minHeight: height }}
-                      >
-                        {page.blocks
-                          .slice()
-                          .sort((a, b) => a.order - b.order)
-                          .map((block, blockIdx, arr) => (
+                      {page.blocks
+                        .slice()
+                        .sort((a, b) => a.order - b.order)
+                        .map((block, blockIdx, arr) => (
+                          <div key={block.id} data-studio-block-id={block.id} className="shrink-0">
                             <StudioBlockEditor
-                              key={block.id}
                               block={block}
                               disabled={!canEdit}
                               aiSelected={aiTargetBlockIds.includes(block.id)}
@@ -1692,42 +1758,40 @@ export default function StudioDocumentPage() {
                                 selectedForAi: t('No âmbito da IA', 'En ámbito de IA', 'In AI scope'),
                               }}
                             />
-                          ))}
-                        {canEdit && (
-                          <div className="flex flex-wrap gap-1.5 border-t border-dashed border-slate-200 pt-4">
-                            {(
-                              [
-                                ['paragraph', t('+ Texto', '+ Texto', '+ Text')],
-                                ['heading', t('+ Título', '+ Título', '+ Heading')],
-                                ['bullets', t('+ Lista', '+ Lista', '+ List')],
-                                ['callout', t('+ Destaque', '+ Destacado', '+ Callout')],
-                                ['diagram', t('+ Diagrama visual', '+ Diagrama visual', '+ Visual diagram')],
-                                ['image', t('+ Imagem', '+ Imagen', '+ Image')],
-                              ] as const
-                            ).map(([kind, label]) => (
-                              <button
-                                key={kind}
-                                type="button"
-                                onClick={() => {
-                                  if (kind === 'image') {
-                                    setImageTargetPageId(page.id);
-                                    setActivePageId(page.id);
-                                    imageInputRef.current?.click();
-                                    return;
-                                  }
-                                  addBlock(page.id, kind);
-                                }}
-                                className="rounded-lg border border-slate-200 bg-white/80 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:border-orange-300 hover:bg-orange-50"
-                              >
-                                {label}
-                              </button>
-                            ))}
                           </div>
-                        )}
-                        {/* Espaço residual da folha A4 quando o conteúdo é curto */}
-                        <div className="min-h-0 flex-1" aria-hidden />
+                        ))}
+                    </StudioSheet>
+                    {canEdit && (
+                      <div className="mt-2 flex flex-wrap gap-1.5" style={{ width }}>
+                        {(
+                          [
+                            ['paragraph', t('+ Texto', '+ Texto', '+ Text')],
+                            ['heading', t('+ Título', '+ Título', '+ Heading')],
+                            ['bullets', t('+ Lista', '+ Lista', '+ List')],
+                            ['callout', t('+ Destaque', '+ Destacado', '+ Callout')],
+                            ['diagram', t('+ Diagrama', '+ Diagrama', '+ Diagram')],
+                            ['image', t('+ Imagem', '+ Imagen', '+ Image')],
+                          ] as const
+                        ).map(([kind, label]) => (
+                          <button
+                            key={kind}
+                            type="button"
+                            onClick={() => {
+                              if (kind === 'image') {
+                                setImageTargetPageId(page.id);
+                                setActivePageId(page.id);
+                                imageInputRef.current?.click();
+                                return;
+                              }
+                              addBlock(page.id, kind);
+                            }}
+                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 shadow-sm hover:border-orange-300 hover:bg-orange-50"
+                          >
+                            {label}
+                          </button>
+                        ))}
                       </div>
-                    </div>
+                    )}
                   </section>
                 );
               })}

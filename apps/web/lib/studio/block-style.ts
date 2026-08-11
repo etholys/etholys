@@ -35,15 +35,15 @@ export function studioBlockAlignClass(style?: StudioBlockStyle): string {
 export function studioBlockScaleClass(style?: StudioBlockStyle, kind?: string): string {
   const scale = style?.textScale;
   if (kind === 'heading') {
-    if (scale === 'sm') return 'text-xl';
-    if (scale === 'lg') return 'text-3xl';
-    if (scale === 'xl') return 'text-4xl';
-    return 'text-2xl';
+    if (scale === 'sm') return 'text-xl tracking-tight';
+    if (scale === 'lg') return 'text-3xl tracking-tight';
+    if (scale === 'xl') return 'text-4xl tracking-tight';
+    return 'text-[1.65rem] tracking-tight';
   }
-  if (scale === 'sm') return 'text-sm';
-  if (scale === 'lg') return 'text-lg';
-  if (scale === 'xl') return 'text-xl';
-  return 'text-[15px]';
+  if (scale === 'sm') return 'text-sm leading-relaxed';
+  if (scale === 'lg') return 'text-lg leading-[1.7]';
+  if (scale === 'xl') return 'text-xl leading-[1.65]';
+  return 'text-[15px] leading-[1.75]';
 }
 
 export function studioBlockFrameClass(style?: StudioBlockStyle): string {
