@@ -27,6 +27,8 @@ config.liveStreamingEnabled = false;
 
 config.disableInviteFunctions = false;
 config.enableWelcomePage = false;
+// Permite entrar no browser móvel (sem página “use desktop / app”).
+config.disableDeepLinking = true;
 config.hideConferenceSubject = true;
 config.hideConferenceTimer = false;
 config.prejoinConfig = config.prejoinConfig || {};

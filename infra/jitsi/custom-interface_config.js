@@ -49,7 +49,6 @@ interfaceConfig.TOOLBAR_BUTTONS = [
   'fullscreen',
   'select-background',
   'noisesuppression',
-  'recording',
   'shortcuts',
   'videoquality',
   'invite',
