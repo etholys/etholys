@@ -113,7 +113,7 @@ export function studioCanvasToHtml(
     .join('\n');
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-  body { font-family: ${font}; margin: 48px; color: #1e293b; font-size: 12.5px; line-height: 1.55; }
+  body { font-family: ${font}; margin: 0; padding: 0; color: #1e293b; font-size: 12.5px; line-height: 1.55; }
   .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid ${color}; padding-bottom: 12px; margin-bottom: 28px; }
   .logo { max-height: 48px; max-width: 160px; object-fit: contain; }
   .org { font-size: 11px; color: #64748b; text-align: right; }
@@ -253,7 +253,14 @@ function escXml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-export async function htmlToPdfViaAbacus(html: string): Promise<Buffer> {
+export async function htmlToPdfViaAbacus(
+  html: string,
+  opts?: {
+    format?: string;
+    landscape?: boolean;
+    margin?: { top: string; right: string; bottom: string; left: string };
+  },
+): Promise<Buffer> {
   const key = process.env.ABACUSAI_API_KEY?.trim();
   if (!key) {
     throw new Error('Falta ABACUSAI_API_KEY para export PDF');
@@ -265,9 +272,10 @@ export async function htmlToPdfViaAbacus(html: string): Promise<Buffer> {
       deployment_token: key,
       html_content: html,
       pdf_options: {
-        format: 'A4',
+        format: opts?.format || 'A4',
+        landscape: !!opts?.landscape,
         print_background: true,
-        margin: { top: '16mm', right: '14mm', bottom: '16mm', left: '14mm' },
+        margin: opts?.margin || { top: '25mm', right: '25mm', bottom: '25mm', left: '25mm' },
       },
       base_url: process.env.NEXTAUTH_URL || 'https://app.etholys.com',
     }),

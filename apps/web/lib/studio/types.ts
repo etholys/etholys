@@ -28,6 +28,67 @@ export const STUDIO_PAGE_SIZE_MM: Record<StudioPageSize, { w: number; h: number 
   Slide: { w: 338, h: 190 },
 };
 
+export type StudioPageOrientation = 'portrait' | 'landscape';
+
+export type StudioPageMarginsMm = {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+};
+
+/** Margens tipo Word “Normal” (≈ 25 mm). */
+export const DEFAULT_STUDIO_MARGINS_MM: StudioPageMarginsMm = {
+  top: 25,
+  right: 25,
+  bottom: 25,
+  left: 25,
+};
+
+export const STUDIO_MARGIN_PRESETS = [
+  { id: 'normal', mm: { top: 25, right: 25, bottom: 25, left: 25 } },
+  { id: 'narrow', mm: { top: 13, right: 13, bottom: 13, left: 13 } },
+  { id: 'moderate', mm: { top: 19, right: 19, bottom: 19, left: 19 } },
+  { id: 'wide', mm: { top: 25, right: 40, bottom: 25, left: 40 } },
+] as const;
+
+export type StudioMarginPresetId = (typeof STUDIO_MARGIN_PRESETS)[number]['id'] | 'custom';
+
+export function clampStudioMarginMm(n: unknown, fallback = 25): number {
+  const v = typeof n === 'number' ? n : Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.min(60, Math.max(5, Math.round(v * 10) / 10));
+}
+
+export function normalizeStudioMargins(raw: unknown): StudioPageMarginsMm {
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_STUDIO_MARGINS_MM };
+  const o = raw as Record<string, unknown>;
+  return {
+    top: clampStudioMarginMm(o.top, DEFAULT_STUDIO_MARGINS_MM.top),
+    right: clampStudioMarginMm(o.right, DEFAULT_STUDIO_MARGINS_MM.right),
+    bottom: clampStudioMarginMm(o.bottom, DEFAULT_STUDIO_MARGINS_MM.bottom),
+    left: clampStudioMarginMm(o.left, DEFAULT_STUDIO_MARGINS_MM.left),
+  };
+}
+
+export function matchStudioMarginPreset(m: StudioPageMarginsMm): StudioMarginPresetId {
+  for (const p of STUDIO_MARGIN_PRESETS) {
+    if (
+      p.mm.top === m.top &&
+      p.mm.right === m.right &&
+      p.mm.bottom === m.bottom &&
+      p.mm.left === m.left
+    ) {
+      return p.id;
+    }
+  }
+  return 'custom';
+}
+
+export function isStudioPageOrientation(v: unknown): v is StudioPageOrientation {
+  return v === 'portrait' || v === 'landscape';
+}
+
 export type StudioBlockKind =
   | 'heading'
   | 'paragraph'
@@ -72,6 +133,8 @@ export type StudioCanvasState = {
   version: 1;
   format: StudioFormat;
   pageSize?: StudioPageSize;
+  orientation?: StudioPageOrientation;
+  marginsMm?: StudioPageMarginsMm;
   pages: StudioPage[];
 };
 
@@ -118,6 +181,8 @@ export function emptyStudioCanvas(format: StudioFormat = 'report'): StudioCanvas
     version: 1,
     format,
     pageSize,
+    orientation: format === 'presentation' ? 'landscape' : 'portrait',
+    marginsMm: { ...DEFAULT_STUDIO_MARGINS_MM },
     pages: [
       {
         id: 'page-1',
@@ -157,6 +222,12 @@ export function normalizeStudioCanvas(raw: unknown): StudioCanvasState {
     : format === 'presentation'
       ? 'Slide'
       : 'A4';
+  const orientation: StudioPageOrientation = isStudioPageOrientation(c.orientation)
+    ? c.orientation
+    : format === 'presentation' || pageSize === 'Slide'
+      ? 'landscape'
+      : 'portrait';
+  const marginsMm = normalizeStudioMargins(c.marginsMm);
   const pages =
     Array.isArray(c.pages) && c.pages.length
       ? c.pages.map((p, i) => ({
@@ -183,7 +254,7 @@ export function normalizeStudioCanvas(raw: unknown): StudioCanvasState {
             : [],
         }))
       : base.pages;
-  return { version: 1, format, pageSize, pages };
+  return { version: 1, format, pageSize, orientation, marginsMm, pages };
 }
 
 export function applyStudioCanvasPatches(
@@ -261,9 +332,28 @@ export function sanitizeStudioCanvasPatches(
 export function studioPageCssSize(
   size: StudioPageSize = 'A4',
   maxWidthPx = 720,
-): { width: number; height: number } {
+  orientation: StudioPageOrientation = 'portrait',
+): { width: number; height: number; wMm: number; hMm: number } {
   const mm = STUDIO_PAGE_SIZE_MM[size] || STUDIO_PAGE_SIZE_MM.A4;
-  const width = Math.min(maxWidthPx, Math.round(mm.w * 2.8));
-  const height = Math.round((width * mm.h) / mm.w);
-  return { width, height };
+  const wMm = orientation === 'landscape' ? mm.h : mm.w;
+  const hMm = orientation === 'landscape' ? mm.w : mm.h;
+  const width = Math.min(maxWidthPx, Math.round(wMm * 2.8));
+  const height = Math.round((width * hMm) / wMm);
+  return { width, height, wMm, hMm };
+}
+
+/** Converte margens mm → padding CSS da folha no ecrã. */
+export function studioMarginsToCssPx(
+  margins: StudioPageMarginsMm,
+  pageMm: { w: number; h: number },
+  css: { width: number; height: number },
+): StudioPageMarginsMm {
+  const x = (mm: number, page: number, px: number) =>
+    Math.max(10, Math.round((mm / Math.max(page, 1)) * px));
+  return {
+    top: x(margins.top, pageMm.h, css.height),
+    right: x(margins.right, pageMm.w, css.width),
+    bottom: x(margins.bottom, pageMm.h, css.height),
+    left: x(margins.left, pageMm.w, css.width),
+  };
 }

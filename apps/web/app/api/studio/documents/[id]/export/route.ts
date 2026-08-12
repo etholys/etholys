@@ -9,7 +9,11 @@ import {
   studioCanvasToDocxBuffer,
   studioCanvasToHtml,
 } from '@/lib/studio/export';
-import type { StudioCanvasState } from '@/lib/studio/types';
+import {
+  normalizeStudioCanvas,
+  normalizeStudioMargins,
+  type StudioCanvasState,
+} from '@/lib/studio/types';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 180;
@@ -57,8 +61,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       });
     }
 
-    const html = studioCanvasToHtml(title, canvas, brand);
-    const pdf = await htmlToPdfViaAbacus(html);
+    const normalized = normalizeStudioCanvas(canvas);
+    const html = studioCanvasToHtml(title, normalized, brand);
+    const margins = normalizeStudioMargins(normalized.marginsMm);
+    const size = normalized.pageSize || 'A4';
+    const pdfFormat =
+      size === 'Letter' || size === 'Legal' || size === 'A3' || size === 'A5' ? size : 'A4';
+    const pdf = await htmlToPdfViaAbacus(html, {
+      format: pdfFormat,
+      landscape: normalized.orientation === 'landscape' || size === 'Slide',
+      margin: {
+        top: `${margins.top}mm`,
+        right: `${margins.right}mm`,
+        bottom: `${margins.bottom}mm`,
+        left: `${margins.left}mm`,
+      },
+    });
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         'Content-Type': 'application/pdf',

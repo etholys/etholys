@@ -10,6 +10,8 @@ type Props = {
   backgroundImage?: string | null;
   canEdit?: boolean;
   onOverflow?: (info: StudioOverflowInfo) => void;
+  /** Padding da área útil (px), derivado das margens em mm */
+  marginPx?: { top: number; right: number; bottom: number; left: number };
   children: React.ReactNode;
 };
 
@@ -23,8 +25,10 @@ export function StudioSheet({
   backgroundImage,
   canEdit,
   onOverflow,
+  marginPx,
   children,
 }: Props) {
+  const pad = marginPx || { top: 48, right: 56, bottom: 48, left: 56 };
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const lastMovedAt = useRef(0);
   const busy = useRef(false);
@@ -147,18 +151,29 @@ export function StudioSheet({
     >
       <div
         ref={bodyRef}
-        className={`absolute inset-0 z-10 box-border overflow-hidden px-[9%] pb-12 pt-[7.5%] ${
+        className={`absolute inset-0 z-10 box-border overflow-hidden ${
           backgroundImage ? 'bg-white/88' : ''
         }`}
         style={{
           fontFamily: 'var(--font-etholys-sans), ui-sans-serif, system-ui, sans-serif',
+          paddingTop: pad.top,
+          paddingRight: pad.right,
+          paddingBottom: pad.bottom,
+          paddingLeft: pad.left,
         }}
       >
         <div className="flex min-h-0 flex-col gap-3.5">{children}</div>
       </div>
 
-      <div className="pointer-events-none absolute inset-[5.5%] z-[1] rounded-[1px] border border-dashed border-slate-200/80" />
-      <div className="pointer-events-none absolute left-[5.5%] right-[5.5%] top-[5.5%] z-[1] h-px bg-gradient-to-r from-transparent via-slate-300/50 to-transparent" />
+      <div
+        className="pointer-events-none absolute z-[1] rounded-[1px] border border-dashed border-slate-200/80"
+        style={{
+          top: pad.top,
+          right: pad.right,
+          bottom: pad.bottom,
+          left: pad.left,
+        }}
+      />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center">
         <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-medium tracking-[0.14em] text-slate-400">

@@ -40,12 +40,14 @@ import type {
   StudioCanvasState,
   StudioConsentRequest,
   StudioPage,
+  StudioPageOrientation,
   StudioPageSize,
 } from '@/lib/studio/types';
 import {
-  STUDIO_PAGE_SIZES,
-  STUDIO_PAGE_SIZE_MM,
+  DEFAULT_STUDIO_MARGINS_MM,
   normalizeStudioCanvas,
+  normalizeStudioMargins,
+  studioMarginsToCssPx,
   studioPageCssSize,
 } from '@/lib/studio/types';
 import { StudioShareDialog } from '@/components/studio/StudioShareDialog';
@@ -56,6 +58,7 @@ import {
 import { StudioCommentsPanel } from '@/components/studio/StudioCommentsPanel';
 import { StudioBlockEditor } from '@/components/studio/StudioBlockEditor';
 import { StudioSheet } from '@/components/studio/StudioSheet';
+import { StudioPageSetup } from '@/components/studio/StudioPageSetup';
 import {
   emptyStudioDrawScene,
   serializeStudioDrawScene,
@@ -801,7 +804,20 @@ export default function StudioDocumentPage() {
     applyCanvas((prev) => ({
       ...prev,
       pageSize: size,
+      orientation:
+        size === 'Slide' ? 'landscape' : prev.orientation || 'portrait',
       pages: prev.pages.map((p) => ({ ...p, pageSize: size })),
+    }));
+  }
+
+  function setDocOrientation(orientation: StudioPageOrientation) {
+    applyCanvas((prev) => ({ ...prev, orientation }));
+  }
+
+  function setDocMargins(marginsMm: StudioCanvasState['marginsMm']) {
+    applyCanvas((prev) => ({
+      ...prev,
+      marginsMm: normalizeStudioMargins(marginsMm),
     }));
   }
 
@@ -955,6 +971,9 @@ export default function StudioDocumentPage() {
   }
 
   const pageSize = (canvas.pageSize || 'A4') as StudioPageSize;
+  const orientation: StudioPageOrientation =
+    canvas.orientation || (pageSize === 'Slide' ? 'landscape' : 'portrait');
+  const marginsMm = normalizeStudioMargins(canvas.marginsMm || DEFAULT_STUDIO_MARGINS_MM);
 
   return (
     <div className="flex h-screen flex-col bg-slate-200/80">
@@ -1006,19 +1025,6 @@ export default function StudioDocumentPage() {
           </div>
         )}
         <div className="flex flex-wrap items-center gap-1.5">
-          <select
-            value={pageSize}
-            disabled={!canEdit}
-            onChange={(e) => setDocPageSize(e.target.value as StudioPageSize)}
-            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700"
-            title={t('Tamanho da folha', 'Tamaño de hoja', 'Page size')}
-          >
-            {STUDIO_PAGE_SIZES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
           <button
             type="button"
             disabled={!canEdit || !undoStack.length}
@@ -1422,7 +1428,11 @@ export default function StudioDocumentPage() {
             </button>
             <span className="text-xs text-slate-500">
               {canvas.pages.length}{' '}
-              {t('folha(s)', 'hoja(s)', 'page(s)')} · {pageSize}
+              {t('folha(s)', 'hoja(s)', 'page(s)')} · {pageSize} ·{' '}
+              {orientation === 'landscape'
+                ? t('paisagem', 'horizontal', 'landscape')
+                : t('retrato', 'vertical', 'portrait')}{' '}
+              · {marginsMm.top}/{marginsMm.right}/{marginsMm.bottom}/{marginsMm.left} mm
             </span>
             {aiTargetBlockIds.length > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-900">
@@ -1432,6 +1442,38 @@ export default function StudioDocumentPage() {
               </span>
             )}
           </div>
+
+          <StudioPageSetup
+            pageSize={pageSize}
+            orientation={orientation}
+            margins={marginsMm}
+            disabled={!canEdit}
+            onPageSize={setDocPageSize}
+            onOrientation={setDocOrientation}
+            onMargins={setDocMargins}
+            labels={{
+              page: t('Página', 'Página', 'Page'),
+              size: t('Tamanho', 'Tamaño', 'Size'),
+              orientation: t('Orientação', 'Orientación', 'Orientation'),
+              portrait: t('Retrato', 'Vertical', 'Portrait'),
+              landscape: t('Paisagem', 'Horizontal', 'Landscape'),
+              margins: t('Margens', 'Márgenes', 'Margins'),
+              normal: t('Normal', 'Normal', 'Normal'),
+              narrow: t('Estreitas', 'Estrechas', 'Narrow'),
+              moderate: t('Moderadas', 'Moderados', 'Moderate'),
+              wide: t('Largas', 'Anchos', 'Wide'),
+              custom: t('Personalizadas', 'Personalizados', 'Custom'),
+              top: t('Superior', 'Superior', 'Top'),
+              right: t('Direita', 'Derecha', 'Right'),
+              bottom: t('Inferior', 'Inferior', 'Bottom'),
+              left: t('Esquerda', 'Izquierda', 'Left'),
+              allSides: t(
+                'Usar a margem superior em todos os lados',
+                'Usar el margen superior en todos los lados',
+                'Use top margin on all sides',
+              ),
+            }}
+          />
 
           {/* Faixa de design (Docs + Canva) */}
           {canEdit && (
@@ -1597,7 +1639,8 @@ export default function StudioDocumentPage() {
               .sort((a, b) => a.order - b.order)
               .map((page, idx) => {
                 const size = (page.pageSize || pageSize) as StudioPageSize;
-                const { width, height } = studioPageCssSize(size, 680);
+                const { width, height, wMm, hMm } = studioPageCssSize(size, 680, orientation);
+                const marginPx = studioMarginsToCssPx(marginsMm, { w: wMm, h: hMm }, { width, height });
                 const mold = page.moldId ? molds.find((m) => m.id === page.moldId) : null;
                 const bg =
                   page.layoutMode === 'mold' && mold?.imageUrl
@@ -1613,8 +1656,7 @@ export default function StudioDocumentPage() {
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2" style={{ width }}>
                       <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         {page.title || `${t('Folha', 'Hoja', 'Sheet')} ${idx + 1}`} · {size} ·{' '}
-                        {Math.round(STUDIO_PAGE_SIZE_MM[size].w)}×{Math.round(STUDIO_PAGE_SIZE_MM[size].h)}
-                        mm
+                        {Math.round(wMm)}×{Math.round(hMm)} mm
                       </p>
                       <div className="flex gap-1">
                         <button
@@ -1653,6 +1695,7 @@ export default function StudioDocumentPage() {
                       pageLabel={`${idx + 1} / ${canvas.pages.length}`}
                       backgroundImage={bg}
                       canEdit={canEdit}
+                      marginPx={marginPx}
                       onOverflow={(info) => handleSheetOverflow(page.id, info)}
                     >
                       {page.blocks

@@ -1,4 +1,9 @@
-import { emptyStudioCanvas, type StudioCanvasState, type StudioFormat } from '@/lib/studio/types';
+import {
+  DEFAULT_STUDIO_MARGINS_MM,
+  emptyStudioCanvas,
+  type StudioCanvasState,
+  type StudioFormat,
+} from '@/lib/studio/types';
 
 /** Domínios Etholys para filtrar templates (F4). */
 export const STUDIO_TEMPLATE_DOMAINS = [
@@ -37,6 +42,8 @@ function page(
     version: 1,
     format,
     pageSize,
+    orientation: format === 'presentation' ? 'landscape' : 'portrait',
+    marginsMm: { ...DEFAULT_STUDIO_MARGINS_MM },
     pages: [
       {
         id: 'page-1',
