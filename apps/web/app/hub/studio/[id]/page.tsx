@@ -60,6 +60,7 @@ import {
   emptyStudioDrawScene,
   serializeStudioDrawScene,
 } from '@/lib/studio/draw-scene';
+import { applyStudioPagination, type StudioOverflowInfo } from '@/lib/studio/paginate';
 
 type ChatMsg = {
   id: string;
@@ -896,62 +897,16 @@ export default function StudioDocumentPage() {
     setAiTargetBlockIds((ids) => ids.filter((id) => id !== blockId));
   }
 
-  /** Move blocos que excedem a folha para a folha seguinte (cria se preciso). */
-  function overflowBlocksToNextPage(fromPageId: string, blockIds: string[]) {
-    if (!blockIds.length) return;
-    applyCanvas((prev) => {
-      const pages = prev.pages.slice().sort((a, b) => a.order - b.order);
-      const fromIdx = pages.findIndex((p) => p.id === fromPageId);
-      if (fromIdx < 0) return prev;
-      const from = pages[fromIdx]!;
-      let moving = from.blocks
-        .slice()
-        .sort((a, b) => a.order - b.order)
-        .filter((b) => blockIds.includes(b.id));
-      if (!moving.length) return prev;
-      if (moving.length >= from.blocks.length) {
-        moving = moving.slice(1);
-        if (!moving.length) return prev;
-      }
-      const moveSet = new Set(moving.map((b) => b.id));
-      const kept = from.blocks
-        .filter((b) => !moveSet.has(b.id))
-        .map((b, i) => ({ ...b, order: i }));
-
-      const existingNext = pages[fromIdx + 1];
-      if (existingNext) {
-        const prepended = [
-          ...moving.map((b, i) => ({ ...b, order: i })),
-          ...existingNext.blocks
-            .slice()
-            .sort((a, b) => a.order - b.order)
-            .map((b, i) => ({ ...b, order: moving.length + i })),
-        ];
-        return {
-          ...prev,
-          pages: pages.map((p, i) => {
-            if (i === fromIdx) return { ...p, blocks: kept };
-            if (i === fromIdx + 1) return { ...p, blocks: prepended };
-            return p;
-          }),
-        };
-      }
-
-      const newPage: StudioPage = {
-        id: `page-${Date.now()}`,
-        title: `${t('Página', 'Página', 'Page')} ${pages.length + 1}`,
-        order: pages.length,
-        pageSize: prev.pageSize || 'A4',
-        layoutMode: 'blank',
-        blocks: moving.map((b, i) => ({ ...b, order: i })),
-      };
-      return {
-        ...prev,
-        pages: [
-          ...pages.map((p, i) => (i === fromIdx ? { ...p, blocks: kept } : p)),
-          newPage,
-        ].map((p, i) => ({ ...p, order: i })),
-      };
+  /** Reflow automático: parte o texto / move blocos sem perder conteúdo. */
+  function handleSheetOverflow(fromPageId: string, info: StudioOverflowInfo) {
+    setCanvas((prev) => {
+      if (!prev) return prev;
+      const next = applyStudioPagination(prev, fromPageId, info, {
+        pageTitlePrefix: t('Página', 'Página', 'Page'),
+      });
+      if (next === prev) return prev;
+      setDirty(true);
+      return next;
     });
   }
 
@@ -1698,12 +1653,7 @@ export default function StudioDocumentPage() {
                       pageLabel={`${idx + 1} / ${canvas.pages.length}`}
                       backgroundImage={bg}
                       canEdit={canEdit}
-                      overflowHint={t(
-                        'Folha cheia — a passar conteúdo para a folha seguinte…',
-                        'Hoja llena — pasando contenido a la siguiente…',
-                        'Sheet full — moving content to the next sheet…',
-                      )}
-                      onOverflowBlocks={(ids) => overflowBlocksToNextPage(page.id, ids)}
+                      onOverflow={(info) => handleSheetOverflow(page.id, info)}
                     >
                       {page.blocks
                         .slice()

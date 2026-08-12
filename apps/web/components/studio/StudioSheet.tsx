@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import type { StudioOverflowInfo } from '@/lib/studio/paginate';
 
 type Props = {
   width: number;
@@ -8,15 +9,12 @@ type Props = {
   pageLabel: string;
   backgroundImage?: string | null;
   canEdit?: boolean;
-  /** Chamado com ids de blocos (do fim) a mover para a folha seguinte */
-  onOverflowBlocks?: (blockIds: string[]) => void;
-  overflowHint?: string;
+  onOverflow?: (info: StudioOverflowInfo) => void;
   children: React.ReactNode;
 };
 
 /**
- * Folha de documento com dimensões fixas (ex. A4).
- * Conteúdo que passa da altura útil é sinalizado para a página seguinte.
+ * Folha com dimensões fixas. Overflow → reflow automático (partir/mover blocos).
  */
 export function StudioSheet({
   width,
@@ -24,56 +22,85 @@ export function StudioSheet({
   pageLabel,
   backgroundImage,
   canEdit,
-  onOverflowBlocks,
-  overflowHint,
+  onOverflow,
   children,
 }: Props) {
   const bodyRef = useRef<HTMLDivElement | null>(null);
-  const [overflowing, setOverflowing] = useState(false);
   const lastMovedAt = useRef(0);
   const busy = useRef(false);
-  const onOverflowRef = useRef(onOverflowBlocks);
-  onOverflowRef.current = onOverflowBlocks;
+  const attempts = useRef(0);
+  const onOverflowRef = useRef(onOverflow);
+  onOverflowRef.current = onOverflow;
 
   const checkOverflow = useCallback(() => {
     const body = bodyRef.current;
     if (!body || busy.current) return;
+    if (!canEdit || !onOverflowRef.current) return;
+
+    const active = document.activeElement;
+    if (active && body.contains(active) && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')) {
+      return;
+    }
 
     const fits = body.scrollHeight <= body.clientHeight + 2;
-    setOverflowing(!fits);
-    if (fits || !canEdit || !onOverflowRef.current) return;
+    if (fits) {
+      attempts.current = 0;
+      return;
+    }
 
     const now = Date.now();
-    if (now - lastMovedAt.current < 900) return;
+    const wait = Math.min(8000, Math.round(380 * Math.pow(1.7, attempts.current)));
+    if (now - lastMovedAt.current < wait) return;
 
     const nodes = Array.from(body.querySelectorAll<HTMLElement>('[data-studio-block-id]'));
-    if (nodes.length <= 1) return;
+    if (!nodes.length) return;
 
-    const bodyRect = body.getBoundingClientRect();
-    const bodyBottom = bodyRect.bottom;
-    const toMove: string[] = [];
-    for (let i = nodes.length - 1; i >= 1; i--) {
+    const bodyBottom = body.getBoundingClientRect().bottom;
+    const overflowing: HTMLElement[] = [];
+    for (let i = nodes.length - 1; i >= 0; i--) {
       const el = nodes[i]!;
       const rect = el.getBoundingClientRect();
-      // Bloco que ultrapassa o fundo útil da folha
       if (rect.bottom > bodyBottom - 2 || rect.top >= bodyBottom - 8) {
-        const id = el.dataset.studioBlockId;
-        if (id) toMove.unshift(id);
+        overflowing.unshift(el);
       } else {
         break;
       }
     }
+    if (!overflowing.length) return;
 
-    if (!toMove.length) return;
+    const partial: HTMLElement[] = [];
+    const fullyBelow: HTMLElement[] = [];
+    for (const el of overflowing) {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < bodyBottom - 8 && rect.bottom > bodyBottom - 2) partial.push(el);
+      else fullyBelow.push(el);
+    }
+
+    const splitEl = partial[0];
+    const moveEls = [...partial.slice(1), ...fullyBelow];
+    const splitBlockId = splitEl?.dataset.studioBlockId;
+    const moveBlockIds = moveEls
+      .map((el) => el.dataset.studioBlockId)
+      .filter((id): id is string => !!id);
+
+    if (!splitBlockId && !moveBlockIds.length) return;
+
+    const overflowPx = Math.max(0, body.scrollHeight - body.clientHeight);
     busy.current = true;
     lastMovedAt.current = now;
-    onOverflowRef.current(toMove);
+    attempts.current += 1;
+    onOverflowRef.current({
+      moveBlockIds,
+      splitBlockId,
+      overflowPx,
+    });
     window.setTimeout(() => {
       busy.current = false;
-    }, 120);
+    }, 180);
   }, [canEdit]);
 
   useEffect(() => {
+    attempts.current = 0;
     const body = bodyRef.current;
     if (!body) return;
 
@@ -95,11 +122,13 @@ export function StudioSheet({
     });
     mo.observe(body, { childList: true, subtree: true, characterData: true });
 
-    const t = window.setTimeout(checkOverflow, 60);
+    const t = window.setTimeout(checkOverflow, 80);
+    const t2 = window.setTimeout(checkOverflow, 500);
     return () => {
       ro.disconnect();
       mo.disconnect();
       window.clearTimeout(t);
+      window.clearTimeout(t2);
     };
   }, [checkOverflow, children]);
 
@@ -116,7 +145,6 @@ export function StudioSheet({
         backgroundPosition: 'top center',
       }}
     >
-      {/* Área útil tipográfica — altura fixa, sem crescimento infinito */}
       <div
         ref={bodyRef}
         className={`absolute inset-0 z-10 box-border overflow-hidden px-[9%] pb-12 pt-[7.5%] ${
@@ -129,22 +157,14 @@ export function StudioSheet({
         <div className="flex min-h-0 flex-col gap-3.5">{children}</div>
       </div>
 
-      {/* Guias de margem (régua visual) */}
       <div className="pointer-events-none absolute inset-[5.5%] z-[1] rounded-[1px] border border-dashed border-slate-200/80" />
       <div className="pointer-events-none absolute left-[5.5%] right-[5.5%] top-[5.5%] z-[1] h-px bg-gradient-to-r from-transparent via-slate-300/50 to-transparent" />
 
-      {/* Rodapé de página — fora da medição de overflow dos blocos */}
       <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center">
         <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-medium tracking-[0.14em] text-slate-400">
           {pageLabel}
         </span>
       </div>
-
-      {overflowing && (
-        <div className="absolute bottom-8 left-1/2 z-30 max-w-[92%] -translate-x-1/2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-center text-[10px] font-semibold text-amber-900 shadow-sm">
-          {overflowHint || 'Folha cheia — o excesso passa para a folha seguinte'}
-        </div>
-      )}
     </div>
   );
 }
