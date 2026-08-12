@@ -60,9 +60,18 @@ export async function startMeetLocalRecorder(): Promise<{
   const fileHandle = await pickSaveHandle(fileName);
 
   const display = await navigator.mediaDevices.getDisplayMedia({
-    video: { frameRate: 30 },
+    video: {
+      frameRate: 30,
+      // Preferir a aba Etholys — uma única barra de partilha no Chrome
+      displaySurface: 'browser',
+    } as MediaTrackConstraints,
     audio: true,
-  });
+    // Chrome / Edge
+    preferCurrentTab: true,
+    selfBrowserSurface: 'include',
+    surfaceSwitching: 'exclude',
+    systemAudio: 'include',
+  } as DisplayMediaStreamOptions);
 
   let mic: MediaStream | null = null;
   try {

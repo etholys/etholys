@@ -14,6 +14,8 @@ import {
   PictureInPicture2,
   Square,
   Users,
+  ChevronLeft,
+  PanelRightOpen,
   X,
 } from 'lucide-react';
 import { meetEmbedUrl } from '@/lib/meet/room';
@@ -29,10 +31,6 @@ import {
   startMeetLocalRecorder,
   type MeetLocalRecorder,
 } from '@/lib/meet/local-recorder';
-import {
-  openMeetDocumentPip,
-  supportsDocumentPictureInPicture,
-} from '@/lib/meet/document-pip';
 
 type SessionRow = {
   id: string;
@@ -105,11 +103,8 @@ export function MeetRoomClient({ sessionId }: Props) {
   const localRecorderRef = useRef<MeetLocalRecorder | null>(null);
   const stageHomeRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
-  const pipWindowRef = useRef<Window | null>(null);
   const segmentsRef = useRef<TranscriptSegment[]>([]);
   const transcriptionStartedAtRef = useRef<number | null>(null);
-  const speechRecRef = useRef<{ stop: () => void } | null>(null);
-  const gotServerTranscriptRef = useRef(false);
 
   useEffect(() => {
     segmentsRef.current = segments;
@@ -218,7 +213,7 @@ export function MeetRoomClient({ sessionId }: Props) {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [segments]);
 
-  // Se o STT “diz que está ligado” mas não chega nenhum trecho, avisar.
+  // Aguarda texto do transcriber (Jigasi) sem alarmes ruidosos.
   useEffect(() => {
     if (!transcriptionOn) {
       setTranscriptionWaiting(false);
@@ -230,30 +225,12 @@ export function MeetRoomClient({ sessionId }: Props) {
       return;
     }
     setTranscriptionWaiting(true);
-    const started = transcriptionStartedAtRef.current ?? Date.now();
-    transcriptionStartedAtRef.current = started;
-    const id = window.setTimeout(() => {
-      if (segmentsRef.current.some((s) => s.text.trim())) return;
-      setError(
-        t(
-          'A transcrição está activa no servidor, mas o painel ainda não recebeu texto. Confirma que o microfone está aberto e que meet.etholys.com está em DNS only (sem proxy Cloudflare).',
-          'La transcripción está activa en el servidor, pero el panel aún no recibió texto. Confirma el micrófono y que meet.etholys.com esté en DNS only (sin proxy Cloudflare).',
-          'Transcription is on server-side, but the panel has not received text yet. Check the mic and that meet.etholys.com is DNS-only (no Cloudflare proxy).',
-        ),
-      );
-    }, 20_000);
-    return () => window.clearTimeout(id);
-  }, [transcriptionOn, segments, locale]);
+  }, [transcriptionOn, segments]);
 
   useEffect(() => {
     return () => {
       localRecorderRef.current?.destroy();
       localRecorderRef.current = null;
-      try {
-        pipWindowRef.current?.close();
-      } catch {
-        /* ignore */
-      }
     };
   }, []);
 
@@ -268,18 +245,6 @@ export function MeetRoomClient({ sessionId }: Props) {
     }) => {
       const text = (chunk.final || chunk.stable || chunk.unstable || '').trim();
       if (!text) return;
-      const localLabel = t('Tu', 'Tú', 'You');
-      const speakerName =
-        chunk.participant?.name?.trim() ||
-        t('Participante', 'Participante', 'Participant');
-      if (speakerName !== localLabel) {
-        gotServerTranscriptRef.current = true;
-        try {
-          speechRecRef.current?.stop();
-        } catch {
-          /* ignore */
-        }
-      }
       setTranscriptionOn(true);
       setTranscriptionWaiting(false);
       const messageId =
@@ -288,7 +253,9 @@ export function MeetRoomClient({ sessionId }: Props) {
       const row: TranscriptSegment = {
         messageId,
         participantId: chunk.participant?.id,
-        participantName: speakerName,
+        participantName:
+          chunk.participant?.name?.trim() ||
+          t('Participante', 'Participante', 'Participant'),
         text,
         language: chunk.language,
         startedAt: new Date().toISOString(),
@@ -315,94 +282,11 @@ export function MeetRoomClient({ sessionId }: Props) {
             text: row.text,
             startedAt: row.startedAt,
           }),
-        }).catch(() =>
-          setError(
-            t(
-              'Falha ao guardar um trecho da transcrição.',
-              'No se pudo guardar un fragmento de la transcripción.',
-              'Failed to save a transcript segment.',
-            ),
-          ),
-        );
+        }).catch(() => undefined);
       }
     },
     [companyId, sessionId, locale],
   );
-
-  // Fallback Web Speech — só depois de handleTranscriptionChunk existir (evita TDZ).
-  useEffect(() => {
-    if (!transcriptionOn) {
-      gotServerTranscriptRef.current = false;
-      try {
-        speechRecRef.current?.stop();
-      } catch {
-        /* ignore */
-      }
-      speechRecRef.current = null;
-      return;
-    }
-
-    const startLocalSpeech = () => {
-      if (gotServerTranscriptRef.current || speechRecRef.current) return;
-      const SpeechEngine =
-        (window as Window & {
-          SpeechRecognition?: new () => SpeechRecognition;
-          webkitSpeechRecognition?: new () => SpeechRecognition;
-        }).SpeechRecognition ||
-        (window as Window & { webkitSpeechRecognition?: new () => SpeechRecognition })
-          .webkitSpeechRecognition;
-      if (!SpeechEngine) return;
-
-      const rec = new SpeechEngine();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
-      rec.onresult = (event: SpeechRecognitionEvent) => {
-        if (gotServerTranscriptRef.current) return;
-        let interim = '';
-        let finalText = '';
-        for (let i = event.resultIndex; i < event.results.length; i += 1) {
-          const piece = event.results[i]?.[0]?.transcript || '';
-          if (event.results[i].isFinal) finalText += piece;
-          else interim += piece;
-        }
-        const finalClean = finalText.trim();
-        const interimClean = interim.trim();
-        if (!finalClean && !interimClean) return;
-        handleTranscriptionChunk({
-          messageID: finalClean ? `local-${Date.now()}` : 'local-interim',
-          participant: { name: t('Tu', 'Tú', 'You') },
-          final: finalClean || undefined,
-          stable: finalClean ? undefined : interimClean,
-        });
-      };
-      rec.onend = () => {
-        if (!transcriptionOn || gotServerTranscriptRef.current) return;
-        try {
-          rec.start();
-        } catch {
-          /* ignore */
-        }
-      };
-      speechRecRef.current = rec;
-      try {
-        rec.start();
-      } catch {
-        speechRecRef.current = null;
-      }
-    };
-
-    const timer = window.setTimeout(startLocalSpeech, 2500);
-    return () => {
-      window.clearTimeout(timer);
-      try {
-        speechRecRef.current?.stop();
-      } catch {
-        /* ignore */
-      }
-      speechRecRef.current = null;
-    };
-  }, [transcriptionOn, locale, handleTranscriptionChunk]);
 
   function toggleTranscription() {
     setError(null);
@@ -434,40 +318,25 @@ export function MeetRoomClient({ sessionId }: Props) {
     if (recordingOn || recordingBusy) return;
     setRecordingBusy(true);
     try {
-      const { recorder, usedPicker } = await startMeetLocalRecorder();
+      const { recorder } = await startMeetLocalRecorder();
       localRecorderRef.current = recorder;
       setRecordingOn(true);
-      if (!usedPicker) {
-        setError(
-          t(
-            'O browser não pediu pasta: ao parar, o ficheiro será descarregado (normalmente para Transferências).',
-            'El navegador no pidió carpeta: al detener, el archivo se descargará (normalmente a Descargas).',
-            'The browser did not ask for a folder: when you stop, the file will download (usually to Downloads).',
-          ),
-        );
-      }
     } catch (err) {
       localRecorderRef.current = null;
       setRecordingOn(false);
       if (err instanceof DOMException && err.name === 'AbortError') {
-        setError(
-          t(
-            'Gravação cancelada — escolhe onde guardar e a janela/aba da reunião para capturar.',
-            'Grabación cancelada — elige dónde guardar y la ventana/pestaña de la reunión.',
-            'Recording cancelled — choose where to save and the meeting window/tab to capture.',
-          ),
-        );
-      } else {
-        setError(
-          err instanceof Error
-            ? err.message
-            : t(
-                'Não foi possível iniciar a gravação neste PC.',
-                'No se pudo iniciar la grabación en este PC.',
-                'Could not start recording on this PC.',
-              ),
-        );
+        /* utilizador cancelou o picker / partilha — silêncio */
+        return;
       }
+      setError(
+        err instanceof Error
+          ? err.message
+          : t(
+              'Não foi possível iniciar a gravação neste PC.',
+              'No se pudo iniciar la grabación en este PC.',
+              'Could not start recording on this PC.',
+            ),
+      );
     } finally {
       setRecordingBusy(false);
     }
@@ -506,51 +375,12 @@ export function MeetRoomClient({ sessionId }: Props) {
     }
   }
 
-  async function openFloatingWindow() {
+  function openFloatingWindow() {
     setError(null);
-    if (pipActive) {
-      try {
-        pipWindowRef.current?.close();
-      } catch {
-        /* ignore */
-      }
-      return;
-    }
-    if (!supportsDocumentPictureInPicture()) {
-      setError(
-        t(
-          'O teu browser não suporta janela flutuante (Document PiP). Usa Chrome/Edge recente.',
-          'Tu navegador no soporta ventana flotante (Document PiP). Usa Chrome/Edge reciente.',
-          'Your browser does not support floating window (Document PiP). Use recent Chrome/Edge.',
-        ),
-      );
-      return;
-    }
-    const stage = stageRef.current;
-    const home = stageHomeRef.current;
-    if (!stage || !home) return;
-    try {
-      const pip = await openMeetDocumentPip({
-        stageEl: stage,
-        homeEl: home,
-        onClose: () => {
-          setPipActive(false);
-          pipWindowRef.current = null;
-        },
-      });
-      pipWindowRef.current = pip;
-      setPipActive(true);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : t(
-              'Não foi possível abrir a janela flutuante.',
-              'No se pudo abrir la ventana flotante.',
-              'Could not open the floating window.',
-            ),
-      );
-    }
+    // Flutuante na mesma página (CSS). Mover o iframe Jitsi para Document PiP
+    // recarrega a sala e volta ao ecrã de pré-entrada.
+    setPipActive((active) => !active);
+    if (!pipActive) setPanelOpen(false);
   }
 
   const endInFlight = useRef(false);
@@ -664,7 +494,11 @@ export function MeetRoomClient({ sessionId }: Props) {
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-[#202124] text-white">
       {/* Top bar — estilo Google Meet */}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 px-4 pb-2 pt-3 sm:px-5">
+      <header
+        className={`pointer-events-none absolute left-0 top-0 z-30 flex items-start justify-between gap-3 px-4 pb-2 pt-3 sm:px-5 ${
+          panelOpen ? 'right-0 sm:right-[22rem]' : 'right-10'
+        }`}
+      >
         <div className="pointer-events-auto flex min-w-0 max-w-[min(100%,48rem)] items-center gap-2 text-[13px] text-white/90 sm:text-sm">
           <button
             type="button"
@@ -714,16 +548,16 @@ export function MeetRoomClient({ sessionId }: Props) {
           </div>
           <button
             type="button"
-            onClick={() => void openFloatingWindow()}
+            onClick={openFloatingWindow}
             className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium shadow-sm ${
               pipActive
                 ? 'bg-[#8ab4f8] text-[#202124] hover:bg-[#aecbfa]'
                 : 'bg-[#3c4043]/95 text-white/90 hover:bg-[#4a4d51]'
             }`}
             title={t(
-              'Janela flutuante — continua a ver a reunião noutra janela',
-              'Ventana flotante — sigue viendo la reunión en otra ventana',
-              'Floating window — keep watching the meeting in another window',
+              'Janela flutuante nesta página (não recarrega a sala)',
+              'Ventana flotante en esta página (no recarga la sala)',
+              'Floating window on this page (does not reload the room)',
             )}
           >
             <PictureInPicture2 className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -806,7 +640,25 @@ export function MeetRoomClient({ sessionId }: Props) {
 
       <div className="flex min-h-0 flex-1">
         <main className="relative min-w-0 flex-1 px-3 pb-3 pt-14 sm:px-4 sm:pb-4">
-          <div ref={stageHomeRef} className="relative h-full w-full overflow-hidden rounded-2xl bg-[#131314]">
+          {pipActive && (
+            <div className="mb-3 rounded-xl border border-white/10 bg-[#292a2d] px-4 py-3 text-xs text-white/60">
+              {t(
+                'Modo flutuante: a sala está no canto. Clica outra vez em Flotante para voltar ao ecrã completo.',
+                'Modo flotante: la sala está en la esquina. Pulsa otra vez Flotante para volver a pantalla completa.',
+                'Float mode: the room is in the corner. Click Float again to return to full screen.',
+              )}
+            </div>
+          )}
+          <div
+            ref={stageHomeRef}
+            className={
+              pipActive
+                ? `fixed bottom-4 z-50 h-[220px] w-[min(92vw,360px)] overflow-hidden rounded-2xl bg-[#131314] shadow-2xl ring-2 ring-[#8ab4f8]/60 ${
+                    panelOpen ? 'right-[23.5rem]' : 'right-14'
+                  }`
+                : 'relative h-full w-full overflow-hidden rounded-2xl bg-[#131314]'
+            }
+          >
             <div ref={stageRef} className="relative h-full w-full">
               {session.meetingUrl && canEmbedJitsiInIframe(session.meetingUrl) ? (
                 <MeetConferenceFrame
@@ -816,7 +668,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                   locale={locale}
                   onReady={() => {
                     if (!features.liveTranscriptionEnabled) return;
-                    setPanelOpen(true);
+                    // STT em fundo — painel fica fechado até o utilizador abrir
                     window.setTimeout(() => {
                       transcriptionStartedAtRef.current = Date.now();
                       setTranscriptionWaiting(true);
@@ -849,17 +701,6 @@ export function MeetRoomClient({ sessionId }: Props) {
                     void endMeeting({ skipHangup: true });
                   }}
                   onRecordingStatus={(state) => {
-                    if (state.error) {
-                      setError(
-                        String(state.error) ||
-                          t(
-                            'Falha na gravação/transcrição do Meet.',
-                            'Fallo en grabación/transcripción de Meet.',
-                            'Meet recording/transcription failed.',
-                          ),
-                      );
-                    }
-                    // Só estado de transcrição Jitsi — a gravação no PC é MediaRecorder nosso.
                     if (state.transcription) {
                       setTranscriptionOn(state.on);
                       if (!state.on) setTranscriptionWaiting(false);
@@ -895,19 +736,36 @@ export function MeetRoomClient({ sessionId }: Props) {
           </div>
         </main>
 
+        {!panelOpen && (
+          <button
+            type="button"
+            onClick={() => setPanelOpen(true)}
+            className="flex w-10 shrink-0 flex-col items-center justify-center gap-2 border-l border-white/10 bg-[#292a2d] pt-14 text-white/65 hover:bg-[#3c4043] hover:text-white"
+            title={t('Abrir transcrição', 'Abrir transcripción', 'Open transcript')}
+          >
+            <PanelRightOpen className="h-4 w-4" />
+            <span className="max-h-40 overflow-hidden text-[10px] font-medium tracking-wide [writing-mode:vertical-rl]">
+              {t('Transcrição', 'Transcripción', 'Transcript')}
+            </span>
+            {transcriptionOn && (
+              <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden />
+            )}
+          </button>
+        )}
+
         {panelOpen && (
-          <aside className="flex w-full max-w-sm shrink-0 flex-col border-l border-white/10 bg-[#292a2d] sm:w-[22rem]">
+          <aside className="relative z-20 flex w-full max-w-sm shrink-0 flex-col border-l border-white/10 bg-[#292a2d] pt-14 sm:w-[22rem]">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-              <div>
+              <div className="min-w-0">
                 <p className="flex items-center gap-1.5 text-sm font-medium text-white">
-                  <FileText className="h-4 w-4 text-white/70" strokeWidth={1.75} />
+                  <FileText className="h-4 w-4 shrink-0 text-white/70" strokeWidth={1.75} />
                   {t('Transcrição ao vivo', 'Transcripción en vivo', 'Live transcript')}
                 </p>
                 <p className="mt-0.5 text-[11px] text-white/45">
                   {t(
-                    'Trechos atribuídos ao nome de cada participante.',
-                    'Fragmentos atribuidos al nombre de cada participante.',
-                    'Segments attributed to each participant name.',
+                    'Trechos do transcriber com o nome de cada participante.',
+                    'Fragmentos del transcriber con el nombre de cada participante.',
+                    'Transcriber segments with each participant name.',
                   )}
                 </p>
               </div>
@@ -915,9 +773,10 @@ export function MeetRoomClient({ sessionId }: Props) {
                 type="button"
                 onClick={() => setPanelOpen(false)}
                 className="rounded-full p-1.5 text-white/55 hover:bg-white/10 hover:text-white"
-                aria-label={t('Fechar painel', 'Cerrar panel', 'Close panel')}
+                aria-label={t('Minimizar painel', 'Minimizar panel', 'Minimize panel')}
+                title={t('Minimizar', 'Minimizar', 'Minimize')}
               >
-                <X className="h-4 w-4" />
+                <ChevronLeft className="h-4 w-4" />
               </button>
             </div>
             <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
@@ -992,9 +851,9 @@ export function MeetRoomClient({ sessionId }: Props) {
 
               <p className="text-[10px] leading-relaxed text-white/35">
                 {t(
-                  'Gravar está só no botão «Gravar» no topo. Esta coluna é só transcrição. Se o Chrome pedir microfone para transcrever, aceita.',
-                  'Grabar está solo en el botón «Grabar» de arriba. Esta columna es solo transcripción. Si Chrome pide micrófono para transcribir, acéptalo.',
-                  'Recording is only the top “Record” button. This column is transcription only. If Chrome asks for the mic to transcribe, allow it.',
+                  'A transcrição vem do servidor Meet (por participante). Minimiza este painel com «‹» à direita.',
+                  'La transcripción viene del servidor Meet (por participante). Minimiza este panel con «‹» a la derecha.',
+                  'Transcript comes from the Meet server (per participant). Minimize this panel with “‹” on the right.',
                 )}
               </p>
             </div>
