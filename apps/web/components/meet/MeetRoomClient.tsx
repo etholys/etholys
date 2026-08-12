@@ -246,80 +246,6 @@ export function MeetRoomClient({ sessionId }: Props) {
   }, [transcriptionOn, segments, locale]);
 
   useEffect(() => {
-    if (!transcriptionOn) {
-      gotServerTranscriptRef.current = false;
-      try {
-        speechRecRef.current?.stop();
-      } catch {
-        /* ignore */
-      }
-      speechRecRef.current = null;
-      return;
-    }
-
-    const startLocalSpeech = () => {
-      if (gotServerTranscriptRef.current || speechRecRef.current) return;
-      const SpeechEngine =
-        (window as Window & {
-          SpeechRecognition?: new () => SpeechRecognition;
-          webkitSpeechRecognition?: new () => SpeechRecognition;
-        }).SpeechRecognition ||
-        (window as Window & { webkitSpeechRecognition?: new () => SpeechRecognition })
-          .webkitSpeechRecognition;
-      if (!SpeechEngine) return;
-
-      const rec = new SpeechEngine();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
-      rec.onresult = (event: SpeechRecognitionEvent) => {
-        if (gotServerTranscriptRef.current) return;
-        let interim = '';
-        let finalText = '';
-        for (let i = event.resultIndex; i < event.results.length; i += 1) {
-          const piece = event.results[i]?.[0]?.transcript || '';
-          if (event.results[i].isFinal) finalText += piece;
-          else interim += piece;
-        }
-        const finalClean = finalText.trim();
-        const interimClean = interim.trim();
-        if (!finalClean && !interimClean) return;
-        handleTranscriptionChunk({
-          messageID: finalClean ? `local-${Date.now()}` : 'local-interim',
-          participant: { name: t('Tu', 'Tú', 'You') },
-          final: finalClean || undefined,
-          stable: finalClean ? undefined : interimClean,
-        });
-      };
-      rec.onend = () => {
-        if (!transcriptionOn || gotServerTranscriptRef.current) return;
-        try {
-          rec.start();
-        } catch {
-          /* ignore */
-        }
-      };
-      speechRecRef.current = rec;
-      try {
-        rec.start();
-      } catch {
-        speechRecRef.current = null;
-      }
-    };
-
-    const timer = window.setTimeout(startLocalSpeech, 2500);
-    return () => {
-      window.clearTimeout(timer);
-      try {
-        speechRecRef.current?.stop();
-      } catch {
-        /* ignore */
-      }
-      speechRecRef.current = null;
-    };
-  }, [transcriptionOn, locale, handleTranscriptionChunk]);
-
-  useEffect(() => {
     return () => {
       localRecorderRef.current?.destroy();
       localRecorderRef.current = null;
@@ -402,6 +328,81 @@ export function MeetRoomClient({ sessionId }: Props) {
     },
     [companyId, sessionId, locale],
   );
+
+  // Fallback Web Speech — só depois de handleTranscriptionChunk existir (evita TDZ).
+  useEffect(() => {
+    if (!transcriptionOn) {
+      gotServerTranscriptRef.current = false;
+      try {
+        speechRecRef.current?.stop();
+      } catch {
+        /* ignore */
+      }
+      speechRecRef.current = null;
+      return;
+    }
+
+    const startLocalSpeech = () => {
+      if (gotServerTranscriptRef.current || speechRecRef.current) return;
+      const SpeechEngine =
+        (window as Window & {
+          SpeechRecognition?: new () => SpeechRecognition;
+          webkitSpeechRecognition?: new () => SpeechRecognition;
+        }).SpeechRecognition ||
+        (window as Window & { webkitSpeechRecognition?: new () => SpeechRecognition })
+          .webkitSpeechRecognition;
+      if (!SpeechEngine) return;
+
+      const rec = new SpeechEngine();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
+      rec.onresult = (event: SpeechRecognitionEvent) => {
+        if (gotServerTranscriptRef.current) return;
+        let interim = '';
+        let finalText = '';
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const piece = event.results[i]?.[0]?.transcript || '';
+          if (event.results[i].isFinal) finalText += piece;
+          else interim += piece;
+        }
+        const finalClean = finalText.trim();
+        const interimClean = interim.trim();
+        if (!finalClean && !interimClean) return;
+        handleTranscriptionChunk({
+          messageID: finalClean ? `local-${Date.now()}` : 'local-interim',
+          participant: { name: t('Tu', 'Tú', 'You') },
+          final: finalClean || undefined,
+          stable: finalClean ? undefined : interimClean,
+        });
+      };
+      rec.onend = () => {
+        if (!transcriptionOn || gotServerTranscriptRef.current) return;
+        try {
+          rec.start();
+        } catch {
+          /* ignore */
+        }
+      };
+      speechRecRef.current = rec;
+      try {
+        rec.start();
+      } catch {
+        speechRecRef.current = null;
+      }
+    };
+
+    const timer = window.setTimeout(startLocalSpeech, 2500);
+    return () => {
+      window.clearTimeout(timer);
+      try {
+        speechRecRef.current?.stop();
+      } catch {
+        /* ignore */
+      }
+      speechRecRef.current = null;
+    };
+  }, [transcriptionOn, locale, handleTranscriptionChunk]);
 
   function toggleTranscription() {
     setError(null);
