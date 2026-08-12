@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import { Loader2 } from 'lucide-react';
+import { normalizeJitsiTranscriptPayload } from '@/lib/meet/parse-transcript-event';
 
 type TranscriptionChunk = {
   language?: string;
@@ -82,7 +83,6 @@ const MEET_TOOLBAR_BUTTONS = [
   'fullscreen',
   'select-background',
   'noisesuppression',
-  'recording',
   'shortcuts',
   'videoquality',
   'invite',
@@ -207,24 +207,26 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
         startTranscription() {
           const api = apiRef.current;
           if (!api) return;
-          // 1) Pedido nativo de legendas → convida o transcriber (Jigasi/Vosk)
-          try {
-            api.executeCommand('setSubtitles', true, true, 'es');
-          } catch {
+          // Vários builds aceitam assinaturas diferentes de setSubtitles.
+          for (const args of [
+            [true, true, 'es'],
+            [true, true, 'translation-languages:es'],
+            [true, true],
+          ] as unknown[][]) {
             try {
-              api.executeCommand('toggleSubtitles');
+              api.executeCommand('setSubtitles', ...args);
+              break;
             } catch {
-              /* ignore */
+              /* tenta a seguinte */
             }
           }
-          // 2) Caminho clássico External API (alguns builds só reagem a isto)
           try {
             api.executeCommand('startRecording', {
               mode: 'file',
               transcription: true,
             });
           } catch {
-            /* ignore — sem Jibri pode falhar; setSubtitles basta para STT */
+            /* sem Jibri pode falhar; setSubtitles basta para STT */
           }
         },
         stopTranscription() {
@@ -464,8 +466,21 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             emitCount();
             callbacksRef.current.onReady?.();
           });
-          api.addListener('transcriptionChunkReceived', (chunk: TranscriptionChunk) => {
+          const emitTranscript = (raw: unknown) => {
+            const chunk = normalizeJitsiTranscriptPayload(raw);
+            if (!chunk) return;
             callbacksRef.current.onTranscriptionChunk?.(chunk);
+          };
+          api.addListener('transcriptionChunkReceived', emitTranscript);
+          api.addListener('endpointTextMessageReceived', emitTranscript);
+          api.addListener('incomingMessage', emitTranscript);
+          api.addListener('transcribingStatusChanged', (state: { on?: boolean } | boolean) => {
+            const on = typeof state === 'boolean' ? state : Boolean(state?.on);
+            callbacksRef.current.onRecordingStatus?.({
+              on,
+              mode: 'file',
+              transcription: true,
+            });
           });
           api.addListener('recordingStatusChanged', (state: RecordingState) => {
             // Ignorar “file” usado só para convidar o transcriber — não é gravação no PC.

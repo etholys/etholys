@@ -107,6 +107,8 @@ export function MeetRoomClient({ sessionId }: Props) {
   const pipWindowRef = useRef<Window | null>(null);
   const segmentsRef = useRef<TranscriptSegment[]>([]);
   const transcriptionStartedAtRef = useRef<number | null>(null);
+  const speechRecRef = useRef<{ stop: () => void } | null>(null);
+  const gotServerTranscriptRef = useRef(false);
 
   useEffect(() => {
     segmentsRef.current = segments;
@@ -243,6 +245,80 @@ export function MeetRoomClient({ sessionId }: Props) {
   }, [transcriptionOn, segments, locale]);
 
   useEffect(() => {
+    if (!transcriptionOn) {
+      gotServerTranscriptRef.current = false;
+      try {
+        speechRecRef.current?.stop();
+      } catch {
+        /* ignore */
+      }
+      speechRecRef.current = null;
+      return;
+    }
+
+    const startLocalSpeech = () => {
+      if (gotServerTranscriptRef.current || speechRecRef.current) return;
+      const SpeechEngine =
+        (window as Window & {
+          SpeechRecognition?: new () => SpeechRecognition;
+          webkitSpeechRecognition?: new () => SpeechRecognition;
+        }).SpeechRecognition ||
+        (window as Window & { webkitSpeechRecognition?: new () => SpeechRecognition })
+          .webkitSpeechRecognition;
+      if (!SpeechEngine) return;
+
+      const rec = new SpeechEngine();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
+      rec.onresult = (event: SpeechRecognitionEvent) => {
+        if (gotServerTranscriptRef.current) return;
+        let interim = '';
+        let finalText = '';
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const piece = event.results[i]?.[0]?.transcript || '';
+          if (event.results[i].isFinal) finalText += piece;
+          else interim += piece;
+        }
+        const finalClean = finalText.trim();
+        const interimClean = interim.trim();
+        if (!finalClean && !interimClean) return;
+        handleTranscriptionChunk({
+          messageID: finalClean ? `local-${Date.now()}` : 'local-interim',
+          participant: { name: t('Tu', 'Tú', 'You') },
+          final: finalClean || undefined,
+          stable: finalClean ? undefined : interimClean,
+        });
+      };
+      rec.onend = () => {
+        if (!transcriptionOn || gotServerTranscriptRef.current) return;
+        try {
+          rec.start();
+        } catch {
+          /* ignore */
+        }
+      };
+      speechRecRef.current = rec;
+      try {
+        rec.start();
+      } catch {
+        speechRecRef.current = null;
+      }
+    };
+
+    const timer = window.setTimeout(startLocalSpeech, 2500);
+    return () => {
+      window.clearTimeout(timer);
+      try {
+        speechRecRef.current?.stop();
+      } catch {
+        /* ignore */
+      }
+      speechRecRef.current = null;
+    };
+  }, [transcriptionOn, locale, handleTranscriptionChunk]);
+
+  useEffect(() => {
     return () => {
       localRecorderRef.current?.destroy();
       localRecorderRef.current = null;
@@ -265,6 +341,18 @@ export function MeetRoomClient({ sessionId }: Props) {
     }) => {
       const text = (chunk.final || chunk.stable || chunk.unstable || '').trim();
       if (!text) return;
+      const localLabel = t('Tu', 'Tú', 'You');
+      const speakerName =
+        chunk.participant?.name?.trim() ||
+        t('Participante', 'Participante', 'Participant');
+      if (speakerName !== localLabel) {
+        gotServerTranscriptRef.current = true;
+        try {
+          speechRecRef.current?.stop();
+        } catch {
+          /* ignore */
+        }
+      }
       setTranscriptionOn(true);
       setTranscriptionWaiting(false);
       const messageId =
@@ -273,9 +361,7 @@ export function MeetRoomClient({ sessionId }: Props) {
       const row: TranscriptSegment = {
         messageId,
         participantId: chunk.participant?.id,
-        participantName:
-          chunk.participant?.name?.trim() ||
-          t('Participante', 'Participante', 'Participant'),
+        participantName: speakerName,
         text,
         language: chunk.language,
         startedAt: new Date().toISOString(),
@@ -838,55 +924,20 @@ export function MeetRoomClient({ sessionId }: Props) {
                   {error}
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={toggleTranscription}
-                  className={`inline-flex items-center justify-center gap-1.5 rounded-full px-2 py-2.5 text-xs font-medium ${
-                    transcriptionOn
-                      ? 'bg-[#ea4335] text-white hover:bg-[#f28b82]'
-                      : 'bg-[#8ab4f8] text-[#202124] hover:bg-[#aecbfa]'
-                  }`}
-                >
-                  {transcriptionOn ? <Square className="h-3 w-3" /> : <Mic className="h-3.5 w-3.5" />}
-                  {transcriptionOn
-                    ? t('Parar', 'Detener', 'Stop')
-                    : t('Transcrever', 'Transcribir', 'Transcribe')}
-                </button>
-                <div className="relative">
-                  {recordingOn ? (
-                    <button
-                      type="button"
-                      onClick={() => void stopRecording()}
-                      disabled={recordingBusy}
-                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-[#ea4335] px-2 py-2.5 text-xs font-medium text-white hover:bg-[#f28b82] disabled:opacity-60"
-                      title={t(
-                        'Para e guarda o ficheiro no destino escolhido',
-                        'Detiene y guarda el archivo en el destino elegido',
-                        'Stops and saves the file to the chosen destination',
-                      )}
-                    >
-                      <Square className="h-3 w-3" />
-                      {t('Parar e guardar', 'Detener y guardar', 'Stop and save')}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void startLocalRecording()}
-                      disabled={recordingBusy}
-                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-white/10 px-2 py-2.5 text-xs font-medium text-white hover:bg-white/15 disabled:opacity-60"
-                      title={t(
-                        'Pede onde guardar e depois a janela/aba a capturar',
-                        'Pide dónde guardar y luego la ventana/pestaña a capturar',
-                        'Asks where to save, then which window/tab to capture',
-                      )}
-                    >
-                      <HardDrive className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      {t('Gravar neste PC', 'Grabar en este PC', 'Record to this PC')}
-                    </button>
-                  )}
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={toggleTranscription}
+                className={`inline-flex w-full items-center justify-center gap-1.5 rounded-full px-2 py-2.5 text-xs font-medium ${
+                  transcriptionOn
+                    ? 'bg-[#ea4335] text-white hover:bg-[#f28b82]'
+                    : 'bg-[#8ab4f8] text-[#202124] hover:bg-[#aecbfa]'
+                }`}
+              >
+                {transcriptionOn ? <Square className="h-3 w-3" /> : <Mic className="h-3.5 w-3.5" />}
+                {transcriptionOn
+                  ? t('Parar transcrição', 'Detener transcripción', 'Stop transcription')
+                  : t('Transcrever', 'Transcribir', 'Transcribe')}
+              </button>
 
               <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl bg-[#1f1f1f] p-3">
                 {segments.length === 0 ? (
@@ -899,9 +950,9 @@ export function MeetRoomClient({ sessionId }: Props) {
                         )
                       : transcriptionWaiting || transcriptionOn
                         ? t(
-                            'A aguardar o transcriber… fala com o microfone ligado. Os trechos aparecem aqui.',
-                            'Esperando al transcriber… habla con el micrófono abierto. Los fragmentos aparecen aquí.',
-                            'Waiting for the transcriber… speak with the mic on. Segments appear here.',
+                            'Transcrição activa. Fala com o microfone ligado — o texto deve aparecer aqui em poucos segundos.',
+                            'Transcripción activa. Habla con el micrófono abierto — el texto debe aparecer aquí en pocos segundos.',
+                            'Transcription is on. Speak with the mic open — text should appear here in a few seconds.',
                           )
                         : t(
                             'Clique em «Transcrever». Os trechos aparecerão aqui com o nome de quem falou.',
@@ -939,9 +990,9 @@ export function MeetRoomClient({ sessionId }: Props) {
 
               <p className="text-[10px] leading-relaxed text-white/35">
                 {t(
-                  'Gravar: escolhe o ficheiro e depois a aba/janela da reunião. A barra “está a partilhar o ecrã” do Chrome é normal na captura. Partilha dentro da call: se falhar, meet.etholys.com deve estar DNS only (sem Cloudflare laranja).',
-                  'Grabar: elige el archivo y luego la pestaña/ventana de la reunión. La barra “está compartiendo” de Chrome es normal. Compartir en la call: si falla, meet.etholys.com debe estar DNS only (sin Cloudflare naranja).',
-                  'Record: pick the file, then the meeting tab/window. Chrome’s “sharing your screen” bar is normal. In-call share issues: set meet.etholys.com to DNS-only (no orange Cloudflare).',
+                  'Gravar está só no botão «Gravar» no topo. Esta coluna é só transcrição. Se o Chrome pedir microfone para transcrever, aceita.',
+                  'Grabar está solo en el botón «Grabar» de arriba. Esta columna es solo transcripción. Si Chrome pide micrófono para transcribir, acéptalo.',
+                  'Recording is only the top “Record” button. This column is transcription only. If Chrome asks for the mic to transcribe, allow it.',
                 )}
               </p>
             </div>

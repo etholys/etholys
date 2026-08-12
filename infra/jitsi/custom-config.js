@@ -82,7 +82,6 @@ config.toolbarButtons = [
   'fullscreen',
   'select-background',
   'noisesuppression',
-  'recording',
   'shortcuts',
   'videoquality',
   'invite',
