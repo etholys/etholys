@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { meetEmbedUrl } from '@/lib/meet/room';
+import { meetRecapPath } from '@/lib/meet/types';
 import { canEmbedJitsiInIframe } from '@/lib/forge/jitsi-config';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
@@ -610,7 +611,7 @@ export function MeetRoomClient({ sessionId }: Props) {
         throw new Error(data.error || 'Falha ao encerrar reunião');
       }
       if (!opts?.skipHangup) conferenceRef.current?.hangup();
-      router.push(`/hub/meet?post=${sessionId}`);
+      router.push(meetRecapPath(sessionId, companyId));
     } catch (e) {
       endInFlight.current = false;
       setError(e instanceof Error ? e.message : 'Error');

@@ -13,8 +13,9 @@ import {
   Users,
   Video,
   X,
+  FileText,
 } from 'lucide-react';
-import { meetHubJoinPath, meetJoinTargetId } from '@/lib/meet/types';
+import { meetHubJoinPath, meetJoinTargetId, meetRecapPath } from '@/lib/meet/types';
 
 export type MeetEventParticipant = {
   id: string;
@@ -520,14 +521,23 @@ export function MeetEventDetailPopup({
             </div>
           )}
 
-          {!editing && session.status !== 'ended' && session.status !== 'cancelled' && (
+          {!editing && (
             <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+              {session.status !== 'ended' && session.status !== 'cancelled' && (
               <Link
                 href={meetHubJoinPath(joinId, companyId)}
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
               >
                 <Video className="h-4 w-4" />
                 {t('Entrar na sala', 'Entrar a la sala', 'Join room')}
+              </Link>
+              )}
+              <Link
+                href={meetRecapPath(session.id, companyId)}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+              >
+                <FileText className="h-4 w-4" />
+                {t('Transcrição e resumo', 'Transcripción y resumen', 'Transcript & summary')}
               </Link>
               {session.meetingUrl && (
                 <button

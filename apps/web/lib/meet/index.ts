@@ -28,6 +28,8 @@ export {
   isMeetMirror,
   meetHubJoinPath,
   meetJoinTargetId,
+  meetRecapPath,
+  meetRecapsPath,
 } from '@/lib/meet/types';
 export { buildMeetRoomUrl, meetEmbedUrl } from '@/lib/meet/room';
 export { buildMeetIcs, toIcsUtc, type MeetIcsInput } from '@/lib/meet/ics';

@@ -6,13 +6,12 @@ import {
   Video,
   Plus,
   Loader2,
-  Sparkles,
   Download,
+  FileText,
 } from 'lucide-react';
 import type { SectionProps } from './types';
 import { SectionTooltip } from './SectionTooltip';
-import { MeetPostMeetingPanel } from '@/components/meet/MeetPostMeetingPanel';
-import { meetHubJoinPath } from '@/lib/meet/types';
+import { meetHubJoinPath, meetRecapPath } from '@/lib/meet/types';
 import { useApp } from '@/app/providers';
 
 type MeetRow = {
@@ -36,7 +35,6 @@ export function MeetingsSection({ project }: SectionProps) {
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [postId, setPostId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!companyId || !projectId) return;
@@ -205,29 +203,21 @@ export function MeetingsSection({ project }: SectionProps) {
                     .ics
                   </a>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setPostId(s.id)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-800"
-                >
-                  <Sparkles className="h-3 w-3" />
-                  {t('Pós-reunião', 'Post-reunión', 'Post-meeting')}
-                </button>
+                {companyId && (
+                  <Link
+                    href={meetRecapPath(s.id, companyId)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-800"
+                  >
+                    <FileText className="h-3 w-3" />
+                    {t('Transcrição', 'Transcripción', 'Transcript')}
+                  </Link>
+                )}
               </div>
             </li>
           ))}
         </ul>
       )}
 
-      {postId && companyId && (
-        <MeetPostMeetingPanel
-          companyId={companyId}
-          sessionId={postId}
-          locale={locale}
-          onClose={() => setPostId(null)}
-          onUpdated={() => void load()}
-        />
-      )}
     </div>
   );
 }

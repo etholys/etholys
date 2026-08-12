@@ -41,6 +41,20 @@ export function meetHubJoinPath(sessionId: string, companyId: string): string {
   return `/hub/meet/${sessionId}?companyId=${encodeURIComponent(companyId)}`;
 }
 
+/** Biblioteca de transcrições / resumos (estilo Otter / Read.ai). */
+export function meetRecapsPath(companyId?: string | null): string {
+  return companyId
+    ? `/hub/meet/recaps?companyId=${encodeURIComponent(companyId)}`
+    : '/hub/meet/recaps';
+}
+
+/** Página de uma reunião: transcrição completa + resumo. */
+export function meetRecapPath(sessionId: string, companyId?: string | null): string {
+  return companyId
+    ? `/hub/meet/recaps/${sessionId}?companyId=${encodeURIComponent(companyId)}`
+    : `/hub/meet/recaps/${sessionId}`;
+}
+
 /** Para ocorrências de série, abrir sempre a sessão mestre (mesmo link Jitsi). */
 export function meetJoinTargetId(session: {
   id: string;

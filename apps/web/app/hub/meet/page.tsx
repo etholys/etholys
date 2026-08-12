@@ -24,12 +24,12 @@ import {
   Link2,
   CalendarRange,
   MonitorUp,
+  FileText,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { CompanyPicker } from '@/components/hub/CompanyPicker';
 import { CompanyRequiredPanel } from '@/components/hub/CompanyRequiredPanel';
-import { MeetPostMeetingPanel } from '@/components/meet/MeetPostMeetingPanel';
 import {
   MeetScheduleDialog,
   type ScheduleDraft,
@@ -42,7 +42,7 @@ import {
   MeetEventDetailPopup,
   type MeetEventDetail,
 } from '@/components/meet/MeetEventDetailPopup';
-import { meetHubJoinPath, meetJoinTargetId } from '@/lib/meet/types';
+import { meetHubJoinPath, meetJoinTargetId, meetRecapPath, meetRecapsPath } from '@/lib/meet/types';
 
 type MeetSessionRow = MeetEventDetail & {
   mirror: string;
@@ -136,7 +136,6 @@ function MeetHubContent() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [shareSession, setShareSession] = useState<{ id: string; meetingUrl: string } | null>(null);
-  const [postSessionId, setPostSessionId] = useState<string | null>(null);
   const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
   const [calBusyId, setCalBusyId] = useState<string | null>(null);
   const [jitsiStatus, setJitsiStatus] = useState<{ baseUrl: string; isDemo: boolean } | null>(null);
@@ -149,8 +148,10 @@ function MeetHubContent() {
 
   useEffect(() => {
     const post = searchParams.get('post')?.trim();
-    if (post) setPostSessionId(post);
-  }, [searchParams]);
+    if (post && companyId) {
+      router.replace(meetRecapPath(post, companyId));
+    }
+  }, [searchParams, companyId, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -735,6 +736,13 @@ function MeetHubContent() {
               <CalendarRange className="mr-1.5 inline h-4 w-4" />
               {t('Meu calendário', 'Mi calendario', 'My calendar')}
             </button>
+            <Link
+              href={meetRecapsPath(companyId)}
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:text-sky-700"
+            >
+              <FileText className="mr-1.5 inline h-4 w-4" />
+              {t('Transcrições', 'Transcripciones', 'Transcripts')}
+            </Link>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {connections?.google.ready ? (
@@ -868,7 +876,6 @@ function MeetHubContent() {
                   onOpen={openSessionDetail}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
-                  onPost={setPostSessionId}
                   t={t}
                 />
               )}
@@ -884,7 +891,6 @@ function MeetHubContent() {
                   onOpen={openSessionDetail}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
-                  onPost={setPostSessionId}
                   t={t}
                 />
               )}
@@ -899,7 +905,6 @@ function MeetHubContent() {
                   onOpen={openSessionDetail}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
-                  onPost={setPostSessionId}
                   t={t}
                 />
               )}
@@ -914,7 +919,6 @@ function MeetHubContent() {
                   onOpen={openSessionDetail}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
-                  onPost={setPostSessionId}
                   t={t}
                 />
               )}
@@ -929,7 +933,6 @@ function MeetHubContent() {
                   onOpen={openSessionDetail}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
-                  onPost={setPostSessionId}
                   t={t}
                 />
               )}
@@ -963,17 +966,6 @@ function MeetHubContent() {
           />
         )}
 
-        {postSessionId && companyId && (
-          <div className="mt-8">
-            <MeetPostMeetingPanel
-              companyId={companyId}
-              sessionId={postSessionId}
-              locale={locale}
-              onClose={() => setPostSessionId(null)}
-              onUpdated={() => void load()}
-            />
-          </div>
-        )}
       </main>
 
       {scheduleOpen && (
@@ -1060,7 +1052,6 @@ type GroupProps = {
   onOpen: (sessionId: string) => void;
   onCopy: (url: string, id: string) => void;
   onCalendar: (sessionId: string, provider: 'google' | 'outlook') => void;
-  onPost: (sessionId: string) => void;
   t: (pt: string, es: string, en: string) => string;
 };
 
@@ -1075,7 +1066,6 @@ function MeetingGroup({
   onOpen,
   onCopy,
   onCalendar,
-  onPost,
   t,
 }: GroupProps) {
   const timeFmt = new Intl.DateTimeFormat(intlLocale, { hour: '2-digit', minute: '2-digit' });
@@ -1164,14 +1154,13 @@ function MeetingGroup({
                       {t('Entrar', 'Unirse', 'Join')}
                     </Link>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => onPost(s.id)}
+                  <Link
+                    href={meetRecapPath(s.id, companyId)}
                     className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                   >
-                    <Sparkles className="mr-1 inline h-3 w-3" />
-                    {t('Resumo', 'Resumen', 'Summary')}
-                  </button>
+                    <FileText className="mr-1 inline h-3 w-3" />
+                    {t('Transcrição', 'Transcripción', 'Transcript')}
+                  </Link>
 
                   <div className="flex items-center gap-1 opacity-70 transition group-hover:opacity-100">
                     {s.meetingUrl && (

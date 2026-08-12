@@ -243,7 +243,7 @@ export async function listMeetSessions(
           user: { select: { id: true, name: true, email: true } },
         },
       },
-      _count: { select: { participants: true, actionItems: true } },
+      _count: { select: { participants: true, actionItems: true, transcriptSegments: true } },
     },
   });
 }

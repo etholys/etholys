@@ -13,7 +13,7 @@ export async function notifyMeetActionsPending(opts: {
 }): Promise<void> {
   if (opts.draftCount <= 0) return;
 
-  const link = `/hub/meet?post=${encodeURIComponent(opts.sessionId)}&companyId=${encodeURIComponent(opts.companyId)}`;
+  const link = `/hub/meet/recaps/${encodeURIComponent(opts.sessionId)}?companyId=${encodeURIComponent(opts.companyId)}`;
   const title =
     opts.draftCount === 1
       ? '1 tarefa de reunião por validar'
