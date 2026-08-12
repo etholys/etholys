@@ -14,8 +14,9 @@ import {
   Video,
   X,
   FileText,
+  MonitorUp,
 } from 'lucide-react';
-import { meetHubJoinPath, meetJoinTargetId, meetRecapPath } from '@/lib/meet/types';
+import { meetHubJoinPath, meetJoinTargetId, meetRecapPath, meetCapturePath, isGoogleImportedMeetSession } from '@/lib/meet/types';
 
 export type MeetEventParticipant = {
   id: string;
@@ -523,15 +524,35 @@ export function MeetEventDetailPopup({
 
           {!editing && (
             <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-              {session.status !== 'ended' && session.status !== 'cancelled' && (
-              <Link
-                href={meetHubJoinPath(joinId, companyId)}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
-              >
-                <Video className="h-4 w-4" />
-                {t('Entrar na sala', 'Entrar a la sala', 'Join room')}
-              </Link>
+              {session.status !== 'ended' &&
+                session.status !== 'cancelled' &&
+                !isGoogleImportedMeetSession(session) && (
+                <Link
+                  href={meetHubJoinPath(joinId, companyId)}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+                >
+                  <Video className="h-4 w-4" />
+                  {t('Entrar na sala', 'Entrar a la sala', 'Join room')}
+                </Link>
               )}
+              {isGoogleImportedMeetSession(session) && session.meetingUrl && (
+                <a
+                  href={session.meetingUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+                >
+                  <Video className="h-4 w-4" />
+                  {t('Abrir call externa', 'Abrir call externa', 'Open external call')}
+                </a>
+              )}
+              <Link
+                href={meetCapturePath({ companyId, sessionId: session.id })}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-900 hover:bg-violet-100"
+              >
+                <MonitorUp className="h-4 w-4" />
+                {t('Captura + transcrição', 'Captura + transcripción', 'Capture + transcript')}
+              </Link>
               <Link
                 href={meetRecapPath(session.id, companyId)}
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"

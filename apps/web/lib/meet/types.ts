@@ -41,6 +41,23 @@ export function meetHubJoinPath(sessionId: string, companyId: string): string {
   return `/hub/meet/${sessionId}?companyId=${encodeURIComponent(companyId)}`;
 }
 
+/** Captura externa (Zoom/Teams/outro) ligada a uma sessão Meet. */
+export function meetCapturePath(opts: {
+  companyId: string;
+  sessionId?: string | null;
+}): string {
+  const params = new URLSearchParams({ companyId: opts.companyId });
+  if (opts.sessionId) params.set('sessionId', opts.sessionId);
+  return `/hub/meet/capture?${params.toString()}`;
+}
+
+/** Sessão importada do Google Calendar (sem Jitsi Etholys por omissão). */
+export function isGoogleImportedMeetSession(session: {
+  roomSlug?: string | null;
+}): boolean {
+  return Boolean(session.roomSlug?.startsWith('gcal-'));
+}
+
 /** Biblioteca de transcrições / resumos (estilo Otter / Read.ai). */
 export function meetRecapsPath(companyId?: string | null): string {
   return companyId

@@ -183,6 +183,74 @@ export async function createMeetSession(input: CreateMeetSessionInput) {
   return prisma.meetSession.findUniqueOrThrow({ where: { id: master.id } });
 }
 
+/** Importação Google/Outlook: sem sala Jitsi; meetingUrl = link Zoom/Teams/Meet externo. */
+export async function upsertExternalCalendarMeetSession(input: {
+  companyId: string;
+  createdById: string;
+  roomSlug: string;
+  title: string;
+  description?: string | null;
+  scheduledAt: Date;
+  endsAt: Date;
+  meetingUrl?: string | null;
+}): Promise<{ session: { id: string }; created: boolean }> {
+  assertMeetPrismaReady();
+  const title = input.title.trim().slice(0, 200);
+  if (!title) throw new Error('title required');
+  const roomSlug = input.roomSlug.trim().slice(0, 80);
+  if (!roomSlug) throw new Error('roomSlug required');
+
+  const now = Date.now();
+  const status = input.endsAt.getTime() < now ? 'ended' : 'scheduled';
+  const meetingUrl = input.meetingUrl?.trim() || null;
+  const description = input.description?.trim() || null;
+
+  const existing = await prisma.meetSession.findFirst({
+    where: { companyId: input.companyId, roomSlug },
+    select: { id: true },
+  });
+
+  if (existing) {
+    const session = await prisma.meetSession.update({
+      where: { id: existing.id },
+      data: {
+        title,
+        description,
+        scheduledAt: input.scheduledAt,
+        endsAt: input.endsAt,
+        status,
+        ...(meetingUrl ? { meetingUrl } : {}),
+      },
+      select: { id: true },
+    });
+    return { session, created: false };
+  }
+
+  const session = await prisma.meetSession.create({
+    data: {
+      companyId: input.companyId,
+      createdById: input.createdById,
+      title,
+      description,
+      mirror: 'loose',
+      status,
+      scheduledAt: input.scheduledAt,
+      endsAt: input.endsAt,
+      roomSlug,
+      meetingUrl,
+      isPermanent: false,
+      recurrence: 'none',
+    },
+    select: { id: true },
+  });
+  await prisma.meetSession.update({
+    where: { id: session.id },
+    data: { seriesId: session.id },
+  });
+  await attachParticipants(session.id, input.createdById, []);
+  return { session, created: true };
+}
+
 /** Sessões `live` que já passaram do fim (ou >4h) — limpa o hub «En curso». */
 const STALE_LIVE_MAX_MS = 4 * 60 * 60 * 1000;
 const STALE_AFTER_END_GRACE_MS = 15 * 60 * 1000;

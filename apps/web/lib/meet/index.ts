@@ -30,6 +30,8 @@ export {
   meetJoinTargetId,
   meetRecapPath,
   meetRecapsPath,
+  meetCapturePath,
+  isGoogleImportedMeetSession,
 } from '@/lib/meet/types';
 export { buildMeetRoomUrl, meetEmbedUrl } from '@/lib/meet/room';
 export { buildMeetIcs, toIcsUtc, type MeetIcsInput } from '@/lib/meet/ics';

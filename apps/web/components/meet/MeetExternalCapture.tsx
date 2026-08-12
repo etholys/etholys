@@ -348,15 +348,38 @@ export function MeetExternalCapture({ companyId, sessionId }: Props) {
             <MonitorUp className="mt-0.5 h-5 w-5 text-[#8ab4f8]" />
             <div>
               <h2 className="text-sm font-medium">
-                {t('Gravar ecrã da reunião', 'Grabar pantalla de la reunión', 'Record meeting screen')}
+                {t('Como usar em Zoom / Teams / outro Meet', 'Cómo usar en Zoom / Teams / otro Meet', 'How to use with Zoom / Teams / other Meet')}
               </h2>
-              <p className="mt-1 text-xs leading-relaxed text-white/50">
-                {t(
-                  'Escolha a janela do Zoom/Teams e permita o microfone. O ficheiro descarrega ao parar.',
-                  'Elige la ventana de Zoom/Teams y permite el micrófono. El archivo se descarga al detener.',
-                  'Pick the Zoom/Teams window and allow the microphone. The file downloads when you stop.',
-                )}
-              </p>
+              <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-white/55">
+                <li>
+                  {t(
+                    'Abre a call externa noutra janela (Zoom, Teams, Google Meet…).',
+                    'Abre la call externa en otra ventana (Zoom, Teams, Google Meet…).',
+                    'Open the external call in another window (Zoom, Teams, Google Meet…).',
+                  )}
+                </li>
+                <li>
+                  {t(
+                    'Aqui: «Iniciar captura» → escolhe essa janela/aba + microfone.',
+                    'Aquí: «Iniciar captura» → elige esa ventana/pestaña + micrófono.',
+                    'Here: “Start capture” → pick that window/tab + microphone.',
+                  )}
+                </li>
+                <li>
+                  {t(
+                    'Fala; a transcrição aparece à direita (Chrome/Edge).',
+                    'Habla; la transcripción aparece a la derecha (Chrome/Edge).',
+                    'Speak; the transcript appears on the right (Chrome/Edge).',
+                  )}
+                </li>
+                <li>
+                  {t(
+                    '«Parar» → descarrega o vídeo. Se vieste de um evento Meet, a transcrição vai ao recap.',
+                    '«Detener» → descarga el vídeo. Si viniste de un evento Meet, la transcripción va al recap.',
+                    '“Stop” → download the video. If you came from a Meet event, the transcript goes to the recap.',
+                  )}
+                </li>
+              </ol>
             </div>
           </div>
 
