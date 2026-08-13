@@ -208,7 +208,7 @@ function splitBlockByLinesToFit(
 /**
  * Paginação tipo Word (nível de bloco / linhas):
  * - junta o picote
- * - distribui por folhas A4 com altura útil real (tamanho + margens)
+ * - distribui por folhas no tamanho do documento (pageSize + orientação + margens)
  * - sem ResizeObserver em loop
  */
 export function reflowStudioDocument(
@@ -251,6 +251,7 @@ export function reflowStudioDocument(
   const contentW = Math.max(120, width - pad.left - pad.right);
 
   const titlePrefix = opts?.pageTitlePrefix || 'Página';
+  const existingPages = canvas.pages.slice().sort((a, b) => a.order - b.order);
   const pagesOut: StudioPage[] = [];
   let bucket: StudioBlock[] = [];
   let used = 0;
@@ -258,13 +259,14 @@ export function reflowStudioDocument(
   const flush = () => {
     if (!bucket.length && pagesOut.length > 0) return;
     const idx = pagesOut.length;
+    const prevPage = existingPages[idx];
     pagesOut.push({
-      id: idx === 0 && canvas.pages[0]?.id ? canvas.pages[0].id : newPageId(idx),
-      title: `${titlePrefix} ${idx + 1}`,
+      id: prevPage?.id || newPageId(idx),
+      title: prevPage?.title || `${titlePrefix} ${idx + 1}`,
       order: idx,
       pageSize: size,
-      layoutMode: 'blank',
-      moldId: null,
+      layoutMode: prevPage?.layoutMode || 'blank',
+      moldId: prevPage?.moldId ?? null,
       blocks: reindex(bucket),
     });
     bucket = [];
@@ -352,7 +354,7 @@ export function reflowStudioDocument(
 }
 
 /**
- * Recuperar picote + paginar em folhas A4 (comportamento tipo Word).
+ * Recuperar picote + paginar no tamanho actual do documento (comportamento tipo Word).
  */
 export function mergeStudioDocument(
   canvas: StudioCanvasState,

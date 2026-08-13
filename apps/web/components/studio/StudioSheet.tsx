@@ -18,8 +18,8 @@ type Props = {
 
 /**
  * Folha de documento.
- * - flow: altura mínima A4, cresce com o texto (Word).
- * - fixed: altura fixa; só move blocos inteiros se onOverflow estiver ativo.
+ * - flow: altura mínima do formato, cresce com o texto (última folha em redação).
+ * - fixed: altura fixa; em desenho move blocos inteiros se onOverflow estiver ativo.
  */
 export function StudioSheet({
   width,

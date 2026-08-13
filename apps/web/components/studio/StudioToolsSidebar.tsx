@@ -6,6 +6,7 @@ import {
   ImagePlus,
   LayoutTemplate,
   PenLine,
+  Pencil,
   Ruler,
   Sparkles,
 } from 'lucide-react';
@@ -30,8 +31,10 @@ type Labels = {
   mode: string;
   write: string;
   writeHint: string;
+  writeIntro: string;
   design: string;
   designHint: string;
+  designIntro: string;
   page: string;
   size: string;
   orientation: string;
@@ -55,8 +58,8 @@ type Labels = {
   callout: string;
   diagram: string;
   image: string;
-  merge: string;
-  mergeHint: string;
+  designTools: string;
+  drawBoard: string;
   molds: string;
   aiScope: string;
 };
@@ -71,13 +74,11 @@ type Props = {
   margins: StudioPageMarginsMm;
   disabled?: boolean;
   pageCount: number;
-  showMerge?: boolean;
   labels: Labels;
   onPageSize: (size: StudioPageSize) => void;
   onOrientation: (o: StudioPageOrientation) => void;
   onMargins: (m: StudioPageMarginsMm) => void;
   onInsert: (kind: StudioBlockKind | 'image') => void;
-  onMerge?: () => void;
   onOpenMolds?: () => void;
 };
 
@@ -91,13 +92,11 @@ export function StudioToolsSidebar({
   margins,
   disabled,
   pageCount,
-  showMerge,
   labels,
   onPageSize,
   onOrientation,
   onMargins,
   onInsert,
-  onMerge,
   onOpenMolds,
 }: Props) {
   const preset = matchStudioMarginPreset(margins);
@@ -143,6 +142,8 @@ export function StudioToolsSidebar({
     );
   }
 
+  const isDesign = mode === 'design';
+
   return (
     <aside className="flex h-full w-[280px] shrink-0 flex-col border-l border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
@@ -187,7 +188,7 @@ export function StudioToolsSidebar({
               disabled={disabled}
               onClick={() => onModeChange('design')}
               className={`rounded-lg px-2 py-2 text-left ${
-                mode === 'design' ? 'bg-white shadow-sm ring-1 ring-orange-200' : 'hover:bg-white/70'
+                isDesign ? 'bg-white shadow-sm ring-1 ring-violet-300' : 'hover:bg-white/70'
               }`}
             >
               <span className="flex items-center gap-1 text-xs font-bold text-slate-900">
@@ -199,24 +200,16 @@ export function StudioToolsSidebar({
               </span>
             </button>
           </div>
+          <p
+            className={`mt-2 rounded-lg px-2.5 py-2 text-[10px] leading-snug ${
+              isDesign
+                ? 'border border-violet-200 bg-violet-50 text-violet-900'
+                : 'border border-orange-100 bg-orange-50/80 text-orange-950'
+            }`}
+          >
+            {isDesign ? labels.designIntro : labels.writeIntro}
+          </p>
         </section>
-
-        {(showMerge || pageCount > 8) && onMerge && (
-          <section className="rounded-xl border border-amber-200 bg-amber-50/80 p-2.5">
-            <p className="text-[11px] font-semibold text-amber-950">
-              {pageCount} {labels.page.toLowerCase()}
-            </p>
-            <p className="mt-1 text-[10px] leading-snug text-amber-900/80">{labels.mergeHint}</p>
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={onMerge}
-              className="mt-2 w-full rounded-lg bg-amber-700 px-2 py-1.5 text-[11px] font-bold text-white hover:bg-amber-800 disabled:opacity-50"
-            >
-              {labels.merge}
-            </button>
-          </section>
-        )}
 
         <section>
           <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
@@ -321,56 +314,88 @@ export function StudioToolsSidebar({
               {labels.allSides}
             </button>
           )}
+          <p className="mt-2 text-[10px] text-slate-400">
+            {pageCount} {labels.page.toLowerCase()}(s) · {pageSize}
+          </p>
         </section>
 
-        <section>
-          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-            {labels.insert}
-          </p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {(
-              [
-                ['paragraph', labels.text],
-                ['heading', labels.heading],
-                ['bullets', labels.list],
-                ['callout', labels.callout],
-                ['diagram', labels.diagram],
-              ] as const
-            ).map(([kind, label]) => (
+        {isDesign ? (
+          <section>
+            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-violet-500">
+              {labels.designTools}
+            </p>
+            <div className="grid grid-cols-1 gap-1.5">
               <button
-                key={kind}
                 type="button"
                 disabled={disabled}
-                onClick={() => onInsert(kind)}
-                className="rounded-lg border border-slate-200 px-2 py-1.5 text-left text-[11px] font-semibold text-slate-700 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-50"
+                onClick={() => onInsert('diagram')}
+                className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-2.5 text-left text-[11px] font-bold text-violet-950 hover:bg-violet-100 disabled:opacity-50"
               >
-                {label}
+                <Pencil className="h-4 w-4 shrink-0" />
+                <span>
+                  {labels.drawBoard}
+                  <span className="mt-0.5 block text-[10px] font-medium text-violet-700/80">
+                    Excalidraw
+                  </span>
+                </span>
               </button>
-            ))}
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => onInsert('image')}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-50"
-            >
-              <ImagePlus className="h-3.5 w-3.5" />
-              {labels.image}
-            </button>
-          </div>
-          <p className="mt-2 text-[10px] text-slate-400">{labels.aiScope}</p>
-        </section>
-
-        {mode === 'design' && onOpenMolds && (
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onInsert('image')}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-2 text-[11px] font-semibold text-slate-700 hover:border-violet-300 hover:bg-violet-50 disabled:opacity-50"
+              >
+                <ImagePlus className="h-3.5 w-3.5" />
+                {labels.image}
+              </button>
+              {onOpenMolds && (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={onOpenMolds}
+                  className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-violet-900 hover:bg-violet-50 disabled:opacity-50"
+                >
+                  <LayoutTemplate className="h-3.5 w-3.5" />
+                  {labels.molds}
+                </button>
+              )}
+            </div>
+          </section>
+        ) : (
           <section>
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={onOpenMolds}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2 py-2 text-[11px] font-bold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
-            >
-              <LayoutTemplate className="h-3.5 w-3.5" />
-              {labels.molds}
-            </button>
+            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              {labels.insert}
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(
+                [
+                  ['paragraph', labels.text],
+                  ['heading', labels.heading],
+                  ['bullets', labels.list],
+                  ['callout', labels.callout],
+                ] as const
+              ).map(([kind, label]) => (
+                <button
+                  key={kind}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onInsert(kind)}
+                  className="rounded-lg border border-slate-200 px-2 py-1.5 text-left text-[11px] font-semibold text-slate-700 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onInsert('image')}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-50"
+              >
+                <ImagePlus className="h-3.5 w-3.5" />
+                {labels.image}
+              </button>
+            </div>
+            <p className="mt-2 text-[10px] text-slate-400">{labels.aiScope}</p>
           </section>
         )}
       </div>

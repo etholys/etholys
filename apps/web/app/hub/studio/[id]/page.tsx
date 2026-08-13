@@ -380,9 +380,13 @@ export default function StudioDocumentPage() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
       setTitle(d.document.title);
-      const c = normalizeStudioCanvas(d.document.canvasState);
+      const c0 = normalizeStudioCanvas(d.document.canvasState);
+      const c =
+        c0.studioMode !== 'design' && studioLikelyOverPaginated(c0)
+          ? mergeStudioDocument(c0, { pageTitlePrefix: 'Página' })
+          : c0;
       canvasRef.current = c;
-      dirtyRef.current = false;
+      dirtyRef.current = c !== c0;
       setCanvas(c);
       setActivePageId(c.pages[0]?.id || null);
       setUndoStack([]);
@@ -392,7 +396,7 @@ export default function StudioDocumentPage() {
         setActiveCompanyId(d.document.companyId);
       }
       setAccess(typeof d.access === 'string' ? d.access : 'owner');
-      setDirty(false);
+      setDirty(c !== c0);
       const ub = d.document.updatedBy;
       setLastEditedBy(ub ? ub.name?.trim() || ub.email || null : null);
       setLastEditedAt(typeof d.document.updatedAt === 'string' ? d.document.updatedAt : null);
@@ -767,8 +771,7 @@ export default function StudioDocumentPage() {
       if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
 
       if (d.canvasState) {
-        applyCanvas(() => normalizeStudioCanvas(d.canvasState), true);
-        setDirty(false);
+        applyCanvas(() => layoutWriteDocument(normalizeStudioCanvas(d.canvasState)), true);
       }
       if (typeof d.title === 'string' && d.title) setTitle(d.title);
       setMessages((m) => [
@@ -869,87 +872,45 @@ export default function StudioDocumentPage() {
     await loadMolds();
   }
 
+  function layoutWriteDocument(prev: StudioCanvasState): StudioCanvasState {
+    if (prev.studioMode === 'design') return prev;
+    return reflowStudioDocument(prev, {
+      pageTitlePrefix: t('Página', 'Página', 'Page'),
+      marginsMm: prev.marginsMm,
+    });
+  }
+
   function setDocPageSize(size: StudioPageSize) {
-    applyCanvas((prev) => ({
-      ...prev,
-      pageSize: size,
-      orientation:
-        size === 'Slide' ? 'landscape' : prev.orientation || 'portrait',
-      pages: prev.pages.map((p) => ({ ...p, pageSize: size })),
-    }));
+    applyCanvas((prev) =>
+      layoutWriteDocument({
+        ...prev,
+        pageSize: size,
+        orientation: size === 'Slide' ? 'landscape' : prev.orientation || 'portrait',
+        pages: prev.pages.map((p) => ({ ...p, pageSize: size })),
+      }),
+    );
   }
 
   function setDocOrientation(orientation: StudioPageOrientation) {
-    applyCanvas((prev) => ({ ...prev, orientation }));
+    applyCanvas((prev) => layoutWriteDocument({ ...prev, orientation }));
   }
 
   function setDocMargins(marginsMm: StudioCanvasState['marginsMm']) {
-    applyCanvas((prev) => ({
-      ...prev,
-      marginsMm: normalizeStudioMargins(marginsMm),
-    }));
+    applyCanvas((prev) =>
+      layoutWriteDocument({
+        ...prev,
+        marginsMm: normalizeStudioMargins(marginsMm),
+      }),
+    );
   }
 
   function setStudioMode(mode: StudioStudioMode) {
-    applyCanvas((prev) => ({ ...prev, studioMode: mode }));
-  }
-
-  async function reunirDocumento() {
-    if (!canvas) return;
-    const ok = window.confirm(
-      t(
-        'Isto recupera o texto picotado e volta a distribuí-lo por folhas A4 (como Word), sem perder conteúdo. Continuar?',
-        'Esto recupera el texto troceado y lo vuelve a repartir en hojas A4 (como Word), sin perder contenido. ¿Continuar?',
-        'This recovers chopped text and redistributes it across A4 sheets (like Word), without losing content. Continue?',
-      ),
-    );
-    if (!ok) return;
-
-    const merged = mergeStudioDocument(canvas, {
-      pageTitlePrefix: t('Página', 'Página', 'Page'),
-    });
-    if (!skipHistory.current) pushHistory(canvas);
-    canvasRef.current = merged;
-    dirtyRef.current = true;
-    setCanvas(merged);
-    setDirty(true);
-    setActivePageId(merged.pages[0]?.id || null);
     setToolsOpen(true);
-
-    try {
-      await persistCanvas({ quiet: false, forceSnap: merged });
-      void loadVersions();
-      void loadActivity();
-    } catch (e: unknown) {
-      alert(
-        e instanceof Error
-          ? e.message
-          : t(
-              'Falha ao gravar o documento paginado. Não feches a página — tenta Guardar.',
-              'Fallo al guardar el documento paginado. No cierres la página — intenta Guardar.',
-              'Failed to save the paginated document. Do not close the page — try Save.',
-            ),
-      );
-    }
-  }
-
-  async function repaginarDocumento() {
-    if (!canvas) return;
-    const next = reflowStudioDocument(canvas, {
-      pageTitlePrefix: t('Página', 'Página', 'Page'),
-      marginsMm: canvas.marginsMm,
+    applyCanvas((prev) => {
+      const next = { ...prev, studioMode: mode };
+      if (mode === 'write') return layoutWriteDocument(next);
+      return next;
     });
-    if (!skipHistory.current) pushHistory(canvas);
-    canvasRef.current = next;
-    dirtyRef.current = true;
-    setCanvas(next);
-    setDirty(true);
-    setActivePageId(next.pages[0]?.id || null);
-    try {
-      await persistCanvas({ quiet: true, forceSnap: next });
-    } catch {
-      /* autosave tentará */
-    }
   }
 
   function addPage() {
@@ -1112,7 +1073,6 @@ export default function StudioDocumentPage() {
     canvas.orientation || (pageSize === 'Slide' ? 'landscape' : 'portrait');
   const marginsMm = normalizeStudioMargins(canvas.marginsMm || DEFAULT_STUDIO_MARGINS_MM);
   const studioMode: StudioStudioMode = canvas.studioMode === 'design' ? 'design' : 'write';
-  const overPaginated = studioLikelyOverPaginated(canvas);
 
   return (
     <div className="flex h-screen flex-col bg-slate-200/80">
@@ -1566,15 +1526,6 @@ export default function StudioDocumentPage() {
               <Plus className="h-3.5 w-3.5" />
               {t('Nova folha', 'Nueva hoja', 'New page')}
             </button>
-            {canEdit && studioMode === 'write' && (
-              <button
-                type="button"
-                onClick={() => void repaginarDocumento()}
-                className="inline-flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-xs font-semibold text-orange-900 hover:bg-orange-100"
-              >
-                {t('Repaginar A4', 'Repaginar A4', 'Repaginate A4')}
-              </button>
-            )}
             <span
               className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                 studioMode === 'write'
@@ -1599,28 +1550,43 @@ export default function StudioDocumentPage() {
             )}
           </div>
 
-          {overPaginated && canEdit && (
-            <div className="mx-auto mb-4 max-w-[720px] rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm">
-              <p className="font-semibold">
-                {t(
-                  `Este documento tem ${canvas.pages.length} folhas — parece picote automático.`,
-                  `Este documento tiene ${canvas.pages.length} hojas — parece un corte automático erróneo.`,
-                  `This document has ${canvas.pages.length} sheets — looks like a bad auto-split.`,
-                )}
-              </p>
-              <p className="mt-1 text-xs text-amber-900/80">
-                {t(
-                  'O texto não se perde. Recuperamos o picote e voltamos a paginar em folhas A4.',
-                  'El texto no se pierde. Recuperamos el corte y volvemos a paginar en hojas A4.',
-                  'Text is not lost. We recover the chop and re-paginate into A4 sheets.',
-                )}
-              </p>
+          {canEdit && studioMode === 'design' && (
+            <div className="mx-auto mb-4 flex w-full max-w-[720px] flex-wrap items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50/90 px-2.5 py-2 shadow-sm">
+              <span className="px-1 text-[10px] font-bold uppercase tracking-wide text-violet-600">
+                {t('Desenho', 'Diseño', 'Design')}
+              </span>
               <button
                 type="button"
-                onClick={reunirDocumento}
-                className="mt-2 rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-800"
+                onClick={() => {
+                  const pageId = activePageId || canvas.pages[0]?.id;
+                  if (pageId) addBlock(pageId, 'diagram');
+                }}
+                className="inline-flex items-center gap-1 rounded-md border border-violet-300 bg-white px-2 py-1.5 text-[11px] font-bold text-violet-950 hover:bg-violet-100"
               >
-                {t('Recuperar e paginar A4', 'Recuperar y paginar A4', 'Recover & paginate A4')}
+                {t('Quadro de desenho', 'Lienzo de dibujo', 'Drawing board')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const pageId = activePageId || canvas.pages[0]?.id;
+                  if (!pageId) return;
+                  setImageTargetPageId(pageId);
+                  setActivePageId(pageId);
+                  imageInputRef.current?.click();
+                }}
+                className="rounded-md border border-violet-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-violet-900 hover:bg-violet-100"
+              >
+                {t('Imagem', 'Imagen', 'Image')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMolds(true);
+                  void loadMolds();
+                }}
+                className="rounded-md border border-violet-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-violet-900 hover:bg-violet-100"
+              >
+                {t('Moldes', 'Moldes', 'Molds')}
               </button>
             </div>
           )}
@@ -1753,52 +1719,82 @@ export default function StudioDocumentPage() {
                     className="relative"
                     onFocusCapture={() => setActivePageId(page.id)}
                     onMouseDown={() => setActivePageId(page.id)}
+                    onBlurCapture={(e) => {
+                      if (studioMode !== 'write' || !canEdit) return;
+                      const next = e.relatedTarget as Node | null;
+                      if (next && e.currentTarget.contains(next)) return;
+                      window.setTimeout(() => {
+                        const snap = canvasRef.current;
+                        if (!snap || snap.studioMode === 'design') return;
+                        const laid = layoutWriteDocument(snap);
+                        if (laid === snap) return;
+                        if (JSON.stringify(laid.pages) === JSON.stringify(snap.pages)) return;
+                        applyCanvas(() => laid, false);
+                      }, 80);
+                    }}
                   >
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2" style={{ width }}>
                       <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         {page.title || `${t('Folha', 'Hoja', 'Sheet')} ${idx + 1}`} · {size} ·{' '}
                         {Math.round(wMm)}×{Math.round(hMm)} mm
                       </p>
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          disabled={!canEdit}
-                          onClick={() => setPageLayout(page.id, 'blank')}
-                          className={`rounded px-2 py-0.5 text-[10px] font-semibold ${
-                            page.layoutMode !== 'mold'
-                              ? 'bg-slate-800 text-white'
-                              : 'bg-white text-slate-600 border border-slate-200'
-                          }`}
-                        >
-                          {t('Do zero', 'Desde cero', 'Blank')}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!canEdit}
-                          onClick={() => {
-                            setActivePageId(page.id);
-                            setShowMolds(true);
-                            void loadMolds();
-                          }}
-                          className={`rounded px-2 py-0.5 text-[10px] font-semibold ${
-                            page.layoutMode === 'mold'
-                              ? 'bg-orange-600 text-white'
-                              : 'bg-white text-slate-600 border border-slate-200'
-                          }`}
-                        >
-                          {t('Molde', 'Molde', 'Mold')}
-                        </button>
-                      </div>
+                      {studioMode === 'design' && (
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            disabled={!canEdit}
+                            onClick={() => setPageLayout(page.id, 'blank')}
+                            className={`rounded px-2 py-0.5 text-[10px] font-semibold ${
+                              page.layoutMode !== 'mold'
+                                ? 'bg-slate-800 text-white'
+                                : 'bg-white text-slate-600 border border-slate-200'
+                            }`}
+                          >
+                            {t('Do zero', 'Desde cero', 'Blank')}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!canEdit}
+                            onClick={() => {
+                              setActivePageId(page.id);
+                              setShowMolds(true);
+                              void loadMolds();
+                            }}
+                            className={`rounded px-2 py-0.5 text-[10px] font-semibold ${
+                              page.layoutMode === 'mold'
+                                ? 'bg-violet-600 text-white'
+                                : 'bg-white text-slate-600 border border-slate-200'
+                            }`}
+                          >
+                            {t('Molde', 'Molde', 'Mold')}
+                          </button>
+                        </div>
+                      )}
                     </div>
+                    <div
+                      className={
+                        studioMode === 'design'
+                          ? 'rounded-sm ring-2 ring-violet-300/70 ring-offset-2 ring-offset-[#e8e4dc]'
+                          : undefined
+                      }
+                    >
                     <StudioSheet
                       width={width}
                       height={height}
                       pageLabel={`${idx + 1} / ${canvas.pages.length}`}
                       backgroundImage={bg}
                       canEdit={canEdit}
-                      layout="fixed"
+                      layout={
+                        studioMode === 'write' && idx === canvas.pages.length - 1
+                          ? 'flow'
+                          : 'fixed'
+                      }
                       marginPx={marginPx}
-                      onOverflow={undefined}
+                      onOverflow={
+                        studioMode === 'design' && canEdit
+                          ? (info) => handleSheetOverflow(page.id, info)
+                          : undefined
+                      }
                     >
                       {page.blocks
                         .slice()
@@ -1856,6 +1852,7 @@ export default function StudioDocumentPage() {
                           </div>
                         ))}
                     </StudioSheet>
+                    </div>
                     {canEdit && studioMode === 'write' && idx === canvas.pages.length - 1 && (
                       <div className="mt-2 flex flex-wrap gap-1.5" style={{ width }}>
                         <button
@@ -1864,6 +1861,24 @@ export default function StudioDocumentPage() {
                           className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 shadow-sm hover:border-orange-300 hover:bg-orange-50"
                         >
                           {t('+ Continuar a escrever', '+ Seguir escribiendo', '+ Keep writing')}
+                        </button>
+                      </div>
+                    )}
+                    {canEdit && studioMode === 'design' && idx === canvas.pages.length - 1 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5" style={{ width }}>
+                        <button
+                          type="button"
+                          onClick={() => addBlock(page.id, 'diagram')}
+                          className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-900 shadow-sm hover:bg-violet-100"
+                        >
+                          {t('+ Quadro de desenho', '+ Lienzo de dibujo', '+ Drawing board')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={addPage}
+                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 shadow-sm hover:border-violet-300 hover:bg-violet-50"
+                        >
+                          {t('+ Folha', '+ Hoja', '+ Page')}
                         </button>
                       </div>
                     )}
@@ -1883,11 +1898,9 @@ export default function StudioDocumentPage() {
           margins={marginsMm}
           disabled={!canEdit}
           pageCount={canvas.pages.length}
-          showMerge={overPaginated}
           onPageSize={setDocPageSize}
           onOrientation={setDocOrientation}
           onMargins={setDocMargins}
-          onMerge={reunirDocumento}
           onOpenMolds={() => {
             setShowMolds(true);
             void loadMolds();
@@ -1910,12 +1923,22 @@ export default function StudioDocumentPage() {
             mode: t('Etapa', 'Etapa', 'Stage'),
             write: t('Redação', 'Redacción', 'Write'),
             writeHint: t(
-              'Texto que flui em folhas A4 (tipo Word)',
-              'Texto que fluye en hojas A4 (tipo Word)',
-              'Text flowing across A4 sheets (Word-like)',
+              'Texto que flui nas folhas',
+              'Texto que fluye en las hojas',
+              'Text flowing on sheets',
+            ),
+            writeIntro: t(
+              'O tamanho da página define as folhas. O texto redistribui-se ao sair do bloco ou ao mudar tamanho/margens.',
+              'El tamaño de página define las hojas. El texto se redistribuye al salir del bloque o al cambiar tamaño/márgenes.',
+              'Page size defines the sheets. Text reflows when you leave a block or change size/margins.',
             ),
             design: t('Desenho', 'Diseño', 'Design'),
-            designHint: t('Folhas, moldes, diagramação', 'Hojas, moldes, diagramación', 'Sheets, molds, layout'),
+            designHint: t('Quadros, moldes, layout', 'Lienzos, moldes, layout', 'Boards, molds, layout'),
+            designIntro: t(
+              'Folhas fixas para diagramar: quadro de desenho, imagens e moldes. Blocos que não cabem passam à folha seguinte.',
+              'Hojas fijas para diagramar: lienzo, imágenes y moldes. Los bloques que no caben pasan a la hoja siguiente.',
+              'Fixed sheets for layout: drawing board, images and molds. Blocks that do not fit move to the next sheet.',
+            ),
             page: t('Página', 'Página', 'Page'),
             size: t('Tamanho', 'Tamaño', 'Size'),
             orientation: t('Orientação', 'Orientación', 'Orientation'),
@@ -1939,12 +1962,8 @@ export default function StudioDocumentPage() {
             callout: t('Destaque', 'Destacado', 'Callout'),
             diagram: t('Diagrama', 'Diagrama', 'Diagram'),
             image: t('Imagem', 'Imagen', 'Image'),
-            merge: t('Recuperar e paginar', 'Recuperar y paginar', 'Recover & paginate'),
-            mergeHint: t(
-              'Corrige o picote e redistribui o texto em folhas A4.',
-              'Corrige el troceo y redistribuye el texto en hojas A4.',
-              'Fixes chopping and redistributes text on A4 sheets.',
-            ),
+            designTools: t('Ferramentas de desenho', 'Herramientas de diseño', 'Design tools'),
+            drawBoard: t('Quadro de desenho', 'Lienzo de dibujo', 'Drawing board'),
             molds: t('Moldes de página', 'Moldes de página', 'Page molds'),
             aiScope: t(
               'Mira / Shift+clique = âmbito IA',
