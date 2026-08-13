@@ -173,6 +173,9 @@ export default function StudioDocumentPage() {
   const dirtyRef = useRef(false);
   const canvasRef = useRef<StudioCanvasState | null>(null);
   const titleRef = useRef('');
+  const saveLockRef = useRef(false);
+  const saveAgainRef = useRef(false);
+  const saveEpochRef = useRef(0);
   const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [dictationInterim, setDictationInterim] = useState('');
   /** Blocos selecionados como âmbito da IA (anti-wipe) */
@@ -223,11 +226,84 @@ export default function StudioDocumentPage() {
       setCanvas((prev) => {
         if (!prev) return prev;
         if (recordHistory && !skipHistory.current) pushHistory(prev);
-        return updater(prev);
+        const next = updater(prev);
+        canvasRef.current = next;
+        return next;
       });
+      dirtyRef.current = true;
       setDirty(true);
+      if (saveLockRef.current) saveAgainRef.current = true;
+      saveEpochRef.current += 1;
     },
     [pushHistory],
+  );
+
+  /** Persistência com mutex — nunca grava um canvas antigo por cima de um merge recente. */
+  const persistCanvas = useCallback(
+    async (opts?: { quiet?: boolean; forceSnap?: StudioCanvasState | null }) => {
+      if (!canEdit || !id) return false;
+      if (saveLockRef.current) {
+        saveAgainRef.current = true;
+        return false;
+      }
+      saveLockRef.current = true;
+      let ok = false;
+      try {
+        do {
+          saveAgainRef.current = false;
+          const snap = opts?.forceSnap || canvasRef.current;
+          opts = { ...opts, forceSnap: null };
+          if (!snap) break;
+          const epoch = ++saveEpochRef.current;
+          setAutoSaveState('saving');
+          setSaving(true);
+          const r = await fetch(`/api/studio/documents/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              companyId: companyId || undefined,
+              title: titleRef.current,
+              canvasState: snap,
+              createVersion: opts?.quiet === false,
+              quiet: opts?.quiet !== false,
+              versionLabel: opts?.quiet === false ? 'Após reunir documento' : undefined,
+            }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error((d as { detail?: string; error?: string }).detail || (d as { error?: string }).error || 'Erro');
+
+          // Se houve alteração mais recente durante o PUT, gravar de novo
+          if (epoch !== saveEpochRef.current || canvasRef.current !== snap) {
+            saveAgainRef.current = true;
+            continue;
+          }
+
+          dirtyRef.current = false;
+          setDirty(false);
+          if (d.document?.updatedAt) {
+            knownUpdatedAt.current = d.document.updatedAt;
+            setLastEditedAt(d.document.updatedAt);
+            setRemoteUpdate(null);
+          }
+          if (d.document?.updatedBy) {
+            setLastEditedBy(
+              d.document.updatedBy.name?.trim() || d.document.updatedBy.email || null,
+            );
+          }
+          setAutoSaveState('saved');
+          window.setTimeout(() => setAutoSaveState('idle'), 2500);
+          ok = true;
+        } while (saveAgainRef.current);
+      } catch (e) {
+        setAutoSaveState('idle');
+        throw e;
+      } finally {
+        saveLockRef.current = false;
+        setSaving(false);
+      }
+      return ok;
+    },
+    [canEdit, id, companyId],
   );
 
   const undo = useCallback(() => {
@@ -304,6 +380,8 @@ export default function StudioDocumentPage() {
       if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
       setTitle(d.document.title);
       const c = normalizeStudioCanvas(d.document.canvasState);
+      canvasRef.current = c;
+      dirtyRef.current = false;
       setCanvas(c);
       setActivePageId(c.pages[0]?.id || null);
       setUndoStack([]);
@@ -434,9 +512,12 @@ export default function StudioDocumentPage() {
               if (gr.ok && !cancelled && !dirtyRef.current) {
                 const gd = await gr.json();
                 skipHistory.current = true;
-                setCanvas(normalizeStudioCanvas(gd.document.canvasState));
+                const nextCanvas = normalizeStudioCanvas(gd.document.canvasState);
+                canvasRef.current = nextCanvas;
+                setCanvas(nextCanvas);
                 if (typeof gd.document.title === 'string') setTitle(gd.document.title);
                 skipHistory.current = false;
+                dirtyRef.current = false;
                 setDirty(false);
                 knownUpdatedAt.current = remoteAt;
                 setLastEditedAt(remoteAt);
@@ -470,7 +551,7 @@ export default function StudioDocumentPage() {
     };
   }, [id, dirty, canEdit, locale, companyId]);
 
-  // Auto-guardar (F6) — 8s após a última alteração local
+  // Auto-guardar (F6) — 2.5s após a última alteração (merge grava já à parte)
   useEffect(() => {
     if (!dirty || !canEdit || !id) {
       setAutoSaveState('idle');
@@ -478,45 +559,43 @@ export default function StudioDocumentPage() {
     }
     setAutoSaveState('idle');
     const timer = window.setTimeout(() => {
-      void (async () => {
-        const snap = canvasRef.current;
-        if (!snap || !dirtyRef.current) return;
-        setAutoSaveState('saving');
-        setSaving(true);
-        try {
-          const r = await fetch(`/api/studio/documents/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              companyId: companyId || undefined,
-              title: titleRef.current,
-              canvasState: snap,
-              createVersion: false,
-              quiet: true,
-            }),
-          });
-          const d = await r.json();
-          if (!r.ok) throw new Error(d.detail || d.error);
-          // Só limpar dirty se o canvas não mudou entretanto
-          if (canvasRef.current === snap) setDirty(false);
-          if (d.document?.updatedAt) {
-            knownUpdatedAt.current = d.document.updatedAt;
-            setLastEditedAt(d.document.updatedAt);
-          }
-          if (d.document?.updatedBy) {
-            setLastEditedBy(d.document.updatedBy.name?.trim() || d.document.updatedBy.email || null);
-          }
-          setAutoSaveState('saved');
-          window.setTimeout(() => setAutoSaveState('idle'), 2500);
-        } catch {
-          setAutoSaveState('idle');
-        } finally {
-          setSaving(false);
-        }
-      })();
-    }, 8000);
+      void persistCanvas({ quiet: true }).catch(() => {
+        /* idle já tratado */
+      });
+    }, 2500);
     return () => window.clearTimeout(timer);
-  }, [dirty, canvas, title, canEdit, id, companyId]);
+  }, [dirty, canvas, title, canEdit, id, companyId, persistCanvas]);
+
+  // Flush ao sair / refresh — evita perder o «Reunir»
+  useEffect(() => {
+    function flush() {
+      if (!dirtyRef.current || !canEdit || !id) return;
+      const snap = canvasRef.current;
+      if (!snap) return;
+      try {
+        void fetch(`/api/studio/documents/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyId: companyId || undefined,
+            title: titleRef.current,
+            canvasState: snap,
+            createVersion: false,
+            quiet: true,
+          }),
+          keepalive: true,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
+    };
+  }, [canEdit, id, companyId]);
 
   useEffect(() => {
     function onMove(e: MouseEvent) {
@@ -613,31 +692,13 @@ export default function StudioDocumentPage() {
   }
 
   async function save() {
-    if (!canvas) return;
-    setSaving(true);
+    if (!canvasRef.current) return;
     try {
-      const r = await fetch(`/api/studio/documents/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId: companyId || undefined, title, canvasState: canvas }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.detail || d.error);
-      setDirty(false);
-      if (d.document?.updatedBy) {
-        setLastEditedBy(d.document.updatedBy.name?.trim() || d.document.updatedBy.email || null);
-      }
-      if (d.document?.updatedAt) {
-        setLastEditedAt(d.document.updatedAt);
-        knownUpdatedAt.current = d.document.updatedAt;
-        setRemoteUpdate(null);
-      }
+      await persistCanvas({ quiet: false, forceSnap: canvasRef.current });
       void loadVersions();
       void loadActivity();
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Erro');
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -832,21 +893,43 @@ export default function StudioDocumentPage() {
     applyCanvas((prev) => ({ ...prev, studioMode: mode }));
   }
 
-  function reunirDocumento() {
+  async function reunirDocumento() {
+    if (!canvas) return;
     const ok = window.confirm(
       t(
-        'Isto reúne todas as folhas num único fluxo de redação, sem perder texto. Continuar?',
-        'Esto reúne todas las hojas en un único flujo de redacción, sin perder texto. ¿Continuar?',
-        'This merges all sheets into one writing flow without losing text. Continue?',
+        'Isto reúne todas as folhas num único fluxo de redação, sem perder texto, e grava de imediato. Continuar?',
+        'Esto reúne todas las hojas en un único flujo de redacción, sin perder texto, y guarda de inmediato. ¿Continuar?',
+        'This merges all sheets into one writing flow without losing text, and saves immediately. Continue?',
       ),
     );
     if (!ok) return;
-    applyCanvas((prev) =>
-      mergeStudioDocument(prev, {
-        pageTitle: t('Documento', 'Documento', 'Document'),
-      }),
-    );
+
+    const merged = mergeStudioDocument(canvas, {
+      pageTitle: t('Documento', 'Documento', 'Document'),
+    });
+    if (!skipHistory.current) pushHistory(canvas);
+    canvasRef.current = merged;
+    dirtyRef.current = true;
+    setCanvas(merged);
+    setDirty(true);
+    setActivePageId(merged.pages[0]?.id || null);
     setToolsOpen(true);
+
+    try {
+      await persistCanvas({ quiet: false, forceSnap: merged });
+      void loadVersions();
+      void loadActivity();
+    } catch (e: unknown) {
+      alert(
+        e instanceof Error
+          ? e.message
+          : t(
+              'Falha ao gravar o documento reunido. Não feches a página — tenta Guardar.',
+              'Fallo al guardar el documento reunido. No cierres la página — intenta Guardar.',
+              'Failed to save the merged document. Do not close the page — try Save.',
+            ),
+      );
+    }
   }
 
   function addPage() {
@@ -945,11 +1028,17 @@ export default function StudioDocumentPage() {
   function handleSheetOverflow(fromPageId: string, info: StudioOverflowInfo) {
     setCanvas((prev) => {
       if (!prev || prev.studioMode !== 'design') return prev;
+      // Hard stop: nunca paginar docs já “explodidos”
+      if ((prev.pages?.length || 0) > 12) return prev;
       const next = applyStudioPagination(prev, fromPageId, info, {
         pageTitlePrefix: t('Página', 'Página', 'Page'),
       });
       if (next === prev) return prev;
+      canvasRef.current = next;
+      dirtyRef.current = true;
       setDirty(true);
+      if (saveLockRef.current) saveAgainRef.current = true;
+      saveEpochRef.current += 1;
       return next;
     });
   }
