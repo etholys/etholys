@@ -129,12 +129,16 @@ export type StudioPage = {
   moldId?: string | null;
 };
 
+export type StudioStudioMode = 'write' | 'design';
+
 export type StudioCanvasState = {
   version: 1;
   format: StudioFormat;
   pageSize?: StudioPageSize;
   orientation?: StudioPageOrientation;
   marginsMm?: StudioPageMarginsMm;
+  /** write = redação contínua (Word); design = folhas fixas / diagramação */
+  studioMode?: StudioStudioMode;
   pages: StudioPage[];
 };
 
@@ -183,6 +187,7 @@ export function emptyStudioCanvas(format: StudioFormat = 'report'): StudioCanvas
     pageSize,
     orientation: format === 'presentation' ? 'landscape' : 'portrait',
     marginsMm: { ...DEFAULT_STUDIO_MARGINS_MM },
+    studioMode: format === 'presentation' ? 'design' : 'write',
     pages: [
       {
         id: 'page-1',
@@ -254,7 +259,16 @@ export function normalizeStudioCanvas(raw: unknown): StudioCanvasState {
             : [],
         }))
       : base.pages;
-  return { version: 1, format, pageSize, orientation, marginsMm, pages };
+  const pageCount = pages.length;
+  const studioMode: StudioStudioMode =
+    c.studioMode === 'design' || c.studioMode === 'write'
+      ? c.studioMode
+      : pageCount > 8
+        ? 'write'
+        : format === 'presentation'
+          ? 'design'
+          : 'write';
+  return { version: 1, format, pageSize, orientation, marginsMm, studioMode, pages };
 }
 
 export function applyStudioCanvasPatches(

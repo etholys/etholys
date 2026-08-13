@@ -42,6 +42,7 @@ import type {
   StudioPage,
   StudioPageOrientation,
   StudioPageSize,
+  StudioStudioMode,
 } from '@/lib/studio/types';
 import {
   DEFAULT_STUDIO_MARGINS_MM,
@@ -58,12 +59,17 @@ import {
 import { StudioCommentsPanel } from '@/components/studio/StudioCommentsPanel';
 import { StudioBlockEditor } from '@/components/studio/StudioBlockEditor';
 import { StudioSheet } from '@/components/studio/StudioSheet';
-import { StudioPageSetup } from '@/components/studio/StudioPageSetup';
+import { StudioToolsSidebar } from '@/components/studio/StudioToolsSidebar';
 import {
   emptyStudioDrawScene,
   serializeStudioDrawScene,
 } from '@/lib/studio/draw-scene';
-import { applyStudioPagination, type StudioOverflowInfo } from '@/lib/studio/paginate';
+import {
+  applyStudioPagination,
+  mergeStudioDocument,
+  studioLikelyOverPaginated,
+  type StudioOverflowInfo,
+} from '@/lib/studio/paginate';
 
 type ChatMsg = {
   id: string;
@@ -136,6 +142,7 @@ export default function StudioDocumentPage() {
   const [commentBlockId, setCommentBlockId] = useState<string | null>(null);
   const [openCommentCount, setOpenCommentCount] = useState(0);
   const [activePageId, setActivePageId] = useState<string | null>(null);
+  const [toolsOpen, setToolsOpen] = useState(true);
   const [presence, setPresence] = useState<
     Array<{
       userId: string;
@@ -821,6 +828,27 @@ export default function StudioDocumentPage() {
     }));
   }
 
+  function setStudioMode(mode: StudioStudioMode) {
+    applyCanvas((prev) => ({ ...prev, studioMode: mode }));
+  }
+
+  function reunirDocumento() {
+    const ok = window.confirm(
+      t(
+        'Isto reúne todas as folhas num único fluxo de redação, sem perder texto. Continuar?',
+        'Esto reúne todas las hojas en un único flujo de redacción, sin perder texto. ¿Continuar?',
+        'This merges all sheets into one writing flow without losing text. Continue?',
+      ),
+    );
+    if (!ok) return;
+    applyCanvas((prev) =>
+      mergeStudioDocument(prev, {
+        pageTitle: t('Documento', 'Documento', 'Document'),
+      }),
+    );
+    setToolsOpen(true);
+  }
+
   function addPage() {
     applyCanvas((prev) => {
       const n = prev.pages.length + 1;
@@ -913,10 +941,10 @@ export default function StudioDocumentPage() {
     setAiTargetBlockIds((ids) => ids.filter((id) => id !== blockId));
   }
 
-  /** Reflow automático: parte o texto / move blocos sem perder conteúdo. */
+  /** Só no modo desenho: move blocos inteiros (nunca parte texto). */
   function handleSheetOverflow(fromPageId: string, info: StudioOverflowInfo) {
     setCanvas((prev) => {
-      if (!prev) return prev;
+      if (!prev || prev.studioMode !== 'design') return prev;
       const next = applyStudioPagination(prev, fromPageId, info, {
         pageTitlePrefix: t('Página', 'Página', 'Page'),
       });
@@ -974,6 +1002,8 @@ export default function StudioDocumentPage() {
   const orientation: StudioPageOrientation =
     canvas.orientation || (pageSize === 'Slide' ? 'landscape' : 'portrait');
   const marginsMm = normalizeStudioMargins(canvas.marginsMm || DEFAULT_STUDIO_MARGINS_MM);
+  const studioMode: StudioStudioMode = canvas.studioMode === 'design' ? 'design' : 'write';
+  const overPaginated = studioLikelyOverPaginated(canvas);
 
   return (
     <div className="flex h-screen flex-col bg-slate-200/80">
@@ -1406,7 +1436,8 @@ export default function StudioDocumentPage() {
           title={t('Arrastar para redimensionar', 'Arrastrar para redimensionar', 'Drag to resize')}
         />
 
-        {/* Documento — direita, folhas de tamanho fixo */}
+        {/* Documento + ferramentas laterais */}
+        <div className="flex min-h-0 min-w-0 flex-1">
         <div
           className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
           style={{
@@ -1426,13 +1457,20 @@ export default function StudioDocumentPage() {
               <Plus className="h-3.5 w-3.5" />
               {t('Nova folha', 'Nueva hoja', 'New page')}
             </button>
+            <span
+              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                studioMode === 'write'
+                  ? 'bg-orange-100 text-orange-900'
+                  : 'bg-violet-100 text-violet-900'
+              }`}
+            >
+              {studioMode === 'write'
+                ? t('Modo redação', 'Modo redacción', 'Write mode')
+                : t('Modo desenho', 'Modo diseño', 'Design mode')}
+            </span>
             <span className="text-xs text-slate-500">
               {canvas.pages.length}{' '}
-              {t('folha(s)', 'hoja(s)', 'page(s)')} · {pageSize} ·{' '}
-              {orientation === 'landscape'
-                ? t('paisagem', 'horizontal', 'landscape')
-                : t('retrato', 'vertical', 'portrait')}{' '}
-              · {marginsMm.top}/{marginsMm.right}/{marginsMm.bottom}/{marginsMm.left} mm
+              {t('folha(s)', 'hoja(s)', 'page(s)')} · {pageSize}
             </span>
             {aiTargetBlockIds.length > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-900">
@@ -1443,193 +1481,138 @@ export default function StudioDocumentPage() {
             )}
           </div>
 
-          <StudioPageSetup
-            pageSize={pageSize}
-            orientation={orientation}
-            margins={marginsMm}
-            disabled={!canEdit}
-            onPageSize={setDocPageSize}
-            onOrientation={setDocOrientation}
-            onMargins={setDocMargins}
-            labels={{
-              page: t('Página', 'Página', 'Page'),
-              size: t('Tamanho', 'Tamaño', 'Size'),
-              orientation: t('Orientação', 'Orientación', 'Orientation'),
-              portrait: t('Retrato', 'Vertical', 'Portrait'),
-              landscape: t('Paisagem', 'Horizontal', 'Landscape'),
-              margins: t('Margens', 'Márgenes', 'Margins'),
-              normal: t('Normal', 'Normal', 'Normal'),
-              narrow: t('Estreitas', 'Estrechas', 'Narrow'),
-              moderate: t('Moderadas', 'Moderados', 'Moderate'),
-              wide: t('Largas', 'Anchos', 'Wide'),
-              custom: t('Personalizadas', 'Personalizados', 'Custom'),
-              top: t('Superior', 'Superior', 'Top'),
-              right: t('Direita', 'Derecha', 'Right'),
-              bottom: t('Inferior', 'Inferior', 'Bottom'),
-              left: t('Esquerda', 'Izquierda', 'Left'),
-              allSides: t(
-                'Usar a margem superior em todos os lados',
-                'Usar el margen superior en todos los lados',
-                'Use top margin on all sides',
-              ),
+          {overPaginated && canEdit && (
+            <div className="mx-auto mb-4 max-w-[720px] rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm">
+              <p className="font-semibold">
+                {t(
+                  `Este documento tem ${canvas.pages.length} folhas — parece picote automático.`,
+                  `Este documento tiene ${canvas.pages.length} hojas — parece un corte automático erróneo.`,
+                  `This document has ${canvas.pages.length} sheets — looks like a bad auto-split.`,
+                )}
+              </p>
+              <p className="mt-1 text-xs text-amber-900/80">
+                {t(
+                  'O texto não se perde. Reúna tudo num fluxo de redação e continue a editar.',
+                  'El texto no se pierde. Reúna todo en un flujo de redacción y siga editando.',
+                  'Text is not lost. Merge into one writing flow and keep editing.',
+                )}
+              </p>
+              <button
+                type="button"
+                onClick={reunirDocumento}
+                className="mt-2 rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-800"
+              >
+                {t('Reunir documento (recuperar)', 'Reunir documento (recuperar)', 'Merge document (recover)')}
+              </button>
+            </div>
+          )}
+
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              const pageId = imageTargetPageId || activePageId || canvas.pages[0]?.id;
+              if (!file || !pageId) return;
+              if (file.size > 2_500_000) {
+                alert(
+                  t(
+                    'Imagem demasiado grande (máx. ~2,5 MB).',
+                    'Imagen demasiado grande (máx. ~2,5 MB).',
+                    'Image too large (max ~2.5 MB).',
+                  ),
+                );
+                return;
+              }
+              const reader = new FileReader();
+              reader.onload = () => {
+                const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+                if (!dataUrl) return;
+                applyCanvas((prev) => ({
+                  ...prev,
+                  pages: prev.pages.map((p) => {
+                    if (p.id !== pageId) return p;
+                    const order = p.blocks.length;
+                    return {
+                      ...p,
+                      blocks: [
+                        ...p.blocks,
+                        {
+                          id: `block-${Date.now()}-${order}`,
+                          kind: 'image' as const,
+                          text: file.name,
+                          imageUrl: dataUrl,
+                          order,
+                        },
+                      ],
+                    };
+                  }),
+                }));
+              };
+              reader.readAsDataURL(file);
             }}
           />
 
-          {/* Faixa de design (Docs + Canva) */}
-          {canEdit && (
-            <div className="sticky top-0 z-20 mx-auto mb-4 flex w-full max-w-[720px] flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white/95 px-2 py-1.5 shadow-sm backdrop-blur">
+          {canEdit && aiTargetBlockIds.length > 0 && (
+            <div className="mx-auto mb-4 flex w-full max-w-[720px] flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white/95 px-2 py-1.5 shadow-sm">
               <span className="px-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                {t('Inserir', 'Insertar', 'Insert')}
+                {t('Estilo', 'Estilo', 'Style')}
               </span>
               {(
                 [
-                  ['paragraph', t('Texto', 'Texto', 'Text')],
-                  ['heading', t('Título', 'Título', 'Heading')],
-                  ['bullets', t('Lista', 'Lista', 'List')],
-                  ['callout', t('Destaque', 'Destacado', 'Callout')],
-                  ['diagram', t('Diagrama', 'Diagrama', 'Diagram')],
+                  ['left', AlignLeft],
+                  ['center', AlignCenter],
+                  ['right', AlignRight],
+                  ['justify', AlignJustify],
                 ] as const
-              ).map(([kind, label]) => (
+              ).map(([align, Icon]) => (
                 <button
-                  key={kind}
+                  key={align}
                   type="button"
-                  onClick={() => {
-                    const pageId = activePageId || canvas.pages[0]?.id;
-                    if (pageId) addBlock(pageId, kind);
-                  }}
-                  className="rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-orange-300 hover:bg-orange-50"
+                  title={align}
+                  onClick={() => patchSelectedStyles({ align })}
+                  className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:border-orange-300 hover:bg-orange-50"
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </button>
+              ))}
+              {(
+                [
+                  ['sm', 'S'],
+                  ['md', 'M'],
+                  ['lg', 'L'],
+                  ['xl', 'XL'],
+                ] as const
+              ).map(([textScale, label]) => (
+                <button
+                  key={textScale}
+                  type="button"
+                  onClick={() => patchSelectedStyles({ textScale })}
+                  className="rounded-md border border-slate-200 px-1.5 py-1 text-[10px] font-bold text-slate-600 hover:border-orange-300 hover:bg-orange-50"
                 >
                   {label}
                 </button>
               ))}
-              <button
-                type="button"
-                onClick={() => {
-                  const pageId = activePageId || canvas.pages[0]?.id;
-                  if (!pageId) return;
-                  setImageTargetPageId(pageId);
-                  imageInputRef.current?.click();
-                }}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-orange-300 hover:bg-orange-50"
-              >
-                <ImagePlus className="h-3.5 w-3.5" />
-                {t('Imagem', 'Imagen', 'Image')}
-              </button>
-              <input
-                ref={imageInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = '';
-                  const pageId = imageTargetPageId || activePageId || canvas.pages[0]?.id;
-                  if (!file || !pageId) return;
-                  if (file.size > 2_500_000) {
-                    alert(
-                      t(
-                        'Imagem demasiado grande (máx. ~2,5 MB).',
-                        'Imagen demasiado grande (máx. ~2,5 MB).',
-                        'Image too large (max ~2.5 MB).',
-                      ),
-                    );
-                    return;
-                  }
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-                    if (!dataUrl) return;
-                    applyCanvas((prev) => ({
-                      ...prev,
-                      pages: prev.pages.map((p) => {
-                        if (p.id !== pageId) return p;
-                        const order = p.blocks.length;
-                        return {
-                          ...p,
-                          blocks: [
-                            ...p.blocks,
-                            {
-                              id: `block-${Date.now()}-${order}`,
-                              kind: 'image' as const,
-                              text: file.name,
-                              imageUrl: dataUrl,
-                              order,
-                            },
-                          ],
-                        };
-                      }),
-                    }));
-                  };
-                  reader.readAsDataURL(file);
-                }}
-              />
-              <span className="ml-auto px-1 text-[10px] text-slate-400">
-                {t(
-                  'Mira / Shift+clique = âmbito IA',
-                  'Mira / Shift+clic = ámbito IA',
-                  'Crosshair / Shift+click = AI scope',
-                )}
-              </span>
-              {aiTargetBlockIds.length > 0 && (
-                <>
-                  <span className="mx-1 h-4 w-px bg-slate-200" />
-                  <span className="px-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                    {t('Estilo', 'Estilo', 'Style')}
-                  </span>
-                  {(
-                    [
-                      ['left', AlignLeft],
-                      ['center', AlignCenter],
-                      ['right', AlignRight],
-                      ['justify', AlignJustify],
-                    ] as const
-                  ).map(([align, Icon]) => (
-                    <button
-                      key={align}
-                      type="button"
-                      title={align}
-                      onClick={() => patchSelectedStyles({ align })}
-                      className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:border-orange-300 hover:bg-orange-50"
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                    </button>
-                  ))}
-                  {(
-                    [
-                      ['sm', 'S'],
-                      ['md', 'M'],
-                      ['lg', 'L'],
-                      ['xl', 'XL'],
-                    ] as const
-                  ).map(([textScale, label]) => (
-                    <button
-                      key={textScale}
-                      type="button"
-                      onClick={() => patchSelectedStyles({ textScale })}
-                      className="rounded-md border border-slate-200 px-1.5 py-1 text-[10px] font-bold text-slate-600 hover:border-orange-300 hover:bg-orange-50"
-                    >
-                      {label}
-                    </button>
-                  ))}
-                  {(
-                    [
-                      ['none', t('Sem moldura', 'Sin marco', 'No frame')],
-                      ['subtle', t('Suave', 'Suave', 'Subtle')],
-                      ['card', 'Card'],
-                      ['accent', t('Destaque', 'Acento', 'Accent')],
-                    ] as const
-                  ).map(([frame, label]) => (
-                    <button
-                      key={frame}
-                      type="button"
-                      onClick={() => patchSelectedStyles({ frame })}
-                      className="rounded-md border border-slate-200 px-1.5 py-1 text-[10px] font-semibold text-slate-600 hover:border-orange-300 hover:bg-orange-50"
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </>
-              )}
+              {(
+                [
+                  ['none', t('Sem moldura', 'Sin marco', 'No frame')],
+                  ['subtle', t('Suave', 'Suave', 'Subtle')],
+                  ['card', 'Card'],
+                  ['accent', t('Destaque', 'Acento', 'Accent')],
+                ] as const
+              ).map(([frame, label]) => (
+                <button
+                  key={frame}
+                  type="button"
+                  onClick={() => patchSelectedStyles({ frame })}
+                  className="rounded-md border border-slate-200 px-1.5 py-1 text-[10px] font-semibold text-slate-600 hover:border-orange-300 hover:bg-orange-50"
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           )}
 
@@ -1695,8 +1678,13 @@ export default function StudioDocumentPage() {
                       pageLabel={`${idx + 1} / ${canvas.pages.length}`}
                       backgroundImage={bg}
                       canEdit={canEdit}
+                      layout={studioMode === 'design' ? 'fixed' : 'flow'}
                       marginPx={marginPx}
-                      onOverflow={(info) => handleSheetOverflow(page.id, info)}
+                      onOverflow={
+                        studioMode === 'design'
+                          ? (info) => handleSheetOverflow(page.id, info)
+                          : undefined
+                      }
                     >
                       {page.blocks
                         .slice()
@@ -1754,41 +1742,99 @@ export default function StudioDocumentPage() {
                           </div>
                         ))}
                     </StudioSheet>
-                    {canEdit && (
+                    {canEdit && studioMode === 'write' && idx === canvas.pages.length - 1 && (
                       <div className="mt-2 flex flex-wrap gap-1.5" style={{ width }}>
-                        {(
-                          [
-                            ['paragraph', t('+ Texto', '+ Texto', '+ Text')],
-                            ['heading', t('+ Título', '+ Título', '+ Heading')],
-                            ['bullets', t('+ Lista', '+ Lista', '+ List')],
-                            ['callout', t('+ Destaque', '+ Destacado', '+ Callout')],
-                            ['diagram', t('+ Diagrama', '+ Diagrama', '+ Diagram')],
-                            ['image', t('+ Imagem', '+ Imagen', '+ Image')],
-                          ] as const
-                        ).map(([kind, label]) => (
-                          <button
-                            key={kind}
-                            type="button"
-                            onClick={() => {
-                              if (kind === 'image') {
-                                setImageTargetPageId(page.id);
-                                setActivePageId(page.id);
-                                imageInputRef.current?.click();
-                                return;
-                              }
-                              addBlock(page.id, kind);
-                            }}
-                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 shadow-sm hover:border-orange-300 hover:bg-orange-50"
-                          >
-                            {label}
-                          </button>
-                        ))}
+                        <button
+                          type="button"
+                          onClick={() => addBlock(page.id, 'paragraph')}
+                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 shadow-sm hover:border-orange-300 hover:bg-orange-50"
+                        >
+                          {t('+ Continuar a escrever', '+ Seguir escribiendo', '+ Keep writing')}
+                        </button>
                       </div>
                     )}
                   </section>
                 );
               })}
           </div>
+        </div>
+
+        <StudioToolsSidebar
+          open={toolsOpen}
+          onOpenChange={setToolsOpen}
+          mode={studioMode}
+          onModeChange={setStudioMode}
+          pageSize={pageSize}
+          orientation={orientation}
+          margins={marginsMm}
+          disabled={!canEdit}
+          pageCount={canvas.pages.length}
+          showMerge={overPaginated}
+          onPageSize={setDocPageSize}
+          onOrientation={setDocOrientation}
+          onMargins={setDocMargins}
+          onMerge={reunirDocumento}
+          onOpenMolds={() => {
+            setShowMolds(true);
+            void loadMolds();
+          }}
+          onInsert={(kind) => {
+            const pageId = activePageId || canvas.pages[0]?.id;
+            if (!pageId) return;
+            if (kind === 'image') {
+              setImageTargetPageId(pageId);
+              setActivePageId(pageId);
+              imageInputRef.current?.click();
+              return;
+            }
+            addBlock(pageId, kind);
+          }}
+          labels={{
+            tools: t('Ferramentas', 'Herramientas', 'Tools'),
+            collapse: t('Minimizar', 'Minimizar', 'Collapse'),
+            expand: t('Abrir ferramentas', 'Abrir herramientas', 'Open tools'),
+            mode: t('Etapa', 'Etapa', 'Stage'),
+            write: t('Redação', 'Redacción', 'Write'),
+            writeHint: t('Texto contínuo, tipo Word', 'Texto continuo, tipo Word', 'Continuous text, Word-like'),
+            design: t('Desenho', 'Diseño', 'Design'),
+            designHint: t('Folhas, moldes, diagramação', 'Hojas, moldes, diagramación', 'Sheets, molds, layout'),
+            page: t('Página', 'Página', 'Page'),
+            size: t('Tamanho', 'Tamaño', 'Size'),
+            orientation: t('Orientação', 'Orientación', 'Orientation'),
+            portrait: t('Retrato', 'Vertical', 'Portrait'),
+            landscape: t('Paisagem', 'Horizontal', 'Landscape'),
+            margins: t('Margens', 'Márgenes', 'Margins'),
+            normal: t('Normal', 'Normal', 'Normal'),
+            narrow: t('Estreitas', 'Estrechas', 'Narrow'),
+            moderate: t('Moderadas', 'Moderados', 'Moderate'),
+            wide: t('Largas', 'Anchos', 'Wide'),
+            custom: t('Personalizadas', 'Personalizados', 'Custom'),
+            top: t('Superior', 'Superior', 'Top'),
+            right: t('Direita', 'Derecha', 'Right'),
+            bottom: t('Inferior', 'Inferior', 'Bottom'),
+            left: t('Esquerda', 'Izquierda', 'Left'),
+            allSides: t('Usar superior em todos', 'Usar superior en todos', 'Use top on all sides'),
+            insert: t('Inserir', 'Insertar', 'Insert'),
+            text: t('Texto', 'Texto', 'Text'),
+            heading: t('Título', 'Título', 'Heading'),
+            list: t('Lista', 'Lista', 'List'),
+            callout: t('Destaque', 'Destacado', 'Callout'),
+            diagram: t('Diagrama', 'Diagrama', 'Diagram'),
+            image: t('Imagem', 'Imagen', 'Image'),
+            merge: t('Reunir documento', 'Reunir documento', 'Merge document'),
+            mergeHint: t(
+              'Recupera o texto picotado numa única redação contínua.',
+              'Recupera el texto cortado en una única redacción continua.',
+              'Recover chopped text into one continuous draft.',
+            ),
+            molds: t('Moldes de página', 'Moldes de página', 'Page molds'),
+            aiScope: t(
+              'Mira / Shift+clique = âmbito IA',
+              'Mira / Shift+clic = ámbito IA',
+              'Crosshair / Shift+click = AI scope',
+            ),
+          }}
+        />
         </div>
       </div>
 

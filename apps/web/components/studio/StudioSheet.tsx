@@ -9,14 +9,17 @@ type Props = {
   pageLabel: string;
   backgroundImage?: string | null;
   canEdit?: boolean;
+  /** flow = redação (cresce); fixed = folha A4 rígida (modo desenho) */
+  layout?: 'flow' | 'fixed';
   onOverflow?: (info: StudioOverflowInfo) => void;
-  /** Padding da área útil (px), derivado das margens em mm */
   marginPx?: { top: number; right: number; bottom: number; left: number };
   children: React.ReactNode;
 };
 
 /**
- * Folha com dimensões fixas. Overflow → reflow automático (partir/mover blocos).
+ * Folha de documento.
+ * - flow: altura mínima A4, cresce com o texto (Word).
+ * - fixed: altura fixa; só move blocos inteiros se onOverflow estiver ativo.
  */
 export function StudioSheet({
   width,
@@ -24,6 +27,7 @@ export function StudioSheet({
   pageLabel,
   backgroundImage,
   canEdit,
+  layout = 'flow',
   onOverflow,
   marginPx,
   children,
@@ -35,8 +39,10 @@ export function StudioSheet({
   const attempts = useRef(0);
   const onOverflowRef = useRef(onOverflow);
   onOverflowRef.current = onOverflow;
+  const isFixed = layout === 'fixed';
 
   const checkOverflow = useCallback(() => {
+    if (!isFixed) return;
     const body = bodyRef.current;
     if (!body || busy.current) return;
     if (!canEdit || !onOverflowRef.current) return;
@@ -53,57 +59,45 @@ export function StudioSheet({
     }
 
     const now = Date.now();
-    const wait = Math.min(8000, Math.round(380 * Math.pow(1.7, attempts.current)));
+    const wait = Math.min(8000, Math.round(500 * Math.pow(1.8, attempts.current)));
     if (now - lastMovedAt.current < wait) return;
 
     const nodes = Array.from(body.querySelectorAll<HTMLElement>('[data-studio-block-id]'));
-    if (!nodes.length) return;
+    if (nodes.length <= 1) return;
 
     const bodyBottom = body.getBoundingClientRect().bottom;
-    const overflowing: HTMLElement[] = [];
-    for (let i = nodes.length - 1; i >= 0; i--) {
+    const toMove: string[] = [];
+    for (let i = nodes.length - 1; i >= 1; i--) {
       const el = nodes[i]!;
       const rect = el.getBoundingClientRect();
-      if (rect.bottom > bodyBottom - 2 || rect.top >= bodyBottom - 8) {
-        overflowing.unshift(el);
+      // Só blocos que já estão completamente abaixo / quase fora — sem partir
+      if (rect.top >= bodyBottom - 12 || rect.bottom > bodyBottom + 4) {
+        const id = el.dataset.studioBlockId;
+        if (id) toMove.unshift(id);
       } else {
         break;
       }
     }
-    if (!overflowing.length) return;
-
-    const partial: HTMLElement[] = [];
-    const fullyBelow: HTMLElement[] = [];
-    for (const el of overflowing) {
-      const rect = el.getBoundingClientRect();
-      if (rect.top < bodyBottom - 8 && rect.bottom > bodyBottom - 2) partial.push(el);
-      else fullyBelow.push(el);
+    if (!toMove.length) {
+      attempts.current += 1;
+      lastMovedAt.current = now;
+      return;
     }
 
-    const splitEl = partial[0];
-    const moveEls = [...partial.slice(1), ...fullyBelow];
-    const splitBlockId = splitEl?.dataset.studioBlockId;
-    const moveBlockIds = moveEls
-      .map((el) => el.dataset.studioBlockId)
-      .filter((id): id is string => !!id);
-
-    if (!splitBlockId && !moveBlockIds.length) return;
-
-    const overflowPx = Math.max(0, body.scrollHeight - body.clientHeight);
     busy.current = true;
     lastMovedAt.current = now;
     attempts.current += 1;
     onOverflowRef.current({
-      moveBlockIds,
-      splitBlockId,
-      overflowPx,
+      moveBlockIds: toMove,
+      overflowPx: Math.max(0, body.scrollHeight - body.clientHeight),
     });
     window.setTimeout(() => {
       busy.current = false;
-    }, 180);
-  }, [canEdit]);
+    }, 200);
+  }, [canEdit, isFixed]);
 
   useEffect(() => {
+    if (!isFixed) return;
     attempts.current = 0;
     const body = bodyRef.current;
     if (!body) return;
@@ -112,37 +106,22 @@ export function StudioSheet({
       requestAnimationFrame(checkOverflow);
     });
     ro.observe(body);
-
-    const observeBlocks = () => {
-      for (const child of Array.from(body.querySelectorAll('[data-studio-block-id]'))) {
-        if (child instanceof HTMLElement) ro.observe(child);
-      }
-    };
-    observeBlocks();
-
-    const mo = new MutationObserver(() => {
-      observeBlocks();
-      requestAnimationFrame(checkOverflow);
-    });
-    mo.observe(body, { childList: true, subtree: true, characterData: true });
-
-    const t = window.setTimeout(checkOverflow, 80);
-    const t2 = window.setTimeout(checkOverflow, 500);
+    for (const child of Array.from(body.querySelectorAll('[data-studio-block-id]'))) {
+      if (child instanceof HTMLElement) ro.observe(child);
+    }
+    const t = window.setTimeout(checkOverflow, 120);
     return () => {
       ro.disconnect();
-      mo.disconnect();
       window.clearTimeout(t);
-      window.clearTimeout(t2);
     };
-  }, [checkOverflow, children]);
+  }, [checkOverflow, children, isFixed]);
 
   return (
     <div
       className="relative bg-white shadow-[0_12px_40px_rgba(15,23,42,0.14)] ring-1 ring-slate-300/80"
       style={{
         width,
-        height,
-        flexShrink: 0,
+        ...(isFixed ? { height, flexShrink: 0 } : { minHeight: height, height: 'auto' }),
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
         backgroundSize: '100% 100%',
         backgroundRepeat: 'no-repeat',
@@ -151,26 +130,25 @@ export function StudioSheet({
     >
       <div
         ref={bodyRef}
-        className={`absolute inset-0 z-10 box-border overflow-hidden ${
-          backgroundImage ? 'bg-white/88' : ''
-        }`}
+        className={`relative z-10 box-border ${isFixed ? 'absolute inset-0 overflow-hidden' : 'overflow-visible'}`}
         style={{
           fontFamily: 'var(--font-etholys-sans), ui-sans-serif, system-ui, sans-serif',
           paddingTop: pad.top,
           paddingRight: pad.right,
-          paddingBottom: pad.bottom,
+          paddingBottom: Math.max(pad.bottom, 36),
           paddingLeft: pad.left,
+          ...(isFixed ? {} : { minHeight: height }),
         }}
       >
         <div className="flex min-h-0 flex-col gap-3.5">{children}</div>
       </div>
 
       <div
-        className="pointer-events-none absolute z-[1] rounded-[1px] border border-dashed border-slate-200/80"
+        className="pointer-events-none absolute z-[1] rounded-[1px] border border-dashed border-slate-200/70"
         style={{
           top: pad.top,
           right: pad.right,
-          bottom: pad.bottom,
+          bottom: isFixed ? pad.bottom : Math.max(pad.bottom, 24),
           left: pad.left,
         }}
       />

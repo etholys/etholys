@@ -44,6 +44,7 @@ function page(
     pageSize,
     orientation: format === 'presentation' ? 'landscape' : 'portrait',
     marginsMm: { ...DEFAULT_STUDIO_MARGINS_MM },
+    studioMode: format === 'presentation' ? 'design' : 'write',
     pages: [
       {
         id: 'page-1',
