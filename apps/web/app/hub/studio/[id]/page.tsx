@@ -67,6 +67,7 @@ import {
 import {
   applyStudioPagination,
   mergeStudioDocument,
+  reflowStudioDocument,
   studioLikelyOverPaginated,
   type StudioOverflowInfo,
 } from '@/lib/studio/paginate';
@@ -897,15 +898,15 @@ export default function StudioDocumentPage() {
     if (!canvas) return;
     const ok = window.confirm(
       t(
-        'Isto reúne todas as folhas num único fluxo de redação, sem perder texto, e grava de imediato. Continuar?',
-        'Esto reúne todas las hojas en un único flujo de redacción, sin perder texto, y guarda de inmediato. ¿Continuar?',
-        'This merges all sheets into one writing flow without losing text, and saves immediately. Continue?',
+        'Isto recupera o texto picotado e volta a distribuí-lo por folhas A4 (como Word), sem perder conteúdo. Continuar?',
+        'Esto recupera el texto troceado y lo vuelve a repartir en hojas A4 (como Word), sin perder contenido. ¿Continuar?',
+        'This recovers chopped text and redistributes it across A4 sheets (like Word), without losing content. Continue?',
       ),
     );
     if (!ok) return;
 
     const merged = mergeStudioDocument(canvas, {
-      pageTitle: t('Documento', 'Documento', 'Document'),
+      pageTitlePrefix: t('Página', 'Página', 'Page'),
     });
     if (!skipHistory.current) pushHistory(canvas);
     canvasRef.current = merged;
@@ -924,11 +925,30 @@ export default function StudioDocumentPage() {
         e instanceof Error
           ? e.message
           : t(
-              'Falha ao gravar o documento reunido. Não feches a página — tenta Guardar.',
-              'Fallo al guardar el documento reunido. No cierres la página — intenta Guardar.',
-              'Failed to save the merged document. Do not close the page — try Save.',
+              'Falha ao gravar o documento paginado. Não feches a página — tenta Guardar.',
+              'Fallo al guardar el documento paginado. No cierres la página — intenta Guardar.',
+              'Failed to save the paginated document. Do not close the page — try Save.',
             ),
       );
+    }
+  }
+
+  async function repaginarDocumento() {
+    if (!canvas) return;
+    const next = reflowStudioDocument(canvas, {
+      pageTitlePrefix: t('Página', 'Página', 'Page'),
+      marginsMm: canvas.marginsMm,
+    });
+    if (!skipHistory.current) pushHistory(canvas);
+    canvasRef.current = next;
+    dirtyRef.current = true;
+    setCanvas(next);
+    setDirty(true);
+    setActivePageId(next.pages[0]?.id || null);
+    try {
+      await persistCanvas({ quiet: true, forceSnap: next });
+    } catch {
+      /* autosave tentará */
     }
   }
 
@@ -1546,6 +1566,15 @@ export default function StudioDocumentPage() {
               <Plus className="h-3.5 w-3.5" />
               {t('Nova folha', 'Nueva hoja', 'New page')}
             </button>
+            {canEdit && studioMode === 'write' && (
+              <button
+                type="button"
+                onClick={() => void repaginarDocumento()}
+                className="inline-flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-xs font-semibold text-orange-900 hover:bg-orange-100"
+              >
+                {t('Repaginar A4', 'Repaginar A4', 'Repaginate A4')}
+              </button>
+            )}
             <span
               className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                 studioMode === 'write'
@@ -1581,9 +1610,9 @@ export default function StudioDocumentPage() {
               </p>
               <p className="mt-1 text-xs text-amber-900/80">
                 {t(
-                  'O texto não se perde. Reúna tudo num fluxo de redação e continue a editar.',
-                  'El texto no se pierde. Reúna todo en un flujo de redacción y siga editando.',
-                  'Text is not lost. Merge into one writing flow and keep editing.',
+                  'O texto não se perde. Recuperamos o picote e voltamos a paginar em folhas A4.',
+                  'El texto no se pierde. Recuperamos el corte y volvemos a paginar en hojas A4.',
+                  'Text is not lost. We recover the chop and re-paginate into A4 sheets.',
                 )}
               </p>
               <button
@@ -1591,7 +1620,7 @@ export default function StudioDocumentPage() {
                 onClick={reunirDocumento}
                 className="mt-2 rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-800"
               >
-                {t('Reunir documento (recuperar)', 'Reunir documento (recuperar)', 'Merge document (recover)')}
+                {t('Recuperar e paginar A4', 'Recuperar y paginar A4', 'Recover & paginate A4')}
               </button>
             </div>
           )}
@@ -1767,13 +1796,9 @@ export default function StudioDocumentPage() {
                       pageLabel={`${idx + 1} / ${canvas.pages.length}`}
                       backgroundImage={bg}
                       canEdit={canEdit}
-                      layout={studioMode === 'design' ? 'fixed' : 'flow'}
+                      layout="fixed"
                       marginPx={marginPx}
-                      onOverflow={
-                        studioMode === 'design'
-                          ? (info) => handleSheetOverflow(page.id, info)
-                          : undefined
-                      }
+                      onOverflow={undefined}
                     >
                       {page.blocks
                         .slice()
@@ -1884,7 +1909,11 @@ export default function StudioDocumentPage() {
             expand: t('Abrir ferramentas', 'Abrir herramientas', 'Open tools'),
             mode: t('Etapa', 'Etapa', 'Stage'),
             write: t('Redação', 'Redacción', 'Write'),
-            writeHint: t('Texto contínuo, tipo Word', 'Texto continuo, tipo Word', 'Continuous text, Word-like'),
+            writeHint: t(
+              'Texto que flui em folhas A4 (tipo Word)',
+              'Texto que fluye en hojas A4 (tipo Word)',
+              'Text flowing across A4 sheets (Word-like)',
+            ),
             design: t('Desenho', 'Diseño', 'Design'),
             designHint: t('Folhas, moldes, diagramação', 'Hojas, moldes, diagramación', 'Sheets, molds, layout'),
             page: t('Página', 'Página', 'Page'),
@@ -1910,11 +1939,11 @@ export default function StudioDocumentPage() {
             callout: t('Destaque', 'Destacado', 'Callout'),
             diagram: t('Diagrama', 'Diagrama', 'Diagram'),
             image: t('Imagem', 'Imagen', 'Image'),
-            merge: t('Reunir documento', 'Reunir documento', 'Merge document'),
+            merge: t('Recuperar e paginar', 'Recuperar y paginar', 'Recover & paginate'),
             mergeHint: t(
-              'Recupera o texto picotado numa única redação contínua.',
-              'Recupera el texto cortado en una única redacción continua.',
-              'Recover chopped text into one continuous draft.',
+              'Corrige o picote e redistribui o texto em folhas A4.',
+              'Corrige el troceo y redistribuye el texto en hojas A4.',
+              'Fixes chopping and redistributes text on A4 sheets.',
             ),
             molds: t('Moldes de página', 'Moldes de página', 'Page molds'),
             aiScope: t(
