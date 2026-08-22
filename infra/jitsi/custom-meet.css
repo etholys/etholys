@@ -79,3 +79,26 @@ body,
 .subject {
   opacity: 0.9;
 }
+
+/*
+ * Partilha de ecrã: no modo orador fica no grande vídeo.
+ * O tile virtual «Pantalla de…» no filmstrip é redundante — esconder.
+ * Em galeria (tile-view) mantém-se visível como os outros.
+ */
+body:not(.tile-view) #remoteVideos .videocontainer[id*="-vssh"],
+body:not(.tile-view) #filmstripRemoteVideosContainer .videocontainer[id*="-vssh"],
+body:not(.tile-view) .filmstrip__videos .videocontainer[id*="-vssh"],
+body:not(.tile-view) .remote-videos-container .videocontainer[id*="-vssh"],
+#videoconference_page:not(.tile-view) .videocontainer[id*="-vssh"] {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

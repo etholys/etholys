@@ -90,12 +90,16 @@ const MEET_TOOLBAR_BUTTONS = [
   'highlight',
 ] as const;
 
+export type MeetLayoutMode = 'speaker' | 'gallery' | 'presentation' | 'stage' | 'crowded';
+
 export type MeetConferenceHandle = {
   startTranscription: () => void;
   stopTranscription: () => void;
   startRecording: (destination: 'local' | 'cloud') => void;
   stopRecording: (destination: 'local' | 'cloud') => void;
   hangup: () => void;
+  dispose: () => void;
+  setLayoutMode: (mode: MeetLayoutMode) => void;
 };
 
 type Props = {
@@ -174,6 +178,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
   ) {
     const parentRef = useRef<HTMLDivElement>(null);
     const apiRef = useRef<JitsiApi | null>(null);
+    const filmstripHiddenRef = useRef(false);
     const callbacksRef = useRef({
       onReady,
       onTranscriptionChunk,
@@ -259,7 +264,53 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
           }
         },
         hangup() {
-          apiRef.current?.executeCommand('hangup');
+          try {
+            apiRef.current?.executeCommand('hangup');
+          } catch {
+            /* ignore */
+          }
+        },
+        dispose() {
+          const api = apiRef.current;
+          apiRef.current = null;
+          try {
+            api?.dispose();
+          } catch {
+            /* ignore */
+          }
+        },
+        setLayoutMode(mode) {
+          const api = apiRef.current;
+          if (!api) return;
+          const run = (cmd: string, ...args: unknown[]) => {
+            try {
+              api.executeCommand(cmd, ...args);
+            } catch {
+              /* ignore */
+            }
+          };
+          const ensureFilmstrip = (hidden: boolean) => {
+            if (filmstripHiddenRef.current === hidden) return;
+            run('toggleFilmstrip');
+            filmstripHiddenRef.current = hidden;
+          };
+          switch (mode) {
+            case 'gallery':
+            case 'crowded':
+              ensureFilmstrip(false);
+              run('setTileView', true);
+              break;
+            case 'presentation':
+              run('setTileView', false);
+              ensureFilmstrip(true);
+              break;
+            case 'stage':
+            case 'speaker':
+            default:
+              ensureFilmstrip(false);
+              run('setTileView', false);
+              break;
+          }
         },
       }),
       [],
@@ -360,7 +411,13 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               filmstrip: {
                 disableResizable: false,
                 disableStageFilmstrip: false,
+                stageFilmstripParticipants: 6,
+                disableTopPanel: false,
               },
+              tileView: {
+                numberOfVisibleTiles: 25,
+              },
+              autoPinLatestScreenShare: 'remote-only',
               notifications: [
                 'connection.CONNFAIL',
                 'dialog.cameraNotSendingData',
@@ -420,7 +477,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               DISPLAY_WELCOME_FOOTER: false,
               VERTICAL_FILMSTRIP: true,
               FILM_STRIP_MAX_HEIGHT: 140,
-              TILE_VIEW_MAX_COLUMNS: 5,
+              TILE_VIEW_MAX_COLUMNS: 7,
               DEFAULT_BACKGROUND: '#202124',
               DEFAULT_LOCAL_DISPLAY_NAME: 'Eu',
               DEFAULT_REMOTE_DISPLAY_NAME: 'Participante',
@@ -430,6 +487,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               TOOLBAR_BUTTONS: [...MEET_TOOLBAR_BUTTONS],
               SETTINGS_SECTIONS: ['devices', 'language', 'moderator', 'profile', 'calendar', 'sounds', 'more'],
               VIDEO_LAYOUT_FIT: 'both',
+              AUTO_PIN_LATEST_SCREEN_SHARE: true,
               JITSI_WATERMARK_LINK: 'https://app.etholys.com/hub/meet',
               BRAND_WATERMARK_LINK: 'https://app.etholys.com/hub/meet',
               SUPPORT_URL: 'https://app.etholys.com/hub/meet',
@@ -461,6 +519,20 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
           }, 1500);
           window.setTimeout(() => window.clearInterval(allowWatch), 30_000);
 
+          const resolveParticipantName = (id?: string | null): string | null => {
+            if (!id || !api) return null;
+            try {
+              const info = api.getParticipantsInfo?.() || [];
+              const match = info.find(
+                (p: any) => p.participantId === id || p.id === id,
+              );
+              const name = (match?.displayName || match?.formattedDisplayName || '').trim();
+              return name || null;
+            } catch {
+              return null;
+            }
+          };
+
           api.addListener('videoConferenceJoined', () => {
             setLoading(false);
             emitCount();
@@ -469,6 +541,17 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
           const emitTranscript = (raw: unknown) => {
             const chunk = normalizeJitsiTranscriptPayload(raw);
             if (!chunk) return;
+            const pid = chunk.participant?.id;
+            const resolved = resolveParticipantName(pid);
+            if (resolved) {
+              chunk.participant = {
+                id: pid,
+                name: resolved,
+                ...(chunk.participant?.avatarUrl
+                  ? { avatarUrl: chunk.participant.avatarUrl }
+                  : {}),
+              };
+            }
             callbacksRef.current.onTranscriptionChunk?.(chunk);
           };
           api.addListener('transcriptionChunkReceived', emitTranscript);
@@ -504,19 +587,8 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               callbacksRef.current.onDominantSpeakerChanged?.(null);
               return;
             }
-            try {
-              const info = api.getParticipantsInfo?.() || [];
-              const match = info.find(
-                (p: any) => p.participantId === payload.id || p.id === payload.id,
-              );
-              const name =
-                match?.displayName ||
-                match?.formattedDisplayName ||
-                null;
-              callbacksRef.current.onDominantSpeakerChanged?.(name);
-            } catch {
-              callbacksRef.current.onDominantSpeakerChanged?.(null);
-            }
+            const name = resolveParticipantName(payload.id);
+            callbacksRef.current.onDominantSpeakerChanged?.(name);
           });
           api.addListener('toolbarButtonClicked', (payload: { key?: string; id?: string }) => {
             const key = payload?.key || payload?.id;
@@ -524,12 +596,14 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               callbacksRef.current.onTranscriptToolbarClick?.();
             }
           });
-          api.addListener('videoConferenceLeft', () => {
+          let leftEmitted = false;
+          const emitLeft = () => {
+            if (leftEmitted || disposed) return;
+            leftEmitted = true;
             callbacksRef.current.onConferenceLeft?.();
-          });
-          api.addListener('readyToClose', () => {
-            callbacksRef.current.onConferenceLeft?.();
-          });
+          };
+          api.addListener('videoConferenceLeft', emitLeft);
+          api.addListener('readyToClose', emitLeft);
 
           // A pré-sala pode ficar aberta antes de videoConferenceJoined.
           window.setTimeout(() => {
@@ -546,8 +620,18 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       void mount();
       return () => {
         disposed = true;
+        const api = apiRef.current;
         apiRef.current = null;
-        api?.dispose();
+        try {
+          api?.executeCommand('hangup');
+        } catch {
+          /* ignore */
+        }
+        try {
+          api?.dispose();
+        } catch {
+          /* ignore */
+        }
       };
     }, [meetingUrl, title, locale]);
 

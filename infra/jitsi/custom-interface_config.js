@@ -15,7 +15,7 @@ interfaceConfig.HIDE_INVITE_MORE_HEADER = true;
 interfaceConfig.DISABLE_JOIN_LEAVE_NOTIFICATIONS = true;
 interfaceConfig.VERTICAL_FILMSTRIP = true;
 interfaceConfig.FILM_STRIP_MAX_HEIGHT = 140;
-interfaceConfig.TILE_VIEW_MAX_COLUMNS = 5;
+interfaceConfig.TILE_VIEW_MAX_COLUMNS = 7;
 interfaceConfig.DEFAULT_BACKGROUND = '#202124';
 interfaceConfig.DEFAULT_LOCAL_DISPLAY_NAME = 'Eu';
 interfaceConfig.DEFAULT_REMOTE_DISPLAY_NAME = 'Participante';
@@ -23,6 +23,8 @@ interfaceConfig.TOOLBAR_ALWAYS_VISIBLE = false;
 interfaceConfig.INITIAL_TOOLBAR_TIMEOUT = 20000;
 interfaceConfig.TOOLBAR_TIMEOUT = 4000;
 interfaceConfig.VIDEO_LAYOUT_FIT = 'both';
+// Partilha recente vai para o grande vídeo; o tile extra no filmstrip é escondido via CSS
+interfaceConfig.AUTO_PIN_LATEST_SCREEN_SHARE = true;
 interfaceConfig.DEFAULT_LOGO_URL = 'https://app.etholys.com/meet-brand/etholys-mark.svg';
 interfaceConfig.DEFAULT_WELCOME_PAGE_LOGO_URL = 'https://app.etholys.com/meet-brand/etholys-meet.svg';
 interfaceConfig.JITSI_WATERMARK_LINK = 'https://app.etholys.com/hub/meet';

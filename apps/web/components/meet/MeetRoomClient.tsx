@@ -9,8 +9,10 @@ import {
   FileText,
   HardDrive,
   Info,
+  LayoutGrid,
   Loader2,
   Mic,
+  PhoneOff,
   PictureInPicture2,
   Square,
   Users,
@@ -26,6 +28,7 @@ import { isLikelyDbId } from '@/lib/utils';
 import {
   MeetConferenceFrame,
   type MeetConferenceHandle,
+  type MeetLayoutMode,
 } from '@/components/meet/MeetConferenceFrame';
 import {
   startMeetLocalRecorder,
@@ -56,6 +59,14 @@ type Props = {
   sessionId: string;
 };
 
+const LAYOUT_MODES: MeetLayoutMode[] = [
+  'speaker',
+  'gallery',
+  'stage',
+  'presentation',
+  'crowded',
+];
+
 function formatMeetClock(locale: string, date: Date): string {
   const tag = locale === 'pt' ? 'pt-BR' : locale === 'es' ? 'es' : 'en-US';
   return date.toLocaleTimeString(tag, { hour: 'numeric', minute: '2-digit' });
@@ -67,6 +78,39 @@ function buildTranscriptText(segments: TranscriptSegment[]): string {
     .map((row) => `${row.participantName}: ${row.text}`)
     .join('\n')
     .trim();
+}
+
+function isWeakSpeakerName(name?: string | null): boolean {
+  const n = (name || '').trim();
+  if (!n) return true;
+  return /^(participante|participant|eu|you|tú|tu|me|transcriber|jigasi|vosk|transcri)/i.test(n);
+}
+
+function speakerAccent(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  const hues = [210, 160, 30, 280, 340, 120, 190];
+  const hue = hues[Math.abs(hash) % hues.length];
+  return `hsl(${hue} 70% 68%)`;
+}
+
+function layoutLabel(
+  mode: MeetLayoutMode,
+  t: (pt: string, es: string, en: string) => string,
+): string {
+  switch (mode) {
+    case 'gallery':
+      return t('Galeria', 'Galería', 'Gallery');
+    case 'stage':
+      return t('Palco', 'Escenario', 'Stage');
+    case 'presentation':
+      return t('Apresentação', 'Presentación', 'Presentation');
+    case 'crowded':
+      return t('Compacta', 'Compacta', 'Compact');
+    case 'speaker':
+    default:
+      return t('Orador', 'Orador', 'Speaker');
+  }
 }
 
 export function MeetRoomClient({ sessionId }: Props) {
@@ -97,9 +141,13 @@ export function MeetRoomClient({ sessionId }: Props) {
     liveTranscriptionEnabled: false,
   });
   const [pipActive, setPipActive] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<MeetLayoutMode>('speaker');
+  const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
   const conferenceRef = useRef<MeetConferenceHandle>(null);
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const dominantSpeakerRef = useRef<string | null>(null);
   const leaveQuietRef = useRef(false);
+  const closingRef = useRef(false);
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
   const localRecorderRef = useRef<MeetLocalRecorder | null>(null);
   const stageHomeRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -243,33 +291,74 @@ export function MeetRoomClient({ sessionId }: Props) {
       stable?: string;
       unstable?: string;
     }) => {
+      const isFinal = Boolean(chunk.final);
       const text = (chunk.final || chunk.stable || chunk.unstable || '').trim();
       if (!text) return;
       setTranscriptionOn(true);
       setTranscriptionWaiting(false);
+
+      let speakerName = chunk.participant?.name?.trim() || '';
+      if (isWeakSpeakerName(speakerName) && dominantSpeakerRef.current) {
+        speakerName = dominantSpeakerRef.current;
+      }
+      if (isWeakSpeakerName(speakerName)) {
+        speakerName = t('Participante', 'Participante', 'Participant');
+      }
+
       const messageId =
         chunk.messageID ||
-        `${chunk.participant?.id || 'unknown'}-${Date.now()}-${text.slice(0, 12)}`;
+        `${chunk.participant?.id || speakerName}-${isFinal ? 'f' : 'i'}-${text.slice(0, 24)}`;
+
       const row: TranscriptSegment = {
         messageId,
         participantId: chunk.participant?.id,
-        participantName:
-          chunk.participant?.name?.trim() ||
-          t('Participante', 'Participante', 'Participant'),
+        participantName: speakerName,
         text,
         language: chunk.language,
         startedAt: new Date().toISOString(),
-        final: Boolean(chunk.final),
+        final: isFinal,
       };
+
       setSegments((current) => {
         const index = current.findIndex((item) => item.messageId === messageId);
-        if (index < 0) return [...current, row];
-        const next = [...current];
-        next[index] = { ...current[index], ...row };
-        return next;
+        if (index >= 0) {
+          const next = [...current];
+          next[index] = { ...current[index], ...row };
+          return next;
+        }
+
+        // Um único bubble interino (ainda a falar)
+        if (!isFinal) {
+          const interimIdx = current.findIndex((item) => !item.final);
+          if (interimIdx >= 0) {
+            const next = [...current];
+            next[interimIdx] = row;
+            return next;
+          }
+          return [...current, row];
+        }
+
+        // Juntar finais consecutivos do mesmo falante (≈ Otter / blocos)
+        const withoutInterim = current.filter((item) => item.final);
+        const last = withoutInterim[withoutInterim.length - 1];
+        if (
+          last &&
+          last.final &&
+          last.participantName === row.participantName &&
+          Date.now() - new Date(last.startedAt).getTime() < 12_000
+        ) {
+          const merged: TranscriptSegment = {
+            ...last,
+            text: `${last.text} ${row.text}`.replace(/\s+/g, ' ').trim(),
+            messageId: last.messageId,
+          };
+          return [...withoutInterim.slice(0, -1), merged];
+        }
+
+        return [...withoutInterim, row];
       });
 
-      if (chunk.final && companyId) {
+      if (isFinal && companyId) {
         void fetch(`/api/meet/sessions/${sessionId}/transcript`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -385,12 +474,44 @@ export function MeetRoomClient({ sessionId }: Props) {
 
   const endInFlight = useRef(false);
 
+  function tearDownConference() {
+    try {
+      conferenceRef.current?.stopTranscription();
+    } catch {
+      /* ignore */
+    }
+    try {
+      conferenceRef.current?.hangup();
+    } catch {
+      /* ignore */
+    }
+    try {
+      conferenceRef.current?.dispose();
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function endMeeting(opts?: { skipHangup?: boolean }) {
-    if (!companyId || endInFlight.current || session?.status === 'ended') return;
+    if (endInFlight.current) return;
+    if (session?.status === 'ended' && opts?.skipHangup) {
+      tearDownConference();
+      router.push(
+        companyId ? meetRecapPath(sessionId, companyId) : '/hub/meet',
+      );
+      return;
+    }
     endInFlight.current = true;
+    closingRef.current = true;
     setEnding(true);
     try {
-      if (transcriptionOn) conferenceRef.current?.stopTranscription();
+      if (transcriptionOn) {
+        try {
+          conferenceRef.current?.stopTranscription();
+        } catch {
+          /* ignore */
+        }
+      }
       if (recordingOn && localRecorderRef.current) {
         try {
           await localRecorderRef.current.stop();
@@ -402,52 +523,90 @@ export function MeetRoomClient({ sessionId }: Props) {
       }
 
       let transcript = buildTranscriptText(segmentsRef.current);
-      try {
-        const tr = await fetch(
-          `/api/meet/sessions/${sessionId}/transcript?companyId=${encodeURIComponent(companyId)}`,
-        );
-        const td = (await tr.json()) as { transcriptText?: string };
-        if ((td.transcriptText || '').trim().length > transcript.length) {
-          transcript = td.transcriptText!.trim();
+      if (companyId) {
+        try {
+          const tr = await fetch(
+            `/api/meet/sessions/${sessionId}/transcript?companyId=${encodeURIComponent(companyId)}`,
+          );
+          const td = (await tr.json()) as { transcriptText?: string };
+          if ((td.transcriptText || '').trim().length > transcript.length) {
+            transcript = td.transcriptText!.trim();
+          }
+        } catch {
+          /* ignore */
         }
+
+        if (session?.status !== 'ended') {
+          const canFinalize = transcript.length >= 20;
+          const endpoint = canFinalize
+            ? `/api/meet/sessions/${sessionId}/finalize`
+            : `/api/meet/sessions/${sessionId}`;
+          const response = await fetch(endpoint, {
+            method: canFinalize ? 'POST' : 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(
+              canFinalize
+                ? {
+                    companyId,
+                    transcriptText: transcript,
+                    endMeeting: true,
+                    replaceDrafts: true,
+                    locale,
+                  }
+                : {
+                    companyId,
+                    status: 'ended',
+                    ...(transcript ? { transcriptText: transcript } : {}),
+                  },
+            ),
+          });
+          if (!response.ok) {
+            const data = (await response.json().catch(() => ({}))) as { error?: string };
+            throw new Error(data.error || 'Falha ao encerrar reunião');
+          }
+          setSession((s) => (s ? { ...s, status: 'ended' } : s));
+        }
+      }
+
+      if (!opts?.skipHangup) {
+        try {
+          conferenceRef.current?.hangup();
+        } catch {
+          /* ignore */
+        }
+      }
+      try {
+        conferenceRef.current?.dispose();
       } catch {
         /* ignore */
       }
-
-      const canFinalize = transcript.length >= 20;
-      const endpoint = canFinalize
-        ? `/api/meet/sessions/${sessionId}/finalize`
-        : `/api/meet/sessions/${sessionId}`;
-      const response = await fetch(endpoint, {
-        method: canFinalize ? 'POST' : 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          canFinalize
-            ? {
-                companyId,
-                transcriptText: transcript,
-                endMeeting: true,
-                replaceDrafts: true,
-                locale,
-              }
-            : {
-                companyId,
-                status: 'ended',
-                ...(transcript ? { transcriptText: transcript } : {}),
-              },
-        ),
-      });
-      if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error || 'Falha ao encerrar reunião');
-      }
-      if (!opts?.skipHangup) conferenceRef.current?.hangup();
-      router.push(meetRecapPath(sessionId, companyId));
+      router.push(
+        companyId ? meetRecapPath(sessionId, companyId) : '/hub/meet',
+      );
     } catch (e) {
       endInFlight.current = false;
+      closingRef.current = false;
       setError(e instanceof Error ? e.message : 'Error');
       setEnding(false);
     }
+  }
+
+  function leaveToMeetHome() {
+    // Sai e destrói a sala neste browser (já não fica “fantasma” ligada).
+    leaveQuietRef.current = true;
+    closingRef.current = true;
+    tearDownConference();
+    router.push(
+      companyId
+        ? `/hub/meet?companyId=${encodeURIComponent(companyId)}`
+        : '/hub/meet',
+    );
+  }
+
+  function applyLayout(mode: MeetLayoutMode) {
+    setLayoutMode(mode);
+    setLayoutMenuOpen(false);
+    conferenceRef.current?.setLayoutMode(mode);
   }
 
   if (loading) {
@@ -474,22 +633,8 @@ export function MeetRoomClient({ sessionId }: Props) {
     : companyId
       ? `/hub/meet?companyId=${encodeURIComponent(companyId)}`
       : '/hub/meet';
-  const meetHomeHref = companyId
-    ? `/hub/meet?companyId=${encodeURIComponent(companyId)}`
-    : '/hub/meet';
 
   const speakerInitial = (dominantSpeaker || session.title).trim().charAt(0).toUpperCase() || 'E';
-
-  function leaveToMeetHome() {
-    // Sai da UI sem encerrar a reunião para os outros participantes
-    leaveQuietRef.current = true;
-    try {
-      conferenceRef.current?.hangup();
-    } catch {
-      /* ignore */
-    }
-    router.push(meetHomeHref);
-  }
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-[#202124] text-white">
@@ -546,6 +691,33 @@ export function MeetRoomClient({ sessionId }: Props) {
             <Users className="h-3.5 w-3.5 text-white/75" strokeWidth={1.75} />
             <span className="min-w-[0.75rem] tabular-nums">{Math.max(participantCount, 0)}</span>
           </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setLayoutMenuOpen((o) => !o)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#3c4043]/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm hover:bg-[#4a4d51]"
+              title={t('Vista dos participantes', 'Vista de participantes', 'Participant layout')}
+            >
+              <LayoutGrid className="h-3.5 w-3.5 text-white/75" strokeWidth={1.75} />
+              <span className="hidden sm:inline">{layoutLabel(layoutMode, t)}</span>
+            </button>
+            {layoutMenuOpen && (
+              <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[11rem] overflow-hidden rounded-xl border border-white/10 bg-[#292a2d] py-1 shadow-2xl">
+                {LAYOUT_MODES.map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => applyLayout(mode)}
+                    className={`flex w-full px-3 py-2 text-left text-xs hover:bg-white/10 ${
+                      layoutMode === mode ? 'font-semibold text-[#8ab4f8]' : 'text-white/85'
+                    }`}
+                  >
+                    {layoutLabel(mode, t)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={openFloatingWindow}
@@ -595,6 +767,20 @@ export function MeetRoomClient({ sessionId }: Props) {
                 : t('Gravar', 'Grabar', 'Record')}
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => void endMeeting()}
+            disabled={ending}
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#ea4335] px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#f28b82] disabled:opacity-60"
+            title={t('Encerrar e sair', 'Finalizar y salir', 'End and leave')}
+          >
+            <PhoneOff className="h-3.5 w-3.5" strokeWidth={1.75} />
+            <span className="hidden sm:inline">
+              {ending
+                ? t('A encerrar…', 'Cerrando…', 'Ending…')
+                : t('Encerrar', 'Finalizar', 'End')}
+            </span>
+          </button>
         </div>
       </header>
 
@@ -620,11 +806,20 @@ export function MeetRoomClient({ sessionId }: Props) {
           <div className="mt-3 flex flex-col gap-2">
             <button
               type="button"
+              onClick={() => void endMeeting()}
+              disabled={ending}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#ea4335] px-3 py-2 text-xs font-semibold text-white hover:bg-[#f28b82] disabled:opacity-60"
+            >
+              <PhoneOff className="h-3.5 w-3.5" />
+              {t('Encerrar reunião', 'Finalizar reunión', 'End meeting')}
+            </button>
+            <button
+              type="button"
               onClick={leaveToMeetHome}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#8ab4f8] px-3 py-2 text-xs font-semibold text-[#202124] hover:bg-[#aecbfa]"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              {t('Voltar ao Meet', 'Volver a Meet', 'Back to Meet')}
+              {t('Sair da sala', 'Salir de la sala', 'Leave room')}
             </button>
             {session.projectId && (
               <Link
@@ -678,7 +873,10 @@ export function MeetRoomClient({ sessionId }: Props) {
                   }}
                   onTranscriptionChunk={handleTranscriptionChunk}
                   onParticipantCountChange={setParticipantCount}
-                  onDominantSpeakerChanged={setDominantSpeaker}
+                  onDominantSpeakerChanged={(name) => {
+                    dominantSpeakerRef.current = name;
+                    setDominantSpeaker(name);
+                  }}
                   onTranscriptToolbarClick={() => {
                     setPanelOpen((open) => {
                       const next = !open;
@@ -694,7 +892,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                     });
                   }}
                   onConferenceLeft={() => {
-                    if (leaveQuietRef.current) {
+                    if (leaveQuietRef.current || closingRef.current) {
                       leaveQuietRef.current = false;
                       return;
                     }
@@ -826,10 +1024,16 @@ export function MeetRoomClient({ sessionId }: Props) {
                     {segments.map((row) => (
                       <li
                         key={row.messageId}
-                        className={row.final ? 'opacity-100' : 'opacity-60'}
+                        className={`rounded-xl border-l-2 pl-2.5 ${
+                          row.final ? 'opacity-100' : 'opacity-60'
+                        }`}
+                        style={{ borderLeftColor: speakerAccent(row.participantName) }}
                       >
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className="truncate text-[11px] font-medium text-[#8ab4f8]">
+                          <span
+                            className="truncate text-[11px] font-semibold"
+                            style={{ color: speakerAccent(row.participantName) }}
+                          >
                             {row.participantName}
                           </span>
                           <time className="shrink-0 text-[9px] text-white/35">

@@ -39,7 +39,16 @@ config.breakoutRooms.hideAddRoomButton = false;
 
 config.filmstrip = config.filmstrip || {};
 config.filmstrip.disableResizable = false;
+// Palco com vários participantes + partilha no grande vídeo
 config.filmstrip.disableStageFilmstrip = false;
+config.filmstrip.stageFilmstripParticipants = 6;
+config.filmstrip.disableTopPanel = false;
+
+config.tileView = config.tileView || {};
+config.tileView.numberOfVisibleTiles = 25;
+
+// Preferir a partilha no ecrã principal (estilo Google Meet)
+config.autoPinLatestScreenShare = 'remote-only';
 
 // Transcrição ao vivo (Vosk ES no contentor transcriber)
 config.transcription = config.transcription || {};

@@ -1,7 +1,7 @@
 export type NormalizedTranscriptChunk = {
   language?: string;
   messageID?: string;
-  participant?: { id?: string; name?: string };
+  participant?: { id?: string; name?: string; avatarUrl?: string };
   final?: string;
   stable?: string;
   unstable?: string;
