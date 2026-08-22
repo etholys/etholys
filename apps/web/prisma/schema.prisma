@@ -209,6 +209,8 @@ model Company {
   museSuggestions             MuseSuggestion[]
   nexusNetworksAnchored       NexusNetwork[]               @relation("NexusNetworkAnchor")
   nexusNetworkMemberships     NexusNetworkMember[]
+  nexusAtEngagementsOperated  NexusAtEngagement[]          @relation("NexusAtOperator")
+  nexusAtEngagementMemberships NexusAtEngagementMember[]
   nexusVentureState           NexusVentureState?
   /// Quem pode usar o Centro de trabalho integrado nesta empresa (não duplica lógica dos sistemas; só espelha APIs).
   integratedWorkspaceAccesses  IntegratedWorkspaceAccess[]
@@ -241,6 +243,7 @@ model Company {
   studioDocumentActivities    StudioDocumentActivity[]
   studioDocumentComments      StudioDocumentComment[]
   studioDocumentPresences     StudioDocumentPresence[]
+  etholysDocumentLinks        EtholysDocumentLink[]
   taskGroups                  TaskGroup[]
   taskApprovalRequests        TaskApprovalRequest[]
   workFolders                 WorkFolder[]
@@ -389,6 +392,8 @@ model Project {
   museSuggestions            MuseSuggestion[]
   nexusNetworksAsContext     NexusNetwork[]         @relation("NexusNetworkSiepProject")
   nexusNetworkMemberProjects NexusNetworkMember[]   @relation("NexusMemberSiepProject")
+  nexusAtEngagementsAsContext NexusAtEngagement[]   @relation("NexusAtSiepProject")
+  nexusAtProjectsAsContext    NexusAtProject[]      @relation("NexusAtProjectSiep")
   objectives                 Objective[]
   company                    Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   members                    ProjectMember[]
@@ -1119,6 +1124,7 @@ model Document {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  etholysLinks     EtholysDocumentLink[]
 }
 
 model StockMovement {
@@ -1600,9 +1606,84 @@ model NexusNetwork {
   siepProject     Project?             @relation("NexusNetworkSiepProject", fields: [siepProjectId], references: [id])
   members         NexusNetworkMember[]
   ventureState    NexusVentureState?
+  atEngagements   NexusAtEngagement[]
 
   @@index([anchorCompanyId])
   @@index([siepProjectId])
+}
+
+/// Serviço de assistência técnica (contrato / oferta) — contém projetos e empresas.
+/// Hierarquia: Serviço → Projeto → Empresa (trabalho separado em cada nível).
+model NexusAtEngagement {
+  id                String                     @id @default(cuid())
+  title             String
+  /// CONTRACT | PROJECT | PROGRAM — tipo comercial do serviço
+  kind              String                     @default("CONTRACT")
+  /// OPEN | ACTIVE | ON_HOLD | CLOSED
+  status            String                     @default("ACTIVE")
+  /// Empresa que presta a AT (operador)
+  operatorCompanyId String
+  /// Rede NEXUS opcional (pré-agrupa empresas)
+  networkId         String?
+  /// Projeto SIEP opcional ao nível do serviço (legado / default)
+  siepProjectId     String?
+  description       String?
+  /// Referência externa do contrato / código interno
+  contractRef       String?
+  startDate         DateTime?
+  endDate           DateTime?
+  isActive          Boolean                    @default(true)
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  operatorCompany   Company                    @relation("NexusAtOperator", fields: [operatorCompanyId], references: [id], onDelete: Cascade)
+  network           NexusNetwork?              @relation(fields: [networkId], references: [id], onDelete: SetNull)
+  siepProject       Project?                   @relation("NexusAtSiepProject", fields: [siepProjectId], references: [id], onDelete: SetNull)
+  members           NexusAtEngagementMember[]
+  projects          NexusAtProject[]
+
+  @@index([operatorCompanyId])
+  @@index([networkId])
+  @@index([siepProjectId])
+  @@index([status, isActive])
+}
+
+/// Projeto dentro de um serviço de AT — isolamento de trabalho.
+model NexusAtProject {
+  id            String            @id @default(cuid())
+  engagementId  String
+  name          String
+  description   String?
+  /// Projeto SIEP opcional ligado a este projeto AT
+  siepProjectId String?
+  /// ACTIVE | ON_HOLD | DONE
+  status        String            @default("ACTIVE")
+  sortOrder     Int               @default(0)
+  isActive      Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  engagement    NexusAtEngagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  siepProject   Project?          @relation("NexusAtProjectSiep", fields: [siepProjectId], references: [id], onDelete: SetNull)
+
+  @@index([engagementId])
+  @@index([siepProjectId])
+  @@index([engagementId, isActive])
+}
+
+model NexusAtEngagementMember {
+  id           String            @id @default(cuid())
+  engagementId String
+  companyId    String
+  /// operator | client
+  memberRole   String            @default("client")
+  notes        String?
+  sortOrder    Int               @default(0)
+  createdAt    DateTime          @default(now())
+  engagement   NexusAtEngagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  company      Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([engagementId, companyId])
+  @@index([companyId])
+  @@index([engagementId, memberRole])
 }
 
 /// Jornada tipo incubadora + prontidão internacional (Nexus)
@@ -2836,6 +2917,7 @@ model StudioDocument {
   activities  StudioDocumentActivity[]
   comments    StudioDocumentComment[]
   presence    StudioDocumentPresence[]
+  etholysLinks EtholysDocumentLink[]
   createdBy   User?         @relation("StudioDocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy   User?         @relation("StudioDocumentUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
 
@@ -2843,6 +2925,38 @@ model StudioDocument {
   @@index([folderId])
   @@index([companyId, updatedAt])
   @@index([updatedById])
+}
+
+/// Vínculo persistente de um documento (Studio ou Core) a uma entidade de sistema Etholys.
+/// Ex.: NEXUS assistência técnica, SIEP projeto, FUNDHUB proposta, empresa, etc.
+model EtholysDocumentLink {
+  id               String          @id @default(cuid())
+  /// studio | core
+  targetType       String
+  studioDocumentId String?
+  coreDocumentId   String?
+  /// Empresa dona do documento / tenant do vínculo
+  companyId        String
+  /// ATLAS | SIEP | FUNDHUB | NEXUS | FORGE | MEET | CORE
+  systemKey        String
+  /// company | project | report | proposal | engagement | course | meet_session | network
+  entityType       String
+  entityId         String
+  /// Nome legível em cache
+  label            String?
+  meta             Json?
+  createdById      String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  company          Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  studioDocument   StudioDocument? @relation(fields: [studioDocumentId], references: [id], onDelete: Cascade)
+  coreDocument     Document?       @relation(fields: [coreDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([studioDocumentId])
+  @@index([coreDocumentId])
+  @@index([systemKey, entityType, entityId])
+  @@index([targetType, companyId])
 }
 
 /// Partilha de pasta ou documento — membro interno ou convidado externo (acesso isolado)

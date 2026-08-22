@@ -253,7 +253,7 @@ export function NexusMirrorRail({
 
       <p className="text-[11px] leading-snug text-slate-400">
         {t.humanRhythmBody}{' '}
-        <Link href={withNet('/hub/nexus/services')} className="text-emerald-800/95 underline-offset-1 hover:underline">
+        <Link href={withNet('/hub/nexus/at')} className="text-emerald-800/95 underline-offset-1 hover:underline">
           {t.humanRhythmCta}
         </Link>
       </p>

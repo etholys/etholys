@@ -200,7 +200,7 @@ El Hub y la UI se arman dinámicamente según los sistemas contratados.
 | 4.11 | Canastas Inteligentes | Venta de canastas frescas por membresía | Add-on | 🔲 Por construir |
 | 4.12 | Billetera Digital | Recibir pagos, captación de recursos | Add-on Premium | 🔲 Por construir |
 | 4.13 | Recomendador de Crédito | IA conecta con microfinanzas y fondos (→ FUNDHUB) | Add-on | 🔲 Por construir |
-| 4.14 | Asistencia Técnica Híbrida (IA + Humano) | Acompañamiento digital + campo, videollamadas, visitas | Core | 🔲 Por construir |
+| 4.14 | Asistencia Técnica Híbrida (IA + Humano) | Acompañamiento digital + campo, videollamadas, visitas | Core | ⚠️ MVP engagement multi-empresa (`/hub/nexus/at`) — visita/Meet/IA pendientes |
 | 4.15 | Asesoría Empresarial Híbrida | Consultoría donde IA prepara análisis, asesor valida | Core | 🔲 Por construir |
 | 4.16 | Inteligencia Productiva | Eficiencia, rendimiento, condiciones, costos, alertas predictivas, IoT | Add-on Premium | 🔲 Por construir |
 | 4.17 | Gestión Agrícola/Productiva Integral | Planificación de producción, calendario, insumos, parcelas, riego | Core | 🔲 Por construir |

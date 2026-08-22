@@ -207,7 +207,7 @@ export function NexusUnitHome({
 
       <p className={cn('pt-2 text-xs leading-relaxed text-slate-500', split ? 'text-left' : 'text-center')}>
         {t.humanRhythmBody}{' '}
-        <Link href={withNet('/hub/nexus/services')} className="font-medium text-emerald-800 underline-offset-1 hover:underline">
+        <Link href={withNet('/hub/nexus/at')} className="font-medium text-emerald-800 underline-offset-1 hover:underline">
           {t.humanRhythmCta} →
         </Link>
       </p>

@@ -56,10 +56,10 @@ export const NEXUS_RUNWAY_CHAPTERS: RunwayChapter[] = [
   },
   {
     id: 'services',
-    path: '/hub/nexus/services',
-    labelPt: 'Apoio',
-    labelEs: 'Apoyo',
-    labelEn: 'Support',
+    path: '/hub/nexus/at',
+    labelPt: 'Assistência técnica',
+    labelEs: 'Asistencia técnica',
+    labelEn: 'Tech assistance',
   },
   {
     id: 'library',

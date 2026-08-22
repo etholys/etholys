@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { touchRunwayChapter } from '@/lib/nexus-runway';
@@ -192,7 +193,12 @@ function NexusServicesInner() {
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-gray-900">Serviços internos Etholys</h2>
         <p className="mt-1 text-sm text-gray-600">
-          Abra pedidos para execução interna (IA, híbrido ou humano). Nexus usa esses tickets para acelerar a rota.
+          Pedidos de execução interna (web, branding, redes…). Para atender clientes externos por contrato ou
+          projeto com várias empresas, use{' '}
+          <Link href="/hub/nexus/at" className="font-medium text-violet-700 underline">
+            Assistência técnica
+          </Link>
+          .
         </p>
       </div>
 

@@ -24,6 +24,7 @@ import {
   ClipboardCheck,
   Route,
   Wrench,
+  Headphones,
   BookOpen,
   History,
   Rocket,
@@ -56,6 +57,7 @@ const NEXUS_GROUP_ROUTES: Record<string, string[]> = {
     '/hub/nexus/diagnosis',
     '/hub/nexus/roadmap',
     '/hub/nexus/networks',
+    '/hub/nexus/at',
     '/hub/nexus/services',
   ],
   resources: ['/hub/nexus/library', '/hub/nexus/history'],
@@ -219,9 +221,24 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
           label: locale === 'es' ? 'Redes' : locale === 'pt' ? 'Redes' : 'Networks',
         },
         {
+          href: withNet('/hub/nexus/at'),
+          icon: Headphones,
+          label:
+            locale === 'es'
+              ? 'Asistencia técnica'
+              : locale === 'pt'
+                ? 'Assistência técnica'
+                : 'Tech assistance',
+        },
+        {
           href: withNet('/hub/nexus/services'),
           icon: Wrench,
-          label: locale === 'es' ? 'Servicios / tickets' : locale === 'pt' ? 'Serviços / tickets' : 'Services / tickets',
+          label:
+            locale === 'es'
+              ? 'Servicios internos'
+              : locale === 'pt'
+                ? 'Serviços internos'
+                : 'Internal services',
         },
       ],
     },
