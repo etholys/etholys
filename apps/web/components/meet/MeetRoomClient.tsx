@@ -18,6 +18,8 @@ import {
   Users,
   ChevronLeft,
   PanelRightOpen,
+  Copy,
+  Check,
   X,
 } from 'lucide-react';
 import { meetEmbedUrl } from '@/lib/meet/room';
@@ -143,7 +145,9 @@ export function MeetRoomClient({ sessionId }: Props) {
   const [pipActive, setPipActive] = useState(false);
   const [layoutMode, setLayoutMode] = useState<MeetLayoutMode>('speaker');
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
+  const [transcriptCopied, setTranscriptCopied] = useState(false);
   const conferenceRef = useRef<MeetConferenceHandle>(null);
+  const layoutMenuRef = useRef<HTMLDivElement>(null);
   const dominantSpeakerRef = useRef<string | null>(null);
   const leaveQuietRef = useRef(false);
   const closingRef = useRef(false);
@@ -281,6 +285,23 @@ export function MeetRoomClient({ sessionId }: Props) {
       localRecorderRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!layoutMenuOpen) return;
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') setLayoutMenuOpen(false);
+    };
+    const onPointer = (ev: MouseEvent) => {
+      const el = layoutMenuRef.current;
+      if (el && !el.contains(ev.target as Node)) setLayoutMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('mousedown', onPointer);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('mousedown', onPointer);
+    };
+  }, [layoutMenuOpen]);
 
   const handleTranscriptionChunk = useCallback(
     (chunk: {
@@ -731,6 +752,27 @@ export function MeetRoomClient({ sessionId }: Props) {
     conferenceRef.current?.setLayoutMode(mode);
   }
 
+  async function copyLiveTranscript() {
+    const text = buildTranscriptText(segmentsRef.current);
+    if (!text) {
+      setError(
+        t(
+          'Ainda não há texto final para copiar.',
+          'Aún no hay texto final para copiar.',
+          'No final transcript text to copy yet.',
+        ),
+      );
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setTranscriptCopied(true);
+      window.setTimeout(() => setTranscriptCopied(false), 2000);
+    } catch {
+      setError(t('Não foi possível copiar.', 'No se pudo copiar.', 'Could not copy.'));
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950">
@@ -813,12 +855,13 @@ export function MeetRoomClient({ sessionId }: Props) {
             <Users className="h-3.5 w-3.5 text-white/75" strokeWidth={1.75} />
             <span className="min-w-[0.75rem] tabular-nums">{Math.max(participantCount, 0)}</span>
           </div>
-          <div className="relative">
+          <div className="relative" ref={layoutMenuRef}>
             <button
               type="button"
               onClick={() => setLayoutMenuOpen((o) => !o)}
               className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm hover:bg-slate-700"
               title={t('Vista dos participantes', 'Vista de participantes', 'Participant layout')}
+              aria-expanded={layoutMenuOpen}
             >
               <LayoutGrid className="h-3.5 w-3.5 text-white/75" strokeWidth={1.75} />
               <span className="hidden sm:inline">{layoutLabel(layoutMode, t)}</span>
@@ -866,7 +909,7 @@ export function MeetRoomClient({ sessionId }: Props) {
               type="button"
               onClick={() => void stopRecording()}
               disabled={recordingBusy || ending}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#ea4335] px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#f28b82] disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-rose-500 disabled:opacity-60"
             >
               <Square className="h-3 w-3" />
               {t('Parar gravação', 'Detener grabación', 'Stop recording')}
@@ -1107,15 +1150,30 @@ export function MeetRoomClient({ sessionId }: Props) {
                   )}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setPanelOpen(false)}
-                className="rounded-full p-1.5 text-white/55 hover:bg-white/10 hover:text-white"
-                aria-label={t('Minimizar painel', 'Minimizar panel', 'Minimize panel')}
-                title={t('Minimizar', 'Minimizar', 'Minimize')}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => void copyLiveTranscript()}
+                  className="rounded-full p-1.5 text-white/55 hover:bg-white/10 hover:text-white"
+                  aria-label={t('Copiar transcrição', 'Copiar transcripción', 'Copy transcript')}
+                  title={t('Copiar', 'Copiar', 'Copy')}
+                >
+                  {transcriptCopied ? (
+                    <Check className="h-4 w-4 text-teal-300" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPanelOpen(false)}
+                  className="rounded-full p-1.5 text-white/55 hover:bg-white/10 hover:text-white"
+                  aria-label={t('Minimizar painel', 'Minimizar panel', 'Minimize panel')}
+                  title={t('Minimizar', 'Minimizar', 'Minimize')}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
               {error && (
@@ -1138,7 +1196,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                   : t('Transcrever', 'Transcribir', 'Transcribe')}
               </button>
 
-              <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl bg-[#1f1f1f] p-3">
+              <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl bg-slate-950/80 p-3">
                 {segments.length === 0 ? (
                   <div className="flex h-full min-h-32 items-center justify-center px-3 text-center text-[11px] text-white/40">
                     {!features.liveTranscriptionEnabled

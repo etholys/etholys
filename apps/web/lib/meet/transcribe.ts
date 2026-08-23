@@ -73,8 +73,10 @@ export async function transcribeMeetRecording(opts: {
 
   const maxBytes = Number(process.env.MEET_TRANSCRIBE_MAX_BYTES || 24 * 1024 * 1024);
   if (buffer.byteLength > maxBytes) {
+    const mb = Math.round(buffer.byteLength / 1024 / 1024);
+    const lim = Math.round(maxBytes / 1024 / 1024);
     throw new Error(
-      `Ficheiro demasiado grande para STT (${Math.round(buffer.byteLength / 1024 / 1024)} MB). Extraia áudio ou use notas manuais.`,
+      `Gravação demasiado grande para Whisper (${mb} MB; limite ~${lim} MB). Exporta só o áudio (m4a/mp3) ou corta o ficheiro e volta a tentar no CHORUS.`,
     );
   }
 

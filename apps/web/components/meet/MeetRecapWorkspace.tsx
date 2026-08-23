@@ -250,7 +250,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f8f9fa] text-slate-900">
+    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
           <Link
@@ -258,7 +258,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
             className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
           >
             <ArrowLeft className="h-4 w-4" />
-            Meet
+            CHORUS
           </Link>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-base font-semibold sm:text-lg">
@@ -324,9 +324,9 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                       <li key={row.id}>
                         <Link
                           href={meetRecapPath(row.id, companyId)}
-                          className={`block px-4 py-3 hover:bg-slate-50 ${active ? 'bg-sky-50' : ''}`}
+                          className={`block px-4 py-3 hover:bg-slate-50 ${active ? 'bg-teal-50' : ''}`}
                         >
-                          <p className={`truncate text-sm font-semibold ${active ? 'text-sky-800' : 'text-slate-900'}`}>
+                          <p className={`truncate text-sm font-semibold ${active ? 'text-teal-900' : 'text-slate-900'}`}>
                             {row.title}
                           </p>
                           <p className="mt-0.5 text-[11px] text-slate-500">{formatWhen(row)}</p>
@@ -361,7 +361,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                 </p>
                 <p className="mt-1 max-w-md text-sm text-slate-500">
                   {t(
-                    'Aqui vês a transcrição completa, o resumo e as tarefas. No calendário Meet, abre o evento e clica em Transcrição.',
+                    'Aqui vês a transcrição completa, o resumo e as tarefas. No calendário CHORUS, abre o evento e clica em Transcrição.',
                     'Aquí ves la transcripción completa, el resumen y las tareas. En el calendario CHORUS, abre el evento y pulsa Transcripción.',
                     'Here you see the full transcript, summary and tasks. From the CHORUS calendar, open the event and click Transcript.',
                   )}
@@ -423,7 +423,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                       type="button"
                       onClick={() => setTab(id)}
                       className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${
-                        tab === id ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600'
+                        tab === id ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-600'
                       }`}
                     >
                       {label}
@@ -499,7 +499,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                         {segments.map((row) => (
                           <li key={row.messageId}>
                             <div className="flex items-baseline justify-between gap-2">
-                              <span className="text-xs font-semibold text-sky-700">{row.participantName}</span>
+                              <span className="text-xs font-semibold text-teal-800">{row.participantName}</span>
                               <time className="text-[10px] text-slate-400">
                                 {new Date(row.startedAt).toLocaleTimeString(intl, {
                                   hour: '2-digit',
