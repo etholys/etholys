@@ -541,13 +541,18 @@ function MeetHubContent() {
             <span className="hidden sm:inline">Hub</span>
           </Link>
 
-          <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-600">
-              <Video className="h-4 w-4 text-white" />
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:flex-none">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-700 to-slate-900 shadow-sm ring-1 ring-teal-600/30">
+              <Video className="h-4 w-4 text-teal-50" />
             </span>
-            <span className="truncate text-lg font-semibold tracking-tight text-slate-900">
-              Etholys Meet
-            </span>
+            <div className="min-w-0 leading-tight">
+              <span className="block truncate text-lg font-semibold tracking-[0.08em] text-slate-900">
+                CHORUS
+              </span>
+              <span className="hidden text-[10px] font-medium uppercase tracking-[0.14em] text-teal-800/70 sm:block">
+                Etholys
+              </span>
+            </div>
           </div>
 
           <CompanyPicker

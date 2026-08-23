@@ -1,12 +1,22 @@
-# Etholys Meet — motor de reuniões (transversal)
+# Etholys CHORUS — motor de reuniões (transversal)
 
-**Versão:** 0.2
-**Data:** 2026-08-05
-**Status:** F0–F6 em código; infra Jitsi/Jibri e chaves R2/STT/OAuth dependem de env + ops
+**Versão:** 0.3
+**Data:** 2026-08-23
+**Status:** F0–F6 em código; rebrand produto **CHORUS** (rotas `/hub/meet` mantidas)
 **Público:** product, desenvolvedores, agentes de IA
 
+**Nome de produto:** **CHORUS** (não “Meet” — evita confusão com Google Meet).  
 **Fonte de verdade** para videoconferência, breakouts, convites, gravação, transcrição e pós-reunião com IA no Etholys.  
 **Entrada para agentes:** [AGENTS.md](../../AGENTS.md) → este ficheiro.
+
+### Transcrição
+
+| Camada | Motor | Qualidade |
+|--------|--------|-----------|
+| Ao vivo | Jigasi + Vosk ES | Rápida; diarização limitada |
+| **Pós-chamada (CHORUS)** | Whisper (`verbose_json`) + LLM diarização com lista de participantes | Estilo Otter — falantes + timestamps |
+
+Upload da gravação → `POST /api/meet/sessions/[id]/transcribe` (`diarize: true` por omissão).
 
 ---
 

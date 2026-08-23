@@ -161,7 +161,7 @@ export function MeetRoomClient({ sessionId }: Props) {
   useEffect(() => {
     const prev = document.title;
     const label = session?.title?.trim();
-    document.title = label ? `Etholys Meet — ${label}` : 'Etholys Meet';
+    document.title = label ? `CHORUS — ${label}` : 'CHORUS · Etholys';
     return () => {
       document.title = prev;
     };
@@ -382,9 +382,9 @@ export function MeetRoomClient({ sessionId }: Props) {
     if (!features.liveTranscriptionEnabled) {
       setError(
         t(
-          'A transcrição ao vivo ainda não está activa no Etholys Meet.',
-          'La transcripción en vivo aún no está activa en Etholys Meet.',
-          'Live transcription is not enabled on Etholys Meet yet.',
+          'A transcrição ao vivo ainda não está activa no CHORUS.',
+          'La transcripción en vivo aún no está activa en CHORUS.',
+          'Live transcription is not enabled on CHORUS yet.',
         ),
       );
       return;
@@ -446,8 +446,8 @@ export function MeetRoomClient({ sessionId }: Props) {
         setError(
           t(
             'A gravação terminou sem dados. Ao iniciar, escolhe a aba ou janela da reunião Etholys.',
-            'La grabación terminó sin datos. Al iniciar, elige la pestaña o ventana de Etholys Meet.',
-            'Recording finished with no data. When starting, pick the Etholys Meet tab or window.',
+            'La grabación terminó sin datos. Al iniciar, elige la pestaña o ventana de CHORUS.',
+            'Recording finished with no data. When starting, pick the CHORUS tab or window.',
           ),
         );
       } else if (result.savedWithPicker) {
@@ -798,7 +798,7 @@ export function MeetRoomClient({ sessionId }: Props) {
             </button>
           </div>
           <p className="text-xs leading-relaxed text-white/55">
-            Etholys Meet
+            CHORUS
             {session.status === 'live'
               ? ` · ${t('Ao vivo', 'En vivo', 'Live')}`
               : ` · ${session.status}`}
@@ -1003,9 +1003,9 @@ export function MeetRoomClient({ sessionId }: Props) {
                   <div className="flex h-full min-h-32 items-center justify-center px-3 text-center text-[11px] text-white/40">
                     {!features.liveTranscriptionEnabled
                       ? t(
-                          'A transcrição ao vivo ainda está a ser activada no Etholys Meet.',
-                          'La transcripción en vivo aún se está activando en Etholys Meet.',
-                          'Live transcription is still being activated on Etholys Meet.',
+                          'A transcrição ao vivo ainda está a ser activada no CHORUS.',
+                          'La transcripción en vivo aún se está activando en CHORUS.',
+                          'Live transcription is still being activated on CHORUS.',
                         )
                       : transcriptionWaiting || transcriptionOn
                         ? t(

@@ -1,6 +1,6 @@
-/* Etholys Meet — interface (Google Meet-like, sem branding Jitsi) */
-interfaceConfig.APP_NAME = 'Etholys Meet';
-interfaceConfig.NATIVE_APP_NAME = 'Etholys Meet';
+/* CHORUS · Etholys — interface (sem branding Jitsi / sem eco Google Meet) */
+interfaceConfig.APP_NAME = 'CHORUS';
+interfaceConfig.NATIVE_APP_NAME = 'CHORUS';
 interfaceConfig.PROVIDER_NAME = 'Etholys';
 interfaceConfig.SHOW_JITSI_WATERMARK = false;
 interfaceConfig.SHOW_WATERMARK_FOR_GUESTS = false;

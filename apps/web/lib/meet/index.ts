@@ -53,4 +53,14 @@ export {
   resolveMeetRecordingUrl,
 } from '@/lib/meet/recording-storage';
 export { isMeetTranscribeConfigured, transcribeMeetRecording } from '@/lib/meet/transcribe';
+export {
+  diarizeWhisperSegments,
+  formatDiarizedTranscript,
+} from '@/lib/meet/diarize';
+export {
+  CHORUS_PRODUCT_NAME,
+  CHORUS_PRODUCT_FULL,
+  chorusName,
+  chorusTagline,
+} from '@/lib/meet/brand';
 export { notifyMeetActionsPending } from '@/lib/meet/notify-pending-actions';

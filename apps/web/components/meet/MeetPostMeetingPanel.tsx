@@ -274,8 +274,16 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
       if (d.transcriptText) setNotes(d.transcriptText);
       setMsg(
         finalize
-          ? t('Transcrição + resumo gerados.', 'Transcripción + resumen listos.', 'Transcript + summary ready.')
-          : t('Transcrição pronta — revê e gera o resumo.', 'Transcripción lista — revisa y genera el resumen.', 'Transcript ready — review and generate summary.'),
+          ? t(
+              'CHORUS: transcrição diarizada + resumo gerados.',
+              'CHORUS: transcripción diarizada + resumen listos.',
+              'CHORUS: diarized transcript + summary ready.',
+            )
+          : t(
+              'CHORUS: transcrição diarizada pronta — revê e gera o resumo.',
+              'CHORUS: transcripción diarizada lista — revisa y genera el resumen.',
+              'CHORUS: diarized transcript ready — review and generate summary.',
+            ),
       );
       await loadDetail();
       onUpdated();
@@ -308,7 +316,7 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
         <div>
           <h3 className="flex items-center gap-2 text-base font-bold text-slate-900">
             <Sparkles className="h-5 w-5 text-sky-600" />
-            {t('Pós-reunião (IA)', 'Post-reunión (IA)', 'Post-meeting (AI)')}
+            {t('Pós-reunião CHORUS', 'Post-reunión CHORUS', 'CHORUS post-meeting')}
           </h3>
           <p className="mt-0.5 text-sm text-slate-600">{detail.title}</p>
         </div>
@@ -320,9 +328,9 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
       <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 space-y-2">
         <p>
           {t(
-            'Gravação: envie um ficheiro, use a gravação na nuvem Etholys, ou grave neste computador. Depois pode pedir a transcrição automática.',
-            'Grabación: sube un archivo, usa la grabación en la nube Etholys, o graba en este ordenador. Después puedes pedir la transcripción automática.',
-            'Recording: upload a file, use Etholys cloud recording, or record on this computer. You can then request automatic transcription.',
+            'Gravação: envie um ficheiro ou grave neste PC. O CHORUS usa Whisper + diarização (falantes) para uma transcrição pós-chamada profissional.',
+            'Grabación: sube un archivo o graba en este PC. CHORUS usa Whisper + diarización (hablantes) para una transcripción post-llamada profesional.',
+            'Recording: upload a file or record on this PC. CHORUS uses Whisper + diarization (speakers) for a professional post-call transcript.',
           )}
         </p>
         <div className="flex flex-wrap items-center gap-2">

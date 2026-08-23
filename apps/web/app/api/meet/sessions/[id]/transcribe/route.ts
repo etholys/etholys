@@ -5,13 +5,14 @@ import { getUserCompanyIds } from '@/lib/tenant';
 import { getMeetSessionForCompany } from '@/lib/meet/create-session';
 import { prisma } from '@/lib/prisma';
 import { isMeetTranscribeConfigured, transcribeMeetRecording } from '@/lib/meet/transcribe';
+import { diarizeWhisperSegments, formatDiarizedTranscript } from '@/lib/meet/diarize';
 import { generateMeetPostMeetingAi } from '@/lib/meet/post-meeting-ai';
 import { notifyMeetActionsPending } from '@/lib/meet/notify-pending-actions';
 
 type Ctx = { params: Promise<{ id: string }> };
 
 /**
- * Transcreve a gravação (Whisper) e opcionalmente corre o fluxo pós-reunião.
+ * Pipeline CHORUS pós-chamada: Whisper (timestamps) → diarização por participante → opcional IA.
  */
 export async function POST(req: Request, ctx: Ctx) {
   try {
@@ -24,6 +25,7 @@ export async function POST(req: Request, ctx: Ctx) {
       languageHint?: string;
       finalize?: boolean;
       locale?: string;
+      diarize?: boolean;
     };
 
     const companyId = body.companyId?.trim();
@@ -45,19 +47,94 @@ export async function POST(req: Request, ctx: Ctx) {
     if (!session) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
     if (!session.recordingUrl) {
       return NextResponse.json(
-        { error: 'Sem recordingUrl — faça upload da gravação ou aguarde a gravação na nuvem Etholys' },
+        {
+          error:
+            'Sem recordingUrl — faça upload da gravação ou aguarde a gravação na nuvem Etholys',
+        },
         { status: 400 },
       );
     }
 
     const lang =
       body.languageHint ||
-      (body.locale === 'es' ? 'es' : body.locale === 'en' ? 'en' : body.locale === 'pt' ? 'pt' : undefined);
+      (body.locale === 'es'
+        ? 'es'
+        : body.locale === 'en'
+          ? 'en'
+          : body.locale === 'pt'
+            ? 'pt'
+            : undefined);
 
-    const { text, model } = await transcribeMeetRecording({
+    const whisper = await transcribeMeetRecording({
       recordingUrlOrKey: session.recordingUrl,
       languageHint: lang,
     });
+
+    const participants = await prisma.meetParticipant.findMany({
+      where: { sessionId: session.id },
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+        user: { select: { name: true } },
+      },
+    });
+
+    const participantNames = participants
+      .map((p) => p.displayName || p.user?.name || p.email || '')
+      .filter(Boolean);
+
+    const liveHints = await prisma.meetTranscriptSegment.findMany({
+      where: { sessionId: session.id },
+      orderBy: { startedAt: 'asc' },
+      take: 80,
+      select: { participantName: true, text: true },
+    });
+
+    const shouldDiarize = body.diarize !== false && whisper.segments.length > 0;
+    let transcriptText = whisper.text;
+    let utteranceCount = 0;
+
+    if (shouldDiarize) {
+      try {
+        const utterances = await diarizeWhisperSegments({
+          segments: whisper.segments,
+          participants: participantNames,
+          liveHints: liveHints.map((h) => ({
+            speaker: h.participantName,
+            text: h.text,
+          })),
+          locale: body.locale,
+        });
+        if (utterances.length > 0) {
+          transcriptText = formatDiarizedTranscript(utterances);
+          utteranceCount = utterances.length;
+
+          await prisma.meetTranscriptSegment.deleteMany({ where: { sessionId: session.id } });
+          const base = new Date(session.startedAt || session.scheduledAt || Date.now());
+          for (let i = 0; i < utterances.length; i += 1) {
+            const u = utterances[i]!;
+            const nameMatch = participants.find((p) => {
+              const label = (p.displayName || p.user?.name || '').toLowerCase();
+              return label && label === u.speaker.toLowerCase();
+            });
+            await prisma.meetTranscriptSegment.create({
+              data: {
+                sessionId: session.id,
+                messageId: `chorus-whisper-${i}-${Math.round(u.startSec * 10)}`,
+                participantId: nameMatch?.id ?? null,
+                participantName: u.speaker,
+                text: u.text,
+                language: lang || null,
+                startedAt: new Date(base.getTime() + Math.round(u.startSec * 1000)),
+              },
+            });
+          }
+        }
+      } catch (diarizeErr) {
+        console.error('[meet/transcribe] diarize fallback', diarizeErr);
+      }
+    }
 
     let projectName: string | null = null;
     if (session.projectId) {
@@ -73,7 +150,7 @@ export async function POST(req: Request, ctx: Ctx) {
         title: session.title,
         mirror: session.mirror,
         projectName,
-        notes: text,
+        notes: transcriptText,
         locale: body.locale,
       });
 
@@ -104,7 +181,7 @@ export async function POST(req: Request, ctx: Ctx) {
       const updated = await prisma.meetSession.update({
         where: { id: session.id },
         data: {
-          transcriptText: text,
+          transcriptText,
           summaryText: ai.summary.slice(0, 20_000),
           status: 'ended',
           endedAt: session.endedAt ?? new Date(),
@@ -121,8 +198,10 @@ export async function POST(req: Request, ctx: Ctx) {
       });
 
       return NextResponse.json({
-        transcriptText: text,
-        model,
+        transcriptText,
+        model: whisper.model,
+        diarized: utteranceCount > 0,
+        utteranceCount,
         session: updated,
         finalized: true,
       });
@@ -130,11 +209,18 @@ export async function POST(req: Request, ctx: Ctx) {
 
     const updated = await prisma.meetSession.update({
       where: { id: session.id },
-      data: { transcriptText: text },
+      data: { transcriptText },
       select: { id: true, transcriptText: true, recordingUrl: true },
     });
 
-    return NextResponse.json({ transcriptText: text, model, session: updated, finalized: false });
+    return NextResponse.json({
+      transcriptText,
+      model: whisper.model,
+      diarized: utteranceCount > 0,
+      utteranceCount,
+      session: updated,
+      finalized: false,
+    });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Error interno';
     console.error('[meet/transcribe]', error);
