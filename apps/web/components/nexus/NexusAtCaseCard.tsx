@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Calendar, Check, Loader2, MessageSquare, Video } from 'lucide-react';
-import { AT_CASE_KIND_LABELS, AT_STATUS_LABELS, type AtCaseKind } from '@/lib/nexus-at';
+import { AT_CASE_KIND_LABELS, AT_STATUS_LABELS, type AtCaseKind } from '@/lib/nexus-at-shared';
 
 export type AtCaseCardModel = {
   id: string;

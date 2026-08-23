@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Building2, FolderKanban, Headphones, Plus, UserPlus } from 'lucide-react';
 import { NexusAtCaseCard, type AtCaseCardModel } from '@/components/nexus/NexusAtCaseCard';
-import { AT_CASE_KIND_LABELS, type AtCaseKind } from '@/lib/nexus-at';
+import { AT_CASE_KIND_LABELS, type AtCaseKind } from '@/lib/nexus-at-shared';
 
 type Company = { id: string; name: string; shortName: string };
 type Member = {
