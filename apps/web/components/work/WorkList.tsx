@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { Check } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import { PRIORITY_STYLE, STATUS_STYLE } from './work-ui';
 
@@ -19,13 +20,16 @@ const OPEN = new Set(['BACKLOG', 'TODO', 'IN_PROGRESS', 'IN_REVIEW']);
 export function WorkList({
   tasks,
   onSelect,
+  onToggleDone,
   t,
 }: {
   tasks: Task[];
   onSelect: (id: string) => void;
+  onToggleDone?: (id: string, nextStatus: string) => Promise<void>;
   t: (en: string, es: string, pt: string) => string;
 }) {
   const [hideDone, setHideDone] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     const list = tasks.filter((task) => !task.parentId);
@@ -42,8 +46,13 @@ export function WorkList({
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-white/70 px-6 py-16 text-center text-sm text-slate-400">
-        {t('No tasks in this list', 'Sin tareas en esta lista', 'Sem tarefas nesta lista')}
+      <div className="rounded-2xl border border-dashed border-slate-200 bg-gradient-to-b from-white to-slate-50/80 px-6 py-16 text-center">
+        <p className="text-sm font-medium text-slate-500">
+          {t('No tasks in this list', 'Sin tareas en esta lista', 'Sem tarefas nesta lista')}
+        </p>
+        <p className="mt-1 text-xs text-slate-400">
+          {t('Use quick add above to create one', 'Usa el campo de arriba para crear', 'Usa a criação rápida acima')}
+        </p>
       </div>
     );
   }
@@ -73,15 +82,45 @@ export function WorkList({
           const pr = PRIORITY_STYLE[task.priority] || PRIORITY_STYLE.MEDIUM;
           const overdue =
             task.dueDate && OPEN.has(task.status) && new Date(task.dueDate).getTime() < now;
+          const done = task.status === 'DONE';
           return (
-            <li key={task.id}>
+            <li key={task.id} className="group flex items-center gap-1 pr-2 hover:bg-slate-50/80">
+              {onToggleDone && (
+                <button
+                  type="button"
+                  disabled={busyId === task.id}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    setBusyId(task.id);
+                    try {
+                      await onToggleDone(task.id, done ? 'TODO' : 'DONE');
+                    } finally {
+                      setBusyId(null);
+                    }
+                  }}
+                  className={cn(
+                    'ml-3 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition',
+                    done
+                      ? 'border-emerald-500 bg-emerald-500 text-white'
+                      : 'border-slate-300 text-transparent hover:border-cyan-500 hover:text-cyan-600',
+                  )}
+                  title={done ? t('Reopen', 'Reabrir', 'Reabrir') : t('Mark done', 'Marcar hecha', 'Marcar concluída')}
+                >
+                  <Check className="h-3 w-3" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onSelect(task.id)}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50"
+                className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left"
               >
-                <span className={cn('h-2 w-2 shrink-0 rounded-full', st.dot)} />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">
+                {!onToggleDone && <span className={cn('h-2 w-2 shrink-0 rounded-full', st.dot)} />}
+                <span
+                  className={cn(
+                    'min-w-0 flex-1 truncate text-sm font-medium',
+                    done ? 'text-slate-400 line-through' : 'text-slate-800',
+                  )}
+                >
                   {task.title}
                 </span>
                 <span className={cn('hidden rounded-md px-1.5 py-0.5 text-[10px] font-semibold sm:inline', pr.bg, pr.text)}>

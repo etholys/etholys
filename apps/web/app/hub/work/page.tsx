@@ -34,9 +34,9 @@ export default function HubWorkPage() {
               </div>
               <p className="truncate text-xs text-slate-500">
                 {t(
-                  'Vistas, pastas partilhadas e integração SIEP',
-                  'Vistas, carpetas compartidas e integración SIEP',
-                  'Views, shared folders and SIEP integration',
+                  'Criação rápida, vistas e pastas partilhadas',
+                  'Creación rápida, vistas y carpetas compartidas',
+                  'Quick add, views and shared folders',
                 )}
               </p>
             </div>

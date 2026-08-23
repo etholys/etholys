@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { STATUS_STYLE } from './work-ui';
 
@@ -34,10 +34,12 @@ function dayKey(d: Date) {
 export function WorkCalendar({
   tasks,
   onSelect,
+  onCreateDay,
   t,
 }: {
   tasks: Task[];
   onSelect: (id: string) => void;
+  onCreateDay?: (day: Date) => void;
   t: (en: string, es: string, pt: string) => string;
 }) {
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
@@ -62,7 +64,7 @@ export function WorkCalendar({
 
   const cells = useMemo(() => {
     const first = startOfMonth(cursor);
-    const startPad = (first.getDay() + 6) % 7; // Monday-first
+    const startPad = (first.getDay() + 6) % 7;
     const gridStart = new Date(first);
     gridStart.setDate(first.getDate() - startPad);
     const out: Date[] = [];
@@ -76,7 +78,7 @@ export function WorkCalendar({
 
   const monthLabel = cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   const weekdays = [1, 2, 3, 4, 5, 6, 0].map((dow) => {
-    const d = new Date(2024, 0, 1 + dow); // Mon..Sun sample week
+    const d = new Date(2024, 0, 1 + dow);
     return d.toLocaleDateString(undefined, { weekday: 'short' });
   });
 
@@ -86,7 +88,11 @@ export function WorkCalendar({
         <div>
           <h3 className="text-sm font-semibold capitalize text-slate-800">{monthLabel}</h3>
           <p className="text-[11px] text-slate-400">
-            {t('Tasks by due date', 'Tareas por fecha límite', 'Tarefas por prazo')}
+            {t(
+              'Click a day to add · click a task to open',
+              'Clic en un día para añadir · clic en tarea para abrir',
+              'Clica num dia para criar · clica numa tarefa para abrir',
+            )}
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -134,17 +140,30 @@ export function WorkCalendar({
             <div
               key={key}
               className={cn(
-                'min-h-[88px] border-b border-r border-slate-100 p-1.5 sm:min-h-[104px]',
+                'group/day relative min-h-[88px] border-b border-r border-slate-100 p-1.5 sm:min-h-[104px]',
                 !inMonth && 'bg-slate-50/50',
+                isToday && 'bg-cyan-50/40',
               )}
             >
-              <div
-                className={cn(
-                  'mb-1 flex h-6 w-6 items-center justify-center rounded-full text-xs tabular-nums',
-                  isToday ? 'bg-cyan-600 font-semibold text-white' : inMonth ? 'text-slate-700' : 'text-slate-300',
+              <div className="mb-1 flex items-center justify-between">
+                <div
+                  className={cn(
+                    'flex h-6 w-6 items-center justify-center rounded-full text-xs tabular-nums',
+                    isToday ? 'bg-cyan-600 font-semibold text-white' : inMonth ? 'text-slate-700' : 'text-slate-300',
+                  )}
+                >
+                  {day.getDate()}
+                </div>
+                {onCreateDay && inMonth && (
+                  <button
+                    type="button"
+                    onClick={() => onCreateDay(day)}
+                    className="rounded p-0.5 text-slate-300 opacity-0 transition hover:bg-cyan-100 hover:text-cyan-700 group-hover/day:opacity-100"
+                    title={t('Add task', 'Añadir tarea', 'Adicionar tarefa')}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
                 )}
-              >
-                {day.getDate()}
               </div>
               <div className="space-y-0.5">
                 {dayTasks.slice(0, 3).map((task) => {
@@ -155,7 +174,7 @@ export function WorkCalendar({
                       type="button"
                       onClick={() => onSelect(task.id)}
                       className={cn(
-                        'block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-medium leading-tight',
+                        'block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-medium leading-tight transition hover:ring-1 hover:ring-cyan-200',
                         st.bg,
                         st.text,
                       )}

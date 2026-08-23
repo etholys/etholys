@@ -93,7 +93,7 @@ export function WorkDashboard({
       value: overdue.length,
       icon: AlertTriangle,
       tone: 'text-rose-700 bg-rose-50',
-      go: () => onNav({ kind: 'all' }),
+      go: () => onNav({ kind: 'overdue' }),
     },
     {
       label: t('My tasks', 'Mis tareas', 'As minhas'),
@@ -113,15 +113,15 @@ export function WorkDashboard({
 
   return (
     <div className="space-y-6 p-1 sm:p-2">
-      <div>
+      <div className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-teal-50/40 px-5 py-5">
         <h2 className="text-xl font-bold tracking-tight text-slate-900">
           {t('Work dashboard', 'Panel de Work', 'Painel Work')}
         </h2>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 max-w-xl text-sm text-slate-500">
           {t(
-            'Load across departments and projects — click a card or row to jump into the board.',
-            'Carga por sectores y proyectos — clic para abrir el tablero.',
-            'Carga por setores e projetos — clica para abrir o quadro.',
+            'See load, overdue work and what needs attention — click through to act.',
+            'Carga, atrasos y lo que necesita atención — clic para actuar.',
+            'Carga, atrasos e o que precisa de atenção — clica para agir.',
           )}
         </p>
       </div>
@@ -132,7 +132,7 @@ export function WorkDashboard({
             key={c.label}
             type="button"
             onClick={c.go}
-            className="rounded-2xl border border-slate-200/80 bg-white p-4 text-left shadow-sm transition hover:border-cyan-200 hover:shadow-md"
+            className="rounded-2xl border border-slate-200/80 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md"
           >
             <div className={cn('mb-3 inline-flex rounded-xl p-2', c.tone)}>
               <c.icon className="h-4 w-4" />
@@ -183,12 +183,22 @@ export function WorkDashboard({
           </h3>
           <ul className="space-y-2">
             {people.map((p) => (
-              <li key={p.id} className="flex items-center gap-2 rounded-xl px-2 py-1.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-100 text-[10px] font-bold text-cyan-800">
-                  {p.id === '__unassigned' ? '?' : getInitials(p.name)}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{p.name}</span>
-                <span className="text-xs tabular-nums text-slate-500">{p.open}</span>
+              <li key={p.id}>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-slate-50"
+                  onClick={() =>
+                    p.id === currentUserId
+                      ? onNav({ kind: 'mine' })
+                      : onNav({ kind: 'all' })
+                  }
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-100 text-[10px] font-bold text-cyan-800">
+                    {p.id === '__unassigned' ? '?' : getInitials(p.name)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{p.name}</span>
+                  <span className="text-xs tabular-nums text-slate-500">{p.open}</span>
+                </button>
               </li>
             ))}
           </ul>
