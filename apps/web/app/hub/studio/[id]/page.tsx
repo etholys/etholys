@@ -1194,6 +1194,7 @@ export default function StudioDocumentPage() {
                   ? 'text-violet-300 hover:bg-violet-900/50'
                   : 'text-stone-600 hover:bg-stone-200/60'
               }`}
+              title={t('Voltar à pasta', 'Volver a la carpeta', 'Back to folder')}
             >
               <ArrowLeft className="h-5 w-5" />
             </Link>
@@ -1208,10 +1209,14 @@ export default function StudioDocumentPage() {
                 setTitle(e.target.value);
                 setDirty(true);
               }}
+              onBlur={() => {
+                if (dirty && canEdit) void persistCanvas({ quiet: true });
+              }}
               disabled={!canEdit}
               className={`min-w-0 flex-1 border-0 bg-transparent text-base font-semibold outline-none focus:ring-0 sm:text-lg ${
                 studioMode === 'design' ? 'text-violet-50' : 'text-stone-900'
               }`}
+              title={t('Nome do documento', 'Nombre del documento', 'Document name')}
             />
           </div>
           {(lastEditedBy || lastEditedAt) && (

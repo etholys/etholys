@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   FilePlus2,
@@ -16,6 +16,8 @@ import {
   Share2,
   BookMarked,
   X,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
@@ -51,15 +53,69 @@ type TemplateRow = {
   descriptionEn: string;
 };
 
+function buildFolderPath(
+  folderId: string | null,
+  allFolders: FolderRow[],
+  folderName?: string | null,
+  folderParentId?: string | null,
+): FolderRow[] {
+  if (!folderId) return [];
+  const byId = new Map(allFolders.map((f) => [f.id, f]));
+  const chain: FolderRow[] = [];
+  const seen = new Set<string>();
+  let cur: string | null = folderId;
+  while (cur && !seen.has(cur)) {
+    seen.add(cur);
+    const f = byId.get(cur);
+    if (!f) break;
+    chain.unshift({ id: f.id, name: f.name, parentId: f.parentId ?? null, access: f.access });
+    cur = f.parentId ?? null;
+  }
+  if (!chain.length) {
+    return [
+      {
+        id: folderId,
+        name: folderName || '…',
+        parentId: folderParentId ?? null,
+      },
+    ];
+  }
+  if (folderName && chain[chain.length - 1]) {
+    chain[chain.length - 1] = { ...chain[chain.length - 1]!, name: folderName };
+  }
+  return chain;
+}
+
+function canManageItem(access?: string) {
+  return access === 'owner' || access === 'admin' || !access;
+}
+
 export default function StudioHubPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center gap-2 text-slate-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+      }
+    >
+      <StudioHubInner />
+    </Suspense>
+  );
+}
+
+function StudioHubInner() {
   const { locale, activeCompanyId, setActiveCompanyId } = useApp();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const companyId = activeCompanyId && isLikelyDbId(activeCompanyId) ? activeCompanyId : '';
 
-  /** Pilha de navegação (não o parentId da BD) — pastas partilhadas entram como raiz virtual. */
+  /** Pasta activa = query ?folder= (fonte de verdade ao voltar do documento). */
+  const folderParam = searchParams.get('folder');
+  const folderId = folderParam && isLikelyDbId(folderParam) ? folderParam : null;
+
   const [pathStack, setPathStack] = useState<FolderRow[]>([]);
-  const folderId = pathStack.length ? pathStack[pathStack.length - 1]!.id : null;
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [documents, setDocuments] = useState<DocRow[]>([]);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
@@ -86,25 +142,6 @@ export default function StudioHubPage() {
   const [showFolderContext, setShowFolderContext] = useState(false);
 
   const effectiveCompanyId = companyId || resolvedCompanyId;
-
-  // Deep-link ?folder= — uma vez, como ponto de entrada
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (pathStack.length) return;
-    const fromUrl = new URLSearchParams(window.location.search).get('folder');
-    if (fromUrl && isLikelyDbId(fromUrl)) {
-      setPathStack([{ id: fromUrl, name: '…', parentId: null }]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só no mount / primeira entrada
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const url = new URL(window.location.href);
-    if (folderId) url.searchParams.set('folder', folderId);
-    else url.searchParams.delete('folder');
-    window.history.replaceState(null, '', `${url.pathname}${url.search}`);
-  }, [folderId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -137,14 +174,15 @@ export default function StudioHubPage() {
       setFolders(d.folders || []);
       setDocuments(d.documents || []);
       setTemplates(d.templates || []);
-      if (folderId && typeof d.folderName === 'string' && d.folderName) {
-        setPathStack((prev) => {
-          if (!prev.length) return prev;
-          const last = prev[prev.length - 1]!;
-          if (last.id !== folderId || last.name === d.folderName) return prev;
-          return [...prev.slice(0, -1), { ...last, name: d.folderName }];
-        });
-      }
+      const all = (d.allFolders || []) as FolderRow[];
+      setPathStack(
+        buildFolderPath(
+          folderId,
+          all,
+          typeof d.folderName === 'string' ? d.folderName : null,
+          typeof d.folderParentId === 'string' ? d.folderParentId : null,
+        ),
+      );
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -157,22 +195,124 @@ export default function StudioHubPage() {
   }, [load]);
 
   function enterFolder(f: FolderRow) {
-    setPathStack((prev) => {
-      const row = { id: f.id, name: f.name, parentId: f.parentId ?? null };
-      // Na raiz (ou lista virtual de partilhas), a pasta aberta é o início do caminho
-      if (prev.length === 0) return [row];
-      return [...prev, row];
-    });
+    router.push(`/hub/studio?folder=${encodeURIComponent(f.id)}`);
   }
 
   function goToPathIndex(index: number) {
-    setPathStack((prev) => (index < 0 ? [] : prev.slice(0, index + 1)));
+    if (index < 0) {
+      router.push('/hub/studio');
+      return;
+    }
+    const target = pathStack[index];
+    if (!target) return;
+    router.push(`/hub/studio?folder=${encodeURIComponent(target.id)}`);
   }
 
   function openNewFolder() {
     setNewFolderName('');
     setNewFolderError(null);
     setShowNewFolder(true);
+  }
+
+  async function renameDocument(doc: DocRow) {
+    const next = window.prompt(
+      t('Novo nome do documento', 'Nuevo nombre del documento', 'New document name'),
+      doc.title,
+    );
+    if (next == null) return;
+    const title = next.trim();
+    if (!title || title === doc.title) return;
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/studio/documents/${doc.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId: effectiveCompanyId || undefined, title }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || d.detail || 'Erro');
+      await load();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteDocument(doc: DocRow) {
+    if (
+      !window.confirm(
+        t(
+          `Apagar «${doc.title}»? Esta ação não se pode anular.`,
+          `¿Borrar «${doc.title}»? Esta acción no se puede deshacer.`,
+          `Delete “${doc.title}”? This cannot be undone.`,
+        ),
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const q = effectiveCompanyId ? `?companyId=${encodeURIComponent(effectiveCompanyId)}` : '';
+      const r = await fetch(`/api/studio/documents/${doc.id}${q}`, { method: 'DELETE' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || d.detail || 'Erro');
+      await load();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function renameFolder(f: FolderRow) {
+    const next = window.prompt(t('Novo nome da pasta', 'Nuevo nombre de la carpeta', 'New folder name'), f.name);
+    if (next == null) return;
+    const name = next.trim();
+    if (!name || name === f.name) return;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/studio/folders', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId: effectiveCompanyId || undefined, id: f.id, name }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || d.detail || 'Erro');
+      await load();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteFolder(f: FolderRow) {
+    if (
+      !window.confirm(
+        t(
+          `Apagar a pasta «${f.name}» e o seu conteúdo?`,
+          `¿Borrar la carpeta «${f.name}» y su contenido?`,
+          `Delete folder “${f.name}” and its contents?`,
+        ),
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const q = new URLSearchParams({ id: f.id });
+      if (effectiveCompanyId) q.set('companyId', effectiveCompanyId);
+      const r = await fetch(`/api/studio/folders?${q}`, { method: 'DELETE' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || d.detail || 'Erro');
+      if (folderId === f.id) router.push('/hub/studio');
+      else await load();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function createFolder(event: React.FormEvent<HTMLFormElement>) {
@@ -431,7 +571,7 @@ export default function StudioHubPage() {
             {folders.map((f) => (
               <div
                 key={f.id}
-                className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-amber-300 hover:shadow-md"
+                className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-amber-300 hover:shadow-md"
               >
                 <button type="button" onClick={() => enterFolder(f)} className="flex min-w-0 flex-1 items-start gap-3 text-left">
                   <Folder className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
@@ -445,23 +585,46 @@ export default function StudioHubPage() {
                     </p>
                   </div>
                 </button>
-                {(f.access === 'owner' || f.access === 'admin' || !f.access) && (
-                  <button
-                    type="button"
-                    title={t('Compartilhar pasta', 'Compartir carpeta', 'Share folder')}
-                    onClick={() => setShareTarget({ folderId: f.id, title: f.name })}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs font-semibold text-amber-800 hover:border-amber-300 hover:bg-amber-100"
-                  >
-                    <Share2 className="h-4 w-4" />
-                    {t('Compartilhar', 'Compartir', 'Share')}
-                  </button>
-                )}
+                <div className="flex shrink-0 flex-col gap-1">
+                  {canManageItem(f.access) && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        title={t('Renomear', 'Renombrar', 'Rename')}
+                        onClick={() => void renameFolder(f)}
+                        className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        title={t('Apagar', 'Borrar', 'Delete')}
+                        onClick={() => void deleteFolder(f)}
+                        className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-700 hover:bg-rose-100 disabled:opacity-40"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
+                  {(f.access === 'owner' || f.access === 'admin' || !f.access) && (
+                    <button
+                      type="button"
+                      title={t('Compartilhar pasta', 'Compartir carpeta', 'Share folder')}
+                      onClick={() => setShareTarget({ folderId: f.id, title: f.name })}
+                      className="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-amber-50 p-2 text-amber-800 hover:bg-amber-100"
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
             {documents.map((doc) => (
               <div
                 key={doc.id}
-                className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-300 hover:shadow-md"
+                className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-300 hover:shadow-md"
               >
                 <Link href={`/hub/studio/${doc.id}`} className="flex min-w-0 flex-1 items-start gap-3">
                   <FileText className="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
@@ -478,17 +641,40 @@ export default function StudioHubPage() {
                     </p>
                   </div>
                 </Link>
-                {(doc.access === 'owner' || doc.access === 'admin' || !doc.access) && (
-                  <button
-                    type="button"
-                    title={t('Compartilhar documento', 'Compartir documento', 'Share document')}
-                    onClick={() => setShareTarget({ documentId: doc.id, title: doc.title })}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-2 text-xs font-semibold text-orange-800 hover:border-orange-300 hover:bg-orange-100"
-                  >
-                    <Share2 className="h-4 w-4" />
-                    {t('Compartilhar', 'Compartir', 'Share')}
-                  </button>
-                )}
+                <div className="flex shrink-0 flex-col gap-1">
+                  {canManageItem(doc.access) && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        title={t('Renomear', 'Renombrar', 'Rename')}
+                        onClick={() => void renameDocument(doc)}
+                        className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        title={t('Apagar', 'Borrar', 'Delete')}
+                        onClick={() => void deleteDocument(doc)}
+                        className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-700 hover:bg-rose-100 disabled:opacity-40"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
+                  {(doc.access === 'owner' || doc.access === 'admin' || !doc.access) && (
+                    <button
+                      type="button"
+                      title={t('Compartilhar documento', 'Compartir documento', 'Share document')}
+                      onClick={() => setShareTarget({ documentId: doc.id, title: doc.title })}
+                      className="inline-flex items-center justify-center rounded-lg border border-orange-200 bg-orange-50 p-2 text-orange-800 hover:bg-orange-100"
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
             {folders.length === 0 && documents.length === 0 && (
