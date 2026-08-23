@@ -1,6 +1,6 @@
 # Etholys Studio — criação de documentos (ferramenta transversal)
 
-**Fase atual (UI):** dois espaços distintos — **Redação** (TipTap + ribbon Formato com seleção real, IA de redação) e **Desenho** (chrome escuro violeta, IA de diagramação `/design-layout` com brand kit + blocos posicionáveis `layout` x/y %). Caminho incremental para paridade Word/Gamma. 
+**Fase atual (UI):** dois espaços distintos — **Redação** (TipTap + ribbon com seleção, Ctrl+Enter / setas entre secções, IA de redação) e **Desenho** (IA `/design-layout`, blocos com `layout` x/y %, arrastar + **redimensionar** com snap). Caminho incremental para paridade Word/Gamma. 
 
 **Fonte de verdade** para o estúdio de documentos com IA no Etholys.  
 **Entrada para agentes:** [AGENTS.md](../../AGENTS.md) → este ficheiro.

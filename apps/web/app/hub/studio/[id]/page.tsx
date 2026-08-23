@@ -61,7 +61,7 @@ import {
 import { StudioCommentsPanel } from '@/components/studio/StudioCommentsPanel';
 import { StudioBlockEditor } from '@/components/studio/StudioBlockEditor';
 import { StudioDesignPlacedBlock } from '@/components/studio/StudioDesignPlacedBlock';
-import { getStudioWriteFocus, runStudioWriteCommand } from '@/lib/studio/write-editor-bus';
+import { getStudioWriteFocus, requestStudioWriteBlockFocus, runStudioWriteCommand } from '@/lib/studio/write-editor-bus';
 import { StudioSheet } from '@/components/studio/StudioSheet';
 import { StudioToolsSidebar } from '@/components/studio/StudioToolsSidebar';
 import { DocumentLinksPanel } from '@/components/studio/DocumentLinksPanel';
@@ -1002,6 +1002,53 @@ export default function StudioDocumentPage() {
     }));
   }
 
+  function insertBlockAfter(pageId: string, afterBlockId: string) {
+    let newId = '';
+    applyCanvas((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) => {
+        if (p.id !== pageId) return p;
+        const blocks = p.blocks.slice().sort((a, b) => a.order - b.order);
+        const idx = blocks.findIndex((b) => b.id === afterBlockId);
+        if (idx < 0) return p;
+        newId = `block-${Date.now()}-${idx + 1}`;
+        const next = [
+          ...blocks.slice(0, idx + 1),
+          { id: newId, kind: 'paragraph' as const, text: '', order: idx + 1 },
+          ...blocks.slice(idx + 1),
+        ].map((b, i) => ({ ...b, order: i }));
+        return { ...p, blocks: next };
+      }),
+    }));
+    window.setTimeout(() => {
+      if (newId) requestStudioWriteBlockFocus(newId);
+    }, 40);
+  }
+
+  function removeEmptyBlockFocusPrev(pageId: string, blockId: string) {
+    let prevId: string | null = null;
+    applyCanvas((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) => {
+        if (p.id !== pageId) return p;
+        const blocks = p.blocks.slice().sort((a, b) => a.order - b.order);
+        if (blocks.length <= 1) return p;
+        const idx = blocks.findIndex((b) => b.id === blockId);
+        if (idx < 0) return p;
+        const target = blocks[idx]!;
+        if (String(target.text || '').trim()) return p;
+        prevId = idx > 0 ? blocks[idx - 1]!.id : blocks[1]?.id || null;
+        return {
+          ...p,
+          blocks: blocks.filter((b) => b.id !== blockId).map((b, i) => ({ ...b, order: i })),
+        };
+      }),
+    }));
+    if (prevId) {
+      window.setTimeout(() => requestStudioWriteBlockFocus(prevId!), 40);
+    }
+  }
+
   function moveBlock(pageId: string, blockId: string, dir: -1 | 1) {
     applyCanvas((prev) => ({
       ...prev,
@@ -1779,9 +1826,9 @@ export default function StudioDocumentPage() {
                 body: t('Corpo', 'Cuerpo', 'Body'),
                 list: t('Lista', 'Lista', 'List'),
                 hint: t(
-                  'Selecione texto no documento — a faixa formata a seleção',
-                  'Seleccione texto en el documento — la cinta formatea la selección',
-                  'Select text in the document — the ribbon formats the selection',
+                  'Ctrl+Enter nova secção · setas entre secções · formata a seleção',
+                  'Ctrl+Enter nueva sección · flechas entre secciones · formatea la selección',
+                  'Ctrl+Enter new section · arrows between sections · formats selection',
                 ),
               }}
             />
@@ -1892,6 +1939,9 @@ export default function StudioDocumentPage() {
               >
                 {t('Posicionar na folha', 'Posicionar en hoja', 'Place on page')}
               </button>
+              <span className="px-1 text-[10px] text-violet-600/80">
+                {t('Arrastar · redimensionar · grelha 2%', 'Arrastrar · redimensionar · cuadrícula 2%', 'Drag · resize · 2% grid')}
+              </span>
             </div>
           )}
 
@@ -2089,6 +2139,7 @@ export default function StudioDocumentPage() {
                       backgroundImage={bg}
                       canEdit={canEdit}
                       brandAccent={studioMode === 'design' ? brandPrimary : null}
+                      compact={studioMode === 'write'}
                       freeform={
                         studioMode === 'design' &&
                         page.blocks.some((b) => b.layout && (b.layout.xPct != null || b.layout.yPct != null))
@@ -2135,6 +2186,26 @@ export default function StudioDocumentPage() {
                               onMoveUp={() => moveBlock(page.id, block.id, -1)}
                               onMoveDown={() => moveBlock(page.id, block.id, 1)}
                               onDelete={() => removeBlock(page.id, block.id)}
+                              onInsertAfter={
+                                studioMode === 'write' && canEdit
+                                  ? () => insertBlockAfter(page.id, block.id)
+                                  : undefined
+                              }
+                              onBackspaceEmpty={
+                                studioMode === 'write' && canEdit && arr.length > 1
+                                  ? () => removeEmptyBlockFocusPrev(page.id, block.id)
+                                  : undefined
+                              }
+                              onFocusNext={
+                                studioMode === 'write' && blockIdx < arr.length - 1
+                                  ? () => requestStudioWriteBlockFocus(arr[blockIdx + 1]!.id)
+                                  : undefined
+                              }
+                              onFocusPrev={
+                                studioMode === 'write' && blockIdx > 0
+                                  ? () => requestStudioWriteBlockFocus(arr[blockIdx - 1]!.id)
+                                  : undefined
+                              }
                               onComment={() => {
                                 setCommentBlockId(block.id);
                                 setShowComments(true);

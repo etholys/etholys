@@ -140,6 +140,10 @@ type Props = {
   disabled?: boolean;
   /** Redação: editar texto directamente (sem clique para «modo preview») */
   writeMode?: boolean;
+  onInsertAfter?: () => void;
+  onBackspaceEmpty?: () => void;
+  onFocusNext?: () => void;
+  onFocusPrev?: () => void;
   labels: {
     edit: string;
     preview: string;
@@ -182,6 +186,10 @@ export function StudioBlockEditor({
   canDelete,
   disabled,
   writeMode = false,
+  onInsertAfter,
+  onBackspaceEmpty,
+  onFocusNext,
+  onFocusPrev,
   labels,
 }: Props) {
   const styleWrap = `${studioBlockAlignClass(block.style)} ${studioBlockFrameClass(block.style)}`.trim();
@@ -396,7 +404,7 @@ export function StudioBlockEditor({
     </div>
   );
 
-  const chrome = !disabled && (
+  const chrome = !disabled && !writeMode && (
     <div className="absolute -right-1 -top-1 z-10 flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white/95 p-0.5 opacity-0 shadow-sm transition group-hover:opacity-100 group-focus-within:opacity-100">
       {onToggleAiSelect && (
         <button
@@ -634,6 +642,10 @@ export function StudioBlockEditor({
             disabled={disabled}
             placeholder={labels.empty}
             onChange={onChange}
+            onInsertAfter={onInsertAfter}
+            onBackspaceEmpty={onBackspaceEmpty}
+            onFocusNext={onFocusNext}
+            onFocusPrev={onFocusPrev}
             className={`studio-rich-editor min-h-[1.5em] w-full outline-none ${
               block.kind === 'heading'
                 ? 'font-bold leading-snug tracking-tight text-slate-900 [font-family:var(--font-etholys-display),ui-sans-serif,system-ui,sans-serif] [&_h1]:text-inherit [&_h2]:text-inherit [&_h3]:text-inherit'

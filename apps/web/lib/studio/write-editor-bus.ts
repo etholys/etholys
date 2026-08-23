@@ -19,6 +19,7 @@ type Focused = {
 
 let focused: Focused | null = null;
 const listeners = new Set<() => void>();
+const focusTargetListeners = new Set<(blockId: string) => void>();
 
 function notify() {
   listeners.forEach((l) => l());
@@ -36,6 +37,16 @@ export function getStudioWriteFocus(): Focused | null {
 export function subscribeStudioWriteFocus(fn: () => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
+}
+
+/** Pede foco ao TipTap de um bloco (após criar secção / setas). */
+export function requestStudioWriteBlockFocus(blockId: string) {
+  focusTargetListeners.forEach((l) => l(blockId));
+}
+
+export function subscribeStudioWriteBlockFocus(fn: (blockId: string) => void): () => void {
+  focusTargetListeners.add(fn);
+  return () => focusTargetListeners.delete(fn);
 }
 
 /** Executa comando na seleção TipTap focada. Devolve false se não houver editor. */

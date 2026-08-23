@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -10,7 +10,11 @@ import {
   studioEditorHtmlToText,
   studioTextToEditorHtml,
 } from '@/lib/studio/rich-text';
-import { getStudioWriteFocus, setStudioWriteFocus } from '@/lib/studio/write-editor-bus';
+import {
+  getStudioWriteFocus,
+  setStudioWriteFocus,
+  subscribeStudioWriteBlockFocus,
+} from '@/lib/studio/write-editor-bus';
 
 type Props = {
   blockId: string;
@@ -21,10 +25,18 @@ type Props = {
   placeholder?: string;
   className?: string;
   onChange: (text: string) => void;
+  /** Ctrl/Cmd+Enter — nova secção abaixo */
+  onInsertAfter?: () => void;
+  /** Backspace no início de bloco vazio */
+  onBackspaceEmpty?: () => void;
+  /** Seta ↓ no fim → bloco seguinte */
+  onFocusNext?: () => void;
+  /** Seta ↑ no início → bloco anterior */
+  onFocusPrev?: () => void;
 };
 
 /**
- * Editor rico (TipTap) para modo Redação — seleção real + ribbon.
+ * Editor rico (TipTap) para modo Redação — seleção real + ribbon + teclas tipo Docs.
  * Persiste markdown-lite em `block.text` para IA/export.
  */
 export function StudioRichTextEditor({
@@ -36,7 +48,14 @@ export function StudioRichTextEditor({
   placeholder,
   className,
   onChange,
+  onInsertAfter,
+  onBackspaceEmpty,
+  onFocusNext,
+  onFocusPrev,
 }: Props) {
+  const cbs = useRef({ onChange, onInsertAfter, onBackspaceEmpty, onFocusNext, onFocusPrev });
+  cbs.current = { onChange, onInsertAfter, onBackspaceEmpty, onFocusNext, onFocusPrev };
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -62,9 +81,42 @@ export function StudioRichTextEditor({
           className ||
           'studio-rich-editor min-h-[1.5em] w-full outline-none focus:outline-none',
       },
+      handleKeyDown: (view, event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+          event.preventDefault();
+          cbs.current.onInsertAfter?.();
+          return true;
+        }
+        if (event.key === 'Backspace' && cbs.current.onBackspaceEmpty) {
+          const plain = view.state.doc.textContent.trim();
+          const { empty, $from } = view.state.selection;
+          if (plain === '' && empty && $from.parentOffset === 0) {
+            event.preventDefault();
+            cbs.current.onBackspaceEmpty();
+            return true;
+          }
+        }
+        if (event.key === 'ArrowDown' && !event.shiftKey && cbs.current.onFocusNext) {
+          const { $to } = view.state.selection;
+          if ($to.pos >= view.state.doc.content.size - 1) {
+            event.preventDefault();
+            cbs.current.onFocusNext();
+            return true;
+          }
+        }
+        if (event.key === 'ArrowUp' && !event.shiftKey && cbs.current.onFocusPrev) {
+          const { $from } = view.state.selection;
+          if ($from.pos <= 1) {
+            event.preventDefault();
+            cbs.current.onFocusPrev();
+            return true;
+          }
+        }
+        return false;
+      },
     },
     onUpdate: ({ editor: ed }) => {
-      onChange(studioEditorHtmlToText(ed.getHTML()));
+      cbs.current.onChange(studioEditorHtmlToText(ed.getHTML()));
     },
     onFocus: ({ editor: ed }) => {
       setStudioWriteFocus({ editor: ed, blockId, pageId });
@@ -89,6 +141,14 @@ export function StudioRichTextEditor({
     if (editor.isFocused) return;
     editor.commands.setContent(studioTextToEditorHtml(text, kind), false);
   }, [editor, text, kind]);
+
+  useEffect(() => {
+    return subscribeStudioWriteBlockFocus((id) => {
+      if (id !== blockId || !editor || editor.isDestroyed) return;
+      editor.commands.focus('end');
+      setStudioWriteFocus({ editor, blockId, pageId });
+    });
+  }, [editor, blockId, pageId]);
 
   useEffect(() => {
     return () => {

@@ -119,4 +119,7 @@
   height: 0;
   pointer-events: none;
 }
+.studio-rich-editor.ProseMirror:focus {
+  caret-color: #ea580c;
+}
 

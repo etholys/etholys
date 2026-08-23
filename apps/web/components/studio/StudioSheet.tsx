@@ -16,6 +16,8 @@ type Props = {
   /** Barra superior com cor da marca (modo desenho). */
   brandAccent?: string | null;
   freeform?: boolean;
+  /** gap mais apertado (redação tipo Word) */
+  compact?: boolean;
   children: React.ReactNode;
 };
 
@@ -35,6 +37,7 @@ export function StudioSheet({
   marginPx,
   brandAccent,
   freeform,
+  compact,
   children,
 }: Props) {
   const pad = marginPx || { top: 48, right: 56, bottom: 48, left: 56 };
@@ -149,7 +152,9 @@ export function StudioSheet({
           ...(isFixed ? {} : { minHeight: height }),
         }}
       >
-        <div className={`flex min-h-0 flex-col gap-3.5 ${freeform ? 'relative min-h-full' : ''}`}>
+        <div
+          className={`flex min-h-0 flex-col ${compact ? 'gap-1.5' : 'gap-3.5'} ${freeform ? 'relative min-h-full' : ''}`}
+        >
           {children}
         </div>
       </div>
