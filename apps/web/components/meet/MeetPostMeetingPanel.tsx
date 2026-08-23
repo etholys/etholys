@@ -297,7 +297,7 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
   if (loading) {
     return (
       <div className="flex justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
+        <Loader2 className="h-6 w-6 animate-spin text-teal-700" />
       </div>
     );
   }
@@ -311,11 +311,11 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
   const drafts = detail.actionItems.filter((a) => a.status === 'draft' || a.status === 'accepted');
 
   return (
-    <div className="space-y-4 rounded-2xl border border-sky-200 bg-white p-5 shadow-sm">
+    <div className="space-y-4 rounded-2xl border border-teal-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="flex items-center gap-2 text-base font-bold text-slate-900">
-            <Sparkles className="h-5 w-5 text-sky-600" />
+            <Sparkles className="h-5 w-5 text-teal-700" />
             {t('Pós-reunião CHORUS', 'Post-reunión CHORUS', 'CHORUS post-meeting')}
           </h3>
           <p className="mt-0.5 text-sm text-slate-600">{detail.title}</p>
@@ -355,7 +355,7 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
                 href={detail.recordingUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs font-semibold text-sky-700 hover:underline"
+                className="text-xs font-semibold text-teal-800 hover:underline"
               >
                 {t('Abrir gravação', 'Abrir grabación', 'Open recording')}
               </a>
@@ -363,7 +363,7 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
                 type="button"
                 disabled={transcribeBusy}
                 onClick={() => void runTranscribe(false)}
-                className="rounded border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-900 disabled:opacity-50"
+                className="rounded border border-teal-300 bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-900 disabled:opacity-50"
               >
                 {transcribeBusy ? <Loader2 className="inline h-3 w-3 animate-spin" /> : null}{' '}
                 {t('Transcrever', 'Transcribir', 'Transcribe')}
@@ -372,7 +372,7 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
                 type="button"
                 disabled={transcribeBusy}
                 onClick={() => void runTranscribe(true)}
-                className="rounded bg-sky-700 px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                className="rounded bg-teal-700 px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
               >
                 {t('Transcrever + finalizar', 'Transcribir + finalizar', 'Transcribe + finalize')}
               </button>
@@ -393,7 +393,7 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={6}
-          className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+          className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal-600"
           placeholder={t(
             'Cole atas, chat ou transcrição…',
             'Pega actas, chat o transcripción…',
@@ -416,7 +416,7 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
           type="button"
           disabled={busy || notes.trim().length < 20}
           onClick={() => void runFinalize()}
-          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           {t('Encerrar + gerar resumo e tarefas', 'Cerrar + generar resumen y tareas', 'End + generate summary & tasks')}
@@ -499,7 +499,7 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
                 type="button"
                 disabled={busy}
                 onClick={() => void convertAll()}
-                className="text-xs font-semibold text-sky-700 hover:underline disabled:opacity-50"
+                className="text-xs font-semibold text-teal-800 hover:underline disabled:opacity-50"
               >
                 {t('Converter todas no SIEP', 'Convertir todas en SIEP', 'Convert all to SIEP')}
               </button>

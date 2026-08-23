@@ -282,7 +282,7 @@ export function MeetEventDetailPopup({
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                className="w-full border-b-2 border-sky-600 bg-transparent py-1 text-xl font-semibold text-slate-900 outline-none"
+                className="w-full border-b-2 border-teal-700 bg-transparent py-1 text-xl font-semibold text-slate-900 outline-none"
               />
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="text-xs font-medium text-slate-500">
@@ -353,7 +353,7 @@ export function MeetEventDetailPopup({
                   type="button"
                   disabled={busy || !title.trim()}
                   onClick={() => void saveEdits()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
                 >
                   {busy && <Loader2 className="h-4 w-4 animate-spin" />}
                   {t('Guardar', 'Guardar', 'Save')}
@@ -363,7 +363,7 @@ export function MeetEventDetailPopup({
           ) : (
             <>
               <div className="flex gap-3">
-                <span className="mt-1.5 h-4 w-4 shrink-0 rounded bg-sky-500" />
+                <span className="mt-1.5 h-4 w-4 shrink-0 rounded bg-teal-600" />
                 <div className="min-w-0">
                   <h2 className="text-xl font-semibold leading-snug text-slate-900">{session.title}</h2>
                   <p className="mt-1 capitalize text-sm text-slate-600">{whenLabel}</p>
@@ -373,7 +373,7 @@ export function MeetEventDetailPopup({
               <div className="flex items-start gap-3 text-sm text-slate-700">
                 <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium">Etholys Meet</p>
+                  <p className="font-medium">CHORUS</p>
                   {session.meetingUrl && (
                     <button
                       type="button"
@@ -419,7 +419,7 @@ export function MeetEventDetailPopup({
                       const isOrganizer = guest.role === 'host' || guest.userId === session.createdById;
                       return (
                         <li key={guest.id} className="flex items-center gap-2.5">
-                          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-800">
+                          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-semibold text-teal-900">
                             {initials(name)}
                             {guest.joinedAt && (
                               <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 text-white">
@@ -445,7 +445,7 @@ export function MeetEventDetailPopup({
                     })}
                     {!guests.length && session.createdBy && (
                       <li className="flex items-center gap-2.5">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-800">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-xs font-semibold text-teal-900">
                           {initials(session.createdBy.name || session.createdBy.email || 'O')}
                         </span>
                         <div>
@@ -529,7 +529,7 @@ export function MeetEventDetailPopup({
                 !isGoogleImportedMeetSession(session) && (
                 <Link
                   href={meetHubJoinPath(joinId, companyId)}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
                 >
                   <Video className="h-4 w-4" />
                   {t('Entrar na sala', 'Entrar a la sala', 'Join room')}
@@ -540,7 +540,7 @@ export function MeetEventDetailPopup({
                   href={session.meetingUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
                 >
                   <Video className="h-4 w-4" />
                   {t('Abrir call externa', 'Abrir call externa', 'Open external call')}

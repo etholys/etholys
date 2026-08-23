@@ -323,7 +323,26 @@ export function MeetRoomClient({ sessionId }: Props) {
         const index = current.findIndex((item) => item.messageId === messageId);
         if (index >= 0) {
           const next = [...current];
-          next[index] = { ...current[index], ...row };
+          const updated = { ...current[index], ...row };
+          next[index] = updated;
+          if (isFinal && companyId) {
+            const persist = updated;
+            queueMicrotask(() => {
+              void fetch(`/api/meet/sessions/${sessionId}/transcript`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  companyId,
+                  messageId: persist.messageId,
+                  participantId: persist.participantId,
+                  participantName: persist.participantName,
+                  language: persist.language,
+                  text: persist.text,
+                  startedAt: persist.startedAt,
+                }),
+              }).catch(() => undefined);
+            });
+          }
           return next;
         }
 
@@ -341,6 +360,8 @@ export function MeetRoomClient({ sessionId }: Props) {
         // Juntar finais consecutivos do mesmo falante (≈ Otter / blocos)
         const withoutInterim = current.filter((item) => item.final);
         const last = withoutInterim[withoutInterim.length - 1];
+        let persistRow = row;
+        let next: TranscriptSegment[];
         if (
           last &&
           last.final &&
@@ -352,27 +373,32 @@ export function MeetRoomClient({ sessionId }: Props) {
             text: `${last.text} ${row.text}`.replace(/\s+/g, ' ').trim(),
             messageId: last.messageId,
           };
-          return [...withoutInterim.slice(0, -1), merged];
+          persistRow = merged;
+          next = [...withoutInterim.slice(0, -1), merged];
+        } else {
+          next = [...withoutInterim, row];
         }
 
-        return [...withoutInterim, row];
+        if (companyId) {
+          const persist = persistRow;
+          queueMicrotask(() => {
+            void fetch(`/api/meet/sessions/${sessionId}/transcript`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                companyId,
+                messageId: persist.messageId,
+                participantId: persist.participantId,
+                participantName: persist.participantName,
+                language: persist.language,
+                text: persist.text,
+                startedAt: persist.startedAt,
+              }),
+            }).catch(() => undefined);
+          });
+        }
+        return next;
       });
-
-      if (isFinal && companyId) {
-        void fetch(`/api/meet/sessions/${sessionId}/transcript`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            companyId,
-            messageId,
-            participantId: row.participantId,
-            participantName: row.participantName,
-            language: row.language,
-            text: row.text,
-            startedAt: row.startedAt,
-          }),
-        }).catch(() => undefined);
-      }
     },
     [companyId, sessionId, locale],
   );
@@ -445,13 +471,99 @@ export function MeetRoomClient({ sessionId }: Props) {
       if (result.blob.size <= 0) {
         setError(
           t(
-            'A gravação terminou sem dados. Ao iniciar, escolhe a aba ou janela da reunião Etholys.',
+            'A gravação terminou sem dados. Ao iniciar, escolhe a aba ou janela do CHORUS.',
             'La grabación terminó sin datos. Al iniciar, elige la pestaña o ventana de CHORUS.',
             'Recording finished with no data. When starting, pick the CHORUS tab or window.',
           ),
         );
-      } else if (result.savedWithPicker) {
-        setError(null);
+        return;
+      }
+      setError(null);
+      // Oferece upload para Whisper + diarização (se storage estiver pronto)
+      if (companyId && result.blob.size > 0) {
+        const wantUpload = window.confirm(
+          t(
+            'Gravação guardada. Queres enviar para o CHORUS gerar a transcrição diarizada (Whisper)?',
+            'Grabación guardada. ¿Quieres subirla a CHORUS para la transcripción diarizada (Whisper)?',
+            'Recording saved. Upload to CHORUS for a diarized Whisper transcript?',
+          ),
+        );
+        if (wantUpload) {
+          try {
+            const fileName = result.fileName || `chorus-${sessionId}.webm`;
+            const contentType = result.blob.type || 'video/webm';
+            const presign = await fetch(`/api/meet/sessions/${sessionId}/recording`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                companyId,
+                action: 'presign',
+                fileName,
+                contentType,
+              }),
+            });
+            const signed = (await presign.json()) as {
+              error?: string;
+              uploadUrl?: string;
+              storageKey?: string;
+              publicUrl?: string | null;
+            };
+            if (!presign.ok) throw new Error(signed.error || 'Presign failed');
+            if (!signed.uploadUrl || !signed.storageKey) throw new Error('Presign incomplete');
+            const put = await fetch(signed.uploadUrl, {
+              method: 'PUT',
+              headers: { 'Content-Type': contentType },
+              body: result.blob,
+            });
+            if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+            const confirm = await fetch(`/api/meet/sessions/${sessionId}/recording`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                companyId,
+                action: 'confirm',
+                storageKey: signed.storageKey,
+                recordingUrl: signed.publicUrl || undefined,
+              }),
+            });
+            if (!confirm.ok) {
+              const conf = (await confirm.json().catch(() => ({}))) as { error?: string };
+              throw new Error(conf.error || 'Confirm failed');
+            }
+            const tr = await fetch(`/api/meet/sessions/${sessionId}/transcribe`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ companyId, locale, finalize: false, diarize: true }),
+            });
+            if (tr.ok) {
+              setError(
+                t(
+                  'CHORUS: gravação enviada e transcrição diarizada em curso — vê o recap ao sair.',
+                  'CHORUS: grabación subida y transcripción diarizada en curso — mira el recap al salir.',
+                  'CHORUS: recording uploaded; diarized transcript in progress — check the recap when you leave.',
+                ),
+              );
+            } else {
+              setError(
+                t(
+                  'Gravação na nuvem OK. Abre o recap e corre «Transcrever» se a IA ainda não arrancou.',
+                  'Grabación en la nube OK. Abre el recap y pulsa «Transcribir» si la IA aún no arrancó.',
+                  'Cloud recording OK. Open the recap and run “Transcribe” if AI did not start.',
+                ),
+              );
+            }
+          } catch (upErr) {
+            setError(
+              upErr instanceof Error
+                ? upErr.message
+                : t(
+                    'Não foi possível enviar a gravação. Fica no teu PC — podes fazer upload no recap.',
+                    'No se pudo subir la grabación. Queda en tu PC — puedes subirla en el recap.',
+                    'Could not upload the recording. It remains on your PC — you can upload it in the recap.',
+                  ),
+            );
+          }
+        }
       }
     } catch (err) {
       setError(
@@ -591,10 +703,20 @@ export function MeetRoomClient({ sessionId }: Props) {
     }
   }
 
-  function leaveToMeetHome() {
-    // Sai e destrói a sala neste browser (já não fica “fantasma” ligada).
+  async function leaveToMeetHome() {
+    // Sai deste browser: flush da transcrição, sem finalizar IA (os outros podem continuar).
     leaveQuietRef.current = true;
     closingRef.current = true;
+    if (companyId) {
+      const transcript = buildTranscriptText(segmentsRef.current);
+      if (transcript) {
+        void fetch(`/api/meet/sessions/${sessionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyId, transcriptText: transcript }),
+        }).catch(() => undefined);
+      }
+    }
     tearDownConference();
     router.push(
       companyId
@@ -611,18 +733,18 @@ export function MeetRoomClient({ sessionId }: Props) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#202124]">
-        <Loader2 className="h-8 w-8 animate-spin text-white/70" />
+      <div className="flex min-h-screen items-center justify-center bg-slate-950">
+        <Loader2 className="h-8 w-8 animate-spin text-teal-300/80" />
       </div>
     );
   }
 
   if (!session) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#f8f9fa] px-4">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-4">
         <p className="text-sm text-red-700">{error || t('Sessão não encontrada.', 'Sesión no encontrada.', 'Session not found.')}</p>
-        <Link href="/hub/meet" className="text-sm font-medium text-[#1a73e8] hover:underline">
-          {t('Voltar ao Meet', 'Volver al Meet', 'Back to Meet')}
+        <Link href="/hub/meet" className="text-sm font-medium text-teal-800 hover:underline">
+          {t('Voltar ao CHORUS', 'Volver a CHORUS', 'Back to CHORUS')}
         </Link>
       </div>
     );
@@ -637,8 +759,8 @@ export function MeetRoomClient({ sessionId }: Props) {
   const speakerInitial = (dominantSpeaker || session.title).trim().charAt(0).toUpperCase() || 'E';
 
   return (
-    <div className="relative flex h-screen flex-col overflow-hidden bg-[#202124] text-white">
-      {/* Top bar — estilo Google Meet */}
+    <div className="relative flex h-screen flex-col overflow-hidden bg-slate-950 text-white">
+      {/* Top bar — CHORUS */}
       <header
         className={`pointer-events-none absolute left-0 top-0 z-30 flex items-start justify-between gap-3 px-4 pb-2 pt-3 sm:px-5 ${
           panelOpen ? 'right-0 sm:right-[22rem]' : 'right-10'
@@ -647,12 +769,12 @@ export function MeetRoomClient({ sessionId }: Props) {
         <div className="pointer-events-auto flex min-w-0 max-w-[min(100%,48rem)] items-center gap-2 text-[13px] text-white/90 sm:text-sm">
           <button
             type="button"
-            onClick={leaveToMeetHome}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#3c4043]/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm hover:bg-[#4a4d51]"
-            title={t('Voltar ao Meet', 'Volver a Meet', 'Back to Meet')}
+            onClick={() => void leaveToMeetHome()}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-slate-800/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm ring-1 ring-white/10 hover:bg-slate-700"
+            title={t('Voltar ao CHORUS', 'Volver a CHORUS', 'Back to CHORUS')}
           >
             <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} />
-            <span className="hidden sm:inline">Meet</span>
+            <span className="hidden tracking-[0.12em] sm:inline">CHORUS</span>
           </button>
           <time className="shrink-0 tabular-nums text-white/80">{clock}</time>
           <span className="shrink-0 text-white/35" aria-hidden>
@@ -672,8 +794,8 @@ export function MeetRoomClient({ sessionId }: Props) {
 
         <div className="pointer-events-auto flex shrink-0 items-center gap-2">
           {dominantSpeaker && (
-            <div className="hidden items-center gap-2 rounded-full bg-[#3c4043]/95 px-2.5 py-1.5 text-xs text-white/90 shadow-sm sm:flex">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#8ab4f8] text-[11px] font-semibold text-[#202124]">
+            <div className="hidden items-center gap-2 rounded-full bg-slate-800/95 px-2.5 py-1.5 text-xs text-white/90 shadow-sm sm:flex">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-400 text-[11px] font-semibold text-slate-950">
                 {speakerInitial}
               </span>
               <span className="max-w-[12rem] truncate">
@@ -685,7 +807,7 @@ export function MeetRoomClient({ sessionId }: Props) {
             </div>
           )}
           <div
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#3c4043]/95 px-2.5 py-1.5 text-xs text-white/90 shadow-sm"
+            className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/95 px-2.5 py-1.5 text-xs text-white/90 shadow-sm"
             title={t('Participantes', 'Participantes', 'Participants')}
           >
             <Users className="h-3.5 w-3.5 text-white/75" strokeWidth={1.75} />
@@ -695,21 +817,21 @@ export function MeetRoomClient({ sessionId }: Props) {
             <button
               type="button"
               onClick={() => setLayoutMenuOpen((o) => !o)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#3c4043]/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm hover:bg-[#4a4d51]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm hover:bg-slate-700"
               title={t('Vista dos participantes', 'Vista de participantes', 'Participant layout')}
             >
               <LayoutGrid className="h-3.5 w-3.5 text-white/75" strokeWidth={1.75} />
               <span className="hidden sm:inline">{layoutLabel(layoutMode, t)}</span>
             </button>
             {layoutMenuOpen && (
-              <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[11rem] overflow-hidden rounded-xl border border-white/10 bg-[#292a2d] py-1 shadow-2xl">
+              <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[11rem] overflow-hidden rounded-xl border border-white/10 bg-slate-900 py-1 shadow-2xl">
                 {LAYOUT_MODES.map((mode) => (
                   <button
                     key={mode}
                     type="button"
                     onClick={() => applyLayout(mode)}
                     className={`flex w-full px-3 py-2 text-left text-xs hover:bg-white/10 ${
-                      layoutMode === mode ? 'font-semibold text-[#8ab4f8]' : 'text-white/85'
+                      layoutMode === mode ? 'font-semibold text-teal-300' : 'text-white/85'
                     }`}
                   >
                     {layoutLabel(mode, t)}
@@ -723,8 +845,8 @@ export function MeetRoomClient({ sessionId }: Props) {
             onClick={openFloatingWindow}
             className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium shadow-sm ${
               pipActive
-                ? 'bg-[#8ab4f8] text-[#202124] hover:bg-[#aecbfa]'
-                : 'bg-[#3c4043]/95 text-white/90 hover:bg-[#4a4d51]'
+                ? 'bg-teal-400 text-slate-950 hover:bg-teal-300'
+                : 'bg-slate-800/95 text-white/90 hover:bg-slate-700'
             }`}
             title={t(
               'Janela flutuante nesta página (não recarrega a sala)',
@@ -754,7 +876,7 @@ export function MeetRoomClient({ sessionId }: Props) {
               type="button"
               onClick={() => void startLocalRecording()}
               disabled={recordingBusy || ending}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#3c4043]/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm hover:bg-[#4a4d51] disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm hover:bg-slate-700 disabled:opacity-60"
               title={t(
                 'Primeiro escolhe onde guardar; depois a aba/janela da reunião',
                 'Primero elige dónde guardar; luego la pestaña/ventana de la reunión',
@@ -769,7 +891,16 @@ export function MeetRoomClient({ sessionId }: Props) {
           )}
           <button
             type="button"
-            onClick={() => void endMeeting()}
+            onClick={() => {
+              const ok = window.confirm(
+                t(
+                  'Encerrar a reunião para todos e ir ao recap CHORUS?',
+                  '¿Finalizar la reunión para todos e ir al recap CHORUS?',
+                  'End the meeting for everyone and go to the CHORUS recap?',
+                ),
+              );
+              if (ok) void endMeeting();
+            }}
             disabled={ending}
             className="inline-flex items-center gap-1.5 rounded-full bg-[#ea4335] px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#f28b82] disabled:opacity-60"
             title={t('Encerrar e sair', 'Finalizar y salir', 'End and leave')}
@@ -785,7 +916,7 @@ export function MeetRoomClient({ sessionId }: Props) {
       </header>
 
       {infoOpen && (
-        <div className="absolute left-4 top-14 z-40 w-[min(100%-2rem,20rem)] rounded-2xl border border-white/10 bg-[#292a2d] p-4 shadow-2xl sm:left-5">
+        <div className="absolute left-4 top-14 z-40 w-[min(100%-2rem,20rem)] rounded-2xl border border-white/10 bg-slate-900 p-4 shadow-2xl sm:left-5">
           <div className="mb-2 flex items-start justify-between gap-2">
             <p className="text-sm font-medium text-white">{session.title}</p>
             <button
@@ -806,7 +937,16 @@ export function MeetRoomClient({ sessionId }: Props) {
           <div className="mt-3 flex flex-col gap-2">
             <button
               type="button"
-              onClick={() => void endMeeting()}
+              onClick={() => {
+              const ok = window.confirm(
+                t(
+                  'Encerrar a reunião para todos e ir ao recap CHORUS?',
+                  '¿Finalizar la reunión para todos e ir al recap CHORUS?',
+                  'End the meeting for everyone and go to the CHORUS recap?',
+                ),
+              );
+              if (ok) void endMeeting();
+            }}
               disabled={ending}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#ea4335] px-3 py-2 text-xs font-semibold text-white hover:bg-[#f28b82] disabled:opacity-60"
             >
@@ -815,8 +955,8 @@ export function MeetRoomClient({ sessionId }: Props) {
             </button>
             <button
               type="button"
-              onClick={leaveToMeetHome}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#8ab4f8] px-3 py-2 text-xs font-semibold text-[#202124] hover:bg-[#aecbfa]"
+              onClick={() => void leaveToMeetHome()}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-teal-400 px-3 py-2 text-xs font-semibold text-slate-950 hover:bg-[#aecbfa]"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               {t('Sair da sala', 'Salir de la sala', 'Leave room')}
@@ -836,7 +976,7 @@ export function MeetRoomClient({ sessionId }: Props) {
       <div className="flex min-h-0 flex-1">
         <main className="relative min-w-0 flex-1 px-3 pb-3 pt-14 sm:px-4 sm:pb-4">
           {pipActive && (
-            <div className="mb-3 rounded-xl border border-white/10 bg-[#292a2d] px-4 py-3 text-xs text-white/60">
+            <div className="mb-3 rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-xs text-white/60">
               {t(
                 'Modo flutuante: a sala está no canto. Clica outra vez em Flotante para voltar ao ecrã completo.',
                 'Modo flotante: la sala está en la esquina. Pulsa otra vez Flotante para volver a pantalla completa.',
@@ -848,10 +988,10 @@ export function MeetRoomClient({ sessionId }: Props) {
             ref={stageHomeRef}
             className={
               pipActive
-                ? `fixed bottom-4 z-50 h-[220px] w-[min(92vw,360px)] overflow-hidden rounded-2xl bg-[#131314] shadow-2xl ring-2 ring-[#8ab4f8]/60 ${
+                ? `fixed bottom-4 z-50 h-[220px] w-[min(92vw,360px)] overflow-hidden rounded-2xl bg-slate-950 shadow-2xl ring-2 ring-teal-400/50 ${
                     panelOpen ? 'right-[23.5rem]' : 'right-14'
                   }`
-                : 'relative h-full w-full overflow-hidden rounded-2xl bg-[#131314]'
+                : 'relative h-full w-full overflow-hidden rounded-2xl bg-slate-950'
             }
           >
             <div ref={stageRef} className="relative h-full w-full">
@@ -919,7 +1059,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                     href={externalRoomUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-2 rounded-full bg-[#8ab4f8] px-4 py-2 text-sm font-medium text-[#202124] hover:bg-[#aecbfa]"
+                    className="inline-flex items-center gap-2 rounded-full bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-[#aecbfa]"
                   >
                     {t('Abrir em nova janela', 'Abrir en nueva ventana', 'Open in new window')}
                     <ExternalLink className="h-4 w-4" />
@@ -938,7 +1078,7 @@ export function MeetRoomClient({ sessionId }: Props) {
           <button
             type="button"
             onClick={() => setPanelOpen(true)}
-            className="flex w-10 shrink-0 flex-col items-center justify-center gap-2 border-l border-white/10 bg-[#292a2d] pt-14 text-white/65 hover:bg-[#3c4043] hover:text-white"
+            className="flex w-10 shrink-0 flex-col items-center justify-center gap-2 border-l border-white/10 bg-slate-900 pt-14 text-white/65 hover:bg-slate-800 hover:text-white"
             title={t('Abrir transcrição', 'Abrir transcripción', 'Open transcript')}
           >
             <PanelRightOpen className="h-4 w-4" />
@@ -952,7 +1092,7 @@ export function MeetRoomClient({ sessionId }: Props) {
         )}
 
         {panelOpen && (
-          <aside className="relative z-20 flex w-full max-w-sm shrink-0 flex-col border-l border-white/10 bg-[#292a2d] pt-14 sm:w-[22rem]">
+          <aside className="relative z-20 flex w-full max-w-sm shrink-0 flex-col border-l border-white/10 bg-slate-900 pt-14 sm:w-[22rem]">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
               <div className="min-w-0">
                 <p className="flex items-center gap-1.5 text-sm font-medium text-white">
@@ -989,7 +1129,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                 className={`inline-flex w-full items-center justify-center gap-1.5 rounded-full px-2 py-2.5 text-xs font-medium ${
                   transcriptionOn
                     ? 'bg-[#ea4335] text-white hover:bg-[#f28b82]'
-                    : 'bg-[#8ab4f8] text-[#202124] hover:bg-[#aecbfa]'
+                    : 'bg-teal-400 text-slate-950 hover:bg-teal-300'
                 }`}
               >
                 {transcriptionOn ? <Square className="h-3 w-3" /> : <Mic className="h-3.5 w-3.5" />}

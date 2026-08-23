@@ -305,7 +305,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
             <div className="max-h-[40vh] overflow-y-auto md:max-h-none md:h-[calc(100vh-7.5rem)]">
               {listLoading ? (
                 <div className="flex justify-center py-10">
-                  <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
+                  <Loader2 className="h-6 w-6 animate-spin text-teal-700" />
                 </div>
               ) : filtered.length === 0 ? (
                 <p className="px-4 py-8 text-center text-sm text-slate-500">
@@ -362,14 +362,14 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                 <p className="mt-1 max-w-md text-sm text-slate-500">
                   {t(
                     'Aqui vês a transcrição completa, o resumo e as tarefas. No calendário Meet, abre o evento e clica em Transcrição.',
-                    'Aquí ves la transcripción completa, el resumen y las tareas. En el calendario Meet, abre el evento y pulsa Transcripción.',
-                    'Here you see the full transcript, summary and tasks. From the Meet calendar, open the event and click Transcript.',
+                    'Aquí ves la transcripción completa, el resumen y las tareas. En el calendario CHORUS, abre el evento y pulsa Transcripción.',
+                    'Here you see the full transcript, summary and tasks. From the CHORUS calendar, open the event and click Transcript.',
                   )}
                 </p>
               </div>
             ) : detailLoading ? (
               <div className="flex min-h-[40vh] items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
+                <Loader2 className="h-8 w-8 animate-spin text-teal-700" />
               </div>
             ) : !detail ? (
               <p className="text-sm text-slate-600">
@@ -395,7 +395,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                     {detail.status !== 'ended' && detail.status !== 'cancelled' && (
                       <Link
                         href={meetHubJoinPath(detail.id, companyId)}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-700"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800"
                       >
                         <Video className="h-3.5 w-3.5" />
                         {t('Entrar', 'Unirse', 'Join')}
@@ -461,7 +461,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                             type="button"
                             disabled={busy}
                             onClick={() => void generateSummary()}
-                            className="mt-4 inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                            className="mt-4 inline-flex items-center gap-2 rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
                           >
                             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                             {t('Gerar resumo', 'Generar resumen', 'Generate summary')}

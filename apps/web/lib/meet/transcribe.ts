@@ -65,6 +65,8 @@ export type MeetWhisperResult = {
 export async function transcribeMeetRecording(opts: {
   recordingUrlOrKey: string;
   languageHint?: string;
+  /** Nomes / glossário para Whisper melhorar reconhecimento */
+  promptHint?: string;
 }): Promise<MeetWhisperResult> {
   const { apiKey, baseUrl, model } = getTranscribeConfig();
   const { buffer, contentType } = await downloadMeetRecordingBuffer(opts.recordingUrlOrKey);
@@ -87,6 +89,9 @@ export async function transcribeMeetRecording(opts: {
   form.append('response_format', 'verbose_json');
   form.append('timestamp_granularities[]', 'segment');
   if (opts.languageHint) form.append('language', opts.languageHint.slice(0, 8));
+  if (opts.promptHint?.trim()) {
+    form.append('prompt', opts.promptHint.trim().slice(0, 900));
+  }
 
   const res = await fetch(`${baseUrl}/audio/transcriptions`, {
     method: 'POST',

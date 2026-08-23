@@ -65,11 +65,6 @@ export async function POST(req: Request, ctx: Ctx) {
             ? 'pt'
             : undefined);
 
-    const whisper = await transcribeMeetRecording({
-      recordingUrlOrKey: session.recordingUrl,
-      languageHint: lang,
-    });
-
     const participants = await prisma.meetParticipant.findMany({
       where: { sessionId: session.id },
       select: {
@@ -84,10 +79,25 @@ export async function POST(req: Request, ctx: Ctx) {
       .map((p) => p.displayName || p.user?.name || p.email || '')
       .filter(Boolean);
 
+    const whisper = await transcribeMeetRecording({
+      recordingUrlOrKey: session.recordingUrl,
+      languageHint: lang,
+      promptHint: [
+        'CHORUS meeting transcript.',
+        participantNames.length ? `Participants: ${participantNames.join(', ')}.` : '',
+        session.title ? `Meeting title: ${session.title}.` : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
+    });
+
     const liveHints = await prisma.meetTranscriptSegment.findMany({
-      where: { sessionId: session.id },
+      where: {
+        sessionId: session.id,
+        NOT: { messageId: { startsWith: 'chorus-whisper-' } },
+      },
       orderBy: { startedAt: 'asc' },
-      take: 80,
+      take: 120,
       select: { participantName: true, text: true },
     });
 
@@ -110,25 +120,30 @@ export async function POST(req: Request, ctx: Ctx) {
           transcriptText = formatDiarizedTranscript(utterances);
           utteranceCount = utterances.length;
 
-          await prisma.meetTranscriptSegment.deleteMany({ where: { sessionId: session.id } });
+          await prisma.meetTranscriptSegment.deleteMany({
+            where: {
+              sessionId: session.id,
+              messageId: { startsWith: 'chorus-whisper-' },
+            },
+          });
           const base = new Date(session.startedAt || session.scheduledAt || Date.now());
-          for (let i = 0; i < utterances.length; i += 1) {
-            const u = utterances[i]!;
+          const rows = utterances.map((u, i) => {
             const nameMatch = participants.find((p) => {
               const label = (p.displayName || p.user?.name || '').toLowerCase();
               return label && label === u.speaker.toLowerCase();
             });
-            await prisma.meetTranscriptSegment.create({
-              data: {
-                sessionId: session.id,
-                messageId: `chorus-whisper-${i}-${Math.round(u.startSec * 10)}`,
-                participantId: nameMatch?.id ?? null,
-                participantName: u.speaker,
-                text: u.text,
-                language: lang || null,
-                startedAt: new Date(base.getTime() + Math.round(u.startSec * 1000)),
-              },
-            });
+            return {
+              sessionId: session.id,
+              messageId: `chorus-whisper-${i}-${Math.round(u.startSec * 10)}`,
+              participantId: nameMatch?.id ?? null,
+              participantName: u.speaker,
+              text: u.text,
+              language: lang || null,
+              startedAt: new Date(base.getTime() + Math.round(u.startSec * 1000)),
+            };
+          });
+          if (rows.length > 0) {
+            await prisma.meetTranscriptSegment.createMany({ data: rows });
           }
         }
       } catch (diarizeErr) {

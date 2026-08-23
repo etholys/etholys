@@ -81,7 +81,7 @@ function startOfDay(date: Date): Date {
   return copy;
 }
 
-/** Semana de segunda a domingo, como no Google Meet. */
+/** Semana de segunda a domingo. */
 function weekOf(date: Date): Date[] {
   const base = startOfDay(date);
   const weekday = (base.getDay() + 6) % 7;
@@ -98,7 +98,7 @@ export default function MeetHubPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-white">
-          <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
+          <Loader2 className="h-8 w-8 animate-spin text-teal-700" />
         </div>
       }
     >
@@ -590,7 +590,7 @@ function MeetHubContent() {
               type="button"
               onClick={joinByCode}
               disabled={!joinInput.trim()}
-              className="touch-manipulation rounded-full px-3 py-2.5 text-sm font-semibold text-sky-700 hover:bg-sky-50 disabled:text-slate-400 disabled:hover:bg-transparent sm:py-2"
+              className="touch-manipulation rounded-full px-3 py-2.5 text-sm font-semibold text-teal-800 hover:bg-teal-50 disabled:text-slate-400 disabled:hover:bg-transparent sm:py-2"
             >
               {t('Entrar', 'Unirse', 'Join')}
             </button>
@@ -600,7 +600,7 @@ function MeetHubContent() {
                 type="button"
                 onClick={() => setNewMenuOpen((open) => !open)}
                 disabled={!companyId}
-                className="inline-flex touch-manipulation items-center gap-2 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50 sm:py-2"
+                className="inline-flex touch-manipulation items-center gap-2 rounded-full bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50 sm:py-2"
               >
                 <Plus className="h-4 w-4" />
                 {t('Nova', 'Nueva', 'New')}
@@ -625,7 +625,7 @@ function MeetHubContent() {
                       disabled={saving}
                       className="flex w-full touch-manipulation items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 disabled:opacity-60 sm:py-3"
                     >
-                      <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+                      <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" />
                       <span>
                         <span className="block text-sm font-medium text-slate-900">
                           {t(
@@ -649,7 +649,7 @@ function MeetHubContent() {
                       disabled={saving}
                       className="flex w-full touch-manipulation items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 disabled:opacity-60 sm:py-3"
                     >
-                      <Zap className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+                      <Zap className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" />
                       <span>
                         <span className="block text-sm font-medium text-slate-900">
                           {t('Iniciar uma reunião instantânea', 'Iniciar una reunión instantánea', 'Start an instant meeting')}
@@ -667,7 +667,7 @@ function MeetHubContent() {
                       }}
                       className="flex w-full touch-manipulation items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 sm:py-3"
                     >
-                      <CalendarPlus className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+                      <CalendarPlus className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" />
                       <span>
                         <span className="block text-sm font-medium text-slate-900">
                           {t(
@@ -694,7 +694,7 @@ function MeetHubContent() {
                       onClick={() => setNewMenuOpen(false)}
                       className="flex w-full touch-manipulation items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 sm:py-3"
                     >
-                      <MonitorUp className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+                      <MonitorUp className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" />
                       <span>
                         <span className="block text-sm font-medium text-slate-900">
                           {t(
@@ -767,7 +767,7 @@ function MeetHubContent() {
               type="button"
               onClick={() => setMainView('agenda')}
               className={`rounded-lg px-3 py-2 text-sm font-medium ${
-                mainView === 'agenda' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600'
+                mainView === 'agenda' ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-600'
               }`}
             >
               <Video className="mr-1.5 inline h-4 w-4" />
@@ -777,7 +777,7 @@ function MeetHubContent() {
               type="button"
               onClick={() => setMainView('calendar')}
               className={`rounded-lg px-3 py-2 text-sm font-medium ${
-                mainView === 'calendar' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600'
+                mainView === 'calendar' ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-600'
               }`}
             >
               <CalendarRange className="mr-1.5 inline h-4 w-4" />
@@ -785,7 +785,7 @@ function MeetHubContent() {
             </button>
             <Link
               href={meetRecapsPath(companyId)}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:text-sky-700"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:text-teal-800"
             >
               <FileText className="mr-1.5 inline h-4 w-4" />
               {t('Transcrições', 'Transcripciones', 'Transcripts')}
@@ -801,7 +801,7 @@ function MeetHubContent() {
                   type="button"
                   disabled={!companyId || googleImportBusy}
                   onClick={() => void importFromGoogleCalendar()}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 font-medium text-sky-800 hover:bg-sky-100 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 font-medium text-teal-900 hover:bg-teal-100 disabled:opacity-50"
                   title={t(
                     'Trazer eventos do Google (7 dias atrás → 21 à frente)',
                     'Traer eventos de Google (7 días atrás → 21 adelante)',
@@ -820,7 +820,7 @@ function MeetHubContent() {
               <button
                 type="button"
                 onClick={() => connectCalendar('google')}
-                className="rounded-full border border-slate-200 px-3 py-1.5 font-medium text-sky-700 hover:bg-sky-50"
+                className="rounded-full border border-slate-200 px-3 py-1.5 font-medium text-teal-800 hover:bg-teal-50"
               >
                 {t('Ligar Google Calendar', 'Conectar Google Calendar', 'Connect Google Calendar')}
               </button>
@@ -833,7 +833,7 @@ function MeetHubContent() {
               <button
                 type="button"
                 onClick={() => connectCalendar('azure-ad')}
-                className="rounded-full border border-slate-200 px-3 py-1.5 font-medium text-sky-700 hover:bg-sky-50"
+                className="rounded-full border border-slate-200 px-3 py-1.5 font-medium text-teal-800 hover:bg-teal-50"
               >
                 {t('Ligar Outlook', 'Conectar Outlook', 'Connect Outlook')}
               </button>
@@ -877,16 +877,16 @@ function MeetHubContent() {
                   type="button"
                   onClick={() => setSelectedDate(day)}
                   className={`flex w-11 flex-col items-center rounded-xl px-1 py-1.5 text-[11px] transition ${
-                    isSelected ? 'bg-sky-100 text-sky-900' : 'text-slate-500 hover:bg-slate-100'
+                    isSelected ? 'bg-teal-100 text-teal-950' : 'text-slate-500 hover:bg-slate-100'
                   }`}
                 >
                   <span className="font-medium">{label}</span>
                   <span
                     className={`mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${
                       isSelected
-                        ? 'bg-sky-600 text-white'
+                        ? 'bg-teal-700 text-white'
                         : isToday
-                          ? 'text-sky-700'
+                          ? 'text-teal-800'
                           : 'text-slate-700'
                     }`}
                   >
@@ -909,7 +909,7 @@ function MeetHubContent() {
         <div className="mt-6">
           {loading ? (
             <div className="flex justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
+              <Loader2 className="h-6 w-6 animate-spin text-teal-700" />
             </div>
           ) : dayGroups.permanent.length +
               dayGroups.unscheduled.length +
@@ -1078,7 +1078,7 @@ function MeetHubContent() {
               <button
                 type="button"
                 onClick={() => void copyUrl(shareSession.meetingUrl, shareSession.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-sky-700 shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-teal-800 shadow-sm"
               >
                 {copiedId === shareSession.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 {copiedId === shareSession.id
@@ -1096,7 +1096,7 @@ function MeetHubContent() {
               </button>
               <Link
                 href={meetHubJoinPath(shareSession.id, companyId)}
-                className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+                className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
               >
                 {t('Entrar agora', 'Entrar ahora', 'Join now')}
               </Link>
@@ -1153,7 +1153,7 @@ function MeetingGroup({
             <li
               key={s.id}
               className={`group rounded-2xl px-4 py-4 transition sm:px-5 ${
-                accent ? 'bg-sky-50 ring-1 ring-sky-200' : 'bg-slate-50 hover:bg-slate-100/80'
+                accent ? 'bg-teal-50 ring-1 ring-teal-200' : 'bg-slate-50 hover:bg-slate-100/80'
               }`}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1165,7 +1165,7 @@ function MeetingGroup({
                   {timeLabel && (
                     <p className="text-xs font-medium text-slate-500">{timeLabel}</p>
                   )}
-                  <p className="mt-0.5 truncate text-base font-semibold text-slate-900 hover:text-sky-700">
+                  <p className="mt-0.5 truncate text-base font-semibold text-slate-900 hover:text-teal-800">
                     {s.title}
                   </p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
@@ -1221,7 +1221,7 @@ function MeetingGroup({
                   {s.meetingUrl && companyId && s.status !== 'ended' && !isGoogleImportedMeetSession(s) && (
                     <Link
                       href={meetHubJoinPath(meetJoinTargetId(s), companyId)}
-                      className="rounded-full bg-sky-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-sky-700"
+                      className="rounded-full bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-teal-800"
                     >
                       {t('Entrar', 'Unirse', 'Join')}
                     </Link>
@@ -1231,7 +1231,7 @@ function MeetingGroup({
                       href={s.meetingUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-full bg-sky-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-sky-700"
+                      className="rounded-full bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-teal-800"
                     >
                       {t('Abrir call', 'Abrir call', 'Open call')}
                     </a>

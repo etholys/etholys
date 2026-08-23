@@ -66,7 +66,7 @@ function applyMeetIframeMediaPermissions(iframe: HTMLIFrameElement) {
   iframe.setAttribute('allowusermedia', 'true');
 }
 
-/** Toolbar order aproximado ao Google Meet (mic → cam → share → … → hangup). */
+/** Toolbar order CHORUS (mic → cam → share → … → hangup). */
 const MEET_TOOLBAR_BUTTONS = [
   'microphone',
   'camera',
@@ -212,10 +212,11 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
         startTranscription() {
           const api = apiRef.current;
           if (!api) return;
+          const lang = locale === 'pt' ? 'pt' : locale === 'en' ? 'en' : 'es';
           // Vários builds aceitam assinaturas diferentes de setSubtitles.
           for (const args of [
-            [true, true, 'es'],
-            [true, true, 'translation-languages:es'],
+            [true, true, lang],
+            [true, true, `translation-languages:${lang}`],
             [true, true],
           ] as unknown[][]) {
             try {
@@ -313,7 +314,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
           }
         },
       }),
-      [],
+      [locale],
     );
 
     useEffect(() => {
@@ -376,9 +377,8 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               transcription: {
                 enabled: true,
                 autoCaptionOnTranscribe: true,
-                // Servidor usa Vosk ES — pedir legendas em espanhol
                 useAppLanguage: false,
-                preferredLanguage: 'es',
+                preferredLanguage: locale === 'pt' ? 'pt' : locale === 'en' ? 'en' : 'es',
                 disableStartForAll: false,
               },
               disableVirtualBackground: false,
@@ -460,8 +460,8 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               ],
             },
             interfaceConfigOverwrite: {
-              APP_NAME: 'Etholys Meet',
-              NATIVE_APP_NAME: 'Etholys Meet',
+              APP_NAME: 'CHORUS',
+              NATIVE_APP_NAME: 'CHORUS',
               PROVIDER_NAME: 'Etholys',
               SHOW_JITSI_WATERMARK: false,
               SHOW_WATERMARK_FOR_GUESTS: false,
@@ -478,7 +478,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               VERTICAL_FILMSTRIP: true,
               FILM_STRIP_MAX_HEIGHT: 140,
               TILE_VIEW_MAX_COLUMNS: 7,
-              DEFAULT_BACKGROUND: '#202124',
+              DEFAULT_BACKGROUND: '#0f172a',
               DEFAULT_LOCAL_DISPLAY_NAME: 'Eu',
               DEFAULT_REMOTE_DISPLAY_NAME: 'Participante',
               TOOLBAR_ALWAYS_VISIBLE: false,

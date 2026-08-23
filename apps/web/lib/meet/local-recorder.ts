@@ -11,7 +11,7 @@ export type MeetLocalRecorder = {
 
 function defaultFileName(): string {
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-  return `etholys-meet-${stamp}.webm`;
+  return `chorus-${stamp}.webm`;
 }
 
 async function pickSaveHandle(suggestedName: string): Promise<FileSystemFileHandle | null> {

@@ -35,8 +35,8 @@ export function meetEmbedUrl(
     overrides.set('interfaceConfig.MOBILE_APP_PROMO', 'false');
     overrides.set('interfaceConfig.SHOW_BRAND_WATERMARK', 'false');
     overrides.set('interfaceConfig.VERTICAL_FILMSTRIP', 'true');
-    overrides.set('interfaceConfig.DEFAULT_BACKGROUND', JSON.stringify('#202124'));
-    overrides.set('interfaceConfig.APP_NAME', JSON.stringify('Etholys Meet'));
+    overrides.set('interfaceConfig.DEFAULT_BACKGROUND', JSON.stringify('#0f172a'));
+    overrides.set('interfaceConfig.APP_NAME', JSON.stringify('CHORUS'));
     overrides.set('interfaceConfig.PROVIDER_NAME', JSON.stringify('Etholys'));
     const title = opts?.title?.trim();
     if (title) {
