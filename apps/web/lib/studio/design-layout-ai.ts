@@ -145,7 +145,16 @@ export function applyDesignLayoutToCanvas(
           title: typeof b.title === 'string' ? b.title : undefined,
           text: String(b.text || ''),
           diagramLang: kind === 'diagram' ? b.diagramLang || 'mermaid' : undefined,
-          style: b.style,
+          style: (() => {
+            const base: NonNullable<StudioBlock['style']> =
+              b.style && typeof b.style === 'object' ? { ...b.style } : {};
+            if (!base.frame && kind === 'callout') base.frame = 'accent';
+            if (kind === 'heading' && i === 0 && j === 0) {
+              if (!base.textScale) base.textScale = 'xl';
+              if (!base.align) base.align = 'center';
+            }
+            return Object.keys(base).length ? base : undefined;
+          })(),
           order: j,
         };
       });

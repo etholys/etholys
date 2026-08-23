@@ -20,12 +20,26 @@ type Props = {
   };
 };
 
-const PRESETS_PT = [
-  'Capa + secções limpas, estilo Gamma, tipografia forte',
-  'Institucional com brand kit, callouts e hierarquia clara',
-  'Apresentação visual para cliente: capas, destaques, pouco texto denso',
-  'Relatório técnico: secções numeradas, listas, molduras subtis',
-];
+const PRESETS = {
+  pt: [
+    'Capa + secções limpas, estilo Gamma, tipografia forte',
+    'Institucional com brand kit, callouts e hierarquia clara',
+    'Apresentação visual para cliente: capas, destaques, pouco texto denso',
+    'Relatório técnico: secções numeradas, listas, molduras subtis',
+  ],
+  es: [
+    'Portada + secciones limpias, estilo Gamma, tipografía fuerte',
+    'Institucional con brand kit, callouts y jerarquía clara',
+    'Presentación visual para cliente: portadas, destacados, poco texto denso',
+    'Informe técnico: secciones numeradas, listas, marcos sutiles',
+  ],
+  en: [
+    'Cover + clean sections, Gamma style, strong typography',
+    'Institutional with brand kit, callouts and clear hierarchy',
+    'Client visual deck: covers, highlights, little dense text',
+    'Technical report: numbered sections, lists, subtle frames',
+  ],
+} as const;
 
 export function StudioDesignAiPanel({
   documentId,
@@ -39,6 +53,7 @@ export function StudioDesignAiPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastMsg, setLastMsg] = useState<string | null>(null);
+  const presets = locale === 'es' ? PRESETS.es : locale === 'en' ? PRESETS.en : PRESETS.pt;
 
   async function run(brief?: string) {
     if (!canEdit || busy) return;
@@ -77,7 +92,7 @@ export function StudioDesignAiPanel({
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
         <p className="text-[10px] font-bold uppercase tracking-wider text-violet-400">{labels.presets}</p>
         <div className="flex flex-col gap-1.5">
-          {PRESETS_PT.map((p) => (
+          {presets.map((p) => (
             <button
               key={p}
               type="button"
