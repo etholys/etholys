@@ -5,8 +5,9 @@ import { useApp } from '@/app/providers';
 import {
   FolderOpen, Plus, Trash2, Search, X, Edit2, Download, Upload,
   FileText, File, FileImage, FileSpreadsheet, FileArchive,
-  Eye, Filter, MoreVertical
+  Eye, Filter, MoreVertical, Link2
 } from 'lucide-react';
+import { DocumentLinksPanel } from '@/components/studio/DocumentLinksPanel';
 
 const CATEGORIES: Record<string, { label: string; color: string }> = {
   general: { label: 'General', color: 'bg-gray-100 text-gray-700' },
@@ -60,6 +61,7 @@ export default function DocumentsPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<globalThis.File | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [linksDocId, setLinksDocId] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -201,6 +203,10 @@ export default function DocumentsPage() {
           }),
         });
         if (!saveRes.ok) throw new Error(L(ml('Error saving document','Error al guardar documento','Erro ao salvar documento')));
+        const saved = await saveRes.json();
+        if (saved?.document?.id) {
+          setLinksDocId(saved.document.id);
+        }
       }
       setUploadProgress(100);
       setShowForm(false);
@@ -383,6 +389,15 @@ export default function DocumentsPage() {
                                 <Edit2 className="w-3.5 h-3.5" /> Editar
                               </button>
                               <button
+                                onClick={() => {
+                                  setLinksDocId(doc.id);
+                                  setMenuOpen(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                              >
+                                <Link2 className="w-3.5 h-3.5" /> Vincular
+                              </button>
+                              <button
                                 onClick={() => handleDelete(doc.id)}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                               >
@@ -550,6 +565,39 @@ export default function DocumentsPage() {
 
       {/* Click outside menu to close */}
       {menuOpen && <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />}
+
+      {linksDocId && (
+        <DocumentLinksPanel
+          targetType="core"
+          documentId={linksDocId}
+          companyId={activeCompanyId || undefined}
+          canEdit
+          open
+          onClose={() => setLinksDocId(null)}
+          labels={{
+            title: L(ml('Document links', 'Vínculos del documento', 'Vínculos do documento')),
+            hint: L(
+              ml(
+                'Link this file to NEXUS, SIEP, FUNDHUB, company, etc.',
+                'Vincula este archivo a NEXUS, SIEP, FUNDHUB, empresa, etc.',
+                'Liga este ficheiro a NEXUS, SIEP, FUNDHUB, empresa, etc.',
+              ),
+            ),
+            system: L(ml('System', 'Sistema', 'Sistema')),
+            entity: L(ml('Entity', 'Entidad', 'Entidade')),
+            add: L(ml('Add link', 'Añadir vínculo', 'Adicionar vínculo')),
+            empty: L(
+              ml(
+                'No links yet — pick a system below.',
+                'Aún sin vínculos — elige un sistema abajo.',
+                'Ainda sem vínculos — escolhe um sistema abaixo.',
+              ),
+            ),
+            close: L(ml('Close', 'Cerrar', 'Fechar')),
+            loading: L(ml('Loading…', 'Cargando…', 'A carregar…')),
+          }}
+        />
+      )}
     </div>
   );
 }

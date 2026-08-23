@@ -1,9 +1,6 @@
 # Etholys Studio — criação de documentos (ferramenta transversal)
 
-**Versão:** 0.8  
-**Data:** 2026-08-08  
-**Status:** F0–F6 em código (auto-save, sync suave, presença, comentários, templates por domínio)  
-**Público:** product, desenvolvedores, agentes de IA  
+**Fase atual (UI):** dois espaços distintos — **Redação** (chrome claro, ribbon Formato, IA de redação) e **Desenho** (chrome escuro violeta, IA de diagramação `/design-layout` com brand kit). Ainda não é TipTap/Canva nativo; o caminho é evolução incremental para paridade Word/Gamma. 
 
 **Fonte de verdade** para o estúdio de documentos com IA no Etholys.  
 **Entrada para agentes:** [AGENTS.md](../../AGENTS.md) → este ficheiro.
@@ -82,6 +79,7 @@ flowchart LR
 - **`StudioDocumentComment`:** comentários no documento ou num bloco (`blockId`); resolver/reabrir; API `/api/studio/documents/[id]/comments`.  
 - **`StudioDocumentPresence`:** quem está a ver/editar (heartbeat ~12s, TTL 45s). API `/api/studio/documents/[id]/presence`. Sync suave: se o doc local não está dirty, aplica a versão remota; senão mostra banner. Auto-guardar silencioso aos 8s (`quiet` + sem snapshot).  
 - **Templates por domínio:** `domain` em `STUDIO_SYSTEM_TEMPLATES` (general/siep/fundhub/meet/forge/atlas/nexus) — filtro na biblioteca.  
+- **`EtholysDocumentLink`:** vínculo persistente Studio/Core → sistema+entidade (NEXUS AT, SIEP, FUNDHUB, empresa…). A IA usa os vínculos sem consentimento de catálogo. API `/api/document-links`.  
 - **Brand kit:** `AiCompanyMemory` category `studio_brand` + fallback `Company.logo` / `Company.color`
 
 Distinto do modelo `Document` (blob S3).

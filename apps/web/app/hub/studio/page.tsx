@@ -272,25 +272,25 @@ export default function StudioHubPage() {
   }, [templates, templateDomain]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50/80 via-white to-slate-50">
-      <header className="border-b border-amber-200/60 bg-white/90 backdrop-blur">
+    <div className="min-h-screen bg-[#f4f0ea]">
+      <header className="border-b border-stone-200/80 bg-[#faf7f2]/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
             <Link
               href="/hub"
-              className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-amber-800"
+              className="inline-flex items-center gap-2 text-sm font-medium text-stone-700 hover:text-orange-800"
             >
               <ArrowLeft className="h-4 w-4" />
               Hub
             </Link>
-            <div className="flex items-center gap-2 text-slate-900">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 text-white">
+            <div className="flex items-center gap-2 text-stone-900">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-sm">
                 <PenLine className="h-4 w-4" />
               </span>
               <div>
                 <span className="font-bold tracking-tight">Studio</span>
-                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
-                  {t('ferramenta', 'herramienta', 'tool')}
+                <span className="ml-2 rounded-full bg-stone-900 px-2 py-0.5 text-[10px] font-semibold text-stone-50">
+                  {t('Redação + Desenho', 'Redacción + Diseño', 'Write + Design')}
                 </span>
               </div>
             </div>
@@ -327,6 +327,15 @@ export default function StudioHubPage() {
             <button
               type="button"
               disabled={busy || !effectiveCompanyId}
+              onClick={() => void createDoc('blank-report')}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm font-semibold text-orange-900 hover:bg-orange-50 disabled:opacity-50"
+            >
+              <FilePlus2 className="h-4 w-4" />
+              {t('Em branco', 'En blanco', 'Blank')}
+            </button>
+            <button
+              type="button"
+              disabled={busy || !effectiveCompanyId}
               onClick={() => setShowTemplates(true)}
               className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-50"
             >
@@ -344,9 +353,9 @@ export default function StudioHubPage() {
           </h1>
           <p className="mt-1 text-sm text-slate-600">
             {t(
-              'Crie e organize documentos com IA. Atalho laranja em qualquer sistema.',
-              'Cree y organice documentos con IA. Atajo naranja en cualquier sistema.',
-              'Create and organize documents with AI. Orange shortcut on every system.',
+              'Crie um documento em branco ou a partir de um template, e vincule-o a NEXUS, SIEP, FUNDHUB, etc.',
+              'Cree un documento en blanco o desde una plantilla, y vincúlelo a NEXUS, SIEP, FUNDHUB, etc.',
+              'Create a blank document or from a template, then link it to NEXUS, SIEP, FUNDHUB, etc.',
             )}
           </p>
         </div>

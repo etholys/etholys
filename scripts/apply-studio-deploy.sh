@@ -19,6 +19,12 @@ if [ -f apps/web/prisma/migrations/manual_etholys_studio.sql ]; then
     && echo "SQL Studio ok (ou já aplicado)" || echo "SQL Studio skip/partial — ok se tabelas já existem"
 fi
 
+if [ -f apps/web/prisma/migrations/manual_etholys_document_links.sql ]; then
+  docker compose -f infra/docker-compose.prod.yml exec -T postgres \
+    psql -U etholys -d etholys < apps/web/prisma/migrations/manual_etholys_document_links.sql \
+    && echo "SQL Document links ok" || echo "SQL Document links skip/partial"
+fi
+
 echo "==> Rebuild web (pode demorar)"
 cd "$ROOT/infra"
 docker compose -f docker-compose.prod.yml up -d --build web

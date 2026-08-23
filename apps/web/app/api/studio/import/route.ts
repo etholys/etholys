@@ -10,12 +10,39 @@ import {
   siepInformeToStudioCanvas,
 } from '@/lib/studio/import-from';
 import { loadInformeEditorState, legacyCanvasFromReport } from '@/lib/siep/informe-service';
+import { createDocumentLink } from '@/lib/document-links';
 import type { ReportCanvasState } from '@/lib/siep/report-canvas-types';
 import { getMeetSessionForCompany } from '@/lib/meet/create-session';
 
 export const dynamic = 'force-dynamic';
 
 type ImportSource = 'siep_informe' | 'fundhub_proposal' | 'meet_session';
+
+async function attachImportLinks(opts: {
+  documentId: string;
+  companyId: string;
+  userId: string;
+  links: Array<{
+    systemKey: string;
+    entityType: string;
+    entityId: string;
+    label?: string;
+  }>;
+}) {
+  for (const link of opts.links) {
+    try {
+      await createDocumentLink({
+        targetType: 'studio',
+        companyId: opts.companyId,
+        studioDocumentId: opts.documentId,
+        userId: opts.userId,
+        link,
+      });
+    } catch (e) {
+      console.warn('[studio/import] link skip', e);
+    }
+  }
+}
 
 /**
  * POST /api/studio/import — one-shot bridge F3.
@@ -64,6 +91,25 @@ export async function POST(req: NextRequest) {
       if (!created.ok) {
         return NextResponse.json({ error: created.error }, { status: created.status });
       }
+      await attachImportLinks({
+        documentId: created.document.id,
+        companyId: created.document.companyId,
+        userId: user.id,
+        links: [
+          {
+            systemKey: 'SIEP',
+            entityType: 'report',
+            entityId: reportId,
+            label: loaded.report.title,
+          },
+          {
+            systemKey: 'SIEP',
+            entityType: 'project',
+            entityId: loaded.report.projectId,
+            label: loaded.report.project?.name,
+          },
+        ].filter((l) => !!l.entityId),
+      });
       return NextResponse.json({ document: { id: created.document.id, title: created.document.title } }, { status: 201 });
     }
 
@@ -101,6 +147,22 @@ export async function POST(req: NextRequest) {
       });
       if (!created.ok) {
         return NextResponse.json({ error: created.error }, { status: created.status });
+      }
+      const proposalId = typeof body.proposalId === 'string' ? body.proposalId.trim() : '';
+      if (proposalId && created.document.companyId) {
+        await attachImportLinks({
+          documentId: created.document.id,
+          companyId: created.document.companyId,
+          userId: user.id,
+          links: [
+            {
+              systemKey: 'FUNDHUB',
+              entityType: 'proposal',
+              entityId: proposalId,
+              label: title,
+            },
+          ],
+        });
       }
       return NextResponse.json({ document: { id: created.document.id, title: created.document.title } }, { status: 201 });
     }
@@ -145,6 +207,19 @@ export async function POST(req: NextRequest) {
       if (!created.ok) {
         return NextResponse.json({ error: created.error }, { status: created.status });
       }
+      await attachImportLinks({
+        documentId: created.document.id,
+        companyId: created.document.companyId,
+        userId: user.id,
+        links: [
+          {
+            systemKey: 'MEET',
+            entityType: 'meet_session',
+            entityId: sessionId,
+            label: meet.title || undefined,
+          },
+        ],
+      });
       return NextResponse.json({ document: { id: created.document.id, title: created.document.title } }, { status: 201 });
     }
 

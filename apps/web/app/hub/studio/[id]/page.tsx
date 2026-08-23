@@ -31,6 +31,8 @@ import {
   AlignCenter,
   AlignRight,
   AlignJustify,
+  Link2,
+  Wand2,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
@@ -60,6 +62,9 @@ import { StudioCommentsPanel } from '@/components/studio/StudioCommentsPanel';
 import { StudioBlockEditor } from '@/components/studio/StudioBlockEditor';
 import { StudioSheet } from '@/components/studio/StudioSheet';
 import { StudioToolsSidebar } from '@/components/studio/StudioToolsSidebar';
+import { DocumentLinksPanel } from '@/components/studio/DocumentLinksPanel';
+import { StudioWriteRibbon } from '@/components/studio/StudioWriteRibbon';
+import { StudioDesignAiPanel } from '@/components/studio/StudioDesignAiPanel';
 import {
   emptyStudioDrawScene,
   serializeStudioDrawScene,
@@ -125,6 +130,7 @@ export default function StudioDocumentPage() {
   const [exporting, setExporting] = useState<'pdf' | 'docx' | null>(null);
   const [access, setAccess] = useState<string>('owner');
   const [shareOpen, setShareOpen] = useState(false);
+  const [showLinks, setShowLinks] = useState(false);
   const [showFolderContext, setShowFolderContext] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [folderContextCount, setFolderContextCount] = useState(0);
@@ -1068,6 +1074,58 @@ export default function StudioDocumentPage() {
     );
   }
 
+  function focusBlockTarget(): { pageId: string; blockId: string } | null {
+    if (!canvas) return null;
+    if (aiTargetBlockIds[0]) {
+      for (const p of canvas.pages) {
+        if (p.blocks.some((b) => b.id === aiTargetBlockIds[0])) {
+          return { pageId: p.id, blockId: aiTargetBlockIds[0]! };
+        }
+      }
+    }
+    const pageId = activePageId || canvas.pages[0]?.id;
+    if (!pageId) return null;
+    const page = canvas.pages.find((p) => p.id === pageId);
+    const blockId = page?.blocks.slice().sort((a, b) => a.order - b.order)[0]?.id;
+    if (!blockId) return null;
+    return { pageId, blockId };
+  }
+
+  function ribbonWrap(before: string, after: string) {
+    const target = focusBlockTarget();
+    if (!target || !canvas) return;
+    const page = canvas.pages.find((p) => p.id === target.pageId);
+    const block = page?.blocks.find((b) => b.id === target.blockId);
+    if (!block) return;
+    const text = String(block.text || '');
+    updateBlock(target.pageId, target.blockId, { text: `${before}${text}${after}` });
+  }
+
+  function ribbonKind(kind: StudioBlock['kind']) {
+    const target = focusBlockTarget();
+    if (!target) return;
+    updateBlock(target.pageId, target.blockId, { kind });
+  }
+
+  function ribbonStyle(partial: NonNullable<StudioBlock['style']>) {
+    const ids = aiTargetBlockIds.length
+      ? aiTargetBlockIds
+      : (() => {
+          const t = focusBlockTarget();
+          return t ? [t.blockId] : [];
+        })();
+    if (!ids.length || !canvas) return;
+    applyCanvas((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) => ({
+        ...p,
+        blocks: p.blocks.map((b) =>
+          ids.includes(b.id) ? { ...b, style: { ...(b.style || {}), ...partial } } : b,
+        ),
+      })),
+    }));
+  }
+
   const pageSize = (canvas.pageSize || 'A4') as StudioPageSize;
   const orientation: StudioPageOrientation =
     canvas.orientation || (pageSize === 'Slide' ? 'landscape' : 'portrait');
@@ -1075,14 +1133,37 @@ export default function StudioDocumentPage() {
   const studioMode: StudioStudioMode = canvas.studioMode === 'design' ? 'design' : 'write';
 
   return (
-    <div className="flex h-screen flex-col bg-slate-200/80">
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2 sm:px-4">
+    <div
+      className={`flex h-screen flex-col ${
+        studioMode === 'design'
+          ? 'bg-[#1a1225]'
+          : 'bg-[#ebe6dc]'
+      }`}
+    >
+      <header
+        className={`flex shrink-0 flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:px-4 ${
+          studioMode === 'design'
+            ? 'border-b border-violet-900/60 bg-[#120c1a] text-violet-50'
+            : 'border-b border-stone-300/80 bg-[#f7f4ef] text-stone-900'
+        }`}
+      >
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex min-w-0 items-center gap-2">
-            <Link href={libraryHref} className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100">
+            <Link
+              href={libraryHref}
+              className={`rounded-lg p-1.5 ${
+                studioMode === 'design'
+                  ? 'text-violet-300 hover:bg-violet-900/50'
+                  : 'text-stone-600 hover:bg-stone-200/60'
+              }`}
+            >
               <ArrowLeft className="h-5 w-5" />
             </Link>
-            <PenLine className="hidden h-4 w-4 text-orange-600 sm:block" />
+            {studioMode === 'design' ? (
+              <Wand2 className="hidden h-4 w-4 text-violet-400 sm:block" />
+            ) : (
+              <PenLine className="hidden h-4 w-4 text-orange-600 sm:block" />
+            )}
             <input
               value={title}
               onChange={(e) => {
@@ -1090,11 +1171,17 @@ export default function StudioDocumentPage() {
                 setDirty(true);
               }}
               disabled={!canEdit}
-              className="min-w-0 flex-1 border-0 bg-transparent text-base font-semibold text-slate-900 outline-none focus:ring-0 sm:text-lg"
+              className={`min-w-0 flex-1 border-0 bg-transparent text-base font-semibold outline-none focus:ring-0 sm:text-lg ${
+                studioMode === 'design' ? 'text-violet-50' : 'text-stone-900'
+              }`}
             />
           </div>
           {(lastEditedBy || lastEditedAt) && (
-            <p className="truncate pl-9 text-[10px] text-slate-500">
+            <p
+              className={`truncate pl-9 text-[10px] ${
+                studioMode === 'design' ? 'text-violet-400' : 'text-stone-500'
+              }`}
+            >
               {t('Última edição', 'Última edición', 'Last edit')}
               {lastEditedBy ? `: ${lastEditedBy}` : ''}
               {lastEditedAt
@@ -1103,6 +1190,42 @@ export default function StudioDocumentPage() {
             </p>
           )}
         </div>
+
+        <div
+          className={`flex rounded-xl p-1 ${
+            studioMode === 'design' ? 'bg-violet-950 ring-1 ring-violet-700' : 'bg-stone-200/80 ring-1 ring-stone-300'
+          }`}
+        >
+          <button
+            type="button"
+            disabled={!canEdit}
+            onClick={() => setStudioMode('write')}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+              studioMode === 'write'
+                ? 'bg-white text-stone-900 shadow-sm'
+                : studioMode === 'design'
+                  ? 'text-violet-300 hover:text-white'
+                  : 'text-stone-600'
+            }`}
+          >
+            <PenLine className="h-3.5 w-3.5" />
+            {t('Redação', 'Redacción', 'Write')}
+          </button>
+          <button
+            type="button"
+            disabled={!canEdit}
+            onClick={() => setStudioMode('design')}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+              studioMode === 'design'
+                ? 'bg-violet-600 text-white shadow-sm'
+                : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            <Wand2 className="h-3.5 w-3.5" />
+            {t('Desenho', 'Diseño', 'Design')}
+          </button>
+        </div>
+
         {presence.filter((p) => !p.isSelf).length > 0 && (
           <div className="flex items-center -space-x-1.5 pr-1" title={t('Online agora', 'En línea ahora', 'Online now')}>
             {presence
@@ -1129,7 +1252,11 @@ export default function StudioDocumentPage() {
             disabled={!canEdit || !undoStack.length}
             onClick={undo}
             title="Undo"
-            className="rounded-lg border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            className={`rounded-lg border p-2 disabled:opacity-40 ${
+              studioMode === 'design'
+                ? 'border-violet-700 bg-violet-950 text-violet-200 hover:bg-violet-900'
+                : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
+            }`}
           >
             <Undo2 className="h-4 w-4" />
           </button>
@@ -1138,7 +1265,11 @@ export default function StudioDocumentPage() {
             disabled={!canEdit || !redoStack.length}
             onClick={redo}
             title="Redo"
-            className="rounded-lg border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            className={`rounded-lg border p-2 disabled:opacity-40 ${
+              studioMode === 'design'
+                ? 'border-violet-700 bg-violet-950 text-violet-200 hover:bg-violet-900'
+                : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
+            }`}
           >
             <Redo2 className="h-4 w-4" />
           </button>
@@ -1176,6 +1307,15 @@ export default function StudioDocumentPage() {
             className="rounded-lg border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50"
           >
             <LayoutTemplate className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowLinks(true)}
+            title={t('Vincular a sistemas', 'Vincular a sistemas', 'Link to systems')}
+            className="inline-flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2 py-1.5 text-xs font-medium text-orange-900 hover:bg-orange-100"
+          >
+            <Link2 className="h-3.5 w-3.5" />
+            {t('Vincular', 'Vincular', 'Link')}
           </button>
           {(access === 'owner' || access === 'admin') && companyId && (
             <button
@@ -1253,20 +1393,69 @@ export default function StudioDocumentPage() {
       )}
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        {/* Chat — esquerda */}
+        {/* Painel esquerdo: IA de redação OU IA de desenho */}
         <aside
-          className="flex h-[40vh] w-full shrink-0 flex-col border-b border-slate-200 bg-white lg:h-auto lg:w-[var(--studio-chat-w)] lg:border-b-0 lg:border-r"
+          className={`flex h-[42vh] w-full shrink-0 flex-col lg:h-auto lg:w-[var(--studio-chat-w)] ${
+            studioMode === 'design'
+              ? 'border-b border-violet-900/50 lg:border-b-0 lg:border-r lg:border-violet-900/50'
+              : 'border-b border-stone-200 bg-[#faf8f5] lg:border-b-0 lg:border-r'
+          }`}
           style={{ ['--studio-chat-w' as string]: `${chatWidth}px` }}
         >
-          <div className="hidden border-b border-slate-100 px-4 py-3 lg:block">
-            <h2 className="text-sm font-bold text-slate-900">
-              {t('Agente Studio', 'Agente Studio', 'Studio agent')}
+          {studioMode === 'design' ? (
+            <StudioDesignAiPanel
+              documentId={id}
+              companyId={companyId || undefined}
+              locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+              canEdit={canEdit}
+              onApplied={(next, message) => {
+                if (!skipHistory.current && canvas) pushHistory(canvas);
+                const normalized = normalizeStudioCanvas(next);
+                canvasRef.current = normalized;
+                dirtyRef.current = true;
+                setCanvas(normalized);
+                setDirty(true);
+                setActivePageId(normalized.pages[0]?.id || null);
+                void persistCanvas({ quiet: true, forceSnap: normalized });
+                if (message) {
+                  setMessages((m) => [
+                    ...m,
+                    {
+                      id: `design-${Date.now()}`,
+                      role: 'assistant',
+                      content: message,
+                      createdAt: new Date().toISOString(),
+                    },
+                  ]);
+                }
+              }}
+              labels={{
+                title: t('IA de diagramação', 'IA de diagramación', 'Layout AI'),
+                subtitle: t(
+                  'Usa o texto da Redação + brand kit. Estilo Gamma/Canva.',
+                  'Usa el texto de Redacción + brand kit. Estilo Gamma/Canva.',
+                  'Uses Write text + brand kit. Gamma/Canva style.',
+                ),
+                placeholder: t(
+                  'Ex.: capa institucional, callouts, tipografia forte…',
+                  'Ej.: portada institucional, callouts, tipografía fuerte…',
+                  'E.g. institutional cover, callouts, strong type…',
+                ),
+                run: t('Diagramar agora', 'Diagramar ahora', 'Lay out now'),
+                presets: t('Estilos rápidos', 'Estilos rápidos', 'Quick styles'),
+              }}
+            />
+          ) : (
+          <>
+          <div className="hidden border-b border-stone-200 px-4 py-3 lg:block">
+            <h2 className="text-sm font-bold text-stone-900">
+              {t('IA de redação', 'IA de redacción', 'Writing AI')}
             </h2>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-xs text-stone-500">
               {t(
-                'Seleciona secções na folha (mira) e pede ajustes só aí. Enter = linha · Ctrl+Enter = enviar.',
-                'Selecciona secciones en la hoja (mira) y pide ajustes solo ahí. Enter = línea · Ctrl+Enter = enviar.',
-                'Select sections on the page (crosshair) and ask for edits only there. Enter = line · Ctrl+Enter = send.',
+                'Seleciona secções (mira) e pede reescritas cirúrgicas. Enter = linha · Ctrl+Enter = enviar.',
+                'Selecciona secciones (mira) y pide reescrituras quirúrgicas. Enter = línea · Ctrl+Enter = enviar.',
+                'Select sections (crosshair) and ask for surgical rewrites. Enter = line · Ctrl+Enter = send.',
               )}
             </p>
             {aiTargetBlockIds.length > 0 && (
@@ -1492,6 +1681,8 @@ export default function StudioDocumentPage() {
               </button>
             </div>
           </div>
+          </>
+          )}
         </aside>
 
         {/* Resize handle */}
@@ -1501,7 +1692,9 @@ export default function StudioDocumentPage() {
           onMouseDown={() => {
             dragging.current = true;
           }}
-          className="hidden w-1.5 shrink-0 cursor-col-resize bg-slate-200 hover:bg-orange-400 lg:block"
+          className={`hidden w-1.5 shrink-0 cursor-col-resize lg:block ${
+            studioMode === 'design' ? 'bg-violet-900 hover:bg-violet-500' : 'bg-stone-300 hover:bg-orange-400'
+          }`}
           title={t('Arrastar para redimensionar', 'Arrastrar para redimensionar', 'Drag to resize')}
         />
 
@@ -1509,19 +1702,54 @@ export default function StudioDocumentPage() {
         <div className="flex min-h-0 min-w-0 flex-1">
         <div
           className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
-          style={{
-            backgroundColor: '#e8e4dc',
-            backgroundImage:
-              'radial-gradient(circle at 1px 1px, rgba(15,23,42,0.04) 1px, transparent 0)',
-            backgroundSize: '18px 18px',
-          }}
+          style={
+            studioMode === 'design'
+              ? {
+                  backgroundColor: '#120c1a',
+                  backgroundImage:
+                    'radial-gradient(circle at 1px 1px, rgba(167,139,250,0.08) 1px, transparent 0)',
+                  backgroundSize: '20px 20px',
+                }
+              : {
+                  backgroundColor: '#ebe6dc',
+                  backgroundImage:
+                    'radial-gradient(circle at 1px 1px, rgba(68,64,60,0.05) 1px, transparent 0)',
+                  backgroundSize: '18px 18px',
+                }
+          }
         >
+          {studioMode === 'write' && (
+            <StudioWriteRibbon
+              disabled={!canEdit}
+              onWrap={ribbonWrap}
+              onKind={ribbonKind}
+              onStyle={ribbonStyle}
+              labels={{
+                format: t('Formato', 'Formato', 'Format'),
+                bold: t('Negrito', 'Negrita', 'Bold'),
+                italic: t('Itálico', 'Cursiva', 'Italic'),
+                underline: t('Sublinhado', 'Subrayado', 'Underline'),
+                heading: t('Título', 'Título', 'Heading'),
+                body: t('Corpo', 'Cuerpo', 'Body'),
+                list: t('Lista', 'Lista', 'List'),
+                hint: t(
+                  'Seleciona um bloco (mira) ou a folha ativa',
+                  'Selecciona un bloque (mira) o la hoja activa',
+                  'Select a block (crosshair) or the active sheet',
+                ),
+              }}
+            />
+          )}
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
               disabled={!canEdit}
               onClick={addPage}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-40"
+              className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-40 ${
+                studioMode === 'design'
+                  ? 'border-violet-700 bg-violet-950 text-violet-100 hover:bg-violet-900'
+                  : 'border-stone-300 bg-white text-stone-700'
+              }`}
             >
               <Plus className="h-3.5 w-3.5" />
               {t('Nova folha', 'Nueva hoja', 'New page')}
@@ -1530,14 +1758,16 @@ export default function StudioDocumentPage() {
               className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                 studioMode === 'write'
                   ? 'bg-orange-100 text-orange-900'
-                  : 'bg-violet-100 text-violet-900'
+                  : 'bg-violet-600 text-white'
               }`}
             >
               {studioMode === 'write'
-                ? t('Modo redação', 'Modo redacción', 'Write mode')
-                : t('Modo desenho', 'Modo diseño', 'Design mode')}
+                ? t('Espaço Redação · Word', 'Espacio Redacción · Word', 'Write space · Word')
+                : t('Espaço Desenho · Canva/Gamma', 'Espacio Diseño · Canva/Gamma', 'Design space · Canva/Gamma')}
             </span>
-            <span className="text-xs text-slate-500">
+            <span
+              className={`text-xs ${studioMode === 'design' ? 'text-violet-300' : 'text-stone-500'}`}
+            >
               {canvas.pages.length}{' '}
               {t('folha(s)', 'hoja(s)', 'page(s)')} · {pageSize}
             </span>
@@ -1923,21 +2153,21 @@ export default function StudioDocumentPage() {
             mode: t('Etapa', 'Etapa', 'Stage'),
             write: t('Redação', 'Redacción', 'Write'),
             writeHint: t(
-              'Texto que flui nas folhas',
-              'Texto que fluye en las hojas',
-              'Text flowing on sheets',
+              'Espaço Word: texto + IA de redação',
+              'Espacio Word: texto + IA de redacción',
+              'Word space: text + writing AI',
             ),
             writeIntro: t(
-              'O tamanho da página define as folhas. O texto redistribui-se ao sair do bloco ou ao mudar tamanho/margens.',
-              'El tamaño de página define las hojas. El texto se redistribuye al salir del bloque o al cambiar tamaño/márgenes.',
-              'Page size defines the sheets. Text reflows when you leave a block or change size/margins.',
+              'Redação contínua nas folhas. Usa a barra Formato e a IA à esquerda.',
+              'Redacción continua en las hojas. Usa la barra Formato y la IA a la izquierda.',
+              'Continuous writing on sheets. Use the Format bar and the AI on the left.',
             ),
             design: t('Desenho', 'Diseño', 'Design'),
-            designHint: t('Quadros, moldes, layout', 'Lienzos, moldes, layout', 'Boards, molds, layout'),
+            designHint: t('Espaço Canva/Gamma + IA layout', 'Espacio Canva/Gamma + IA layout', 'Canva/Gamma space + layout AI'),
             designIntro: t(
-              'Folhas fixas para diagramar: quadro de desenho, imagens e moldes. Blocos que não cabem passam à folha seguinte.',
-              'Hojas fijas para diagramar: lienzo, imágenes y moldes. Los bloques que no caben pasan a la hoja siguiente.',
-              'Fixed sheets for layout: drawing board, images and molds. Blocks that do not fit move to the next sheet.',
+              'Folhas fixas + IA de diagramação (brand kit). O texto vem da Redação.',
+              'Hojas fijas + IA de diagramación (brand kit). El texto viene de Redacción.',
+              'Fixed sheets + layout AI (brand kit). Text comes from Write.',
             ),
             page: t('Página', 'Página', 'Page'),
             size: t('Tamanho', 'Tamaño', 'Size'),
@@ -1984,6 +2214,29 @@ export default function StudioDocumentPage() {
           onClose={() => setShareOpen(false)}
         />
       )}
+
+      <DocumentLinksPanel
+        targetType="studio"
+        documentId={id}
+        companyId={companyId || undefined}
+        canEdit={canEdit}
+        open={showLinks}
+        onClose={() => setShowLinks(false)}
+        labels={{
+          title: t('Vínculos do documento', 'Vínculos del documento', 'Document links'),
+          hint: t(
+            'Liga este documento a NEXUS (AT), SIEP, FUNDHUB, empresa, etc. A IA usa estes vínculos como contexto.',
+            'Vincula este documento a NEXUS (AT), SIEP, FUNDHUB, empresa, etc. La IA usa estos vínculos como contexto.',
+            'Link this document to NEXUS (AT), SIEP, FUNDHUB, company, etc. AI uses these links as context.',
+          ),
+          system: t('Sistema', 'Sistema', 'System'),
+          entity: t('Entidade', 'Entidad', 'Entity'),
+          add: t('Adicionar vínculo', 'Añadir vínculo', 'Add link'),
+          empty: t('Ainda sem vínculos — escolhe um sistema abaixo.', 'Aún sin vínculos — elige un sistema abajo.', 'No links yet — pick a system below.'),
+          close: t('Fechar', 'Cerrar', 'Close'),
+          loading: t('A carregar…', 'Cargando…', 'Loading…'),
+        }}
+      />
 
       {showFolderContext && docFolderId && (
         <StudioContextPanel

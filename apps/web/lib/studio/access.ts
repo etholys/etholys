@@ -155,6 +155,32 @@ export async function loadApprovedStudioContext(
     }
   }
 
+  if (set.has('nexus.at_engagements')) {
+    try {
+      const engagements = await prisma.nexusAtEngagement.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { operatorCompanyId: companyId },
+            { members: { some: { companyId } } },
+          ],
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 10,
+        select: {
+          id: true,
+          title: true,
+          kind: true,
+          status: true,
+          contractRef: true,
+        },
+      });
+      parts.push(`nexus.at_engagements: ${JSON.stringify(engagements)}`);
+    } catch {
+      parts.push('nexus.at_engagements: (indisponível)');
+    }
+  }
+
   if (set.has('atlas.finance_summary')) {
     try {
       const since = new Date();

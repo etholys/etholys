@@ -21,6 +21,7 @@ import {
   loadStudioUserContextText,
 } from '@/lib/studio/context-assets';
 import { canEditStudioContent, getDocumentAccess } from '@/lib/studio/share';
+import { loadDocumentLinksContext } from '@/lib/document-links';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -123,7 +124,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     },
   });
 
-  const [approvedContext, userUploadedContext, multimodalParts] = await Promise.all([
+  const [approvedContext, userUploadedContext, linkContext, multimodalParts] = await Promise.all([
     loadApprovedStudioContext(effectiveCompanyId, approvedSources),
     loadStudioUserContextText({
       companyId: effectiveCompanyId,
@@ -131,8 +132,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       documentId: doc.id,
       extraAssetIds: attachmentIds,
     }),
+    loadDocumentLinksContext({
+      targetType: 'studio',
+      studioDocumentId: doc.id,
+    }),
     buildStudioContextLlmParts(attachmentIds, effectiveCompanyId),
   ]);
+
+  const mergedUserContext = [userUploadedContext, linkContext].filter(Boolean).join('\n\n');
 
   const system = buildStudioSystemPrompt({
     locale,
@@ -140,7 +147,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     canvas,
     catalog: studioCatalogForCompany(),
     approvedContext: approvedContext || null,
-    userUploadedContext: userUploadedContext || null,
+    userUploadedContext: mergedUserContext || null,
     targetBlockIds: targetBlockIds.length ? targetBlockIds : null,
   });
 
