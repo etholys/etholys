@@ -8,6 +8,7 @@ import type { NexusQuickStep } from '@/lib/nexus-guides';
 import { getNexusHomeSecondary } from '@/lib/nexus-home-secondary';
 import { NexusCoachPanel } from '@/components/nexus/NexusCoachPanel';
 import { NexusMirrorRail } from '@/components/nexus/NexusMirrorRail';
+import { NexusModeChooser } from '@/components/nexus/NexusModeChooser';
 import { parseNexusAdvisorMirror, type NexusAdvisorMirrorState } from '@/lib/nexus-advisor-mirror';
 
 type OverviewCompany = {
@@ -83,10 +84,7 @@ type OverviewNetwork = {
 
 type NexusOverview = OverviewCompany | OverviewNetwork;
 
-function pickStepText(
-  locale: string,
-  s: NexusQuickStep,
-): { title: string; hint: string } {
+function pickStepText(locale: string, s: NexusQuickStep): { title: string; hint: string } {
   if (locale === 'es') return { title: s.titleEs, hint: s.hintEs };
   if (locale === 'en') return { title: s.titleEn, hint: s.hintEn };
   return { title: s.titlePt, hint: s.hintPt };
@@ -96,6 +94,7 @@ function NexusHomeInner() {
   const { locale } = useApp();
   const searchParams = useSearchParams();
   const networkId = searchParams.get('network');
+  const focus = searchParams.get('focus');
   const s = getNexusHomeSecondary(locale);
 
   const [data, setData] = useState<NexusOverview | null>(null);
@@ -103,6 +102,8 @@ function NexusHomeInner() {
   const [msg, setMsg] = useState<string | null>(null);
   const [advisorSessionId, setAdvisorSessionId] = useState<string | null>(null);
   const [advisorMirror, setAdvisorMirror] = useState<NexusAdvisorMirrorState | null>(null);
+  const [openAtCases, setOpenAtCases] = useState<number | null>(null);
+  const [showMineWorkspace, setShowMineWorkspace] = useState(focus === 'mine');
 
   const loadOverview = useCallback(
     async (opts?: { background?: boolean }) => {
@@ -127,12 +128,33 @@ function NexusHomeInner() {
         if (!opts?.background) setLoading(false);
       }
     },
-    [networkId, locale],
+    [networkId, locale]
   );
 
   useEffect(() => {
     void loadOverview();
   }, [loadOverview]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/nexus/at/inbox');
+        if (!r.ok) return;
+        const d = (await r.json()) as { summary?: { openCases?: number } };
+        if (!cancelled) setOpenAtCases(d.summary?.openCases ?? 0);
+      } catch {
+        /* optional */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (focus === 'mine') setShowMineWorkspace(true);
+  }, [focus]);
 
   const refreshAdvisorMirror = useCallback(async () => {
     if (!advisorSessionId) {
@@ -146,8 +168,7 @@ function NexusHomeInner() {
       });
       if (!r.ok) return;
       const j = (await r.json()) as { nexusMirror?: unknown };
-      const raw = j.nexusMirror;
-      setAdvisorMirror(raw ? parseNexusAdvisorMirror(raw) : null);
+      setAdvisorMirror(j.nexusMirror ? parseNexusAdvisorMirror(j.nexusMirror) : null);
     } catch {
       setAdvisorMirror(null);
     }
@@ -170,6 +191,13 @@ function NexusHomeInner() {
   const loc = locale === 'es' || locale === 'en' || locale === 'pt' ? locale : 'pt';
   const adjustStageLabel =
     loc === 'es' ? 'Ajustar fase y metas' : loc === 'en' ? 'Adjust phase & goals' : 'Ajustar fase e metas';
+
+  const continueMineLabel =
+    loc === 'es'
+      ? 'Continuar mejora de mi empresa (copiloto)'
+      : loc === 'en'
+        ? 'Continue improving my company (copilot)'
+        : 'Continuar melhoria da minha empresa (copiloto)';
 
   return (
     <div className="space-y-5">
@@ -195,7 +223,8 @@ function NexusHomeInner() {
         <>
           {net && (
             <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
-              <strong>{net.name}</strong> · {net.members.length} {s.netCompanies} · {s.netAnchor} {net.anchorCompany.shortName}
+              <strong>{net.name}</strong> · {net.members.length} {s.netCompanies} · {s.netAnchor}{' '}
+              {net.anchorCompany.shortName}
               {net.siepProject && (
                 <>
                   {' '}
@@ -205,35 +234,73 @@ function NexusHomeInner() {
             </div>
           )}
 
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
-            <section
-              className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
-              aria-label={locale === 'es' ? 'Copiloto' : locale === 'pt' ? 'Copiloto' : 'Co-pilot'}
-            >
-              <NexusCoachPanel
-                embeddedOnHub
-                dense
-                onAdvisorSessionId={setAdvisorSessionId}
-                onConversationActivity={refreshAdvisorMirror}
-              />
-            </section>
-            <aside
-              className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:min-h-0 lg:min-w-0 lg:flex-1 lg:overflow-y-auto lg:border-l lg:border-slate-200 lg:pl-8"
-              aria-label={locale === 'es' ? 'Trilha y resultados' : locale === 'pt' ? 'Trilha e resultados' : 'Path & results'}
-            >
-              <div className="border-t border-slate-200 pt-6 lg:border-t-0 lg:pt-0">
-                <NexusMirrorRail
-                  withNet={withNet}
-                  ventureStage={data.ventureStage}
-                  quickNextSteps={data.quickNextSteps || []}
-                  adjustStageLabel={adjustStageLabel}
-                  pickStepText={pickStepText}
-                  loc={loc}
-                  advisorMirror={advisorMirror}
-                />
+          <NexusModeChooser withNet={withNet} openAtCases={openAtCases} />
+
+          {!showMineWorkspace ? (
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+              <button
+                type="button"
+                onClick={() => setShowMineWorkspace(true)}
+                className="font-medium text-violet-700 hover:underline"
+              >
+                {continueMineLabel} →
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-100 bg-violet-50/80 px-3 py-2 text-xs text-violet-900">
+                <span className="font-semibold">
+                  {loc === 'es'
+                    ? 'Modo: mejora de mi empresa (IA)'
+                    : loc === 'en'
+                      ? 'Mode: improve my company (AI)'
+                      : 'Modo: melhoria da minha empresa (IA)'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowMineWorkspace(false)}
+                  className="text-violet-700 hover:underline"
+                >
+                  {loc === 'es'
+                    ? 'Volver a las dos puertas'
+                    : loc === 'en'
+                      ? 'Back to the two doors'
+                      : 'Voltar às duas portas'}
+                </button>
               </div>
-            </aside>
-          </div>
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+                <section
+                  className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+                  aria-label={locale === 'es' ? 'Copiloto' : locale === 'pt' ? 'Copiloto' : 'Co-pilot'}
+                >
+                  <NexusCoachPanel
+                    embeddedOnHub
+                    dense
+                    onAdvisorSessionId={setAdvisorSessionId}
+                    onConversationActivity={refreshAdvisorMirror}
+                  />
+                </section>
+                <aside
+                  className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:min-h-0 lg:min-w-0 lg:flex-1 lg:overflow-y-auto lg:border-l lg:border-slate-200 lg:pl-8"
+                  aria-label={
+                    locale === 'es' ? 'Trilha y resultados' : locale === 'pt' ? 'Trilha e resultados' : 'Path & results'
+                  }
+                >
+                  <div className="border-t border-slate-200 pt-6 lg:border-t-0 lg:pt-0">
+                    <NexusMirrorRail
+                      withNet={withNet}
+                      ventureStage={data.ventureStage}
+                      quickNextSteps={data.quickNextSteps || []}
+                      adjustStageLabel={adjustStageLabel}
+                      pickStepText={pickStepText}
+                      loc={loc}
+                      advisorMirror={advisorMirror}
+                    />
+                  </div>
+                </aside>
+              </div>
+            </div>
+          )}
         </>
       ) : null}
     </div>

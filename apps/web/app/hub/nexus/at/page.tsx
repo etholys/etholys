@@ -185,11 +185,11 @@ export default function NexusAtPage() {
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
             <Headphones className="h-5 w-5 text-violet-700" />
-            Assistência técnica
+            AT a clientes
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-600">
-            Serviço → projeto → empresa. Inbox global para a equipa; dentro de cada serviço, filas separadas por
-            empresa.
+            Aqui prestam assistência técnica a outras empresas. Não confundir com o copiloto da «minha empresa».
+            Fluxo: <strong>serviço</strong> → <strong>projeto</strong> → <strong>empresa-cliente</strong>.
           </p>
         </div>
         <button

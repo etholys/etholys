@@ -50,10 +50,10 @@ export function NexusMirrorRail({
 
   const meetLabel =
     L === 'es'
-      ? { title: 'Abrir Meet (NEXUS)', hint: 'Reunión AT / red con el motor Etholys Meet', err: 'No se pudo abrir Meet' }
+      ? { title: 'Abrir Meet (asesor)', hint: 'Reunión con el equipo / asesor de la empresa activa', err: 'No se pudo abrir Meet' }
       : L === 'en'
-        ? { title: 'Open Meet (NEXUS)', hint: 'AT / network call via Etholys Meet', err: 'Could not open Meet' }
-        : { title: 'Abrir Meet (NEXUS)', hint: 'Reunião AT / rede via Etholys Meet', err: 'Não foi possível abrir o Meet' };
+        ? { title: 'Open Meet (advisor)', hint: 'Call with the team / advisor for the active company', err: 'Could not open Meet' }
+        : { title: 'Abrir Meet (assessor)', hint: 'Reunião com a equipa / assessor da empresa ativa', err: 'Não foi possível abrir o Meet' };
 
   async function openNexusMeet() {
     if (!companyId) {
@@ -253,7 +253,7 @@ export function NexusMirrorRail({
 
       <p className="text-[11px] leading-snug text-slate-400">
         {t.humanRhythmBody}{' '}
-        <Link href={withNet('/hub/nexus/at')} className="text-emerald-800/95 underline-offset-1 hover:underline">
+        <Link href={withNet('/hub/nexus/journey')} className="text-violet-700/95 underline-offset-1 hover:underline">
           {t.humanRhythmCta}
         </Link>
       </p>

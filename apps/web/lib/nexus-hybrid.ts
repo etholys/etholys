@@ -79,8 +79,8 @@ const COPY: Record<NexusHybridLocale, NexusHybridCopy> = {
     },
     humanRhythmTitle: 'Acompanhamento humano, no teu ritmo',
     humanRhythmBody:
-      'Num fecho de fase ou ponto mensal, o diagnóstico, os dados e o assistente alimentam a conversa com o assessor. Juntos definem o próximo passo — sem bloqueio automático por algoritmo.',
-    humanRhythmCta: 'Assistência técnica / casos',
+      'Num fecho de fase ou ponto mensal, o diagnóstico e o copiloto alimentam a conversa com o assessor da vossa empresa. Isto é melhoria interna — não confundir com AT a clientes.',
+    humanRhythmCta: 'Ajustar fase e metas',
     chatTeaserTitle: 'Conversa com o assistente (continua aqui)',
     chatTeaserOpenFull: 'Abrir ecrã completo',
     chatTeaserPlaceholder: 'Escrevem uma dúvida ou colam um excerto do negócio…',
@@ -117,8 +117,8 @@ const COPY: Record<NexusHybridLocale, NexusHybridCopy> = {
     },
     humanRhythmTitle: 'Acompañamiento humano, a vuestro ritmo',
     humanRhythmBody:
-      'En cierre de fase o cita mensual, el diagnóstico, los datos y el asistente alimentan la charla con el asesor. Juntos definen el siguiente paso — sin bloqueo automático de un algoritmo.',
-    humanRhythmCta: 'Asistencia técnica / casos',
+      'En cierre de fase o cita mensual, el diagnóstico y el copiloto alimentan la charla con el asesor de vuestra empresa. Esto es mejora interna — no confundir con AT a clientes.',
+    humanRhythmCta: 'Ajustar fase y metas',
     chatTeaserTitle: 'Hablá con el asistente (sigue acá)',
     chatTeaserOpenFull: 'Pantalla completa',
     chatTeaserPlaceholder: 'Escribid una duda o pegad un resumen del negocio…',
@@ -155,8 +155,8 @@ const COPY: Record<NexusHybridLocale, NexusHybridCopy> = {
     },
     humanRhythmTitle: 'Human check-ins, on your schedule',
     humanRhythmBody:
-      'At a phase close or a monthly touchpoint, your diagnosis, data, and the AI context feed a conversation with a human advisor. You decide the next move together—no automatic algorithm block.',
-    humanRhythmCta: 'Tech assistance / cases',
+      'At a phase close or monthly touchpoint, diagnosis and the copilot feed a conversation with your company advisor. This is internal improvement — not client AT delivery.',
+    humanRhythmCta: 'Adjust phase & goals',
     chatTeaserTitle: 'Talk with the assistant (continues here)',
     chatTeaserOpenFull: 'Open full screen',
     chatTeaserPlaceholder: 'Type a question or paste a business snippet…',

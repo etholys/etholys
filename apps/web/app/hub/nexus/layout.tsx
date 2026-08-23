@@ -50,16 +50,15 @@ type NavGroup = {
 const NEXUS_GROUP_ROUTES: Record<string, string[]> = {
   /** Módulos Etholys ligados à gestão (fora de /hub/nexus, mas o mesmo fluxo NEXUS) */
   integrated: ['/hub/workspace', '/dashboard', '/siep'],
-  /** Fase → assistente → diagnóstico → roadmap → redes → pedidos — um grupo, menos ruído no menu */
-  trail: [
+  /** Percurso da EMPRESA ativa: melhorar com IA (não é AT a terceiros) */
+  mine: [
     '/hub/nexus/journey',
     '/hub/nexus/coach',
     '/hub/nexus/diagnosis',
     '/hub/nexus/roadmap',
-    '/hub/nexus/networks',
-    '/hub/nexus/at',
-    '/hub/nexus/services',
   ],
+  /** Prestação de AT a outras MIPYMEs: serviços → projetos → empresas */
+  deliver: ['/hub/nexus/at', '/hub/nexus/networks', '/hub/nexus/services'],
   resources: ['/hub/nexus/library', '/hub/nexus/history'],
 };
 
@@ -191,9 +190,14 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
       ],
     },
     {
-      key: 'trail',
-      label: locale === 'es' ? 'Recorrido NEXUS' : locale === 'pt' ? 'Trilha NEXUS' : 'NEXUS path',
-      icon: Route,
+      key: 'mine',
+      label:
+        locale === 'es'
+          ? 'Mi empresa (con IA)'
+          : locale === 'pt'
+            ? 'A minha empresa (com IA)'
+            : 'My company (with AI)',
+      icon: Sparkles,
       items: [
         {
           href: withNet('/hub/nexus/journey'),
@@ -203,7 +207,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
         {
           href: withNet('/hub/nexus/coach'),
           icon: Sparkles,
-          label: locale === 'es' ? 'Asistente IA' : locale === 'pt' ? 'Assistente IA' : 'AI coach',
+          label: locale === 'es' ? 'Copiloto IA' : locale === 'pt' ? 'Copiloto IA' : 'AI copilot',
         },
         {
           href: withNet('/hub/nexus/diagnosis'),
@@ -215,30 +219,42 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
           icon: Route,
           label: locale === 'es' ? 'Ruta viva' : locale === 'pt' ? 'Rota viva' : 'Live roadmap',
         },
-        {
-          href: withNet('/hub/nexus/networks'),
-          icon: Share2,
-          label: locale === 'es' ? 'Redes' : locale === 'pt' ? 'Redes' : 'Networks',
-        },
+      ],
+    },
+    {
+      key: 'deliver',
+      label:
+        locale === 'es'
+          ? 'AT a clientes'
+          : locale === 'pt'
+            ? 'AT a clientes'
+            : 'Client AT delivery',
+      icon: Headphones,
+      items: [
         {
           href: withNet('/hub/nexus/at'),
           icon: Headphones,
           label:
             locale === 'es'
-              ? 'Asistencia técnica'
+              ? 'Servicios y casos'
               : locale === 'pt'
-                ? 'Assistência técnica'
-                : 'Tech assistance',
+                ? 'Serviços e casos'
+                : 'Services & cases',
+        },
+        {
+          href: withNet('/hub/nexus/networks'),
+          icon: Share2,
+          label: locale === 'es' ? 'Redes de clientes' : locale === 'pt' ? 'Redes de clientes' : 'Client networks',
         },
         {
           href: withNet('/hub/nexus/services'),
           icon: Wrench,
           label:
             locale === 'es'
-              ? 'Servicios internos'
+              ? 'Pedidos internos Etholys'
               : locale === 'pt'
-                ? 'Serviços internos'
-                : 'Internal services',
+                ? 'Pedidos internos Etholys'
+                : 'Internal Etholys requests',
         },
       ],
     },
