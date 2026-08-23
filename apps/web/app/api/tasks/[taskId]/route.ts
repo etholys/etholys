@@ -3,15 +3,45 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
+import { requireProjectPermission } from '@/lib/siep/permissions';
+import {
+  canEditFolderContent,
+  canReadFolder,
+  getFolderAccess,
+} from '@/lib/work/folder-access';
 
-async function assertTaskAccess(taskId: string, tenant: { userId: string; companyIds: string[] }) {
+async function assertTaskAccess(
+  taskId: string,
+  tenant: { userId: string; companyIds: string[] },
+  opts?: { requireEdit?: boolean },
+) {
   const task = await prisma.task.findFirst({
     where: { id: taskId, isActive: true },
     include: { project: { select: { companyId: true } } },
   });
   if (!task) return null;
+
   const companyId = task.project?.companyId || task.companyId;
-  if (!companyId || !tenant.companyIds.includes(companyId)) return null;
+  const isCompanyMember = !!(companyId && tenant.companyIds.includes(companyId));
+
+  if (task.folderId) {
+    const folderAccess = await getFolderAccess(task.folderId, tenant.userId, tenant.companyIds);
+    if (!folderAccess || !canReadFolder(folderAccess.access)) return null;
+    if (opts?.requireEdit && !canEditFolderContent(folderAccess.access)) return null;
+  }
+
+  if (task.projectId) {
+    const needed = opts?.requireEdit
+      ? (['siep.tasks.edit'] as const)
+      : (['siep.tasks.view', 'siep.tasks.edit', 'siep.project.view', 'siep.activities.report'] as const);
+    const gate = await requireProjectPermission(tenant.userId, task.projectId, [...needed]);
+    // Integrated Workspace: company members can use Work as a mirror even without a SIEP key;
+    // project guests still need ProjectMember permissions.
+    if (!gate.ok && !isCompanyMember) return null;
+  } else if (!isCompanyMember) {
+    return null;
+  }
+
   return task;
 }
 
@@ -74,7 +104,7 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const task = await assertTaskAccess(params.taskId, tenant);
+    const task = await assertTaskAccess(params.taskId, tenant, { requireEdit: true });
     if (!task) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
 
     const body = await req.json();
@@ -128,19 +158,11 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
       if (body.folderId === null || body.folderId === '') {
         data.folderId = null;
       } else {
-        const folder = await prisma.workFolder.findFirst({
-          where: {
-            id: String(body.folderId),
-            isActive: true,
-            companyId: { in: tenant.companyIds },
-            OR: [
-              { ownerId: tenant.userId },
-              { visibility: 'SHARED' },
-            ],
-          },
-        });
-        if (!folder) return NextResponse.json({ error: 'Carpeta no encontrada' }, { status: 404 });
-        data.folderId = folder.id;
+        const folderAccess = await getFolderAccess(String(body.folderId), tenant.userId, tenant.companyIds);
+        if (!folderAccess || !canEditFolderContent(folderAccess.access)) {
+          return NextResponse.json({ error: 'Carpeta no encontrada' }, { status: 404 });
+        }
+        data.folderId = folderAccess.folder.id;
       }
     }
     if (body.order !== undefined) {
@@ -167,7 +189,7 @@ export async function DELETE(_req: Request, { params }: { params: { taskId: stri
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const task = await assertTaskAccess(params.taskId, tenant);
+    const task = await assertTaskAccess(params.taskId, tenant, { requireEdit: true });
     if (!task) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
 
     await prisma.task.update({ where: { id: params.taskId }, data: { isActive: false } });

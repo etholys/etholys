@@ -100,7 +100,7 @@ export function WorkDashboard({
       value: mine.length,
       icon: UserRound,
       tone: 'text-slate-700 bg-slate-100',
-      go: () => onNav({ kind: 'all' }),
+      go: () => onNav({ kind: 'mine' }),
     },
     {
       label: t('Due this week', 'Esta semana', 'Esta semana'),

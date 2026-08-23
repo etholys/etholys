@@ -529,7 +529,7 @@ model WorkFolderMember {
   id        String     @id @default(cuid())
   folderId  String
   userId    String
-  /// member | editor
+  /// member (legacy viewer) | viewer | editor
   role      String     @default("member")
   createdAt DateTime   @default(now())
   folder    WorkFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)

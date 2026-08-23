@@ -5,6 +5,11 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { createNotification } from '@/lib/notify';
 import { getGuestProjectIds, requireProjectPermission } from '@/lib/siep/permissions';
+import {
+  canEditFolderContent,
+  folderVisibleTaskFilter,
+  getFolderAccess,
+} from '@/lib/work/folder-access';
 
 export async function GET(req: Request) {
   try {
@@ -54,13 +59,21 @@ export async function GET(req: Request) {
     const departmentId = searchParams.get('departmentId');
     if (departmentId) where.departmentId = departmentId;
     const folderId = searchParams.get('folderId');
-    if (folderId) where.folderId = folderId;
+    if (folderId) {
+      const folderAccess = await getFolderAccess(folderId, tenant.userId, tenant.companyIds);
+      if (!folderAccess) return NextResponse.json({ error: 'Carpeta no encontrada' }, { status: 404 });
+      where.folderId = folderId;
+    }
     // No-project filter (company tasks only) — guests cannot list company-wide tasks
     const noProject = searchParams.get('noProject');
     if (noProject === '1') {
       if (!companyMemberIds.length) return NextResponse.json({ tasks: [] });
       where.projectId = null;
     }
+
+    // Drive ACL: hide tasks in folders the user cannot access
+    const folderGate = folderVisibleTaskFilter(tenant.userId);
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), folderGate];
 
     const tasks = await prisma.task.findMany({
       where,
@@ -121,6 +134,13 @@ export async function POST(req: Request) {
     if (!taskData.projectId) delete taskData.projectId;
     if (!taskData.parentId) delete taskData.parentId;
     if (!taskData.groupId) delete taskData.groupId;
+    if (!taskData.folderId) delete taskData.folderId;
+    else {
+      const folderAccess = await getFolderAccess(String(taskData.folderId), tenant.userId, tenant.companyIds);
+      if (!folderAccess || !canEditFolderContent(folderAccess.access)) {
+        return NextResponse.json({ error: 'Carpeta no encontrada' }, { status: 404 });
+      }
+    }
     if (taskData.dueDate) taskData.dueDate = new Date(String(taskData.dueDate));
     if (taskData.startDate) taskData.startDate = new Date(String(taskData.startDate));
     if (taskData.estimatedHours !== undefined && taskData.estimatedHours !== '') {

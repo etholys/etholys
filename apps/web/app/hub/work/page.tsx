@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CheckSquare, Layers, Settings } from 'lucide-react';
 import { useApp } from '@/app/providers';
@@ -33,9 +34,9 @@ export default function HubWorkPage() {
               </div>
               <p className="truncate text-xs text-slate-500">
                 {t(
-                  'Organizador: setores, projetos, dashboard e timeline',
-                  'Organizador: sectores, proyectos, panel y timeline',
-                  'Organizer: departments, projects, dashboard and timeline',
+                  'Vistas, pastas partilhadas e integração SIEP',
+                  'Vistas, carpetas compartidas e integración SIEP',
+                  'Views, shared folders and SIEP integration',
                 )}
               </p>
             </div>
@@ -60,7 +61,15 @@ export default function HubWorkPage() {
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col px-3 py-4 sm:px-6 lg:px-8">
-        <WorkShell />
+        <Suspense
+          fallback={
+            <div className="flex justify-center py-24">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-600/30 border-t-cyan-600" />
+            </div>
+          }
+        >
+          <WorkShell />
+        </Suspense>
       </main>
     </div>
   );

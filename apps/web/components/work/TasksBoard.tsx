@@ -21,6 +21,7 @@ export type TasksBoardProps = {
   initialDepartmentId?: string;
   initialTaskScope?: string;
   initialFolderId?: string;
+  initialAssigneeId?: string;
   onTasksChanged?: () => void;
   externalSelectedId?: string | null;
   onExternalSelect?: (id: string | null) => void;
@@ -53,6 +54,7 @@ export default function TasksBoard({
   initialDepartmentId = '',
   initialTaskScope = '',
   initialFolderId = '',
+  initialAssigneeId = '',
   onTasksChanged,
   externalSelectedId,
   onExternalSelect,
@@ -86,7 +88,7 @@ export default function TasksBoard({
   const [projectFilter, setProjectFilter] = useState(initialProjectId);
   const [priorityFilter, setPriorityFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [assigneeFilter, setAssigneeFilter] = useState(initialAssigneeId);
   const [dateFromFilter, setDateFromFilter] = useState('');
   const [dateToFilter, setDateToFilter] = useState('');
   const [showAdvFilters, setShowAdvFilters] = useState(false);
@@ -103,7 +105,8 @@ export default function TasksBoard({
     setDepartmentFilter(initialDepartmentId);
     setTaskScopeFilter(initialTaskScope);
     setFolderFilter(initialFolderId);
-  }, [initialProjectId, initialDepartmentId, initialTaskScope, initialFolderId]);
+    setAssigneeFilter(initialAssigneeId);
+  }, [initialProjectId, initialDepartmentId, initialTaskScope, initialFolderId, initialAssigneeId]);
 
   const fetchTasks = (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -112,6 +115,7 @@ export default function TasksBoard({
     if (projectFilter) params.set('projectId', projectFilter);
     if (departmentFilter) params.set('departmentId', departmentFilter);
     if (folderFilter) params.set('folderId', folderFilter);
+    if (assigneeFilter) params.set('assigneeId', assigneeFilter);
     if (taskScopeFilter === 'company') params.set('noProject', '1');
     fetch(`/api/tasks?${params}`)
       .then((r) => r.json())
@@ -146,7 +150,7 @@ export default function TasksBoard({
 
   useEffect(() => {
     fetchTasks();
-  }, [activeCompanyId, projectFilter, departmentFilter, taskScopeFilter, folderFilter]);
+  }, [activeCompanyId, projectFilter, departmentFilter, taskScopeFilter, folderFilter, assigneeFilter]);
 
   useEffect(() => {
     fetchGroups();

@@ -33,7 +33,7 @@
 | **Studio** | `/hub/studio` | [etholys-studio.md](./etholys-studio.md) |
 | **Meet** | `/hub/meet` | [etholys-meet.md](./etholys-meet.md) |
 | **CARTA** | `/hub/carta` | Governança / aprovações |
-| **Work** (tarefas) | `/hub/work` (+ atalho cyan; ATLAS `/tasks`) | [etholys-work.md](./etholys-work.md) — motor único `Task` |
+| **Work** (tarefas) | `/hub/work` (+ atalho cyan; ATLAS `/tasks`) | [etholys-work.md](./etholys-work.md) — motor único `Task`; vistas Board/List/Kanban/Calendar/Timeline/Workload; pastas com ACL tipo Drive; modo Integrated Workspace com SIEP (F11) |
 
 Candidato futuro (Tools, fora de Work): **Board** — mural da empresa (links, docs, senhas).
 

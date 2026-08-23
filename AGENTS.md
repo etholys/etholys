@@ -8,7 +8,7 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 |------|-----------|------------|
 | **Ecossistema de produtos (visão geral)** | [ETHOLYS_Arquitectura_v2.md](./ETHOLYS_Arquitectura_v2.md) | Módulos, princípios, integrações entre sistemas |
 | **Etholys Tools — faixa de ferramentas** | [docs/architecture/etholys-tools.md](./docs/architecture/etholys-tools.md) | Advisor, Studio, Meet, CARTA, Work — não confundir com Core nem com Studio como guarda-chuva |
-| **Etholys Work — motor de tarefas** | [docs/architecture/etholys-work.md](./docs/architecture/etholys-work.md) | `Task` único, espelhos ATLAS/SIEP/Meet; grupos, aprovações via CARTA |
+| **Etholys Work — motor de tarefas** | [docs/architecture/etholys-work.md](./docs/architecture/etholys-work.md) | `Task` único, espelhos ATLAS/SIEP/Meet; vistas Board/List/Kanban/Calendar/Workload; pastas ACL tipo Drive; Integrated Workspace (F11) |
 | **FORGE — EAD unificado + jogos + gamificação** | [docs/architecture/forge-ead.md](./docs/architecture/forge-ead.md) | Qualquer trabalho em `/hub/forge`, APIs `forge`, LMS, jogos, IA geradora de jogos |
 | **Etholys Meet — reuniões / vídeo (transversal)** | [docs/architecture/etholys-meet.md](./docs/architecture/etholys-meet.md) | Jitsi, breakouts, convites, gravação, IA pós-reunião, espelhos FORGE/SIEP/NEXUS |
 | **Etholys Studio — documentos com IA (ferramenta)** | [docs/architecture/etholys-studio.md](./docs/architecture/etholys-studio.md) | `/hub/studio`, pastas, templates, canvas+chat, agente com consentimento, atalho hot |
