@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Building2, FolderKanban, Headphones, Plus, UserPlus } from 'lucide-react';
+import { ArrowLeft, Plus, Search, X } from 'lucide-react';
+import { useApp } from '@/app/providers';
 import { NexusAtCaseCard, type AtCaseCardModel } from '@/components/nexus/NexusAtCaseCard';
 import { AT_CASE_KIND_LABELS, type AtCaseKind } from '@/lib/nexus-at-shared';
 
@@ -34,21 +35,22 @@ type Service = {
   projects: AtProject[];
 };
 
-const CASE_KINDS = (Object.keys(AT_CASE_KIND_LABELS) as AtCaseKind[]).map((id) => ({
-  id,
-  label: AT_CASE_KIND_LABELS[id].pt,
-}));
-
 export default function NexusAtServicePage() {
   const params = useParams();
   const id = typeof params.id === 'string' ? params.id : '';
+  const { locale } = useApp();
+  const es = locale === 'es';
+
+  const CASE_KINDS = (Object.keys(AT_CASE_KIND_LABELS) as AtCaseKind[]).map((kid) => ({
+    id: kid,
+    label: AT_CASE_KIND_LABELS[kid][es ? 'es' : 'pt'],
+  }));
 
   const [service, setService] = useState<Service | null>(null);
   const [cases, setCases] = useState<AtCaseCardModel[]>([]);
   const [isOperator, setIsOperator] = useState(false);
-  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
@@ -56,8 +58,6 @@ export default function NexusAtServicePage() {
 
   const [newProjectName, setNewProjectName] = useState('');
   const [savingProject, setSavingProject] = useState(false);
-  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
-  const [editProjectName, setEditProjectName] = useState('');
 
   const [caseKind, setCaseKind] = useState<AtCaseKind>('visit');
   const [brief, setBrief] = useState('');
@@ -65,27 +65,25 @@ export default function NexusAtServicePage() {
   const [priority, setPriority] = useState('MEDIUM');
   const [assignToMe, setAssignToMe] = useState(true);
   const [savingCase, setSavingCase] = useState(false);
+  const [showNewCase, setShowNewCase] = useState(false);
 
-  const [addCompanyId, setAddCompanyId] = useState('');
+  const [addQuery, setAddQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<Company[]>([]);
   const [addingMember, setAddingMember] = useState(false);
+  const [showAddCompany, setShowAddCompany] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
-    setMsg(null);
+    setError(null);
     try {
-      const [r, cRes] = await Promise.all([
-        fetch(`/api/nexus/at/engagements/${encodeURIComponent(id)}`),
-        fetch('/api/companies'),
-      ]);
+      const r = await fetch(`/api/nexus/at/engagements/${encodeURIComponent(id)}`);
       const d = await r.json();
-      const cJson = await cRes.json();
-      if (!r.ok) throw new Error(d.error || 'Não encontrado');
+      if (!r.ok) throw new Error(d.error || (es ? 'No encontrado' : 'Não encontrado'));
       const eng = d.engagement as Service;
       setService(eng);
       setCases(d.cases || []);
       setIsOperator(Boolean(d.isOperator));
-      setCompanies(cJson.companies || []);
 
       setSelectedProjectId((prev) => {
         if (prev && eng.projects.some((p) => p.id === prev)) return prev;
@@ -97,21 +95,42 @@ export default function NexusAtServicePage() {
         return clients[0]?.companyId || '';
       });
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Erro');
+      setError(e instanceof Error ? e.message : 'Error');
       setService(null);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, es]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!showAddCompany) return;
+    const q = addQuery.trim();
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/nexus/at/client-companies?q=${encodeURIComponent(q)}&take=20`);
+        const d = await r.json();
+        if (!cancelled && r.ok) setSuggestions(d.companies || []);
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      }
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [addQuery, showAddCompany]);
+
   const clients = useMemo(
     () => (service?.members || []).filter((m) => m.memberRole !== 'operator'),
     [service]
   );
+
+  const presentIds = useMemo(() => new Set((service?.members || []).map((m) => m.companyId)), [service]);
 
   const companyLabel = useCallback(
     (companyId: string | null | undefined) => {
@@ -160,15 +179,10 @@ export default function NexusAtServicePage() {
 
   const selectedProject = service?.projects.find((p) => p.id === selectedProjectId) || null;
 
-  const availableToAdd = useMemo(() => {
-    const present = new Set((service?.members || []).map((m) => m.companyId));
-    return companies.filter((c) => !present.has(c.id));
-  }, [companies, service]);
-
   const createProject = async () => {
     if (!newProjectName.trim()) return;
     setSavingProject(true);
-    setMsg(null);
+    setError(null);
     try {
       const r = await fetch(`/api/nexus/at/engagements/${encodeURIComponent(id)}/projects`, {
         method: 'POST',
@@ -176,65 +190,21 @@ export default function NexusAtServicePage() {
         body: JSON.stringify({ name: newProjectName.trim() }),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Falha ao criar projeto');
+      if (!r.ok) throw new Error(d.error || 'Error');
       setNewProjectName('');
       setSelectedProjectId(d.project.id);
       await load();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Erro');
+      setError(e instanceof Error ? e.message : 'Error');
     } finally {
       setSavingProject(false);
-    }
-  };
-
-  const renameProject = async () => {
-    if (!editingProjectId || editProjectName.trim().length < 2) return;
-    setSavingProject(true);
-    setMsg(null);
-    try {
-      const r = await fetch(
-        `/api/nexus/at/engagements/${encodeURIComponent(id)}/projects/${encodeURIComponent(editingProjectId)}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: editProjectName.trim() }),
-        }
-      );
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Falha ao renomear');
-      setEditingProjectId(null);
-      await load();
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Erro');
-    } finally {
-      setSavingProject(false);
-    }
-  };
-
-  const archiveProject = async (projectId: string) => {
-    if (!confirm('Arquivar este projeto? Os casos mantêm-se, mas o projeto sai da lista.')) return;
-    setMsg(null);
-    try {
-      const r = await fetch(
-        `/api/nexus/at/engagements/${encodeURIComponent(id)}/projects/${encodeURIComponent(projectId)}`,
-        { method: 'DELETE' }
-      );
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Falha ao arquivar');
-      if (selectedProjectId === projectId) setSelectedProjectId('');
-      await load();
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Erro');
     }
   };
 
   const createCase = async () => {
-    if (!selectedProjectId || !selectedCompanyId) {
-      setMsg('Seleciona projeto e empresa.');
-      return;
-    }
+    if (!selectedProjectId || !selectedCompanyId) return;
     setSavingCase(true);
-    setMsg(null);
+    setError(null);
     try {
       const r = await fetch(`/api/nexus/at/engagements/${encodeURIComponent(id)}/cases`, {
         method: 'POST',
@@ -250,60 +220,85 @@ export default function NexusAtServicePage() {
         }),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Falha ao abrir caso');
+      if (!r.ok) throw new Error(d.error || 'Error');
       setBrief('');
       setDueDate('');
-      setMsg('Caso aberto.');
+      setShowNewCase(false);
       await load();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Erro');
+      setError(e instanceof Error ? e.message : 'Error');
     } finally {
       setSavingCase(false);
     }
   };
 
-  const addMember = async () => {
-    if (!addCompanyId) return;
+  const addMemberById = async (companyId: string) => {
     setAddingMember(true);
-    setMsg(null);
+    setError(null);
     try {
       const r = await fetch(`/api/nexus/at/engagements/${encodeURIComponent(id)}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId: addCompanyId }),
+        body: JSON.stringify({ companyId }),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Falha ao adicionar');
-      const added = addCompanyId;
-      setAddCompanyId('');
-      setSelectedCompanyId(added);
+      if (!r.ok) throw new Error(d.error || 'Error');
+      setAddQuery('');
+      setShowAddCompany(false);
+      setSelectedCompanyId(companyId);
       await load();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Erro');
+      setError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setAddingMember(false);
+    }
+  };
+
+  const addMemberByName = async () => {
+    const name = addQuery.trim();
+    if (name.length < 2) return;
+    setAddingMember(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/nexus/at/engagements/${encodeURIComponent(id)}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Error');
+      setAddQuery('');
+      setShowAddCompany(false);
+      if (d.member?.companyId) setSelectedCompanyId(d.member.companyId);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
     } finally {
       setAddingMember(false);
     }
   };
 
   const removeMember = async (companyId: string) => {
-    setMsg(null);
+    setError(null);
     try {
       const r = await fetch(
         `/api/nexus/at/engagements/${encodeURIComponent(id)}/members?companyId=${encodeURIComponent(companyId)}`,
         { method: 'DELETE' }
       );
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Falha ao remover');
+      if (!r.ok) throw new Error(d.error || 'Error');
       await load();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Erro');
+      setError(e instanceof Error ? e.message : 'Error');
     }
   };
+
+  const filteredSuggestions = suggestions.filter((c) => !presentIds.has(c.id));
 
   if (loading) {
     return (
       <div className="flex min-h-[30vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-600/30 border-t-violet-600" />
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-300 border-t-slate-800" />
       </div>
     );
   }
@@ -311,147 +306,119 @@ export default function NexusAtServicePage() {
   if (!service) {
     return (
       <div className="space-y-3">
-        <Link href="/hub/nexus/at" className="inline-flex items-center gap-1 text-sm text-violet-700">
-          <ArrowLeft className="h-4 w-4" /> Voltar
+        <Link href="/hub/nexus/at" className="inline-flex items-center gap-1 text-sm text-slate-600">
+          <ArrowLeft className="h-4 w-4" /> {es ? 'Volver' : 'Voltar'}
         </Link>
-        <p className="text-sm text-red-700">{msg || 'Serviço não encontrado.'}</p>
+        <p className="text-sm text-red-600">{error || (es ? 'No encontrado' : 'Não encontrado')}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-5xl space-y-5">
       <div>
-        <Link href="/hub/nexus/at" className="mb-2 inline-flex items-center gap-1 text-sm text-violet-700">
-          <ArrowLeft className="h-4 w-4" /> Serviços de AT
+        <Link href="/hub/nexus/at" className="mb-3 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
+          <ArrowLeft className="h-4 w-4" /> {es ? 'Contratos' : 'Contratos'}
         </Link>
-        <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
-          <Headphones className="h-5 w-5 text-violet-700" />
-          {service.title}
-        </h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Serviço · {service.kind}
-          {service.contractRef ? ` · ${service.contractRef}` : ''} · Operador:{' '}
-          {service.operatorCompany.shortName || service.operatorCompany.name}
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{service.title}</h1>
+            <p className="mt-0.5 text-sm text-slate-500">
+              {service.contractRef ? `${service.contractRef} · ` : ''}
+              {service.operatorCompany.shortName || service.operatorCompany.name}
+            </p>
+          </div>
+          {isOperator && selectedProjectId && selectedCompanyId && (
+            <button
+              type="button"
+              onClick={() => setShowNewCase(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              <Plus className="h-4 w-4" />
+              {es ? 'Nuevo caso' : 'Novo caso'}
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-        <aside className="space-y-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-          <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
-            <FolderKanban className="h-3.5 w-3.5" /> Projetos
-          </h2>
-          <div className="space-y-1">
-            {service.projects.map((p) => {
-              const n = openByProject.get(p.id) || 0;
-              if (editingProjectId === p.id) {
-                return (
-                  <div key={p.id} className="space-y-1 rounded-lg bg-violet-50 p-2">
-                    <input
-                      value={editProjectName}
-                      onChange={(e) => setEditProjectName(e.target.value)}
-                      className="w-full rounded border border-violet-200 px-2 py-1 text-sm"
-                      autoFocus
-                    />
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        disabled={savingProject}
-                        onClick={renameProject}
-                        className="flex-1 rounded bg-violet-700 px-2 py-1 text-[10px] font-semibold text-white"
-                      >
-                        Guardar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingProjectId(null)}
-                        className="rounded px-2 py-1 text-[10px] text-gray-600"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                );
-              }
-              return (
-                <div key={p.id} className="group relative">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProjectId(p.id)}
-                    className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm ${
-                      selectedProjectId === p.id
-                        ? 'bg-violet-100 font-medium text-violet-900'
-                        : 'text-gray-700 hover:bg-gray-50'
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <div className="grid gap-5 lg:grid-cols-[200px_1fr]">
+        <aside className="space-y-1">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+            {es ? 'Proyectos' : 'Projetos'}
+          </p>
+          {service.projects.map((p) => {
+            const n = openByProject.get(p.id) || 0;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setSelectedProjectId(p.id)}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${
+                  selectedProjectId === p.id
+                    ? 'bg-slate-900 font-medium text-white'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <span className="truncate">{p.name}</span>
+                {n > 0 && (
+                  <span
+                    className={`ml-2 rounded-full px-1.5 text-[10px] font-semibold ${
+                      selectedProjectId === p.id ? 'bg-white/20' : 'bg-slate-200 text-slate-700'
                     }`}
                   >
-                    <span className="truncate">{p.name}</span>
-                    {n > 0 && (
-                      <span className="rounded-full bg-violet-700 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                        {n}
-                      </span>
-                    )}
-                  </button>
-                  {isOperator && (
-                    <div className="absolute right-1 top-1 hidden gap-0.5 group-hover:flex">
-                      <button
-                        type="button"
-                        title="Renomear"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingProjectId(p.id);
-                          setEditProjectName(p.name);
-                        }}
-                        className="rounded bg-white/90 px-1 text-[10px] text-violet-700 shadow"
-                      >
-                        ✎
-                      </button>
-                      <button
-                        type="button"
-                        title="Arquivar"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          archiveProject(p.id);
-                        }}
-                        className="rounded bg-white/90 px-1 text-[10px] text-red-600 shadow"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {service.projects.length === 0 && (
-              <p className="px-1 text-xs text-amber-800">Cria o primeiro projeto.</p>
-            )}
-          </div>
+                    {n}
+                  </span>
+                )}
+              </button>
+            );
+          })}
           {isOperator && (
-            <div className="space-y-2 border-t border-gray-100 pt-3">
+            <div className="pt-3">
               <input
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm"
-                placeholder="Novo projeto…"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') createProject();
+                }}
+                className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-slate-400"
+                placeholder={es ? 'Nuevo proyecto…' : 'Novo projeto…'}
               />
               <button
                 type="button"
                 disabled={savingProject || newProjectName.trim().length < 2}
                 onClick={createProject}
-                className="inline-flex w-full items-center justify-center gap-1 rounded-lg bg-violet-700 px-2 py-1.5 text-xs font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
+                className="mt-1.5 w-full rounded-lg border border-slate-200 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
               >
-                <Plus className="h-3.5 w-3.5" /> Projeto
+                {es ? 'Añadir proyecto' : 'Adicionar projeto'}
               </button>
             </div>
           )}
         </aside>
 
         <div className="space-y-4">
-          <section className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-            <h2 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              <Building2 className="h-3.5 w-3.5" /> Empresas
-            </h2>
+          <div>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                {es ? 'Empresas del contrato' : 'Empresas do contrato'}
+              </p>
+              {isOperator && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddCompany((v) => !v)}
+                  className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                >
+                  {showAddCompany ? (es ? 'Cerrar' : 'Fechar') : es ? '+ Empresa' : '+ Empresa'}
+                </button>
+              )}
+            </div>
             {clients.length === 0 ? (
-              <p className="text-sm text-amber-800">Adiciona empresas ao serviço.</p>
+              <p className="text-sm text-slate-400">
+                {es
+                  ? 'Añade las empresas que entran en este contrato.'
+                  : 'Adiciona as empresas deste contrato.'}
+              </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {clients.map((m) => {
@@ -462,17 +429,13 @@ export default function NexusAtServicePage() {
                       key={m.companyId}
                       type="button"
                       onClick={() => setSelectedCompanyId(m.companyId)}
-                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm ${
-                        active ? 'bg-violet-700 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm ${
+                        active ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
                       }`}
                     >
                       {m.company.shortName || m.company.name}
                       {n > 0 && (
-                        <span
-                          className={`rounded-full px-1.5 text-[10px] font-semibold ${
-                            active ? 'bg-white/20 text-white' : 'bg-violet-200 text-violet-900'
-                          }`}
-                        >
+                        <span className={`text-[10px] font-semibold ${active ? 'text-white/80' : 'text-slate-500'}`}>
                           {n}
                         </span>
                       )}
@@ -490,10 +453,9 @@ export default function NexusAtServicePage() {
                               removeMember(m.companyId);
                             }
                           }}
-                          className={`ml-0.5 text-xs ${active ? 'text-violet-200' : 'text-gray-400'} hover:underline`}
-                          title="Remover"
+                          className={`ml-0.5 ${active ? 'text-white/60 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}
                         >
-                          ×
+                          <X className="h-3 w-3" />
                         </span>
                       )}
                     </button>
@@ -501,55 +463,82 @@ export default function NexusAtServicePage() {
                 })}
               </div>
             )}
-            {isOperator && availableToAdd.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-3">
-                <select
-                  value={addCompanyId}
-                  onChange={(e) => setAddCompanyId(e.target.value)}
-                  className="min-w-[10rem] flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-sm"
-                >
-                  <option value="">+ empresa…</option>
-                  {availableToAdd.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.shortName || c.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  disabled={!addCompanyId || addingMember}
-                  onClick={addMember}
-                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-900 disabled:opacity-50"
-                >
-                  <UserPlus className="h-3.5 w-3.5" />
-                  Adicionar
-                </button>
+            {showAddCompany && isOperator && (
+              <div className="relative mt-3">
+                <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  value={addQuery}
+                  onChange={(e) => setAddQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (filteredSuggestions[0]) addMemberById(filteredSuggestions[0].id);
+                      else addMemberByName();
+                    }
+                  }}
+                  disabled={addingMember}
+                  className="w-full rounded-lg border border-slate-200 py-2 pl-8 pr-3 text-sm outline-none focus:border-slate-400"
+                  placeholder={
+                    es ? 'Buscar o crear empresa…' : 'Pesquisar ou criar empresa…'
+                  }
+                />
+                {addQuery.trim().length > 0 && (
+                  <ul className="absolute z-10 mt-1 max-h-44 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                    {filteredSuggestions.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => addMemberById(c.id)}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                        >
+                          {c.shortName || c.name}
+                        </button>
+                      </li>
+                    ))}
+                    {addQuery.trim().length >= 2 && (
+                      <li>
+                        <button
+                          type="button"
+                          onClick={addMemberByName}
+                          className="w-full px-3 py-2 text-left text-sm font-medium text-emerald-800 hover:bg-slate-50"
+                        >
+                          + {es ? 'Crear' : 'Criar'} «{addQuery.trim()}»
+                        </button>
+                      </li>
+                    )}
+                  </ul>
+                )}
               </div>
             )}
-          </section>
+          </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-950">
-            <span>
-              <strong>{selectedProject?.name || '—'}</strong>
-              {' · '}
-              <strong>{companyLabel(selectedCompanyId) || '—'}</strong>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-y border-slate-100 py-2 text-sm">
+            <span className="text-slate-700">
+              <span className="font-medium">{selectedProject?.name || '—'}</span>
+              <span className="mx-1.5 text-slate-300">/</span>
+              <span className="font-medium">{companyLabel(selectedCompanyId) || '—'}</span>
             </span>
-            <label className="flex items-center gap-1.5 text-xs text-violet-800">
+            <label className="flex items-center gap-1.5 text-xs text-slate-500">
               <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />
-              Mostrar concluídos
+              {es ? 'Incluir cerrados' : 'Incluir concluídos'}
             </label>
           </div>
 
-          <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-gray-900">Novo caso</h2>
-            {!selectedProjectId || !selectedCompanyId ? (
-              <p className="text-sm text-amber-800">Seleciona projeto e empresa.</p>
-            ) : (
+          {showNewCase && (
+            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-900">
+                  {es ? 'Nuevo caso' : 'Novo caso'}
+                </h3>
+                <button type="button" onClick={() => setShowNewCase(false)} className="text-slate-400 hover:text-slate-700">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 <select
                   value={caseKind}
                   onChange={(e) => setCaseKind(e.target.value as AtCaseKind)}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm sm:col-span-1"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                 >
                   {CASE_KINDS.map((k) => (
                     <option key={k.id} value={k.id}>
@@ -560,65 +549,74 @@ export default function NexusAtServicePage() {
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                 >
-                  <option value="LOW">Prioridade baixa</option>
-                  <option value="MEDIUM">Média</option>
-                  <option value="HIGH">Alta</option>
-                  <option value="CRITICAL">Crítica</option>
+                  <option value="LOW">{es ? 'Prioridad baja' : 'Prioridade baixa'}</option>
+                  <option value="MEDIUM">{es ? 'Media' : 'Média'}</option>
+                  <option value="HIGH">{es ? 'Alta' : 'Alta'}</option>
+                  <option value="CRITICAL">{es ? 'Crítica' : 'Crítica'}</option>
                 </select>
                 <input
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                 />
-                <label className="flex items-center gap-2 text-sm text-gray-700">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
                   <input type="checkbox" checked={assignToMe} onChange={(e) => setAssignToMe(e.target.checked)} />
-                  Atribuir a mim
+                  {es ? 'Asignarme' : 'Atribuir a mim'}
                 </label>
                 <textarea
                   value={brief}
                   onChange={(e) => setBrief(e.target.value)}
                   rows={3}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm sm:col-span-2"
-                  placeholder="O que fazer nesta empresa, neste projeto…"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm sm:col-span-2"
+                  placeholder={
+                    es
+                      ? 'Qué hay que hacer en esta empresa…'
+                      : 'O que fazer nesta empresa…'
+                  }
                 />
                 <button
                   type="button"
                   disabled={savingCase || brief.trim().length < 8}
                   onClick={createCase}
-                  className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50 sm:col-span-2"
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40 sm:col-span-2"
                 >
-                  {savingCase ? 'A abrir…' : 'Abrir caso'}
+                  {savingCase ? (es ? 'Guardando…' : 'A guardar…') : es ? 'Abrir caso' : 'Abrir caso'}
                 </button>
               </div>
-            )}
-          </section>
+            </div>
+          )}
 
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold text-gray-900">Fila ({filteredCases.length})</h2>
-            {filteredCases.map((c) => (
-              <NexusAtCaseCard
-                key={c.id}
-                caseItem={{
-                  ...c,
-                  companyLabel: companyLabel(c.companyId),
-                  projectName: projectLabel(c.projectId),
-                }}
-                onUpdated={(updated) => {
-                  setCases((prev) => prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)));
-                }}
-              />
-            ))}
-            {filteredCases.length === 0 && (
-              <p className="text-sm text-gray-500">Sem casos nesta combinação projeto + empresa.</p>
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold text-slate-900">
+              {es ? 'Cola' : 'Fila'} · {filteredCases.length}
+            </h2>
+            {filteredCases.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-400">
+                {es
+                  ? 'Sin casos para este proyecto + empresa.'
+                  : 'Sem casos neste projeto + empresa.'}
+              </p>
+            ) : (
+              filteredCases.map((c) => (
+                <NexusAtCaseCard
+                  key={c.id}
+                  caseItem={{
+                    ...c,
+                    companyLabel: companyLabel(c.companyId),
+                    projectName: projectLabel(c.projectId),
+                  }}
+                  onUpdated={(updated) => {
+                    setCases((prev) => prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)));
+                  }}
+                />
+              ))
             )}
           </section>
         </div>
       </div>
-
-      {msg && <p className="text-sm text-gray-700">{msg}</p>}
     </div>
   );
 }

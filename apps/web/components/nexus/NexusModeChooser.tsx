@@ -22,39 +22,33 @@ export function NexusModeChooser({ withNet, openAtCases }: Props) {
       ? {
           title: '¿Qué querés hacer ahora?',
           mineTitle: 'Mejorar mi empresa',
-          mineBody:
-            'Diagnóstico, ruta y copiloto IA para la empresa activa. Es vuestro proceso interno de mejora continua — no es atención a terceros.',
+          mineBody: 'Diagnóstico, ruta y copiloto IA para la empresa activa.',
           mineCta: 'Abrir copiloto y ruta',
           deliverTitle: 'Prestar AT a clientes',
-          deliverBody:
-            'Servicios → proyectos → empresas. Aquí atendéis MIPYMEs / contratos: filas, visitas, Meet y casos por cliente.',
-          deliverCta: 'Abrir servicios y casos',
-          tip: 'En el menú: «Mi empresa (con IA)» vs «AT a clientes». Son dos trabajos distintos.',
+          deliverBody: 'Contratos con varias empresas — trabajo separado por cliente.',
+          deliverCta: 'Abrir AT a clientes',
+          tip: 'Dos trabajos distintos en el menú.',
         }
       : L === 'en'
         ? {
             title: 'What do you want to do now?',
             mineTitle: 'Improve my company',
-            mineBody:
-              'Diagnosis, roadmap and AI copilot for the active company. Your internal continuous-improvement path — not client delivery.',
+            mineBody: 'Diagnosis, roadmap and AI copilot for the active company.',
             mineCta: 'Open copilot & path',
             deliverTitle: 'Deliver AT to clients',
-            deliverBody:
-              'Services → projects → companies. Serve MIPYMEs / contracts: queues, visits, Meet and cases per client.',
-            deliverCta: 'Open services & cases',
-            tip: 'In the menu: “My company (with AI)” vs “Client AT delivery”. Two different jobs.',
+            deliverBody: 'Contracts with several companies — separate work per client.',
+            deliverCta: 'Open AT delivery',
+            tip: 'Two different jobs in the menu.',
           }
         : {
             title: 'O que queres fazer agora?',
             mineTitle: 'Melhorar a minha empresa',
-            mineBody:
-              'Diagnóstico, rota e copiloto IA para a empresa ativa. É o vosso processo interno de melhoria contínua — não é atendimento a terceiros.',
+            mineBody: 'Diagnóstico, rota e copiloto IA para a empresa ativa.',
             mineCta: 'Abrir copiloto e rota',
             deliverTitle: 'Prestar AT a clientes',
-            deliverBody:
-              'Serviços → projetos → empresas. Aqui atendem MIPYMEs / contratos: filas, visitas, Meet e casos por cliente.',
-            deliverCta: 'Abrir serviços e casos',
-            tip: 'No menu: «A minha empresa (com IA)» vs «AT a clientes». São dois trabalhos diferentes.',
+            deliverBody: 'Contratos com várias empresas — trabalho separado por cliente.',
+            deliverCta: 'Abrir AT a clientes',
+            tip: 'Dois trabalhos distintos no menu.',
           };
 
   return (
@@ -101,10 +95,10 @@ export function NexusModeChooser({ withNet, openAtCases }: Props) {
       {activeCompanyId && (
         <p className="text-[11px] text-slate-400">
           {L === 'es'
-            ? 'La empresa del selector (arriba a la izquierda) es el contexto de «Mi empresa». En AT a clientes elegís servicio → proyecto → empresa-cliente.'
+            ? 'El selector de empresa (arriba) es solo para «Mi empresa».'
             : L === 'en'
-              ? 'The company in the top-left selector is the “My company” context. In client AT you pick service → project → client company.'
-              : 'A empresa do seletor (canto superior esquerdo) é o contexto de «A minha empresa». Em AT a clientes escolhes serviço → projeto → empresa-cliente.'}
+              ? 'The company selector (top) is only for “My company”.'
+              : 'O seletor de empresa (cima) é só para «A minha empresa».'}
         </p>
       )}
     </div>

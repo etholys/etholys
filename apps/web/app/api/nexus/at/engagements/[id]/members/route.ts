@@ -25,16 +25,45 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 });
   }
 
-  const companyId = String(body.companyId || '').trim();
-  if (!companyId || !tenant.companyIds.includes(companyId)) {
-    return NextResponse.json(
-      { error: 'Empresa inválida ou sem permissão (MVP: tem de pertencer ao utilizador).' },
-      { status: 403 }
-    );
+  let companyId = String(body.companyId || '').trim();
+
+  // Criar ficha de cliente no momento (empresa diferente, mesmo serviço/contrato).
+  if (!companyId && body.name) {
+    const name = String(body.name).trim().slice(0, 200);
+    if (name.length < 2) {
+      return NextResponse.json({ error: 'Nome da empresa inválido.' }, { status: 400 });
+    }
+    const shortRaw = String(body.shortName || '').trim().slice(0, 40);
+    const shortName =
+      shortRaw ||
+      name
+        .split(/\s+/)
+        .slice(0, 3)
+        .map((w) => w[0]?.toUpperCase() || '')
+        .join('')
+        .slice(0, 12) ||
+      name.slice(0, 12);
+    const created = await prisma.company.create({
+      data: { name, shortName, color: '#6366F1' },
+      select: { id: true },
+    });
+    companyId = created.id;
+  }
+
+  if (!companyId) {
+    return NextResponse.json({ error: 'Empresa obrigatória.' }, { status: 400 });
+  }
+
+  const company = await prisma.company.findFirst({
+    where: { id: companyId, isActive: true },
+    select: { id: true },
+  });
+  if (!company) {
+    return NextResponse.json({ error: 'Empresa não encontrada.' }, { status: 404 });
   }
 
   if (engagement.members.some((m) => m.companyId === companyId)) {
-    return NextResponse.json({ error: 'Empresa já está no engagement.' }, { status: 409 });
+    return NextResponse.json({ error: 'Empresa já está no serviço.' }, { status: 409 });
   }
 
   const memberRole =

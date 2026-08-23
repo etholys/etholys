@@ -49,12 +49,39 @@ export async function POST(req: NextRequest) {
     ? [...new Set((body.clientCompanyIds as unknown[]).map((x) => String(x || '').trim()).filter(Boolean))]
     : [];
 
-  for (const cid of clientIds) {
-    if (!tenant.companyIds.includes(cid)) {
-      return NextResponse.json(
-        { error: 'Só pode incluir empresas às quais o utilizador pertence (MVP).' },
-        { status: 403 }
-      );
+  // Novas fichas de empresa-cliente (mesmo contrato, trabalhos separados) — sem membership do operador.
+  const newClientsRaw = Array.isArray(body.newClients) ? (body.newClients as unknown[]) : [];
+  for (const raw of newClientsRaw) {
+    if (!raw || typeof raw !== 'object') continue;
+    const row = raw as Record<string, unknown>;
+    const name = String(row.name || '').trim().slice(0, 200);
+    if (name.length < 2) continue;
+    const shortRaw = String(row.shortName || '').trim().slice(0, 40);
+    const shortName =
+      shortRaw ||
+      name
+        .split(/\s+/)
+        .slice(0, 3)
+        .map((w) => w[0]?.toUpperCase() || '')
+        .join('')
+        .slice(0, 12) ||
+      name.slice(0, 12);
+    const created = await prisma.company.create({
+      data: { name, shortName, color: '#6366F1' },
+      select: { id: true },
+    });
+    if (!clientIds.includes(created.id)) clientIds.push(created.id);
+  }
+
+  if (clientIds.length > 0) {
+    const existing = await prisma.company.findMany({
+      where: { id: { in: clientIds }, isActive: true },
+      select: { id: true },
+    });
+    const ok = new Set(existing.map((c) => c.id));
+    const missing = clientIds.filter((id) => !ok.has(id));
+    if (missing.length > 0) {
+      return NextResponse.json({ error: 'Uma ou mais empresas-cliente são inválidas.' }, { status: 400 });
     }
   }
 
@@ -64,7 +91,7 @@ export async function POST(req: NextRequest) {
     if (!network) return NextResponse.json({ error: 'Rede NEXUS não encontrada.' }, { status: 404 });
     const fromNetwork = memberCompanyIds(network).filter((id) => id !== operatorCompanyId);
     for (const cid of fromNetwork) {
-      if (!clientIds.includes(cid) && tenant.companyIds.includes(cid)) clientIds.push(cid);
+      if (!clientIds.includes(cid)) clientIds.push(cid);
     }
   } else {
     networkId = null;
