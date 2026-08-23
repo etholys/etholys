@@ -135,6 +135,8 @@ type Props = {
   canMoveDown?: boolean;
   canDelete?: boolean;
   disabled?: boolean;
+  /** Redação: editar texto directamente (sem clique para «modo preview») */
+  writeMode?: boolean;
   labels: {
     edit: string;
     preview: string;
@@ -175,6 +177,7 @@ export function StudioBlockEditor({
   canMoveDown,
   canDelete,
   disabled,
+  writeMode = false,
   labels,
 }: Props) {
   const styleWrap = `${studioBlockAlignClass(block.style)} ${studioBlockFrameClass(block.style)}`.trim();
@@ -183,7 +186,7 @@ export function StudioBlockEditor({
   const isDiagram = block.kind === 'diagram';
   const isDraw = isDiagram && isStudioDrawBlock(block);
   const isImage = block.kind === 'image';
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(!!writeMode);
   const [diagramSourceOpen, setDiagramSourceOpen] = useState(
     () => isDiagram && !isDraw && !block.text.trim(),
   );
@@ -191,24 +194,25 @@ export function StudioBlockEditor({
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!editing) return;
-    const el = taRef.current;
-    if (!el) return;
-    el.focus();
-    const len = el.value.length;
-    el.setSelectionRange(len, len);
-    el.style.height = '0px';
-    el.style.height = `${Math.max(el.scrollHeight, 72)}px`;
-  }, [editing]);
+    if (writeMode && !isDiagram && !isImage) setEditing(true);
+  }, [writeMode, isDiagram, isImage]);
 
   useEffect(() => {
     if (!editing) return;
+    const el = taRef.current;
+    if (!el) return;
+    el.style.height = '0px';
+    el.style.height = `${Math.max(el.scrollHeight, writeMode ? 48 : 72)}px`;
+  }, [editing, block.text, writeMode]);
+
+  useEffect(() => {
+    if (!editing || writeMode) return;
     const onDoc = (e: MouseEvent) => {
       if (!rootRef.current?.contains(e.target as Node)) setEditing(false);
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [editing]);
+  }, [editing, writeMode]);
 
   const applyWrap = useCallback(
     (before: string, after: string) => {
@@ -259,7 +263,7 @@ export function StudioBlockEditor({
   const toolBtn =
     'rounded p-1.5 text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-40';
 
-  const toolbar = !disabled && editing && !isDiagram && (
+  const toolbar = !disabled && editing && !isDiagram && !writeMode && (
     <div className="mb-2 flex flex-wrap items-center gap-0.5 rounded-xl border border-slate-200/90 bg-white px-1.5 py-1 shadow-sm">
       <button
         type="button"
@@ -618,7 +622,11 @@ export function StudioBlockEditor({
       {chrome}
       {editing && !disabled ? (
         <div
-          className={`rounded-lg ring-2 ring-orange-200/80 ring-offset-2 ${styleWrap || ''}`}
+          className={
+            writeMode
+              ? `${styleWrap || ''}`
+              : `rounded-lg ring-2 ring-orange-200/80 ring-offset-2 ${styleWrap || ''}`
+          }
         >
           {toolbar}
           <textarea
@@ -628,10 +636,10 @@ export function StudioBlockEditor({
               onChange(e.target.value);
               const el = e.target;
               el.style.height = '0px';
-              el.style.height = `${Math.max(el.scrollHeight, 72)}px`;
+              el.style.height = `${Math.max(el.scrollHeight, writeMode ? 48 : 72)}px`;
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Escape') {
+              if (e.key === 'Escape' && !writeMode) {
                 e.preventDefault();
                 setEditing(false);
               }
@@ -656,9 +664,11 @@ export function StudioBlockEditor({
                 : `${scaleCls} leading-[1.75] text-slate-800`
             }`}
           />
-          <p className="mt-1.5 text-[10px] text-slate-400">
-            Esc · {labels.preview} · Ctrl+B / I / U
-          </p>
+          {!writeMode ? (
+            <p className="mt-1.5 text-[10px] text-slate-400">
+              Esc · {labels.preview} · Ctrl+B / I / U
+            </p>
+          ) : null}
         </div>
       ) : (
         <button

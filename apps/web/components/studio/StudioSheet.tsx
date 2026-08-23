@@ -13,6 +13,8 @@ type Props = {
   layout?: 'flow' | 'fixed';
   onOverflow?: (info: StudioOverflowInfo) => void;
   marginPx?: { top: number; right: number; bottom: number; left: number };
+  /** Barra superior com cor da marca (modo desenho). */
+  brandAccent?: string | null;
   children: React.ReactNode;
 };
 
@@ -30,6 +32,7 @@ export function StudioSheet({
   layout = 'flow',
   onOverflow,
   marginPx,
+  brandAccent,
   children,
 }: Props) {
   const pad = marginPx || { top: 48, right: 56, bottom: 48, left: 56 };
@@ -126,6 +129,9 @@ export function StudioSheet({
         backgroundSize: '100% 100%',
         backgroundRepeat: 'no-repeat',
         backgroundPosition: 'top center',
+        boxShadow: brandAccent
+          ? `0 12px 40px rgba(15,23,42,0.16), inset 0 3px 0 0 ${brandAccent}`
+          : undefined,
       }}
     >
       <div

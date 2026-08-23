@@ -46,6 +46,7 @@ export function studioBlockScaleClass(style?: StudioBlockStyle, kind?: string): 
   return 'text-[15px] leading-[1.75]';
 }
 
+/** Frames usam --studio-brand / --studio-brand-soft quando definidos no canvas. */
 export function studioBlockFrameClass(style?: StudioBlockStyle): string {
   switch (style?.frame) {
     case 'subtle':
@@ -53,13 +54,13 @@ export function studioBlockFrameClass(style?: StudioBlockStyle): string {
     case 'card':
       return 'rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm';
     case 'accent':
-      return 'rounded-lg border border-orange-200 bg-orange-50/50 px-3 py-2';
+      return 'rounded-lg border px-3 py-2 [border-color:color-mix(in_srgb,var(--studio-brand,#ea580c)_35%,transparent)] [background:color-mix(in_srgb,var(--studio-brand,#ea580c)_10%,white)]';
     default:
       return '';
   }
 }
 
-export function studioBlockStyleToInlineCss(style?: StudioBlockStyle): string {
+export function studioBlockStyleToInlineCss(style?: StudioBlockStyle, brandPrimary = '#ea580c'): string {
   const parts: string[] = [];
   if (style?.align === 'center') parts.push('text-align:center');
   else if (style?.align === 'right') parts.push('text-align:right');
@@ -71,7 +72,9 @@ export function studioBlockStyleToInlineCss(style?: StudioBlockStyle): string {
       'border:1px solid #e2e8f0;background:#fff;padding:12px 14px;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.06)',
     );
   } else if (style?.frame === 'accent') {
-    parts.push('border:1px solid #fed7aa;background:#fff7ed;padding:10px 12px;border-radius:8px');
+    parts.push(
+      `border:1px solid ${brandPrimary}59;background:${brandPrimary}14;padding:10px 12px;border-radius:8px`,
+    );
   }
   return parts.join(';');
 }

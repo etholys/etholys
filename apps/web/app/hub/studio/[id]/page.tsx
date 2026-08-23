@@ -189,6 +189,7 @@ export default function StudioDocumentPage() {
   const [aiTargetBlockIds, setAiTargetBlockIds] = useState<string[]>([]);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [imageTargetPageId, setImageTargetPageId] = useState<string | null>(null);
+  const [brandPrimary, setBrandPrimary] = useState('#ea580c');
 
   useEffect(() => {
     dirtyRef.current = dirty;
@@ -374,6 +375,27 @@ export default function StudioDocumentPage() {
     if (!r.ok) return;
     const d = await r.json();
     setMolds(d.molds || []);
+  }, [companyId]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await fetch(`/api/studio/brand?companyId=${encodeURIComponent(companyId)}`, {
+          cache: 'no-store',
+        });
+        if (!r.ok || cancelled) return;
+        const d = await r.json();
+        const color = String(d.brand?.primaryColor || '').trim();
+        if (color && /^#[0-9a-fA-F]{3,8}$/.test(color)) setBrandPrimary(color);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [companyId]);
 
   const load = useCallback(async () => {
@@ -1703,19 +1725,22 @@ export default function StudioDocumentPage() {
         <div
           className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
           style={
-            studioMode === 'design'
-              ? {
-                  backgroundColor: '#120c1a',
-                  backgroundImage:
-                    'radial-gradient(circle at 1px 1px, rgba(167,139,250,0.08) 1px, transparent 0)',
-                  backgroundSize: '20px 20px',
-                }
-              : {
-                  backgroundColor: '#ebe6dc',
-                  backgroundImage:
-                    'radial-gradient(circle at 1px 1px, rgba(68,64,60,0.05) 1px, transparent 0)',
-                  backgroundSize: '18px 18px',
-                }
+            {
+              ['--studio-brand' as string]: brandPrimary,
+              ...(studioMode === 'design'
+                ? {
+                    backgroundColor: '#120c1a',
+                    backgroundImage:
+                      'radial-gradient(circle at 1px 1px, rgba(167,139,250,0.08) 1px, transparent 0)',
+                    backgroundSize: '20px 20px',
+                  }
+                : {
+                    backgroundColor: '#ebe6dc',
+                    backgroundImage:
+                      'radial-gradient(circle at 1px 1px, rgba(68,64,60,0.05) 1px, transparent 0)',
+                    backgroundSize: '18px 18px',
+                  }),
+            }
           }
         >
           {studioMode === 'write' && (
@@ -2014,6 +2039,7 @@ export default function StudioDocumentPage() {
                       pageLabel={`${idx + 1} / ${canvas.pages.length}`}
                       backgroundImage={bg}
                       canEdit={canEdit}
+                      brandAccent={studioMode === 'design' ? brandPrimary : null}
                       layout={
                         studioMode === 'write' && idx === canvas.pages.length - 1
                           ? 'flow'
@@ -2033,6 +2059,7 @@ export default function StudioDocumentPage() {
                           <div key={block.id} data-studio-block-id={block.id} className="shrink-0">
                             <StudioBlockEditor
                               block={block}
+                              writeMode={studioMode === 'write'}
                               disabled={!canEdit}
                               aiSelected={aiTargetBlockIds.includes(block.id)}
                               onToggleAiSelect={() => toggleAiTarget(block.id)}
@@ -2060,7 +2087,10 @@ export default function StudioDocumentPage() {
                                 list: t('Lista', 'Lista', 'List'),
                                 heading: t('Subtítulo', 'Subtítulo', 'Subheading'),
                                 code: t('Código', 'Código', 'Code'),
-                                empty: t('Clique para escrever…', 'Clic para escribir…', 'Click to write…'),
+                                empty:
+                                  studioMode === 'write'
+                                    ? t('Comece a escrever…', 'Empiece a escribir…', 'Start typing…')
+                                    : t('Clique para escrever…', 'Clic para escribir…', 'Click to write…'),
                                 editSource: t('Editar código', 'Editar código', 'Edit source'),
                                 templates: t('Modelos', 'Plantillas', 'Templates'),
                                 asHeading: t('Como título', 'Como título', 'As heading'),

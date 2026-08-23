@@ -49,9 +49,9 @@ function inlineMdHtml(s: string): string {
     .replace(/`([^`]+)`/g, '<code>$1</code>');
 }
 
-function blockHtml(block: StudioBlock): string {
+function blockHtml(block: StudioBlock, brandPrimary?: string): string {
   const text = block.text || '';
-  const wrapStyle = studioBlockStyleToInlineCss(block.style);
+  const wrapStyle = studioBlockStyleToInlineCss(block.style, brandPrimary);
   const wrap = (inner: string) =>
     wrapStyle ? `<div style="${wrapStyle}">${inner}</div>` : inner;
 
@@ -106,7 +106,7 @@ export function studioCanvasToHtml(
       const blocks = page.blocks
         .slice()
         .sort((a, b) => a.order - b.order)
-        .map(blockHtml)
+        .map((b) => blockHtml(b, color))
         .join('\n');
       return `<section class="page"><div class="page-label">${esc(page.title)}</div>${blocks}</section>`;
     })

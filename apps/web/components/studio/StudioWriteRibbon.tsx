@@ -96,6 +96,27 @@ export function StudioWriteRibbon({ disabled, onWrap, onKind, onStyle, labels }:
             </button>
           ))}
         </div>
+        <div className="flex items-center gap-0.5 rounded-lg border border-stone-200 bg-stone-100/80 p-0.5">
+          {(
+            [
+              ['none', '—'],
+              ['subtle', 'S'],
+              ['card', 'C'],
+              ['accent', 'A'],
+            ] as const
+          ).map(([frame, short]) => (
+            <button
+              key={frame}
+              type="button"
+              disabled={disabled}
+              title={frame}
+              onClick={() => onStyle({ frame })}
+              className="h-8 min-w-[1.75rem] rounded-md px-1.5 text-[10px] font-bold text-slate-700 hover:bg-white hover:shadow-sm disabled:opacity-40"
+            >
+              {short}
+            </button>
+          ))}
+        </div>
         <p className="ml-auto hidden text-[10px] text-stone-400 lg:block">{labels.hint}</p>
       </div>
     </div>

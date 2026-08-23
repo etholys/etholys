@@ -347,17 +347,37 @@ export default function StudioHubPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">
-            {t('Biblioteca de documentos', 'Biblioteca de documentos', 'Document library')}
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {t(
-              'Crie um documento em branco ou a partir de um template, e vincule-o a NEXUS, SIEP, FUNDHUB, etc.',
-              'Cree un documento en blanco o desde una plantilla, y vincúlelo a NEXUS, SIEP, FUNDHUB, etc.',
-              'Create a blank document or from a template, then link it to NEXUS, SIEP, FUNDHUB, etc.',
-            )}
-          </p>
+        <div className="mb-8 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-stone-900 [font-family:var(--font-etholys-display),ui-sans-serif,system-ui,sans-serif]">
+              {t('Biblioteca de documentos', 'Biblioteca de documentos', 'Document library')}
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-stone-600">
+              {t(
+                'Redação tipo Word e Desenho tipo Canva/Gamma — no mesmo documento. Vincule a NEXUS, SIEP, FUNDHUB e a IA usa o contexto.',
+                'Redacción tipo Word y Diseño tipo Canva/Gamma — en el mismo documento. Vincule a NEXUS, SIEP, FUNDHUB y la IA usa el contexto.',
+                'Word-like Write and Canva/Gamma Design — same document. Link NEXUS, SIEP, FUNDHUB and AI uses that context.',
+              )}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 self-end">
+            <div className="rounded-2xl border border-orange-200/80 bg-gradient-to-br from-orange-50 to-amber-50 px-3 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-700">
+                {t('Redação', 'Redacción', 'Write')}
+              </p>
+              <p className="mt-1 text-xs leading-snug text-stone-700">
+                {t('Texto contínuo, faixa de formato', 'Texto continuo, cinta de formato', 'Flowing text, format ribbon')}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-3 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-violet-700">
+                {t('Desenho', 'Diseño', 'Design')}
+              </p>
+              <p className="mt-1 text-xs leading-snug text-stone-700">
+                {t('Layout com IA + brand kit', 'Layout con IA + brand kit', 'AI layout + brand kit')}
+              </p>
+            </div>
+          </div>
         </div>
 
         <nav className="mb-4 flex flex-wrap items-center gap-1 text-sm text-slate-600">
