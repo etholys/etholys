@@ -36,6 +36,7 @@ import {
   studioBlockFrameClass,
   studioBlockScaleClass,
 } from '@/lib/studio/block-style';
+import { StudioRichTextEditor } from '@/components/studio/StudioRichTextEditor';
 
 const DIAGRAM_TEMPLATES: Array<{ id: string; label: string; source: string }> = [
   {
@@ -120,6 +121,8 @@ function prefixLines(value: string, start: number, end: number, prefix: string):
 
 type Props = {
   block: StudioBlock;
+  /** Necessário para TipTap + ribbon (modo redação) */
+  pageId?: string;
   onChange: (text: string) => void;
   onKindChange?: (kind: StudioBlockKind) => void;
   onDiagramLangChange?: (lang: 'draw' | 'mermaid') => void;
@@ -163,6 +166,7 @@ type Props = {
 
 export function StudioBlockEditor({
   block,
+  pageId,
   onChange,
   onKindChange,
   onDiagramLangChange,
@@ -620,7 +624,24 @@ export function StudioBlockEditor({
         </div>
       )}
       {chrome}
-      {editing && !disabled ? (
+      {writeMode && pageId && !isDiagram && !isImage ? (
+        <div className={`${styleWrap || ''} ${scaleCls}`}>
+          <StudioRichTextEditor
+            blockId={block.id}
+            pageId={pageId}
+            text={block.text}
+            kind={block.kind}
+            disabled={disabled}
+            placeholder={labels.empty}
+            onChange={onChange}
+            className={`studio-rich-editor min-h-[1.5em] w-full outline-none ${
+              block.kind === 'heading'
+                ? 'font-bold leading-snug tracking-tight text-slate-900 [font-family:var(--font-etholys-display),ui-sans-serif,system-ui,sans-serif] [&_h1]:text-inherit [&_h2]:text-inherit [&_h3]:text-inherit'
+                : 'leading-[1.75] text-slate-800'
+            }`}
+          />
+        </div>
+      ) : editing && !disabled ? (
         <div
           className={
             writeMode

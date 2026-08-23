@@ -15,6 +15,7 @@ type Props = {
   marginPx?: { top: number; right: number; bottom: number; left: number };
   /** Barra superior com cor da marca (modo desenho). */
   brandAccent?: string | null;
+  freeform?: boolean;
   children: React.ReactNode;
 };
 
@@ -33,6 +34,7 @@ export function StudioSheet({
   onOverflow,
   marginPx,
   brandAccent,
+  freeform,
   children,
 }: Props) {
   const pad = marginPx || { top: 48, right: 56, bottom: 48, left: 56 };
@@ -136,6 +138,7 @@ export function StudioSheet({
     >
       <div
         ref={bodyRef}
+        data-studio-sheet-body
         className={`relative z-10 box-border ${isFixed ? 'absolute inset-0 overflow-hidden' : 'overflow-visible'}`}
         style={{
           fontFamily: 'var(--font-etholys-sans), ui-sans-serif, system-ui, sans-serif',
@@ -146,7 +149,9 @@ export function StudioSheet({
           ...(isFixed ? {} : { minHeight: height }),
         }}
       >
-        <div className="flex min-h-0 flex-col gap-3.5">{children}</div>
+        <div className={`flex min-h-0 flex-col gap-3.5 ${freeform ? 'relative min-h-full' : ''}`}>
+          {children}
+        </div>
       </div>
 
       <div

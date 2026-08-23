@@ -1,4 +1,4 @@
-import type { StudioBlockStyle } from '@/lib/studio/types';
+import type { StudioBlockLayout, StudioBlockStyle } from '@/lib/studio/types';
 
 export function normalizeStudioBlockStyle(raw: unknown): StudioBlockStyle | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
@@ -17,6 +17,20 @@ export function normalizeStudioBlockStyle(raw: unknown): StudioBlockStyle | unde
       : undefined;
   if (!align && !textScale && !frame) return undefined;
   return { align, textScale, frame };
+}
+
+export function normalizeStudioBlockLayout(raw: unknown): StudioBlockLayout | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const o = raw as Record<string, unknown>;
+  const clamp = (n: unknown, fallback?: number) => {
+    if (typeof n !== 'number' || Number.isNaN(n)) return fallback;
+    return Math.max(0, Math.min(100, n));
+  };
+  const xPct = clamp(o.xPct);
+  const yPct = clamp(o.yPct);
+  const wPct = clamp(o.wPct);
+  if (xPct === undefined && yPct === undefined && wPct === undefined) return undefined;
+  return { xPct, yPct, wPct };
 }
 
 export function studioBlockAlignClass(style?: StudioBlockStyle): string {

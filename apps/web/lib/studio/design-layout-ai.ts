@@ -6,13 +6,15 @@ import type { StudioBlock, StudioCanvasState, StudioPage } from '@/lib/studio/ty
 import { normalizeStudioCanvas } from '@/lib/studio/types';
 import type { StudioBrandKit } from '@/lib/studio/export';
 
+import { studioBlockPlainText } from '@/lib/studio/rich-text';
+
 export function flattenStudioTextForDesign(canvas: StudioCanvasState): string {
   const pages = canvas.pages.slice().sort((a, b) => a.order - b.order);
   const parts: string[] = [];
   for (const p of pages) {
     for (const b of p.blocks.slice().sort((x, y) => x.order - y.order)) {
       if (b.kind === 'image' || b.kind === 'diagram') continue;
-      const t = String(b.text || '').trim();
+      const t = studioBlockPlainText(String(b.text || '')).trim();
       if (!t) continue;
       const tag =
         b.kind === 'heading'
@@ -61,7 +63,9 @@ ${opts.styleBrief || '(moderno, limpo, institucional)'}
 4. Capa: 1.ª página com título grande (heading xl, center) + subtítulo.
 5. Secções claras; callouts para destaques; listas para bullets.
 6. Máximo 8 páginas. Densidade equilibrada (não folhas quase vazias).
-7. Responde **só JSON** válido:
+7. Em cada bloco podes incluir layout livre (Canva-like) em % da folha:
+   "layout": { "xPct": 6, "yPct": 12, "wPct": 88 }
+8. Responde **só JSON** válido:
 {
   "message": "resumo curto do que fizeste",
   "pages": [
@@ -84,14 +88,15 @@ export function parseDesignLayoutJson(raw: string): {
   message: string;
   pages: Array<{
     title?: string;
-    blocks: Array<{
-      kind?: string;
-      text?: string;
-      title?: string;
-      style?: StudioBlock['style'];
-      diagramLang?: StudioBlock['diagramLang'];
-    }>;
-  }>;
+        blocks: Array<{
+          kind?: string;
+          text?: string;
+          title?: string;
+          style?: StudioBlock['style'];
+          layout?: StudioBlock['layout'];
+          diagramLang?: StudioBlock['diagramLang'];
+        }>;
+      }>;
 } | null {
   const trimmed = raw.trim();
   const start = trimmed.indexOf('{');
@@ -139,6 +144,22 @@ export function applyDesignLayoutToCanvas(
       .map((b, j) => {
         const kindRaw = String(b.kind || 'paragraph');
         const kind = (KINDS.has(kindRaw) ? kindRaw : 'paragraph') as StudioBlock['kind'];
+        const fromAi =
+          b.layout && typeof b.layout === 'object'
+            ? {
+                xPct: typeof b.layout.xPct === 'number' ? b.layout.xPct : undefined,
+                yPct: typeof b.layout.yPct === 'number' ? b.layout.yPct : undefined,
+                wPct: typeof b.layout.wPct === 'number' ? b.layout.wPct : undefined,
+              }
+            : null;
+        const autoLayout =
+          fromAi && (fromAi.xPct != null || fromAi.yPct != null)
+            ? fromAi
+            : {
+                xPct: i === 0 && j === 0 ? 8 : 6,
+                yPct: i === 0 && j === 0 ? 28 : Math.min(78, 8 + j * 14),
+                wPct: i === 0 && j === 0 ? 84 : 88,
+              };
         return {
           id: newId('block'),
           kind,
@@ -155,6 +176,7 @@ export function applyDesignLayoutToCanvas(
             }
             return Object.keys(base).length ? base : undefined;
           })(),
+          layout: autoLayout,
           order: j,
         };
       });

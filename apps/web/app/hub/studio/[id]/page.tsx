@@ -60,6 +60,8 @@ import {
 } from '@/components/studio/StudioContextPanel';
 import { StudioCommentsPanel } from '@/components/studio/StudioCommentsPanel';
 import { StudioBlockEditor } from '@/components/studio/StudioBlockEditor';
+import { StudioDesignPlacedBlock } from '@/components/studio/StudioDesignPlacedBlock';
+import { getStudioWriteFocus, runStudioWriteCommand } from '@/lib/studio/write-editor-bus';
 import { StudioSheet } from '@/components/studio/StudioSheet';
 import { StudioToolsSidebar } from '@/components/studio/StudioToolsSidebar';
 import { DocumentLinksPanel } from '@/components/studio/DocumentLinksPanel';
@@ -673,6 +675,7 @@ export default function StudioDocumentPage() {
       kind?: StudioBlock['kind'];
       diagramLang?: StudioBlock['diagramLang'];
       style?: StudioBlock['style'];
+      layout?: StudioBlock['layout'];
     },
   ) {
     applyCanvas((prev) => ({
@@ -701,6 +704,7 @@ export default function StudioDocumentPage() {
                       ...(patch.style !== undefined
                         ? { style: { ...(b.style || {}), ...patch.style } }
                         : {}),
+                      ...(patch.layout !== undefined ? { layout: patch.layout } : {}),
                     }
                   : b,
               ),
@@ -1098,6 +1102,8 @@ export default function StudioDocumentPage() {
 
   function focusBlockTarget(): { pageId: string; blockId: string } | null {
     if (!canvas) return null;
+    const tip = getStudioWriteFocus();
+    if (tip?.pageId && tip.blockId) return { pageId: tip.pageId, blockId: tip.blockId };
     if (aiTargetBlockIds[0]) {
       for (const p of canvas.pages) {
         if (p.blocks.some((b) => b.id === aiTargetBlockIds[0])) {
@@ -1114,6 +1120,10 @@ export default function StudioDocumentPage() {
   }
 
   function ribbonWrap(before: string, after: string) {
+    if (before === '**' && after === '**' && runStudioWriteCommand({ type: 'bold' })) return;
+    if ((before === '_' || before === '*') && (after === '_' || after === '*') && runStudioWriteCommand({ type: 'italic' }))
+      return;
+    if (before === '<u>' && after === '</u>' && runStudioWriteCommand({ type: 'underline' })) return;
     const target = focusBlockTarget();
     if (!target || !canvas) return;
     const page = canvas.pages.find((p) => p.id === target.pageId);
@@ -1124,12 +1134,18 @@ export default function StudioDocumentPage() {
   }
 
   function ribbonKind(kind: StudioBlock['kind']) {
+    if (kind === 'heading' && runStudioWriteCommand({ type: 'heading' })) return;
+    if (kind === 'paragraph' && runStudioWriteCommand({ type: 'paragraph' })) return;
+    if (kind === 'bullets' && runStudioWriteCommand({ type: 'bulletList' })) return;
     const target = focusBlockTarget();
     if (!target) return;
     updateBlock(target.pageId, target.blockId, { kind });
   }
 
   function ribbonStyle(partial: NonNullable<StudioBlock['style']>) {
+    if (partial.align && runStudioWriteCommand({ type: 'align', align: partial.align })) {
+      /* also persist block style for export/design */
+    }
     const ids = aiTargetBlockIds.length
       ? aiTargetBlockIds
       : (() => {
@@ -1758,9 +1774,9 @@ export default function StudioDocumentPage() {
                 body: t('Corpo', 'Cuerpo', 'Body'),
                 list: t('Lista', 'Lista', 'List'),
                 hint: t(
-                  'Seleciona um bloco (mira) ou a folha ativa',
-                  'Selecciona un bloque (mira) o la hoja activa',
-                  'Select a block (crosshair) or the active sheet',
+                  'Selecione texto no documento — a faixa formata a seleção',
+                  'Seleccione texto en el documento — la cinta formatea la selección',
+                  'Select text in the document — the ribbon formats the selection',
                 ),
               }}
             />
@@ -1842,6 +1858,34 @@ export default function StudioDocumentPage() {
                 className="rounded-md border border-violet-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-violet-900 hover:bg-violet-100"
               >
                 {t('Moldes', 'Moldes', 'Molds')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const pageId = activePageId || canvas.pages[0]?.id;
+                  if (!pageId) return;
+                  applyCanvas((prev) => ({
+                    ...prev,
+                    pages: prev.pages.map((p) => {
+                      if (p.id !== pageId) return p;
+                      const sorted = p.blocks.slice().sort((a, b) => a.order - b.order);
+                      return {
+                        ...p,
+                        blocks: sorted.map((b, j) => ({
+                          ...b,
+                          layout: {
+                            xPct: j === 0 ? 8 : 6,
+                            yPct: Math.min(78, 10 + j * 16),
+                            wPct: j === 0 ? 84 : 88,
+                          },
+                        })),
+                      };
+                    }),
+                  }));
+                }}
+                className="rounded-md border border-violet-300 bg-violet-600 px-2 py-1.5 text-[11px] font-bold text-white hover:bg-violet-500"
+              >
+                {t('Posicionar na folha', 'Posicionar en hoja', 'Place on page')}
               </button>
             </div>
           )}
@@ -2040,6 +2084,10 @@ export default function StudioDocumentPage() {
                       backgroundImage={bg}
                       canEdit={canEdit}
                       brandAccent={studioMode === 'design' ? brandPrimary : null}
+                      freeform={
+                        studioMode === 'design' &&
+                        page.blocks.some((b) => b.layout && (b.layout.xPct != null || b.layout.yPct != null))
+                      }
                       layout={
                         studioMode === 'write' && idx === canvas.pages.length - 1
                           ? 'flow'
@@ -2057,8 +2105,15 @@ export default function StudioDocumentPage() {
                         .sort((a, b) => a.order - b.order)
                         .map((block, blockIdx, arr) => (
                           <div key={block.id} data-studio-block-id={block.id} className="shrink-0">
+                            <StudioDesignPlacedBlock
+                              freeform={studioMode === 'design'}
+                              layout={block.layout}
+                              canEdit={canEdit}
+                              onLayoutChange={(layout) => updateBlock(page.id, block.id, { layout })}
+                            >
                             <StudioBlockEditor
                               block={block}
+                              pageId={page.id}
                               writeMode={studioMode === 'write'}
                               disabled={!canEdit}
                               aiSelected={aiTargetBlockIds.includes(block.id)}
@@ -2109,6 +2164,7 @@ export default function StudioDocumentPage() {
                                 selectedForAi: t('No âmbito da IA', 'En ámbito de IA', 'In AI scope'),
                               }}
                             />
+                            </StudioDesignPlacedBlock>
                           </div>
                         ))}
                     </StudioSheet>

@@ -92,3 +92,31 @@
     animation: none;
   }
 }
+
+/* Etholys Studio — TipTap (modo Redação) */
+.studio-rich-editor.ProseMirror {
+  min-height: 1.5em;
+}
+.studio-rich-editor.ProseMirror p {
+  margin: 0.25em 0;
+}
+.studio-rich-editor.ProseMirror h1,
+.studio-rich-editor.ProseMirror h2,
+.studio-rich-editor.ProseMirror h3 {
+  margin: 0.35em 0;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.studio-rich-editor.ProseMirror ul {
+  margin: 0.35em 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+.studio-rich-editor.ProseMirror p.is-editor-empty:first-child::before {
+  color: #a8a29e;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+

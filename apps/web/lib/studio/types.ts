@@ -106,6 +106,13 @@ export type StudioBlockStyle = {
   frame?: 'none' | 'subtle' | 'card' | 'accent';
 };
 
+/** Posição livre no modo Desenho (% da área útil da folha). Ignorado na Redação. */
+export type StudioBlockLayout = {
+  xPct?: number;
+  yPct?: number;
+  wPct?: number;
+};
+
 export type StudioBlock = {
   id: string;
   kind: StudioBlockKind;
@@ -115,6 +122,8 @@ export type StudioBlock = {
   diagramLang?: 'mermaid' | 'draw' | 'text';
   imageUrl?: string | null;
   style?: StudioBlockStyle;
+  /** Só modo design — arrastar/redimensionar na folha */
+  layout?: StudioBlockLayout;
   order: number;
 };
 
@@ -254,6 +263,20 @@ export function normalizeStudioCanvas(raw: unknown): StudioCanvasState {
                     : undefined,
                 imageUrl: b.imageUrl ?? null,
                 style: normalizeStudioBlockStyle((b as { style?: unknown }).style),
+                layout: (() => {
+                  const raw = (b as { layout?: unknown }).layout;
+                  if (!raw || typeof raw !== 'object') return undefined;
+                  const o = raw as Record<string, unknown>;
+                  const clamp = (n: unknown) =>
+                    typeof n === 'number' && !Number.isNaN(n)
+                      ? Math.max(0, Math.min(100, n))
+                      : undefined;
+                  const xPct = clamp(o.xPct);
+                  const yPct = clamp(o.yPct);
+                  const wPct = clamp(o.wPct);
+                  if (xPct === undefined && yPct === undefined && wPct === undefined) return undefined;
+                  return { xPct, yPct, wPct };
+                })(),
                 order: typeof b.order === 'number' ? b.order : j,
               }))
             : [],
