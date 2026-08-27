@@ -2,6 +2,8 @@ import type { StudioCanvasState, StudioBlock } from '@/lib/studio/types';
 import { markdownLiteToHtml } from '@/lib/studio/markdown-lite';
 import { parseStudioDrawScene } from '@/lib/studio/draw-scene';
 import { studioBlockStyleToInlineCss } from '@/lib/studio/block-style';
+import { parseMarkdownTable, tableGridToHtml } from '@/lib/studio/table-markdown';
+import { displayTableCellValue, isTableFormula } from '@/lib/studio/table-formulas';
 
 export type StudioBrandKit = {
   primaryColor: string;
@@ -69,11 +71,19 @@ function blockHtml(block: StudioBlock, brandPrimary?: string): string {
     case 'callout':
       return wrap(`<div class="callout">${markdownLiteToHtml(text)}</div>`);
     case 'image':
-      return wrap(
-        block.imageUrl
-          ? `<figure class="studio-image"><img src="${esc(block.imageUrl)}" alt="${esc(block.text || '')}" /></figure>`
-          : `<p class="muted">${esc(block.text || '—')}</p>`,
-      );
+      {
+        const scene =
+          block.mediaMeta?.type === 'video-scene' && block.mediaMeta.narration
+            ? `<figcaption class="studio-video-scene">${esc(block.mediaMeta.narration)}${
+                block.mediaMeta.durationSec ? ` (${block.mediaMeta.durationSec}s)` : ''
+              }</figcaption>`
+            : '';
+        return wrap(
+          block.imageUrl
+            ? `<figure class="studio-image"><img src="${esc(block.imageUrl)}" alt="${esc(block.text || '')}" />${scene}</figure>`
+            : `<p class="muted">${esc(block.text || block.imagePrompt || '—')}</p>`,
+        );
+      }
     case 'diagram': {
       const draw = parseStudioDrawScene(text);
       if (draw?.svgPreview) {
@@ -82,10 +92,22 @@ function blockHtml(block: StudioBlock, brandPrimary?: string): string {
       return wrap(`<pre class="diagram">${esc(text)}</pre>`);
     }
     case 'table':
-      return wrap(`<pre class="table-raw">${esc(text)}</pre>`);
+      return wrap(tableGridToHtml(text));
     default:
       return wrap(markdownLiteToHtml(text));
   }
+}
+
+function positionedBlockHtml(block: StudioBlock, brandPrimary?: string, designMode?: boolean): string {
+  const inner = blockHtml(block, brandPrimary);
+  const layout = block.layout;
+  if (!designMode || !layout || (layout.xPct == null && layout.yPct == null)) return inner;
+  const x = layout.xPct ?? 0;
+  const y = layout.yPct ?? 0;
+  const w = layout.wPct ?? 88;
+  const h = layout.hPct;
+  const pos = `position:absolute;left:${x}%;top:${y}%;width:${w}%;${h != null ? `height:${h}%;overflow:hidden;` : ''}box-sizing:border-box;`;
+  return `<div style="${pos}">${inner}</div>`;
 }
 
 export function studioCanvasToHtml(
@@ -99,16 +121,31 @@ export function studioCanvasToHtml(
   const logo = brand.logoUrl
     ? `<img class="logo" src="${esc(brand.logoUrl)}" alt="" />`
     : '';
+  const designMode = canvas.studioMode === 'design';
   const pages = canvas.pages
     .slice()
     .sort((a, b) => a.order - b.order)
-    .map((page) => {
+    .map((page, pageIdx, allPages) => {
+      const hf = canvas.headerFooter;
+      const footerLine = [
+        hf?.footer || '',
+        hf?.showPageNumbers ? `${pageIdx + 1} / ${allPages.length}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      const hasFreeform = designMode && page.blocks.some((b) => b.layout && (b.layout.xPct != null || b.layout.yPct != null));
       const blocks = page.blocks
         .slice()
         .sort((a, b) => a.order - b.order)
-        .map((b) => blockHtml(b, color))
+        .map((b) => positionedBlockHtml(b, color, designMode))
         .join('\n');
-      return `<section class="page"><div class="page-label">${esc(page.title)}</div>${blocks}</section>`;
+      const body = hasFreeform
+        ? `<div class="page-canvas" style="position:relative;min-height:720px;">${blocks}</div>`
+        : blocks;
+      const bgStyle = page.backgroundColor
+        ? ` style="background-color:${esc(page.backgroundColor)};"`
+        : '';
+      return `<section class="page"${bgStyle}><div class="page-label">${esc(page.title)}</div>${hf?.header ? `<div class="page-header">${esc(hf.header)}</div>` : ''}${body}${footerLine ? `<div class="page-footer">${esc(footerLine)}</div>` : ''}</section>`;
     })
     .join('\n');
 
@@ -127,12 +164,17 @@ export function studioCanvasToHtml(
   li { margin: 4px 0; }
   .callout { background: #fff7ed; border-left: 4px solid ${color}; padding: 12px 14px; margin: 10px 0; border-radius: 0 8px 8px 0; }
   .diagram, .table-raw { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; font-size: 10px; white-space: pre-wrap; overflow-wrap: break-word; }
+  table.studio-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 11px; }
+  table.studio-table th, table.studio-table td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
+  table.studio-table th { background: #f1f5f9; font-weight: 600; }
+  .page-canvas { margin: 8px 0; }
   .diagram-visual { margin: 12px 0; text-align: center; }
   .diagram-visual svg { max-width: 100%; height: auto; }
   .studio-image { margin: 14px 0; text-align: center; }
   .studio-image img { max-width: 100%; height: auto; border-radius: 6px; }
   .muted { color: #94a3b8; }
-  .footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 9px; color: #94a3b8; text-align: center; }
+  .page-footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 9px; color: #94a3b8; text-align: center; }
+  .page-header { margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; color: #64748b; }
 </style></head><body>
   <div class="header">
     <div>
@@ -176,6 +218,21 @@ export async function studioCanvasToDocxBuffer(
         for (const item of items) {
           paras.push(wParagraph(wRun(`• ${stripMdMarkers(item)}`, { size: 22 })));
         }
+      } else if (block.kind === 'table') {
+        paras.push(wDocxTable(block.text || ''));
+      } else if (block.kind === 'callout') {
+        paras.push(
+          wParagraph(wRun(stripMdMarkers(block.text) || ' ', { size: 22, color: colorHex })),
+        );
+      } else if (block.kind === 'image') {
+        paras.push(
+          wParagraph(
+            wRun(block.imageUrl ? `[Imagem: ${stripMdMarkers(block.text) || '—'}]` : stripMdMarkers(block.text) || '[Imagem]', {
+              size: 20,
+              color: '64748B',
+            }),
+          ),
+        );
       } else if (block.kind === 'diagram') {
         const draw = parseStudioDrawScene(block.text || '');
         if (draw?.svgPreview) {
@@ -195,22 +252,31 @@ export async function studioCanvasToDocxBuffer(
   }
 
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <w:body>
     ${paras.join('\n')}
-    <w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>
+    <w:sectPr>
+      <w:pgSz w:w="11906" w:h="16838"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+      ${docxHeaderFooterRefs(canvas)}
+    </w:sectPr>
   </w:body>
 </w:document>`;
 
-  zip.file(
-    '[Content_Types].xml',
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  const hf = canvas.headerFooter;
+  const hasHeader = !!hf?.header?.trim();
+  const hasFooter = !!(hf?.footer?.trim() || hf?.showPageNumbers);
+  const contentTypes = [`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>`,
-  );
+  ${hasHeader ? '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' : ''}
+  ${hasFooter ? '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' : ''}
+</Types>`];
+
+  zip.file('[Content_Types].xml', contentTypes);
   zip.folder('_rels')?.file(
     '.rels',
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -219,9 +285,52 @@ export async function studioCanvasToDocxBuffer(
 </Relationships>`,
   );
   zip.folder('word')?.file('document.xml', documentXml);
+  if (hasHeader) {
+    zip.folder('word')?.file(
+      'header1.xml',
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  ${wParagraph(wRun(hf!.header!.trim(), { size: 18, color: '64748B' }))}
+</w:hdr>`,
+    );
+  }
+  if (hasFooter) {
+    const footerRuns = [
+      hf?.footer?.trim() ? wRun(hf.footer.trim(), { size: 16, color: '94A3B8' }) : '',
+      hf?.footer?.trim() && hf?.showPageNumbers ? wRun(' · ', { size: 16, color: '94A3B8' }) : '',
+      hf?.showPageNumbers
+        ? `<w:r><w:rPr><w:sz w:val="16"/><w:color w:val="94A3B8"/></w:rPr><w:fldSimple w:instr=" PAGE "><w:r><w:t>1</w:t></w:r></w:fldSimple></w:r>`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('');
+    zip.folder('word')?.file(
+      'footer1.xml',
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>${footerRuns}</w:p>
+</w:ftr>`,
+    );
+  }
+  const docRels: string[] = [];
+  if (hasHeader) {
+    docRels.push(
+      `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>`,
+    );
+  }
+  if (hasFooter) {
+    docRels.push(
+      `<Relationship Id="rId${hasHeader ? 2 : 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>`,
+    );
+  }
   zip.folder('word')?.folder('_rels')?.file(
     'document.xml.rels',
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    docRels.length
+      ? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${docRels.join('\n  ')}
+</Relationships>`
+      : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>`,
   );
 
@@ -243,6 +352,47 @@ function wRun(
 
 function wParagraph(inner: string): string {
   return `<w:p>${inner}</w:p>`;
+}
+
+function docxHeaderFooterRefs(canvas: StudioCanvasState): string {
+  const hf = canvas.headerFooter;
+  const hasHeader = !!hf?.header?.trim();
+  const hasFooter = !!(hf?.footer?.trim() || hf?.showPageNumbers);
+  const parts: string[] = [];
+  if (hasHeader) {
+    parts.push('<w:headerReference w:type="default" r:id="rId1"/>');
+  }
+  if (hasFooter) {
+    parts.push(`<w:footerReference w:type="default" r:id="rId${hasHeader ? 2 : 1}"/>`);
+  }
+  return parts.join('\n      ');
+}
+
+function wDocxTable(text: string): string {
+  const grid = parseMarkdownTable(text);
+  if (!grid || !grid.headers.length) {
+    return wParagraph(wRun(stripMdMarkers(text) || ' ', { size: 20 }));
+  }
+  const cols = grid.headers.length;
+  const colPct = Math.floor(5000 / cols);
+  const gridCols = grid.headers.map(() => `<w:gridCol w:w="${colPct}"/>`).join('');
+  const headerRow = `<w:tr>${grid.headers
+    .map((h) => `<w:tc><w:p>${wRun(stripMdMarkers(h), { bold: true, size: 20 })}</w:p></w:tc>`)
+    .join('')}</w:tr>`;
+  const bodyRows = grid.rows
+    .map(
+      (row) =>
+        `<w:tr>${row
+          .map((c) => `<w:tc><w:p>${wRun(stripMdMarkers(c), { size: 20 })}</w:p></w:tc>`)
+          .join('')}</w:tr>`,
+    )
+    .join('');
+  return `<w:tbl>
+    <w:tblPr><w:tblW w:w="5000" w:type="pct"/></w:tblPr>
+    <w:tblGrid>${gridCols}</w:tblGrid>
+    ${headerRow}
+    ${bodyRows}
+  </w:tbl>`;
 }
 
 function escXml(s: string): string {

@@ -8,7 +8,9 @@ import {
   Bold,
   Heading2,
   Italic,
+  Link2,
   List,
+  ListOrdered,
   Type,
   Underline,
 } from 'lucide-react';
@@ -17,6 +19,7 @@ import type { StudioBlockKind, StudioBlockStyle } from '@/lib/studio/types';
 type Props = {
   disabled?: boolean;
   onWrap: (before: string, after: string) => void;
+  onCommand?: (cmd: 'orderedList' | 'link') => void;
   onKind: (kind: StudioBlockKind) => void;
   onStyle: (partial: StudioBlockStyle) => void;
   labels: {
@@ -27,11 +30,13 @@ type Props = {
     heading: string;
     body: string;
     list: string;
+    orderedList: string;
+    link: string;
     hint: string;
   };
 };
 
-export function StudioWriteRibbon({ disabled, onWrap, onKind, onStyle, labels }: Props) {
+export function StudioWriteRibbon({ disabled, onWrap, onCommand, onKind, onStyle, labels }: Props) {
   const btn =
     'inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-700 hover:bg-white hover:shadow-sm disabled:opacity-40';
 
@@ -67,6 +72,24 @@ export function StudioWriteRibbon({ disabled, onWrap, onKind, onStyle, labels }:
           </button>
           <button type="button" disabled={disabled} title={labels.list} className={btn} onClick={() => onKind('bullets')}>
             <List className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            title={labels.orderedList}
+            className={btn}
+            onClick={() => onCommand?.('orderedList')}
+          >
+            <ListOrdered className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            title={labels.link}
+            className={btn}
+            onClick={() => onCommand?.('link')}
+          >
+            <Link2 className="h-3.5 w-3.5" />
           </button>
         </div>
         <div className="flex items-center gap-0.5 rounded-lg border border-stone-200 bg-stone-100/80 p-0.5">

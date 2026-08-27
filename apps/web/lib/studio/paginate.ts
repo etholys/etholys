@@ -375,3 +375,30 @@ export function studioLikelyOverPaginated(canvas: StudioCanvasState): boolean {
     canvas.pages.reduce((s, p) => s + (p.blocks?.length || 0), 0) / Math.max(1, n);
   return avgBlocks <= 2 || n > 20;
 }
+
+/**
+ * Após editar um bloco, remove folhas seguintes que parecem picote de overflow
+ * (evita que fragmentos antigos reapareçam ao reflow / voltar ao chat).
+ */
+export function trimWriteOverflowTail(
+  canvas: StudioCanvasState,
+  editedBlockId: string,
+): StudioCanvasState {
+  if (canvas.studioMode === 'design') return canvas;
+  const pages = canvas.pages.slice().sort((a, b) => a.order - b.order);
+  let pageIdx = -1;
+  for (let i = 0; i < pages.length; i++) {
+    if (pages[i]!.blocks.some((b) => b.id === editedBlockId)) {
+      pageIdx = i;
+      break;
+    }
+  }
+  if (pageIdx < 0 || pageIdx >= pages.length - 1) return canvas;
+  const tail = pages.slice(pageIdx + 1);
+  const tailLooksLikeOverflow = tail.every((p) => (p.blocks?.length || 0) <= 2);
+  if (!tailLooksLikeOverflow) return canvas;
+  return {
+    ...canvas,
+    pages: pages.slice(0, pageIdx + 1).map((p, i) => ({ ...p, order: i })),
+  };
+}

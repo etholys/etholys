@@ -4,11 +4,12 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { createStudioDocument } from '@/lib/studio/create-document';
 import { extractTextFromBuffer } from '@/lib/siep/extract-file-text';
-import { emptyStudioCanvas } from '@/lib/studio/types';
+import { parseImportedTextToCanvas } from '@/lib/studio/parse-import';
+import { normalizeStudioCanvas } from '@/lib/studio/types';
 
 export const dynamic = 'force-dynamic';
 
-/** POST /api/studio/documents/from-file — PDF/DOCX/TXT → documento Studio */
+/** POST /api/studio/documents/from-file — PDF/DOCX/TXT → documento Studio estruturado */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -40,14 +41,7 @@ export async function POST(req: NextRequest) {
   }
 
   const title = name.replace(/\.[^.]+$/, '').slice(0, 120) || 'Documento importado';
-  const canvas = emptyStudioCanvas('report');
-  canvas.studioMode = 'write';
-  if (canvas.pages[0]?.blocks[0]) {
-    canvas.pages[0].blocks[0].text = title;
-  }
-  if (canvas.pages[0]?.blocks[1]) {
-    canvas.pages[0].blocks[1].text = text.slice(0, 80_000);
-  }
+  const canvas = normalizeStudioCanvas(parseImportedTextToCanvas(text, title));
 
   const created = await createStudioDocument({
     userId: user.id,
@@ -56,8 +50,8 @@ export async function POST(req: NextRequest) {
     title,
     canvasState: canvas,
     activityKind: 'imported',
-    activitySummary: `Importado: ${name}`,
-    activityMeta: { sourceFile: name, bytes: buf.length },
+    activitySummary: `Importado (estruturado): ${name}`,
+    activityMeta: { sourceFile: name, bytes: buf.length, structured: true },
   });
 
   if (!created.ok) {

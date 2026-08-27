@@ -3,7 +3,8 @@ import { prismaHasEnumValue } from '@/lib/prisma-has-field';
 import { resolveStudioCompanyId } from '@/lib/studio/access';
 import { recordStudioActivity } from '@/lib/studio/activity';
 import { canCreateStudioContent, getFolderAccess } from '@/lib/studio/share';
-import { findSystemTemplate } from '@/lib/studio/templates';
+import { findSystemTemplate, resolveTemplateStudioLayer } from '@/lib/studio/templates';
+import { templateHasDesignLayout } from '@/lib/studio/template-library/resolve-preview';
 import {
   emptyStudioCanvas,
   isStudioFormat,
@@ -98,7 +99,11 @@ export async function createStudioDocument(
   }
   if (input.studioMode === 'write' || input.studioMode === 'design') {
     canvas.studioMode = input.studioMode;
+  } else if (tpl) {
+    canvas.studioMode = resolveTemplateStudioLayer(tpl) === 'content' ? 'write' : 'design';
   } else if (!templateKey && !input.canvasState && isStudioPageSize(input.pageSize)) {
+    canvas.studioMode = 'design';
+  } else if (templateKey && templateHasDesignLayout(canvas)) {
     canvas.studioMode = 'design';
   }
 

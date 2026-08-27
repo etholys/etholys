@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
@@ -33,6 +33,14 @@ import {
   AlignJustify,
   Link2,
   Wand2,
+  Table2,
+  Layers,
+  ChevronUp,
+  ChevronDown,
+  Play,
+  Monitor,
+  Presentation,
+  Download,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
@@ -67,6 +75,16 @@ import { StudioToolsSidebar } from '@/components/studio/StudioToolsSidebar';
 import { DocumentLinksPanel } from '@/components/studio/DocumentLinksPanel';
 import { StudioWriteRibbon } from '@/components/studio/StudioWriteRibbon';
 import { StudioDesignAiPanel } from '@/components/studio/StudioDesignAiPanel';
+import { StudioWriteQuickActions } from '@/components/studio/StudioWriteQuickActions';
+import { StudioVideoTimeline } from '@/components/studio/StudioVideoTimeline';
+import { StudioPageFilmstrip } from '@/components/studio/StudioPageFilmstrip';
+import { StudioStoryboardPlayer } from '@/components/studio/StudioStoryboardPlayer';
+import { StudioPresenterMode } from '@/components/studio/StudioPresenterMode';
+import {
+  collectStudioVideoScenes,
+  patchBlockMediaMeta,
+  storyboardToSrt,
+} from '@/lib/studio/video-timeline';
 import {
   emptyStudioDrawScene,
   serializeStudioDrawScene,
@@ -76,8 +94,10 @@ import {
   mergeStudioDocument,
   reflowStudioDocument,
   studioLikelyOverPaginated,
+  trimWriteOverflowTail,
   type StudioOverflowInfo,
 } from '@/lib/studio/paginate';
+import { defaultTableMarkdown } from '@/lib/studio/table-markdown';
 
 type ChatMsg = {
   id: string;
@@ -129,7 +149,10 @@ export default function StudioDocumentPage() {
   const [chatBusy, setChatBusy] = useState(false);
   const [consent, setConsent] = useState<StudioConsentRequest | null>(null);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
-  const [exporting, setExporting] = useState<'pdf' | 'docx' | null>(null);
+  const [exporting, setExporting] = useState<'pdf' | 'docx' | 'pptx' | 'xlsx' | null>(null);
+  const [slideFocusMode, setSlideFocusMode] = useState(false);
+  const [presenterOpen, setPresenterOpen] = useState(false);
+  const [storyboardOpen, setStoryboardOpen] = useState(false);
   const [access, setAccess] = useState<string>('owner');
   const [shareOpen, setShareOpen] = useState(false);
   const [showLinks, setShowLinks] = useState(false);
@@ -186,6 +209,7 @@ export default function StudioDocumentPage() {
   const saveLockRef = useRef(false);
   const saveAgainRef = useRef(false);
   const saveEpochRef = useRef(0);
+  const writeReflowTimerRef = useRef<number | null>(null);
   const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [dictationInterim, setDictationInterim] = useState('');
   /** Blocos selecionados como âmbito da IA (anti-wipe) */
@@ -248,6 +272,33 @@ export default function StudioDocumentPage() {
     },
     [pushHistory],
   );
+
+  const scheduleWriteReflow = useCallback(
+    (delay = 300) => {
+      if (canvasRef.current?.studioMode !== 'write') return;
+      if (writeReflowTimerRef.current) window.clearTimeout(writeReflowTimerRef.current);
+      writeReflowTimerRef.current = window.setTimeout(() => {
+        writeReflowTimerRef.current = null;
+        const focusId = getStudioWriteFocus()?.blockId;
+        const snap = canvasRef.current;
+        if (!snap || snap.studioMode === 'design') return;
+        const laid = reflowStudioDocument(snap, {
+          pageTitlePrefix: t('Página', 'Página', 'Page'),
+          marginsMm: snap.marginsMm,
+        });
+        if (JSON.stringify(laid.pages) === JSON.stringify(snap.pages)) return;
+        applyCanvas(() => laid, false);
+        if (focusId) window.setTimeout(() => requestStudioWriteBlockFocus(focusId), 50);
+      }, delay);
+    },
+    [applyCanvas, t],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (writeReflowTimerRef.current) window.clearTimeout(writeReflowTimerRef.current);
+    };
+  }, []);
 
   /** Persistência com mutex — nunca grava um canvas antigo por cima de um merge recente. */
   const persistCanvas = useCallback(
@@ -677,41 +728,82 @@ export default function StudioDocumentPage() {
       diagramLang?: StudioBlock['diagramLang'];
       style?: StudioBlock['style'];
       layout?: StudioBlock['layout'];
+      imageUrl?: string | null;
+      imagePrompt?: string;
+      mediaMeta?: StudioBlock['mediaMeta'];
+      imageEdit?: StudioBlock['imageEdit'];
     },
   ) {
-    applyCanvas((prev) => ({
-      ...prev,
-      pages: prev.pages.map((p) =>
-        p.id !== pageId
-          ? p
-          : {
-              ...p,
-              blocks: p.blocks.map((b) =>
-                b.id === blockId
-                  ? {
-                      ...b,
-                      ...(patch.text !== undefined ? { text: patch.text } : {}),
-                      ...(patch.kind !== undefined
-                        ? {
-                            kind: patch.kind,
-                            ...(patch.kind === 'diagram' && !patch.diagramLang
-                              ? { diagramLang: 'draw' as const }
-                              : {}),
-                          }
-                        : {}),
-                      ...(patch.diagramLang !== undefined
-                        ? { diagramLang: patch.diagramLang }
-                        : {}),
-                      ...(patch.style !== undefined
-                        ? { style: { ...(b.style || {}), ...patch.style } }
-                        : {}),
-                      ...(patch.layout !== undefined ? { layout: patch.layout } : {}),
-                    }
-                  : b,
-              ),
-            },
-      ),
-    }));
+    applyCanvas((prev) => {
+      let next = {
+        ...prev,
+        pages: prev.pages.map((p) =>
+          p.id !== pageId
+            ? p
+            : {
+                ...p,
+                blocks: p.blocks.map((b) =>
+                  b.id === blockId
+                    ? {
+                        ...b,
+                        ...(patch.text !== undefined ? { text: patch.text } : {}),
+                        ...(patch.kind !== undefined
+                          ? {
+                              kind: patch.kind,
+                              ...(patch.kind === 'diagram' && !patch.diagramLang
+                                ? { diagramLang: 'draw' as const }
+                                : {}),
+                            }
+                          : {}),
+                        ...(patch.diagramLang !== undefined
+                          ? { diagramLang: patch.diagramLang }
+                          : {}),
+                        ...(patch.style !== undefined
+                          ? { style: { ...(b.style || {}), ...patch.style } }
+                          : {}),
+                        ...(patch.layout !== undefined ? { layout: patch.layout } : {}),
+                        ...(patch.imageUrl !== undefined ? { imageUrl: patch.imageUrl } : {}),
+                        ...(patch.imagePrompt !== undefined ? { imagePrompt: patch.imagePrompt } : {}),
+                        ...(patch.mediaMeta !== undefined ? { mediaMeta: patch.mediaMeta } : {}),
+                        ...(patch.imageEdit !== undefined ? { imageEdit: patch.imageEdit } : {}),
+                      }
+                    : b,
+                ),
+              },
+        ),
+      };
+      if (patch.text !== undefined && next.studioMode === 'write') {
+        next = trimWriteOverflowTail(next, blockId);
+      }
+      return next;
+    });
+    if (patch.text !== undefined && canvasRef.current?.studioMode === 'write') {
+      scheduleWriteReflow();
+    }
+  }
+
+  async function generateBlockImage(pageId: string, blockId: string, prompt?: string) {
+    if (!canEdit) return;
+    try {
+      const r = await fetch(`/api/studio/documents/${id}/generate-image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blockId, prompt }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Erro');
+      if (d.canvasState) {
+        if (!skipHistory.current && canvas) pushHistory(canvas);
+        const normalized = normalizeStudioCanvas(d.canvasState);
+        canvasRef.current = normalized;
+        dirtyRef.current = true;
+        setCanvas(normalized);
+        setDirty(true);
+        void persistCanvas({ quiet: true, forceSnap: normalized });
+      }
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro');
+    }
   }
 
   function patchSelectedStyles(partial: NonNullable<StudioBlock['style']>) {
@@ -838,7 +930,7 @@ export default function StudioDocumentPage() {
           companyId: companyId || undefined,
           locale,
           message: text,
-          canvasState: canvas,
+          canvasState: canvasRef.current || canvas,
           approvedSources: opts?.approvedSources || [],
           attachmentIds,
           targetBlockIds: aiTargetBlockIds,
@@ -883,7 +975,7 @@ export default function StudioDocumentPage() {
     }
   }
 
-  async function exportFile(format: 'pdf' | 'docx') {
+  async function exportFile(format: 'pdf' | 'docx' | 'pptx' | 'xlsx') {
     if (!canvas) return;
     setExporting(format);
     try {
@@ -981,6 +1073,38 @@ export default function StudioDocumentPage() {
     );
   }
 
+  function setHeaderFooter(hf: NonNullable<StudioCanvasState['headerFooter']>) {
+    applyCanvas((prev) => ({ ...prev, headerFooter: hf }));
+  }
+
+  function setActivePageBackground(color: string | null) {
+    const pageId = activePageId || canvas.pages[0]?.id;
+    if (!pageId) return;
+    applyCanvas((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) =>
+        p.id !== pageId
+          ? p
+          : {
+              ...p,
+              backgroundColor:
+                color && /^#[0-9A-Fa-f]{6}$/.test(color) ? color : undefined,
+            },
+      ),
+    }));
+  }
+
+  function downloadStoryboardSrt() {
+    if (!videoScenes.length) return;
+    const blob = new Blob([storyboardToSrt(videoScenes)], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title || 'storyboard'}.srt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function setStudioMode(mode: StudioStudioMode) {
     setToolsOpen(true);
     applyCanvas((prev) => {
@@ -1022,6 +1146,27 @@ export default function StudioDocumentPage() {
       pages: prev.pages.map((p) => {
         if (p.id !== pageId) return p;
         const order = p.blocks.length;
+        const isDesign = prev.studioMode === 'design';
+        const baseText =
+          kind === 'diagram'
+            ? serializeStudioDrawScene(emptyStudioDrawScene())
+            : kind === 'bullets'
+              ? '- '
+              : kind === 'table'
+                ? defaultTableMarkdown()
+                : kind === 'heading'
+                  ? t('Título', 'Título', 'Title')
+                  : kind === 'callout'
+                    ? `**${t('Destaque', 'Destacado', 'Highlight')}**`
+                    : '';
+        const layout = isDesign
+          ? {
+              xPct: 6,
+              yPct: Math.min(72, 8 + order * 14),
+              wPct: kind === 'image' ? 55 : 88,
+              hPct: kind === 'image' ? 38 : undefined,
+            }
+          : undefined;
         return {
           ...p,
           blocks: [
@@ -1029,15 +1174,9 @@ export default function StudioDocumentPage() {
             {
               id: `block-${Date.now()}-${order}`,
               kind,
-              text:
-                kind === 'diagram'
-                  ? serializeStudioDrawScene(emptyStudioDrawScene())
-                  : kind === 'bullets'
-                    ? '- '
-                    : kind === 'image'
-                      ? ''
-                      : '',
+              text: kind === 'image' ? '' : baseText,
               order,
+              ...(layout ? { layout } : {}),
               ...(kind === 'diagram' ? { diagramLang: 'draw' as const } : {}),
               ...(kind === 'image' ? { imageUrl: null } : {}),
             },
@@ -1089,6 +1228,7 @@ export default function StudioDocumentPage() {
         };
       }),
     }));
+    scheduleWriteReflow(0);
     if (prevId) {
       window.setTimeout(() => requestStudioWriteBlockFocus(prevId!), 40);
     }
@@ -1127,6 +1267,7 @@ export default function StudioDocumentPage() {
       }),
     }));
     setAiTargetBlockIds((ids) => ids.filter((id) => id !== blockId));
+    scheduleWriteReflow(0);
   }
 
   /** Só no modo desenho: move blocos inteiros (nunca parte texto). */
@@ -1171,6 +1312,11 @@ export default function StudioDocumentPage() {
   const libraryHref = docFolderId
     ? `/hub/studio?folder=${encodeURIComponent(docFolderId)}`
     : '/hub/studio';
+
+  const videoScenes = useMemo(
+    () => (canvas ? collectStudioVideoScenes(canvas) : []),
+    [canvas],
+  );
 
   if (loading) {
     return (
@@ -1234,6 +1380,16 @@ export default function StudioDocumentPage() {
     updateBlock(target.pageId, target.blockId, { kind });
   }
 
+  function ribbonCommand(cmd: 'orderedList' | 'link') {
+    if (cmd === 'orderedList' && runStudioWriteCommand({ type: 'orderedList' })) return;
+    if (cmd === 'link' && runStudioWriteCommand({ type: 'link' })) return;
+    if (cmd === 'link') {
+      const url = window.prompt('URL', 'https://');
+      if (!url) return;
+      ribbonWrap('[', `](${url})`);
+    }
+  }
+
   function ribbonStyle(partial: NonNullable<StudioBlock['style']>) {
     if (partial.align && runStudioWriteCommand({ type: 'align', align: partial.align })) {
       /* also persist block style for export/design */
@@ -1261,6 +1417,57 @@ export default function StudioDocumentPage() {
     canvas.orientation || (pageSize === 'Slide' ? 'landscape' : 'portrait');
   const marginsMm = normalizeStudioMargins(canvas.marginsMm || DEFAULT_STUDIO_MARGINS_MM);
   const studioMode: StudioStudioMode = canvas.studioMode === 'design' ? 'design' : 'write';
+
+  function bumpBlockLayer(delta: number) {
+    if (!canvas || !aiTargetBlockIds.length) return;
+    applyCanvas((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) => ({
+        ...p,
+        blocks: p.blocks.map((b) => {
+          if (!aiTargetBlockIds.includes(b.id)) return b;
+          const cur = b.layout?.zIndex ?? b.order;
+          const next = Math.max(0, cur + delta);
+          return {
+            ...b,
+            layout: { ...(b.layout || {}), zIndex: next },
+          };
+        }),
+      })),
+    }));
+  }
+
+  function updateSceneDuration(pageId: string, blockId: string, durationSec: number) {
+    applyCanvas((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) =>
+        p.id !== pageId
+          ? p
+          : {
+              ...p,
+              blocks: p.blocks.map((b) =>
+                b.id !== blockId ? b : patchBlockMediaMeta(b, { durationSec }),
+              ),
+            },
+      ),
+    }));
+  }
+
+  const isPresentationDeck =
+    canvas.format === 'presentation' || pageSize === 'Slide' || canvas.pages.length > 1;
+  const pagesToRender =
+    slideFocusMode && studioMode === 'design' && isPresentationDeck && activePageId
+      ? canvas.pages.filter((p) => p.id === activePageId)
+      : canvas.pages;
+
+  function selectPage(pageId: string) {
+    setActivePageId(pageId);
+    requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-studio-page-id="${pageId}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
 
   return (
     <div
@@ -1494,6 +1701,42 @@ export default function StudioDocumentPage() {
           <button
             type="button"
             disabled={!!exporting}
+            onClick={() => void exportFile('xlsx')}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium disabled:opacity-40"
+          >
+            {exporting === 'xlsx' ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Table2 className="h-3.5 w-3.5" />
+            )}
+            XLSX
+          </button>
+          <button
+            type="button"
+            disabled={!!exporting}
+            onClick={() => void exportFile('pptx')}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium disabled:opacity-40"
+          >
+            {exporting === 'pptx' ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <LayoutTemplate className="h-3.5 w-3.5" />
+            )}
+            PPTX
+          </button>
+          {isPresentationDeck && (
+            <button
+              type="button"
+              onClick={() => setPresenterOpen(true)}
+              className="inline-flex items-center gap-1 rounded-lg border border-fuchsia-200 bg-fuchsia-50 px-2 py-1.5 text-xs font-medium text-fuchsia-900 hover:bg-fuchsia-100"
+            >
+              <Presentation className="h-3.5 w-3.5" />
+              {t('Apresentar', 'Presentar', 'Present')}
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={!!exporting}
             onClick={() => void exportFile('pdf')}
             className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium disabled:opacity-40"
           >
@@ -1584,24 +1827,17 @@ export default function StudioDocumentPage() {
                   ]);
                 }
               }}
-              labels={{
-                title: t('IA de diagramação', 'IA de diagramación', 'Layout AI'),
-                subtitle: t(
-                  'Usa o texto da Redação + brand kit. Estilo Gamma/Canva.',
-                  'Usa el texto de Redacción + brand kit. Estilo Gamma/Canva.',
-                  'Uses Write text + brand kit. Gamma/Canva style.',
-                ),
-                placeholder: t(
-                  'Ex.: capa institucional, callouts, tipografia forte…',
-                  'Ej.: portada institucional, callouts, tipografía fuerte…',
-                  'E.g. institutional cover, callouts, strong type…',
-                ),
-                run: t('Diagramar agora', 'Diagramar ahora', 'Lay out now'),
-                presets: t('Estilos rápidos', 'Estilos rápidos', 'Quick styles'),
-              }}
             />
           ) : (
           <>
+          <StudioWriteQuickActions
+            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+            disabled={chatBusy || !canEdit}
+            onRun={(prompt) => {
+              setInput(prompt);
+              void sendChat({ text: prompt });
+            }}
+          />
           <div className="hidden border-b border-stone-200 px-4 py-3 lg:block">
             <h2 className="text-sm font-bold text-stone-900">
               {t('IA de redação', 'IA de redacción', 'Writing AI')}
@@ -1855,6 +2091,7 @@ export default function StudioDocumentPage() {
 
         {/* Documento + ferramentas laterais */}
         <div className="flex min-h-0 min-w-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div
           className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
           style={
@@ -1880,6 +2117,7 @@ export default function StudioDocumentPage() {
             <StudioWriteRibbon
               disabled={!canEdit}
               onWrap={ribbonWrap}
+              onCommand={ribbonCommand}
               onKind={ribbonKind}
               onStyle={ribbonStyle}
               labels={{
@@ -1890,10 +2128,12 @@ export default function StudioDocumentPage() {
                 heading: t('Título', 'Título', 'Heading'),
                 body: t('Corpo', 'Cuerpo', 'Body'),
                 list: t('Lista', 'Lista', 'List'),
+                orderedList: t('Lista num.', 'Lista num.', 'Numbered list'),
+                link: t('Hiperligação', 'Enlace', 'Link'),
                 hint: t(
-                  'Ctrl+Enter nova secção · setas entre secções · formata a seleção',
-                  'Ctrl+Enter nueva sección · flechas entre secciones · formatea la selección',
-                  'Ctrl+Enter new section · arrows between sections · formats selection',
+                  'Ctrl+Enter nova secção · setas entre secções · Excel/tabelas na barra lateral',
+                  'Ctrl+Enter nueva sección · flechas entre secciones · Excel/tablas en barra lateral',
+                  'Ctrl+Enter new section · arrows between sections · Excel/tables in sidebar',
                 ),
               }}
             />
@@ -1920,8 +2160,8 @@ export default function StudioDocumentPage() {
               }`}
             >
               {studioMode === 'write'
-                ? t('Espaço Redação · Word', 'Espacio Redacción · Word', 'Write space · Word')
-                : t('Espaço Desenho · Canva/Gamma', 'Espacio Diseño · Canva/Gamma', 'Design space · Canva/Gamma')}
+                ? t('Conteúdo · Word/Excel/PPT/PDF', 'Contenido · Word/Excel/PPT/PDF', 'Content · Word/Excel/PPT/PDF')
+                : t('Desenho · Canva/Gamma/InDesign', 'Diseño · Canva/Gamma/InDesign', 'Design · Canva/Gamma/InDesign')}
             </span>
             <span
               className={`text-xs ${studioMode === 'design' ? 'text-violet-300' : 'text-stone-500'}`}
@@ -1943,6 +2183,26 @@ export default function StudioDocumentPage() {
               <span className="px-1 text-[10px] font-bold uppercase tracking-wide text-violet-600">
                 {t('Desenho', 'Diseño', 'Design')}
               </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const pageId = activePageId || canvas.pages[0]?.id;
+                  if (pageId) addBlock(pageId, 'paragraph');
+                }}
+                className="rounded-md border border-violet-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-violet-900 hover:bg-violet-100"
+              >
+                {t('Caixa de texto', 'Caja de texto', 'Text box')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const pageId = activePageId || canvas.pages[0]?.id;
+                  if (pageId) addBlock(pageId, 'heading');
+                }}
+                className="rounded-md border border-violet-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-violet-900 hover:bg-violet-100"
+              >
+                {t('Título', 'Título', 'Title')}
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -2007,6 +2267,53 @@ export default function StudioDocumentPage() {
               <span className="px-1 text-[10px] text-violet-600/80">
                 {t('Arrastar · redimensionar · grelha 2%', 'Arrastrar · redimensionar · cuadrícula 2%', 'Drag · resize · 2% grid')}
               </span>
+              {aiTargetBlockIds.length > 0 && (
+                <>
+                  <span className="mx-1 h-4 w-px bg-violet-200" />
+                  <Layers className="h-3.5 w-3.5 text-violet-600" />
+                  <button
+                    type="button"
+                    title={t('Trazer para a frente', 'Traer al frente', 'Bring forward')}
+                    onClick={() => bumpBlockLayer(1)}
+                    className="rounded-md border border-violet-200 bg-white p-1.5 text-violet-900 hover:bg-violet-100"
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    title={t('Enviar para trás', 'Enviar atrás', 'Send backward')}
+                    onClick={() => bumpBlockLayer(-1)}
+                    className="rounded-md border border-violet-200 bg-white p-1.5 text-violet-900 hover:bg-violet-100"
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
+              {isPresentationDeck && (
+                <>
+                  <span className="mx-1 h-4 w-px bg-violet-200" />
+                  <button
+                    type="button"
+                    onClick={() => setSlideFocusMode((v) => !v)}
+                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-[11px] font-semibold ${
+                      slideFocusMode
+                        ? 'border-fuchsia-400 bg-fuchsia-600 text-white'
+                        : 'border-violet-200 bg-white text-violet-900 hover:bg-violet-100'
+                    }`}
+                  >
+                    <Monitor className="h-3.5 w-3.5" />
+                    {t('Foco slide', 'Foco slide', 'Slide focus')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPresenterOpen(true)}
+                    className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-violet-900 hover:bg-violet-100"
+                  >
+                    <Presentation className="h-3.5 w-3.5" />
+                    {t('Apresentar', 'Presentar', 'Present')}
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -2120,10 +2427,12 @@ export default function StudioDocumentPage() {
           )}
 
           <div className="mx-auto flex flex-col items-center gap-10 pb-16">
-            {canvas.pages
+            {pagesToRender
               .slice()
               .sort((a, b) => a.order - b.order)
               .map((page, idx) => {
+                const pageIndex = canvas.pages.findIndex((p) => p.id === page.id);
+                const idxDisplay = pageIndex >= 0 ? pageIndex : idx;
                 const size = (page.pageSize || pageSize) as StudioPageSize;
                 const { width, height, wMm, hMm } = studioPageCssSize(size, 680, orientation);
                 const marginPx = studioMarginsToCssPx(marginsMm, { w: wMm, h: hMm }, { width, height });
@@ -2135,6 +2444,7 @@ export default function StudioDocumentPage() {
                 return (
                   <section
                     key={page.id}
+                    data-studio-page-id={page.id}
                     className="relative"
                     onFocusCapture={() => setActivePageId(page.id)}
                     onMouseDown={() => setActivePageId(page.id)}
@@ -2142,19 +2452,12 @@ export default function StudioDocumentPage() {
                       if (studioMode !== 'write' || !canEdit) return;
                       const next = e.relatedTarget as Node | null;
                       if (next && e.currentTarget.contains(next)) return;
-                      window.setTimeout(() => {
-                        const snap = canvasRef.current;
-                        if (!snap || snap.studioMode === 'design') return;
-                        const laid = layoutWriteDocument(snap);
-                        if (laid === snap) return;
-                        if (JSON.stringify(laid.pages) === JSON.stringify(snap.pages)) return;
-                        applyCanvas(() => laid, false);
-                      }, 80);
+                      scheduleWriteReflow(0);
                     }}
                   >
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2" style={{ width }}>
                       <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                        {page.title || `${t('Folha', 'Hoja', 'Sheet')} ${idx + 1}`} · {size} ·{' '}
+                        {page.title || `${t('Folha', 'Hoja', 'Sheet')} ${idxDisplay + 1}`} · {size} ·{' '}
                         {Math.round(wMm)}×{Math.round(hMm)} mm
                       </p>
                       {studioMode === 'design' && (
@@ -2200,20 +2503,24 @@ export default function StudioDocumentPage() {
                     <StudioSheet
                       width={width}
                       height={height}
-                      pageLabel={`${idx + 1} / ${canvas.pages.length}`}
+                      pageLabel={`${idxDisplay + 1} / ${canvas.pages.length}`}
                       backgroundImage={bg}
+                      backgroundColor={page.backgroundColor || null}
                       canEdit={canEdit}
                       brandAccent={studioMode === 'design' ? brandPrimary : null}
                       compact={studioMode === 'write'}
+                      headerText={studioMode === 'write' ? canvas.headerFooter?.header : null}
+                      footerText={studioMode === 'write' ? canvas.headerFooter?.footer : null}
+                      showPageNumbers={
+                        studioMode === 'write' && !!canvas.headerFooter?.showPageNumbers
+                      }
+                      pageNumber={idxDisplay + 1}
+                      pageTotal={canvas.pages.length}
                       freeform={
                         studioMode === 'design' &&
                         page.blocks.some((b) => b.layout && (b.layout.xPct != null || b.layout.yPct != null))
                       }
-                      layout={
-                        studioMode === 'write' && idx === canvas.pages.length - 1
-                          ? 'flow'
-                          : 'fixed'
-                      }
+                      layout={studioMode === 'write' ? 'flow' : 'fixed'}
                       marginPx={marginPx}
                       onOverflow={
                         studioMode === 'design' && canEdit
@@ -2223,7 +2530,11 @@ export default function StudioDocumentPage() {
                     >
                       {page.blocks
                         .slice()
-                        .sort((a, b) => a.order - b.order)
+                        .sort((a, b) => {
+                          const za = a.layout?.zIndex ?? a.order;
+                          const zb = b.layout?.zIndex ?? b.order;
+                          return za - zb;
+                        })
                         .map((block, blockIdx, arr) => (
                           <div key={block.id} data-studio-block-id={block.id} className="shrink-0">
                             <StudioDesignPlacedBlock
@@ -2248,6 +2559,17 @@ export default function StudioDocumentPage() {
                                 updateBlock(page.id, block.id, { diagramLang })
                               }
                               onStyleChange={(style) => updateBlock(page.id, block.id, { style })}
+                              onImagePromptChange={(imagePrompt) =>
+                                updateBlock(page.id, block.id, { imagePrompt })
+                              }
+                              onImageEditChange={(imageEdit) =>
+                                updateBlock(page.id, block.id, { imageEdit })
+                              }
+                              onGenerateImage={
+                                studioMode === 'design' && block.kind === 'image' && canEdit
+                                  ? (prompt) => generateBlockImage(page.id, block.id, prompt)
+                                  : undefined
+                              }
                               onMoveUp={() => moveBlock(page.id, block.id, -1)}
                               onMoveDown={() => moveBlock(page.id, block.id, 1)}
                               onDelete={() => removeBlock(page.id, block.id)}
@@ -2303,6 +2625,13 @@ export default function StudioDocumentPage() {
                                 collapseDraw: t('Fechar', 'Cerrar', 'Close'),
                                 selectForAi: t('Usar na IA', 'Usar en la IA', 'Use for AI'),
                                 selectedForAi: t('No âmbito da IA', 'En ámbito de IA', 'In AI scope'),
+                                generateImage: t('Gerar imagem IA', 'Generar imagen IA', 'Generate AI image'),
+                                imagePrompt: t('Prompt visual', 'Prompt visual', 'Visual prompt'),
+                                videoScene: t('Plano vídeo', 'Plano vídeo', 'Video scene'),
+                                adjustImage: t('Ajustar imagem', 'Ajustar imagen', 'Adjust image'),
+                                brightness: t('Brilho', 'Brillo', 'Brightness'),
+                                contrast: t('Contraste', 'Contraste', 'Contrast'),
+                                crop: t('Recorte', 'Recorte', 'Crop'),
                               }}
                             />
                             </StudioDesignPlacedBlock>
@@ -2344,6 +2673,47 @@ export default function StudioDocumentPage() {
               })}
           </div>
         </div>
+        {studioMode === 'design' && isPresentationDeck && (
+          <StudioPageFilmstrip
+            pages={canvas.pages}
+            activePageId={activePageId}
+            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+            canEdit={canEdit}
+            onAddPage={canEdit ? addPage : undefined}
+            onSelect={selectPage}
+          />
+        )}
+        {studioMode === 'design' && videoScenes.length > 0 && (
+          <>
+            <div className="flex items-center justify-end gap-2 border-t border-violet-900/30 bg-[#0c0814] px-3 py-1">
+              <button
+                type="button"
+                onClick={downloadStoryboardSrt}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-violet-700 bg-violet-950 px-3 py-1.5 text-[11px] font-semibold text-violet-200 hover:bg-violet-900"
+              >
+                <Download className="h-3.5 w-3.5" />
+                SRT
+              </button>
+              <button
+                type="button"
+                onClick={() => setStoryboardOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-fuchsia-500"
+              >
+                <Play className="h-3.5 w-3.5" />
+                {t('Preview vídeo', 'Preview vídeo', 'Video preview')}
+              </button>
+            </div>
+            <StudioVideoTimeline
+              scenes={videoScenes}
+              activePageId={activePageId}
+              locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+              canEdit={canEdit}
+              onSelectPage={selectPage}
+              onDurationChange={canEdit ? updateSceneDuration : undefined}
+            />
+          </>
+        )}
+        </div>
 
         <StudioToolsSidebar
           open={toolsOpen}
@@ -2358,10 +2728,20 @@ export default function StudioDocumentPage() {
           onPageSize={setDocPageSize}
           onOrientation={setDocOrientation}
           onMargins={setDocMargins}
+          headerFooter={canvas.headerFooter}
+          onHeaderFooter={setHeaderFooter}
+          pageBackgroundColor={
+            studioMode === 'design'
+              ? canvas.pages.find((p) => p.id === (activePageId || canvas.pages[0]?.id))
+                  ?.backgroundColor || null
+              : null
+          }
+          onPageBackgroundColor={studioMode === 'design' ? setActivePageBackground : undefined}
           onOpenMolds={() => {
             setShowMolds(true);
             void loadMolds();
           }}
+          onAddPage={addPage}
           onInsert={(kind) => {
             const pageId = activePageId || canvas.pages[0]?.id;
             if (!pageId) return;
@@ -2380,21 +2760,21 @@ export default function StudioDocumentPage() {
             mode: t('Etapa', 'Etapa', 'Stage'),
             write: t('Redação', 'Redacción', 'Write'),
             writeHint: t(
-              'Espaço Word: texto + IA de redação',
-              'Espacio Word: texto + IA de redacción',
-              'Word space: text + writing AI',
+              'Word · Excel · PPT · PDF',
+              'Word · Excel · PPT · PDF',
+              'Word · Excel · PPT · PDF',
             ),
             writeIntro: t(
-              'Redação contínua nas folhas. Usa a barra Formato e a IA à esquerda.',
-              'Redacción continua en las hojas. Usa la barra Formato y la IA a la izquierda.',
-              'Continuous writing on sheets. Use the Format bar and the AI on the left.',
+              'Redação contínua, tabelas, export PDF/DOCX/PPTX. IA à esquerda.',
+              'Redacción continua, tablas, export PDF/DOCX/PPTX. IA a la izquierda.',
+              'Continuous writing, tables, PDF/DOCX/PPTX export. AI on the left.',
             ),
             design: t('Desenho', 'Diseño', 'Design'),
-            designHint: t('Espaço Canva/Gamma + IA layout', 'Espacio Canva/Gamma + IA layout', 'Canva/Gamma space + layout AI'),
+            designHint: t('Canva · Gamma · InDesign', 'Canva · Gamma · InDesign', 'Canva · Gamma · InDesign'),
             designIntro: t(
-              'Folhas fixas + IA de diagramação (brand kit). O texto vem da Redação.',
-              'Hojas fijas + IA de diagramación (brand kit). El texto viene de Redacción.',
-              'Fixed sheets + layout AI (brand kit). Text comes from Write.',
+              'Caixas de texto, imagens IA, storyboard vídeo + timeline. IA de desenho.',
+              'Cajas de texto, imágenes IA, storyboard vídeo + timeline. IA de diseño.',
+              'Text boxes, AI images, video storyboard + timeline. Design AI.',
             ),
             page: t('Página', 'Página', 'Page'),
             size: t('Tamanho', 'Tamaño', 'Size'),
@@ -2417,20 +2797,48 @@ export default function StudioDocumentPage() {
             heading: t('Título', 'Título', 'Heading'),
             list: t('Lista', 'Lista', 'List'),
             callout: t('Destaque', 'Destacado', 'Callout'),
+            table: t('Tabela / Excel', 'Tabla / Excel', 'Table / Excel'),
+            newSlide: t('Novo slide / folha', 'Nuevo slide / hoja', 'New slide / page'),
             diagram: t('Diagrama', 'Diagrama', 'Diagram'),
             image: t('Imagem', 'Imagen', 'Image'),
-            designTools: t('Ferramentas de desenho', 'Herramientas de diseño', 'Design tools'),
+            designTools: t('Elementos visuais', 'Elementos visuales', 'Visual elements'),
             drawBoard: t('Quadro de desenho', 'Lienzo de dibujo', 'Drawing board'),
             molds: t('Moldes de página', 'Moldes de página', 'Page molds'),
+            textBox: t('Caixa texto', 'Caja texto', 'Text box'),
+            titleBox: t('Título', 'Título', 'Title'),
+            contentLayer: t('Camada Conteúdo', 'Capa Contenido', 'Content layer'),
+            designLayer: t('Camada Desenho', 'Capa Diseño', 'Design layer'),
             aiScope: t(
               'Mira / Shift+clique = âmbito IA',
               'Mira / Shift+clic = ámbito IA',
               'Crosshair / Shift+click = AI scope',
             ),
+            header: t('Cabeçalho', 'Encabezado', 'Header'),
+            footer: t('Rodapé', 'Pie de página', 'Footer'),
+            pageNumbers: t('Numerar páginas', 'Numerar páginas', 'Page numbers'),
+            pageBackground: t('Fundo da folha', 'Fondo de hoja', 'Page background'),
           }}
         />
         </div>
       </div>
+
+      {presenterOpen && (
+        <StudioPresenterMode
+          pages={canvas.pages}
+          locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+          initialPageId={activePageId}
+          onClose={() => setPresenterOpen(false)}
+        />
+      )}
+
+      {storyboardOpen && videoScenes.length > 0 && (
+        <StudioStoryboardPlayer
+          scenes={videoScenes}
+          locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+          onSelectPage={selectPage}
+          onClose={() => setStoryboardOpen(false)}
+        />
+      )}
 
       {shareOpen && companyId && (
         <StudioShareDialog

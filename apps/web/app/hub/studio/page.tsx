@@ -879,6 +879,7 @@ function StudioHubInner() {
         open={showTemplates}
         locale={locale}
         busy={busy}
+        companyId={effectiveCompanyId}
         templates={templates}
         onClose={() => setShowTemplates(false)}
         onPickSystem={(key) => void createDoc(key)}
@@ -887,7 +888,7 @@ function StudioHubInner() {
           void createDoc(undefined, {
             pageSize: opts?.pageSize,
             format: opts?.format,
-            studioMode: 'design',
+            studioMode: opts?.studioMode ?? 'design',
           })
         }
         onUploadFile={(file) => void uploadDoc(file)}

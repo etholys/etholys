@@ -9,6 +9,8 @@ import {
   studioCanvasToDocxBuffer,
   studioCanvasToHtml,
 } from '@/lib/studio/export';
+import { studioCanvasToPptxBuffer } from '@/lib/studio/pptx-export';
+import { studioCanvasToXlsxBuffer } from '@/lib/studio/xlsx-export';
 import {
   normalizeStudioCanvas,
   normalizeStudioMargins,
@@ -18,7 +20,7 @@ import {
 export const dynamic = 'force-dynamic';
 export const maxDuration = 180;
 
-/** POST /api/studio/documents/[id]/export — { format: 'pdf' | 'docx' } */
+/** POST /api/studio/documents/[id]/export — { format: 'pdf' | 'docx' | 'pptx' } */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -33,7 +35,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   );
   if (!companyId) return NextResponse.json({ error: 'No company' }, { status: 400 });
 
-  const format = body.format === 'docx' ? 'docx' : 'pdf';
+  const formatRaw = typeof body.format === 'string' ? body.format : 'pdf';
+  const format =
+    formatRaw === 'docx'
+      ? 'docx'
+      : formatRaw === 'pptx'
+        ? 'pptx'
+        : formatRaw === 'xlsx'
+          ? 'xlsx'
+          : 'pdf';
   const doc = await prisma.studioDocument.findFirst({
     where: { id: params.id, companyId },
   });
@@ -57,6 +67,30 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           'Content-Type':
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           'Content-Disposition': `attachment; filename="${safeName}.docx"`,
+        },
+      });
+    }
+
+    if (format === 'pptx') {
+      const normalized = normalizeStudioCanvas(canvas);
+      const buf = await studioCanvasToPptxBuffer(title, normalized, brand);
+      return new NextResponse(new Uint8Array(buf), {
+        headers: {
+          'Content-Type':
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'Content-Disposition': `attachment; filename="${safeName}.pptx"`,
+        },
+      });
+    }
+
+    if (format === 'xlsx') {
+      const normalized = normalizeStudioCanvas(canvas);
+      const buf = await studioCanvasToXlsxBuffer(title, normalized);
+      return new NextResponse(new Uint8Array(buf), {
+        headers: {
+          'Content-Type':
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="${safeName}.xlsx"`,
         },
       });
     }

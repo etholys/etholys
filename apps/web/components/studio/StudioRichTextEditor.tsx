@@ -55,6 +55,8 @@ export function StudioRichTextEditor({
 }: Props) {
   const cbs = useRef({ onChange, onInsertAfter, onBackspaceEmpty, onFocusNext, onFocusPrev });
   cbs.current = { onChange, onInsertAfter, onBackspaceEmpty, onFocusNext, onFocusPrev };
+  /** Evita que o efeito de sync prop→editor restaure texto obsoleto ao mudar para o chat. */
+  const lastEmittedRef = useRef(text);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -116,12 +118,17 @@ export function StudioRichTextEditor({
       },
     },
     onUpdate: ({ editor: ed }) => {
-      cbs.current.onChange(studioEditorHtmlToText(ed.getHTML()));
+      const latest = studioEditorHtmlToText(ed.getHTML());
+      lastEmittedRef.current = latest;
+      cbs.current.onChange(latest);
     },
     onFocus: ({ editor: ed }) => {
       setStudioWriteFocus({ editor: ed, blockId, pageId });
     },
     onBlur: ({ editor: ed }) => {
+      const latest = studioEditorHtmlToText(ed.getHTML());
+      lastEmittedRef.current = latest;
+      cbs.current.onChange(latest);
       requestAnimationFrame(() => {
         const f = getStudioWriteFocus();
         if (f?.editor === ed) setStudioWriteFocus(null);
@@ -137,9 +144,15 @@ export function StudioRichTextEditor({
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
     const current = studioEditorHtmlToText(editor.getHTML());
-    if (current === text) return;
+    if (current === text) {
+      lastEmittedRef.current = text;
+      return;
+    }
     if (editor.isFocused) return;
+    // Parent ainda não recebeu o último onChange — não clobber o editor
+    if (current === lastEmittedRef.current && text !== lastEmittedRef.current) return;
     editor.commands.setContent(studioTextToEditorHtml(text, kind), false);
+    lastEmittedRef.current = text;
   }, [editor, text, kind]);
 
   useEffect(() => {

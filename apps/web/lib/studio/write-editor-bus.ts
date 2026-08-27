@@ -9,6 +9,8 @@ export type StudioWriteCommand =
   | { type: 'heading' }
   | { type: 'paragraph' }
   | { type: 'bulletList' }
+  | { type: 'orderedList' }
+  | { type: 'link' }
   | { type: 'align'; align: 'left' | 'center' | 'right' | 'justify' };
 
 type Focused = {
@@ -73,6 +75,11 @@ export function runStudioWriteCommand(cmd: StudioWriteCommand): boolean {
     case 'bulletList':
       chain.toggleBulletList().run();
       return true;
+    case 'orderedList':
+      chain.toggleOrderedList().run();
+      return true;
+    case 'link':
+      return false;
     case 'align':
       chain.setTextAlign(cmd.align).run();
       return true;

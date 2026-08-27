@@ -1,6 +1,6 @@
 # Etholys Studio — criação de documentos (ferramenta transversal)
 
-**Fase atual (UI):** dois espaços distintos — **Redação** (TipTap + ribbon com seleção, Ctrl+Enter / setas entre secções, IA de redação) e **Desenho** (IA `/design-layout`, blocos com `layout` x/y %, arrastar + **redimensionar** com snap). Caminho incremental para paridade Word/Gamma. 
+**Fase atual (UI):** duas camadas na galeria e no editor — **Conteúdo** (Word/Excel/PPT guión/PDF, modo `write`) e **Desenho** (Canva/Gamma/InDesign, modo `design`, inclui Fotos e Vídeos como composição visual). Caminho incremental para paridade Word/Gamma.
 
 **Fonte de verdade** para o estúdio de documentos com IA no Etholys.  
 **Entrada para agentes:** [AGENTS.md](../../AGENTS.md) → este ficheiro.
@@ -41,6 +41,7 @@
 | **F4** | Templates por domínio + colaboração/comentários | ✅ filtros SIEP/FUNDHUB/Meet/… + `StudioDocumentComment` |
 | **F5** | Presença colaborativa + aviso de edição remota | ✅ heartbeat Postgres + avatars + reload |
 | **F6** | Sync suave + auto-save + gestão de blocos | ✅ pull remoto se limpo; autosave 8s; mover/apagar |
+| **F6.1** | Camadas Conteúdo/Desenho + ferramentas por camada | ✅ galeria dual; tabelas Excel; ribbon Word; toolbar Canva |
 | **F7** | OT / CRDT (Yjs) para edição simultânea no mesmo bloco | Seguinte |
 
 ---
@@ -79,7 +80,7 @@ flowchart LR
 - **`StudioDocumentComment`:** comentários no documento ou num bloco (`blockId`); resolver/reabrir; API `/api/studio/documents/[id]/comments`.  
 - **`StudioDocumentPresence`:** quem está a ver/editar (heartbeat ~12s, TTL 45s). API `/api/studio/documents/[id]/presence`. Sync suave: se o doc local não está dirty, aplica a versão remota; senão mostra banner. Auto-guardar silencioso aos 8s (`quiet` + sem snapshot).  
 - **Templates por domínio:** `domain` em `STUDIO_SYSTEM_TEMPLATES` (general/siep/fundhub/meet/forge/atlas/nexus) — filtro na biblioteca.  
-- **Galeria Criar (estilo Canva):** modal único com sidebar por tipo (`docs` / `proposals` / `presentations` / `letters` / `company`) + **tamanho livre** + **subir** PDF/DOCX/TXT. Templates de sistema já vêm com layout Design (posições %) e texto placeholder visível — não abrem “folha em branco”.  
+- **Galeria Criar (estilo Canva):** modal com **duas camadas** (Conteúdo / Desenho), sidebar por tipo, pré-visualização antes de criar, **tamanho livre** (Desenho) + **subir** PDF/DOCX/TXT (Conteúdo). Templates com `studioLayer` explícito; Design usa posições % visíveis.  
 - **Plantillas da empresa:** `StudioTemplate` (`isSystem=false`); no editor **«Plantilla»** grava o `canvasState` actual; reaparecem em Criar → «As nossas».  
 - **IA — um copiloto, herança de contexto (não árvore de agentes):** o mesmo agente Studio; contexto herda pasta → documento (`StudioContextAsset` + brand + links). Novas páginas (manual ou via IA de diagramação) devem seguir o padrão de layout das páginas do template activo — sem UI de “multi-agentes”.  
 - **`EtholysDocumentLink`:** vínculo persistente Studio/Core → sistema+entidade (NEXUS AT, SIEP, FUNDHUB, empresa…). A IA usa os vínculos sem consentimento de catálogo. API `/api/document-links`.  

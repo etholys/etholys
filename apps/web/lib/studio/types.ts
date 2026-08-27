@@ -111,6 +111,29 @@ export type StudioBlockLayout = {
   xPct?: number;
   yPct?: number;
   wPct?: number;
+  /** Altura em % (modo Desenho — Canva/InDesign) */
+  hPct?: number;
+  /** Ordem de empilhamento (Canva/Photoshop — maior = frente) */
+  zIndex?: number;
+};
+
+export type StudioImageEdit = {
+  brightness?: number;
+  contrast?: number;
+  saturate?: number;
+  grayscale?: boolean;
+  zoom?: number;
+  /** Recorte (% inset por aresta — Photoshop-lite) */
+  cropTop?: number;
+  cropRight?: number;
+  cropBottom?: number;
+  cropLeft?: number;
+};
+
+export type StudioHeaderFooter = {
+  header?: string;
+  footer?: string;
+  showPageNumbers?: boolean;
 };
 
 export type StudioBlock = {
@@ -121,6 +144,16 @@ export type StudioBlock = {
   /** mermaid = código; draw = quadro visual (Excalidraw JSON); text = legado */
   diagramLang?: 'mermaid' | 'draw' | 'text';
   imageUrl?: string | null;
+  /** Prompt para gerar ilustração (Canva / IA imagem) */
+  imagePrompt?: string;
+  /** Ajustes visuais (Photoshop-lite) */
+  imageEdit?: StudioImageEdit;
+  /** Metadados de media (storyboard vídeo, etc.) */
+  mediaMeta?: {
+    type: 'video-scene';
+    durationSec?: number;
+    narration?: string;
+  };
   style?: StudioBlockStyle;
   /** Só modo design — arrastar/redimensionar na folha */
   layout?: StudioBlockLayout;
@@ -133,6 +166,8 @@ export type StudioPage = {
   order: number;
   blocks: StudioBlock[];
   pageSize?: StudioPageSize;
+  /** Cor de fundo da folha (modo design) */
+  backgroundColor?: string;
   /** blank = desenhar do zero; mold = usar molde gráfico */
   layoutMode?: 'blank' | 'mold';
   moldId?: string | null;
@@ -148,6 +183,8 @@ export type StudioCanvasState = {
   marginsMm?: StudioPageMarginsMm;
   /** write = redação contínua (Word); design = folhas fixas / diagramação */
   studioMode?: StudioStudioMode;
+  /** Cabeçalho/rodapé Word (modo write) */
+  headerFooter?: StudioHeaderFooter;
   pages: StudioPage[];
 };
 
@@ -249,6 +286,11 @@ export function normalizeStudioCanvas(raw: unknown): StudioCanvasState {
           title: typeof p.title === 'string' ? p.title : `Página ${i + 1}`,
           order: typeof p.order === 'number' ? p.order : i,
           pageSize: isStudioPageSize(p.pageSize) ? p.pageSize : pageSize,
+          backgroundColor: (() => {
+            const raw = (p as { backgroundColor?: unknown }).backgroundColor;
+            if (typeof raw !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(raw.trim())) return undefined;
+            return raw.trim();
+          })(),
           layoutMode: p.layoutMode === 'mold' ? ('mold' as const) : ('blank' as const),
           moldId: typeof p.moldId === 'string' ? p.moldId : null,
           blocks: Array.isArray(p.blocks)
@@ -262,6 +304,48 @@ export function normalizeStudioCanvas(raw: unknown): StudioCanvasState {
                     ? b.diagramLang
                     : undefined,
                 imageUrl: b.imageUrl ?? null,
+                imagePrompt:
+                  typeof (b as { imagePrompt?: unknown }).imagePrompt === 'string'
+                    ? (b as { imagePrompt: string }).imagePrompt
+                    : undefined,
+                imageEdit: (() => {
+                  const ie = (b as { imageEdit?: unknown }).imageEdit;
+                  if (!ie || typeof ie !== 'object') return undefined;
+                  const o = ie as Record<string, unknown>;
+                  const clamp = (n: unknown, def: number) => {
+                    const v = typeof n === 'number' ? n : def;
+                    return Math.max(0, Math.min(200, Math.round(v)));
+                  };
+                  const clampCrop = (n: unknown) => {
+                    if (typeof n !== 'number' || !Number.isFinite(n)) return undefined;
+                    return Math.max(0, Math.min(45, Math.round(n)));
+                  };
+                  return {
+                    brightness: clamp(o.brightness, 100),
+                    contrast: clamp(o.contrast, 100),
+                    saturate: clamp(o.saturate, 100),
+                    grayscale: o.grayscale === true,
+                    zoom: clamp(o.zoom, 100),
+                    cropTop: clampCrop(o.cropTop),
+                    cropRight: clampCrop(o.cropRight),
+                    cropBottom: clampCrop(o.cropBottom),
+                    cropLeft: clampCrop(o.cropLeft),
+                  };
+                })(),
+                mediaMeta: (() => {
+                  const m = (b as { mediaMeta?: unknown }).mediaMeta;
+                  if (!m || typeof m !== 'object') return undefined;
+                  const o = m as Record<string, unknown>;
+                  if (o.type !== 'video-scene') return undefined;
+                  return {
+                    type: 'video-scene' as const,
+                    durationSec:
+                      typeof o.durationSec === 'number' && Number.isFinite(o.durationSec)
+                        ? o.durationSec
+                        : undefined,
+                    narration: typeof o.narration === 'string' ? o.narration : undefined,
+                  };
+                })(),
                 style: normalizeStudioBlockStyle((b as { style?: unknown }).style),
                 layout: (() => {
                   const raw = (b as { layout?: unknown }).layout;
@@ -274,8 +358,20 @@ export function normalizeStudioCanvas(raw: unknown): StudioCanvasState {
                   const xPct = clamp(o.xPct);
                   const yPct = clamp(o.yPct);
                   const wPct = clamp(o.wPct);
-                  if (xPct === undefined && yPct === undefined && wPct === undefined) return undefined;
-                  return { xPct, yPct, wPct };
+                  const hPct = clamp(o.hPct);
+                  const zRaw = o.zIndex;
+                  const zIndex =
+                    typeof zRaw === 'number' && Number.isFinite(zRaw) ? Math.round(zRaw) : undefined;
+                  if (
+                    xPct === undefined &&
+                    yPct === undefined &&
+                    wPct === undefined &&
+                    hPct === undefined &&
+                    zIndex === undefined
+                  ) {
+                    return undefined;
+                  }
+                  return { xPct, yPct, wPct, hPct, zIndex };
                 })(),
                 order: typeof b.order === 'number' ? b.order : j,
               }))
@@ -291,7 +387,25 @@ export function normalizeStudioCanvas(raw: unknown): StudioCanvasState {
         : format === 'presentation'
           ? 'design'
           : 'write';
-  return { version: 1, format, pageSize, orientation, marginsMm, studioMode, pages };
+  return {
+    version: 1,
+    format,
+    pageSize,
+    orientation,
+    marginsMm,
+    studioMode,
+    headerFooter: (() => {
+      const hf = c.headerFooter;
+      if (!hf || typeof hf !== 'object') return undefined;
+      const o = hf as Record<string, unknown>;
+      return {
+        header: typeof o.header === 'string' ? o.header : undefined,
+        footer: typeof o.footer === 'string' ? o.footer : undefined,
+        showPageNumbers: o.showPageNumbers === true,
+      };
+    })(),
+    pages,
+  };
 }
 
 export function applyStudioCanvasPatches(

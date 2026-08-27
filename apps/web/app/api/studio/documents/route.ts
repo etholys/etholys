@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import { STUDIO_SYSTEM_TEMPLATES, galleryKindForFormat, serializeStudioTemplate } from '@/lib/studio/templates';
+import { ALL_STUDIO_TEMPLATES, galleryKindForFormat, serializeStudioTemplate } from '@/lib/studio/templates';
 import { createStudioDocument } from '@/lib/studio/create-document';
 import { isStudioPageSize, normalizeStudioCanvas } from '@/lib/studio/types';
 import { getDocumentAccess, getFolderAccess, listActiveStudioShareTargets } from '@/lib/studio/share';
@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
         folders,
         allFolders: crumbFolders,
         documents,
-        templates: STUDIO_SYSTEM_TEMPLATES.map(serializeStudioTemplate),
+        templates: ALL_STUDIO_TEMPLATES.map(serializeStudioTemplate),
         accessMode: 'share_only',
         access,
         canEdit,
@@ -337,7 +337,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const templates = STUDIO_SYSTEM_TEMPLATES.map(serializeStudioTemplate);
+    const templates = ALL_STUDIO_TEMPLATES.map(serializeStudioTemplate);
     try {
       const companyTpls = await prisma.studioTemplate.findMany({
         where: { companyId: resolvedCompanyId, isSystem: false },

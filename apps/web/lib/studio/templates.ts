@@ -5,6 +5,11 @@ import {
   type StudioCanvasState,
   type StudioFormat,
 } from '@/lib/studio/types';
+import { STUDIO_PUBLIC_TEMPLATES } from '@/lib/studio/template-library/public-catalog';
+import { applyLayoutPreset, designPageCanvas, writePageCanvas, type LayoutVariant } from '@/lib/studio/template-library/layout-presets';
+
+/** Camada do Studio na galeria — Conteúdo (Word/Excel/PPT/PDF) vs Desenho (Canva/Gamma/InDesign). */
+export type StudioStudioLayer = 'content' | 'design';
 
 /** Domínios Etholys para filtrar templates (F4). */
 export const STUDIO_TEMPLATE_DOMAINS = [
@@ -19,26 +24,58 @@ export const STUDIO_TEMPLATE_DOMAINS = [
 
 export type StudioTemplateDomain = (typeof STUDIO_TEMPLATE_DOMAINS)[number];
 
-/** Tipos da galeria “Crear” (estilo Canva, só o que Etholys precisa). */
+/** Tipos da galeria “Crear” — duas camadas (Conteúdo + Desenho), variedade Canva. */
 export const STUDIO_GALLERY_KINDS = [
   'for_you',
+  /* Conteúdo (Write) */
   'docs',
-  'proposals',
+  'data',
+  'slides',
+  'pdf',
+  'upload',
+  /* Desenho (Design) */
   'presentations',
+  'social',
+  'photos',
+  'videos',
+  'print',
+  'whiteboards',
+  'web',
+  'emails',
+  'proposals',
   'letters',
   'company',
   'custom_size',
-  'upload',
 ] as const;
 
 export type StudioGalleryKind = (typeof STUDIO_GALLERY_KINDS)[number];
+
+export type StudioGalleryContentKind = Exclude<
+  StudioGalleryKind,
+  'for_you' | 'company' | 'custom_size' | 'upload'
+>;
+
+export const STUDIO_CONTENT_GALLERY_KINDS = ['docs', 'data', 'slides', 'pdf'] as const;
+export const STUDIO_DESIGN_GALLERY_KINDS = [
+  'presentations',
+  'social',
+  'photos',
+  'videos',
+  'print',
+  'whiteboards',
+  'web',
+  'emails',
+  'proposals',
+  'letters',
+] as const;
 
 export type StudioSystemTemplate = {
   key: string;
   format: StudioFormat;
   domain: StudioTemplateDomain;
-  /** Secção da galeria Canva-like */
-  galleryKind?: Exclude<StudioGalleryKind, 'for_you' | 'company' | 'custom_size' | 'upload'>;
+  /** content = Redação; design = diagramação visual */
+  studioLayer?: StudioStudioLayer;
+  galleryKind?: StudioGalleryContentKind;
   nameEs: string;
   namePt: string;
   nameEn: string;
@@ -49,57 +86,15 @@ export type StudioSystemTemplate = {
   buildCanvas: () => StudioCanvasState;
 };
 
-function stackLayout(blocks: StudioBlock[], opts?: { cover?: boolean }): StudioBlock[] {
-  return blocks.map((b, i) => {
-    const isCover = opts?.cover && i === 0 && b.kind === 'heading';
-    return {
-      ...b,
-      layout: b.layout || {
-        xPct: isCover ? 8 : 6,
-        yPct: isCover ? 28 : Math.min(78, 8 + i * 13),
-        wPct: isCover ? 84 : 88,
-      },
-      style: {
-        ...(isCover
-          ? { textScale: 'xl' as const, align: 'center' as const }
-          : b.kind === 'heading'
-            ? { textScale: 'lg' as const }
-            : b.kind === 'callout'
-              ? { frame: 'accent' as const }
-              : {}),
-        ...(b.style || {}),
-      },
-    };
-  });
-}
-
 function page(
   blocks: StudioBlock[],
   format: StudioFormat = 'report',
   title = 'Página 1',
-  opts?: { design?: boolean; cover?: boolean },
+  layoutVariant: LayoutVariant = 'report',
 ): StudioCanvasState {
-  const pageSize = format === 'presentation' ? 'Slide' : 'A4';
-  const design = opts?.design !== false;
-  const laidOut = design ? stackLayout(blocks, { cover: opts?.cover }) : blocks;
-  return {
-    version: 1,
-    format,
-    pageSize,
-    orientation: format === 'presentation' ? 'landscape' : 'portrait',
-    marginsMm: { ...DEFAULT_STUDIO_MARGINS_MM },
-    studioMode: design ? 'design' : 'write',
-    pages: [
-      {
-        id: 'page-1',
-        title,
-        order: 0,
-        pageSize,
-        layoutMode: 'blank',
-        blocks: laidOut,
-      },
-    ],
-  };
+  const c = designPageCanvas(blocks, format, layoutVariant);
+  if (c.pages[0]) c.pages[0].title = title;
+  return c;
 }
 
 /** Texto visível no canvas (antes só ia para `title` e a folha parecia vazia). */
@@ -129,22 +124,50 @@ export function galleryKindForFormat(
   if (format === 'presentation') return 'presentations';
   if (format === 'proposal' || domain === 'fundhub') return 'proposals';
   if (format === 'letter') return 'letters';
+  if (format === 'diagram') return 'whiteboards';
   return 'docs';
 }
 
 export function galleryKindLabel(kind: StudioGalleryKind, locale: string): string {
   const map: Record<StudioGalleryKind, [string, string, string]> = {
     for_you: ['Para ti', 'Para vos', 'For you'],
-    docs: ['Documentos', 'Documentos', 'Docs'],
+    docs: ['Documentos / Word', 'Documentos / Word', 'Docs / Word'],
+    data: ['Excel / dados', 'Excel / datos', 'Excel / data'],
+    slides: ['Apresentações (guión)', 'Presentaciones (guión)', 'Slides (outline)'],
+    pdf: ['PDF / relatório', 'PDF / informe', 'PDF / report'],
+    upload: ['Carregar ficheiro', 'Subir archivo', 'Upload file'],
+    presentations: ['Apresentações visuais', 'Presentaciones visuales', 'Visual decks'],
+    social: ['Redes sociais', 'Redes sociales', 'Social media'],
+    photos: ['Fotos', 'Fotos', 'Photos'],
+    videos: ['Vídeos / storyboard', 'Vídeos / storyboard', 'Videos / storyboard'],
+    print: ['Imprimir', 'Imprimir', 'Print'],
+    whiteboards: ['Pizarras', 'Pizarras online', 'Whiteboards'],
+    web: ['Sites / one-pager', 'Sitios web', 'Websites'],
+    emails: ['Correos', 'Correos', 'Emails'],
     proposals: ['Propostas', 'Propuestas', 'Proposals'],
-    presentations: ['Apresentações', 'Presentaciones', 'Presentations'],
     letters: ['Cartas e briefs', 'Cartas y briefs', 'Letters & briefs'],
     company: ['As nossas', 'Las nuestras', 'Ours'],
     custom_size: ['Tamanho livre', 'Elegir el tamaño', 'Custom size'],
-    upload: ['Carregar', 'Subir', 'Upload'],
   };
   const [pt, es, en] = map[kind];
   return locale === 'pt' ? pt : locale === 'es' ? es : en;
+}
+
+export function studioLayerLabel(layer: StudioStudioLayer, locale: string): string {
+  const map: Record<StudioStudioLayer, [string, string, string]> = {
+    content: ['Conteúdo', 'Contenido', 'Content'],
+    design: ['Desenho', 'Diseño', 'Design'],
+  };
+  const [pt, es, en] = map[layer];
+  return locale === 'pt' ? pt : locale === 'es' ? es : en;
+}
+
+export function galleryKindLayer(kind: StudioGalleryKind): StudioStudioLayer | 'both' {
+  if (kind === 'for_you' || kind === 'company') return 'both';
+  if (kind === 'upload') return 'content';
+  if (kind === 'custom_size') return 'design';
+  if ((STUDIO_CONTENT_GALLERY_KINDS as readonly string[]).includes(kind)) return 'content';
+  return 'design';
 }
 
 /** Catálogo embutido — seed em memória; DB opcional para custom da empresa. */
@@ -153,6 +176,8 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
     key: 'blank-report',
     format: 'report',
     domain: 'general',
+    studioLayer: 'content',
+    galleryKind: 'docs',
     nameEs: 'Informe en blanco',
     namePt: 'Relatório em branco',
     nameEn: 'Blank report',
@@ -173,6 +198,7 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
     key: 'project-one-pager',
     format: 'brief',
     domain: 'general',
+    studioLayer: 'design',
     galleryKind: 'docs',
     nameEs: 'One-pager de proyecto',
     namePt: 'One-pager de projeto',
@@ -197,6 +223,8 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
     key: 'funding-proposal-outline',
     format: 'proposal',
     domain: 'fundhub',
+    studioLayer: 'design',
+    galleryKind: 'proposals',
     nameEs: 'Esquema de propuesta',
     namePt: 'Esquema de proposta',
     nameEn: 'Proposal outline',
@@ -222,6 +250,8 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
     key: 'fundhub-concept-note',
     format: 'brief',
     domain: 'fundhub',
+    studioLayer: 'design',
+    galleryKind: 'proposals',
     nameEs: 'Nota conceptual (FUNDHUB)',
     namePt: 'Nota conceptual (FUNDHUB)',
     nameEn: 'Concept note (FUNDHUB)',
@@ -246,6 +276,8 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
     key: 'formal-letter',
     format: 'letter',
     domain: 'general',
+    studioLayer: 'design',
+    galleryKind: 'letters',
     nameEs: 'Carta formal',
     namePt: 'Carta formal',
     nameEn: 'Formal letter',
@@ -268,6 +300,8 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
     key: 'meeting-minutes',
     format: 'report',
     domain: 'meet',
+    studioLayer: 'content',
+    galleryKind: 'docs',
     nameEs: 'Acta de reunión',
     namePt: 'Ata de reunião',
     nameEn: 'Meeting minutes',
@@ -276,20 +310,19 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
     descriptionEn: 'Attendees, topics, and decisions.',
     sortOrder: 50,
     buildCanvas: () =>
-      page(
-        [
-          block('b1', 'heading', 'Acta — título', 0),
-          block('b2', 'bullets', 'Participantes', 1),
-          block('b3', 'paragraph', 'Temas tratados', 2),
-          block('b4', 'bullets', 'Acuerdos / próximos pasos', 3),
-        ],
-        'report',
-      ),
+      writePageCanvas([
+        block('b1', 'heading', 'Acta — título', 0),
+        block('b2', 'bullets', 'Participantes', 1),
+        block('b3', 'paragraph', 'Temas tratados', 2),
+        block('b4', 'bullets', 'Acuerdos / próximos pasos', 3),
+      ]),
   },
   {
     key: 'meet-post-brief',
     format: 'brief',
     domain: 'meet',
+    studioLayer: 'content',
+    galleryKind: 'docs',
     nameEs: 'Resumen post-reunión',
     namePt: 'Resumo pós-reunião',
     nameEn: 'Post-meeting brief',
@@ -298,7 +331,7 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
     descriptionEn: 'Summary, decisions and tasks to share.',
     sortOrder: 52,
     buildCanvas: () =>
-      page(
+      writePageCanvas(
         [
           block('b1', 'heading', 'Reunión', 0),
           block('b2', 'paragraph', 'Resumen', 1),
@@ -313,6 +346,8 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
     key: 'siep-monthly-informe',
     format: 'report',
     domain: 'siep',
+    studioLayer: 'content',
+    galleryKind: 'pdf',
     nameEs: 'Informe mensual SIEP',
     namePt: 'Informe mensal SIEP',
     nameEn: 'SIEP monthly report',
@@ -321,18 +356,15 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
     descriptionEn: 'Typical monitoring report outline.',
     sortOrder: 55,
     buildCanvas: () =>
-      page(
-        [
-          block('b1', 'heading', 'Informe — período', 0),
-          block('b2', 'paragraph', 'Resumen ejecutivo', 1),
-          block('b3', 'paragraph', 'Avances del período', 2),
-          block('b4', 'bullets', 'Indicadores / evidencias', 3),
-          block('b5', 'paragraph', 'Desafíos y riesgos', 4),
-          block('b6', 'bullets', 'Próximos pasos', 5),
-          block('b7', 'callout', 'Solicitudes / decisiones', 6),
-        ],
-        'report',
-      ),
+      writePageCanvas([
+        block('b1', 'heading', 'Informe — período', 0),
+        block('b2', 'paragraph', 'Resumen ejecutivo', 1),
+        block('b3', 'paragraph', 'Avances del período', 2),
+        block('b4', 'bullets', 'Indicadores / evidencias', 3),
+        block('b5', 'paragraph', 'Desafíos y riesgos', 4),
+        block('b6', 'bullets', 'Próximos pasos', 5),
+        block('b7', 'callout', 'Solicitudes / decisiones', 6),
+      ]),
   },
   {
     key: 'atlas-project-memo',
@@ -407,6 +439,8 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
     key: 'process-diagram',
     format: 'diagram',
     domain: 'general',
+    studioLayer: 'design',
+    galleryKind: 'whiteboards',
     nameEs: 'Diagrama de proceso',
     namePt: 'Diagrama de processo',
     nameEn: 'Process diagram',
@@ -435,6 +469,7 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
     key: 'pitch-deck-outline',
     format: 'presentation',
     domain: 'general',
+    studioLayer: 'design',
     galleryKind: 'presentations',
     nameEs: 'Guion de presentación',
     namePt: 'Guião de apresentação',
@@ -465,12 +500,12 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
           order: i,
           pageSize: 'Slide' as const,
           layoutMode: 'blank' as const,
-          blocks: stackLayout(
+          blocks: applyLayoutPreset(
             [
               block(`h-${i}`, 'heading', title, 0),
               block(`p-${i}`, 'paragraph', 'Contenido', 1, body),
             ],
-            { cover: i === 0 },
+            i === 0 ? 'cover' : 'slide',
           ),
         })),
       };
@@ -478,8 +513,21 @@ export const STUDIO_SYSTEM_TEMPLATES: StudioSystemTemplate[] = [
   },
 ];
 
+/** Sistema + biblioteca pública embutida. */
+export const ALL_STUDIO_TEMPLATES: StudioSystemTemplate[] = [
+  ...STUDIO_SYSTEM_TEMPLATES,
+  ...(STUDIO_PUBLIC_TEMPLATES as StudioSystemTemplate[]),
+];
+
 export function findSystemTemplate(key: string): StudioSystemTemplate | undefined {
-  return STUDIO_SYSTEM_TEMPLATES.find((t) => t.key === key);
+  return ALL_STUDIO_TEMPLATES.find((t) => t.key === key);
+}
+
+export function resolveTemplateStudioLayer(t: StudioSystemTemplate): StudioStudioLayer {
+  if (t.studioLayer) return t.studioLayer;
+  const canvas = t.buildCanvas();
+  if (canvas.studioMode === 'write') return 'content';
+  return 'design';
 }
 
 export function resolveTemplateGalleryKind(t: StudioSystemTemplate): StudioSystemTemplate['galleryKind'] {
@@ -491,6 +539,7 @@ export function serializeStudioTemplate(t: StudioSystemTemplate) {
     key: t.key,
     format: t.format,
     domain: t.domain,
+    studioLayer: resolveTemplateStudioLayer(t),
     galleryKind: resolveTemplateGalleryKind(t),
     nameEs: t.nameEs,
     namePt: t.namePt,

@@ -9,6 +9,11 @@ import {
   Pencil,
   Ruler,
   Sparkles,
+  Table2,
+  Type,
+  Heading1,
+  Megaphone,
+  Presentation,
 } from 'lucide-react';
 import type {
   StudioBlockKind,
@@ -17,6 +22,7 @@ import type {
   StudioPageOrientation,
   StudioPageSize,
   StudioStudioMode,
+  type StudioHeaderFooter,
 } from '@/lib/studio/types';
 import {
   STUDIO_MARGIN_PRESETS,
@@ -56,12 +62,22 @@ type Labels = {
   heading: string;
   list: string;
   callout: string;
+  table: string;
+  newSlide: string;
   diagram: string;
   image: string;
   designTools: string;
   drawBoard: string;
   molds: string;
+  textBox: string;
+  titleBox: string;
   aiScope: string;
+  contentLayer: string;
+  designLayer: string;
+  header: string;
+  footer: string;
+  pageNumbers: string;
+  pageBackground: string;
 };
 
 type Props = {
@@ -80,6 +96,11 @@ type Props = {
   onMargins: (m: StudioPageMarginsMm) => void;
   onInsert: (kind: StudioBlockKind | 'image') => void;
   onOpenMolds?: () => void;
+  onAddPage?: () => void;
+  headerFooter?: StudioHeaderFooter;
+  onHeaderFooter?: (hf: StudioHeaderFooter) => void;
+  pageBackgroundColor?: string | null;
+  onPageBackgroundColor?: (color: string | null) => void;
 };
 
 export function StudioToolsSidebar({
@@ -98,6 +119,11 @@ export function StudioToolsSidebar({
   onMargins,
   onInsert,
   onOpenMolds,
+  onAddPage,
+  headerFooter,
+  onHeaderFooter,
+  pageBackgroundColor,
+  onPageBackgroundColor,
 }: Props) {
   const preset = matchStudioMarginPreset(margins);
   const presetLabel = (id: StudioMarginPresetId) => {
@@ -317,11 +343,129 @@ export function StudioToolsSidebar({
           <p className="mt-2 text-[10px] text-slate-400">
             {pageCount} {labels.page.toLowerCase()}(s) · {pageSize}
           </p>
+          {!isDesign && onHeaderFooter && (
+            <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                Word
+              </p>
+              <label className="flex flex-col gap-0.5 text-[10px] font-semibold text-slate-500">
+                {labels.header}
+                <input
+                  type="text"
+                  disabled={disabled}
+                  value={headerFooter?.header || ''}
+                  onChange={(e) =>
+                    onHeaderFooter({ ...(headerFooter || {}), header: e.target.value })
+                  }
+                  className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-800"
+                />
+              </label>
+              <label className="flex flex-col gap-0.5 text-[10px] font-semibold text-slate-500">
+                {labels.footer}
+                <input
+                  type="text"
+                  disabled={disabled}
+                  value={headerFooter?.footer || ''}
+                  onChange={(e) =>
+                    onHeaderFooter({ ...(headerFooter || {}), footer: e.target.value })
+                  }
+                  className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-800"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-600">
+                <input
+                  type="checkbox"
+                  disabled={disabled}
+                  checked={headerFooter?.showPageNumbers ?? false}
+                  onChange={(e) =>
+                    onHeaderFooter({
+                      ...(headerFooter || {}),
+                      showPageNumbers: e.target.checked,
+                    })
+                  }
+                />
+                {labels.pageNumbers}
+              </label>
+            </div>
+          )}
         </section>
 
         {isDesign ? (
           <section>
             <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-violet-500">
+              {labels.designLayer}
+            </p>
+            {onPageBackgroundColor && (
+              <label className="mb-3 flex flex-col gap-1 text-[10px] font-semibold text-slate-500">
+                {labels.pageBackground}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    disabled={disabled}
+                    value={pageBackgroundColor || '#ffffff'}
+                    onChange={(e) => onPageBackgroundColor(e.target.value)}
+                    className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-white p-0.5"
+                  />
+                  <input
+                    type="text"
+                    disabled={disabled}
+                    value={pageBackgroundColor || '#ffffff'}
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      if (/^#[0-9A-Fa-f]{6}$/.test(v)) onPageBackgroundColor(v);
+                    }}
+                    className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1 font-mono text-[10px] text-slate-800"
+                  />
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onPageBackgroundColor(null)}
+                    className="rounded border border-slate-200 px-1.5 py-1 text-[9px] font-bold text-slate-500 hover:bg-slate-50"
+                  >
+                    ×
+                  </button>
+                </div>
+              </label>
+            )}
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onInsert('paragraph')}
+                className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2 py-2 text-[11px] font-semibold text-violet-950 hover:bg-violet-50 disabled:opacity-50"
+              >
+                <Type className="h-3.5 w-3.5" />
+                {labels.textBox}
+              </button>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onInsert('heading')}
+                className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2 py-2 text-[11px] font-semibold text-violet-950 hover:bg-violet-50 disabled:opacity-50"
+              >
+                <Heading1 className="h-3.5 w-3.5" />
+                {labels.titleBox}
+              </button>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onInsert('callout')}
+                className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2 py-2 text-[11px] font-semibold text-violet-950 hover:bg-violet-50 disabled:opacity-50"
+              >
+                <Megaphone className="h-3.5 w-3.5" />
+                {labels.callout}
+              </button>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onInsert('image')}
+                className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2 py-2 text-[11px] font-semibold text-violet-950 hover:bg-violet-50 disabled:opacity-50"
+              >
+                <ImagePlus className="h-3.5 w-3.5" />
+                {labels.image}
+              </button>
+            </div>
+            <p className="mb-1.5 mt-3 text-[10px] font-bold uppercase tracking-wide text-violet-500">
               {labels.designTools}
             </p>
             <div className="grid grid-cols-1 gap-1.5">
@@ -339,15 +483,17 @@ export function StudioToolsSidebar({
                   </span>
                 </span>
               </button>
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={() => onInsert('image')}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-2 text-[11px] font-semibold text-slate-700 hover:border-violet-300 hover:bg-violet-50 disabled:opacity-50"
-              >
-                <ImagePlus className="h-3.5 w-3.5" />
-                {labels.image}
-              </button>
+              {onAddPage && (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={onAddPage}
+                  className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50/50 px-2.5 py-2 text-[11px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+                >
+                  <Presentation className="h-3.5 w-3.5" />
+                  {labels.newSlide}
+                </button>
+              )}
               {onOpenMolds && (
                 <button
                   type="button"
@@ -363,6 +509,9 @@ export function StudioToolsSidebar({
           </section>
         ) : (
           <section>
+            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-orange-600">
+              {labels.contentLayer}
+            </p>
             <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
               {labels.insert}
             </p>
@@ -373,6 +522,7 @@ export function StudioToolsSidebar({
                   ['heading', labels.heading],
                   ['bullets', labels.list],
                   ['callout', labels.callout],
+                  ['table', labels.table],
                 ] as const
               ).map(([kind, label]) => (
                 <button
@@ -382,7 +532,13 @@ export function StudioToolsSidebar({
                   onClick={() => onInsert(kind)}
                   className="rounded-lg border border-slate-200 px-2 py-1.5 text-left text-[11px] font-semibold text-slate-700 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-50"
                 >
-                  {label}
+                  {kind === 'table' ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Table2 className="h-3 w-3" /> {label}
+                    </span>
+                  ) : (
+                    label
+                  )}
                 </button>
               ))}
               <button
@@ -394,6 +550,17 @@ export function StudioToolsSidebar({
                 <ImagePlus className="h-3.5 w-3.5" />
                 {labels.image}
               </button>
+              {onAddPage && (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={onAddPage}
+                  className="inline-flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50/60 px-2 py-1.5 text-[11px] font-semibold text-orange-900 hover:bg-orange-100 disabled:opacity-50"
+                >
+                  <Presentation className="h-3.5 w-3.5" />
+                  {labels.newSlide}
+                </button>
+              )}
             </div>
             <p className="mt-2 text-[10px] text-slate-400">{labels.aiScope}</p>
           </section>

@@ -30,12 +30,13 @@ export function StudioDesignPlacedBlock({
   children,
 }: Props) {
   const drag = useRef<{
-    mode: 'move' | 'resize';
+    mode: 'move' | 'resize' | 'resizeH';
     startX: number;
     startY: number;
     origX: number;
     origY: number;
     origW: number;
+    origH: number;
     parentW: number;
     parentH: number;
   } | null>(null);
@@ -49,6 +50,7 @@ export function StudioDesignPlacedBlock({
   const x = layout.xPct ?? 0;
   const y = layout.yPct ?? 0;
   const w = layout.wPct ?? 88;
+  const h = layout.hPct;
 
   function sheetEl(from: EventTarget | null): HTMLElement | null {
     return ((from as HTMLElement | null)?.closest?.('[data-studio-sheet-body]') ||
@@ -57,7 +59,7 @@ export function StudioDesignPlacedBlock({
 
   function begin(
     e: React.PointerEvent,
-    mode: 'move' | 'resize',
+    mode: 'move' | 'resize' | 'resizeH',
   ) {
     e.preventDefault();
     e.stopPropagation();
@@ -71,6 +73,7 @@ export function StudioDesignPlacedBlock({
       origX: x,
       origY: y,
       origW: w,
+      origH: h ?? 20,
       parentW: rect.width || 1,
       parentH: rect.height || 1,
     };
@@ -85,10 +88,13 @@ export function StudioDesignPlacedBlock({
       const nextW = drag.current.origW;
       const nextX = snapPct(Math.max(0, Math.min(100 - nextW, drag.current.origX + dx)));
       const nextY = snapPct(Math.max(0, Math.min(92, drag.current.origY + dy)));
-      onLayoutChange({ ...layout, xPct: nextX, yPct: nextY, wPct: nextW });
+      onLayoutChange({ ...layout, xPct: nextX, yPct: nextY, wPct: nextW, hPct: h });
+    } else if (drag.current.mode === 'resizeH') {
+      const nextH = snapPct(Math.max(8, Math.min(92 - drag.current.origY, drag.current.origH + dy)));
+      onLayoutChange({ ...layout, xPct: drag.current.origX, yPct: drag.current.origY, wPct: drag.current.origW, hPct: nextH });
     } else {
       const nextW = snapPct(Math.max(18, Math.min(100 - drag.current.origX, drag.current.origW + dx)));
-      onLayoutChange({ ...layout, xPct: drag.current.origX, yPct: drag.current.origY, wPct: nextW });
+      onLayoutChange({ ...layout, xPct: drag.current.origX, yPct: drag.current.origY, wPct: nextW, hPct: h });
     }
   }
 
@@ -103,11 +109,13 @@ export function StudioDesignPlacedBlock({
 
   return (
     <div
-      className="group/place absolute z-10"
+      className="group/place absolute"
       style={{
         left: `${x}%`,
         top: `${y}%`,
         width: `${w}%`,
+        zIndex: layout.zIndex ?? 10,
+        ...(h != null ? { height: `${h}%`, overflow: 'hidden' } : {}),
       }}
     >
       {canEdit && onLayoutChange ? (
@@ -124,10 +132,19 @@ export function StudioDesignPlacedBlock({
           </button>
           <button
             type="button"
-            title="Redimensionar"
-            aria-label="Resize"
+            title="Redimensionar largura"
+            aria-label="Resize width"
             className="absolute -bottom-1 -right-1 z-20 h-3.5 w-3.5 cursor-se-resize rounded-sm border border-violet-300 bg-violet-500 opacity-0 shadow group-hover/place:opacity-100"
             onPointerDown={(e) => begin(e, 'resize')}
+            onPointerMove={move}
+            onPointerUp={end}
+          />
+          <button
+            type="button"
+            title="Redimensionar altura"
+            aria-label="Resize height"
+            className="absolute -bottom-1 left-1/2 z-20 h-2 w-5 -translate-x-1/2 cursor-s-resize rounded-full border border-violet-300 bg-violet-400 opacity-0 group-hover/place:opacity-100"
+            onPointerDown={(e) => begin(e, 'resizeH')}
             onPointerMove={move}
             onPointerUp={end}
           />

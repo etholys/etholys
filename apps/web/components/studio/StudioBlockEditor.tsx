@@ -21,8 +21,12 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  Clapperboard,
+  ImagePlus,
+  Loader2,
 } from 'lucide-react';
-import type { StudioBlock, StudioBlockKind, StudioBlockStyle } from '@/lib/studio/types';
+import type { StudioBlock, StudioBlockKind, StudioBlockStyle, StudioImageEdit } from '@/lib/studio/types';
+import { DEFAULT_IMAGE_EDIT, imageEditClipStyle, imageEditToCssFilter, imageEditZoomStyle } from '@/lib/studio/image-edit';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import { StudioMermaidPreview } from '@/components/studio/StudioMermaidPreview';
 import { StudioDrawingEditor } from '@/components/studio/StudioDrawingEditor';
@@ -37,6 +41,7 @@ import {
   studioBlockScaleClass,
 } from '@/lib/studio/block-style';
 import { StudioRichTextEditor } from '@/components/studio/StudioRichTextEditor';
+import { StudioTableEditor } from '@/components/studio/StudioTableEditor';
 
 const DIAGRAM_TEMPLATES: Array<{ id: string; label: string; source: string }> = [
   {
@@ -144,6 +149,10 @@ type Props = {
   onBackspaceEmpty?: () => void;
   onFocusNext?: () => void;
   onFocusPrev?: () => void;
+  /** Gera ilustração IA para bloco image (modo Desenho) */
+  onGenerateImage?: (prompt?: string) => Promise<void>;
+  onImagePromptChange?: (prompt: string) => void;
+  onImageEditChange?: (edit: import('@/lib/studio/types').StudioImageEdit) => void;
   labels: {
     edit: string;
     preview: string;
@@ -165,6 +174,13 @@ type Props = {
     collapseDraw: string;
     selectForAi: string;
     selectedForAi: string;
+    generateImage: string;
+    imagePrompt: string;
+    videoScene: string;
+    adjustImage: string;
+    brightness: string;
+    contrast: string;
+    crop: string;
   };
 };
 
@@ -190,6 +206,9 @@ export function StudioBlockEditor({
   onBackspaceEmpty,
   onFocusNext,
   onFocusPrev,
+  onGenerateImage,
+  onImagePromptChange,
+  onImageEditChange,
   labels,
 }: Props) {
   const styleWrap = `${studioBlockAlignClass(block.style)} ${studioBlockFrameClass(block.style)}`.trim();
@@ -198,7 +217,9 @@ export function StudioBlockEditor({
   const isDiagram = block.kind === 'diagram';
   const isDraw = isDiagram && isStudioDrawBlock(block);
   const isImage = block.kind === 'image';
+  const isTable = block.kind === 'table';
   const [editing, setEditing] = useState(!!writeMode);
+  const [imageBusy, setImageBusy] = useState(false);
   const [diagramSourceOpen, setDiagramSourceOpen] = useState(
     () => isDiagram && !isDraw && !block.text.trim(),
   );
@@ -206,8 +227,8 @@ export function StudioBlockEditor({
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (writeMode && !isDiagram && !isImage) setEditing(true);
-  }, [writeMode, isDiagram, isImage]);
+    if (writeMode && !isDiagram && !isImage && !isTable) setEditing(true);
+  }, [writeMode, isDiagram, isImage, isTable]);
 
   useEffect(() => {
     if (!editing) return;
@@ -461,7 +482,7 @@ export function StudioBlockEditor({
     </div>
   );
 
-  if (isImage) {
+  if (isTable) {
     return (
       <div
         ref={rootRef}
@@ -475,19 +496,177 @@ export function StudioBlockEditor({
           </div>
         )}
         {chrome}
+        <StudioTableEditor text={block.text} disabled={disabled} onChange={onChange} />
+      </div>
+    );
+  }
+
+  if (isImage) {
+    const scene = block.mediaMeta?.type === 'video-scene' ? block.mediaMeta : null;
+    return (
+      <div
+        ref={rootRef}
+        className={`group relative w-full rounded-lg transition ${
+          aiSelected ? 'ring-2 ring-orange-400 ring-offset-2 bg-orange-50/40' : ''
+        }`}
+      >
+        {aiSelected && (
+          <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+            <Sparkles className="h-3 w-3" /> {labels.selectedForAi}
+          </div>
+        )}
+        {scene && (
+          <div className="mb-2 inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-800">
+            <Clapperboard className="h-3 w-3" />
+            {labels.videoScene}
+            {scene.durationSec ? ` · ${scene.durationSec}s` : ''}
+            {scene.narration ? (
+              <span className="font-normal text-violet-600"> — {scene.narration.slice(0, 80)}</span>
+            ) : null}
+          </div>
+        )}
+        {chrome}
         {block.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={block.imageUrl}
-            alt={block.text || 'image'}
-            className={`mx-auto max-h-[200px] w-auto max-w-full rounded-lg object-contain shadow-sm ${styleWrap}`}
-          />
+          <div
+            className="overflow-hidden rounded-lg"
+            style={imageEditClipStyle(block.imageEdit)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={block.imageUrl}
+              alt={block.text || 'image'}
+              style={{
+                filter: imageEditToCssFilter(block.imageEdit),
+                ...imageEditZoomStyle(block.imageEdit),
+              }}
+              className={`mx-auto max-h-[240px] w-auto max-w-full rounded-lg object-contain shadow-sm ${styleWrap}`}
+            />
+          </div>
         ) : (
           <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
             {labels.empty}
           </p>
         )}
-        {block.text ? <p className="mt-2 text-center text-xs text-slate-500">{block.text}</p> : null}
+        {!disabled && onGenerateImage && !writeMode && (
+          <div className="mt-2 space-y-2">
+            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              {labels.imagePrompt}
+            </label>
+            <textarea
+              value={block.imagePrompt || ''}
+              onChange={(e) =>
+                onImagePromptChange ? onImagePromptChange(e.target.value) : onChange(e.target.value)
+              }
+              rows={2}
+              disabled={imageBusy}
+              className="w-full resize-none rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-violet-400"
+              placeholder={labels.imagePrompt}
+            />
+            <button
+              type="button"
+              disabled={imageBusy}
+              onClick={() => {
+                setImageBusy(true);
+                void onGenerateImage(block.imagePrompt || block.text || undefined).finally(() =>
+                  setImageBusy(false),
+                );
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-40"
+            >
+              {imageBusy ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ImagePlus className="h-3.5 w-3.5" />
+              )}
+              {labels.generateImage}
+            </button>
+          </div>
+        )}
+        {!disabled && onImageEditChange && block.imageUrl && !writeMode && (
+          <div className="mt-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              {labels.adjustImage}
+            </p>
+            {(
+              [
+                ['brightness', labels.brightness, block.imageEdit?.brightness ?? 100],
+                ['contrast', labels.contrast, block.imageEdit?.contrast ?? 100],
+                ['saturate', 'Sat', block.imageEdit?.saturate ?? 100],
+                ['zoom', 'Zoom', block.imageEdit?.zoom ?? 100],
+              ] as const
+            ).map(([key, label, val]) => (
+              <label key={key} className="flex items-center gap-2 text-[10px] text-slate-600">
+                <span className="w-14 shrink-0 font-semibold">{label}</span>
+                <input
+                  type="range"
+                  min={key === 'zoom' ? 100 : 0}
+                  max={200}
+                  value={val}
+                  disabled={disabled}
+                  onChange={(e) => {
+                    const next: StudioImageEdit = {
+                      ...DEFAULT_IMAGE_EDIT,
+                      ...block.imageEdit,
+                      [key]: Number(e.target.value),
+                    };
+                    onImageEditChange(next);
+                  }}
+                  className="min-w-0 flex-1"
+                />
+                <span className="w-8 tabular-nums">{val}</span>
+              </label>
+            ))}
+            <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-600">
+              <input
+                type="checkbox"
+                checked={block.imageEdit?.grayscale ?? false}
+                disabled={disabled}
+                onChange={(e) =>
+                  onImageEditChange({
+                    ...DEFAULT_IMAGE_EDIT,
+                    ...block.imageEdit,
+                    grayscale: e.target.checked,
+                  })
+                }
+              />
+              B/W
+            </label>
+            <p className="pt-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              {labels.crop}
+            </p>
+            {(
+              [
+                ['cropTop', '↑', block.imageEdit?.cropTop ?? 0],
+                ['cropRight', '→', block.imageEdit?.cropRight ?? 0],
+                ['cropBottom', '↓', block.imageEdit?.cropBottom ?? 0],
+                ['cropLeft', '←', block.imageEdit?.cropLeft ?? 0],
+              ] as const
+            ).map(([key, label, val]) => (
+              <label key={key} className="flex items-center gap-2 text-[10px] text-slate-600">
+                <span className="w-14 shrink-0 font-semibold">{label}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={45}
+                  value={val}
+                  disabled={disabled}
+                  onChange={(e) => {
+                    onImageEditChange({
+                      ...DEFAULT_IMAGE_EDIT,
+                      ...block.imageEdit,
+                      [key]: Number(e.target.value),
+                    });
+                  }}
+                  className="min-w-0 flex-1"
+                />
+                <span className="w-8 tabular-nums">{val}%</span>
+              </label>
+            ))}
+          </div>
+        )}
+        {block.text && writeMode ? (
+          <p className="mt-2 text-center text-xs text-slate-500">{block.text}</p>
+        ) : null}
       </div>
     );
   }
@@ -632,7 +811,7 @@ export function StudioBlockEditor({
         </div>
       )}
       {chrome}
-      {writeMode && pageId && !isDiagram && !isImage ? (
+      {writeMode && pageId && !isDiagram && !isImage && !isTable ? (
         <div className={`${styleWrap || ''} ${scaleCls}`}>
           <StudioRichTextEditor
             blockId={block.id}

@@ -18,6 +18,12 @@ type Props = {
   freeform?: boolean;
   /** gap mais apertado (redação tipo Word) */
   compact?: boolean;
+  headerText?: string | null;
+  footerText?: string | null;
+  showPageNumbers?: boolean;
+  pageNumber?: number;
+  pageTotal?: number;
+  backgroundColor?: string | null;
   children: React.ReactNode;
 };
 
@@ -38,6 +44,12 @@ export function StudioSheet({
   brandAccent,
   freeform,
   compact,
+  headerText,
+  footerText,
+  showPageNumbers,
+  pageNumber,
+  pageTotal,
+  backgroundColor,
   children,
 }: Props) {
   const pad = marginPx || { top: 48, right: 56, bottom: 48, left: 56 };
@@ -129,6 +141,7 @@ export function StudioSheet({
       className="relative bg-white shadow-[0_12px_40px_rgba(15,23,42,0.14)] ring-1 ring-slate-300/80"
       style={{
         width,
+        backgroundColor: backgroundColor || undefined,
         ...(isFixed ? { height, flexShrink: 0 } : { minHeight: height, height: 'auto' }),
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
         backgroundSize: '100% 100%',
@@ -152,11 +165,25 @@ export function StudioSheet({
           ...(isFixed ? {} : { minHeight: height }),
         }}
       >
+        {headerText ? (
+          <div className="mb-3 border-b border-slate-200/80 pb-2 text-[10px] font-medium text-slate-500">
+            {headerText}
+          </div>
+        ) : null}
         <div
           className={`flex min-h-0 flex-col ${compact ? 'gap-1.5' : 'gap-3.5'} ${freeform ? 'relative min-h-full' : ''}`}
         >
           {children}
         </div>
+        {(footerText || showPageNumbers) && (
+          <div className="mt-4 border-t border-slate-200/80 pt-2 text-[10px] text-slate-400">
+            {footerText}
+            {footerText && showPageNumbers ? ' · ' : ''}
+            {showPageNumbers && pageNumber != null && pageTotal != null
+              ? `${pageNumber} / ${pageTotal}`
+              : null}
+          </div>
+        )}
       </div>
 
       <div
