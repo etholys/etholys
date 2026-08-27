@@ -8,6 +8,7 @@ import { useApp } from '@/app/providers';
 import { NexusAtCaseCard, type AtCaseCardModel } from '@/components/nexus/NexusAtCaseCard';
 
 type Company = { id: string; name: string; shortName: string };
+type SiepProject = { id: string; name: string; code: string | null; companyId: string };
 type Service = {
   id: string;
   title: string;
@@ -15,6 +16,8 @@ type Service = {
   status: string;
   contractRef: string | null;
   operatorCompany: { id: string; name: string; shortName: string };
+  sponsorCompany?: { id: string; name: string; shortName: string } | null;
+  siepProject?: { id: string; name: string; code?: string | null } | null;
   members: Array<{ companyId: string; memberRole: string; company: { shortName: string; name: string } }>;
   projects: Array<{ id: string; name: string; status: string }>;
   openCaseCount: number;
@@ -65,6 +68,13 @@ export default function NexusAtPage() {
   const [suggestions, setSuggestions] = useState<Company[]>([]);
   const [searching, setSearching] = useState(false);
   const [firstProjectName, setFirstProjectName] = useState('');
+
+  const [sponsor, setSponsor] = useState<PickedClient | null>(null);
+  const [sponsorQuery, setSponsorQuery] = useState('');
+  const [sponsorSuggestions, setSponsorSuggestions] = useState<Company[]>([]);
+  const [siepProjectId, setSiepProjectId] = useState('');
+  const [siepProjects, setSiepProjects] = useState<SiepProject[]>([]);
+  const [loadingSiep, setLoadingSiep] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,10 +130,54 @@ export default function NexusAtPage() {
     };
   }, [clientQuery, showForm]);
 
+  useEffect(() => {
+    if (!showForm) return;
+    const q = sponsorQuery.trim();
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/nexus/at/client-companies?q=${encodeURIComponent(q)}&take=20`);
+        const d = await r.json();
+        if (!cancelled && r.ok) setSponsorSuggestions(d.companies || []);
+      } catch {
+        if (!cancelled) setSponsorSuggestions([]);
+      }
+    }, 220);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [sponsorQuery, showForm]);
+
+  useEffect(() => {
+    if (!sponsor?.id) {
+      setSiepProjects([]);
+      setSiepProjectId('');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoadingSiep(true);
+      try {
+        const r = await fetch(`/api/nexus/at/siep-projects?companyId=${encodeURIComponent(sponsor.id!)}`);
+        const d = await r.json();
+        if (!cancelled && r.ok) setSiepProjects(d.projects || []);
+      } catch {
+        if (!cancelled) setSiepProjects([]);
+      } finally {
+        if (!cancelled) setLoadingSiep(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sponsor?.id]);
+
   const pickedIds = useMemo(() => new Set(picked.map((p) => p.id).filter(Boolean) as string[]), [picked]);
 
   const addExisting = (c: Company) => {
     if (c.id === operatorCompanyId) return;
+    if (sponsor?.id === c.id) return;
     if (pickedIds.has(c.id)) return;
     setPicked((prev) => [...prev, { key: c.id, id: c.id, name: c.name, shortName: c.shortName }]);
     setClientQuery('');
@@ -143,6 +197,36 @@ export default function NexusAtPage() {
 
   const removePicked = (key: string) => setPicked((prev) => prev.filter((p) => p.key !== key));
 
+  const pickSponsor = (c: Company) => {
+    if (c.id === operatorCompanyId) return;
+    setSponsor({ key: c.id, id: c.id, name: c.name, shortName: c.shortName });
+    setSponsorQuery('');
+    setPicked((prev) => prev.filter((p) => p.id !== c.id));
+  };
+
+  const createSponsorByName = async () => {
+    const name = sponsorQuery.trim();
+    if (name.length < 2) return;
+    try {
+      const r = await fetch('/api/nexus/at/client-companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Error');
+      setSponsor({
+        key: d.company.id,
+        id: d.company.id,
+        name: d.company.name,
+        shortName: d.company.shortName,
+      });
+      setSponsorQuery('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
+    }
+  };
+
   const create = async () => {
     setSaving(true);
     setError(null);
@@ -159,6 +243,9 @@ export default function NexusAtPage() {
           clientCompanyIds,
           newClients,
           contractRef: contractRef.trim() || undefined,
+          sponsorCompanyId: sponsor?.id || undefined,
+          newSponsor: sponsor && !sponsor.id ? { name: sponsor.name, shortName: sponsor.shortName } : undefined,
+          siepProjectId: siepProjectId || undefined,
         }),
       });
       const d = await r.json();
@@ -176,6 +263,8 @@ export default function NexusAtPage() {
       setContractRef('');
       setPicked([]);
       setFirstProjectName('');
+      setSponsor(null);
+      setSiepProjectId('');
       router.push(`/hub/nexus/at/${d.engagement.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
@@ -197,7 +286,7 @@ export default function NexusAtPage() {
   });
 
   const filteredSuggestions = suggestions.filter(
-    (c) => c.id !== operatorCompanyId && !pickedIds.has(c.id)
+    (c) => c.id !== operatorCompanyId && c.id !== sponsor?.id && !pickedIds.has(c.id)
   );
 
   return (
@@ -209,8 +298,8 @@ export default function NexusAtPage() {
           </h1>
           <p className="mt-0.5 text-sm text-slate-500">
             {es
-              ? 'Contrato → proyectos → empresas. Trabajo separado por cliente.'
-              : 'Contrato → projetos → empresas. Trabalho separado por cliente.'}
+              ? 'Contratante → proyecto SIEP → empresas atendidas. Trabajo separado por beneficiaria.'
+              : 'Contratante → projeto SIEP → empresas atendidas. Trabalho separado por beneficiária.'}
           </p>
         </div>
         <button
@@ -259,8 +348,8 @@ export default function NexusAtPage() {
                 </h2>
                 <p className="mt-1 text-xs text-slate-500">
                   {es
-                    ? 'Un contrato puede incluir varias empresas. El trabajo de cada una queda separado.'
-                    : 'Um contrato pode incluir várias empresas. O trabalho de cada uma fica separado.'}
+                    ? 'Quien paga (contratante) ≠ empresas que atendéis. Podéis vincular un proyecto SIEP de la institución.'
+                    : 'Quem paga (contratante) ≠ empresas que atendem. Podem vincular um projeto SIEP da instituição.'}
                 </p>
               </div>
               <button
@@ -274,7 +363,7 @@ export default function NexusAtPage() {
 
             <div className="space-y-4">
               <label className="block text-sm font-medium text-slate-700">
-                {es ? 'Nombre' : 'Nome'}
+                {es ? 'Nombre del servicio' : 'Nome do serviço'}
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -295,7 +384,7 @@ export default function NexusAtPage() {
                   />
                 </label>
                 <label className="block text-sm font-medium text-slate-700">
-                  {es ? 'Operador' : 'Operador'}
+                  {es ? 'Operador (quien presta)' : 'Operador (quem presta)'}
                   <select
                     value={operatorCompanyId}
                     onChange={(e) => setOperatorCompanyId(e.target.value)}
@@ -310,10 +399,130 @@ export default function NexusAtPage() {
                 </label>
               </div>
 
+              <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-3">
+                <p className="text-sm font-medium text-slate-800">
+                  {es ? 'Cliente contratante (quien paga)' : 'Cliente contratante (quem paga)'}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  {es
+                    ? 'Incubadora, institución, donante… no es la MIPYME atendida.'
+                    : 'Incubadora, instituição, doador… não é a MIPYME atendida.'}
+                </p>
+                {sponsor ? (
+                  <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm">
+                    <span className="font-medium text-slate-900">
+                      {sponsor.shortName || sponsor.name}
+                      {!sponsor.id && (
+                        <span className="ml-2 text-[10px] uppercase text-emerald-700">
+                          {es ? 'nueva' : 'nova'}
+                        </span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSponsor(null);
+                        setSiepProjectId('');
+                      }}
+                      className="text-slate-400 hover:text-slate-700"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative mt-2">
+                    <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                    <input
+                      value={sponsorQuery}
+                      onChange={(e) => setSponsorQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const first = sponsorSuggestions.find((c) => c.id !== operatorCompanyId);
+                          if (first) pickSponsor(first);
+                          else createSponsorByName();
+                        }
+                      }}
+                      className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-8 pr-3 text-sm outline-none focus:border-slate-400"
+                      placeholder={
+                        es ? 'Buscar o crear incubadora / institución…' : 'Pesquisar ou criar incubadora / instituição…'
+                      }
+                    />
+                    {sponsorQuery.trim().length > 0 && (
+                      <ul className="absolute z-10 mt-1 max-h-36 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                        {sponsorSuggestions
+                          .filter((c) => c.id !== operatorCompanyId)
+                          .map((c) => (
+                            <li key={c.id}>
+                              <button
+                                type="button"
+                                onClick={() => pickSponsor(c)}
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                              >
+                                {c.shortName || c.name}
+                              </button>
+                            </li>
+                          ))}
+                        {sponsorQuery.trim().length >= 2 && (
+                          <li>
+                            <button
+                              type="button"
+                              onClick={createSponsorByName}
+                              className="w-full px-3 py-2 text-left text-sm font-medium text-emerald-800 hover:bg-slate-50"
+                            >
+                              + {es ? 'Crear' : 'Criar'} «{sponsorQuery.trim()}»
+                            </button>
+                          </li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                <label className="mt-3 block text-sm font-medium text-slate-700">
+                  {es ? 'Proyecto institucional (SIEP)' : 'Projeto institucional (SIEP)'}
+                  <select
+                    value={siepProjectId}
+                    onChange={(e) => setSiepProjectId(e.target.value)}
+                    disabled={!sponsor?.id || loadingSiep}
+                    className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 disabled:opacity-50"
+                  >
+                    <option value="">
+                      {!sponsor
+                        ? es
+                          ? 'Primero elige el contratante'
+                          : 'Primeiro escolhe o contratante'
+                        : loadingSiep
+                          ? es
+                            ? 'Cargando…'
+                            : 'A carregar…'
+                          : siepProjects.length === 0
+                            ? es
+                              ? '— sin proyectos SIEP en esa empresa —'
+                              : '— sem projetos SIEP nessa empresa —'
+                            : es
+                              ? '— sin proyecto —'
+                              : '— sem projeto —'}
+                    </option>
+                    {siepProjects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.code ? `${p.code} · ` : ''}
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
               <div>
                 <p className="text-sm font-medium text-slate-700">
-                  {es ? 'Empresas atendidas' : 'Empresas atendidas'}
+                  {es ? 'Empresas atendidas (beneficiarias)' : 'Empresas atendidas (beneficiárias)'}
                   <span className="ml-1 font-normal text-slate-400">({picked.length})</span>
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  {es
+                    ? 'MIPYMEs que recibís en este contrato. Trabajo separado por cada una.'
+                    : 'MIPYMEs que atendem neste contrato. Trabalho separado por cada uma.'}
                 </p>
                 {picked.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
@@ -354,8 +563,8 @@ export default function NexusAtPage() {
                     className="w-full rounded-lg border border-slate-200 py-2 pl-8 pr-3 text-sm outline-none focus:border-slate-400"
                     placeholder={
                       es
-                        ? 'Buscar o escribir nombre y Enter…'
-                        : 'Pesquisar ou escrever nome e Enter…'
+                        ? 'Buscar o escribir MIPYME y Enter…'
+                        : 'Pesquisar ou escrever MIPYME e Enter…'
                     }
                   />
                 </div>
@@ -387,23 +596,23 @@ export default function NexusAtPage() {
                         </button>
                       </li>
                     )}
-                    {!searching && filteredSuggestions.length === 0 && clientQuery.trim().length < 2 && (
-                      <li className="px-3 py-2 text-xs text-slate-400">
-                        {es ? 'Escribe al menos 2 letras' : 'Escreve pelo menos 2 letras'}
-                      </li>
-                    )}
                   </ul>
                 )}
               </div>
 
               <label className="block text-sm font-medium text-slate-700">
-                {es ? 'Primer proyecto (opcional)' : 'Primeiro projeto (opcional)'}
+                {es ? 'Línea de trabajo AT (opcional)' : 'Linha de trabalho AT (opcional)'}
                 <input
                   value={firstProjectName}
                   onChange={(e) => setFirstProjectName(e.target.value)}
                   className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
-                  placeholder={es ? 'Ej. Diagnóstico' : 'Ex. Diagnóstico'}
+                  placeholder={es ? 'Ej. Diagnóstico / Fase 1' : 'Ex. Diagnóstico / Fase 1'}
                 />
+                <span className="mt-1 block text-[11px] font-normal text-slate-400">
+                  {es
+                    ? 'No es el proyecto SIEP: es la carpeta interna de casos en este servicio.'
+                    : 'Não é o projeto SIEP: é a pasta interna de casos neste serviço.'}
+                </span>
               </label>
 
               {error && <p className="text-sm text-red-600">{error}</p>}
@@ -501,7 +710,11 @@ export default function NexusAtPage() {
             ) : (
               <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
                 {services.map((s) => {
-                  const clients = s.members.filter((m) => m.memberRole !== 'operator');
+                  const clients = s.members.filter((m) => m.memberRole === 'client');
+                  const sponsorLabel = s.sponsorCompany
+                    ? s.sponsorCompany.shortName || s.sponsorCompany.name
+                    : null;
+                  const siepLabel = s.siepProject?.name || null;
                   return (
                     <li key={s.id}>
                       <Link
@@ -512,11 +725,15 @@ export default function NexusAtPage() {
                           <p className="truncate font-medium text-slate-900">{s.title}</p>
                           <p className="mt-0.5 truncate text-xs text-slate-500">
                             {s.contractRef ? `${s.contractRef} · ` : ''}
-                            {clients.length === 0
-                              ? es
-                                ? 'Sin empresas'
-                                : 'Sem empresas'
-                              : clients.map((m) => m.company.shortName || m.company.name).join(' · ')}
+                            {sponsorLabel
+                              ? `${es ? 'Contrata' : 'Contrata'}: ${sponsorLabel}`
+                              : es
+                                ? 'Sin contratante'
+                                : 'Sem contratante'}
+                            {siepLabel ? ` · ${siepLabel}` : ''}
+                            {clients.length > 0
+                              ? ` · ${clients.map((m) => m.company.shortName || m.company.name).join(', ')}`
+                              : ''}
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2 text-xs text-slate-500">

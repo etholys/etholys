@@ -31,6 +31,8 @@ type Service = {
   description: string | null;
   operatorCompanyId: string;
   operatorCompany: { id: string; name: string; shortName: string };
+  sponsorCompany?: { id: string; name: string; shortName: string } | null;
+  siepProject?: { id: string; name: string; code?: string | null } | null;
   members: Member[];
   projects: AtProject[];
 };
@@ -325,7 +327,13 @@ export default function NexusAtServicePage() {
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{service.title}</h1>
             <p className="mt-0.5 text-sm text-slate-500">
               {service.contractRef ? `${service.contractRef} · ` : ''}
-              {service.operatorCompany.shortName || service.operatorCompany.name}
+              {es ? 'Opera' : 'Opera'}: {service.operatorCompany.shortName || service.operatorCompany.name}
+              {service.sponsorCompany
+                ? ` · ${es ? 'Contrata' : 'Contrata'}: ${service.sponsorCompany.shortName || service.sponsorCompany.name}`
+                : ''}
+              {service.siepProject
+                ? ` · ${service.siepProject.code ? `${service.siepProject.code} · ` : ''}${service.siepProject.name}`
+                : ''}
             </p>
           </div>
           {isOperator && selectedProjectId && selectedCompanyId && (
@@ -401,7 +409,7 @@ export default function NexusAtServicePage() {
           <div>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                {es ? 'Empresas del contrato' : 'Empresas do contrato'}
+                {es ? 'Empresas atendidas' : 'Empresas atendidas'}
               </p>
               {isOperator && (
                 <button

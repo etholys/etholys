@@ -74,13 +74,23 @@ export function enrichAtCase<T extends { tags: string | null; status: string }>(
 
 export function engagementCompanyIds(engagement: {
   operatorCompanyId: string;
+  sponsorCompanyId?: string | null;
   members: { companyId: string }[];
 }): string[] {
-  return [...new Set([engagement.operatorCompanyId, ...engagement.members.map((m) => m.companyId)])];
+  return [
+    ...new Set(
+      [
+        engagement.operatorCompanyId,
+        engagement.sponsorCompanyId || null,
+        ...engagement.members.map((m) => m.companyId),
+      ].filter(Boolean) as string[]
+    ),
+  ];
 }
 
+/** Empresas beneficiárias (trabalho AT) — não inclui operador nem contratante. */
 export function clientCompanyIds(engagement: { members: { companyId: string; memberRole: string }[] }): string[] {
-  return engagement.members.filter((m) => m.memberRole !== 'operator').map((m) => m.companyId);
+  return engagement.members.filter((m) => m.memberRole === 'client').map((m) => m.companyId);
 }
 
 export function userIsOperator(engagement: { operatorCompanyId: string }, tenantCompanyIds: string[]): boolean {

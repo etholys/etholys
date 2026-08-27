@@ -86,9 +86,31 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   }
   if (body.siepProjectId !== undefined) {
     const siepProjectId = body.siepProjectId ? String(body.siepProjectId).trim() : null;
-    const v = await validateEngagementSiep(siepProjectId, engagementCompanyIds(engagement));
+    const v = await validateEngagementSiep(
+      siepProjectId,
+      engagementCompanyIds({
+        operatorCompanyId: engagement.operatorCompanyId,
+        sponsorCompanyId: (engagement as { sponsorCompanyId?: string | null }).sponsorCompanyId,
+        members: engagement.members,
+      })
+    );
     if (!v.ok) return NextResponse.json({ error: v.message }, { status: 400 });
     data.siepProjectId = siepProjectId;
+  }
+
+  if (body.sponsorCompanyId !== undefined) {
+    const sponsorCompanyId = body.sponsorCompanyId ? String(body.sponsorCompanyId).trim() : null;
+    if (sponsorCompanyId) {
+      const sponsor = await prisma.company.findFirst({
+        where: { id: sponsorCompanyId, isActive: true },
+        select: { id: true },
+      });
+      if (!sponsor) return NextResponse.json({ error: 'Cliente contratante inválido.' }, { status: 400 });
+      if (sponsorCompanyId === engagement.operatorCompanyId) {
+        return NextResponse.json({ error: 'O contratante não pode ser o operador.' }, { status: 400 });
+      }
+    }
+    data.sponsorCompanyId = sponsorCompanyId;
   }
 
   const parseDate = (raw: unknown) => {
@@ -105,8 +127,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     data,
     include: {
       operatorCompany: { select: { id: true, name: true, shortName: true } },
+      sponsorCompany: { select: { id: true, name: true, shortName: true } },
       network: { select: { id: true, name: true } },
-      siepProject: { select: { id: true, name: true, companyId: true } },
+      siepProject: { select: { id: true, name: true, companyId: true, code: true } },
       members: {
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
         include: { company: { select: { id: true, name: true, shortName: true } } },

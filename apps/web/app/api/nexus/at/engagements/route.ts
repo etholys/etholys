@@ -85,6 +85,42 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Contratante / quem paga (incubadora, instituição) — pode ser diferente das atendidas.
+  let sponsorCompanyId: string | null = body.sponsorCompanyId ? String(body.sponsorCompanyId).trim() : null;
+  if (!sponsorCompanyId && body.newSponsor && typeof body.newSponsor === 'object') {
+    const row = body.newSponsor as Record<string, unknown>;
+    const name = String(row.name || '').trim().slice(0, 200);
+    if (name.length >= 2) {
+      const shortRaw = String(row.shortName || '').trim().slice(0, 40);
+      const shortName =
+        shortRaw ||
+        name
+          .split(/\s+/)
+          .slice(0, 3)
+          .map((w) => w[0]?.toUpperCase() || '')
+          .join('')
+          .slice(0, 12) ||
+        name.slice(0, 12);
+      const created = await prisma.company.create({
+        data: { name, shortName, color: '#0F766E' },
+        select: { id: true },
+      });
+      sponsorCompanyId = created.id;
+    }
+  }
+  if (sponsorCompanyId) {
+    const sponsor = await prisma.company.findFirst({
+      where: { id: sponsorCompanyId, isActive: true },
+      select: { id: true },
+    });
+    if (!sponsor) {
+      return NextResponse.json({ error: 'Cliente contratante inválido.' }, { status: 400 });
+    }
+    if (sponsorCompanyId === operatorCompanyId) {
+      sponsorCompanyId = null; // operador não é contratante
+    }
+  }
+
   let networkId: string | null = body.networkId ? String(body.networkId).trim() : null;
   if (networkId) {
     const network = await loadNetworkForTenant(networkId, tenant.companyIds);
@@ -98,7 +134,9 @@ export async function POST(req: NextRequest) {
   }
 
   const siepProjectId = body.siepProjectId ? String(body.siepProjectId).trim() : null;
-  const allowed = [...new Set([operatorCompanyId, ...clientIds])];
+  const allowed = [
+    ...new Set([operatorCompanyId, ...(sponsorCompanyId ? [sponsorCompanyId] : []), ...clientIds]),
+  ];
   const v = await validateEngagementSiep(siepProjectId, allowed);
   if (!v.ok) return NextResponse.json({ error: v.message }, { status: 400 });
 
@@ -114,7 +152,7 @@ export async function POST(req: NextRequest) {
   const memberCreates = [
     { companyId: operatorCompanyId, memberRole: 'operator', sortOrder: 0 },
     ...clientIds
-      .filter((id) => id !== operatorCompanyId)
+      .filter((id) => id !== operatorCompanyId && id !== sponsorCompanyId)
       .map((companyId, idx) => ({
         companyId,
         memberRole: 'client',
@@ -128,6 +166,7 @@ export async function POST(req: NextRequest) {
       kind: kindRaw,
       status: 'ACTIVE',
       operatorCompanyId,
+      sponsorCompanyId,
       networkId,
       siepProjectId: siepProjectId || null,
       description,
@@ -138,8 +177,9 @@ export async function POST(req: NextRequest) {
     },
     include: {
       operatorCompany: { select: { id: true, name: true, shortName: true } },
+      sponsorCompany: { select: { id: true, name: true, shortName: true } },
       network: { select: { id: true, name: true } },
-      siepProject: { select: { id: true, name: true, companyId: true } },
+      siepProject: { select: { id: true, name: true, companyId: true, code: true } },
       members: {
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
         include: { company: { select: { id: true, name: true, shortName: true } } },

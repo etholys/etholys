@@ -13,8 +13,9 @@ export * from './nexus-at-shared';
 
 const engagementInclude = {
   operatorCompany: { select: { id: true, name: true, shortName: true } },
+  sponsorCompany: { select: { id: true, name: true, shortName: true } },
   network: { select: { id: true, name: true } },
-  siepProject: { select: { id: true, name: true, companyId: true } },
+  siepProject: { select: { id: true, name: true, companyId: true, code: true } },
   members: {
     orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }],
     include: {
@@ -47,7 +48,7 @@ export const atCaseSelect = {
 
 export type NexusAtEngagementRow = NonNullable<Awaited<ReturnType<typeof loadEngagementForTenant>>>;
 
-/** Serviços onde o utilizador é operador ou empresa-cliente membro. */
+/** Serviços onde o utilizador é operador, contratante ou empresa-cliente membro. */
 export async function listEngagementsForTenant(companyIds: string[]) {
   if (companyIds.length === 0) return [];
   return prisma.nexusAtEngagement.findMany({
@@ -55,6 +56,7 @@ export async function listEngagementsForTenant(companyIds: string[]) {
       isActive: true,
       OR: [
         { operatorCompanyId: { in: companyIds } },
+        { sponsorCompanyId: { in: companyIds } },
         { members: { some: { companyId: { in: companyIds } } } },
       ],
     },
@@ -70,6 +72,7 @@ export async function loadEngagementForTenant(engagementId: string, tenantCompan
       isActive: true,
       OR: [
         { operatorCompanyId: { in: tenantCompanyIds } },
+        { sponsorCompanyId: { in: tenantCompanyIds } },
         { members: { some: { companyId: { in: tenantCompanyIds } } } },
       ],
     },
@@ -138,7 +141,7 @@ export async function listAtInboxForTenant(companyIds: string[], take = 40) {
   const allClientIds = [
     ...new Set(
       engagements.flatMap((e) =>
-        e.members.filter((m) => m.memberRole !== 'operator').map((m) => m.companyId)
+        e.members.filter((m) => m.memberRole === 'client').map((m) => m.companyId)
       )
     ),
   ];

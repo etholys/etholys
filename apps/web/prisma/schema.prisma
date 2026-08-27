@@ -210,6 +210,7 @@ model Company {
   nexusNetworksAnchored       NexusNetwork[]               @relation("NexusNetworkAnchor")
   nexusNetworkMemberships     NexusNetworkMember[]
   nexusAtEngagementsOperated  NexusAtEngagement[]          @relation("NexusAtOperator")
+  nexusAtEngagementsSponsored NexusAtEngagement[]          @relation("NexusAtSponsor")
   nexusAtEngagementMemberships NexusAtEngagementMember[]
   nexusVentureState           NexusVentureState?
   /// Quem pode usar o Centro de trabalho integrado nesta empresa (não duplica lógica dos sistemas; só espelha APIs).
@@ -1623,9 +1624,11 @@ model NexusAtEngagement {
   status            String                     @default("ACTIVE")
   /// Empresa que presta a AT (operador)
   operatorCompanyId String
+  /// Cliente contratante / quem paga (incubadora, instituição, doador) — ≠ empresas atendidas
+  sponsorCompanyId  String?
   /// Rede NEXUS opcional (pré-agrupa empresas)
   networkId         String?
-  /// Projeto SIEP opcional ao nível do serviço (legado / default)
+  /// Projeto SIEP / institucional do contratante (opcional)
   siepProjectId     String?
   description       String?
   /// Referência externa do contrato / código interno
@@ -1636,12 +1639,14 @@ model NexusAtEngagement {
   createdAt         DateTime                   @default(now())
   updatedAt         DateTime                   @updatedAt
   operatorCompany   Company                    @relation("NexusAtOperator", fields: [operatorCompanyId], references: [id], onDelete: Cascade)
+  sponsorCompany    Company?                   @relation("NexusAtSponsor", fields: [sponsorCompanyId], references: [id], onDelete: SetNull)
   network           NexusNetwork?              @relation(fields: [networkId], references: [id], onDelete: SetNull)
   siepProject       Project?                   @relation("NexusAtSiepProject", fields: [siepProjectId], references: [id], onDelete: SetNull)
   members           NexusAtEngagementMember[]
   projects          NexusAtProject[]
 
   @@index([operatorCompanyId])
+  @@index([sponsorCompanyId])
   @@index([networkId])
   @@index([siepProjectId])
   @@index([status, isActive])
