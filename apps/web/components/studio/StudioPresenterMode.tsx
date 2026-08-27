@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2, MousePointer2, X } from 'lucide-react';
 import type { StudioBlock, StudioPage } from '@/lib/studio/types';
 import { imageEditClipStyle, imageEditToCssFilter, imageEditZoomStyle } from '@/lib/studio/image-edit';
 
@@ -130,15 +130,31 @@ export function StudioPresenterMode({ pages, locale, initialPageId, onClose }: P
   );
   const [index, setIndex] = useState(startIdx >= 0 ? startIdx : 0);
   const [fullscreen, setFullscreen] = useState(false);
+  const [laserOn, setLaserOn] = useState(false);
+  const [laser, setLaser] = useState<{ x: number; y: number } | null>(null);
+  const [slideElapsed, setSlideElapsed] = useState(0);
+  const slideAreaRef = useRef<HTMLDivElement | null>(null);
   const page = sorted[index];
   const notes = page ? speakerNotes(page) : '';
 
   const go = useCallback(
     (delta: number) => {
+      setSlideElapsed(0);
+      setLaser(null);
       setIndex((i) => Math.max(0, Math.min(sorted.length - 1, i + delta)));
     },
     [sorted.length],
   );
+
+  useEffect(() => {
+    setSlideElapsed(0);
+    setLaser(null);
+  }, [index]);
+
+  useEffect(() => {
+    const t = window.setInterval(() => setSlideElapsed((s) => s + 1), 1000);
+    return () => window.clearInterval(t);
+  }, [index]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -192,8 +208,16 @@ export function StudioPresenterMode({ pages, locale, initialPageId, onClose }: P
         </p>
         <div className="flex items-center gap-2">
           <span className="tabular-nums text-xs text-white/60">
-            {index + 1} / {sorted.length}
+            {index + 1} / {sorted.length} · {Math.floor(slideElapsed / 60)}:{String(slideElapsed % 60).padStart(2, '0')}
           </span>
+          <button
+            type="button"
+            onClick={() => setLaserOn((v) => !v)}
+            className={`rounded-lg p-2 ${laserOn ? 'bg-red-600 hover:bg-red-500' : 'bg-white/10 hover:bg-white/20'}`}
+            title={t(locale, 'Apontador laser', 'Puntero láser', 'Laser pointer')}
+          >
+            <MousePointer2 className="h-4 w-4" />
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -218,8 +242,18 @@ export function StudioPresenterMode({ pages, locale, initialPageId, onClose }: P
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <div className="flex min-h-0 flex-1 items-center justify-center p-4 lg:p-8">
           <div
+            ref={slideAreaRef}
             className="relative aspect-video w-full max-w-5xl overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10"
-            style={{ backgroundColor: bg }}
+            style={{ backgroundColor: bg, cursor: laserOn ? 'none' : undefined }}
+            onMouseMove={(e) => {
+              if (!laserOn || !slideAreaRef.current) return;
+              const r = slideAreaRef.current.getBoundingClientRect();
+              setLaser({
+                x: ((e.clientX - r.left) / r.width) * 100,
+                y: ((e.clientY - r.top) / r.height) * 100,
+              });
+            }}
+            onMouseLeave={() => setLaser(null)}
           >
             <div
               className={`h-full w-full p-8 sm:p-10 ${hasFreeform ? 'relative' : 'flex flex-col gap-4'}`}
@@ -238,6 +272,12 @@ export function StudioPresenterMode({ pages, locale, initialPageId, onClose }: P
                   <PresenterBlock key={block.id} block={block} />
                 ))}
             </div>
+            {laserOn && laser ? (
+              <div
+                className="pointer-events-none absolute z-50 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500 shadow-[0_0_12px_4px_rgba(239,68,68,0.7)]"
+                style={{ left: `${laser.x}%`, top: `${laser.y}%` }}
+              />
+            ) : null}
           </div>
         </div>
 

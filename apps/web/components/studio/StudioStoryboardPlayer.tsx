@@ -1,13 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pause, Play, Square, X } from 'lucide-react';
+import { Download, Loader2, Pause, Play, Square, X } from 'lucide-react';
 import type { StudioVideoScene } from '@/lib/studio/video-timeline';
 import { formatVideoTimestamp, totalVideoDurationSec } from '@/lib/studio/video-timeline';
+import { downloadBlob, recordStoryboardWebm } from '@/lib/studio/storyboard-export';
 
 type Props = {
   scenes: StudioVideoScene[];
   locale: string;
+  documentTitle?: string;
   onSelectPage: (pageId: string) => void;
   onClose: () => void;
 };
@@ -17,10 +19,18 @@ function t(locale: string, pt: string, es: string, en: string): string {
 }
 
 /** Preview playback estilo CapCut/Premiere — avança planos por duração. */
-export function StudioStoryboardPlayer({ scenes, locale, onSelectPage, onClose }: Props) {
+export function StudioStoryboardPlayer({
+  scenes,
+  locale,
+  documentTitle,
+  onSelectPage,
+  onClose,
+}: Props) {
   const [playing, setPlaying] = useState(true);
   const [index, setIndex] = useState(0);
   const [elapsed, setElapsed] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [exportPct, setExportPct] = useState(0);
   const timerRef = useRef<number | null>(null);
   const scene = scenes[index];
   const total = totalVideoDurationSec(scenes);
@@ -71,6 +81,37 @@ export function StudioStoryboardPlayer({ scenes, locale, onSelectPage, onClose }
           <span className="tabular-nums text-xs text-white/60">
             {formatVideoTimestamp(globalTime)} / {formatVideoTimestamp(total)}
           </span>
+          <button
+            type="button"
+            disabled={exporting}
+            onClick={() => {
+              setPlaying(false);
+              setExporting(true);
+              void recordStoryboardWebm(scenes, {
+                onProgress: (p) => {
+                  if (p.sceneTotal) setExportPct(Math.round((p.elapsedSec / total) * 100));
+                },
+              })
+                .then((blob) => {
+                  downloadBlob(blob, `${(documentTitle || 'storyboard').replace(/[^\w.-]+/g, '_')}.webm`);
+                })
+                .catch((e) => {
+                  alert(e instanceof Error ? e.message : 'Export WebM falhou');
+                })
+                .finally(() => {
+                  setExporting(false);
+                  setExportPct(0);
+                });
+            }}
+            className="inline-flex items-center gap-1 rounded-lg bg-fuchsia-600 px-2.5 py-1.5 text-[11px] font-bold hover:bg-fuchsia-500 disabled:opacity-50"
+          >
+            {exporting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Download className="h-3.5 w-3.5" />
+            )}
+            WebM{exporting ? ` ${exportPct}%` : ''}
+          </button>
           <button
             type="button"
             onClick={() => setPlaying((p) => !p)}

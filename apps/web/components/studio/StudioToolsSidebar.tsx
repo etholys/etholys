@@ -22,7 +22,7 @@ import type {
   StudioPageOrientation,
   StudioPageSize,
   StudioStudioMode,
-  type StudioHeaderFooter,
+  StudioHeaderFooter,
 } from '@/lib/studio/types';
 import {
   STUDIO_MARGIN_PRESETS,

@@ -2835,6 +2835,7 @@ export default function StudioDocumentPage() {
         <StudioStoryboardPlayer
           scenes={videoScenes}
           locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+          documentTitle={title}
           onSelectPage={selectPage}
           onClose={() => setStoryboardOpen(false)}
         />
