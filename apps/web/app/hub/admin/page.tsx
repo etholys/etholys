@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useApp } from '@/app/providers';
 import { EtholysSettingsContent } from '@/components/etholys-admin/EtholysSettingsContent';
+import { BillingOverview } from '@/components/etholys-admin/BillingOverview';
 import { LicenseOverviewPanel } from '@/components/etholys-admin/LicenseOverviewPanel';
 import { ArrowRight } from 'lucide-react';
 
 export default function EtholysAdminPage() {
-  const { locale } = useApp();
+  const { locale, activeCompanyId } = useApp();
 
   const title =
     locale === 'pt' ? 'Conta e organização' : locale === 'es' ? 'Cuenta y organización' : 'Account & organization';
@@ -28,6 +29,13 @@ export default function EtholysAdminPage() {
 
   return (
     <div className="space-y-6">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-slate-900">
+          {locale === 'pt' ? 'Licenciamento e pagamentos' : locale === 'es' ? 'Licencias y pagos' : 'Licensing & billing'}
+        </h2>
+        <BillingOverview companyId={activeCompanyId} />
+      </div>
+
       <LicenseOverviewPanel />
 
       <EtholysSettingsContent

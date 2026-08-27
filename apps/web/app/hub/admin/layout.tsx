@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useApp } from '@/app/providers';
 import { Layers, ArrowLeft } from 'lucide-react';
+import { AdminAccessGuard } from '@/components/hub/AdminAccessGuard';
 
 export default function EtholysAdminLayout({ children }: { children: React.ReactNode }) {
-  const { locale } = useApp();
+  const { locale, activeCompanyId } = useApp();
 
   const back =
     locale === 'pt' ? 'Voltar ao Hub' : locale === 'es' ? 'Volver al Hub' : 'Back to Hub';
@@ -34,7 +35,9 @@ export default function EtholysAdminLayout({ children }: { children: React.React
           </Link>
         </div>
       </header>
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">{children}</main>
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+        <AdminAccessGuard companyId={activeCompanyId}>{children}</AdminAccessGuard>
+      </main>
     </div>
   );
 }

@@ -1,54 +1,83 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { parseSystemsJson, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
-import { isLikelyDbId } from '@/lib/utils';
+import type { WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
 
-type AccessResponse = {
-  canManage?: boolean;
-  me?: { enabled?: boolean; systems?: unknown } | null;
-  error?: string;
-};
+export type UserAccessScope = 'loading' | 'full' | 'systems' | 'none';
 
-/**
- * Sistemas licenciados para a empresa activa.
- * `null` = ainda não filtrar / sem grant (mostrar todos — compatibilidade).
- */
-export function useLicensedSystems(activeCompanyId: string | null | undefined) {
+export function useLicensedSystems(companyId: string | null) {
   const [licensedSystems, setLicensedSystems] = useState<WorkspaceSystemKey[] | null>(null);
+  const [companyLicensedSystems, setCompanyLicensedSystems] = useState<WorkspaceSystemKey[] | null>(null);
   const [canManage, setCanManage] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const companyId = activeCompanyId && isLikelyDbId(activeCompanyId) ? activeCompanyId : '';
+  const [accessScope, setAccessScope] = useState<UserAccessScope>('loading');
+  const [showIntegratedWorkspace, setShowIntegratedWorkspace] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     if (!companyId) {
       setLicensedSystems(null);
+      setCompanyLicensedSystems(null);
+      setCanManage(false);
+      setAccessScope('none');
+      setShowIntegratedWorkspace(false);
+      setLoading(false);
       return;
     }
     setLoading(true);
+    setAccessScope('loading');
     try {
-      const r = await fetch(`/api/workspace/access?companyId=${encodeURIComponent(companyId)}`, {
+      const res = await fetch(`/api/workspace/access?companyId=${encodeURIComponent(companyId)}`, {
         cache: 'no-store',
       });
-      const data = (await r.json()) as AccessResponse;
-      if (!r.ok) {
-        setLicensedSystems(null);
+      if (!res.ok) {
+        setLicensedSystems([]);
+        setCompanyLicensedSystems([]);
         setCanManage(false);
+        setAccessScope('none');
+        setShowIntegratedWorkspace(false);
         return;
       }
-      setCanManage(data.canManage === true);
-      const me = data.me;
-      if (me?.enabled && me.systems) {
-        const parsed = parseSystemsJson(me.systems);
-        if (parsed.length > 0) {
-          setLicensedSystems(parsed);
-          return;
-        }
+      const data = (await res.json()) as {
+        canManage?: boolean;
+        me?: { enabled?: boolean; systems?: WorkspaceSystemKey[] } | null;
+        companyLicensedSystems?: WorkspaceSystemKey[] | null;
+      };
+      const manage = data.canManage === true;
+      setCanManage(manage);
+      setCompanyLicensedSystems(data.companyLicensedSystems ?? null);
+
+      if (manage) {
+        setLicensedSystems(data.companyLicensedSystems ?? null);
+        setAccessScope('full');
+        setShowIntegratedWorkspace(true);
+        return;
       }
-      setLicensedSystems(null);
+
+      const me = data.me;
+      if (!me || me.enabled === false) {
+        setLicensedSystems([]);
+        setAccessScope('none');
+        setShowIntegratedWorkspace(false);
+        return;
+      }
+
+      const systems = Array.isArray(me.systems) ? me.systems : [];
+      if (systems.length === 0) {
+        setLicensedSystems([]);
+        setAccessScope('none');
+        setShowIntegratedWorkspace(false);
+        return;
+      }
+
+      setLicensedSystems(systems);
+      setAccessScope('systems');
+      setShowIntegratedWorkspace(systems.length > 0);
     } catch {
-      setLicensedSystems(null);
+      setLicensedSystems([]);
+      setCompanyLicensedSystems([]);
+      setCanManage(false);
+      setAccessScope('none');
+      setShowIntegratedWorkspace(false);
     } finally {
       setLoading(false);
     }
@@ -58,10 +87,13 @@ export function useLicensedSystems(activeCompanyId: string | null | undefined) {
     void refresh();
   }, [refresh]);
 
-  const licensedCount = licensedSystems?.length ?? null;
-
-  const showIntegratedWorkspace =
-    licensedSystems === null || licensedSystems.length >= 2 || canManage;
-
-  return { licensedSystems, licensedCount, canManage, showIntegratedWorkspace, loading, refresh };
+  return {
+    licensedSystems,
+    companyLicensedSystems,
+    canManage,
+    accessScope,
+    showIntegratedWorkspace,
+    loading,
+    refresh,
+  };
 }

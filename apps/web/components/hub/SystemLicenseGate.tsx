@@ -37,14 +37,13 @@ export function SystemLicenseGate({ system, children, isExemptPath }: Props) {
       return;
     }
 
-    // Convidados do jogo: só FORGE; sem empresa NÃO abrir outros sistemas
     if (isCourseOnly) {
       setState(system === 'FORGE' ? 'allowed' : 'denied');
       return;
     }
 
     if (!companyId) {
-      setState('allowed');
+      setState('denied');
       return;
     }
 
@@ -54,25 +53,41 @@ export function SystemLicenseGate({ system, children, isExemptPath }: Props) {
         const r = await fetch(`/api/workspace/access?companyId=${encodeURIComponent(companyId)}`, {
           cache: 'no-store',
         });
-        const data = (await r.json()) as { me?: { enabled?: boolean; systems?: unknown } };
         if (cancelled) return;
         if (!r.ok) {
+          setState('denied');
+          return;
+        }
+        const data = (await r.json()) as {
+          canManage?: boolean;
+          me?: { enabled?: boolean; systems?: unknown } | null;
+          companyLicensedSystems?: WorkspaceSystemKey[];
+        };
+
+        const catalog = data.companyLicensedSystems ?? [];
+        if (catalog.length > 0 && !catalog.includes(system)) {
+          setState('denied');
+          return;
+        }
+
+        if (data.canManage) {
           setState('allowed');
           return;
         }
+
         const me = data.me;
-        if (!me?.enabled || me.systems == null) {
-          setState('allowed');
+        if (!me || me.enabled === false) {
+          setState('denied');
           return;
         }
         const systems = parseSystemsJson(me.systems);
         if (systems.length === 0) {
-          setState('allowed');
+          setState('denied');
           return;
         }
         setState(systems.includes(system) ? 'allowed' : 'denied');
       } catch {
-        if (!cancelled) setState('allowed');
+        if (!cancelled) setState('denied');
       }
     })();
 
@@ -124,7 +139,7 @@ export function SystemLicenseGate({ system, children, isExemptPath }: Props) {
               <ArrowLeft className="h-4 w-4" />
               {isCourseOnly
                 ? t('Voltar ao curso', 'Volver al curso', 'Back to course')
-                : t('Voltar ao Hub', 'Volver al Hub', 'Back to Hub')}
+                : t('Voltar ao Hub', 'Voltar al Hub', 'Back to Hub')}
             </Link>
             {!isCourseOnly && (
               <Link

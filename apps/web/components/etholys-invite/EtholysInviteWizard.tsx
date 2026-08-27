@@ -74,7 +74,6 @@ export function EtholysInviteWizard({
   const loc = (locale as Locale) || 'es';
   const t = (pt: string, es: string, en: string) => (loc === 'pt' ? pt : loc === 'en' ? en : es);
 
-  const systemOptions = allowedSystems?.length ? allowedSystems : [...WORKSPACE_SYSTEM_KEYS];
   const siepGroups = useMemo(() => getSiepPermissionGroups(loc), [loc]);
 
   const [step, setStep] = useState(0);
@@ -84,6 +83,32 @@ export function EtholysInviteWizard({
   const [companyId, setCompanyId] = useState(
     () => defaultCompanyId || companies[0]?.id || '',
   );
+  const [companyCatalog, setCompanyCatalog] = useState<WorkspaceSystemKey[] | null>(null);
+
+  useEffect(() => {
+    if (!companyId) {
+      setCompanyCatalog(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/workspace/access?companyId=${encodeURIComponent(companyId)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { companyLicensedSystems?: WorkspaceSystemKey[] } | null) => {
+        if (!cancelled) setCompanyCatalog(d?.companyLicensedSystems ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setCompanyCatalog(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+
+  const systemOptions = useMemo(() => {
+    if (allowedSystems?.length) return allowedSystems;
+    if (companyCatalog?.length) return companyCatalog;
+    return [...WORKSPACE_SYSTEM_KEYS];
+  }, [allowedSystems, companyCatalog]);
   const [email, setEmail] = useState('');
   const [inviteKind, setInviteKind] = useState<InviteKind>(() =>
     lockAlly || context === 'siep_project' ? 'ally' : 'employee',
@@ -482,16 +507,33 @@ export function EtholysInviteWizard({
                     {t('Sistemas', 'Sistemas', 'Systems')}
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {systemOptions.map((k) => (
-                      <label key={k} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={!!systems[k]}
-                          onChange={(e) => setSystems((s) => ({ ...s, [k]: e.target.checked }))}
-                        />
-                        {k}
-                      </label>
-                    ))}
+                    {WORKSPACE_SYSTEM_KEYS.map((k) => {
+                      const licensed = systemOptions.includes(k);
+                      return (
+                        <label
+                          key={k}
+                          className={cn(
+                            'flex items-center gap-2 rounded-lg border px-2 py-1.5 text-sm',
+                            licensed ? 'border-slate-200' : 'border-slate-100 bg-slate-50 text-slate-400',
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            disabled={!licensed}
+                            checked={licensed && !!systems[k]}
+                            onChange={(e) =>
+                              licensed && setSystems((s) => ({ ...s, [k]: e.target.checked }))
+                            }
+                          />
+                          <span>{k}</span>
+                          {!licensed && (
+                            <span className="text-[10px] uppercase tracking-wide">
+                              {t('Sem licença', 'Sin licencia', 'No license')}
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               )}

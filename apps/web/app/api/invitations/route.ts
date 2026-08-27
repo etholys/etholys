@@ -9,6 +9,10 @@ import { normalizeSystemsInput, parseSystemsJson } from '@/lib/integrated-worksp
 import { validateInvitePayload, type EtholysInvitePayload } from '@/lib/etholys-invite';
 import { applyAcceptedInvitation, invitationRowToApplyOpts } from '@/lib/etholys-invite-apply';
 import type { Prisma, UserRole } from '@prisma/client';
+import {
+  assertSeatAvailable,
+  assertSystemsAllowedForCompany,
+} from '@/lib/billing/company-entitlements';
 
 export async function GET(req: Request) {
   try {
@@ -75,7 +79,19 @@ export async function POST(req: Request) {
       }
     }
 
-    const systems = normalizeSystemsInput(data.systems);
+    const systemsRaw = normalizeSystemsInput(data.systems);
+    const seatCheck = await assertSeatAvailable(data.companyId);
+    if (!seatCheck.ok) {
+      return NextResponse.json({ error: seatCheck.error }, { status: 400 });
+    }
+    let systems = systemsRaw;
+    if (systems.length > 0 && data.inviteKind !== 'ally') {
+      const allowed = await assertSystemsAllowedForCompany(data.companyId, systems);
+      if (!allowed.ok) {
+        return NextResponse.json({ error: allowed.error }, { status: 400 });
+      }
+      systems = allowed.systems;
+    }
     if (isPrecommercialMode() && data.role !== 'ADMIN' && systems.length === 0 && data.inviteKind !== 'ally') {
       return NextResponse.json(
         {

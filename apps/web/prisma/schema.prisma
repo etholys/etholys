@@ -248,6 +248,154 @@ model Company {
   taskGroups                  TaskGroup[]
   taskApprovalRequests        TaskApprovalRequest[]
   workFolders                 WorkFolder[]
+  billingAccount              CompanyBillingAccount?
+  subscriptions               CompanySubscription[]
+  billingEntitlements         CompanyEntitlement[]
+  platformInvoices            PlatformInvoice[]
+  commissionEvents            BillingCommissionEvent[]
+}
+
+/// Plano comercial Etholys (catálogo; Stripe price opcional).
+model BillingPlan {
+  id            String                @id @default(cuid())
+  code          String                @unique
+  name          String
+  /// plan | license
+  kind          String                @default("plan")
+  systems       Json                  @default("[]")
+  maxSeats      Int?
+  priceCents    Int                   @default(0)
+  currency      String                @default("USD")
+  stripePriceId String?               @unique
+  interval      String                @default("MONTH")
+  isActive      Boolean               @default(true)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  subscriptions CompanySubscription[]
+}
+
+/// Conta de faturação da empresa (Stripe customer futuro).
+model CompanyBillingAccount {
+  id               String   @id @default(cuid())
+  companyId        String   @unique
+  stripeCustomerId String?  @unique
+  billingEmail     String?
+  currency         String   @default("USD")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+/// Subscrição activa ou em trial — fonte de verdade dos sistemas licenciados ao nível empresa.
+model CompanySubscription {
+  id                   String       @id @default(cuid())
+  companyId            String
+  planId               String?
+  status               String       @default("INCOMPLETE")
+  licensedSystems      Json         @default("[]")
+  maxSeats             Int?
+  /// MONTH | YEAR
+  interval             String       @default("MONTH")
+  stripeSubscriptionId String?      @unique
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean      @default(false)
+  trialEndsAt          DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  company              Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan                 BillingPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status])
+}
+
+/// Item contratado além do plano: add-on, licença anual, regra de comissão, sistema à-la-carte.
+model CompanyEntitlement {
+  id                 String    @id @default(cuid())
+  companyId          String
+  skuCode            String
+  /// plan | system | addon | license | commission
+  kind               String
+  status             String    @default("ACTIVE")
+  quantity           Int       @default(1)
+  autoRenew          Boolean   @default(true)
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  unitPriceCents     Int?
+  currency           String    @default("USD")
+  metadata           Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, skuCode])
+  @@index([companyId, status])
+  @@index([skuCode])
+}
+
+/// Fatura Etholys → cliente (não misturar com Invoice do ATLAS).
+model PlatformInvoice {
+  id             String                   @id @default(cuid())
+  companyId      String
+  number         String
+  /// SUBSCRIPTION | LICENSE | ADDON | COMMISSION | MIXED
+  kind           String                   @default("SUBSCRIPTION")
+  /// DRAFT | ISSUED | PAID | VOID
+  status         String                   @default("ISSUED")
+  currency       String                   @default("USD")
+  subtotalCents  Int                      @default(0)
+  taxCents       Int                      @default(0)
+  totalCents     Int                      @default(0)
+  periodStart    DateTime?
+  periodEnd      DateTime?
+  dueDate        DateTime?
+  paidAt         DateTime?
+  notes          String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  company        Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lines          PlatformInvoiceLine[]
+  commissionEvents BillingCommissionEvent[]
+
+  @@unique([companyId, number])
+  @@index([companyId, status])
+  @@index([dueDate])
+}
+
+model PlatformInvoiceLine {
+  id             String          @id @default(cuid())
+  invoiceId      String
+  skuCode        String
+  description    String
+  quantity       Int             @default(1)
+  unitPriceCents Int
+  amountCents    Int
+  invoice        PlatformInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+/// Comissão acumulada (success fee, marketplace) — cobra-se quando se gera a fatura.
+model BillingCommissionEvent {
+  id              String           @id @default(cuid())
+  companyId       String
+  skuCode         String
+  sourceType      String
+  sourceId        String
+  baseAmountCents Int
+  currency        String           @default("USD")
+  rateBps         Int
+  amountCents     Int
+  /// ACCRUED | INVOICED | PAID | WAIVED
+  status          String           @default("ACCRUED")
+  invoiceId       String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoice         PlatformInvoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, skuCode, sourceType, sourceId])
+  @@index([companyId, status])
 }
 
 /// Autorização ao Hub /hub/workspace — espelho operacional: quais sistemas o utilizador vê e usa a partir dali (dados continuam nos sistemas de origem).
@@ -1640,6 +1788,8 @@ model NexusAtEngagement {
   operatorCompanyId String
   /// Cliente contratante / quem paga (incubadora, instituição, doador) — ≠ empresas atendidas
   sponsorCompanyId  String?
+  /// Setor económico principal do programa (filtros, playbook, relatórios)
+  primarySectorId   String?
   /// Rede NEXUS opcional (pré-agrupa empresas)
   networkId         String?
   /// Projeto SIEP / institucional do contratante (opcional)
@@ -1661,6 +1811,7 @@ model NexusAtEngagement {
 
   @@index([operatorCompanyId])
   @@index([sponsorCompanyId])
+  @@index([primarySectorId])
   @@index([networkId])
   @@index([siepProjectId])
   @@index([status, isActive])

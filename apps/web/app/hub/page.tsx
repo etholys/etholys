@@ -261,7 +261,13 @@ export default function HubPage() {
   const { locale, setLocale, activeCompanyId } = useApp();
   const { companies, companiesReady, companiesLoadError, companyId, setActiveCompanyId, reloadCompanies } =
     useEnsureActiveCompany();
-  const { licensedSystems, showIntegratedWorkspace } = useLicensedSystems(activeCompanyId);
+  const {
+    licensedSystems,
+    companyLicensedSystems,
+    canManage,
+    showIntegratedWorkspace,
+    loading: accessLoading,
+  } = useLicensedSystems(activeCompanyId);
   const [moduleHints, setModuleHints] = useState<ModuleHintCode[]>([]);
   const [hasMeaningfulSetup, setHasMeaningfulSetup] = useState(false);
   const [setupNudge, setSetupNudge] = useState<null | 'missing' | 'currency-mismatch'>(null);
@@ -382,7 +388,11 @@ export default function HubPage() {
     const Icon = sys.icon;
     const isAdvisor = sys.productTier === 'advisor';
     const isTool = sys.productTier === 'tool';
-    const cardAccess = resolveHubCardAccess(sys.id, sys.active, licensedSystems);
+    const cardAccess = resolveHubCardAccess(sys.id, sys.active, licensedSystems, {
+      canManage,
+      loading: accessLoading,
+      companyLicensedSystems,
+    });
     if (cardAccess === 'locked') {
       return (
         <div

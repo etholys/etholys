@@ -2,9 +2,18 @@ import 'server-only';
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getWorkspaceAccessForUser, hasSystem } from '@/lib/integrated-workspace';
+import {
+  getWorkspaceAccessForUser,
+  hasSystem,
+  isCompanyAdmin,
+} from '@/lib/integrated-workspace';
 import type { WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
 import { isLikelyDbId } from '@/lib/utils';
+import {
+  effectiveCompanyCatalog,
+  getCompanyEntitlements,
+} from '@/lib/billing/company-entitlements';
+import { isCompanyMembershipExpired } from '@/lib/access/membership-access';
 
 export type SystemLicenseDenyReason = 'disabled' | 'no_systems' | 'missing_system' | 'invalid_company';
 
@@ -36,7 +45,7 @@ export function resolveCompanyForLicense(
   return tenant.companyIds[0] || null;
 }
 
-/** Sem grant na BD → em pré-comercial negar; senão permitir (legado). */
+/** Sem grant na BD → negar (excepto admin empresa / system admin). Respeita licença da empresa. */
 export async function checkSystemLicense(
   userId: string,
   companyId: string,
@@ -46,25 +55,30 @@ export async function checkSystemLicense(
     return { allowed: false, enforced: true, reason: 'invalid_company', companyId };
   }
 
+  if (await isCompanyMembershipExpired(userId, companyId)) {
+    return { allowed: false, enforced: true, reason: 'disabled', companyId };
+  }
+
+  const ent = await getCompanyEntitlements(companyId);
+  const catalog = effectiveCompanyCatalog(ent);
+  if (!catalog.includes(system)) {
+    return { allowed: false, enforced: true, reason: 'missing_system', companyId };
+  }
+
+  const { isPlatformFullAccess } = await import('@/lib/platform-access');
+  const user = await import('@/lib/prisma').then((m) =>
+    m.prisma.user.findUnique({ where: { id: userId }, select: { email: true, role: true } }),
+  );
+  if (isPlatformFullAccess({ email: user?.email, role: user?.role })) {
+    return { allowed: true, enforced: false };
+  }
+
+  if (await isCompanyAdmin(userId, companyId)) {
+    return { allowed: true, enforced: true, companyId };
+  }
+
   const access = await getWorkspaceAccessForUser(userId, companyId);
   if (!access.ok) {
-    if (access.reason === 'no_record') {
-      const { isPrecommercialMode, isPlatformFullAccess } = await import('@/lib/platform-access');
-      if (isPrecommercialMode()) {
-        const user = await import('@/lib/prisma').then((m) =>
-          m.prisma.user.findUnique({ where: { id: userId }, select: { email: true, role: true } }),
-        );
-        if (isPlatformFullAccess({ email: user?.email, role: user?.role })) {
-          return { allowed: true, enforced: false };
-        }
-        const { isCompanyAdmin } = await import('@/lib/integrated-workspace');
-        if (await isCompanyAdmin(userId, companyId)) {
-          return { allowed: true, enforced: false };
-        }
-        return { allowed: false, enforced: true, reason: 'no_systems', companyId };
-      }
-      return { allowed: true, enforced: false };
-    }
     return {
       allowed: false,
       enforced: true,

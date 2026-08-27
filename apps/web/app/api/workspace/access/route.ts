@@ -9,6 +9,11 @@ import {
   normalizeSystemsInput,
   parseSystemsJson,
 } from '@/lib/integrated-workspace';
+import {
+  assertSystemsAllowedForCompany,
+  effectiveCompanyCatalog,
+  getCompanyEntitlements,
+} from '@/lib/billing/company-entitlements';
 
 /** GET: acesso do utilizador actual +, se for admin, lista de grants na empresa. */
 export async function GET(req: NextRequest) {
@@ -27,6 +32,8 @@ export async function GET(req: NextRequest) {
   }
 
   const admin = await isCompanyAdmin(tenant.userId, companyId);
+  const entitlements = await getCompanyEntitlements(companyId);
+  const companyLicensedSystems = effectiveCompanyCatalog(entitlements);
 
   const me = await prisma.integratedWorkspaceAccess.findUnique({
     where: { companyId_userId: { companyId, userId: tenant.userId } },
@@ -35,6 +42,13 @@ export async function GET(req: NextRequest) {
   if (!admin) {
     return NextResponse.json({
       canManage: false,
+      companyLicensedSystems,
+      billing: {
+        enforced: entitlements.billingEnforced,
+        status: entitlements.subscriptionStatus,
+        planCode: entitlements.planCode,
+        maxSeats: entitlements.maxSeats,
+      },
       me: me
         ? { ...me, systems: parseSystemsJson(me.systems) }
         : null,
@@ -49,6 +63,13 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     canManage: true,
+    companyLicensedSystems,
+    billing: {
+      enforced: entitlements.billingEnforced,
+      status: entitlements.subscriptionStatus,
+      planCode: entitlements.planCode,
+      maxSeats: entitlements.maxSeats,
+    },
     me: me ? { ...me, systems: parseSystemsJson(me.systems) } : null,
     grants: grants.map((g) => ({
       id: g.id,
@@ -89,7 +110,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'O utilizador não pertence a esta empresa.' }, { status: 400 });
   }
 
-  const systems = normalizeSystemsInput(body.systems);
+  const systemsRaw = normalizeSystemsInput(body.systems);
+  const allowed = await assertSystemsAllowedForCompany(companyId, systemsRaw);
+  if (!allowed.ok) {
+    return NextResponse.json({ error: allowed.error }, { status: 400 });
+  }
+  const systems = allowed.systems;
   const enabled = body.enabled !== false;
 
   if (enabled && systems.length === 0) {

@@ -4,6 +4,12 @@ import type { Prisma, UserRole } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import type { EtholysInvitePayload } from '@/lib/etholys-invite';
 import { parseSiepPermissions } from '@/lib/siep/permissions-shared';
+import {
+  clampSystemsToCompanyEntitlements,
+  effectiveCompanyCatalog,
+  getCompanyEntitlements,
+} from '@/lib/billing/company-entitlements';
+import { normalizeSystemsInput, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
 
 type ApplyOpts = {
   invitationId: string;
@@ -25,6 +31,9 @@ type ApplyOpts = {
  */
 export async function applyAcceptedInvitation(opts: ApplyOpts): Promise<void> {
   const isAlly = opts.inviteKind === 'ally' || opts.accessMode === 'project_guest';
+  const ent = await getCompanyEntitlements(opts.companyId);
+  const normalized = normalizeSystemsInput(opts.systems) as WorkspaceSystemKey[];
+  const systemsClamped = clampSystemsToCompanyEntitlements(normalized, ent);
 
   if (isAlly && opts.projectId) {
     const perms = parseSiepPermissions(opts.projectPermissions);
@@ -46,7 +55,7 @@ export async function applyAcceptedInvitation(opts: ApplyOpts): Promise<void> {
       },
     });
 
-    const systems = opts.systems.length ? opts.systems : ['SIEP'];
+    const systems = systemsClamped.length ? systemsClamped : ['SIEP'];
     await prisma.integratedWorkspaceAccess.upsert({
       where: { companyId_userId: { companyId: opts.companyId, userId: opts.userId } },
       create: {
@@ -82,18 +91,22 @@ export async function applyAcceptedInvitation(opts: ApplyOpts): Promise<void> {
       },
     });
 
-    if (opts.systems.length > 0 || opts.role === 'ADMIN') {
+    if (systemsClamped.length > 0 || opts.role === 'ADMIN') {
+      const grantSystems =
+        opts.role === 'ADMIN' && systemsClamped.length === 0
+          ? effectiveCompanyCatalog(ent)
+          : systemsClamped;
       await prisma.integratedWorkspaceAccess.upsert({
         where: { companyId_userId: { companyId: opts.companyId, userId: opts.userId } },
         create: {
           companyId: opts.companyId,
           userId: opts.userId,
-          systems: (opts.systems.length ? opts.systems : []) as unknown as Prisma.InputJsonValue,
-          enabled: opts.role === 'ADMIN' || opts.systems.length > 0,
+          systems: grantSystems as unknown as Prisma.InputJsonValue,
+          enabled: opts.role === 'ADMIN' || grantSystems.length > 0,
         },
         update: {
-          systems: (opts.systems.length ? opts.systems : []) as unknown as Prisma.InputJsonValue,
-          enabled: opts.role === 'ADMIN' || opts.systems.length > 0,
+          systems: grantSystems as unknown as Prisma.InputJsonValue,
+          enabled: opts.role === 'ADMIN' || grantSystems.length > 0,
         },
       });
     }

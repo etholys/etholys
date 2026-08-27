@@ -3,7 +3,6 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import {
   isPlatformFullAccess,
-  isPrecommercialMode,
   homePathForSystems,
   type WorkspaceAccessMode,
 } from '@/lib/platform-access';
@@ -13,6 +12,7 @@ import {
   parseSystemsJson,
   type WorkspaceSystemKey,
 } from '@/lib/integrated-workspace';
+import { isCompanyMembershipExpired } from '@/lib/access/membership-access';
 
 export type WorkspaceJwtScope = {
   mode: WorkspaceAccessMode;
@@ -43,13 +43,18 @@ export async function resolveWorkspaceJwtScope(userId: string): Promise<Workspac
     select: { companyId: true, role: true },
   });
 
-  if (memberships.some((m) => m.role === 'ADMIN')) {
+  const activeMemberships = [];
+  for (const m of memberships) {
+    if (!(await isCompanyMembershipExpired(userId, m.companyId))) {
+      activeMemberships.push(m);
+    }
+  }
+
+  if (activeMemberships.some((m) => m.role === 'ADMIN')) {
     return { mode: 'full', allowedSystems: [], homePath: '/hub', isSystemAdmin: false };
   }
 
-  // Sem CompanyUser: NUNCA dar Hub full (isso abriria a plataforma a project_guest).
-  // FORGE course_only / Studio share_only / SIEP project_guest tratam-se nos respectivos scopes.
-  if (memberships.length === 0) {
+  if (activeMemberships.length === 0) {
     const { getGuestProjectIds } = await import('@/lib/siep/permissions');
     const guestProjects = await getGuestProjectIds(userId);
     if (guestProjects.length > 0) {
@@ -59,36 +64,18 @@ export async function resolveWorkspaceJwtScope(userId: string): Promise<Workspac
           : '/siep/projects';
       return { mode: 'none', allowedSystems: [], homePath: home, isSystemAdmin: false };
     }
-    if (!isPrecommercialMode()) {
-      // Sem empresa e sem convite de projeto: sem acesso ao hub
-      return { mode: 'none', allowedSystems: [], homePath: '/acesso', isSystemAdmin: false };
-    }
     return { mode: 'none', allowedSystems: [], homePath: '/acesso', isSystemAdmin: false };
   }
 
-  // Agregar grants de todas as empresas
   const systems = new Set<WorkspaceSystemKey>();
-  let hasAnyGrant = false;
   let hasEnabledGrant = false;
 
-  for (const m of memberships) {
+  for (const m of activeMemberships) {
     const access = await getWorkspaceAccessForUser(userId, m.companyId);
     if (access.ok) {
-      hasAnyGrant = true;
       hasEnabledGrant = true;
       for (const s of access.systems) systems.add(s);
-    } else if (access.reason !== 'no_record') {
-      hasAnyGrant = true;
-    } else {
-      // no_record: em modo aberto = full; pré-comercial = sem acesso a essa empresa
-      if (!isPrecommercialMode()) {
-        return { mode: 'full', allowedSystems: [], homePath: '/hub', isSystemAdmin: false };
-      }
     }
-  }
-
-  if (!isPrecommercialMode() && !hasAnyGrant) {
-    return { mode: 'full', allowedSystems: [], homePath: '/hub', isSystemAdmin: false };
   }
 
   const list = [...systems];
