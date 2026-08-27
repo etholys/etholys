@@ -16,7 +16,8 @@ if command -v npx >/dev/null 2>&1 && [ -d "$WEB/node_modules" ]; then
   npx tsx --require dotenv/config scripts/seed-billing.ts
 else
   docker cp "$WEB/scripts/seed-billing.ts" etholys-web-prod:/app/scripts/seed-billing.ts
-  docker cp "$WEB/lib/billing" etholys-web-prod:/app/lib/billing
+  docker exec etholys-web-prod rm -rf /app/lib/billing
+  docker cp "$WEB/lib/billing" etholys-web-prod:/app/lib/
   docker cp "$WEB/lib/sandbox" etholys-web-prod:/app/lib/sandbox
   docker cp "$WEB/lib/integrated-workspace-shared.ts" etholys-web-prod:/app/lib/integrated-workspace-shared.ts
   docker exec -e DATABASE_URL="$DATABASE_URL" -w /app etholys-web-prod \
