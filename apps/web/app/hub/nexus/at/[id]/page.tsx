@@ -6,13 +6,22 @@ import { useParams } from 'next/navigation';
 import { ArrowLeft, Plus, Search, X } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { NexusAtCaseCard, type AtCaseCardModel } from '@/components/nexus/NexusAtCaseCard';
+import { NexusAtSectorPlaybook, sectorBadgeLabel } from '@/components/nexus/NexusAtSectorPlaybook';
+import { NexusAtClientDossier } from '@/components/nexus/NexusAtClientDossier';
 import { AT_CASE_KIND_LABELS, type AtCaseKind } from '@/lib/nexus-at-shared';
+import {
+  buildAtBriefTemplate,
+  buildSectorCaseChecklist,
+  clearAtCaseDraft,
+  loadAtCaseDraft,
+} from '@/lib/nexus-at-sector-playbook';
 
 type Company = { id: string; name: string; shortName: string };
 type Member = {
   id: string;
   companyId: string;
   memberRole: string;
+  sectorId?: string | null;
   company: { id: string; name: string; shortName: string };
 };
 type AtProject = {
@@ -33,6 +42,7 @@ type Service = {
   operatorCompany: { id: string; name: string; shortName: string };
   sponsorCompany?: { id: string; name: string; shortName: string } | null;
   siepProject?: { id: string; name: string; code?: string | null } | null;
+  primarySectorId?: string | null;
   members: Member[];
   projects: AtProject[];
 };
@@ -42,6 +52,7 @@ export default function NexusAtServicePage() {
   const id = typeof params.id === 'string' ? params.id : '';
   const { locale } = useApp();
   const es = locale === 'es';
+  const loc = (es ? 'es' : locale === 'pt' ? 'pt' : 'en') as 'es' | 'pt' | 'en';
 
   const CASE_KINDS = (Object.keys(AT_CASE_KIND_LABELS) as AtCaseKind[]).map((kid) => ({
     id: kid,
@@ -68,11 +79,17 @@ export default function NexusAtServicePage() {
   const [assignToMe, setAssignToMe] = useState(true);
   const [savingCase, setSavingCase] = useState(false);
   const [showNewCase, setShowNewCase] = useState(false);
+  const [checklistPreview, setChecklistPreview] = useState<string[]>([]);
 
   const [addQuery, setAddQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Company[]>([]);
   const [addingMember, setAddingMember] = useState(false);
   const [showAddCompany, setShowAddCompany] = useState(false);
+
+  const [sectorCatalog, setSectorCatalog] = useState<
+    Array<{ id: string; label: { es: string; pt: string; en: string } }>
+  >([]);
+  const [savingSectorFor, setSavingSectorFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -91,7 +108,7 @@ export default function NexusAtServicePage() {
         if (prev && eng.projects.some((p) => p.id === prev)) return prev;
         return eng.projects[0]?.id || '';
       });
-      const clients = eng.members.filter((m) => m.memberRole !== 'operator');
+      const clients = eng.members.filter((m) => m.memberRole === 'client');
       setSelectedCompanyId((prev) => {
         if (prev && clients.some((m) => m.companyId === prev)) return prev;
         return clients[0]?.companyId || '';
@@ -107,6 +124,22 @@ export default function NexusAtServicePage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/nexus/at/sectors');
+        const d = await r.json();
+        if (!cancelled && r.ok) setSectorCatalog(d.sectors || []);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!showAddCompany) return;
@@ -128,9 +161,34 @@ export default function NexusAtServicePage() {
   }, [addQuery, showAddCompany]);
 
   const clients = useMemo(
-    () => (service?.members || []).filter((m) => m.memberRole !== 'operator'),
+    () => (service?.members || []).filter((m) => m.memberRole === 'client'),
     [service]
   );
+
+  const playbookSectorId = useMemo(() => {
+    if (!service) return null;
+    const selected = clients.find((m) => m.companyId === selectedCompanyId);
+    return selected?.sectorId || service.primarySectorId || null;
+  }, [service, clients, selectedCompanyId]);
+
+  const updateClientSector = async (companyId: string, sectorId: string) => {
+    setSavingSectorFor(companyId);
+    setError(null);
+    try {
+      const r = await fetch(`/api/nexus/at/client-companies/${encodeURIComponent(companyId)}/sector`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sectorId: sectorId || null }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Error');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setSavingSectorFor(null);
+    }
+  };
 
   const presentIds = useMemo(() => new Set((service?.members || []).map((m) => m.companyId)), [service]);
 
@@ -142,6 +200,42 @@ export default function NexusAtServicePage() {
     },
     [service]
   );
+
+  const applyBriefTemplate = useCallback(
+    (kind: AtCaseKind, focusAreaIndex?: number) => {
+      const name = companyLabel(selectedCompanyId) || undefined;
+      const nextBrief = buildAtBriefTemplate(playbookSectorId, kind, loc, {
+        companyName: name,
+        focusAreaIndex,
+      });
+      setBrief(nextBrief);
+      setChecklistPreview(buildSectorCaseChecklist(playbookSectorId, kind, loc));
+    },
+    [playbookSectorId, loc, selectedCompanyId, companyLabel]
+  );
+
+  const suggestCaseKind = (kind: AtCaseKind) => {
+    setCaseKind(kind);
+    applyBriefTemplate(kind);
+    setShowNewCase(true);
+  };
+
+  const suggestFocusArea = (focusIndex: number, kind: AtCaseKind) => {
+    setCaseKind(kind);
+    applyBriefTemplate(kind, focusIndex);
+    setShowNewCase(true);
+  };
+
+  useEffect(() => {
+    if (!selectedCompanyId) return;
+    const draft = loadAtCaseDraft(selectedCompanyId);
+    if (!draft) return;
+    setCaseKind(draft.caseKind);
+    setBrief(draft.brief);
+    setChecklistPreview(draft.checklistItems || buildSectorCaseChecklist(playbookSectorId, draft.caseKind, loc));
+    setShowNewCase(true);
+    clearAtCaseDraft();
+  }, [selectedCompanyId, playbookSectorId, loc]);
 
   const projectLabel = useCallback(
     (projectId: string | null | undefined) => {
@@ -219,12 +313,14 @@ export default function NexusAtServicePage() {
           priority,
           dueDate: dueDate || undefined,
           assignToMe,
+          checklistItems: checklistPreview,
         }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Error');
       setBrief('');
       setDueDate('');
+      setChecklistPreview([]);
       setShowNewCase(false);
       await load();
     } catch (e) {
@@ -317,7 +413,7 @@ export default function NexusAtServicePage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="mx-auto max-w-6xl space-y-5">
       <div>
         <Link href="/hub/nexus/at" className="mb-3 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
           <ArrowLeft className="h-4 w-4" /> {es ? 'Contratos' : 'Contratos'}
@@ -325,7 +421,12 @@ export default function NexusAtServicePage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{service.title}</h1>
-            <p className="mt-0.5 text-sm text-slate-500">
+            {service.primarySectorId && (
+              <span className="mt-1 inline-block rounded-md bg-teal-50 px-2.5 py-0.5 text-xs font-medium text-teal-900">
+                {sectorBadgeLabel(service.primarySectorId, loc)}
+              </span>
+            )}
+            <p className="mt-1 text-sm text-slate-500">
               {service.contractRef ? `${service.contractRef} · ` : ''}
               {es ? 'Opera' : 'Opera'}: {service.operatorCompany.shortName || service.operatorCompany.name}
               {service.sponsorCompany
@@ -339,7 +440,10 @@ export default function NexusAtServicePage() {
           {isOperator && selectedProjectId && selectedCompanyId && (
             <button
               type="button"
-              onClick={() => setShowNewCase(true)}
+              onClick={() => {
+                applyBriefTemplate(caseKind);
+                setShowNewCase(true);
+              }}
               className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-800"
             >
               <Plus className="h-4 w-4" />
@@ -351,7 +455,7 @@ export default function NexusAtServicePage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="grid gap-5 lg:grid-cols-[200px_1fr]">
+      <div className="grid gap-5 lg:grid-cols-[200px_minmax(0,1fr)_260px]">
         <aside className="space-y-1">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
             {es ? 'Proyectos' : 'Projetos'}
@@ -442,6 +546,15 @@ export default function NexusAtServicePage() {
                       }`}
                     >
                       {m.company.shortName || m.company.name}
+                      {m.sectorId && (
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] ${
+                            active ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-900'
+                          }`}
+                        >
+                          {sectorBadgeLabel(m.sectorId, loc)}
+                        </span>
+                      )}
                       {n > 0 && (
                         <span className={`text-[10px] font-semibold ${active ? 'text-white/80' : 'text-slate-500'}`}>
                           {n}
@@ -469,6 +582,41 @@ export default function NexusAtServicePage() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+            {isOperator && clients.length > 0 && sectorCatalog.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span>{es ? 'Sector de la empresa seleccionada:' : 'Setor da empresa selecionada:'}</span>
+                <select
+                  value={clients.find((m) => m.companyId === selectedCompanyId)?.sectorId || service.primarySectorId || ''}
+                  disabled={!selectedCompanyId || savingSectorFor === selectedCompanyId}
+                  onChange={(e) => {
+                    if (selectedCompanyId) updateClientSector(selectedCompanyId, e.target.value);
+                  }}
+                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                >
+                  <option value="">{es ? '— sin sector —' : '— sem setor —'}</option>
+                  {sectorCatalog.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label[loc]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {selectedCompanyId && (
+              <div className="mt-3">
+                <NexusAtClientDossier
+                  companyId={selectedCompanyId}
+                  companyName={companyLabel(selectedCompanyId) || '—'}
+                  sectorId={
+                    clients.find((m) => m.companyId === selectedCompanyId)?.sectorId ||
+                    service.primarySectorId
+                  }
+                  locale={loc}
+                  es={es}
+                  engagementId={id}
+                />
               </div>
             )}
             {showAddCompany && isOperator && (
@@ -545,7 +693,11 @@ export default function NexusAtServicePage() {
               <div className="grid gap-2 sm:grid-cols-2">
                 <select
                   value={caseKind}
-                  onChange={(e) => setCaseKind(e.target.value as AtCaseKind)}
+                  onChange={(e) => {
+                    const kind = e.target.value as AtCaseKind;
+                    setCaseKind(kind);
+                    applyBriefTemplate(kind);
+                  }}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                 >
                   {CASE_KINDS.map((k) => (
@@ -577,14 +729,26 @@ export default function NexusAtServicePage() {
                 <textarea
                   value={brief}
                   onChange={(e) => setBrief(e.target.value)}
-                  rows={3}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm sm:col-span-2"
+                  rows={8}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs leading-relaxed sm:col-span-2"
                   placeholder={
                     es
-                      ? 'Qué hay que hacer en esta empresa…'
-                      : 'O que fazer nesta empresa…'
+                      ? 'Plano de intervenção… (use o quadro AT por sector)'
+                      : 'Plano de intervenção… (use o quadro AT por setor)'
                   }
                 />
+                {checklistPreview.length > 0 && (
+                  <div className="rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2 sm:col-span-2">
+                    <p className="text-[11px] font-medium uppercase text-teal-900">
+                      {es ? 'Checklist sectorial' : 'Checklist sectorial'}
+                    </p>
+                    <ul className="mt-1 space-y-0.5 text-xs text-teal-950">
+                      {checklistPreview.map((line, i) => (
+                        <li key={i}>· {line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <button
                   type="button"
                   disabled={savingCase || brief.trim().length < 8}
@@ -624,6 +788,25 @@ export default function NexusAtServicePage() {
             )}
           </section>
         </div>
+
+        <aside className="hidden lg:block">
+          <NexusAtSectorPlaybook
+            sectorId={playbookSectorId}
+            locale={loc}
+            onSuggestCaseKind={isOperator && selectedProjectId && selectedCompanyId ? suggestCaseKind : undefined}
+            onSuggestFocusArea={isOperator && selectedProjectId && selectedCompanyId ? suggestFocusArea : undefined}
+          />
+        </aside>
+      </div>
+
+      <div className="lg:hidden">
+        <NexusAtSectorPlaybook
+          sectorId={playbookSectorId}
+          locale={loc}
+          compact
+          onSuggestCaseKind={isOperator && selectedProjectId && selectedCompanyId ? suggestCaseKind : undefined}
+          onSuggestFocusArea={isOperator && selectedProjectId && selectedCompanyId ? suggestFocusArea : undefined}
+        />
       </div>
     </div>
   );

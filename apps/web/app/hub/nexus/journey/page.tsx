@@ -8,6 +8,8 @@ import type { VentureStageId } from '@/lib/nexus-venture';
 import { VENTURE_STAGE_ORDER, internationalReadinessScore, stageLabel, stageSummary } from '@/lib/nexus-venture';
 import { touchRunwayChapter } from '@/lib/nexus-runway';
 import { ArrowRight, ListChecks, Loader2 } from 'lucide-react';
+import { NexusIncubationProcessPanel } from '@/components/nexus/NexusIncubationProcessPanel';
+import { mergeHumanNotesIntoIncubatorNotes, parseHumanNotesFromIncubatorNotes } from '@/lib/nexus-incubation-run';
 
 type VentureApi = {
   scope: 'company' | 'network';
@@ -55,6 +57,7 @@ function NexusJourneyInner() {
   }, [networkId, activeCompanyId]);
 
   const [venture, setVenture] = useState<VentureApi | null>(null);
+  const [humanNotes, setHumanNotes] = useState('');
   const [overview, setOverview] = useState<OverviewLite | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -73,7 +76,10 @@ function NexusJourneyInner() {
         fetch(`/api/nexus/venture?${ventureQs}`, { cache: 'no-store' }).then((r) => r.json()),
         fetch(`/api/nexus/overview?${overviewQs}`, { cache: 'no-store' }).then((r) => r.json()),
       ]);
-      if (!rv.error) setVenture(rv as VentureApi);
+      if (!rv.error) {
+        setVenture(rv as VentureApi);
+        setHumanNotes(parseHumanNotesFromIncubatorNotes((rv as VentureApi).incubatorNotes));
+      }
       if (!ro.error && ro.metrics) setOverview({ metrics: ro.metrics });
       if (!opts?.background) setMsg(null);
     } catch {
@@ -323,6 +329,12 @@ function NexusJourneyInner() {
         <p className="mt-2 text-sm text-slate-600">{stageSummary(venture.stage, locale)}</p>
       </div>
 
+      <NexusIncubationProcessPanel
+        companyId={networkId ? null : activeCompanyId}
+        networkId={networkId}
+        locale={locale === 'pt' ? 'pt' : locale === 'en' ? 'en' : 'es'}
+      />
+
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <label className="text-sm font-medium text-slate-800" htmlFor="regions-ta">
           {t.markets}
@@ -422,11 +434,13 @@ function NexusJourneyInner() {
           id="notes-ta"
           className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
           rows={3}
-          value={venture.incubatorNotes}
+          value={humanNotes}
           onChange={(e) => {
-            const incubatorNotes = e.target.value;
-            setVenture((v) => (v ? { ...v, incubatorNotes } : v));
-            schedulePatch({ incubatorNotes });
+            const next = e.target.value;
+            setHumanNotes(next);
+            schedulePatch({
+              incubatorNotes: mergeHumanNotesIntoIncubatorNotes(venture.incubatorNotes, next),
+            });
           }}
         />
       </div>

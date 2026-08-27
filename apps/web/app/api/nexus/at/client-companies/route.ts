@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
+import { emptyContextSetup, type CompanyContextSetup } from '@/lib/company-context-setup';
+import { normalizeEconomicSectorId, parseCompanySectorId } from '@/lib/nexus-economic-sectors';
 
 /**
  * Diretório de empresas-cliente para AT.
@@ -28,12 +30,19 @@ export async function GET(req: NextRequest) {
           }
         : {}),
     },
-    select: { id: true, name: true, shortName: true },
+    select: { id: true, name: true, shortName: true, contextSetupJson: true },
     orderBy: { name: 'asc' },
     take,
   });
 
-  return NextResponse.json({ companies });
+  return NextResponse.json({
+    companies: companies.map((c) => ({
+      id: c.id,
+      name: c.name,
+      shortName: c.shortName,
+      sectorId: parseCompanySectorId(c.contextSetupJson),
+    })),
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -63,15 +72,37 @@ export async function POST(req: NextRequest) {
       .slice(0, 12) ||
     name.slice(0, 12);
 
+  const sectorRaw = body.sectorId ? String(body.sectorId).trim() : '';
+  const sectorId = sectorRaw ? normalizeEconomicSectorId(sectorRaw) : null;
+  if (sectorRaw && !sectorId) {
+    return NextResponse.json({ error: 'Setor económico inválido.' }, { status: 400 });
+  }
+
+  const context: CompanyContextSetup = sectorId
+    ? { ...emptyContextSetup(), sectorId }
+    : emptyContextSetup();
+
   const company = await prisma.company.create({
     data: {
       name,
       shortName,
       description: body.description ? String(body.description).trim().slice(0, 2000) : null,
       color: '#6366F1',
+      contextSetupJson: sectorId ? context : undefined,
     },
-    select: { id: true, name: true, shortName: true },
+    select: { id: true, name: true, shortName: true, contextSetupJson: true },
   });
 
-  return NextResponse.json({ ok: true, company }, { status: 201 });
+  return NextResponse.json(
+    {
+      ok: true,
+      company: {
+        id: company.id,
+        name: company.name,
+        shortName: company.shortName,
+        sectorId: parseCompanySectorId(company.contextSetupJson),
+      },
+    },
+    { status: 201 }
+  );
 }

@@ -528,10 +528,13 @@ export async function POST(
       systemInstruction: systemPrompt,
       userText: fullUserText,
       userParts: hasAttachments ? attachmentLlmParts : undefined,
-      maxOutputTokens: bootstrapNexus ? 1024 : 2048,
+      maxOutputTokens: useDesignPartner ? (bootstrapNexus ? 420 : 520) : 2048,
       temperature: useDesignPartner ? 0.52 : 0.3,
     });
     aiText = result.text;
+    if (useDesignPartner && aiText.length > 1100) {
+      aiText = `${aiText.slice(0, 1090).trim()}…`;
+    }
   } catch (err) {
     console.error('[AI Advisor] LLM error:', err);
     return NextResponse.json({ error: 'AI unavailable', detail: String(err) }, { status: 503 });

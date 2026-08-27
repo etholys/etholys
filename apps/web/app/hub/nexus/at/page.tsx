@@ -6,8 +6,15 @@ import { useRouter } from 'next/navigation';
 import { AlertTriangle, Plus, Search, X } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { NexusAtCaseCard, type AtCaseCardModel } from '@/components/nexus/NexusAtCaseCard';
+import { groupSectorsForSelect, sectorBadgeLabel } from '@/components/nexus/NexusAtSectorPlaybook';
 
-type Company = { id: string; name: string; shortName: string };
+type Company = { id: string; name: string; shortName: string; sectorId?: string | null };
+type SectorCatalogRow = {
+  id: string;
+  groupId: string;
+  label: { es: string; pt: string; en: string };
+};
+type SectorPortfolioRow = { sectorId: string; companies: number; contracts: number; openCases: number };
 type SiepProject = { id: string; name: string; code: string | null; companyId: string };
 type Service = {
   id: string;
@@ -18,7 +25,14 @@ type Service = {
   operatorCompany: { id: string; name: string; shortName: string };
   sponsorCompany?: { id: string; name: string; shortName: string } | null;
   siepProject?: { id: string; name: string; code?: string | null } | null;
-  members: Array<{ companyId: string; memberRole: string; company: { shortName: string; name: string } }>;
+  primarySectorId?: string | null;
+  sectorMix?: string[];
+  members: Array<{
+    companyId: string;
+    memberRole: string;
+    sectorId?: string | null;
+    company: { shortName: string; name: string };
+  }>;
   projects: Array<{ id: string; name: string; status: string }>;
   openCaseCount: number;
   clientCount: number;
@@ -35,12 +49,19 @@ type Agenda = {
 
 type InboxTab = 'all' | 'overdue' | 'today' | 'week';
 
-type PickedClient = { key: string; id?: string; name: string; shortName?: string };
+type PickedClient = { key: string; id?: string; name: string; shortName?: string; sectorId?: string };
 
 export default function NexusAtPage() {
   const router = useRouter();
   const { locale, activeCompanyId } = useApp();
   const es = locale === 'es';
+  const loc = (es ? 'es' : locale === 'pt' ? 'pt' : 'en') as 'es' | 'pt' | 'en';
+
+  const [sectorCatalog, setSectorCatalog] = useState<SectorCatalogRow[]>([]);
+  const [sectorGroups, setSectorGroups] = useState<Array<{ id: string; label: { es: string; pt: string; en: string } }>>([]);
+  const [sectorPortfolio, setSectorPortfolio] = useState<SectorPortfolioRow[]>([]);
+  const [sectorFilter, setSectorFilter] = useState<string>('all');
+  const [primarySectorId, setPrimarySectorId] = useState('');
 
   const [services, setServices] = useState<Service[]>([]);
   const [inbox, setInbox] = useState<AtCaseCardModel[]>([]);
@@ -80,10 +101,18 @@ export default function NexusAtPage() {
     setLoading(true);
     setError(null);
     try {
-      const [inboxRes, cRes] = await Promise.all([fetch('/api/nexus/at/inbox'), fetch('/api/companies')]);
+      const [inboxRes, cRes, secRes] = await Promise.all([
+        fetch('/api/nexus/at/inbox'),
+        fetch('/api/companies'),
+        fetch('/api/nexus/at/sectors'),
+      ]);
       const inboxJson = await inboxRes.json();
       const cJson = await cRes.json();
+      const secJson = secRes.ok ? await secRes.json() : { sectors: [], groups: [] };
       if (!inboxRes.ok) throw new Error(inboxJson.error || 'Error');
+      setSectorCatalog(secJson.sectors || []);
+      setSectorGroups(secJson.groups || []);
+      setSectorPortfolio(inboxJson.sectorPortfolio || []);
       const list = (cJson.companies || []) as Company[];
       const nameMap: Record<string, string> = {};
       for (const c of list) nameMap[c.id] = c.shortName || c.name;
@@ -175,11 +204,25 @@ export default function NexusAtPage() {
 
   const pickedIds = useMemo(() => new Set(picked.map((p) => p.id).filter(Boolean) as string[]), [picked]);
 
+  const sectorSelectGroups = useMemo(
+    () => groupSectorsForSelect(sectorCatalog, sectorGroups as never, loc),
+    [sectorCatalog, sectorGroups, loc]
+  );
+
   const addExisting = (c: Company) => {
     if (c.id === operatorCompanyId) return;
     if (sponsor?.id === c.id) return;
     if (pickedIds.has(c.id)) return;
-    setPicked((prev) => [...prev, { key: c.id, id: c.id, name: c.name, shortName: c.shortName }]);
+    setPicked((prev) => [
+      ...prev,
+      {
+        key: c.id,
+        id: c.id,
+        name: c.name,
+        shortName: c.shortName,
+        sectorId: c.sectorId || primarySectorId || undefined,
+      },
+    ]);
     setClientQuery('');
   };
 
@@ -191,7 +234,10 @@ export default function NexusAtPage() {
       setClientQuery('');
       return;
     }
-    setPicked((prev) => [...prev, { key, name }]);
+    setPicked((prev) => [
+      ...prev,
+      { key, name, sectorId: primarySectorId || undefined },
+    ]);
     setClientQuery('');
   };
 
@@ -232,7 +278,9 @@ export default function NexusAtPage() {
     setError(null);
     try {
       const clientCompanyIds = picked.filter((p) => p.id).map((p) => p.id!) as string[];
-      const newClients = picked.filter((p) => !p.id).map((p) => ({ name: p.name, shortName: p.shortName }));
+      const newClients = picked
+        .filter((p) => !p.id)
+        .map((p) => ({ name: p.name, shortName: p.shortName, sectorId: p.sectorId }));
       const r = await fetch('/api/nexus/at/engagements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -240,6 +288,7 @@ export default function NexusAtPage() {
           title: title.trim(),
           kind: 'CONTRACT',
           operatorCompanyId,
+          primarySectorId: primarySectorId || undefined,
           clientCompanyIds,
           newClients,
           contractRef: contractRef.trim() || undefined,
@@ -250,6 +299,18 @@ export default function NexusAtPage() {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || (es ? 'No se pudo crear' : 'Falha ao criar'));
+
+      await Promise.all(
+        picked
+          .filter((p) => p.id && p.sectorId)
+          .map((p) =>
+            fetch(`/api/nexus/at/client-companies/${encodeURIComponent(p.id!)}/sector`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sectorId: p.sectorId }),
+            })
+          )
+      );
 
       const projectName = firstProjectName.trim() || (es ? 'Entrega' : 'Entrega');
       await fetch(`/api/nexus/at/engagements/${encodeURIComponent(d.engagement.id)}/projects`, {
@@ -265,6 +326,7 @@ export default function NexusAtPage() {
       setFirstProjectName('');
       setSponsor(null);
       setSiepProjectId('');
+      setPrimarySectorId('');
       router.push(`/hub/nexus/at/${d.engagement.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
@@ -285,6 +347,16 @@ export default function NexusAtPage() {
     companyLabel: c.companyId ? companyNames[c.companyId] || c.companyLabel : null,
   });
 
+  const filteredServices = useMemo(() => {
+    if (sectorFilter === 'all') return services;
+    return services.filter(
+      (s) =>
+        s.primarySectorId === sectorFilter ||
+        s.sectorMix?.includes(sectorFilter) ||
+        s.members.some((m) => m.sectorId === sectorFilter)
+    );
+  }, [services, sectorFilter]);
+
   const filteredSuggestions = suggestions.filter(
     (c) => c.id !== operatorCompanyId && c.id !== sponsor?.id && !pickedIds.has(c.id)
   );
@@ -298,8 +370,8 @@ export default function NexusAtPage() {
           </h1>
           <p className="mt-0.5 text-sm text-slate-500">
             {es
-              ? 'Contratante → proyecto SIEP → empresas atendidas. Trabajo separado por beneficiaria.'
-              : 'Contratante → projeto SIEP → empresas atendidas. Trabalho separado por beneficiária.'}
+              ? 'Consultoría y AT por sector económico — incubadora, contrato, empresas atendidas.'
+              : 'Consultoria e AT por setor económico — incubadora, contrato, empresas atendidas.'}
           </p>
         </div>
         <button
@@ -333,6 +405,57 @@ export default function NexusAtPage() {
           <span className="ml-2 font-semibold text-slate-900">{summary.dueToday}</span>
         </div>
       </div>
+
+      {sectorPortfolio.length > 0 && (
+        <section className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-900">
+              {es ? 'Cartera por sector' : 'Carteira por setor'}
+            </h2>
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                onClick={() => setSectorFilter('all')}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+                  sectorFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {es ? 'Todos' : 'Todos'}
+              </button>
+              {sectorPortfolio.map((row) => (
+                <button
+                  key={row.sectorId}
+                  type="button"
+                  onClick={() => setSectorFilter(row.sectorId)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+                    sectorFilter === row.sectorId ? 'bg-teal-800 text-white' : 'bg-teal-50 text-teal-900'
+                  }`}
+                >
+                  {sectorBadgeLabel(row.sectorId, loc) || row.sectorId} · {row.companies}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {sectorPortfolio.map((row) => (
+              <button
+                key={`card-${row.sectorId}`}
+                type="button"
+                onClick={() => setSectorFilter(row.sectorId)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-teal-300 hover:shadow-sm"
+              >
+                <p className="text-sm font-medium text-slate-900">
+                  {sectorBadgeLabel(row.sectorId, loc) || row.sectorId}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {row.contracts} {es ? 'contratos' : 'contratos'} · {row.companies}{' '}
+                  {es ? 'empresas' : 'empresas'} · {row.openCases} {es ? 'casos abiertos' : 'casos abertos'}
+                </p>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center">
@@ -371,6 +494,26 @@ export default function NexusAtPage() {
                   className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
                   placeholder={es ? 'Ej. AT Cooperativas Norte 2026' : 'Ex. AT Cooperativas Norte 2026'}
                 />
+              </label>
+
+              <label className="block text-sm font-medium text-slate-700">
+                {es ? 'Sector económico del programa' : 'Setor económico do programa'}
+                <select
+                  value={primarySectorId}
+                  onChange={(e) => setPrimarySectorId(e.target.value)}
+                  className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                >
+                  <option value="">{es ? '— seleccionar —' : '— selecionar —'}</option>
+                  {sectorSelectGroups.map((g) => (
+                    <optgroup key={g.groupId} label={g.groupLabel}>
+                      {g.sectors.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
               </label>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -529,14 +672,37 @@ export default function NexusAtPage() {
                     {picked.map((p) => (
                       <span
                         key={p.key}
-                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-800"
+                        className="inline-flex flex-wrap items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-800"
                       >
                         {p.shortName || p.name}
+                        {p.sectorId && (
+                          <span className="rounded bg-teal-100 px-1.5 py-0.5 text-[10px] text-teal-900">
+                            {sectorBadgeLabel(p.sectorId, loc)}
+                          </span>
+                        )}
                         {!p.id && (
                           <span className="text-[10px] uppercase text-emerald-700">
                             {es ? 'nueva' : 'nova'}
                           </span>
                         )}
+                        <select
+                          value={p.sectorId || primarySectorId || ''}
+                          onChange={(e) =>
+                            setPicked((prev) =>
+                              prev.map((x) =>
+                                x.key === p.key ? { ...x, sectorId: e.target.value || undefined } : x
+                              )
+                            )
+                          }
+                          className="max-w-[8rem] rounded border-0 bg-white py-0 text-[10px] text-slate-600"
+                        >
+                          <option value="">{es ? 'Sector' : 'Setor'}</option>
+                          {sectorCatalog.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.label[loc]}
+                            </option>
+                          ))}
+                        </select>
                         <button
                           type="button"
                           onClick={() => removePicked(p.key)}
@@ -627,7 +793,7 @@ export default function NexusAtPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={saving || title.trim().length < 2 || !operatorCompanyId}
+                  disabled={saving || title.trim().length < 2 || !operatorCompanyId || !primarySectorId}
                   onClick={create}
                   className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40"
                 >
@@ -692,7 +858,7 @@ export default function NexusAtPage() {
             <h2 className="text-sm font-semibold text-slate-900">
               {es ? 'Contratos / servicios' : 'Contratos / serviços'}
             </h2>
-            {services.length === 0 ? (
+            {filteredServices.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
                 <p className="text-sm text-slate-500">
                   {es
@@ -709,12 +875,13 @@ export default function NexusAtPage() {
               </div>
             ) : (
               <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
-                {services.map((s) => {
+                {filteredServices.map((s) => {
                   const clients = s.members.filter((m) => m.memberRole === 'client');
                   const sponsorLabel = s.sponsorCompany
                     ? s.sponsorCompany.shortName || s.sponsorCompany.name
                     : null;
                   const siepLabel = s.siepProject?.name || null;
+                  const sectorLabelMain = sectorBadgeLabel(s.primarySectorId, loc);
                   return (
                     <li key={s.id}>
                       <Link
@@ -723,6 +890,11 @@ export default function NexusAtPage() {
                       >
                         <div className="min-w-0">
                           <p className="truncate font-medium text-slate-900">{s.title}</p>
+                          {sectorLabelMain && (
+                            <span className="mt-1 inline-block rounded bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-900">
+                              {sectorLabelMain}
+                            </span>
+                          )}
                           <p className="mt-0.5 truncate text-xs text-slate-500">
                             {s.contractRef ? `${s.contractRef} · ` : ''}
                             {sponsorLabel

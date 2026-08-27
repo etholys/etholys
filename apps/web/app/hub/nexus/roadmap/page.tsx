@@ -92,6 +92,25 @@ function NexusRoadmapInner() {
   const selectedMember = network?.members.find((m) => m.companyId === targetCompanyId) || null;
   const selectedSiepName = selectedMember?.siepProject?.name || network?.siepProject?.name || null;
 
+  const incubationGroups = useMemo(() => {
+    const incubation = actions.filter((a) => a.tags?.includes('nexus:incubation'));
+    const other = actions.filter((a) => !a.tags?.includes('nexus:incubation'));
+    const byLayer = new Map<number, RoadmapAction[]>();
+    for (const a of incubation) {
+      const m = a.tags?.match(/incubation:layer:(\d+)/);
+      const layer = m ? Number(m[1]) : 0;
+      byLayer.set(layer, [...(byLayer.get(layer) || []), a]);
+    }
+    const layers = [...byLayer.entries()].sort((a, b) => a[0] - b[0]);
+    return { layers, other, incubationCount: incubation.length };
+  }, [actions]);
+
+  function tagMeta(tags: string | null) {
+    const kind = tags?.match(/incubation:kind:([a-z]+)/)?.[1];
+    const pillar = tags?.match(/pillar:([a-z_]+)/)?.[1];
+    return { kind, pillar };
+  }
+
   const refresh = useCallback(async (opts?: { background?: boolean }) => {
     if (!opts?.background) setLoading(true);
     try {
@@ -223,21 +242,60 @@ function NexusRoadmapInner() {
           <div className="h-7 w-7 animate-spin rounded-full border-2 border-indigo-600/30 border-t-indigo-600" />
         </div>
       ) : (
-        <div className="space-y-3">
-          {actions.map((a) => (
-            <div key={a.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-medium text-gray-900">{a.title}</p>
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{a.status}</span>
-              </div>
-              {a.description && <p className="mt-1 text-sm text-gray-600">{a.description}</p>}
-              {networkId && a.companyId && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Empresa: {companyLabel.get(a.companyId) || a.companyId}
-                </p>
-              )}
+        <div className="space-y-4">
+          {incubationGroups.incubationCount > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-teal-900">Plano de incubação · camadas</h3>
+              {incubationGroups.layers.map(([layerIdx, items]) => (
+                <div key={layerIdx} className="rounded-xl border border-teal-100 bg-teal-50/30 p-3">
+                  <p className="text-xs font-semibold uppercase text-teal-800">
+                    Camada {layerIdx + 1} · {items.filter((x) => x.status === 'DONE').length}/{items.length} concluídas
+                  </p>
+                  <ul className="mt-2 space-y-2">
+                    {items.map((a) => {
+                      const meta = tagMeta(a.tags);
+                      return (
+                        <li key={a.id} className="rounded-lg border border-white bg-white p-3 shadow-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="font-medium text-gray-900">{a.title}</p>
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{a.status}</span>
+                          </div>
+                          {(meta.kind || meta.pillar) && (
+                            <p className="mt-1 text-[10px] uppercase text-slate-500">
+                              {[meta.kind, meta.pillar].filter(Boolean).join(' · ')}
+                            </p>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+
+          {incubationGroups.other.length > 0 && (
+            <div className="space-y-3">
+              {incubationGroups.incubationCount > 0 && (
+                <h3 className="text-sm font-semibold text-slate-700">Outras ações de rota</h3>
+              )}
+              {incubationGroups.other.map((a) => (
+                <div key={a.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-medium text-gray-900">{a.title}</p>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{a.status}</span>
+                  </div>
+                  {a.description && <p className="mt-1 text-sm text-gray-600">{a.description}</p>}
+                  {networkId && a.companyId && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Empresa: {companyLabel.get(a.companyId) || a.companyId}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           {actions.length === 0 && <p className="text-sm text-gray-500">Sem ações ainda. Crie a primeira ação acima.</p>}
         </div>
       )}

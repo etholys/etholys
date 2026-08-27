@@ -9,6 +9,8 @@ import {
   listEngagementsForTenant,
   validateEngagementSiep,
 } from '@/lib/nexus-at';
+import { isEconomicSectorId, normalizeEconomicSectorId } from '@/lib/nexus-economic-sectors';
+import { emptyContextSetup } from '@/lib/company-context-setup';
 import { loadNetworkForTenant, memberCompanyIds } from '@/lib/nexus-network';
 
 export async function GET() {
@@ -66,8 +68,15 @@ export async function POST(req: NextRequest) {
         .join('')
         .slice(0, 12) ||
       name.slice(0, 12);
+    const sectorRaw = row.sectorId ? String(row.sectorId).trim() : '';
+    const sectorId = sectorRaw ? normalizeEconomicSectorId(sectorRaw) : null;
     const created = await prisma.company.create({
-      data: { name, shortName, color: '#6366F1' },
+      data: {
+        name,
+        shortName,
+        color: '#6366F1',
+        ...(sectorId ? { contextSetupJson: { ...emptyContextSetup(), sectorId } } : {}),
+      },
       select: { id: true },
     });
     if (!clientIds.includes(created.id)) clientIds.push(created.id);
@@ -143,6 +152,12 @@ export async function POST(req: NextRequest) {
   const description = body.description ? String(body.description).trim().slice(0, 8000) : null;
   const contractRef = body.contractRef ? String(body.contractRef).trim().slice(0, 120) : null;
 
+  const primarySectorRaw = body.primarySectorId ? String(body.primarySectorId).trim() : '';
+  const primarySectorId = primarySectorRaw ? normalizeEconomicSectorId(primarySectorRaw) : null;
+  if (primarySectorRaw && !primarySectorId) {
+    return NextResponse.json({ error: 'Setor económico inválido.' }, { status: 400 });
+  }
+
   const parseDate = (raw: unknown) => {
     if (!raw) return null;
     const d = new Date(String(raw));
@@ -167,6 +182,7 @@ export async function POST(req: NextRequest) {
       status: 'ACTIVE',
       operatorCompanyId,
       sponsorCompanyId,
+      primarySectorId,
       networkId,
       siepProjectId: siepProjectId || null,
       description,

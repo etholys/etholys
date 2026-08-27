@@ -120,6 +120,15 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       dueDate: dueDate && !Number.isNaN(dueDate.getTime()) ? dueDate : undefined,
       assigneeId: body.take === true || body.assignToMe === true ? tenant.userId : undefined,
       isActive: true,
+      checklist: {
+        create: Array.isArray(body.checklistItems)
+          ? (body.checklistItems as unknown[])
+              .map((x) => String(x || '').trim())
+              .filter((t) => t.length >= 3)
+              .slice(0, 20)
+              .map((text, order) => ({ text: text.slice(0, 500), order }))
+          : [],
+      },
     },
     select: {
       id: true,

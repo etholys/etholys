@@ -394,7 +394,7 @@ model BillingCommissionEvent {
   company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoice         PlatformInvoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
-  @@unique([companyId, skuCode, sourceType, sourceId])
+  @@unique([companyId, skuCode, sourceType, sourceId], map: "BillingCommissionEvent_source_key")
   @@index([companyId, status])
 }
 

@@ -13,6 +13,7 @@ import {
   userIsOperator,
   validateEngagementSiep,
 } from '@/lib/nexus-at';
+import { normalizeEconomicSectorId, parseCompanySectorId } from '@/lib/nexus-economic-sectors';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -28,6 +29,18 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
   const projectId = _req.nextUrl.searchParams.get('projectId') || undefined;
   const companyId = _req.nextUrl.searchParams.get('companyId') || undefined;
   const openOnly = _req.nextUrl.searchParams.get('openOnly') === '1';
+
+  const clientRows =
+    clients.length > 0
+      ? await prisma.company.findMany({
+          where: { id: { in: clients }, isActive: true },
+          select: { id: true, contextSetupJson: true },
+        })
+      : [];
+  const sectorByCompany = new Map(
+    clientRows.map((c) => [c.id, parseCompanySectorId(c.contextSetupJson)])
+  );
+
   const casesRaw = await listAtCasesForEngagement(
     engagement.id,
     clients.length ? clients : engagementCompanyIds(engagement),
@@ -38,11 +51,18 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
   const openCount = cases.filter((c) => c.isOpen).length;
 
   return NextResponse.json({
-    engagement,
+    engagement: {
+      ...engagement,
+      members: engagement.members.map((m) => ({
+        ...m,
+        sectorId: m.memberRole === 'client' ? sectorByCompany.get(m.companyId) || null : null,
+      })),
+    },
     cases,
     isOperator: userIsOperator(engagement, tenant.companyIds),
     companyIds: engagementCompanyIds(engagement),
     openCount,
+    companySectors: Object.fromEntries(sectorByCompany),
   });
 }
 
@@ -111,6 +131,14 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       }
     }
     data.sponsorCompanyId = sponsorCompanyId;
+  }
+  if (body.primarySectorId !== undefined) {
+    const raw = body.primarySectorId ? String(body.primarySectorId).trim() : '';
+    const primarySectorId = raw ? normalizeEconomicSectorId(raw) : null;
+    if (raw && !primarySectorId) {
+      return NextResponse.json({ error: 'Setor económico inválido.' }, { status: 400 });
+    }
+    data.primarySectorId = primarySectorId;
   }
 
   const parseDate = (raw: unknown) => {

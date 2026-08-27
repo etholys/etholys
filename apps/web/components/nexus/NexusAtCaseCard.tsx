@@ -31,6 +31,8 @@ type CommentRow = {
   user: { id: string; name: string | null; email: string } | null;
 };
 
+type ChecklistRow = { id: string; text: string; completed: boolean; order: number };
+
 const STATUSES = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE', 'CANCELLED'];
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
@@ -46,6 +48,7 @@ export function NexusAtCaseCard({ caseItem, onUpdated, showServiceLink }: Props)
   const [expanded, setExpanded] = useState(false);
   const [draftDesc, setDraftDesc] = useState(caseItem.description || '');
   const [comments, setComments] = useState<CommentRow[]>([]);
+  const [checklist, setChecklist] = useState<ChecklistRow[]>([]);
   const [commentText, setCommentText] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
 
@@ -63,9 +66,14 @@ export function NexusAtCaseCard({ caseItem, onUpdated, showServiceLink }: Props)
     (async () => {
       setLoadingComments(true);
       try {
-        const r = await fetch(`/api/nexus/at/cases/${encodeURIComponent(caseItem.id)}/comments`);
-        const d = await r.json();
-        if (!cancelled && r.ok) setComments(d.comments || []);
+        const [cr, caseR] = await Promise.all([
+          fetch(`/api/nexus/at/cases/${encodeURIComponent(caseItem.id)}/comments`),
+          fetch(`/api/nexus/at/cases/${encodeURIComponent(caseItem.id)}`),
+        ]);
+        const d = await cr.json();
+        const caseData = await caseR.json();
+        if (!cancelled && cr.ok) setComments(d.comments || []);
+        if (!cancelled && caseR.ok) setChecklist(caseData.case?.checklist || []);
       } catch {
         /* ignore */
       } finally {
@@ -110,6 +118,25 @@ export function NexusAtCaseCard({ caseItem, onUpdated, showServiceLink }: Props)
       if (!r.ok) throw new Error(d.error || 'Falha ao comentar');
       setComments((prev) => [...prev, d.comment]);
       setCommentText('');
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleChecklist = async (itemId: string, completed: boolean) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await fetch('/api/checklist', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: itemId, completed }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Erro');
+      setChecklist((prev) => prev.map((x) => (x.id === itemId ? { ...x, completed } : x)));
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -266,6 +293,33 @@ export function NexusAtCaseCard({ caseItem, onUpdated, showServiceLink }: Props)
 
       {expanded && (
         <div className="mt-3 space-y-3 border-t border-gray-100 pt-3">
+          {checklist.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-gray-500">
+                Checklist AT
+                <span className="ml-1 font-normal text-gray-400">
+                  ({checklist.filter((c) => c.completed).length}/{checklist.length})
+                </span>
+              </p>
+              <ul className="space-y-1">
+                {checklist.map((item) => (
+                  <li key={item.id}>
+                    <label className="flex cursor-pointer items-start gap-2 text-sm text-gray-800">
+                      <input
+                        type="checkbox"
+                        checked={item.completed}
+                        disabled={busy}
+                        onChange={(e) => toggleChecklist(item.id, e.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span className={item.completed ? 'text-gray-400 line-through' : ''}>{item.text}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="space-y-2">
             <p className="text-xs font-medium text-gray-500">Notas do caso</p>
             <textarea

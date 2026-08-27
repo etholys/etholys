@@ -41,12 +41,12 @@ const STEPS: Record<VentureStageId, NexusQuickStep[]> = {
   DISCOVER: [
     {
       id: 'disc-1',
-      titlePt: 'Fazer o diagnóstico guiado',
-      titleEs: 'Hacer el diagnóstico guiado',
-      titleEn: 'Run the guided diagnosis',
-      hintPt: 'Clareia forças e lacunas; alimenta a rota e o assessor.',
-      hintEs: 'Aclara brechas; alimenta la ruta y el asesor.',
-      hintEn: 'Surfaces strengths and gaps; feeds roadmap and the advisor.',
+      titlePt: 'Diagnóstico por setor económico',
+      titleEs: 'Diagnóstico por sector económico',
+      titleEn: 'Sector-based diagnosis',
+      hintPt: 'Questionário base do setor; a IA só prolonga se faltar informação crítica.',
+      hintEs: 'Cuestionario base del sector; la IA solo amplía si falta información crítica.',
+      hintEn: 'Sector base questionnaire; AI extends only when critical gaps remain.',
       path: 'diagnosis',
       emphasis: 'high',
     },

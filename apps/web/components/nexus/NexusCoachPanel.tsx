@@ -206,7 +206,7 @@ export function NexusCoachPanel({
           road: 'Ruta viva',
           roadHint: 'Acciones abiertas',
           diag: 'Diagnóstico',
-          diagHint: 'Cuestionario',
+          diagHint: 'Por sector (6 preg.)',
           workspace: 'Centro hoy',
           workspaceHint: 'Etholys',
         }
@@ -217,8 +217,8 @@ export function NexusCoachPanel({
             journeyHint: 'Level, markets',
             road: 'Live roadmap',
             roadHint: 'Open actions',
-            diag: 'Diagnosis',
-            diagHint: 'Questionnaire',
+          diag: 'Diagnosis',
+          diagHint: 'By sector (~6 Q)',
             workspace: 'Today hub',
             workspaceHint: 'Etholys',
           }
@@ -228,8 +228,8 @@ export function NexusCoachPanel({
             journeyHint: 'Nível, mercados',
             road: 'Rota viva',
             roadHint: 'Ações em aberto',
-            diag: 'Diagnóstico',
-            diagHint: 'Questionário',
+          diag: 'Diagnóstico',
+          diagHint: 'Por setor (~6 perg.)',
             workspace: 'Centro hoje',
             workspaceHint: 'Etholys',
           };

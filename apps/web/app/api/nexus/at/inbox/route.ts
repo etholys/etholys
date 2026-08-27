@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import {
   clientCompanyIds,
@@ -8,6 +9,7 @@ import {
   listAtInboxForTenant,
   listEngagementsForTenant,
 } from '@/lib/nexus-at';
+import { parseCompanySectorId } from '@/lib/nexus-economic-sectors';
 
 /** Inbox AT + serviços com contagem de casos abertos. */
 export async function GET() {
@@ -19,6 +21,20 @@ export async function GET() {
     listAtInboxForTenant(tenant.companyIds, 30),
   ]);
 
+  const allClientIds = [
+    ...new Set(engagements.flatMap((e) => clientCompanyIds(e))),
+  ];
+  const companyRows =
+    allClientIds.length > 0
+      ? await prisma.company.findMany({
+          where: { id: { in: allClientIds }, isActive: true },
+          select: { id: true, contextSetupJson: true },
+        })
+      : [];
+  const sectorByCompany = new Map(
+    companyRows.map((c) => [c.id, parseCompanySectorId(c.contextSetupJson)])
+  );
+
   const clientMap = new Map<string, string[]>();
   for (const e of engagements) {
     clientMap.set(e.id, clientCompanyIds(e));
@@ -28,12 +44,37 @@ export async function GET() {
     clientMap
   );
 
-  const services = engagements.map((e) => ({
-    ...e,
-    openCaseCount: openCounts.get(e.id) || 0,
-    clientCount: clientCompanyIds(e).length,
-    projectCount: e.projects.length,
-  }));
+  const sectorPortfolio = new Map<string, { companies: number; contracts: number; openCases: number }>();
+
+  const services = engagements.map((e) => {
+    const clients = clientCompanyIds(e);
+    const clientSectors = clients
+      .map((cid) => sectorByCompany.get(cid))
+      .filter(Boolean) as string[];
+    const sectorMix = [...new Set(clientSectors)];
+    const programSector = e.primarySectorId || sectorMix[0] || null;
+
+    if (programSector) {
+      const row = sectorPortfolio.get(programSector) || { companies: 0, contracts: 0, openCases: 0 };
+      row.contracts += 1;
+      row.companies += clients.length;
+      row.openCases += openCounts.get(e.id) || 0;
+      sectorPortfolio.set(programSector, row);
+    }
+
+    return {
+      ...e,
+      openCaseCount: openCounts.get(e.id) || 0,
+      clientCount: clients.length,
+      projectCount: e.projects.length,
+      primarySectorId: e.primarySectorId || programSector,
+      sectorMix,
+      members: e.members.map((m) => ({
+        ...m,
+        sectorId: m.memberRole === 'client' ? sectorByCompany.get(m.companyId) || null : null,
+      })),
+    };
+  });
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -58,6 +99,10 @@ export async function GET() {
   return NextResponse.json({
     services,
     inbox,
+    sectorPortfolio: [...sectorPortfolio.entries()].map(([sectorId, stats]) => ({
+      sectorId,
+      ...stats,
+    })),
     agenda: {
       overdue: overdueItems,
       today: todayItems,

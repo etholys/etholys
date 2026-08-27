@@ -23,7 +23,14 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
   if (!loaded) return NextResponse.json({ error: 'Caso AT não encontrado.' }, { status: 404 });
 
   return NextResponse.json({
-    case: loaded.enriched,
+    case: {
+      ...loaded.enriched,
+      checklist: await prisma.checklistItem.findMany({
+        where: { taskId: loaded.task.id },
+        orderBy: { order: 'asc' },
+        select: { id: true, text: true, completed: true, order: true },
+      }),
+    },
     engagementId: loaded.engagement.id,
     isOperator: userIsOperator(loaded.engagement, tenant.companyIds),
   });

@@ -44,10 +44,10 @@ export function buildNexusDesignPartnerSystemLayer(
 
   const productCoherence =
     locale === 'en'
-      ? `PRODUCT TRUTH: The user is already inside the Etholys suite. NEXUS is a module within Etholys — not a separate "other product". NEVER say things like "the same as in Etholys" or "you also have this in Etholys" as if Etholys were elsewhere. If you mention the guided diagnosis, say it is done here in this NEXUS chat (step by step), and they can optionally open the structured form from the NEXUS menu — same journey, not two places.`
+      ? `PRODUCT TRUTH: The user is already inside the Etholys suite. NEXUS is a module within Etholys — not a separate "other product". NEVER say things like "the same as in Etholys" or "you also have this in Etholys" as if Etholys were elsewhere. Structured diagnosis lives at /hub/nexus/diagnosis (sector questionnaire); this chat is business/brand copilot — it does NOT replace that questionnaire.`
       : locale === 'es'
-        ? `VERDAD DE PRODUCTO: La persona ya está dentro de la suite Etholys. NEXUS es un módulo de Etholys, no "otro sitio". PROHIBIDO hablar como si "Etholys" fuera un lugar distinto de "aquí": no digas "lo mismo que en Etholys", "como en Etholys" o "en Etholys también tienes…". El diagnóstico guiado se hace en ESTE chat de NEXUS, pregunta a pregunta; si quieren, pueden abrir el cuestionario estructurado desde el menú de NEXUS — mismo recorrido, una sola plataforma.`
-        : `VERDADE DE PRODUTO: O utilizador já está na suite Etholys. O NEXUS é um módulo do Etholys, não "outro sítio". NÃO digas "o mesmo que no Etholys" ou "no Etholys também tens…" como se fossem lugares diferentes. O diagnóstico guiado faz-se AQUI neste chat NEXUS, pergunta a pergunta; podem opcionalmente abrir o questionário estruturado pelo menu do NEXUS — o mesmo percurso, uma só plataforma.`;
+        ? `VERDAD DE PRODUCTO: La persona ya está dentro de la suite Etholys. NEXUS es un módulo de Etholys, no "otro sitio". PROHIBIDO hablar como si "Etholys" fuera un lugar distinto de "aquí": no digas "lo mismo que en Etholys", "como en Etholys" o "en Etholys también tienes…". El diagnóstico estructurado vive en /hub/nexus/diagnosis (cuestionario por sector económico); este chat es copiloto de negocio/marca, NO sustituye ese cuestionario.`
+        : `VERDADE DE PRODUTO: O utilizador já está na suite Etholys. O NEXUS é um módulo do Etholys, não "outro sítio". NÃO digas "o mesmo que no Etholys" ou "no Etholys também tens…" como se fossem lugares diferentes. O diagnóstico estruturado está em /hub/nexus/diagnosis (questionário por setor económico); este chat é copiloto de negócio/marca — NÃO substitui esse questionário.`;
 
   const discoveryCoaching =
     locale === 'en'
@@ -131,8 +131,7 @@ export function nexusBootstrapOpeningInstruction(
       return `Genera SOLO la PRIMERA respuesta del copiloto, en español.
 CONTEXTO: el siguiente paso prioritario en NEXUS es: "${priority?.title}" (${priority?.hint ?? ''}). Debe coincidir con lo que la persona ve en pantalla como siguiente paso; no abras con un saludo genérico que ignore eso.
 REGLA DE PRODUCTO: ya están en Etholys (NEXUS es parte de Etholys). NO digas "como en Etholys", "el mismo que en Etholys" ni contrapongas "aquí" frente a "Etholys".
-IMPORTANTE: Muchas pymes aún no tienen "propuesta de valor" clara; no la pidas como primera pregunta. La primera pregunta debe ser CONCRETA y fácil de responder (ej.: qué venden o entregan en la práctica, quién les paga y cómo, o un ejemplo reciente de cliente) — tú luego ayudarás a ordenar y a proponer borradores de propuesta/posicionamiento.
-Tu cometido: (1) saludo humano breve; (2) una frase: el diagnóstico guiado lo hacéis aquí, en esta conversación, pregunta a pregunta (el cuestionario por pantalla desde NEXUS es opcional si lo preferís); (3) primera pregunta solo anclada en la realidad cotidiana — PROHIBIDO abrir con "¿cuál es vuestra propuesta de valor?" u otra jerga de consultoría; (4) máximo 3–4 frases antes de la pregunta. Sin listas largas ni viñetas.`;
+IMPORTANTE: El diagnóstico NO es este chat. Indica en UNA frase que abran /hub/nexus/diagnosis (cuestionario por sector, 6 preguntas, IA breve al final). Este copiloto ayuda después con modelo, marca y prioridades — respuestas MÁXIMO 3 frases + UNA pregunta corta. Sin listas largas.`;
     }
     return `Genera la PRIMERA respuesta de la conversación, en español. Naturalidad breve (2–3 frases), encaja modelo/comercial/marca en modo diálogo si encaja el contexto del usuario; termina con UNA sola pregunta concreta. No pidas aún subir documentos.`;
   }
@@ -141,8 +140,7 @@ Tu cometido: (1) saludo humano breve; (2) una frase: el diagnóstico guiado lo h
       return `Generate ONLY the FIRST co-pilot message, in English.
 CONTEXT: NEXUS priority next step: "${priority.title}".${priority.hint ? ` (${priority.hint})` : ''} Match what the UI shows—no generic onboarding.
 PRODUCT: The user is already in the Etholys suite; NEXUS is part of Etholys. Do NOT say "like in Etholys" or "the same as in Etholys" as if Etholys were elsewhere.
-IMPORTANT: Many teams do not yet have a crisp "value proposition" — do NOT ask for it as the first question. The first question must be CONCRETE for anyone to answer (what you sell or deliver in a typical week, who pays you and how, one real customer story). You will help them shape value prop and structure LATER from what they say.
-Tasks: (1) brief warm greeting; (2) one sentence: guided diagnosis happens here, step by step (the on-screen form from NEXUS is optional); (3) first question = grounded in daily reality — FORBIDDEN first line: "What is your value proposition?" or similar consultant jargon; (4) max 4 short sentences before the question; no bullets.`;
+IMPORTANT: Diagnosis is NOT this chat. One sentence: open /hub/nexus/diagnosis (sector questionnaire, ~6 questions, short AI summary). This copilot helps later with model/brand — MAX 3 sentences + ONE short question. No long lists.`;
     }
     return `Generate the OPENING message only in English. Human, concise; end with ONE clear question aligned to discovering their business—not a robotic intro.`;
   }
@@ -150,8 +148,7 @@ Tasks: (1) brief warm greeting; (2) one sentence: guided diagnosis happens here,
     return `Gera APENAS a primeira mensagem do copiloto, em português do Brasil.
 CONTEXTO: o próximo passo prioritário no NEXUS é: "${priority?.title}".${priority?.hint ? ` (${priority.hint})` : ''} Alinha com o que a pessoa vê na coluna lateral; não abras com texto genérico que ignore isso.
 PRODUTO: a pessoa já está na suite Etholys; o NEXUS é um módulo do Etholys. PROIBIDO dizer "o mesmo que no Etholys" ou "como no Etholys" como se fossem sítios diferentes.
-IMPORTANTE: Muitos negócios ainda não têm "proposta de valor" clara — não peças isso na primeira pergunta. A primeira pergunta tem de ser CONCRETA (o que vendem/entregam na prática, quem paga, um exemplo real) — mais tarde ajudas a organizar e propor rascunhos de proposta ou posicionamento.
-Instruções: (1) saudação breve; (2) uma frase: o diagnóstico guiado faz-se **neste chat**, pergunta a pergunta (o questionário por ecrã no NEXUS é opcional); (3) primeira pergunta ancorada no dia a dia — PROIBIDO começar por "qual é a proposta de valor?" ou jargão parecido; (4) no máximo 3–4 frases antes da pergunta, sem listas.`;
+IMPORTANTE: O diagnóstico NÃO é este chat. Uma frase: abrir /hub/nexus/diagnosis (questionário por setor, ~6 perguntas, resumo IA curto). Este copiloto ajuda depois com modelo/marca — MÁXIMO 3 frases + UMA pergunta curta. Sem listas longas.`;
   }
   return `Gera SÓ a abertura em português do Brasil (PT-BR). Tom humano (2–3 frases); termina com UMA pergunta concreta sobre o negócio.`;
 }
