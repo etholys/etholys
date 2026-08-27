@@ -13,6 +13,7 @@ type Detail = {
   status: string;
   priority: string;
   dueDate: string | null;
+  startDate?: string | null;
   tags: unknown;
   assigneeId: string | null;
   groupId?: string | null;
@@ -155,6 +156,11 @@ export function WorkTaskPanel({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, completed: !completed }),
     });
+    await load();
+  };
+
+  const deleteChecklist = async (id: string) => {
+    await fetch(`/api/checklist?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
     await load();
   };
 
@@ -357,6 +363,35 @@ export function WorkTaskPanel({
                 className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs"
               />
             </label>
+            <label className="space-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                {t('Start', 'Inicio', 'Início')}
+              </span>
+              <input
+                type="date"
+                value={task.startDate ? String(task.startDate).slice(0, 10) : ''}
+                onChange={(e) => void patch({ startDate: e.target.value || null })}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                {t('Estimate (h)', 'Estimación (h)', 'Estimativa (h)')}
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="0.25"
+                value={task.estimatedHours ?? ''}
+                onChange={(e) =>
+                  void patch({
+                    estimatedHours: e.target.value === '' ? null : parseFloat(e.target.value),
+                  })
+                }
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs"
+                placeholder="0"
+              />
+            </label>
             <label className="col-span-2 space-y-1">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                 {t('Group', 'Grupo', 'Grupo')}
@@ -421,21 +456,49 @@ export function WorkTaskPanel({
           </label>
 
           <section>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-              {t('Checklist', 'Checklist', 'Checklist')}
-            </p>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                {t('Checklist', 'Checklist', 'Checklist')}
+              </p>
+              {(task.checklist || []).length > 0 && (
+                <span className="text-[10px] tabular-nums text-slate-400">
+                  {(task.checklist || []).filter((c) => c.completed).length}/{(task.checklist || []).length}
+                </span>
+              )}
+            </div>
+            {(task.checklist || []).length > 0 && (
+              <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-cyan-500 transition-all"
+                  style={{
+                    width: `${Math.round(
+                      ((task.checklist || []).filter((c) => c.completed).length /
+                        Math.max((task.checklist || []).length, 1)) *
+                        100,
+                    )}%`,
+                  }}
+                />
+              </div>
+            )}
             <ul className="space-y-1.5">
               {(task.checklist || []).map((s) => (
-                <li key={s.id} className="flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-slate-50">
+                <li key={s.id} className="group flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-slate-50">
                   <input
                     type="checkbox"
                     checked={s.completed}
                     onChange={() => void toggleChecklist(s.id, s.completed)}
                     className="h-4 w-4 rounded border-slate-300 text-cyan-600"
                   />
-                  <span className={`text-sm ${s.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                  <span className={`min-w-0 flex-1 text-sm ${s.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
                     {s.text}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => void deleteChecklist(s.id)}
+                    className="text-[10px] font-medium text-slate-300 opacity-0 hover:text-rose-600 group-hover:opacity-100"
+                  >
+                    ×
+                  </button>
                 </li>
               ))}
             </ul>

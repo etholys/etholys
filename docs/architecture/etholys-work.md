@@ -87,6 +87,7 @@ Relatórios de campo / quilometragem / informes doador → **SIEP-only** (não W
 | **F8** | Pastas pessoais / de equipa (`WorkFolder`) — qualquer membro cria e gere as suas | ✅ (ago/2026) |
 | **F9** | Vistas: Board, List, Kanban, Calendar, Timeline, Workload; URL `?nav=&view=`; My tasks | ✅ (ago/2026) |
 | **F10** | ACL pastas tipo Drive: privado por defeito; invite + roles `viewer`/`editor`; `assertTaskAccess` | ✅ (ago/2026) |
+| **F10b** | Bulk multi-select; schedule fields (start/estimate); calendar drag due; checklist delete/%; assign notify | ✅ (ago/2026) |
 | **F11** | Integrated Hub (entry unificada SIEP↔Work; setting empresa) | Planeado |
 
 ---

@@ -35,11 +35,13 @@ export function WorkCalendar({
   tasks,
   onSelect,
   onCreateDay,
+  onReschedule,
   t,
 }: {
   tasks: Task[];
   onSelect: (id: string) => void;
   onCreateDay?: (day: Date) => void;
+  onReschedule?: (taskId: string, day: Date) => void;
   t: (en: string, es: string, pt: string) => string;
 }) {
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
@@ -89,9 +91,9 @@ export function WorkCalendar({
           <h3 className="text-sm font-semibold capitalize text-slate-800">{monthLabel}</h3>
           <p className="text-[11px] text-slate-400">
             {t(
-              'Click a day to add · click a task to open',
-              'Clic en un día para añadir · clic en tarea para abrir',
-              'Clica num dia para criar · clica numa tarefa para abrir',
+              'Drag tasks to reschedule · + to add on a day',
+              'Arrastra tareas para reprogramar · + para añadir',
+              'Arrasta tarefas para remarcar · + para criar no dia',
             )}
           </p>
         </div>
@@ -144,6 +146,16 @@ export function WorkCalendar({
                 !inMonth && 'bg-slate-50/50',
                 isToday && 'bg-cyan-50/40',
               )}
+              onDragOver={(e) => {
+                if (!onReschedule) return;
+                e.preventDefault();
+              }}
+              onDrop={(e) => {
+                if (!onReschedule) return;
+                e.preventDefault();
+                const id = e.dataTransfer.getData('text/task-id');
+                if (id) onReschedule(id, day);
+              }}
             >
               <div className="mb-1 flex items-center justify-between">
                 <div
@@ -172,9 +184,14 @@ export function WorkCalendar({
                     <button
                       key={task.id}
                       type="button"
+                      draggable={Boolean(onReschedule)}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/task-id', task.id);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
                       onClick={() => onSelect(task.id)}
                       className={cn(
-                        'block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-medium leading-tight transition hover:ring-1 hover:ring-cyan-200',
+                        'block w-full cursor-grab truncate rounded px-1 py-0.5 text-left text-[10px] font-medium leading-tight transition hover:ring-1 hover:ring-cyan-200 active:cursor-grabbing',
                         st.bg,
                         st.text,
                       )}

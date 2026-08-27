@@ -51,6 +51,9 @@ export function WorkTableBoard({
   onSeedStarter,
   creatingGroup,
   seedingStarter,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
   t,
   statusLabel,
   priorityLabel,
@@ -70,6 +73,9 @@ export function WorkTableBoard({
   onSeedStarter: () => void;
   creatingGroup: boolean;
   seedingStarter: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+  onToggleSelectAll?: (ids: string[]) => void;
   t: (en: string, es: string, pt: string) => string;
   statusLabel: (s: string) => string;
   priorityLabel: (p: string) => string;
@@ -283,9 +289,25 @@ export function WorkTableBoard({
 
             {!isCollapsed && (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] border-collapse text-sm">
+                <table className="w-full min-w-[800px] border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                      {onToggleSelect && (
+                        <th className="w-8 px-2 py-2">
+                          <input
+                            type="checkbox"
+                            checked={
+                              section.tasks.length > 0 &&
+                              section.tasks.every((task) => selectedIds?.has(task.id))
+                            }
+                            onChange={() =>
+                              onToggleSelectAll?.(section.tasks.map((task) => task.id))
+                            }
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-cyan-600"
+                            onClick={cellStop}
+                          />
+                        </th>
+                      )}
                       <th className="w-8 px-1 py-2" />
                       <th className="w-[34%] px-3 py-2 font-semibold">{t('Task', 'Tarea', 'Tarefa')}</th>
                       <th className="w-[14%] px-2 py-2">{t('Status', 'Estado', 'Status')}</th>
@@ -298,6 +320,7 @@ export function WorkTableBoard({
                   <tbody>
                     {section.tasks.map((task) => {
                       const selected = selectedId === task.id;
+                      const multiSelected = selectedIds?.has(task.id);
                       const rowDrop =
                         dropTarget?.kind === 'row' &&
                         dropTarget.beforeTaskId === task.id &&
@@ -322,9 +345,19 @@ export function WorkTableBoard({
                           className={`group cursor-pointer border-b border-slate-50 transition ${
                             draggingId === task.id ? 'opacity-40' : ''
                           } ${rowDrop ? 'border-t-2 border-t-cyan-500' : ''} ${
-                            selected ? 'bg-cyan-50/70' : 'hover:bg-slate-50/80'
+                            selected || multiSelected ? 'bg-cyan-50/70' : 'hover:bg-slate-50/80'
                           }`}
                         >
+                          {onToggleSelect && (
+                            <td className="px-2 py-2" onClick={cellStop}>
+                              <input
+                                type="checkbox"
+                                checked={Boolean(multiSelected)}
+                                onChange={() => onToggleSelect(task.id)}
+                                className="h-3.5 w-3.5 rounded border-slate-300 text-cyan-600"
+                              />
+                            </td>
+                          )}
                           <td className="px-1 py-2" onClick={cellStop}>
                             <button
                               type="button"

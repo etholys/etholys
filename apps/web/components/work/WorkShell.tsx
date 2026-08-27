@@ -15,6 +15,7 @@ import { WorkWorkload } from './WorkWorkload';
 import { WorkTaskPanel } from './WorkTaskPanel';
 import { WorkFolderShareDialog } from './WorkFolderShareDialog';
 import { WorkQuickAdd } from './WorkQuickAdd';
+import { WORK_KANBAN, WORK_PRIORITIES } from './work-ui';
 import {
   Calendar,
   CalendarRange,
@@ -108,6 +109,8 @@ export default function WorkShell() {
   const [loadingDash, setLoadingDash] = useState(true);
   const [shareFolder, setShareFolder] = useState<{ id: string; name: string } | null>(null);
   const [query, setQuery] = useState('');
+  const [statusChip, setStatusChip] = useState('');
+  const [priorityChip, setPriorityChip] = useState('');
 
   const currentUserId = (session?.user as { id?: string } | undefined)?.id || null;
 
@@ -259,12 +262,14 @@ export default function WorkShell() {
       );
     }
     const q = query.trim().toLowerCase();
+    if (statusChip) list = list.filter((t: any) => t.status === statusChip);
+    if (priorityChip) list = list.filter((t: any) => t.priority === priorityChip);
     if (!q) return list;
     return list.filter((t: any) => {
       const hay = `${t.title || ''} ${t.assignee?.name || ''} ${t.status || ''} ${t.priority || ''}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [tasks, nav, currentUserId, query]);
+  }, [tasks, nav, currentUserId, query, statusChip, priorityChip]);
 
   const counts = useMemo(() => {
     const top = (tasks ?? []).filter((t: any) => !t.parentId);
@@ -355,6 +360,24 @@ export default function WorkShell() {
     if (!res.ok) throw new Error(data?.error || 'create failed');
     fetchAllTasks({ silent: true });
     if (data?.task?.id) setSelectedId(data.task.id);
+  };
+
+  const runBulk = async (ids: string[], patch: Record<string, unknown>) => {
+    await fetch('/api/tasks/bulk', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, patch }),
+    });
+    fetchAllTasks({ silent: true });
+  };
+
+  const rescheduleTask = async (taskId: string, day: Date) => {
+    await fetch(`/api/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dueDate: toDateInputValue(day) }),
+    });
+    fetchAllTasks({ silent: true });
   };
 
   const scopeProps =
@@ -483,6 +506,30 @@ export default function WorkShell() {
                   </button>
                 )}
               </div>
+              <select
+                value={statusChip}
+                onChange={(e) => setStatusChip(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-600"
+              >
+                <option value="">{t3('Any status', 'Cualquier estado', 'Qualquer estado')}</option>
+                {WORK_KANBAN.map((s) => (
+                  <option key={s} value={s}>
+                    {s.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={priorityChip}
+                onChange={(e) => setPriorityChip(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-600"
+              >
+                <option value="">{t3('Any priority', 'Cualquier prioridad', 'Qualquer prioridade')}</option>
+                {WORK_PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
         </div>
@@ -513,12 +560,15 @@ export default function WorkShell() {
                   const label = t3('New task', 'Nueva tarea', 'Nova tarefa');
                   void quickCreate(label, toDateInputValue(day));
                 }}
+                onReschedule={(id, day) => void rescheduleTask(id, day)}
                 t={t3}
               />
             ) : boardView === 'list' ? (
               <WorkList
                 tasks={scopedTasks}
+                users={users}
                 onSelect={setSelectedId}
+                onBulk={runBulk}
                 onToggleDone={async (id, next) => {
                   await fetch(`/api/tasks/${id}`, {
                     method: 'PUT',
@@ -542,7 +592,9 @@ export default function WorkShell() {
             ) : nav.kind === 'overdue' ? (
               <WorkList
                 tasks={scopedTasks}
+                users={users}
                 onSelect={setSelectedId}
+                onBulk={runBulk}
                 onToggleDone={async (id, next) => {
                   await fetch(`/api/tasks/${id}`, {
                     method: 'PUT',

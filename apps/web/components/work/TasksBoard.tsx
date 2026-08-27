@@ -6,6 +6,7 @@ import { cn, formatDate, getInitials, getPriorityColor, getStatusColor } from '@
 import { LayoutGrid, List, Plus, Search, X } from 'lucide-react';
 import { WorkTableBoard } from './WorkTableBoard';
 import { WorkTaskPanel } from './WorkTaskPanel';
+import { WorkBulkBar } from './WorkBulkBar';
 import { WORK_KANBAN, STARTER_GROUPS, parseTags } from './work-ui';
 
 type ML = { es: string; pt: string; en: string };
@@ -83,6 +84,8 @@ export default function TasksBoard({
   const [form, setForm] = useState({ ...emptyForm });
   const [kanbanDragId, setKanbanDragId] = useState<string | null>(null);
   const [kanbanDropCol, setKanbanDropCol] = useState<string | null>(null);
+  const [bulkIds, setBulkIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const [search, setSearch] = useState('');
   const [projectFilter, setProjectFilter] = useState(initialProjectId);
@@ -194,6 +197,44 @@ export default function TasksBoard({
       body: JSON.stringify(body),
     });
     notifyChanged();
+  };
+
+  const toggleBulk = (id: string) => {
+    setBulkIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleBulkSection = (ids: string[]) => {
+    setBulkIds((prev) => {
+      const next = new Set(prev);
+      const allOn = ids.length > 0 && ids.every((id) => next.has(id));
+      if (allOn) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const runBulk = async (patch: Record<string, unknown>) => {
+    if (bulkIds.size === 0) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch('/api/tasks/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [...bulkIds], patch }),
+      });
+      if (res.ok) {
+        setBulkIds(new Set());
+        fetchTasks({ silent: true });
+        notifyChanged();
+      }
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -580,7 +621,17 @@ export default function TasksBoard({
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-600/30 border-t-cyan-600" />
             </div>
           ) : view === 'table' ? (
-            <WorkTableBoard
+            <>
+              <WorkBulkBar
+                count={bulkIds.size}
+                users={users}
+                busy={bulkBusy}
+                onClear={() => setBulkIds(new Set())}
+                onSelectAll={() => setBulkIds(new Set(filtered.map((t: any) => t.id)))}
+                onBulk={runBulk}
+                t={t3}
+              />
+              <WorkTableBoard
               groups={groups}
               ungroupedTasks={ungroupedTasks}
               tasksByGroupId={tasksByGroupId}
@@ -596,10 +647,14 @@ export default function TasksBoard({
               onSeedStarter={seedStarterGroups}
               creatingGroup={creatingGroup}
               seedingStarter={seedingStarter}
+              selectedIds={bulkIds}
+              onToggleSelect={toggleBulk}
+              onToggleSelectAll={toggleBulkSection}
               t={t3}
               statusLabel={(s) => tr(`status.${s.toLowerCase()}`)}
               priorityLabel={(p) => tr(`priority.${p.toLowerCase()}`)}
             />
+            </>
           ) : (
             <div className="flex gap-3 overflow-x-auto pb-2">
               {WORK_KANBAN.map((col) => {

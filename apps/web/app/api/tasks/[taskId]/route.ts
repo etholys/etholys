@@ -9,6 +9,7 @@ import {
   canReadFolder,
   getFolderAccess,
 } from '@/lib/work/folder-access';
+import { notifyTaskAssigned } from '@/lib/work/task-notify';
 
 async function assertTaskAccess(
   taskId: string,
@@ -172,11 +173,23 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
     if (body.status === 'DONE') data.completedAt = new Date();
     else if (body.status !== undefined) data.completedAt = null;
 
+    const prevAssignee = task.assigneeId;
     const updated = await prisma.task.update({
       where: { id: params.taskId },
       data,
       include: detailInclude,
     });
+
+    if (body.assigneeId !== undefined) {
+      notifyTaskAssigned({
+        assigneeId: updated.assigneeId,
+        actorId: tenant.userId,
+        title: updated.title,
+        projectId: updated.projectId,
+        prevAssigneeId: prevAssignee,
+      });
+    }
+
     return NextResponse.json({ task: updated });
   } catch (error: unknown) {
     console.error('Update task error:', error);
