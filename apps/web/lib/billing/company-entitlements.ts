@@ -7,6 +7,7 @@ import {
   parseSystemsJson,
   type WorkspaceSystemKey,
 } from '@/lib/integrated-workspace-shared';
+import { getSku } from '@/lib/billing/catalog';
 
 export type CompanyEntitlementState = {
   /** null = sem subscrição registada (legado: todos os sistemas permitidos ao nível empresa). */
@@ -15,38 +16,96 @@ export type CompanyEntitlementState = {
   planCode: string | null;
   maxSeats: number | null;
   billingEnforced: boolean;
+  interval: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  addOnCodes: string[];
+  commissionCodes: string[];
+  licenseCodes: string[];
 };
 
 const ACTIVE_SUB_STATUSES = new Set(['ACTIVE', 'TRIALING']);
 
-export async function getCompanyEntitlements(companyId: string): Promise<CompanyEntitlementState> {
-  const sub = await prisma.companySubscription.findFirst({
-    where: { companyId, status: { in: [...ACTIVE_SUB_STATUSES] } },
-    orderBy: { updatedAt: 'desc' },
-    include: { plan: { select: { code: true, systems: true, maxSeats: true } } },
-  });
-
-  if (!sub) {
-    return {
-      licensedSystems: null,
-      subscriptionStatus: null,
-      planCode: null,
-      maxSeats: null,
-      billingEnforced: false,
-    };
-  }
-
-  const fromSub = normalizeSystemsInput(parseSystemsJson(sub.licensedSystems));
-  const fromPlan = sub.plan ? normalizeSystemsInput(parseSystemsJson(sub.plan.systems)) : [];
-  const licensedSystems = fromSub.length > 0 ? fromSub : fromPlan;
-
+function emptyState(): CompanyEntitlementState {
   return {
-    licensedSystems: licensedSystems.length > 0 ? licensedSystems : null,
-    subscriptionStatus: sub.status,
-    planCode: sub.plan?.code ?? null,
-    maxSeats: sub.maxSeats ?? sub.plan?.maxSeats ?? null,
-    billingEnforced: true,
+    licensedSystems: null,
+    subscriptionStatus: null,
+    planCode: null,
+    maxSeats: null,
+    billingEnforced: false,
+    interval: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    addOnCodes: [],
+    commissionCodes: [],
+    licenseCodes: [],
   };
+}
+
+export async function getCompanyEntitlements(companyId: string): Promise<CompanyEntitlementState> {
+  try {
+    const sub = await prisma.companySubscription.findFirst({
+      where: { companyId, status: { in: [...ACTIVE_SUB_STATUSES] } },
+      orderBy: { updatedAt: 'desc' },
+      include: { plan: { select: { code: true, systems: true, maxSeats: true } } },
+    });
+
+    let extras: { skuCode: string; kind: string; status: string; metadata: unknown }[] = [];
+    try {
+      extras = await prisma.companyEntitlement.findMany({
+        where: { companyId, status: 'ACTIVE' },
+        select: { skuCode: true, kind: true, status: true, metadata: true },
+      });
+    } catch {
+      extras = [];
+    }
+
+    const addOnCodes = extras.filter((e) => e.kind === 'addon').map((e) => e.skuCode);
+    const commissionCodes = extras.filter((e) => e.kind === 'commission').map((e) => e.skuCode);
+    const licenseCodes = extras.filter((e) => e.kind === 'license').map((e) => e.skuCode);
+
+    const extraSystems: WorkspaceSystemKey[] = [];
+    for (const e of extras) {
+      const sku = getSku(e.skuCode);
+      if (sku?.systems.length) extraSystems.push(...sku.systems);
+      const meta = e.metadata as { systems?: unknown } | null;
+      if (meta?.systems) extraSystems.push(...normalizeSystemsInput(meta.systems));
+    }
+
+    if (!sub) {
+      if (extras.length === 0) return emptyState();
+      const licensed = [...new Set(extraSystems)];
+      return {
+        ...emptyState(),
+        licensedSystems: licensed.length ? licensed : null,
+        billingEnforced: licensed.length > 0,
+        addOnCodes,
+        commissionCodes,
+        licenseCodes,
+      };
+    }
+
+    const fromSub = normalizeSystemsInput(parseSystemsJson(sub.licensedSystems));
+    const fromPlan = sub.plan ? normalizeSystemsInput(parseSystemsJson(sub.plan.systems)) : [];
+    const licensedSystems = [...new Set([...fromSub, ...fromPlan, ...extraSystems])];
+
+    return {
+      licensedSystems: licensedSystems.length > 0 ? licensedSystems : null,
+      subscriptionStatus: sub.status,
+      planCode: sub.plan?.code ?? null,
+      maxSeats: sub.maxSeats ?? sub.plan?.maxSeats ?? null,
+      billingEnforced: true,
+      interval: sub.interval ?? 'MONTH',
+      currentPeriodEnd: sub.currentPeriodEnd?.toISOString() ?? null,
+      cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+      addOnCodes,
+      commissionCodes,
+      licenseCodes,
+    };
+  } catch (e) {
+    console.error('[billing] getCompanyEntitlements', e);
+    return emptyState();
+  }
 }
 
 /** Intersect user/invite systems with o que a empresa contratou. */
@@ -100,4 +159,8 @@ export async function assertSeatAvailable(companyId: string): Promise<{ ok: true
 export function effectiveCompanyCatalog(entitlements: CompanyEntitlementState): WorkspaceSystemKey[] {
   if (entitlements.licensedSystems?.length) return entitlements.licensedSystems;
   return [...WORKSPACE_SYSTEM_KEYS];
+}
+
+export function companyHasAddon(entitlements: CompanyEntitlementState, skuCode: string): boolean {
+  return entitlements.addOnCodes.includes(skuCode);
 }

@@ -18,6 +18,7 @@ else
   docker cp "$WEB/scripts/seed-billing.ts" etholys-web-prod:/app/scripts/seed-billing.ts
   docker cp "$WEB/lib/billing" etholys-web-prod:/app/lib/billing
   docker cp "$WEB/lib/sandbox" etholys-web-prod:/app/lib/sandbox
+  docker cp "$WEB/lib/integrated-workspace-shared.ts" etholys-web-prod:/app/lib/integrated-workspace-shared.ts
   docker exec -e DATABASE_URL="$DATABASE_URL" -w /app etholys-web-prod \
     npx tsx scripts/seed-billing.ts
 fi

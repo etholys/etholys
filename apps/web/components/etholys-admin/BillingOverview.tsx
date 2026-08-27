@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CreditCard, Layers, Users } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, CreditCard, Layers, Users } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import type { WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
 
@@ -107,11 +108,18 @@ export function BillingOverview({ companyId }: { companyId: string | null }) {
         {state.stripeConnected
           ? t('Pagamentos ligados.', 'Pagos conectados.', 'Payments connected.')
           : t(
-              'Base de faturação preparada. Checkout Stripe e webhooks entram na fase seguinte — convites e acessos já respeitam o catálogo licenciado.',
-              'Base de facturación lista. Checkout Stripe y webhooks en la siguiente fase — invitaciones y accesos ya respetan el catálogo licenciado.',
-              'Billing foundation ready. Stripe checkout and webhooks come next — invites and access already respect the licensed catalog.',
+              'Contrate pacotes, sistemas, add-ons e regras de comissão. As faturas nascem no contrato; a renovação é automática.',
+              'Contrate paquetes, sistemas, add-ons y reglas de comisión. Las facturas nacen al contratar; la renovación es automática.',
+              'Hire packs, systems, add-ons, and commission rules. Invoices are created on contract; renewal is automatic.',
             )}
       </p>
+      <Link
+        href="/hub/billing"
+        className="inline-flex items-center gap-1 text-sm font-medium text-teal-700 hover:underline"
+      >
+        {t('Abrir loja de licenças', 'Abrir tienda de licencias', 'Open license store')}
+        <ArrowRight className="h-4 w-4" />
+      </Link>
     </div>
   );
 }
