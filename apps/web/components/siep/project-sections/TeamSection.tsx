@@ -26,6 +26,7 @@ import {
 } from '@/lib/siep/permissions-shared';
 import { useApp } from '@/app/providers';
 import { useSiepT } from '@/lib/siep/use-siep-t';
+import { EtholysInviteWizard } from '@/components/etholys-invite/EtholysInviteWizard';
 
 type AddMode = 'company' | 'guest';
 
@@ -426,38 +427,59 @@ export function TeamSection({ project, onRefresh, tr }: SectionProps) {
         </div>
       )}
 
-      {showForm && (
+      {showForm && addMode === 'guest' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowForm(false)}>
+          <div
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b p-5">
+              <h2 className="text-lg font-semibold">Invitar aliado al proyecto</h2>
+              <button type="button" onClick={() => setShowForm(false)}>
+                <X className="h-5 w-5 text-gray-400" />
+              </button>
+            </div>
+            <div className="p-5">
+              {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+              {inviteInfo && <p className="mb-3 text-sm text-teal-800">{inviteInfo}</p>}
+              <EtholysInviteWizard
+                context="siep_project"
+                companies={[{ id: project.companyId, name: project.company?.name || project.companyId }]}
+                defaultCompanyId={project.companyId}
+                defaultProjectId={project.id}
+                defaultProjectName={project.name}
+                lockCompany
+                lockAlly
+                onCancel={() => setShowForm(false)}
+                onSuccess={({ code, alreadyAccepted, email }) => {
+                  setInviteInfo(
+                    alreadyAccepted
+                      ? `Acceso asignado a ${email}.`
+                      : `Invitado: ${email}. Código: ${code || '—'}`,
+                  );
+                  setShowForm(false);
+                  onRefresh();
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showForm && addMode === 'company' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowForm(false)}>
           <div
             className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b p-5">
-              <h2 className="text-lg font-semibold">
-                {addMode === 'guest' ? 'Agregar aliado / temporal' : 'Agregar miembro de la empresa'}
-              </h2>
+              <h2 className="text-lg font-semibold">Agregar miembro de la empresa</h2>
               <button onClick={() => setShowForm(false)}>
                 <X className="h-5 w-5 text-gray-400" />
               </button>
             </div>
             <form onSubmit={addMember} className="space-y-4 p-5">
-              {addMode === 'guest' ? (
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Email del aliado *</label>
-                  <input
-                    type="email"
-                    required
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="w-full rounded-lg border px-3 py-2 text-sm"
-                    placeholder="persona@organizacion.org"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    No necesita pertenecer a la empresa. Quedará vinculado solo a este proyecto.
-                  </p>
-                </div>
-              ) : (
-                <div>
+              <div>
                   <label className="mb-1 block text-sm font-medium">Usuario *</label>
                   <select
                     required
@@ -473,7 +495,6 @@ export function TeamSection({ project, onRefresh, tr }: SectionProps) {
                     ))}
                   </select>
                 </div>
-              )}
 
               <div>
                 <label className="mb-1 block text-sm font-medium">Rol en el proyecto</label>
@@ -533,7 +554,7 @@ export function TeamSection({ project, onRefresh, tr }: SectionProps) {
                   disabled={saving || selectedPerms.length === 0}
                   className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {saving ? 'Guardando…' : addMode === 'guest' ? 'Invitar al proyecto' : tr('general.create')}
+                  {saving ? 'Guardando…' : tr('general.create')}
                 </button>
               </div>
             </form>

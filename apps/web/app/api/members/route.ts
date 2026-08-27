@@ -124,6 +124,7 @@ export async function POST(req: Request) {
           email: normalizedEmail,
           role: 'COLLABORATOR',
           invitedBy: tenant.userId,
+          inviteKind: 'ally',
           systems: ['SIEP'],
           projectId,
           accessMode: 'project_guest',

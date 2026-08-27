@@ -285,16 +285,22 @@ model Department {
 }
 
 model CompanyUser {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   userId          String
   companyId       String
-  role            UserRole @default(COLLABORATOR)
-  isDefault       Boolean  @default(false)
+  role            UserRole  @default(COLLABORATOR)
+  isDefault       Boolean   @default(false)
+  /// Cargo / título funcional (ex.: Coordenador financeiro) — distinto do UserRole
+  jobTitle        String?
+  /// employee | temporary — espelho do convite (aliado não cria CompanyUser)
+  inviteKind      String?
+  /// Fim de acesso para temporários
+  accessUntil     DateTime?
   /// Permissões SIEP granulares (array JSON de chaves — ver lib/siep/permissions.ts)
   siepPermissions Json?
-  createdAt       DateTime @default(now())
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, companyId])
 }
@@ -951,14 +957,22 @@ model Invitation {
   code       String    @unique @default(cuid())
   invitedBy  String
   status     String    @default("pending")
+  /// employee | temporary | ally
+  inviteKind String    @default("employee")
+  /// Cargo / título (funcionário / temporário)
+  jobTitle   String?
+  /// Fim de acesso (temporário) — distinto de expiresAt do código
+  accessUntil DateTime?
   /// JSON: ["SIEP","ATLAS",…] — convite só a funções; null = legado
   systems    Json?
-  /// Se definido: convite só a este projeto (aliado / temporário)
+  /// Se definido: convite só a este projeto (aliado)
   projectId  String?
   /// company | project_guest
   accessMode String    @default("company")
-  /// Permissões SIEP do projeto (JSON array) — usado com project_guest
+  /// Permissões SIEP do projeto (JSON array) — usado com project_guest / aliado
   projectPermissions Json?
+  /// Permissões SIEP a nível empresa (funcionário / temporário com SIEP)
+  companySiepPermissions Json?
   expiresAt  DateTime?
   acceptedAt DateTime?
   createdAt  DateTime  @default(now())

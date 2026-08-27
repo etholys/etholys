@@ -23,6 +23,9 @@ import {
   LayoutGrid,
   ArrowRight,
 } from 'lucide-react';
+import { EtholysInviteWizard } from '@/components/etholys-invite/EtholysInviteWizard';
+import { inviteKindLabel, isInviteKind } from '@/lib/etholys-invite';
+import type { Locale } from '@/lib/i18n';
 
 export type SettingsSection =
   | 'profile'
@@ -82,8 +85,8 @@ export function EtholysSettingsContent({
     permissions: '',
   });
   const [showInviteForm, setShowInviteForm] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ companyId: '', email: '', role: 'COLLABORATOR' });
   const [copiedCode, setCopiedCode] = useState('');
+  const [inviteFlash, setInviteFlash] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState({ name: '', phone: '', currentPassword: '', newPassword: '' });
   const [profileMsg, setProfileMsg] = useState('');
@@ -295,24 +298,6 @@ export function EtholysSettingsContent({
     fetchData();
   };
 
-  const handleSendInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    const res = await fetch('/api/invitations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(inviteForm),
-    });
-    if (res.ok) {
-      setShowInviteForm(false);
-      setInviteForm({ companyId: '', email: '', role: 'COLLABORATOR' });
-      fetchData();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      alert(data?.error || 'Error al enviar invitación');
-    }
-    setSaving(false);
-  };
   const handleRevokeInvite = async (id: string) => {
     if (!confirm('¿Revocar esta invitación?')) return;
     await fetch(`/api/invitations?id=${id}`, { method: 'DELETE' });
@@ -564,7 +549,7 @@ export function EtholysSettingsContent({
               type="button"
               onClick={() => {
                 setShowInviteForm(true);
-                setInviteForm({ companyId: companies[0]?.id || '', email: '', role: 'COLLABORATOR' });
+                setInviteFlash(null);
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition ${btnSoft}`}
             >
@@ -572,30 +557,33 @@ export function EtholysSettingsContent({
               Invitar miembro
             </button>
           </div>
+          {inviteFlash && (
+            <p className="mb-3 text-sm text-teal-800 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2">
+              {inviteFlash}
+            </p>
+          )}
           {showInviteForm && (
-            <form onSubmit={handleSendInvite} className="mb-4 p-4 border rounded-lg space-y-3">
-              <select required value={inviteForm.companyId} onChange={(e) => setInviteForm({ ...inviteForm, companyId: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm">
-                <option value="">Seleccionar empresa...</option>
-                {companies.map((c: any) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              <input required type="email" placeholder="Email" value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm" />
-              <select value={inviteForm.role} onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm">
-                <option value="COLLABORATOR">Colaborador</option>
-                <option value="TECHNICIAN">Técnico</option>
-                <option value="PROJECT_MANAGER">Gerente de Proyecto</option>
-                <option value="ADMIN">Administrador</option>
-              </select>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowInviteForm(false)} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-                  {tr('general.cancel')}
-                </button>
-                <button type="submit" disabled={saving} className={`px-3 py-1.5 text-sm text-white rounded-lg ${btn}`}>
-                  Enviar
-                </button>
-              </div>
-            </form>
+            <div className="mb-4">
+              <EtholysInviteWizard
+                context="admin"
+                companies={companies.map((c: any) => ({
+                  id: c.id,
+                  name: c.name,
+                  shortName: c.shortName,
+                }))}
+                defaultCompanyId={companies[0]?.id}
+                onCancel={() => setShowInviteForm(false)}
+                onSuccess={({ code, alreadyAccepted, email }) => {
+                  setShowInviteForm(false);
+                  setInviteFlash(
+                    alreadyAccepted
+                      ? `Acceso asignado a ${email}.`
+                      : `Invitación enviada a ${email}. Código: ${code || '—'}`,
+                  );
+                  fetchData();
+                }}
+              />
+            </div>
           )}
           <div className="space-y-2">
             {invitations.map((inv: any) => (
@@ -603,7 +591,16 @@ export function EtholysSettingsContent({
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900 text-sm">{inv.email}</p>
                   <p className="text-xs text-gray-500">
-                    {inv.company?.shortName} · <span className="font-mono">{inv.code}</span>
+                    {inv.company?.shortName}
+                    {inv.inviteKind && isInviteKind(inv.inviteKind)
+                      ? ` · ${inviteKindLabel(inv.inviteKind, (locale as Locale) || 'es')}`
+                      : ''}
+                    {inv.jobTitle ? ` · ${inv.jobTitle}` : ''}
+                    {' · '}
+                    <span className="font-mono">{inv.code}</span>
+                    {Array.isArray(inv.systems) && inv.systems.length > 0
+                      ? ` · ${inv.systems.join(', ')}`
+                      : ''}
                   </p>
                 </div>
                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${statusColors[inv.status] || ''}`}>

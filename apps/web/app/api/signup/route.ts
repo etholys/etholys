@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { isPrecommercialMode } from '@/lib/platform-access';
 import { normalizeSystemsInput, parseSystemsJson } from '@/lib/integrated-workspace-shared';
+import { applyAcceptedInvitation, invitationRowToApplyOpts } from '@/lib/etholys-invite-apply';
 
 export async function POST(req: Request) {
   try {
@@ -25,19 +26,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const existing = await prisma.user.findUnique({ where: { email: String(email).trim().toLowerCase() } });
+    const existing = await prisma.user.findUnique({
+      where: { email: String(email).trim().toLowerCase() },
+    });
     if (existing) {
       return NextResponse.json({ error: 'El email ya está registrado' }, { status: 400 });
     }
 
-    let invitation: {
-      id: string;
-      companyId: string;
-      role: string;
-      status: string;
-      expiresAt: Date | null;
-      systems?: unknown;
-    } | null = null;
+    let invitation: Awaited<ReturnType<typeof prisma.invitation.findUnique>> = null;
 
     if (code) {
       invitation = await prisma.invitation.findUnique({ where: { code } });
@@ -60,76 +56,8 @@ export async function POST(req: Request) {
     });
 
     if (invitation) {
-      const inviteFull = await prisma.invitation.findUnique({ where: { id: invitation.id } });
-      const isProjectGuest =
-        inviteFull?.accessMode === 'project_guest' && Boolean(inviteFull.projectId);
-
-      if (isProjectGuest && inviteFull?.projectId) {
-        // Project-only guest: no CompanyUser
-        await prisma.projectMember.upsert({
-          where: {
-            projectId_userId: { projectId: inviteFull.projectId, userId: user.id },
-          },
-          update: {
-            accessMode: 'project_guest',
-            status: 'active',
-            permissions: (inviteFull.projectPermissions as any) ?? undefined,
-          },
-          create: {
-            projectId: inviteFull.projectId,
-            userId: user.id,
-            role: 'aliado',
-            accessMode: 'project_guest',
-            status: 'active',
-            permissions: (inviteFull.projectPermissions as any) ?? undefined,
-          },
-        });
-
-        const systemsRaw = normalizeSystemsInput(parseSystemsJson(invitation.systems));
-        const systems = systemsRaw.length > 0 ? systemsRaw : ['SIEP'];
-        await prisma.integratedWorkspaceAccess.create({
-          data: {
-            companyId: invitation.companyId,
-            userId: user.id,
-            systems: systems as unknown as import('@prisma/client').Prisma.InputJsonValue,
-            enabled: true,
-          },
-        });
-      } else {
-        await prisma.companyUser.create({
-          data: {
-            userId: user.id,
-            companyId: invitation.companyId,
-            role: invitation.role as 'COLLABORATOR' | 'ADMIN' | 'PROJECT_MANAGER' | 'TECHNICIAN',
-          },
-        });
-
-        const systems = normalizeSystemsInput(parseSystemsJson(invitation.systems));
-        if (systems.length > 0) {
-          await prisma.integratedWorkspaceAccess.create({
-            data: {
-              companyId: invitation.companyId,
-              userId: user.id,
-              systems: systems as unknown as import('@prisma/client').Prisma.InputJsonValue,
-              enabled: true,
-            },
-          });
-        } else if (isPrecommercialMode()) {
-          await prisma.integratedWorkspaceAccess.create({
-            data: {
-              companyId: invitation.companyId,
-              userId: user.id,
-              systems: [] as unknown as import('@prisma/client').Prisma.InputJsonValue,
-              enabled: false,
-            },
-          });
-        }
-      }
-
-      await prisma.invitation.update({
-        where: { id: invitation.id },
-        data: { status: 'accepted', acceptedAt: new Date() },
-      });
+      const systems = normalizeSystemsInput(parseSystemsJson(invitation.systems));
+      await applyAcceptedInvitation(invitationRowToApplyOpts(invitation, user.id, systems));
     }
 
     return NextResponse.json({ success: true, userId: user.id });
