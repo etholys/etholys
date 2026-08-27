@@ -20,8 +20,6 @@ import {
   type IncubationDiagnosisSnapshot,
 } from '@/lib/nexus-incubation-run';
 
-export const normalizeIncubationProgram = normalizeProgram;
-
 type PlanItem = {
   id?: string;
   title: string;
