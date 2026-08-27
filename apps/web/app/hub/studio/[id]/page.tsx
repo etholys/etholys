@@ -147,6 +147,7 @@ export default function StudioDocumentPage() {
   const [lastEditedAt, setLastEditedAt] = useState<string | null>(null);
   const [molds, setMolds] = useState<MoldRow[]>([]);
   const [showMolds, setShowMolds] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [commentBlockId, setCommentBlockId] = useState<string | null>(null);
   const [openCommentCount, setOpenCommentCount] = useState(0);
@@ -736,6 +737,50 @@ export default function StudioDocumentPage() {
       void loadActivity();
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Erro');
+    }
+  }
+
+  async function saveAsCompanyTemplate() {
+    if (!canvasRef.current || !companyId || !canEdit) return;
+    const name = window.prompt(
+      t(
+        'Nome da plantilla da empresa',
+        'Nombre de la plantilla de la empresa',
+        'Company template name',
+      ),
+      title || t('Minha plantilla', 'Mi plantilla', 'My template'),
+    );
+    if (!name?.trim()) return;
+    setSavingTemplate(true);
+    try {
+      if (dirty) await persistCanvas({ quiet: true, forceSnap: canvasRef.current });
+      const r = await fetch('/api/studio/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          name: name.trim(),
+          canvasState: canvasRef.current,
+          description: t(
+            'Pré-estrutura reutilizável (layout Design + texto).',
+            'Preestructura reutilizable (layout Diseño + texto).',
+            'Reusable pre-structure (Design layout + text).',
+          ),
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error);
+      alert(
+        t(
+          'Plantilla guardada. Aparece em Criar → As nossas.',
+          'Plantilla guardada. Aparece en Crear → Las nuestras.',
+          'Template saved. It appears under Create → Ours.',
+        ),
+      );
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setSavingTemplate(false);
     }
   }
 
@@ -1398,6 +1443,26 @@ export default function StudioDocumentPage() {
           >
             <LayoutTemplate className="h-4 w-4" />
           </button>
+          {canEdit && companyId && (
+            <button
+              type="button"
+              disabled={savingTemplate}
+              onClick={() => void saveAsCompanyTemplate()}
+              title={t(
+                'Guardar como plantilla da empresa',
+                'Guardar como plantilla de la empresa',
+                'Save as company template',
+              )}
+              className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-40"
+            >
+              {savingTemplate ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <BookMarked className="h-3.5 w-3.5" />
+              )}
+              {t('Plantilla', 'Plantilla', 'Template')}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowLinks(true)}

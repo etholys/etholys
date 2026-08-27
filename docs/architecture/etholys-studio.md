@@ -79,6 +79,9 @@ flowchart LR
 - **`StudioDocumentComment`:** comentários no documento ou num bloco (`blockId`); resolver/reabrir; API `/api/studio/documents/[id]/comments`.  
 - **`StudioDocumentPresence`:** quem está a ver/editar (heartbeat ~12s, TTL 45s). API `/api/studio/documents/[id]/presence`. Sync suave: se o doc local não está dirty, aplica a versão remota; senão mostra banner. Auto-guardar silencioso aos 8s (`quiet` + sem snapshot).  
 - **Templates por domínio:** `domain` em `STUDIO_SYSTEM_TEMPLATES` (general/siep/fundhub/meet/forge/atlas/nexus) — filtro na biblioteca.  
+- **Galeria Criar (estilo Canva):** modal único com sidebar por tipo (`docs` / `proposals` / `presentations` / `letters` / `company`) + **tamanho livre** + **subir** PDF/DOCX/TXT. Templates de sistema já vêm com layout Design (posições %) e texto placeholder visível — não abrem “folha em branco”.  
+- **Plantillas da empresa:** `StudioTemplate` (`isSystem=false`); no editor **«Plantilla»** grava o `canvasState` actual; reaparecem em Criar → «As nossas».  
+- **IA — um copiloto, herança de contexto (não árvore de agentes):** o mesmo agente Studio; contexto herda pasta → documento (`StudioContextAsset` + brand + links). Novas páginas (manual ou via IA de diagramação) devem seguir o padrão de layout das páginas do template activo — sem UI de “multi-agentes”.  
 - **`EtholysDocumentLink`:** vínculo persistente Studio/Core → sistema+entidade (NEXUS AT, SIEP, FUNDHUB, empresa…). A IA usa os vínculos sem consentimento de catálogo. API `/api/document-links`.  
 - **Brand kit:** `AiCompanyMemory` category `studio_brand` + fallback `Company.logo` / `Company.color`
 
@@ -112,8 +115,9 @@ API: `POST /api/studio/documents/[id]/export` com `{ format: "pdf" | "docx" }`.
 | Área | Path |
 |------|------|
 | UI Hub | `apps/web/app/hub/studio/` |
+| Galeria Criar | `apps/web/components/studio/StudioCreateGallery.tsx` |
 | Hot button | `apps/web/components/studio/StudioHotButton.tsx` |
-| APIs | `apps/web/app/api/studio/` |
+| APIs | `apps/web/app/api/studio/` (incl. `templates`, `documents/from-file`) |
 | Lib | `apps/web/lib/studio/` |
 | Import F3 | `apps/web/lib/studio/import-from.ts`, `POST /api/studio/import` |
 | Prisma | `StudioFolder`, `StudioDocument`, `StudioTemplate`, `StudioContextAsset` |

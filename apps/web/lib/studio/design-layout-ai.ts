@@ -65,7 +65,8 @@ ${opts.styleBrief || '(moderno, limpo, institucional)'}
 6. Máximo 8 páginas. Densidade equilibrada (não folhas quase vazias).
 7. Em cada bloco podes incluir layout livre (Canva-like) em % da folha:
    "layout": { "xPct": 6, "yPct": 12, "wPct": 88 }
-8. Responde **só JSON** válido:
+8. Se o documento já tiver páginas com layout Design (posições %), **mantém o ritmo visual** (margens, escalas, molduras) ao criar páginas novas — não inventes um estilo paralelo.
+9. Responde **só JSON** válido:
 {
   "message": "resumo curto do que fizeste",
   "pages": [

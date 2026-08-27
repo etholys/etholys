@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import { STUDIO_SYSTEM_TEMPLATES, serializeStudioTemplate } from '@/lib/studio/templates';
+import { STUDIO_SYSTEM_TEMPLATES, galleryKindForFormat, serializeStudioTemplate } from '@/lib/studio/templates';
 import { createStudioDocument } from '@/lib/studio/create-document';
-import { normalizeStudioCanvas } from '@/lib/studio/types';
+import { isStudioPageSize, normalizeStudioCanvas } from '@/lib/studio/types';
 import { getDocumentAccess, getFolderAccess, listActiveStudioShareTargets } from '@/lib/studio/share';
 import {
   canCreateStudioContent,
@@ -338,6 +338,31 @@ export async function GET(req: NextRequest) {
     }
 
     const templates = STUDIO_SYSTEM_TEMPLATES.map(serializeStudioTemplate);
+    try {
+      const companyTpls = await prisma.studioTemplate.findMany({
+        where: { companyId: resolvedCompanyId, isSystem: false },
+        orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }],
+      });
+      for (const r of companyTpls) {
+        templates.push({
+          key: r.key,
+          format: r.format as never,
+          domain: 'general',
+          galleryKind: galleryKindForFormat(r.format as never),
+          nameEs: r.nameEs,
+          namePt: r.namePt,
+          nameEn: r.nameEn,
+          descriptionEs: r.descriptionEs || '',
+          descriptionPt: r.descriptionPt || '',
+          descriptionEn: r.descriptionEn || '',
+          sortOrder: r.sortOrder,
+          isSystem: false,
+          isCompany: true,
+        } as ReturnType<typeof serializeStudioTemplate> & { isCompany: boolean });
+      }
+    } catch {
+      // tabela pode não existir ainda
+    }
 
     return NextResponse.json({
       companyId: resolvedCompanyId,
@@ -386,6 +411,9 @@ export async function POST(req: NextRequest) {
     title: typeof body.title === 'string' ? body.title : undefined,
     templateKey: typeof body.templateKey === 'string' ? body.templateKey : undefined,
     format: typeof body.format === 'string' ? body.format : null,
+    pageSize: typeof body.pageSize === 'string' && isStudioPageSize(body.pageSize) ? body.pageSize : null,
+    studioMode:
+      body.studioMode === 'write' || body.studioMode === 'design' ? body.studioMode : null,
     canvasState,
   });
 
