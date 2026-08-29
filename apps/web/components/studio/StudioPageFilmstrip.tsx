@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { Plus } from 'lucide-react';
 import type { StudioPage } from '@/lib/studio/types';
 
@@ -30,6 +31,11 @@ export function StudioPageFilmstrip({
   const sorted = pages.slice().sort((a, b) => a.order - b.order);
   const activeIdx = sorted.findIndex((p) => p.id === activePageId);
   const isWrite = variant === 'write';
+  const activeThumbRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    activeThumbRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [activePageId]);
 
   const shell = isWrite
     ? 'border-t border-stone-300/80 bg-[#f0ebe3]'
@@ -68,6 +74,7 @@ export function StudioPageFilmstrip({
           return (
             <button
               key={page.id}
+              ref={active ? activeThumbRef : undefined}
               type="button"
               onClick={() => onSelect(page.id)}
               className={`group shrink-0 rounded-lg border transition ${
