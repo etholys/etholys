@@ -10,8 +10,10 @@ import {
 } from '@/lib/studio/access';
 import { recordStudioActivity, truncatePreview } from '@/lib/studio/activity';
 import { buildStudioSystemPrompt, parseStudioCopilotJson } from '@/lib/studio/agent';
+import { shouldTrustClientStudioCanvas } from '@/lib/studio/document-scope';
 import {
   applyStudioCanvasPatches,
+  normalizeStudioCanvas,
   sanitizeStudioCanvasPatches,
   type StudioCanvasState,
 } from '@/lib/studio/types';
@@ -54,6 +56,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const message = typeof body.message === 'string' ? body.message.trim() : '';
   if (!message) return NextResponse.json({ error: 'Message required' }, { status: 400 });
 
+  if (typeof body.documentId === 'string' && body.documentId !== doc.id) {
+    return NextResponse.json({ error: 'Document mismatch' }, { status: 400 });
+  }
+
   const locale = typeof body.locale === 'string' ? body.locale : 'pt';
   const approvedSources = Array.isArray(body.approvedSources)
     ? body.approvedSources.filter((s): s is string => typeof s === 'string')
@@ -67,9 +73,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       ? [body.targetBlockId]
       : [];
 
-  let canvas = doc.canvasState as StudioCanvasState;
+  let canvas = normalizeStudioCanvas(doc.canvasState) as StudioCanvasState;
   if (body.canvasState && typeof body.canvasState === 'object') {
-    canvas = body.canvasState as StudioCanvasState;
+    const clientDirty = body.clientDirty === true;
+    const clientRevision =
+      typeof body.clientRevision === 'string' ? body.clientRevision : null;
+    if (
+      shouldTrustClientStudioCanvas(clientDirty, clientRevision, doc.updatedAt)
+    ) {
+      canvas = body.canvasState as StudioCanvasState;
+    }
   }
 
   let aiSessionId = doc.aiSessionId;

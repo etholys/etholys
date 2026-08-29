@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
@@ -98,6 +98,7 @@ import {
   type StudioOverflowInfo,
 } from '@/lib/studio/paginate';
 import { defaultTableMarkdown } from '@/lib/studio/table-markdown';
+import { shouldApplyStudioDocumentFetch } from '@/lib/studio/document-scope';
 
 type ChatMsg = {
   id: string;
@@ -203,6 +204,9 @@ export default function StudioDocumentPage() {
       : `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   );
   const knownUpdatedAt = useRef<string | null>(null);
+  /** Bumped on every [id] change — stale fetches must not mutate state. */
+  const docEpochRef = useRef(0);
+  const activeDocIdRef = useRef<string | null>(null);
   const selfUserIdRef = useRef<string | null>(null);
   const dirtyRef = useRef(false);
   const canvasRef = useRef<StudioCanvasState | null>(null);
@@ -228,6 +232,32 @@ export default function StudioDocumentPage() {
   useEffect(() => {
     titleRef.current = title;
   }, [title]);
+
+  useLayoutEffect(() => {
+    docEpochRef.current += 1;
+    activeDocIdRef.current = null;
+    setLoading(true);
+    setError(null);
+    setTitle('');
+    setCanvas(null);
+    canvasRef.current = null;
+    dirtyRef.current = false;
+    knownUpdatedAt.current = null;
+    setDirty(false);
+    setMessages([]);
+    setVersions([]);
+    setActivities([]);
+    setConsent(null);
+    setPendingPrompt(null);
+    setAiTargetBlockIds([]);
+    setUndoStack([]);
+    setRedoStack([]);
+    setShowHistory(false);
+    setRemoteUpdate(null);
+    setOpenCommentCount(0);
+    setInput('');
+    setPendingFiles([]);
+  }, [id]);
 
   const appendDictation = useCallback((text: string) => {
     const chunk = text.trim();
@@ -396,16 +426,22 @@ export default function StudioDocumentPage() {
   }, [canvas]);
 
   const loadVersions = useCallback(async () => {
-    const r = await fetch(`/api/studio/documents/${id}/versions`, { cache: 'no-store' });
+    const docId = id;
+    const epoch = docEpochRef.current;
+    const r = await fetch(`/api/studio/documents/${docId}/versions`, { cache: 'no-store' });
     if (!r.ok) return;
     const d = await r.json();
+    if (!shouldApplyStudioDocumentFetch(docId, id, epoch, docEpochRef.current)) return;
     setVersions(d.versions || []);
   }, [id]);
 
   const loadActivity = useCallback(async () => {
-    const r = await fetch(`/api/studio/documents/${id}/activity`, { cache: 'no-store' });
+    const docId = id;
+    const epoch = docEpochRef.current;
+    const r = await fetch(`/api/studio/documents/${docId}/activity`, { cache: 'no-store' });
     if (!r.ok) return;
     const d = await r.json();
+    if (!shouldApplyStudioDocumentFetch(docId, id, epoch, docEpochRef.current)) return;
     setActivities(d.activities || []);
     const ub = d.document?.updatedBy;
     if (ub) setLastEditedBy(ub.name?.trim() || ub.email || null);
@@ -455,12 +491,15 @@ export default function StudioDocumentPage() {
 
   const load = useCallback(async () => {
     if (!id) return;
+    const docId = id;
+    const epoch = docEpochRef.current;
     setLoading(true);
     setError(null);
     try {
       const q = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
-      const r = await fetch(`/api/studio/documents/${id}${q}`);
+      const r = await fetch(`/api/studio/documents/${docId}${q}`);
       const d = await r.json();
+      if (!shouldApplyStudioDocumentFetch(docId, id, epoch, docEpochRef.current)) return;
       if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
       setTitle(d.document.title);
       const c0 = normalizeStudioCanvas(d.document.canvasState);
@@ -500,9 +539,9 @@ export default function StudioDocumentPage() {
       }
 
       const mr = await fetch(
-        `/api/studio/documents/${id}/copilot${companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''}`,
+        `/api/studio/documents/${docId}/copilot${companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''}`,
       );
-      if (mr.ok) {
+      if (shouldApplyStudioDocumentFetch(docId, id, epoch, docEpochRef.current) && mr.ok) {
         const md = await mr.json();
         setMessages(
           (md.messages || []).map(
@@ -525,8 +564,9 @@ export default function StudioDocumentPage() {
       void loadVersions();
       void loadActivity();
       void loadMolds();
-      fetch(`/api/studio/documents/${id}/comments`, { cache: 'no-store' })
+      fetch(`/api/studio/documents/${docId}/comments`, { cache: 'no-store' })
         .then(async (cr) => {
+          if (!shouldApplyStudioDocumentFetch(docId, id, epoch, docEpochRef.current)) return;
           if (!cr.ok) return;
           const cd = await cr.json();
           setOpenCommentCount(
@@ -536,10 +576,14 @@ export default function StudioDocumentPage() {
           );
         })
         .catch(() => {});
+      activeDocIdRef.current = docId;
     } catch (e: unknown) {
+      if (!shouldApplyStudioDocumentFetch(docId, id, epoch, docEpochRef.current)) return;
       setError(e instanceof Error ? e.message : 'Erro');
     } finally {
-      setLoading(false);
+      if (shouldApplyStudioDocumentFetch(docId, id, epoch, docEpochRef.current)) {
+        setLoading(false);
+      }
     }
   }, [id, companyId, setActiveCompanyId, loadVersions, loadActivity, loadMolds]);
 
@@ -893,7 +937,7 @@ export default function StudioDocumentPage() {
 
   async function sendChat(opts?: { text?: string; approvedSources?: string[] }) {
     const text = (opts?.text ?? input).trim();
-    if (!text || !canvas || chatBusy) return;
+    if (!text || !canvas || chatBusy || loading || activeDocIdRef.current !== id) return;
     setChatBusy(true);
     setConsent(null);
     setInput('');
@@ -921,20 +965,26 @@ export default function StudioDocumentPage() {
         attachmentIds.push(asset.id);
       }
 
-      const r = await fetch(`/api/studio/documents/${id}/copilot`, {
+      const chatDocId = id;
+      const chatEpoch = docEpochRef.current;
+      const r = await fetch(`/api/studio/documents/${chatDocId}/copilot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId: companyId || undefined,
           locale,
           message: text,
+          documentId: chatDocId,
           canvasState: canvasRef.current || canvas,
+          clientDirty: dirtyRef.current,
+          clientRevision: knownUpdatedAt.current,
           approvedSources: opts?.approvedSources || [],
           attachmentIds,
           targetBlockIds: aiTargetBlockIds,
         }),
       });
       const d = await r.json();
+      if (!shouldApplyStudioDocumentFetch(chatDocId, id, chatEpoch, docEpochRef.current)) return;
       if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
 
       if (d.canvasState) {
@@ -1003,12 +1053,15 @@ export default function StudioDocumentPage() {
 
   async function restoreVersion(versionId: string) {
     if (!confirm(t('Restaurar esta versão?', '¿Restaurar esta versión?', 'Restore this version?'))) return;
-    const r = await fetch(`/api/studio/documents/${id}/versions`, {
+    const docId = id;
+    const epoch = docEpochRef.current;
+    const r = await fetch(`/api/studio/documents/${docId}/versions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'restore', versionId }),
     });
     const d = await r.json();
+    if (!shouldApplyStudioDocumentFetch(docId, id, epoch, docEpochRef.current)) return;
     if (!r.ok) {
       alert(d.error || 'Erro');
       return;
@@ -2048,7 +2101,7 @@ export default function StudioDocumentPage() {
                 </div>
                 <button
                   type="button"
-                  disabled={chatBusy || !input.trim() || !canEdit}
+                  disabled={chatBusy || loading || !input.trim() || !canEdit}
                   onClick={() => {
                     if (dictating) stopDictation();
                     void sendChat();
