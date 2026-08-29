@@ -215,6 +215,7 @@ export default function StudioDocumentPage() {
   const saveAgainRef = useRef(false);
   const saveEpochRef = useRef(0);
   const writeReflowTimerRef = useRef<number | null>(null);
+  const canvasScrollRef = useRef<HTMLDivElement | null>(null);
   const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [dictationInterim, setDictationInterim] = useState('');
   /** Blocos selecionados como âmbito da IA (anti-wipe) */
@@ -594,6 +595,60 @@ export default function StudioDocumentPage() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, consent]);
+
+  /** Scroll spy — folha activa ao percorrer o documento (estilo Word). */
+  useEffect(() => {
+    const root = canvasScrollRef.current;
+    if (!root || !canvas?.pages.length) return;
+    const sections = root.querySelectorAll<HTMLElement>('[data-studio-page-id]');
+    if (!sections.length) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        let best: { id: string; ratio: number } | null = null;
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const pageId = (e.target as HTMLElement).dataset.studioPageId;
+          if (!pageId) continue;
+          if (!best || e.intersectionRatio > best.ratio) {
+            best = { id: pageId, ratio: e.intersectionRatio };
+          }
+        }
+        if (best) setActivePageId(best.id);
+      },
+      { root, threshold: [0.25, 0.5, 0.75] },
+    );
+    sections.forEach((el) => obs.observe(el));
+    return () => obs.disconnect();
+  }, [canvas?.pages.map((p) => p.id).join('|')]);
+
+  /** Atalhos folha anterior/seguinte — PageUp/PageDown ou Alt+↑/↓ */
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const el = e.target as HTMLElement | null;
+      if (el?.closest('input, textarea, [contenteditable="true"], .ProseMirror')) return;
+      if (!canvas?.pages.length) return;
+      const sorted = canvas.pages.slice().sort((a, b) => a.order - b.order);
+      const idx = sorted.findIndex((p) => p.id === activePageId);
+      const cur = idx >= 0 ? idx : 0;
+      const next =
+        e.key === 'PageDown' || (e.altKey && e.key === 'ArrowDown')
+          ? cur + 1
+          : e.key === 'PageUp' || (e.altKey && e.key === 'ArrowUp')
+            ? cur - 1
+            : -1;
+      if (next < 0 || next >= sorted.length) return;
+      e.preventDefault();
+      const pageId = sorted[next]!.id;
+      setActivePageId(pageId);
+      requestAnimationFrame(() => {
+        document
+          .querySelector(`[data-studio-page-id="${pageId}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [canvas, activePageId]);
 
   // Presença + deteção de edição remota (F5)
   useEffect(() => {
@@ -1511,6 +1566,17 @@ export default function StudioDocumentPage() {
       ? canvas.pages.filter((p) => p.id === activePageId)
       : canvas.pages;
 
+  const sortedPages = canvas.pages.slice().sort((a, b) => a.order - b.order);
+  const activePageIndex = sortedPages.findIndex((p) => p.id === activePageId);
+  const headerIconBtn =
+    studioMode === 'design'
+      ? 'rounded-lg border border-violet-700 bg-violet-950 p-2 text-violet-200 hover:bg-violet-900 disabled:opacity-40'
+      : 'rounded-lg border border-stone-200 bg-white p-2 text-stone-700 hover:bg-stone-50 disabled:opacity-40';
+  const headerTextBtn =
+    studioMode === 'design'
+      ? 'inline-flex items-center gap-1 rounded-lg border border-violet-700 bg-violet-950 px-2 py-1.5 text-xs font-medium text-violet-100 hover:bg-violet-900 disabled:opacity-40'
+      : 'inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-40';
+
   function selectPage(pageId: string) {
     setActivePageId(pageId);
     requestAnimationFrame(() => {
@@ -1576,6 +1642,16 @@ export default function StudioDocumentPage() {
                 : ''}
             </p>
           )}
+          {studioMode === 'write' && sortedPages.length > 1 && (
+            <p className="truncate pl-9 text-[10px] font-medium text-orange-700/90">
+              {t('Folha', 'Hoja', 'Page')}{' '}
+              {(activePageIndex >= 0 ? activePageIndex : 0) + 1} / {sortedPages.length}
+              <span className="font-normal text-stone-500">
+                {' '}
+                · {t('PageUp/Down ou Alt+↑↓', 'RePág/AvPág o Alt+↑↓', 'PageUp/Down or Alt+↑↓')}
+              </span>
+            </p>
+          )}
         </div>
 
         <div
@@ -1639,11 +1715,7 @@ export default function StudioDocumentPage() {
             disabled={!canEdit || !undoStack.length}
             onClick={undo}
             title="Undo"
-            className={`rounded-lg border p-2 disabled:opacity-40 ${
-              studioMode === 'design'
-                ? 'border-violet-700 bg-violet-950 text-violet-200 hover:bg-violet-900'
-                : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
-            }`}
+            className={headerIconBtn}
           >
             <Undo2 className="h-4 w-4" />
           </button>
@@ -1652,11 +1724,7 @@ export default function StudioDocumentPage() {
             disabled={!canEdit || !redoStack.length}
             onClick={redo}
             title="Redo"
-            className={`rounded-lg border p-2 disabled:opacity-40 ${
-              studioMode === 'design'
-                ? 'border-violet-700 bg-violet-950 text-violet-200 hover:bg-violet-900'
-                : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
-            }`}
+            className={headerIconBtn}
           >
             <Redo2 className="h-4 w-4" />
           </button>
@@ -1664,7 +1732,7 @@ export default function StudioDocumentPage() {
             type="button"
             onClick={() => openHistory('activity')}
             title={t('Atividade e versões', 'Actividad y versiones', 'Activity & versions')}
-            className="rounded-lg border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50"
+            className={headerIconBtn}
           >
             <History className="h-4 w-4" />
           </button>
@@ -1675,7 +1743,7 @@ export default function StudioDocumentPage() {
               setShowComments(true);
             }}
             title={t('Comentários', 'Comentarios', 'Comments')}
-            className="relative rounded-lg border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50"
+            className={`relative ${headerIconBtn}`}
           >
             <MessageSquare className="h-4 w-4" />
             {openCommentCount > 0 && (
@@ -1691,7 +1759,7 @@ export default function StudioDocumentPage() {
               void loadMolds();
             }}
             title={t('Moldes / templates', 'Moldes / plantillas', 'Molds / templates')}
-            className="rounded-lg border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50"
+            className={headerIconBtn}
           >
             <LayoutTemplate className="h-4 w-4" />
           </button>
@@ -1719,7 +1787,11 @@ export default function StudioDocumentPage() {
             type="button"
             onClick={() => setShowLinks(true)}
             title={t('Vincular a sistemas', 'Vincular a sistemas', 'Link to systems')}
-            className="inline-flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2 py-1.5 text-xs font-medium text-orange-900 hover:bg-orange-100"
+            className={
+              studioMode === 'design'
+                ? 'inline-flex items-center gap-1 rounded-lg border border-orange-700/60 bg-orange-950/40 px-2 py-1.5 text-xs font-medium text-orange-200 hover:bg-orange-900/50'
+                : 'inline-flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2 py-1.5 text-xs font-medium text-orange-900 hover:bg-orange-100'
+            }
           >
             <Link2 className="h-3.5 w-3.5" />
             {t('Vincular', 'Vincular', 'Link')}
@@ -1728,7 +1800,7 @@ export default function StudioDocumentPage() {
             <button
               type="button"
               onClick={() => setShareOpen(true)}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700"
+              className={headerTextBtn}
             >
               <Share2 className="h-3.5 w-3.5" />
               {t('Partilhar', 'Compartir', 'Share')}
@@ -1739,7 +1811,7 @@ export default function StudioDocumentPage() {
               type="button"
               disabled={!!exporting}
               onClick={() => setExportOpen((v) => !v)}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium disabled:opacity-40"
+              className={headerTextBtn}
             >
               {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
               {t('Exportar', 'Exportar', 'Export')}
@@ -1769,8 +1841,12 @@ export default function StudioDocumentPage() {
             onClick={() => setToolsOpen((v) => !v)}
             className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-medium ${
               toolsOpen
-                ? 'border-orange-300 bg-orange-50 text-orange-900'
-                : 'border-slate-200 bg-white text-slate-700'
+                ? studioMode === 'design'
+                  ? 'border-fuchsia-400 bg-fuchsia-950/60 text-fuchsia-100'
+                  : 'border-orange-300 bg-orange-50 text-orange-900'
+                : studioMode === 'design'
+                  ? 'border-violet-700 bg-violet-950 text-violet-100 hover:bg-violet-900'
+                  : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
             }`}
           >
             <LayoutTemplate className="h-3.5 w-3.5" />
@@ -1780,7 +1856,9 @@ export default function StudioDocumentPage() {
             type="button"
             disabled={saving || !dirty || !canEdit}
             onClick={() => void save()}
-            className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-40 ${
+              studioMode === 'design' ? 'bg-fuchsia-600 hover:bg-fuchsia-500' : 'bg-slate-900'
+            }`}
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             {t('Guardar', 'Guardar', 'Save')}
@@ -2135,6 +2213,7 @@ export default function StudioDocumentPage() {
         <div className="flex min-h-0 min-w-0 flex-1">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div
+          ref={canvasScrollRef}
           className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4"
           style={
             {
@@ -2716,6 +2795,18 @@ export default function StudioDocumentPage() {
             pages={canvas.pages}
             activePageId={activePageId}
             locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+            variant="design"
+            canEdit={canEdit}
+            onAddPage={canEdit ? addPage : undefined}
+            onSelect={selectPage}
+          />
+        )}
+        {studioMode === 'write' && canvas.pages.length > 1 && (
+          <StudioPageFilmstrip
+            pages={canvas.pages}
+            activePageId={activePageId}
+            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+            variant="write"
             canEdit={canEdit}
             onAddPage={canEdit ? addPage : undefined}
             onSelect={selectPage}
@@ -2925,10 +3016,23 @@ export default function StudioDocumentPage() {
       {showHistory && (
         <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 sm:items-center">
           <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="font-bold text-slate-900">
-                {t('Rastreabilidade', 'Trazabilidad', 'Traceability')}
-              </h3>
+            <div className="mb-3 flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="font-bold text-slate-900">
+                  {t('Rastreabilidade', 'Trazabilidad', 'Traceability')}
+                </h3>
+                <p className="mt-0.5 truncate text-xs text-slate-500">
+                  {title || t('Sem título', 'Sin título', 'Untitled')}
+                  <span className="ml-1.5 font-mono text-[10px] text-slate-400">#{id.slice(0, 8)}</span>
+                </p>
+                <p className="mt-0.5 text-[10px] text-slate-400">
+                  {t(
+                    'Histórico deste documento apenas',
+                    'Historial solo de este documento',
+                    'This document only',
+                  )}
+                </p>
+              </div>
               <button type="button" onClick={() => setShowHistory(false)}>
                 <X className="h-4 w-4" />
               </button>
