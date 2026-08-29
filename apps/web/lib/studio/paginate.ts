@@ -12,8 +12,11 @@ export type StudioOverflowInfo = {
   overflowPx: number;
 };
 
-/** Limite de segurança — evita o bug das 98/1000 folhas. */
-const MAX_SAFE_PAGES = 40;
+/** Limite no modo desenho (ResizeObserver) — evita milhares de folhas por overflow. */
+const MAX_DESIGN_PAGES = 40;
+
+/** Limite generoso em redação — documentos longos (planos, relatórios). */
+const MAX_WRITE_REFLOW_PAGES = 200;
 
 function reindex(blocks: StudioBlock[]): StudioBlock[] {
   return blocks.map((b, i) => ({ ...b, order: i }));
@@ -40,7 +43,7 @@ export function applyStudioPagination(
   if (canvas.studioMode !== 'design') return canvas;
 
   const pages = canvas.pages.slice().sort((a, b) => a.order - b.order);
-  if (pages.length >= MAX_SAFE_PAGES) return canvas;
+  if (pages.length >= MAX_DESIGN_PAGES) return canvas;
 
   const fromIdx = pages.findIndex((p) => p.id === fromPageId);
   if (fromIdx < 0) return canvas;
@@ -83,7 +86,7 @@ export function applyStudioPagination(
     };
   }
 
-  if (pages.length + 1 > MAX_SAFE_PAGES) return canvas;
+  if (pages.length + 1 > MAX_DESIGN_PAGES) return canvas;
 
   const newPage: StudioPage = {
     id: newPageId(pages.length),
@@ -275,7 +278,7 @@ export function reflowStudioDocument(
 
   const queue = blocks.slice();
   let guard = 0;
-  while (queue.length && pagesOut.length < MAX_SAFE_PAGES && guard < 5000) {
+  while (queue.length && pagesOut.length < MAX_WRITE_REFLOW_PAGES && guard < 5000) {
     guard += 1;
     const block = queue.shift()!;
     const h = estimateBlockHeightPx(block, contentW);
@@ -319,7 +322,7 @@ export function reflowStudioDocument(
     queue.unshift(block);
   }
 
-  // Resto se atingimos MAX_SAFE_PAGES — mete tudo na última folha (não cria milhares)
+  // Resto se atingimos MAX_WRITE_REFLOW_PAGES — mete tudo na última folha (não cria milhares)
   if (queue.length) {
     if (!bucket.length) flush();
     const last = pagesOut[pagesOut.length - 1];
@@ -376,29 +379,12 @@ export function studioLikelyOverPaginated(canvas: StudioCanvasState): boolean {
   return avgBlocks <= 2 || n > 20;
 }
 
-/**
- * Após editar um bloco, remove folhas seguintes que parecem picote de overflow
- * (evita que fragmentos antigos reapareçam ao reflow / voltar ao chat).
- */
-export function trimWriteOverflowTail(
-  canvas: StudioCanvasState,
-  editedBlockId: string,
-): StudioCanvasState {
-  if (canvas.studioMode === 'design') return canvas;
-  const pages = canvas.pages.slice().sort((a, b) => a.order - b.order);
-  let pageIdx = -1;
-  for (let i = 0; i < pages.length; i++) {
-    if (pages[i]!.blocks.some((b) => b.id === editedBlockId)) {
-      pageIdx = i;
-      break;
-    }
-  }
-  if (pageIdx < 0 || pageIdx >= pages.length - 1) return canvas;
-  const tail = pages.slice(pageIdx + 1);
-  const tailLooksLikeOverflow = tail.every((p) => (p.blocks?.length || 0) <= 2);
-  if (!tailLooksLikeOverflow) return canvas;
-  return {
-    ...canvas,
-    pages: pages.slice(0, pageIdx + 1).map((p, i) => ({ ...p, order: i })),
-  };
+/** Soma todo o texto dos blocos (para testes / diagnóstico). */
+export function studioCanvasTextLength(canvas: StudioCanvasState): number {
+  return canvas.pages.reduce(
+    (n, p) =>
+      n +
+      p.blocks.reduce((m, b) => m + String(b.text || '').length, 0),
+    0,
+  );
 }

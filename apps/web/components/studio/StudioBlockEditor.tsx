@@ -153,6 +153,7 @@ type Props = {
   onGenerateImage?: (prompt?: string) => Promise<void>;
   onImagePromptChange?: (prompt: string) => void;
   onImageEditChange?: (edit: import('@/lib/studio/types').StudioImageEdit) => void;
+  expandHeight?: boolean;
   labels: {
     edit: string;
     preview: string;
@@ -209,6 +210,7 @@ export function StudioBlockEditor({
   onGenerateImage,
   onImagePromptChange,
   onImageEditChange,
+  expandHeight,
   labels,
 }: Props) {
   const styleWrap = `${studioBlockAlignClass(block.style)} ${studioBlockFrameClass(block.style)}`.trim();
@@ -826,6 +828,8 @@ export function StudioBlockEditor({
             onFocusNext={onFocusNext}
             onFocusPrev={onFocusPrev}
             className={`studio-rich-editor min-h-[1.5em] w-full outline-none ${
+              expandHeight ? 'studio-rich-editor-expand' : ''
+            } ${
               block.kind === 'heading'
                 ? 'font-bold leading-snug tracking-tight text-slate-900 [font-family:var(--font-etholys-display),ui-sans-serif,system-ui,sans-serif] [&_h1]:text-inherit [&_h2]:text-inherit [&_h3]:text-inherit'
                 : 'leading-[1.75] text-slate-800'

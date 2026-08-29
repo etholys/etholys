@@ -97,6 +97,9 @@
 .studio-rich-editor.ProseMirror {
   min-height: 1.5em;
 }
+.studio-rich-editor.studio-rich-editor-expand.ProseMirror {
+  min-height: min(58vh, 520px);
+}
 .studio-rich-editor.ProseMirror p {
   margin: 0.25em 0;
 }

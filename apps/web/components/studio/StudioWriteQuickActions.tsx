@@ -112,9 +112,9 @@ export function StudioWriteQuickActions({ locale, disabled, onRun }: Props) {
         : 'Conteúdo rápido';
 
   return (
-    <div className="border-b border-stone-200 px-4 py-2.5">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-stone-400">{title}</p>
-      <div className="flex flex-wrap gap-1.5">
+    <div className="border-b border-stone-200 px-3 py-2">
+      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-stone-400">{title}</p>
+      <div className="flex gap-1 overflow-x-auto pb-0.5">
         {actions.map((a) => {
           const Icon = a.icon;
           return (
@@ -123,7 +123,7 @@ export function StudioWriteQuickActions({ locale, disabled, onRun }: Props) {
               type="button"
               disabled={disabled}
               onClick={() => onRun(a.prompt)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-stone-700 shadow-sm hover:border-orange-300 hover:bg-orange-50 disabled:opacity-40"
+              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-[10px] font-semibold text-stone-700 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-40"
             >
               <Icon className="h-3.5 w-3.5 text-orange-600" />
               {a.label}

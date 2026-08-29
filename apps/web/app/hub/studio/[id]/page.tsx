@@ -73,6 +73,7 @@ import { getStudioWriteFocus, requestStudioWriteBlockFocus, runStudioWriteComman
 import { StudioSheet } from '@/components/studio/StudioSheet';
 import { StudioToolsSidebar } from '@/components/studio/StudioToolsSidebar';
 import { DocumentLinksPanel } from '@/components/studio/DocumentLinksPanel';
+import { StudioDocumentTitle } from '@/components/studio/StudioDocumentTitle';
 import { StudioWriteRibbon } from '@/components/studio/StudioWriteRibbon';
 import { StudioDesignAiPanel } from '@/components/studio/StudioDesignAiPanel';
 import { StudioWriteQuickActions } from '@/components/studio/StudioWriteQuickActions';
@@ -94,7 +95,6 @@ import {
   mergeStudioDocument,
   reflowStudioDocument,
   studioLikelyOverPaginated,
-  trimWriteOverflowTail,
   type StudioOverflowInfo,
 } from '@/lib/studio/paginate';
 import { defaultTableMarkdown } from '@/lib/studio/table-markdown';
@@ -159,7 +159,7 @@ export default function StudioDocumentPage() {
   const [showFolderContext, setShowFolderContext] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [folderContextCount, setFolderContextCount] = useState(0);
-  const [chatWidth, setChatWidth] = useState(400);
+  const [chatWidth, setChatWidth] = useState(320);
   const [undoStack, setUndoStack] = useState<StudioCanvasState[]>([]);
   const [redoStack, setRedoStack] = useState<StudioCanvasState[]>([]);
   const [versions, setVersions] = useState<VersionRow[]>([]);
@@ -175,7 +175,8 @@ export default function StudioDocumentPage() {
   const [commentBlockId, setCommentBlockId] = useState<string | null>(null);
   const [openCommentCount, setOpenCommentCount] = useState(0);
   const [activePageId, setActivePageId] = useState<string | null>(null);
-  const [toolsOpen, setToolsOpen] = useState(true);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [presence, setPresence] = useState<
     Array<{
       userId: string;
@@ -772,9 +773,6 @@ export default function StudioDocumentPage() {
               },
         ),
       };
-      if (patch.text !== undefined && next.studioMode === 'write') {
-        next = trimWriteOverflowTail(next, blockId);
-      }
       return next;
     });
     if (patch.text !== undefined && canvasRef.current?.studioMode === 'write') {
@@ -1478,17 +1476,17 @@ export default function StudioDocumentPage() {
       }`}
     >
       <header
-        className={`flex shrink-0 flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:px-4 ${
+        className={`flex shrink-0 flex-col gap-2 px-3 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4 ${
           studioMode === 'design'
             ? 'border-b border-violet-900/60 bg-[#120c1a] text-violet-50'
             : 'border-b border-stone-300/80 bg-[#f7f4ef] text-stone-900'
         }`}
       >
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex w-full min-w-0 flex-col gap-0.5 sm:w-auto sm:flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <Link
               href={libraryHref}
-              className={`rounded-lg p-1.5 ${
+              className={`shrink-0 rounded-lg p-1.5 ${
                 studioMode === 'design'
                   ? 'text-violet-300 hover:bg-violet-900/50'
                   : 'text-stone-600 hover:bg-stone-200/60'
@@ -1497,25 +1495,19 @@ export default function StudioDocumentPage() {
             >
               <ArrowLeft className="h-5 w-5" />
             </Link>
-            {studioMode === 'design' ? (
-              <Wand2 className="hidden h-4 w-4 text-violet-400 sm:block" />
-            ) : (
-              <PenLine className="hidden h-4 w-4 text-orange-600 sm:block" />
-            )}
-            <input
+            <StudioDocumentTitle
               value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
+              onChange={(v) => {
+                setTitle(v);
                 setDirty(true);
               }}
               onBlur={() => {
                 if (dirty && canEdit) void persistCanvas({ quiet: true });
               }}
-              disabled={!canEdit}
-              className={`min-w-0 flex-1 border-0 bg-transparent text-base font-semibold outline-none focus:ring-0 sm:text-lg ${
-                studioMode === 'design' ? 'text-violet-50' : 'text-stone-900'
-              }`}
-              title={t('Nome do documento', 'Nombre del documento', 'Document name')}
+              canEdit={canEdit}
+              variant={studioMode === 'design' ? 'design' : 'write'}
+              placeholder={t('Sem título', 'Sin título', 'Untitled')}
+              editHint={t('Clique para editar o nome', 'Clic para editar el nombre', 'Click to edit name')}
             />
           </div>
           {(lastEditedBy || lastEditedAt) && (
@@ -1588,7 +1580,7 @@ export default function StudioDocumentPage() {
               ))}
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
           <button
             type="button"
             disabled={!canEdit || !undoStack.length}
@@ -1689,59 +1681,47 @@ export default function StudioDocumentPage() {
               {t('Partilhar', 'Compartir', 'Share')}
             </button>
           )}
-          <button
-            type="button"
-            disabled={!!exporting}
-            onClick={() => void exportFile('docx')}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium disabled:opacity-40"
-          >
-            {exporting === 'docx' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileType className="h-3.5 w-3.5" />}
-            DOCX
-          </button>
-          <button
-            type="button"
-            disabled={!!exporting}
-            onClick={() => void exportFile('xlsx')}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium disabled:opacity-40"
-          >
-            {exporting === 'xlsx' ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Table2 className="h-3.5 w-3.5" />
-            )}
-            XLSX
-          </button>
-          <button
-            type="button"
-            disabled={!!exporting}
-            onClick={() => void exportFile('pptx')}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium disabled:opacity-40"
-          >
-            {exporting === 'pptx' ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <LayoutTemplate className="h-3.5 w-3.5" />
-            )}
-            PPTX
-          </button>
-          {isPresentationDeck && (
+          <div className="relative">
             <button
               type="button"
-              onClick={() => setPresenterOpen(true)}
-              className="inline-flex items-center gap-1 rounded-lg border border-fuchsia-200 bg-fuchsia-50 px-2 py-1.5 text-xs font-medium text-fuchsia-900 hover:bg-fuchsia-100"
+              disabled={!!exporting}
+              onClick={() => setExportOpen((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium disabled:opacity-40"
             >
-              <Presentation className="h-3.5 w-3.5" />
-              {t('Apresentar', 'Presentar', 'Present')}
+              {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+              {t('Exportar', 'Exportar', 'Export')}
+              <ChevronDown className="h-3.5 w-3.5" />
             </button>
-          )}
+            {exportOpen && (
+              <div className="absolute right-0 top-full z-50 mt-1 min-w-[8rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                {(['docx', 'xlsx', 'pptx', 'pdf'] as const).map((fmt) => (
+                  <button
+                    key={fmt}
+                    type="button"
+                    disabled={!!exporting}
+                    onClick={() => {
+                      setExportOpen(false);
+                      void exportFile(fmt);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    {fmt.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             type="button"
-            disabled={!!exporting}
-            onClick={() => void exportFile('pdf')}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium disabled:opacity-40"
+            onClick={() => setToolsOpen((v) => !v)}
+            className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-medium ${
+              toolsOpen
+                ? 'border-orange-300 bg-orange-50 text-orange-900'
+                : 'border-slate-200 bg-white text-slate-700'
+            }`}
           >
-            {exporting === 'pdf' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
-            PDF
+            <LayoutTemplate className="h-3.5 w-3.5" />
+            {t('Ferramentas', 'Herramientas', 'Tools')}
           </button>
           <button
             type="button"
@@ -1793,7 +1773,7 @@ export default function StudioDocumentPage() {
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {/* Painel esquerdo: IA de redação OU IA de desenho */}
         <aside
-          className={`flex h-[42vh] w-full shrink-0 flex-col lg:h-auto lg:w-[var(--studio-chat-w)] ${
+          className={`flex max-h-[38vh] w-full shrink-0 flex-col lg:max-h-none lg:h-auto lg:w-[var(--studio-chat-w)] ${
             studioMode === 'design'
               ? 'border-b border-violet-900/50 lg:border-b-0 lg:border-r lg:border-violet-900/50'
               : 'border-b border-stone-200 bg-[#faf8f5] lg:border-b-0 lg:border-r'
@@ -1979,97 +1959,106 @@ export default function StudioDocumentPage() {
                 ))}
               </ul>
             )}
-            <div className="flex items-end gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                multiple
-                accept=".pdf,.txt,.md,.csv,.json,.docx,image/png,image/jpeg,image/webp,image/gif"
-                onChange={(e) => {
-                  const list = e.target.files ? Array.from(e.target.files) : [];
-                  e.target.value = '';
-                  if (list.length) setPendingFiles((prev) => [...prev, ...list].slice(0, 6));
-                }}
-              />
-              <button
-                type="button"
-                disabled={chatBusy || !canEdit}
-                onClick={() => fileInputRef.current?.click()}
-                className="rounded-lg border border-slate-200 p-2 text-slate-600 disabled:opacity-40"
-              >
-                <Paperclip className="h-5 w-5" />
-              </button>
-              {docFolderId && (
-                <button
-                  type="button"
-                  onClick={() => setShowFolderContext(true)}
-                  className="rounded-lg border border-slate-200 p-2 text-slate-600"
-                >
-                  <BookMarked className="h-5 w-5" />
-                </button>
-              )}
-              {dictationSupported && (
-                <button
-                  type="button"
-                  disabled={chatBusy || !canEdit}
-                  onClick={() => toggleDictation()}
-                  title={
-                    dictating
-                      ? t('Parar ditado', 'Detener dictado', 'Stop dictation')
-                      : t('Ditar (microfone)', 'Dictar (micrófono)', 'Dictate (microphone)')
-                  }
-                  className={`rounded-lg border p-2 disabled:opacity-40 ${
-                    dictating
-                      ? 'border-red-300 bg-red-50 text-red-700 animate-pulse'
-                      : 'border-slate-200 text-slate-600 hover:border-orange-300 hover:bg-orange-50'
-                  }`}
-                >
-                  {dictating ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                </button>
-              )}
-              <div className="relative min-w-0 flex-1">
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  disabled={chatBusy || !canEdit}
-                  rows={4}
-                  placeholder={
-                    dictating
-                      ? t('A ouvir… fale agora', 'Escuchando… hable ahora', 'Listening… speak now')
-                      : t(
-                          'Escreva ou dite instruções… (Enter = parágrafo)',
-                          'Escriba o dicte instrucciones… (Enter = párrafo)',
-                          'Write or dictate instructions… (Enter = paragraph)',
-                        )
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                      e.preventDefault();
-                      if (dictating) stopDictation();
-                      void sendChat();
-                    }
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  multiple
+                  accept=".pdf,.txt,.md,.csv,.json,.docx,image/png,image/jpeg,image/webp,image/gif"
+                  onChange={(e) => {
+                    const list = e.target.files ? Array.from(e.target.files) : [];
+                    e.target.value = '';
+                    if (list.length) setPendingFiles((prev) => [...prev, ...list].slice(0, 6));
                   }}
-                  className="min-h-[96px] w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed outline-none focus:border-orange-400"
                 />
-                {dictating && dictationInterim && (
-                  <p className="pointer-events-none absolute bottom-2 left-3 right-3 truncate text-[11px] italic text-orange-700/80">
-                    {dictationInterim}
-                  </p>
+                <button
+                  type="button"
+                  disabled={chatBusy || !canEdit}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-lg border border-slate-200 p-1.5 text-slate-600 disabled:opacity-40"
+                  title={t('Anexar', 'Adjuntar', 'Attach')}
+                >
+                  <Paperclip className="h-4 w-4" />
+                </button>
+                {docFolderId && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFolderContext(true)}
+                    className="rounded-lg border border-slate-200 p-1.5 text-slate-600"
+                    title={t('Contexto da pasta', 'Contexto de carpeta', 'Folder context')}
+                  >
+                    <BookMarked className="h-4 w-4" />
+                  </button>
                 )}
+                {dictationSupported && (
+                  <button
+                    type="button"
+                    disabled={chatBusy || !canEdit}
+                    onClick={() => toggleDictation()}
+                    title={
+                      dictating
+                        ? t('Parar ditado', 'Detener dictado', 'Stop dictation')
+                        : t('Ditar (microfone)', 'Dictar (micrófono)', 'Dictate (microphone)')
+                    }
+                    className={`rounded-lg border p-1.5 disabled:opacity-40 ${
+                      dictating
+                        ? 'border-red-300 bg-red-50 text-red-700 animate-pulse'
+                        : 'border-slate-200 text-slate-600 hover:border-orange-300 hover:bg-orange-50'
+                    }`}
+                  >
+                    {dictating ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  </button>
+                )}
+                <span className="ml-auto text-[10px] text-slate-400">
+                  {t('Ctrl+Enter enviar', 'Ctrl+Enter enviar', 'Ctrl+Enter send')}
+                </span>
               </div>
-              <button
-                type="button"
-                disabled={chatBusy || !input.trim() || !canEdit}
-                onClick={() => {
-                  if (dictating) stopDictation();
-                  void sendChat();
-                }}
-                className="rounded-lg bg-orange-600 p-2.5 text-white disabled:opacity-40"
-                title="Ctrl+Enter"
-              >
-                {chatBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-              </button>
+              <div className="flex items-end gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    disabled={chatBusy || !canEdit}
+                    rows={3}
+                    placeholder={
+                      dictating
+                        ? t('A ouvir… fale agora', 'Escuchando… hable ahora', 'Listening… speak now')
+                        : t(
+                            'Instruções para a IA…',
+                            'Instrucciones para la IA…',
+                            'Instructions for AI…',
+                          )
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        if (dictating) stopDictation();
+                        void sendChat();
+                      }
+                    }}
+                    className="min-h-[72px] w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed outline-none focus:border-orange-400"
+                  />
+                  {dictating && dictationInterim && (
+                    <p className="pointer-events-none absolute bottom-2 left-3 right-3 truncate text-[11px] italic text-orange-700/80">
+                      {dictationInterim}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  disabled={chatBusy || !input.trim() || !canEdit}
+                  onClick={() => {
+                    if (dictating) stopDictation();
+                    void sendChat();
+                  }}
+                  className="shrink-0 rounded-lg bg-orange-600 p-2.5 text-white disabled:opacity-40"
+                  title="Ctrl+Enter"
+                >
+                  {chatBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
           </div>
           </>
@@ -2093,7 +2082,7 @@ export default function StudioDocumentPage() {
         <div className="flex min-h-0 min-w-0 flex-1">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div
-          className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
+          className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4"
           style={
             {
               ['--studio-brand' as string]: brandPrimary,
@@ -2120,6 +2109,22 @@ export default function StudioDocumentPage() {
               onCommand={ribbonCommand}
               onKind={ribbonKind}
               onStyle={ribbonStyle}
+              trailing={
+                <>
+                  <button
+                    type="button"
+                    disabled={!canEdit}
+                    onClick={addPage}
+                    className="inline-flex items-center gap-1 rounded-md border border-stone-300 bg-white px-2 py-1 text-[10px] font-semibold text-stone-700"
+                  >
+                    <Plus className="h-3 w-3" />
+                    {t('Folha', 'Hoja', 'Page')}
+                  </button>
+                  <span className="text-[10px] text-stone-500">
+                    {canvas.pages.length} · {pageSize}
+                  </span>
+                </>
+              }
               labels={{
                 format: t('Formato', 'Formato', 'Format'),
                 bold: t('Negrito', 'Negrita', 'Bold'),
@@ -2135,51 +2140,26 @@ export default function StudioDocumentPage() {
                   'Ctrl+Enter nueva sección · flechas entre secciones · Excel/tablas en barra lateral',
                   'Ctrl+Enter new section · arrows between sections · Excel/tables in sidebar',
                 ),
+                more: t('Mais', 'Más', 'More'),
               }}
             />
           )}
-          <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="mx-auto flex max-w-[720px] flex-wrap items-center gap-2 px-1 pb-2 sm:hidden">
             <button
               type="button"
               disabled={!canEdit}
               onClick={addPage}
-              className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-40 ${
-                studioMode === 'design'
-                  ? 'border-violet-700 bg-violet-950 text-violet-100 hover:bg-violet-900'
-                  : 'border-stone-300 bg-white text-stone-700'
-              }`}
+              className="inline-flex items-center gap-1 rounded-lg border border-stone-300 bg-white px-2 py-1 text-[11px] font-semibold text-stone-700"
             >
               <Plus className="h-3.5 w-3.5" />
               {t('Nova folha', 'Nueva hoja', 'New page')}
             </button>
-            <span
-              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                studioMode === 'write'
-                  ? 'bg-orange-100 text-orange-900'
-                  : 'bg-violet-600 text-white'
-              }`}
-            >
-              {studioMode === 'write'
-                ? t('Conteúdo · Word/Excel/PPT/PDF', 'Contenido · Word/Excel/PPT/PDF', 'Content · Word/Excel/PPT/PDF')
-                : t('Desenho · Canva/Gamma/InDesign', 'Diseño · Canva/Gamma/InDesign', 'Design · Canva/Gamma/InDesign')}
+            <span className="text-[11px] text-stone-500">
+              {canvas.pages.length} {t('folha(s)', 'hoja(s)', 'page(s)')} · {pageSize}
             </span>
-            <span
-              className={`text-xs ${studioMode === 'design' ? 'text-violet-300' : 'text-stone-500'}`}
-            >
-              {canvas.pages.length}{' '}
-              {t('folha(s)', 'hoja(s)', 'page(s)')} · {pageSize}
-            </span>
-            {aiTargetBlockIds.length > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-900">
-                <Crosshair className="h-3 w-3" />
-                {aiTargetBlockIds.length}{' '}
-                {t('secção(ões) para IA', 'sección(es) para IA', 'section(s) for AI')}
-              </span>
-            )}
           </div>
-
-          {canEdit && studioMode === 'design' && (
-            <div className="mx-auto mb-4 flex w-full max-w-[720px] flex-wrap items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50/90 px-2.5 py-2 shadow-sm">
+          {canEdit && studioMode === 'design' && !toolsOpen && (
+            <div className="mx-auto mb-3 flex w-full max-w-[720px] flex-wrap items-center gap-1 rounded-lg border border-violet-200/80 bg-violet-950/40 px-2 py-1.5">
               <span className="px-1 text-[10px] font-bold uppercase tracking-wide text-violet-600">
                 {t('Desenho', 'Diseño', 'Design')}
               </span>
@@ -2455,10 +2435,9 @@ export default function StudioDocumentPage() {
                       scheduleWriteReflow(0);
                     }}
                   >
-                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2" style={{ width }}>
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                        {page.title || `${t('Folha', 'Hoja', 'Sheet')} ${idxDisplay + 1}`} · {size} ·{' '}
-                        {Math.round(wMm)}×{Math.round(hMm)} mm
+                    <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5" style={{ width }}>
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                        {page.title || `${t('Folha', 'Hoja', 'Sheet')} ${idxDisplay + 1}`} · {size}
                       </p>
                       {studioMode === 'design' && (
                         <div className="flex gap-1">
@@ -2597,6 +2576,12 @@ export default function StudioDocumentPage() {
                                 setCommentBlockId(block.id);
                                 setShowComments(true);
                               }}
+                              expandHeight={
+                                studioMode === 'write' &&
+                                page.blocks.length === 1 &&
+                                blockIdx === 0 &&
+                                !(block.text || '').trim()
+                              }
                               labels={{
                                 edit: t('Editar', 'Editar', 'Edit'),
                                 preview: t('Ver documento', 'Ver documento', 'Preview'),
