@@ -12,6 +12,19 @@ import { recordStudioActivity, truncatePreview } from '@/lib/studio/activity';
 import { buildStudioSystemPrompt, parseStudioCopilotJson } from '@/lib/studio/agent';
 import { buildStudioCopilotUserText } from '@/lib/studio/copilot-history';
 import {
+  actionAssistantMessage,
+  actionUserMessage,
+  buildStudioCopilotModeAddendum,
+  inferStudioCopilotMode,
+  normalizeStudioCopilotAction,
+  normalizeStudioCopilotMode,
+  pendingStructureActions,
+} from '@/lib/studio/copilot-modes';
+import {
+  loadStudioCopilotSession,
+  saveStudioCopilotSession,
+} from '@/lib/studio/copilot-session';
+import {
   buildStructureApprovalPatches,
   buildStructureApprovalSystemAddendum,
   buildStructureDevelopPatches,
@@ -54,6 +67,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const locale = typeof body.locale === 'string' ? body.locale : 'pt';
+
+  const action = normalizeStudioCopilotAction(body.action);
+  const requestedMode = normalizeStudioCopilotMode(body.mode);
+  let message = typeof body.message === 'string' ? body.message.trim() : '';
+  if (!message && action) message = actionUserMessage(action, locale);
+  if (!message) return NextResponse.json({ error: 'Message required' }, { status: 400 });
 
   const doc = await prisma.studioDocument.findFirst({
     where: { id: params.id },
@@ -66,14 +86,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
   const effectiveCompanyId = doc.companyId;
 
-  const message = typeof body.message === 'string' ? body.message.trim() : '';
-  if (!message) return NextResponse.json({ error: 'Message required' }, { status: 400 });
-
   if (typeof body.documentId === 'string' && body.documentId !== doc.id) {
     return NextResponse.json({ error: 'Document mismatch' }, { status: 400 });
   }
 
-  const locale = typeof body.locale === 'string' ? body.locale : 'pt';
   const approvedSources = Array.isArray(body.approvedSources)
     ? body.approvedSources.filter((s): s is string => typeof s === 'string')
     : [];
@@ -129,19 +145,65 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       })
     : [];
 
-  const structureStateBefore = readStudioStructureState(priorMessages);
-  const structureApproval = isStructureApprovalMessage(message);
-  const structureDevelop = isStructureDevelopRequest(message);
-  const proposalText =
+  const sessionMirror = aiSessionId ? await loadStudioCopilotSession(prisma, aiSessionId) : null;
+  const structureStateBefore =
+    sessionMirror?.structureState || readStudioStructureState(priorMessages);
+
+  let proposalText =
     structureStateBefore?.proposalText ||
     findStructureProposalMessage(priorMessages)?.content ||
     null;
-  const applyMode: 'apply' | 'develop' =
-    structureDevelop || structureStateBefore?.status === 'approved' ? 'develop' : 'apply';
-  const useDeterministicStructureApply =
+
+  let effectiveMode = inferStudioCopilotMode({
+    requested:
+      action === 'adjust_plan' || action === 'cancel_plan'
+        ? 'discuss'
+        : action === 'apply_structure'
+          ? 'apply'
+          : requestedMode,
+    targetBlockIds,
+    structureStatus: structureStateBefore?.status,
+  });
+
+  if (targetBlockIds.length) effectiveMode = 'edit_selection';
+
+  let structureApproval =
+    isStructureApprovalMessage(message) || action === 'approve_structure';
+  let structureDevelop =
+    isStructureDevelopRequest(message) || action === 'apply_structure';
+  let useDeterministicStructureApply =
     !targetBlockIds.length &&
     !!proposalText &&
-    (structureApproval || structureDevelop);
+    (structureApproval || structureDevelop || action === 'apply_structure');
+  let skipLlm = false;
+
+  if (action === 'approve_structure' && proposalText) {
+    skipLlm = true;
+    structureApproval = true;
+    useDeterministicStructureApply = false;
+  }
+  if (action === 'apply_structure' && proposalText) {
+    skipLlm = true;
+    structureDevelop = true;
+    useDeterministicStructureApply = true;
+    effectiveMode = 'apply';
+  }
+  if (action === 'adjust_plan') {
+    skipLlm = true;
+    effectiveMode = 'discuss';
+  }
+  if (action === 'cancel_plan') {
+    skipLlm = true;
+    proposalText = null;
+    effectiveMode = 'discuss';
+  }
+
+  const applyMode: 'apply' | 'develop' =
+    structureDevelop ||
+    action === 'apply_structure' ||
+    structureStateBefore?.status === 'approved'
+      ? 'develop'
+      : 'apply';
 
   await prisma.aiAdvisorMessage.create({
     data: {
@@ -156,6 +218,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         userId: user.id,
         userName: user.name,
         userEmail: user.email,
+        copilotMode: effectiveMode,
+        copilotAction: action,
       },
     },
   });
@@ -205,6 +269,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     targetBlockIds: targetBlockIds.length ? targetBlockIds : null,
   });
 
+  system += `\n\n${buildStudioCopilotModeAddendum(effectiveMode, locale)}`;
+
   if (proposalText && (structureApproval || structureDevelop) && !useDeterministicStructureApply) {
     system += `\n\n${buildStructureApprovalSystemAddendum(proposalText, locale, applyMode)}`;
   }
@@ -215,6 +281,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (useDeterministicStructureApply && proposalText) {
     payload = {
       message: structureApplySuccessMessage(locale, 0, applyMode),
+      canvasPatches: [],
+      consentRequest: null,
+      suggestedTitle: undefined,
+    };
+  } else if (skipLlm && action) {
+    payload = {
+      message: actionAssistantMessage(action, locale),
+      canvasPatches: [],
+      consentRequest: null,
+      suggestedTitle: undefined,
+    };
+  } else if (skipLlm) {
+    payload = {
+      message: 'Pronto.',
       canvasPatches: [],
       consentRequest: null,
       suggestedTitle: undefined,
@@ -273,6 +353,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (useDeterministicStructureApply && proposalText) {
     patches = buildStructureDevelopPatches(canvas, proposalText);
   } else if (
+    action === 'apply_structure' &&
+    proposalText
+  ) {
+    patches = buildStructureDevelopPatches(canvas, proposalText);
+  } else if (
     (structureApproval || structureDevelop) &&
     proposalText &&
     !patches.length
@@ -280,6 +365,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     patches = buildStructureDevelopPatches(canvas, proposalText);
   } else if (structureApproval && proposalText && !patches.length) {
     patches = buildStructureApprovalPatches(canvas, proposalText);
+  }
+
+  if (
+    (effectiveMode === 'discuss' || effectiveMode === 'propose') &&
+    !useDeterministicStructureApply &&
+    action !== 'apply_structure'
+  ) {
+    patches = [];
   }
 
   const sanitized = sanitizeStudioCanvasPatches(canvas, patches, {
@@ -298,14 +391,32 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   let studioStructureState = structureStateBefore;
-  if (proposalText) {
+  if (action === 'cancel_plan') {
+    studioStructureState = null;
+  } else if (proposalText) {
     if (useDeterministicStructureApply && patchCount > 0) {
       studioStructureState = buildStudioStructureState(proposalText, 'applied');
-    } else if (structureApproval) {
+    } else if (structureApproval || action === 'approve_structure') {
       studioStructureState = buildStudioStructureState(proposalText, 'approved');
     } else if (isStructureProposalContent(assistantMessage)) {
       studioStructureState = buildStudioStructureState(assistantMessage, 'pending_approval');
     }
+  }
+
+  const nextCopilotSession = {
+    mode:
+      action === 'adjust_plan' || action === 'cancel_plan'
+        ? 'discuss'
+        : patchCount > 0 && effectiveMode === 'apply'
+          ? 'discuss'
+          : effectiveMode,
+    structureState: studioStructureState,
+  } as const;
+
+  try {
+    await saveStudioCopilotSession(prisma, aiSessionId, nextCopilotSession);
+  } catch (e) {
+    console.warn('[studio] copilot session save skipped', e);
   }
   if (sanitized.blockedFullRewrite) {
     assistantMessage +=
@@ -421,6 +532,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     suggestedTitle: titleUpdate ?? null,
     aiSessionId,
     title: titleUpdate ?? doc.title,
+    copilotSession: {
+      mode: nextCopilotSession.mode,
+      structureState: studioStructureState,
+      pendingActions: pendingStructureActions(studioStructureState),
+    },
   });
 }
 
@@ -444,8 +560,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const access = await getDocumentAccess(user.id, doc);
   if (access === 'none') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  if (!doc.aiSessionId) return NextResponse.json({ messages: [] });
+  if (!doc.aiSessionId) {
+    return NextResponse.json({
+      messages: [],
+      copilotSession: { mode: 'discuss', structureState: null, pendingActions: [] },
+    });
+  }
 
+  const sessionMirror = await loadStudioCopilotSession(prisma, doc.aiSessionId);
   const messages = await prisma.aiAdvisorMessage.findMany({
     where: { sessionId: doc.aiSessionId },
     orderBy: { createdAt: 'asc' },
@@ -482,5 +604,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     };
   });
 
-  return NextResponse.json({ messages: enriched });
+  const structureState =
+    sessionMirror?.structureState ||
+    readStudioStructureState(
+      messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        context: m.context,
+      })),
+    );
+
+  return NextResponse.json({
+    messages: enriched,
+    copilotSession: {
+      mode: sessionMirror?.mode || 'discuss',
+      structureState,
+      pendingActions: pendingStructureActions(structureState),
+    },
+  });
 }

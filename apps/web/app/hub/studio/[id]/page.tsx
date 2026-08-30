@@ -103,6 +103,11 @@ import {
   shouldPersistStudioDocument,
   detectStudioContentMismatch,
 } from '@/lib/studio/document-scope';
+import type { StudioCopilotAction, StudioCopilotMode } from '@/lib/studio/copilot-modes';
+import { actionUserMessage } from '@/lib/studio/copilot-modes';
+import { StudioCollapsedChatContent } from '@/components/studio/StudioCollapsedChatContent';
+import { StudioCopilotModeBar } from '@/components/studio/StudioCopilotModeBar';
+import { StudioStructureActionBar } from '@/components/studio/StudioStructureActionBar';
 
 type ChatMsg = {
   id: string;
@@ -225,6 +230,8 @@ export default function StudioDocumentPage() {
   const [dictationInterim, setDictationInterim] = useState('');
   /** Blocos selecionados como âmbito da IA (anti-wipe) */
   const [aiTargetBlockIds, setAiTargetBlockIds] = useState<string[]>([]);
+  const [copilotMode, setCopilotMode] = useState<StudioCopilotMode>('discuss');
+  const [pendingStructureActions, setPendingStructureActions] = useState<StudioCopilotAction[]>([]);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [imageTargetPageId, setImageTargetPageId] = useState<string | null>(null);
   const [brandPrimary, setBrandPrimary] = useState('#ea580c');
@@ -584,6 +591,16 @@ export default function StudioDocumentPage() {
             }),
           ),
         );
+        if (md.copilotSession) {
+          if (typeof md.copilotSession.mode === 'string') {
+            setCopilotMode(md.copilotSession.mode as StudioCopilotMode);
+          }
+          setPendingStructureActions(
+            Array.isArray(md.copilotSession.pendingActions)
+              ? md.copilotSession.pendingActions
+              : [],
+          );
+        }
       }
       void loadVersions();
       void loadActivity();
@@ -1018,9 +1035,17 @@ export default function StudioDocumentPage() {
     return blockId;
   }
 
-  async function sendChat(opts?: { text?: string; approvedSources?: string[] }) {
+  async function sendChat(opts?: {
+    text?: string;
+    approvedSources?: string[];
+    action?: StudioCopilotAction;
+    mode?: StudioCopilotMode;
+  }) {
     const text = (opts?.text ?? input).trim();
-    if (!text || !canvas || chatBusy || loading || activeDocIdRef.current !== id) return;
+    const sendMode = opts?.mode ?? copilotMode;
+    if ((!text && !opts?.action) || !canvas || chatBusy || loading || activeDocIdRef.current !== id) {
+      return;
+    }
     setChatBusy(true);
     setConsent(null);
     setInput('');
@@ -1035,7 +1060,12 @@ export default function StudioDocumentPage() {
       aiTargetBlockIds.length > 0
         ? `\n\n[${t('Âmbito', 'Ámbito', 'Scope')}: ${aiTargetBlockIds.map(blockLabel).join(' · ')}]`
         : '';
-    setMessages((m) => [...m, { id: tempId, role: 'user', content: text + attachNote + scopeNote }]);
+    const userLine =
+      text ||
+      (opts?.action
+        ? actionUserMessage(opts.action, locale === 'en' || locale === 'es' ? locale : 'pt')
+        : '');
+    setMessages((m) => [...m, { id: tempId, role: 'user', content: userLine + attachNote + scopeNote }]);
 
     try {
       const attachmentIds: string[] = [];
@@ -1056,7 +1086,9 @@ export default function StudioDocumentPage() {
         body: JSON.stringify({
           companyId: companyId || undefined,
           locale,
-          message: text,
+          message: text || (opts?.action ? userLine : ''),
+          mode: sendMode,
+          action: opts?.action,
           documentId: chatDocId,
           canvasState: canvasRef.current || canvas,
           clientDirty: dirtyRef.current,
@@ -1074,6 +1106,14 @@ export default function StudioDocumentPage() {
         applyCanvas(() => layoutWriteDocument(normalizeStudioCanvas(d.canvasState)), true);
       }
       if (typeof d.title === 'string' && d.title) setTitle(d.title);
+      if (d.copilotSession) {
+        if (typeof d.copilotSession.mode === 'string') {
+          setCopilotMode(d.copilotSession.mode as StudioCopilotMode);
+        }
+        setPendingStructureActions(
+          Array.isArray(d.copilotSession.pendingActions) ? d.copilotSession.pendingActions : [],
+        );
+      }
       setMessages((m) => [
         ...m,
         {
@@ -1993,6 +2033,13 @@ export default function StudioDocumentPage() {
             />
           ) : (
           <>
+          <StudioCopilotModeBar
+            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+            mode={copilotMode}
+            hasSelection={aiTargetBlockIds.length > 0}
+            disabled={chatBusy || !canEdit}
+            onChange={(m) => setCopilotMode(m)}
+          />
           <StudioWriteQuickActions
             locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
             disabled={chatBusy || !canEdit}
@@ -2062,6 +2109,16 @@ export default function StudioDocumentPage() {
                 )}
               </p>
             )}
+            {pendingStructureActions.length > 0 && (
+              <div className="mb-3">
+                <StudioStructureActionBar
+                  locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+                  actions={pendingStructureActions}
+                  disabled={chatBusy || !canEdit}
+                  onAction={(action) => void sendChat({ action, mode: copilotMode })}
+                />
+              </div>
+            )}
             {messages.map((m) => (
               <div
                 key={m.id}
@@ -2081,7 +2138,14 @@ export default function StudioDocumentPage() {
                     </span>
                   )}
                 </div>
-                <div className="whitespace-pre-wrap">{m.content}</div>
+                {m.role === 'user' ? (
+                  <StudioCollapsedChatContent
+                    content={m.content}
+                    locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+                  />
+                ) : (
+                  <div className="whitespace-pre-wrap">{m.content}</div>
+                )}
               </div>
             ))}
             {consent && (
