@@ -114,6 +114,12 @@ import {
   pageSelectionState,
   togglePageBlockSelection,
 } from '@/lib/studio/selection-scope';
+import {
+  findPageIdForBlock,
+  previewStructurePatches,
+} from '@/lib/studio/canvas-patch-preview';
+import { canvasWarrantsStructureMigration } from '@/lib/studio/structure-migrate';
+import type { StudioStructureSessionState } from '@/lib/studio/structure-apply';
 
 type ChatMsg = {
   id: string;
@@ -238,6 +244,11 @@ export default function StudioDocumentPage() {
   const [aiTargetBlockIds, setAiTargetBlockIds] = useState<string[]>([]);
   const [copilotMode, setCopilotMode] = useState<StudioCopilotMode>('discuss');
   const [pendingStructureActions, setPendingStructureActions] = useState<StudioCopilotAction[]>([]);
+  const [structureSessionState, setStructureSessionState] =
+    useState<StudioStructureSessionState | null>(null);
+  /** Highlight temporário após edição IA (scroll + flash). */
+  const [aiEditedBlockIds, setAiEditedBlockIds] = useState<string[]>([]);
+  const aiEditHighlightTimerRef = useRef<number | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [imageTargetPageId, setImageTargetPageId] = useState<string | null>(null);
   const [brandPrimary, setBrandPrimary] = useState('#ea580c');
@@ -606,6 +617,12 @@ export default function StudioDocumentPage() {
               ? md.copilotSession.pendingActions
               : [],
           );
+          setStructureSessionState(
+            md.copilotSession.structureState &&
+              typeof md.copilotSession.structureState === 'object'
+              ? (md.copilotSession.structureState as StudioStructureSessionState)
+              : null,
+          );
         }
       }
       void loadVersions();
@@ -656,6 +673,60 @@ export default function StudioDocumentPage() {
     }
     return out;
   }, [canvas, aiTargetBlockIds]);
+
+  const structureActionPreview = useMemo(() => {
+    if (
+      !canvas ||
+      !structureSessionState?.proposalText ||
+      structureSessionState.status !== 'approved'
+    ) {
+      return null;
+    }
+    const apply = previewStructurePatches(
+      canvas,
+      structureSessionState.proposalText,
+      'apply',
+    );
+    if (!apply.blockIds.length) return null;
+    const canMigrate = canvasWarrantsStructureMigration(canvas);
+    const migrate = canMigrate
+      ? previewStructurePatches(canvas, structureSessionState.proposalText, 'migrate')
+      : undefined;
+    return { apply, migrate };
+  }, [canvas, structureSessionState]);
+
+  const focusAiEditedBlocks = useCallback(
+    (blockIds: string[], canvasOverride?: StudioCanvasState | null) => {
+      const unique = [...new Set(blockIds.filter(Boolean))];
+      if (!unique.length) return;
+      setAiEditedBlockIds(unique);
+      if (aiEditHighlightTimerRef.current) {
+        window.clearTimeout(aiEditHighlightTimerRef.current);
+      }
+      const c = canvasOverride ?? canvas;
+      const firstId = unique[0]!;
+      const pageId = c ? findPageIdForBlock(c, firstId) : null;
+      if (pageId) setActivePageId(pageId);
+      requestAnimationFrame(() => {
+        document
+          .querySelector(`[data-studio-block-id="${firstId}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+      aiEditHighlightTimerRef.current = window.setTimeout(() => {
+        setAiEditedBlockIds([]);
+        aiEditHighlightTimerRef.current = null;
+      }, 6500);
+    },
+    [canvas],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (aiEditHighlightTimerRef.current) {
+        window.clearTimeout(aiEditHighlightTimerRef.current);
+      }
+    };
+  }, []);
 
   /** Scroll spy — folha activa ao percorrer o documento (estilo Word). */
   useEffect(() => {
@@ -1133,6 +1204,20 @@ export default function StudioDocumentPage() {
         setPendingStructureActions(
           Array.isArray(d.copilotSession.pendingActions) ? d.copilotSession.pendingActions : [],
         );
+        setStructureSessionState(
+          d.copilotSession.structureState && typeof d.copilotSession.structureState === 'object'
+            ? (d.copilotSession.structureState as StudioStructureSessionState)
+            : null,
+        );
+      }
+      const patchedIds = Array.isArray(d.patchedBlockIds)
+        ? d.patchedBlockIds.filter((x: unknown): x is string => typeof x === 'string')
+        : [];
+      if (patchedIds.length) {
+        const nextForFocus = d.canvasState
+          ? normalizeStudioCanvas(d.canvasState)
+          : canvasRef.current;
+        focusAiEditedBlocks(patchedIds, nextForFocus);
       }
       setMessages((m) => [
         ...m,
@@ -2112,6 +2197,7 @@ export default function StudioDocumentPage() {
                   locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
                   actions={pendingStructureActions}
                   disabled={chatBusy || !canEdit}
+                  structurePreview={structureActionPreview}
                   onAction={(action) => void sendChat({ action, mode: copilotMode })}
                 />
               </div>
@@ -2787,7 +2873,15 @@ export default function StudioDocumentPage() {
                           return za - zb;
                         })
                         .map((block, blockIdx, arr) => (
-                          <div key={block.id} data-studio-block-id={block.id} className="shrink-0">
+                          <div
+                            key={block.id}
+                            data-studio-block-id={block.id}
+                            className={`shrink-0 transition-shadow duration-500 ${
+                              aiEditedBlockIds.includes(block.id)
+                                ? 'rounded-lg ring-2 ring-emerald-500 ring-offset-2 ring-offset-[#ebe6dc] shadow-[0_0_0_4px_rgba(16,185,129,0.15)]'
+                                : ''
+                            }`}
+                          >
                             <StudioDesignPlacedBlock
                               freeform={studioMode === 'design'}
                               layout={block.layout}

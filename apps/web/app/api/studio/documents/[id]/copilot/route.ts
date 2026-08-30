@@ -572,6 +572,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         canMigrate: canvasWarrantsStructureMigration(nextCanvas),
       }),
     },
+    patchedBlockIds: safePatches.map((p) => p.blockId),
+    patchCount,
   });
 }
 
