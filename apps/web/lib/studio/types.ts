@@ -444,7 +444,7 @@ export function countStudioBlocks(canvas: StudioCanvasState): number {
 export function sanitizeStudioCanvasPatches(
   canvas: StudioCanvasState,
   patches: StudioCanvasPatch[],
-  opts?: { targetBlockIds?: string[] | null },
+  opts?: { targetBlockIds?: string[] | null; allowApprovedRestructure?: boolean },
 ): { patches: StudioCanvasPatch[]; dropped: number; blockedFullRewrite: boolean } {
   const raw = Array.isArray(patches) ? patches : [];
   const known = new Set(
@@ -467,7 +467,7 @@ export function sanitizeStudioCanvasPatches(
 
   const total = countStudioBlocks(canvas);
   let blockedFullRewrite = false;
-  if (!targets.length && total > 2 && next.length >= total) {
+  if (!opts?.allowApprovedRestructure && !targets.length && total > 2 && next.length >= total) {
     blockedFullRewrite = true;
     next = [];
   }

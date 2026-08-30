@@ -11,6 +11,12 @@ import {
 import { recordStudioActivity, truncatePreview } from '@/lib/studio/activity';
 import { buildStudioSystemPrompt, parseStudioCopilotJson } from '@/lib/studio/agent';
 import { buildStudioCopilotUserText } from '@/lib/studio/copilot-history';
+import {
+  buildStructureApprovalPatches,
+  buildStructureApprovalSystemAddendum,
+  findStructureProposalMessage,
+  isStructureApprovalMessage,
+} from '@/lib/studio/structure-apply';
 import { shouldTrustClientStudioCanvas } from '@/lib/studio/document-scope';
 import {
   applyStudioCanvasPatches,
@@ -164,7 +170,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const mergedUserContext = [userUploadedContext, linkContext].filter(Boolean).join('\n\n');
 
-  const system = buildStudioSystemPrompt({
+  const structureProposal = findStructureProposalMessage(priorMessages);
+  const structureApproval =
+    !!structureProposal && isStructureApprovalMessage(message);
+
+  let system = buildStudioSystemPrompt({
     locale,
     documentTitle: doc.title,
     canvas,
@@ -173,6 +183,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     userUploadedContext: mergedUserContext || null,
     targetBlockIds: targetBlockIds.length ? targetBlockIds : null,
   });
+
+  if (structureApproval && structureProposal) {
+    system += `\n\n${buildStructureApprovalSystemAddendum(structureProposal.content, locale)}`;
+  }
 
   const scopedUserText =
     targetBlockIds.length > 0
@@ -206,14 +220,29 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const payload = parseStudioCopilotJson(raw);
-  const sanitized = sanitizeStudioCanvasPatches(canvas, payload.canvasPatches || [], {
+  let patches = payload.canvasPatches || [];
+
+  if (structureApproval && structureProposal && !patches.length) {
+    patches = buildStructureApprovalPatches(canvas, structureProposal.content);
+  }
+
+  const sanitized = sanitizeStudioCanvasPatches(canvas, patches, {
     targetBlockIds,
+    allowApprovedRestructure: structureApproval,
   });
   const safePatches = sanitized.patches;
   const nextCanvas = applyStudioCanvasPatches(canvas, safePatches);
   const patchCount = safePatches.length;
 
   let assistantMessage = payload.message || 'Pronto.';
+  if (structureApproval && patchCount > 0 && !payload.canvasPatches?.length) {
+    assistantMessage =
+      locale === 'es'
+        ? `Estructura aprobada aplicada al documento (${patchCount} sección${patchCount === 1 ? '' : 'es'} actualizada${patchCount === 1 ? '' : 's'}).`
+        : locale === 'en'
+          ? `Approved structure applied to the document (${patchCount} section${patchCount === 1 ? '' : 's'} updated).`
+          : `Estrutura aprovada aplicada ao documento (${patchCount} secção${patchCount === 1 ? '' : 'ões'} actualizada${patchCount === 1 ? '' : 's'}).`;
+  }
   if (sanitized.blockedFullRewrite) {
     assistantMessage +=
       locale === 'es'
