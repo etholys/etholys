@@ -2,7 +2,7 @@
 
 import type { StudioCopilotAction } from '@/lib/studio/copilot-modes';
 import { actionLabel } from '@/lib/studio/copilot-modes';
-import { Check, Pencil, Play, X } from 'lucide-react';
+import { Check, Layers, Pencil, Play, X } from 'lucide-react';
 
 type Props = {
   locale: string;
@@ -14,6 +14,7 @@ type Props = {
 const ICONS: Record<StudioCopilotAction, typeof Check> = {
   approve_structure: Check,
   apply_structure: Play,
+  migrate_structure: Layers,
   adjust_plan: Pencil,
   cancel_plan: X,
 };
@@ -21,6 +22,7 @@ const ICONS: Record<StudioCopilotAction, typeof Check> = {
 const STYLES: Record<StudioCopilotAction, string> = {
   approve_structure: 'bg-emerald-700 hover:bg-emerald-600 text-white',
   apply_structure: 'bg-orange-600 hover:bg-orange-500 text-white',
+  migrate_structure: 'bg-amber-700 hover:bg-amber-600 text-white',
   adjust_plan: 'border border-stone-300 bg-white text-stone-800 hover:bg-stone-50',
   cancel_plan: 'border border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100',
 };

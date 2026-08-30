@@ -36,6 +36,10 @@ import {
   readStudioStructureState,
   structureApplySuccessMessage,
 } from '@/lib/studio/structure-apply';
+import {
+  buildStructureMigrationPatches,
+  canvasWarrantsStructureMigration,
+} from '@/lib/studio/structure-migrate';
 import { shouldTrustClientStudioCanvas } from '@/lib/studio/document-scope';
 import {
   applyStudioCanvasPatches,
@@ -158,7 +162,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     requested:
       action === 'adjust_plan' || action === 'cancel_plan'
         ? 'discuss'
-        : action === 'apply_structure'
+        : action === 'apply_structure' || action === 'migrate_structure'
           ? 'apply'
           : requestedMode,
     targetBlockIds,
@@ -170,11 +174,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   let structureApproval =
     isStructureApprovalMessage(message) || action === 'approve_structure';
   let structureDevelop =
-    isStructureDevelopRequest(message) || action === 'apply_structure';
+    isStructureDevelopRequest(message) ||
+    action === 'apply_structure' ||
+    action === 'migrate_structure';
+  const structureMigrate = action === 'migrate_structure';
   let useDeterministicStructureApply =
     !targetBlockIds.length &&
     !!proposalText &&
-    (structureApproval || structureDevelop || action === 'apply_structure');
+    (structureApproval || structureDevelop || action === 'apply_structure' || structureMigrate);
+  let useDeterministicStructureMigrate =
+    !targetBlockIds.length && !!proposalText && structureMigrate;
   let skipLlm = false;
 
   if (action === 'approve_structure' && proposalText) {
@@ -186,6 +195,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     skipLlm = true;
     structureDevelop = true;
     useDeterministicStructureApply = true;
+    useDeterministicStructureMigrate = false;
+    effectiveMode = 'apply';
+  }
+  if (action === 'migrate_structure' && proposalText) {
+    skipLlm = true;
+    structureDevelop = true;
+    useDeterministicStructureApply = false;
+    useDeterministicStructureMigrate = true;
     effectiveMode = 'apply';
   }
   if (action === 'adjust_plan') {
@@ -198,12 +215,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     effectiveMode = 'discuss';
   }
 
-  const applyMode: 'apply' | 'develop' =
-    structureDevelop ||
-    action === 'apply_structure' ||
-    structureStateBefore?.status === 'approved'
-      ? 'develop'
-      : 'apply';
+  const applyMode: 'apply' | 'develop' | 'migrate' =
+    action === 'migrate_structure' || useDeterministicStructureMigrate
+      ? 'migrate'
+      : structureDevelop ||
+          action === 'apply_structure' ||
+          structureStateBefore?.status === 'approved'
+        ? 'develop'
+        : 'apply';
 
   await prisma.aiAdvisorMessage.create({
     data: {
@@ -271,14 +290,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   system += `\n\n${buildStudioCopilotModeAddendum(effectiveMode, locale)}`;
 
-  if (proposalText && (structureApproval || structureDevelop) && !useDeterministicStructureApply) {
+  if (
+    proposalText &&
+    (structureApproval || structureDevelop) &&
+    !useDeterministicStructureApply &&
+    !useDeterministicStructureMigrate
+  ) {
     system += `\n\n${buildStructureApprovalSystemAddendum(proposalText, locale, applyMode)}`;
   }
 
   let raw = '';
   let payload = { message: 'Pronto.', canvasPatches: [] as ReturnType<typeof parseStudioCopilotJson>['canvasPatches'], consentRequest: null as ReturnType<typeof parseStudioCopilotJson>['consentRequest'], suggestedTitle: undefined as string | undefined };
 
-  if (useDeterministicStructureApply && proposalText) {
+  if ((useDeterministicStructureApply || useDeterministicStructureMigrate) && proposalText) {
     payload = {
       message: structureApplySuccessMessage(locale, 0, applyMode),
       canvasPatches: [],
@@ -350,13 +374,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   let patches = payload.canvasPatches || [];
 
-  if (useDeterministicStructureApply && proposalText) {
+  if (useDeterministicStructureMigrate && proposalText) {
+    patches = buildStructureMigrationPatches(canvas, proposalText);
+  } else if (useDeterministicStructureApply && proposalText) {
     patches = buildStructureDevelopPatches(canvas, proposalText);
-  } else if (
-    action === 'apply_structure' &&
-    proposalText
-  ) {
+  } else if (action === 'apply_structure' && proposalText) {
     patches = buildStructureDevelopPatches(canvas, proposalText);
+  } else if (action === 'migrate_structure' && proposalText) {
+    patches = buildStructureMigrationPatches(canvas, proposalText);
   } else if (
     (structureApproval || structureDevelop) &&
     proposalText &&
@@ -370,21 +395,29 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (
     (effectiveMode === 'discuss' || effectiveMode === 'propose') &&
     !useDeterministicStructureApply &&
-    action !== 'apply_structure'
+    action !== 'apply_structure' &&
+    action !== 'migrate_structure'
   ) {
     patches = [];
   }
 
   const sanitized = sanitizeStudioCanvasPatches(canvas, patches, {
     targetBlockIds,
-    allowApprovedRestructure: structureApproval || structureDevelop || useDeterministicStructureApply,
+    allowApprovedRestructure:
+      structureApproval ||
+      structureDevelop ||
+      useDeterministicStructureApply ||
+      useDeterministicStructureMigrate,
   });
   const safePatches = sanitized.patches;
   const nextCanvas = applyStudioCanvasPatches(canvas, safePatches);
   const patchCount = safePatches.length;
 
   let assistantMessage = payload.message || 'Pronto.';
-  if (useDeterministicStructureApply && patchCount > 0) {
+  if (
+    (useDeterministicStructureApply || useDeterministicStructureMigrate) &&
+    patchCount > 0
+  ) {
     assistantMessage = structureApplySuccessMessage(locale, patchCount, applyMode);
   } else if ((structureApproval || structureDevelop) && patchCount > 0 && !payload.canvasPatches?.length) {
     assistantMessage = structureApplySuccessMessage(locale, patchCount, applyMode);
@@ -394,7 +427,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (action === 'cancel_plan') {
     studioStructureState = null;
   } else if (proposalText) {
-    if (useDeterministicStructureApply && patchCount > 0) {
+    if ((useDeterministicStructureApply || useDeterministicStructureMigrate) && patchCount > 0) {
       studioStructureState = buildStudioStructureState(proposalText, 'applied');
     } else if (structureApproval || action === 'approve_structure') {
       studioStructureState = buildStudioStructureState(proposalText, 'approved');
@@ -535,7 +568,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     copilotSession: {
       mode: nextCopilotSession.mode,
       structureState: studioStructureState,
-      pendingActions: pendingStructureActions(studioStructureState),
+      pendingActions: pendingStructureActions(studioStructureState, {
+        canMigrate: canvasWarrantsStructureMigration(nextCanvas),
+      }),
     },
   });
 }
@@ -555,7 +590,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const doc = await prisma.studioDocument.findFirst({
     where: companyId ? { id: params.id, companyId } : { id: params.id },
-    select: { id: true, companyId: true, createdById: true, folderId: true, visibility: true, aiSessionId: true },
+    select: {
+      id: true,
+      companyId: true,
+      createdById: true,
+      folderId: true,
+      visibility: true,
+      aiSessionId: true,
+      canvasState: true,
+    },
   });
   if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const access = await getDocumentAccess(user.id, doc);
@@ -614,12 +657,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       })),
     );
 
+  const canvas = normalizeStudioCanvas(doc.canvasState);
+  const canMigrate = canvasWarrantsStructureMigration(canvas);
+
   return NextResponse.json({
     messages: enriched,
     copilotSession: {
       mode: sessionMirror?.mode || 'discuss',
       structureState,
-      pendingActions: pendingStructureActions(structureState),
+      pendingActions: pendingStructureActions(structureState, { canMigrate }),
     },
   });
 }

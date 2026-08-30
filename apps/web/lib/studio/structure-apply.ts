@@ -320,17 +320,26 @@ Implementa a proposta aprovada abaixo com \`canvasPatches\` NESTE turno.
 export function structureApplySuccessMessage(
   locale: string,
   patchCount: number,
-  mode: 'apply' | 'develop',
+  mode: 'apply' | 'develop' | 'migrate',
 ): string {
   if (locale === 'es') {
+    if (mode === 'migrate') {
+      return `Estructura aplicada y contenido migrado (${patchCount} cambio${patchCount === 1 ? '' : 's'}). Revisa cada sección; pídeme ajustes puntuales si hace falta.`;
+    }
     return mode === 'develop'
       ? `He desarrollado la estructura aprobada en el documento (${patchCount} cambio${patchCount === 1 ? '' : 's'}). Revisa las secciones y pídeme ajustes puntuales si hace falta.`
       : `Estructura aprobada aplicada al documento (${patchCount} sección${patchCount === 1 ? '' : 'es'} actualizada${patchCount === 1 ? '' : 's'}).`;
   }
   if (locale === 'en') {
+    if (mode === 'migrate') {
+      return `Structure applied and content migrated (${patchCount} change${patchCount === 1 ? '' : 's'}). Review each section; ask for targeted edits if needed.`;
+    }
     return mode === 'develop'
       ? `I've developed the approved structure in the document (${patchCount} change${patchCount === 1 ? '' : 's'}). Review the sections and ask for targeted edits if needed.`
       : `Approved structure applied (${patchCount} section${patchCount === 1 ? '' : 's'} updated).`;
+  }
+  if (mode === 'migrate') {
+    return `Estrutura aplicada e conteúdo migrado (${patchCount} alteração${patchCount === 1 ? '' : 'ões'}). Revê cada secção.`;
   }
   return mode === 'develop'
     ? `Desenvolvi a estrutura aprovada no documento (${patchCount} alteração${patchCount === 1 ? '' : 'ões'}).`

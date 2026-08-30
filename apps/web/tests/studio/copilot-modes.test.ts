@@ -21,13 +21,18 @@ describe('copilot modes', () => {
   });
 
   it('pending actions for approved structure', () => {
-    const actions = pendingStructureActions({
-      status: 'approved',
+    const approved = {
+      status: 'approved' as const,
       proposalText: 'plan',
       outline: ['A'],
       updatedAt: new Date().toISOString(),
-    });
-    assert.ok(actions.includes('apply_structure'));
+    };
+    const withoutMigrate = pendingStructureActions(approved);
+    assert.ok(withoutMigrate.includes('apply_structure'));
+    assert.ok(!withoutMigrate.includes('migrate_structure'));
+
+    const withMigrate = pendingStructureActions(approved, { canMigrate: true });
+    assert.ok(withMigrate.includes('migrate_structure'));
   });
 });
 

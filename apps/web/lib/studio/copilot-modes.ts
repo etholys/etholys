@@ -6,6 +6,7 @@ export type StudioCopilotMode = (typeof STUDIO_COPILOT_MODES)[number];
 export const STUDIO_COPILOT_ACTIONS = [
   'approve_structure',
   'apply_structure',
+  'migrate_structure',
   'adjust_plan',
   'cancel_plan',
 ] as const;
@@ -50,6 +51,11 @@ export function actionUserMessage(action: StudioCopilotAction, locale: string): 
       en: 'Apply approved structure to the document',
       pt: 'Aplicar estrutura aprovada ao documento',
     },
+    migrate_structure: {
+      es: 'Aplicar estructura y migrar contenido existente',
+      en: 'Apply structure and migrate existing content',
+      pt: 'Aplicar estrutura e migrar conteúdo existente',
+    },
     adjust_plan: {
       es: 'Quiero ajustar el plan antes de aplicar',
       en: 'I want to adjust the plan before applying',
@@ -77,6 +83,11 @@ export function actionAssistantMessage(action: StudioCopilotAction, locale: stri
       en: 'Applying structure to the document…',
       pt: 'A aplicar estrutura ao documento…',
     },
+    migrate_structure: {
+      es: 'Migrando contenido a la estructura aprobada…',
+      en: 'Migrating content into the approved structure…',
+      pt: 'A migrar conteúdo para a estrutura aprovada…',
+    },
     adjust_plan: {
       es: 'Modo conversación: dime qué quieres cambiar en el plan.',
       en: 'Discuss mode: tell me what you want to change in the plan.',
@@ -93,13 +104,17 @@ export function actionAssistantMessage(action: StudioCopilotAction, locale: stri
 
 export function pendingStructureActions(
   structure: StudioStructureSessionState | null | undefined,
+  opts?: { canMigrate?: boolean },
 ): StudioCopilotAction[] {
   if (!structure) return [];
   if (structure.status === 'pending_approval') {
     return ['approve_structure', 'adjust_plan', 'cancel_plan'];
   }
   if (structure.status === 'approved') {
-    return ['apply_structure', 'adjust_plan', 'cancel_plan'];
+    const base: StudioCopilotAction[] = ['apply_structure'];
+    if (opts?.canMigrate) base.push('migrate_structure');
+    base.push('adjust_plan', 'cancel_plan');
+    return base;
   }
   return [];
 }
@@ -168,6 +183,11 @@ export function actionLabel(action: StudioCopilotAction, locale: string): string
   const labels: Record<StudioCopilotAction, Record<string, string>> = {
     approve_structure: { es: 'Aprobar estructura', en: 'Approve structure', pt: 'Aprovar estrutura' },
     apply_structure: { es: 'Aplicar estructura', en: 'Apply structure', pt: 'Aplicar estrutura' },
+    migrate_structure: {
+      es: 'Migrar contenido',
+      en: 'Migrate content',
+      pt: 'Migrar conteúdo',
+    },
     adjust_plan: { es: 'Ajustar plan', en: 'Adjust plan', pt: 'Ajustar plano' },
     cancel_plan: { es: 'Cancelar plan', en: 'Cancel plan', pt: 'Cancelar plano' },
   };
