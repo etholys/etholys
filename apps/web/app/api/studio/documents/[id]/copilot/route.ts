@@ -14,8 +14,14 @@ import { buildStudioCopilotUserText } from '@/lib/studio/copilot-history';
 import {
   buildStructureApprovalPatches,
   buildStructureApprovalSystemAddendum,
+  buildStructureDevelopPatches,
+  buildStudioStructureState,
   findStructureProposalMessage,
   isStructureApprovalMessage,
+  isStructureDevelopRequest,
+  isStructureProposalContent,
+  readStudioStructureState,
+  structureApplySuccessMessage,
 } from '@/lib/studio/structure-apply';
 import { shouldTrustClientStudioCanvas } from '@/lib/studio/document-scope';
 import {
@@ -118,10 +124,24 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     ? await prisma.aiAdvisorMessage.findMany({
         where: { sessionId: aiSessionId },
         orderBy: { createdAt: 'asc' },
-        take: 24,
-        select: { role: true, content: true },
+        take: 40,
+        select: { role: true, content: true, context: true },
       })
     : [];
+
+  const structureStateBefore = readStudioStructureState(priorMessages);
+  const structureApproval = isStructureApprovalMessage(message);
+  const structureDevelop = isStructureDevelopRequest(message);
+  const proposalText =
+    structureStateBefore?.proposalText ||
+    findStructureProposalMessage(priorMessages)?.content ||
+    null;
+  const applyMode: 'apply' | 'develop' =
+    structureDevelop || structureStateBefore?.status === 'approved' ? 'develop' : 'apply';
+  const useDeterministicStructureApply =
+    !targetBlockIds.length &&
+    !!proposalText &&
+    (structureApproval || structureDevelop);
 
   await prisma.aiAdvisorMessage.create({
     data: {
@@ -170,9 +190,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const mergedUserContext = [userUploadedContext, linkContext].filter(Boolean).join('\n\n');
 
-  const structureProposal = findStructureProposalMessage(priorMessages);
-  const structureApproval =
-    !!structureProposal && isStructureApprovalMessage(message);
+  const scopedUserText =
+    targetBlockIds.length > 0
+      ? `[Âmbito de edição — só estes blockId: ${targetBlockIds.join(', ')}]\n\n${message}`
+      : message;
 
   let system = buildStudioSystemPrompt({
     locale,
@@ -184,64 +205,107 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     targetBlockIds: targetBlockIds.length ? targetBlockIds : null,
   });
 
-  if (structureApproval && structureProposal) {
-    system += `\n\n${buildStructureApprovalSystemAddendum(structureProposal.content, locale)}`;
+  if (proposalText && (structureApproval || structureDevelop) && !useDeterministicStructureApply) {
+    system += `\n\n${buildStructureApprovalSystemAddendum(proposalText, locale, applyMode)}`;
   }
 
-  const scopedUserText =
-    targetBlockIds.length > 0
-      ? `[Âmbito de edição — só estes blockId: ${targetBlockIds.join(', ')}]\n\n${message}`
-      : message;
+  let raw = '';
+  let payload = { message: 'Pronto.', canvasPatches: [] as ReturnType<typeof parseStudioCopilotJson>['canvasPatches'], consentRequest: null as ReturnType<typeof parseStudioCopilotJson>['consentRequest'], suggestedTitle: undefined as string | undefined };
 
-  const fullUserText = buildStudioCopilotUserText(priorMessages, scopedUserText, locale);
+  if (useDeterministicStructureApply && proposalText) {
+    payload = {
+      message: structureApplySuccessMessage(locale, 0, applyMode),
+      canvasPatches: [],
+      consentRequest: null,
+      suggestedTitle: undefined,
+    };
+  } else {
+    try {
+      const llmOpts = multimodalParts.length
+        ? {
+            systemInstruction: system,
+            userParts: [
+              {
+                text: buildStudioCopilotUserText(
+                  priorMessages.map((m) => ({ role: m.role, content: m.content })),
+                  scopedUserText,
+                  locale,
+                ),
+              },
+              ...multimodalParts,
+            ],
+            maxOutputTokens: 8000,
+            temperature: 0.1,
+            responseMimeType: 'application/json' as const,
+          }
+        : {
+            systemInstruction: system,
+            chatMessages: [
+              ...priorMessages.map((m) => ({
+                role: m.role as 'user' | 'assistant',
+                content: m.content,
+              })),
+              { role: 'user' as const, content: scopedUserText },
+            ],
+            maxOutputTokens: 8000,
+            temperature: 0.1,
+            responseMimeType: 'application/json' as const,
+          };
 
-  let raw: string;
-  try {
-    const { text, finishReason } = await llmGenerateContent({
-      systemInstruction: system,
-      userText: multimodalParts.length ? undefined : fullUserText,
-      userParts: multimodalParts.length
-        ? [{ text: fullUserText }, ...multimodalParts]
-        : undefined,
-      maxOutputTokens: 8000,
-      temperature: 0.1,
-      responseMimeType: 'application/json',
-    });
-    if (finishReason === 'MAX_TOKENS') {
-      return NextResponse.json(
-        { error: 'LLM truncated', detail: 'Resposta cortada — tente um pedido mais curto.' },
-        { status: 502 },
-      );
+      const { text, finishReason } = await llmGenerateContent(llmOpts);
+      if (finishReason === 'MAX_TOKENS') {
+        return NextResponse.json(
+          { error: 'LLM truncated', detail: 'Resposta cortada — tente um pedido mais curto.' },
+          { status: 502 },
+        );
+      }
+      raw = text;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return NextResponse.json({ error: 'LLM failed', detail: msg }, { status: 502 });
     }
-    raw = text;
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: 'LLM failed', detail: msg }, { status: 502 });
+
+    payload = parseStudioCopilotJson(raw);
   }
 
-  const payload = parseStudioCopilotJson(raw);
   let patches = payload.canvasPatches || [];
 
-  if (structureApproval && structureProposal && !patches.length) {
-    patches = buildStructureApprovalPatches(canvas, structureProposal.content);
+  if (useDeterministicStructureApply && proposalText) {
+    patches = buildStructureDevelopPatches(canvas, proposalText);
+  } else if (
+    (structureApproval || structureDevelop) &&
+    proposalText &&
+    !patches.length
+  ) {
+    patches = buildStructureDevelopPatches(canvas, proposalText);
+  } else if (structureApproval && proposalText && !patches.length) {
+    patches = buildStructureApprovalPatches(canvas, proposalText);
   }
 
   const sanitized = sanitizeStudioCanvasPatches(canvas, patches, {
     targetBlockIds,
-    allowApprovedRestructure: structureApproval,
+    allowApprovedRestructure: structureApproval || structureDevelop || useDeterministicStructureApply,
   });
   const safePatches = sanitized.patches;
   const nextCanvas = applyStudioCanvasPatches(canvas, safePatches);
   const patchCount = safePatches.length;
 
   let assistantMessage = payload.message || 'Pronto.';
-  if (structureApproval && patchCount > 0 && !payload.canvasPatches?.length) {
-    assistantMessage =
-      locale === 'es'
-        ? `Estructura aprobada aplicada al documento (${patchCount} sección${patchCount === 1 ? '' : 'es'} actualizada${patchCount === 1 ? '' : 's'}).`
-        : locale === 'en'
-          ? `Approved structure applied to the document (${patchCount} section${patchCount === 1 ? '' : 's'} updated).`
-          : `Estrutura aprovada aplicada ao documento (${patchCount} secção${patchCount === 1 ? '' : 'ões'} actualizada${patchCount === 1 ? '' : 's'}).`;
+  if (useDeterministicStructureApply && patchCount > 0) {
+    assistantMessage = structureApplySuccessMessage(locale, patchCount, applyMode);
+  } else if ((structureApproval || structureDevelop) && patchCount > 0 && !payload.canvasPatches?.length) {
+    assistantMessage = structureApplySuccessMessage(locale, patchCount, applyMode);
+  }
+
+  let studioStructureState = structureStateBefore;
+  if (proposalText) {
+    if (useDeterministicStructureApply && patchCount > 0) {
+      studioStructureState = buildStudioStructureState(proposalText, 'applied');
+    } else if (structureApproval) {
+      studioStructureState = buildStudioStructureState(proposalText, 'approved');
+    } else if (isStructureProposalContent(assistantMessage)) {
+      studioStructureState = buildStudioStructureState(assistantMessage, 'pending_approval');
+    }
   }
   if (sanitized.blockedFullRewrite) {
     assistantMessage +=
@@ -315,6 +379,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         targetBlockIds,
         droppedPatches: sanitized.dropped,
         blockedFullRewrite: sanitized.blockedFullRewrite,
+        ...(studioStructureState ? { studioStructureState } : {}),
+        deterministicStructureApply: useDeterministicStructureApply,
       },
     },
   });

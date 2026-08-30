@@ -10,6 +10,8 @@ import {
   extractStructureOutline,
   findStructureProposalMessage,
   isStructureApprovalMessage,
+  isStructureDevelopRequest,
+  readStudioStructureState,
 } from '../../lib/studio/structure-apply';
 import { emptyStudioCanvas } from '../../lib/studio/types';
 
@@ -99,8 +101,34 @@ describe('structure approval', () => {
 
   it('extracts outline sections', () => {
     const sections = extractStructureOutline(
-      '### PARTE I\n**1. Identidad de Marca**\n- 9.1 Producción',
+      '### PARTE I\n**1. Identidad de Marca**\n- 9.1 Producción por Lotes',
     );
-    assert.deepEqual(sections, ['PARTE I', '1. Identidad de Marca', '9.1 Producción']);
+    assert.deepEqual(sections, ['PARTE I', '1. Identidad de Marca', '9.1 Producción por Lotes']);
+  });
+
+  it('detects develop request for approved structure', () => {
+    assert.equal(
+      isStructureDevelopRequest(
+        'pero lo que estoy pidiendo es que desarrolles esa estructura que está aprobada',
+      ),
+      true,
+    );
+  });
+
+  it('infers approved state from conversation', () => {
+    const messages = [
+      {
+        role: 'assistant',
+        content:
+          '## PROPUESTA DE ESTRUCTURA\n**1. Identidad**\n¿Apruebas esta estructura antes de que edite el documento?',
+      },
+      { role: 'user', content: 'apruebo esta estructura tal como está' },
+      {
+        role: 'assistant',
+        content: 'Perfecto, la estructura queda aprobada tal como está.',
+      },
+    ];
+    const state = readStudioStructureState(messages);
+    assert.equal(state?.status, 'approved');
   });
 });

@@ -5,6 +5,14 @@ import {
 } from '@/lib/studio/copilot-history';
 import type { StudioCanvasPatch, StudioCanvasState } from '@/lib/studio/types';
 
+/** Estado persistido na sessão Studio (context das mensagens assistant). */
+export type StudioStructureSessionState = {
+  status: 'pending_approval' | 'approved' | 'applied';
+  proposalText: string;
+  outline: string[];
+  updatedAt: string;
+};
+
 const STRUCTURE_PROPOSAL_MARKERS = [
   /propuesta de estructura/i,
   /¿apruebas esta estructura/i,
@@ -16,26 +24,15 @@ const STRUCTURE_PROPOSAL_MARKERS = [
   /antes de editar o documento/i,
 ];
 
-const APPROVAL_PHRASES = [
-  /^aprob/i,
-  /^aprobo/i,
-  /^apruebo/i,
-  /^confirmo/i,
-  /^confirmado/i,
-  /^de acuerdo/i,
-  /estructura tal como/i,
-  /estructura como está/i,
-  /tal como está/i,
-  /^sim[,.\s!]*$/i,
-  /^s[ií][,.\s!]*$/i,
-  /^ok[,.\s!]*$/i,
-  /^yes[,.\s!]*$/i,
-  /^vale[,.\s!]*$/i,
-  /^perfecto/i,
-  /^adelante/i,
-  /^hazlo/i,
-  /^proceed/i,
-];
+const DEVELOP_REQUEST_RE =
+  /\b(desarroll(?:a|ar|es|e)|implement(?:a|ar|es|e)|aplic(?:a|ar|as|ado)|escrib(?:e|ir|a)|redact(?:a|ar)|aplica la estructura|desarrolla la estructura|desenvolv(?:e|er|a)|implementa a estrutura|apply the structure|develop the structure|write out the structure|fill in the structure|crea(?:r)? (?:las )?secciones)\b/i;
+
+const APPROVED_REF_RE =
+  /\b(estructura aprobada|estructura que (?:est[aá]|qued[oó]) aprobada|la estructura que aprob|approved structure|estrutura aprovada)\b/i;
+
+export function isStructureProposalContent(content: string): boolean {
+  return STRUCTURE_PROPOSAL_MARKERS.some((re) => re.test(content));
+}
 
 /** Mensagem do assistente que pede aprovação de estrutura. */
 export function findStructureProposalMessage(
@@ -44,14 +41,79 @@ export function findStructureProposalMessage(
   for (let i = history.length - 1; i >= 0; i--) {
     const m = history[i];
     if (m.role !== 'assistant') continue;
-    if (STRUCTURE_PROPOSAL_MARKERS.some((re) => re.test(m.content))) {
-      return m;
-    }
+    if (isStructureProposalContent(m.content)) return m;
   }
   return null;
 }
 
-/** Utilizador aprovou a estrutura (curto, explícito ou mensagem longa de confirmação). */
+export function readStudioStructureState(
+  messages: Array<{ role: string; content: string; context?: unknown }>,
+): StudioStructureSessionState | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== 'assistant' || !m.context || typeof m.context !== 'object') continue;
+    const ctx = m.context as Record<string, unknown>;
+    const raw = ctx.studioStructureState;
+    if (!raw || typeof raw !== 'object') continue;
+    const s = raw as Record<string, unknown>;
+    if (typeof s.proposalText !== 'string' || !s.proposalText.trim()) continue;
+    const status =
+      s.status === 'approved' || s.status === 'applied' || s.status === 'pending_approval'
+        ? s.status
+        : 'pending_approval';
+    const outline = Array.isArray(s.outline)
+      ? s.outline.filter((x): x is string => typeof x === 'string')
+      : extractStructureOutline(s.proposalText);
+    return {
+      status,
+      proposalText: s.proposalText,
+      outline,
+      updatedAt: typeof s.updatedAt === 'string' ? s.updatedAt : new Date().toISOString(),
+    };
+  }
+
+  const proposal = findStructureProposalMessage(messages);
+  if (!proposal) return null;
+
+  const proposalIdx = messages.findIndex((m) => m === proposal);
+  const after = proposalIdx >= 0 ? messages.slice(proposalIdx + 1) : [];
+  const userApproved = after.some(
+    (m) => m.role === 'user' && isStructureApprovalMessage(m.content),
+  );
+  const assistantAckApproved = after.some(
+    (m) =>
+      m.role === 'assistant' &&
+      /queda aprobada|estructura aprobada|estructura queda|ficou aprovada/i.test(m.content),
+  );
+  const userDevelop = after.some(
+    (m) => m.role === 'user' && isStructureDevelopRequest(m.content),
+  );
+
+  let status: StudioStructureSessionState['status'] = 'pending_approval';
+  if (userApproved || assistantAckApproved) status = 'approved';
+  if (userDevelop && (userApproved || assistantAckApproved)) status = 'applied';
+
+  return {
+    status,
+    proposalText: proposal.content,
+    outline: extractStructureOutline(proposal.content),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function buildStudioStructureState(
+  proposalText: string,
+  status: StudioStructureSessionState['status'],
+): StudioStructureSessionState {
+  return {
+    status,
+    proposalText,
+    outline: extractStructureOutline(proposalText),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/** Utilizador aprovou a estrutura. */
 export function isStructureApprovalMessage(message: string): boolean {
   const t = message.trim();
   if (!t) return false;
@@ -62,93 +124,137 @@ export function isStructureApprovalMessage(message: string): boolean {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
 
-  if (t.length <= 280 && APPROVAL_PHRASES.some((re) => re.test(n))) return true;
-
   if (/\b(aprobado|aprobe|aprob[eé]|apruebo|aprobo|confirmo)\b/.test(n)) {
     if (/estructura|propuesta|propuse|propusiste|tal como/.test(n)) return true;
     if (t.length <= 64) return true;
   }
 
+  if (/queda aprobada|est[aá] aprobada|ficou aprovada/.test(n)) return true;
+
   return false;
 }
 
+/** Pedido para aplicar/desenvolver a estrutura já acordada. */
+export function isStructureDevelopRequest(message: string): boolean {
+  const t = message.trim();
+  if (!t) return false;
+  const n = t
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (APPROVED_REF_RE.test(n)) return true;
+  if (
+    DEVELOP_REQUEST_RE.test(n) &&
+    /estructura|estrutura|structure|secciones|secoes|plan|documento/.test(n)
+  ) {
+    return true;
+  }
+  if (/desarroll(?:a|ar|es|e) (?:esa|la|esta|lo)/.test(n)) return true;
+  if (/lo que estoy pidiendo/.test(n) && /estructura|desarroll|aplic|implement/.test(n)) return true;
+
+  return false;
+}
+
+export type StructureSection = {
+  title: string;
+  bullets: string[];
+};
+
 /** Extrai títulos de secção da proposta markdown. */
 export function extractStructureOutline(proposalText: string): string[] {
-  const out: string[] = [];
+  return parseStructureProposalSections(proposalText).map((s) => s.title);
+}
+
+/** Parseia proposta em secções com sub-itens. */
+export function parseStructureProposalSections(proposalText: string): StructureSection[] {
+  const sections: StructureSection[] = [];
+  let current: StructureSection | null = null;
+
   for (const line of proposalText.split('\n')) {
     const t = line.trim();
     if (!t || t.startsWith('---') || t.startsWith('⚠️')) continue;
+
     const h = t.match(/^#{1,4}\s+(.+)$/);
     if (h) {
       const title = h[1].replace(/\*\*/g, '').trim();
       if (/^propuesta de estructura/i.test(title)) continue;
-      out.push(title);
+      current = { title, bullets: [] };
+      sections.push(current);
       continue;
     }
+
     const bold = t.match(/^\*\*(.+?)\*\*$/);
     if (bold) {
-      out.push(bold[1].trim());
+      current = { title: bold[1].trim(), bullets: [] };
+      sections.push(current);
       continue;
     }
-    const sub = t.match(/^-\s+((?:\d+\.)*\d+\s+.+)$/);
-    if (sub) {
-      out.push(sub[1].trim());
+
+    const sub = t.match(/^-\s+(.+)$/);
+    if (sub && current) {
+      current.bullets.push(sub[1].trim());
     }
   }
-  return out.filter((s) => s.length > 2 && !/^notas antes/i.test(s));
+
+  return sections.filter((s) => s.title.length > 2 && !/^notas antes/i.test(s.title));
 }
 
-/** Blocos candidatos a receber títulos da nova estrutura (ordem do documento). */
 function structureTargetBlocks(canvas: StudioCanvasState) {
-  const all = canvas.pages.flatMap((p) => p.blocks);
-  const headings = all.filter((b) => b.kind === 'heading');
-  if (headings.length >= 3) return headings;
-  return all.filter(
-    (b) =>
-      b.kind === 'heading' ||
-      b.kind === 'paragraph' ||
-      b.kind === 'bullets' ||
-      b.kind === 'callout',
-  );
+  return canvas.pages.flatMap((p) => p.blocks);
 }
 
-/**
- * Fallback determinístico: aplica outline aprovado nos blocos existentes
- * quando o LLM devolve canvasPatches vazio.
- */
+/** Aplica títulos da estrutura (fallback mínimo). */
 export function buildStructureApprovalPatches(
   canvas: StudioCanvasState,
   proposalText: string,
 ): StudioCanvasPatch[] {
-  const sections = extractStructureOutline(proposalText);
+  return buildStructureDevelopPatches(canvas, proposalText);
+}
+
+/**
+ * Desenvolve estrutura aprovada: título + bullets por secção nos blocos existentes.
+ */
+export function buildStructureDevelopPatches(
+  canvas: StudioCanvasState,
+  proposalText: string,
+): StudioCanvasPatch[] {
+  const sections = parseStructureProposalSections(proposalText);
   if (!sections.length) return [];
 
-  const targets = structureTargetBlocks(canvas);
-  if (!targets.length) return [];
+  const blocks = structureTargetBlocks(canvas);
+  if (!blocks.length) return [];
 
   const patches: StudioCanvasPatch[] = [];
-  const used = Math.min(sections.length, targets.length);
+  let blockIdx = 0;
 
-  for (let i = 0; i < used; i++) {
+  for (const section of sections) {
+    if (blockIdx >= blocks.length) break;
+
+    const headingBlock = blocks[blockIdx];
     patches.push({
-      blockId: targets[i].id,
+      blockId: headingBlock.id,
       kind: 'heading',
-      title: sections[i].slice(0, 120),
-      text: sections[i],
+      title: section.title.slice(0, 120),
+      text: section.title,
     });
-  }
+    blockIdx++;
 
-  if (sections.length > used && targets[0]) {
-    const remainder = sections.slice(used).map((s) => `- ${s}`).join('\n');
-    const existing = (targets[0].text || '').trim();
-    patches.push({
-      blockId: targets[0].id,
-      kind: 'bullets',
-      title: 'Índice de estructura',
-      text: existing
-        ? `${existing}\n\n## Estructura aprobada\n${remainder}`
-        : `## Estructura aprobada\n${remainder}`,
-    });
+    const bodyText =
+      section.bullets.length > 0
+        ? section.bullets.map((b) => `- ${b}`).join('\n')
+        : '(Contenido pendiente de desarrollar.)';
+
+    if (blockIdx < blocks.length) {
+      const bodyBlock = blocks[blockIdx];
+      patches.push({
+        blockId: bodyBlock.id,
+        kind: section.bullets.length ? 'bullets' : 'paragraph',
+        title: section.title.slice(0, 80),
+        text: bodyText,
+      });
+      blockIdx++;
+    }
   }
 
   return patches;
@@ -157,36 +263,76 @@ export function buildStructureApprovalPatches(
 export function buildStructureApprovalSystemAddendum(
   proposalText: string,
   locale: string,
+  mode: 'apply' | 'develop' = 'apply',
 ): string {
   const loc = locale === 'es' ? 'es' : locale === 'en' ? 'en' : 'pt';
+  if (mode === 'develop') {
+    if (loc === 'es') {
+      return `## DESARROLLAR ESTRUCTURA APROBADA — APLICAR AHORA
+El usuario pide DESARROLLAR/APLICAR la estructura ya aprobada. La propuesta está abajo.
+- **Prohibido** preguntar "¿a qué estructura te refieres?" — es la de abajo.
+- **Prohibido** pedir confirmación o más contexto.
+- **Obligatorio** devolver \`canvasPatches\` que implementen TODAS las secciones (títulos + contenido inicial/bullets).
+
+### Estructura aprobada:
+${proposalText.slice(0, 12000)}`;
+    }
+    if (loc === 'en') {
+      return `## DEVELOP APPROVED STRUCTURE — APPLY NOW
+The user asks to DEVELOP/APPLY the already approved structure below.
+- Do **not** ask which structure they mean.
+- You **must** return \`canvasPatches\` implementing ALL sections.
+
+### Approved structure:
+${proposalText.slice(0, 12000)}`;
+    }
+    return `## DESENVOLVER ESTRUTURA APROVADA — APLICAR AGORA
+O utilizador pede DESENVOLVER/APLICAR a estrutura já aprovada abaixo.
+- **Proibido** perguntar a qual estrutura se refere.
+- **Obrigatório** devolver \`canvasPatches\` com TODAS as secções.
+
+### Estrutura aprovada:
+${proposalText.slice(0, 12000)}`;
+  }
+
   const header =
     loc === 'es'
       ? `## APROBACIÓN DE ESTRUCTURA — APLICAR AHORA
 El usuario acaba de APROBAR la siguiente propuesta. Debes implementarla en el documento con \`canvasPatches\` en ESTE turno.
-- **Prohibido** decir que no tienes historial — la propuesta está abajo.
-- **Prohibido** volver a pedir confirmación.
-- **Obligatorio** devolver \`canvasPatches\` que reflejen la estructura (títulos de sección, reorganización).
-- Puedes actualizar muchos bloques porque el usuario aprobó una reestructuración completa.
 
 ### Propuesta aprobada:
 `
       : loc === 'en'
         ? `## STRUCTURE APPROVAL — APPLY NOW
-The user just APPROVED the proposal below. Implement it in the document with \`canvasPatches\` in THIS turn.
-- Do **not** say you lack history — the proposal is below.
-- Do **not** ask for confirmation again.
-- You **must** return \`canvasPatches\` reflecting the structure.
+Implement the approved proposal below with \`canvasPatches\` in THIS turn.
 
 ### Approved proposal:
 `
         : `## APROVAÇÃO DE ESTRUTURA — APLICAR AGORA
-O utilizador acabou de APROVAR a proposta abaixo. Implementa-a no documento com \`canvasPatches\` NESTE turno.
-- **Proibido** dizer que não tens histórico — a proposta está abaixo.
-- **Proibido** pedir confirmação outra vez.
-- **Obrigatório** devolver \`canvasPatches\` que reflitam a estrutura.
+Implementa a proposta aprovada abaixo com \`canvasPatches\` NESTE turno.
 
 ### Proposta aprovada:
 `;
 
   return `${header}${proposalText.slice(0, 12000)}`;
+}
+
+export function structureApplySuccessMessage(
+  locale: string,
+  patchCount: number,
+  mode: 'apply' | 'develop',
+): string {
+  if (locale === 'es') {
+    return mode === 'develop'
+      ? `He desarrollado la estructura aprobada en el documento (${patchCount} cambio${patchCount === 1 ? '' : 's'}). Revisa las secciones y pídeme ajustes puntuales si hace falta.`
+      : `Estructura aprobada aplicada al documento (${patchCount} sección${patchCount === 1 ? '' : 'es'} actualizada${patchCount === 1 ? '' : 's'}).`;
+  }
+  if (locale === 'en') {
+    return mode === 'develop'
+      ? `I've developed the approved structure in the document (${patchCount} change${patchCount === 1 ? '' : 's'}). Review the sections and ask for targeted edits if needed.`
+      : `Approved structure applied (${patchCount} section${patchCount === 1 ? '' : 's'} updated).`;
+  }
+  return mode === 'develop'
+    ? `Desenvolvi a estrutura aprovada no documento (${patchCount} alteração${patchCount === 1 ? '' : 'ões'}).`
+    : `Estrutura aprovada aplicada (${patchCount} secção${patchCount === 1 ? '' : 'ões'} actualizada${patchCount === 1 ? '' : 's'}).`;
 }

@@ -109,10 +109,14 @@ export type LlmPart = {
   inlineData?: { mimeType: string; data: string };
 };
 
+export type LlmChatMessage = { role: 'user' | 'assistant'; content: string };
+
 export type LlmGenerateOptions = {
   systemInstruction: string;
   userText?: string;
   userParts?: LlmPart[];
+  /** Histórico nativo user/assistant (preferir em chats multi-turno). */
+  chatMessages?: LlmChatMessage[];
   maxOutputTokens?: number;
   temperature?: number;
   responseMimeType?: 'application/json' | 'text/plain';
@@ -272,12 +276,28 @@ async function llmGenerateContentWithModel(
       '\n\nYou must respond with valid JSON only. Do not wrap in markdown code fences. No commentary before or after the JSON.';
   }
 
+  const anthropicMessages: Array<{
+    role: 'user' | 'assistant';
+    content: string | AnthropicContentBlock[];
+  }> = [];
+
+  if (opts.chatMessages?.length) {
+    for (const m of opts.chatMessages.slice(-24)) {
+      anthropicMessages.push({
+        role: m.role,
+        content: m.content,
+      });
+    }
+  } else {
+    anthropicMessages.push({ role: 'user', content: partsToAnthropicContent(parts) });
+  }
+
   const body: Record<string, unknown> = {
     model,
     max_tokens: maxOut,
     temperature: opts.temperature ?? 0.1,
     system,
-    messages: [{ role: 'user', content: partsToAnthropicContent(parts) }],
+    messages: anthropicMessages,
   };
 
   if (opts.webSearch) {
