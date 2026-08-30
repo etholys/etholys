@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Plus } from 'lucide-react';
+import { Crosshair, Plus } from 'lucide-react';
 import type { StudioPage } from '@/lib/studio/types';
+import type { PageSelectionState } from '@/lib/studio/selection-scope';
 
 type Props = {
   pages: StudioPage[];
@@ -12,6 +13,9 @@ type Props = {
   onSelect: (pageId: string) => void;
   onAddPage?: () => void;
   canEdit?: boolean;
+  /** Estado de selecção IA por folha (miniatura). */
+  pageAiSelection?: Record<string, PageSelectionState>;
+  onToggleAiPage?: (pageId: string) => void;
 };
 
 function t(locale: string, pt: string, es: string, en: string): string {
@@ -27,6 +31,8 @@ export function StudioPageFilmstrip({
   onSelect,
   onAddPage,
   canEdit,
+  pageAiSelection,
+  onToggleAiPage,
 }: Props) {
   const sorted = pages.slice().sort((a, b) => a.order - b.order);
   const activeIdx = sorted.findIndex((p) => p.id === activePageId);
@@ -71,22 +77,31 @@ export function StudioPageFilmstrip({
               ? preview.text.replace(/^#+\s*/, '').slice(0, 40)
               : preview?.text.slice(0, 40) || page.title;
 
+          const aiSel = pageAiSelection?.[page.id] || 'none';
+
           return (
+            <div key={page.id} className="group relative shrink-0" style={{ width: '112px' }}>
             <button
-              key={page.id}
               ref={active ? activeThumbRef : undefined}
               type="button"
               onClick={() => onSelect(page.id)}
-              className={`group shrink-0 rounded-lg border transition ${
+              className={`w-full rounded-lg border transition ${
                 active
                   ? isWrite
                     ? 'border-orange-400 bg-white ring-2 ring-orange-300/50'
                     : 'border-fuchsia-400 bg-violet-900/80 ring-2 ring-fuchsia-400/40'
-                  : isWrite
-                    ? 'border-stone-300/80 bg-white/60 hover:border-orange-300 hover:bg-white'
-                    : 'border-violet-800/60 bg-violet-950/40 hover:border-violet-500'
+                  : aiSel === 'full'
+                    ? isWrite
+                      ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-300/60'
+                      : 'border-orange-400 bg-violet-900/60 ring-2 ring-orange-400/50'
+                    : aiSel === 'partial'
+                      ? isWrite
+                        ? 'border-orange-300 bg-white ring-1 ring-orange-200'
+                        : 'border-orange-500/70 bg-violet-950/50 ring-1 ring-orange-400/40'
+                      : isWrite
+                        ? 'border-stone-300/80 bg-white/60 hover:border-orange-300 hover:bg-white'
+                        : 'border-violet-800/60 bg-violet-950/40 hover:border-violet-500'
               }`}
-              style={{ width: '112px' }}
               title={label || page.title || `${idx + 1}`}
             >
               <div
@@ -104,6 +119,26 @@ export function StudioPageFilmstrip({
                 {idx + 1}
               </p>
             </button>
+            {canEdit && onToggleAiPage && (
+              <button
+                type="button"
+                title={t(locale, 'Seleccionar folha para IA', 'Seleccionar hoja para IA', 'Select page for AI')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleAiPage(page.id);
+                }}
+                className={`absolute right-1 top-1 rounded-md p-0.5 shadow-sm ${
+                  aiSel === 'full'
+                    ? 'bg-orange-600 text-white'
+                    : aiSel === 'partial'
+                      ? 'bg-orange-100 text-orange-800 ring-1 ring-orange-300'
+                      : 'bg-white/90 text-stone-600 ring-1 ring-stone-200 opacity-0 group-hover:opacity-100'
+                }`}
+              >
+                <Crosshair className="h-3 w-3" />
+              </button>
+            )}
+            </div>
           );
         })}
         {canEdit && onAddPage && (

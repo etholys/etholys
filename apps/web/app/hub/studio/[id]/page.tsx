@@ -108,6 +108,12 @@ import { actionUserMessage } from '@/lib/studio/copilot-modes';
 import { StudioCollapsedChatContent } from '@/components/studio/StudioCollapsedChatContent';
 import { StudioCopilotModeBar } from '@/components/studio/StudioCopilotModeBar';
 import { StudioStructureActionBar } from '@/components/studio/StudioStructureActionBar';
+import { StudioSelectionScopeBar } from '@/components/studio/StudioSelectionScopeBar';
+import {
+  blockLabelWithPage,
+  pageSelectionState,
+  togglePageBlockSelection,
+} from '@/lib/studio/selection-scope';
 
 type ChatMsg = {
   id: string;
@@ -636,6 +642,21 @@ export default function StudioDocumentPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, consent]);
 
+  useEffect(() => {
+    if (aiTargetBlockIds.length > 0) {
+      setCopilotMode('edit_selection');
+    }
+  }, [aiTargetBlockIds.length]);
+
+  const pageAiSelectionMap = useMemo(() => {
+    if (!canvas) return {};
+    const out: Record<string, ReturnType<typeof pageSelectionState>> = {};
+    for (const p of canvas.pages) {
+      out[p.id] = pageSelectionState(canvas, p.id, aiTargetBlockIds);
+    }
+    return out;
+  }, [canvas, aiTargetBlockIds]);
+
   /** Scroll spy — folha activa ao percorrer o documento (estilo Word). */
   useEffect(() => {
     const root = canvasScrollRef.current;
@@ -1024,15 +1045,14 @@ export default function StudioDocumentPage() {
     );
   }
 
+  function togglePageForAi(pageId: string) {
+    if (!canvas) return;
+    setAiTargetBlockIds(togglePageBlockSelection(canvas, pageId, aiTargetBlockIds));
+  }
+
   function blockLabel(blockId: string): string {
     if (!canvas) return blockId;
-    for (const page of canvas.pages) {
-      const b = page.blocks.find((x) => x.id === blockId);
-      if (!b) continue;
-      const raw = (b.title || b.text || b.kind).replace(/\s+/g, ' ').trim();
-      return raw.slice(0, 48) || b.kind;
-    }
-    return blockId;
+    return blockLabelWithPage(canvas, blockId);
   }
 
   async function sendChat(opts?: {
@@ -2059,38 +2079,15 @@ export default function StudioDocumentPage() {
                 'Select sections (crosshair) and ask for surgical rewrites. Enter = line · Ctrl+Enter = send.',
               )}
             </p>
-            {aiTargetBlockIds.length > 0 && (
-              <div className="mt-2 rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-2">
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <p className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-orange-800">
-                    <Crosshair className="h-3 w-3" />
-                    {t('Âmbito IA', 'Ámbito IA', 'AI scope')}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setAiTargetBlockIds([])}
-                    className="text-[11px] font-semibold text-orange-700 underline"
-                  >
-                    {t('Limpar', 'Limpiar', 'Clear')}
-                  </button>
-                </div>
-                <ul className="flex flex-wrap gap-1">
-                  {aiTargetBlockIds.map((bid) => (
-                    <li key={bid}>
-                      <button
-                        type="button"
-                        onClick={() => toggleAiTarget(bid)}
-                        className="inline-flex max-w-[12rem] items-center gap-1 truncate rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-orange-900 ring-1 ring-orange-200"
-                        title={bid}
-                      >
-                        <Sparkles className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{blockLabel(bid)}</span>
-                        <X className="h-3 w-3 shrink-0 opacity-60" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            {canvas && (
+              <StudioSelectionScopeBar
+                locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+                canvas={canvas}
+                selectedBlockIds={aiTargetBlockIds}
+                activePageId={activePageId}
+                disabled={chatBusy || !canEdit}
+                onChange={setAiTargetBlockIds}
+              />
             )}
             {folderContextCount > 0 && (
               <p className="mt-1 text-[11px] font-medium text-amber-800">
@@ -2669,11 +2666,18 @@ export default function StudioDocumentPage() {
                   page.layoutMode === 'mold' && mold?.imageUrl
                     ? mold.imageUrl
                     : null;
+                const pageSel = pageSelectionState(canvas, page.id, aiTargetBlockIds);
                 return (
                   <section
                     key={page.id}
                     data-studio-page-id={page.id}
-                    className="relative"
+                    className={`relative rounded-lg transition ${
+                      pageSel === 'full'
+                        ? 'bg-orange-50/30 ring-2 ring-orange-400 ring-offset-2 ring-offset-[#faf8f5]'
+                        : pageSel === 'partial'
+                          ? 'ring-2 ring-dashed ring-orange-300 ring-offset-2 ring-offset-[#faf8f5]'
+                          : ''
+                    }`}
                     onFocusCapture={() => setActivePageId(page.id)}
                     onMouseDown={() => setActivePageId(page.id)}
                     onBlurCapture={(e) => {
@@ -2687,6 +2691,25 @@ export default function StudioDocumentPage() {
                       <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
                         {page.title || `${t('Folha', 'Hoja', 'Sheet')} ${idxDisplay + 1}`} · {size}
                       </p>
+                      <div className="flex flex-wrap items-center gap-1">
+                      {studioMode === 'write' && canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => togglePageForAi(page.id)}
+                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold ${
+                            pageSel === 'full'
+                              ? 'bg-orange-600 text-white'
+                              : pageSel === 'partial'
+                                ? 'border border-orange-300 bg-orange-50 text-orange-900'
+                                : 'border border-slate-200 bg-white text-slate-600 hover:border-orange-300'
+                          }`}
+                        >
+                          <Crosshair className="h-3 w-3" />
+                          {pageSel === 'full'
+                            ? t('Folha na IA', 'Hoja en IA', 'Page in AI')
+                            : t('IA: folha', 'IA: hoja', 'AI: page')}
+                        </button>
+                      )}
                       {studioMode === 'design' && (
                         <div className="flex gap-1">
                           <button
@@ -2719,6 +2742,7 @@ export default function StudioDocumentPage() {
                           </button>
                         </div>
                       )}
+                      </div>
                     </div>
                     <div
                       className={
@@ -2915,6 +2939,8 @@ export default function StudioDocumentPage() {
             canEdit={canEdit}
             onAddPage={canEdit ? addPage : undefined}
             onSelect={selectPage}
+            pageAiSelection={pageAiSelectionMap}
+            onToggleAiPage={canEdit ? togglePageForAi : undefined}
           />
         )}
         {studioMode === 'write' && canvas.pages.length > 1 && (
@@ -2926,6 +2952,8 @@ export default function StudioDocumentPage() {
             canEdit={canEdit}
             onAddPage={canEdit ? addPage : undefined}
             onSelect={selectPage}
+            pageAiSelection={pageAiSelectionMap}
+            onToggleAiPage={canEdit ? togglePageForAi : undefined}
           />
         )}
         {studioMode === 'design' && videoScenes.length > 0 && (
