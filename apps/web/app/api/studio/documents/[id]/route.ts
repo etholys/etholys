@@ -87,6 +87,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: 'Sem permissão para editar' }, { status: 403 });
   }
 
+  if (typeof body.documentId === 'string' && body.documentId !== existing.id) {
+    return NextResponse.json({ error: 'Document mismatch' }, { status: 400 });
+  }
+
   const data: {
     title?: string;
     canvasState?: StudioCanvasState;

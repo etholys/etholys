@@ -45,7 +45,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       createdBy: { select: { id: true, name: true, email: true } },
     },
   });
-  return NextResponse.json({ versions });
+  return NextResponse.json({ documentId: doc.id, versions });
 }
 
 /** POST /api/studio/documents/[id]/versions — { action: 'snapshot'|'restore', versionId?, label?, canvasState?, title? } */

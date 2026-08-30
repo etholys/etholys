@@ -98,7 +98,11 @@ import {
   type StudioOverflowInfo,
 } from '@/lib/studio/paginate';
 import { defaultTableMarkdown } from '@/lib/studio/table-markdown';
-import { shouldApplyStudioDocumentFetch } from '@/lib/studio/document-scope';
+import {
+  shouldApplyStudioDocumentFetch,
+  shouldPersistStudioDocument,
+  detectStudioContentMismatch,
+} from '@/lib/studio/document-scope';
 
 type ChatMsg = {
   id: string;
@@ -166,6 +170,7 @@ export default function StudioDocumentPage() {
   const [versions, setVersions] = useState<VersionRow[]>([]);
   const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [historyTab, setHistoryTab] = useState<'activity' | 'versions'>('activity');
   const [lastEditedBy, setLastEditedBy] = useState<string | null>(null);
   const [lastEditedAt, setLastEditedAt] = useState<string | null>(null);
@@ -236,6 +241,7 @@ export default function StudioDocumentPage() {
 
   useLayoutEffect(() => {
     docEpochRef.current += 1;
+    saveEpochRef.current += 1;
     activeDocIdRef.current = null;
     setLoading(true);
     setError(null);
@@ -336,6 +342,8 @@ export default function StudioDocumentPage() {
   const persistCanvas = useCallback(
     async (opts?: { quiet?: boolean; forceSnap?: StudioCanvasState | null }) => {
       if (!canEdit || !id) return false;
+      const docId = id;
+      const epochAtStart = docEpochRef.current;
       if (saveLockRef.current) {
         saveAgainRef.current = true;
         return false;
@@ -345,28 +353,35 @@ export default function StudioDocumentPage() {
       try {
         do {
           saveAgainRef.current = false;
+          if (!shouldPersistStudioDocument(docId, epochAtStart, id, docEpochRef.current)) {
+            break;
+          }
           const snap = opts?.forceSnap || canvasRef.current;
           opts = { ...opts, forceSnap: null };
           if (!snap) break;
           const epoch = ++saveEpochRef.current;
           setAutoSaveState('saving');
           setSaving(true);
-          const r = await fetch(`/api/studio/documents/${id}`, {
+          const r = await fetch(`/api/studio/documents/${docId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               companyId: companyId || undefined,
+              documentId: docId,
               title: titleRef.current,
               canvasState: snap,
+              clientRevision: knownUpdatedAt.current,
               createVersion: opts?.quiet === false,
               quiet: opts?.quiet !== false,
               versionLabel: opts?.quiet === false ? 'Após reunir documento' : undefined,
             }),
           });
           const d = await r.json().catch(() => ({}));
+          if (!shouldPersistStudioDocument(docId, epochAtStart, id, docEpochRef.current)) {
+            break;
+          }
           if (!r.ok) throw new Error((d as { detail?: string; error?: string }).detail || (d as { error?: string }).error || 'Erro');
 
-          // Se houve alteração mais recente durante o PUT, gravar de novo
           if (epoch !== saveEpochRef.current || canvasRef.current !== snap) {
             saveAgainRef.current = true;
             continue;
@@ -429,20 +444,26 @@ export default function StudioDocumentPage() {
   const loadVersions = useCallback(async () => {
     const docId = id;
     const epoch = docEpochRef.current;
-    const r = await fetch(`/api/studio/documents/${docId}/versions`, { cache: 'no-store' });
+    const r = await fetch(`/api/studio/documents/${docId}/versions?_=${Date.now()}`, {
+      cache: 'no-store',
+    });
     if (!r.ok) return;
     const d = await r.json();
     if (!shouldApplyStudioDocumentFetch(docId, id, epoch, docEpochRef.current)) return;
+    if (d.documentId && d.documentId !== docId) return;
     setVersions(d.versions || []);
   }, [id]);
 
   const loadActivity = useCallback(async () => {
     const docId = id;
     const epoch = docEpochRef.current;
-    const r = await fetch(`/api/studio/documents/${docId}/activity`, { cache: 'no-store' });
+    const r = await fetch(`/api/studio/documents/${docId}/activity?_=${Date.now()}`, {
+      cache: 'no-store',
+    });
     if (!r.ok) return;
     const d = await r.json();
     if (!shouldApplyStudioDocumentFetch(docId, id, epoch, docEpochRef.current)) return;
+    if (d.document?.id && d.document.id !== docId) return;
     setActivities(d.activities || []);
     const ub = d.document?.updatedBy;
     if (ub) setLastEditedBy(ub.name?.trim() || ub.email || null);
@@ -453,8 +474,10 @@ export default function StudioDocumentPage() {
     (tab: 'activity' | 'versions' = 'activity') => {
       setHistoryTab(tab);
       setShowHistory(true);
-      void loadActivity();
-      void loadVersions();
+      setHistoryLoading(true);
+      setActivities([]);
+      setVersions([]);
+      void Promise.all([loadActivity(), loadVersions()]).finally(() => setHistoryLoading(false));
     },
     [loadActivity, loadVersions],
   );
@@ -756,17 +779,22 @@ export default function StudioDocumentPage() {
   // Flush ao sair / refresh — evita perder o «Reunir»
   useEffect(() => {
     function flush() {
-      if (!dirtyRef.current || !canEdit || !id) return;
+      const docId = id;
+      const epochAtStart = docEpochRef.current;
+      if (!dirtyRef.current || !canEdit || !docId) return;
       const snap = canvasRef.current;
       if (!snap) return;
+      if (!shouldPersistStudioDocument(docId, epochAtStart, id, docEpochRef.current)) return;
       try {
-        void fetch(`/api/studio/documents/${id}`, {
+        void fetch(`/api/studio/documents/${docId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             companyId: companyId || undefined,
+            documentId: docId,
             title: titleRef.current,
             canvasState: snap,
+            clientRevision: knownUpdatedAt.current,
             createVersion: false,
             quiet: true,
           }),
@@ -1424,6 +1452,11 @@ export default function StudioDocumentPage() {
     [canvas],
   );
 
+  const contentMismatch = useMemo(
+    () => (canvas ? detectStudioContentMismatch(title, canvas) : null),
+    [canvas, title],
+  );
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center gap-2 text-slate-500">
@@ -1872,6 +1905,25 @@ export default function StudioDocumentPage() {
           )}
         </div>
       </header>
+
+      {contentMismatch && (
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-950">
+          <p>
+            {t(
+              `O conteúdo principal («${contentMismatch.slice(0, 60)}…») não corresponde ao título «${title}». Pode ter sido misturado com outro documento.`,
+              `El contenido principal («${contentMismatch.slice(0, 60)}…») no coincide con el título «${title}». Puede haberse mezclado con otro documento.`,
+              `Main content («${contentMismatch.slice(0, 60)}…») does not match title «${title}». It may have been mixed with another document.`,
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => openHistory('versions')}
+            className="shrink-0 rounded-lg border border-red-300 bg-white px-3 py-1 text-xs font-semibold text-red-800 hover:bg-red-100"
+          >
+            {t('Restaurar versão', 'Restaurar versión', 'Restore version')}
+          </button>
+        </div>
+      )}
 
       {remoteUpdate && (
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-950">
@@ -3058,7 +3110,12 @@ export default function StudioDocumentPage() {
               </button>
             </div>
 
-            {historyTab === 'activity' ? (
+            {historyLoading ? (
+              <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t('A carregar histórico…', 'Cargando historial…', 'Loading history…')}
+              </div>
+            ) : historyTab === 'activity' ? (
               activities.length === 0 ? (
                 <p className="text-sm text-slate-500">
                   {t(
