@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -18,12 +18,18 @@ import {
   X,
   Pencil,
   Trash2,
+  FolderInput,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
 import { StudioShareDialog } from '@/components/studio/StudioShareDialog';
 import { StudioContextPanel } from '@/components/studio/StudioContextPanel';
 import { StudioCreateGallery, type GalleryTemplate } from '@/components/studio/StudioCreateGallery';
+import {
+  StudioLibraryGrid,
+  type StudioMovePayload,
+  readStudioMovePayload,
+} from '@/components/studio/StudioLibraryGrid';
 import type { StudioPageSize } from '@/lib/studio/types';
 
 type FolderRow = { id: string; name: string; parentId: string | null; visibility?: string; access?: string };
@@ -126,6 +132,13 @@ function StudioHubInner() {
     title: string;
   }>(null);
   const [showFolderContext, setShowFolderContext] = useState(false);
+  const [allFolders, setAllFolders] = useState<FolderRow[]>([]);
+  const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  const [dropHighlightId, setDropHighlightId] = useState<string | null | 'root'>(null);
+  const [showMovePicker, setShowMovePicker] = useState(false);
+  const dragPayloadRef = useRef<StudioMovePayload | null>(null);
+  const lastSelectedRef = useRef<{ kind: 'folder' | 'doc'; id: string } | null>(null);
 
   const effectiveCompanyId = companyId || resolvedCompanyId;
 
@@ -161,6 +174,9 @@ function StudioHubInner() {
       setDocuments(d.documents || []);
       setTemplates(d.templates || []);
       const all = (d.allFolders || []) as FolderRow[];
+      setAllFolders(all);
+      setSelectedFolderIds([]);
+      setSelectedDocIds([]);
       setPathStack(
         buildFolderPath(
           folderId,
@@ -250,6 +266,83 @@ function StudioHubInner() {
       setBusy(false);
     }
   }
+
+  async function moveItems(payload: StudioMovePayload, targetFolderId: string | null) {
+    if (!payload.folderIds.length && !payload.documentIds.length) return;
+    if (targetFolderId && payload.folderIds.includes(targetFolderId)) return;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/studio/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: effectiveCompanyId || undefined,
+          targetFolderId,
+          folderIds: payload.folderIds,
+          documentIds: payload.documentIds,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || d.detail || 'Erro');
+      setSelectedFolderIds([]);
+      setSelectedDocIds([]);
+      setShowMovePicker(false);
+      await load();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(false);
+      dragPayloadRef.current = null;
+      setDropHighlightId(null);
+    }
+  }
+
+  function handleDropTarget(targetFolderId: string | null) {
+    const payload = dragPayloadRef.current;
+    if (!payload) return;
+    void moveItems(payload, targetFolderId);
+  }
+
+  function toggleFolderSelect(id: string, extend: boolean) {
+    setSelectedDocIds([]);
+    setSelectedFolderIds((prev) => {
+      if (extend && lastSelectedRef.current?.kind === 'folder') {
+        const ids = folders.map((f) => f.id);
+        const a = ids.indexOf(lastSelectedRef.current!.id);
+        const b = ids.indexOf(id);
+        if (a >= 0 && b >= 0) {
+          const [lo, hi] = a < b ? [a, b] : [b, a];
+          return ids.slice(lo, hi + 1);
+        }
+      }
+      return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+    });
+    lastSelectedRef.current = { kind: 'folder', id };
+  }
+
+  function toggleDocSelect(id: string, extend: boolean) {
+    setSelectedFolderIds([]);
+    setSelectedDocIds((prev) => {
+      if (extend && lastSelectedRef.current?.kind === 'doc') {
+        const ids = documents.map((d) => d.id);
+        const a = ids.indexOf(lastSelectedRef.current!.id);
+        const b = ids.indexOf(id);
+        if (a >= 0 && b >= 0) {
+          const [lo, hi] = a < b ? [a, b] : [b, a];
+          return ids.slice(lo, hi + 1);
+        }
+      }
+      return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+    });
+    lastSelectedRef.current = { kind: 'doc', id };
+  }
+
+  function selectAllVisible() {
+    setSelectedFolderIds(folders.filter((f) => canManageItem(f.access)).map((f) => f.id));
+    setSelectedDocIds(documents.filter((d) => canManageItem(d.access)).map((d) => d.id));
+  }
+
+  const selectionCount = selectedFolderIds.length + selectedDocIds.length;
 
   async function renameFolder(f: FolderRow) {
     const next = window.prompt(t('Novo nome da pasta', 'Nuevo nombre de la carpeta', 'New folder name'), f.name);
@@ -522,11 +615,26 @@ function StudioHubInner() {
           </div>
         </div>
 
-        <nav className="mb-4 flex flex-wrap items-center gap-1 text-sm text-slate-600">
+        <nav
+          className="mb-4 flex flex-wrap items-center gap-1 text-sm text-slate-600"
+          onDragLeave={() => setDropHighlightId(null)}
+        >
           <button
             type="button"
             onClick={() => goToPathIndex(-1)}
-            className="rounded px-1.5 py-0.5 font-medium hover:bg-amber-50 hover:text-amber-900"
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDropHighlightId('root');
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const payload = readStudioMovePayload(e.dataTransfer) || dragPayloadRef.current;
+              if (payload) dragPayloadRef.current = payload;
+              handleDropTarget(null);
+            }}
+            className={`rounded px-1.5 py-0.5 font-medium hover:bg-amber-50 hover:text-amber-900 ${
+              dropHighlightId === 'root' ? 'bg-amber-100 font-semibold text-amber-900 ring-1 ring-amber-300' : ''
+            }`}
           >
             {t('Raiz', 'Raíz', 'Root')}
           </button>
@@ -536,13 +644,104 @@ function StudioHubInner() {
               <button
                 type="button"
                 onClick={() => goToPathIndex(index)}
-                className="rounded px-1.5 py-0.5 font-medium hover:bg-amber-50 hover:text-amber-900"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDropHighlightId(f.id);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const payload = readStudioMovePayload(e.dataTransfer) || dragPayloadRef.current;
+                  if (payload) dragPayloadRef.current = payload;
+                  handleDropTarget(f.id);
+                }}
+                className={`rounded px-1.5 py-0.5 font-medium hover:bg-amber-50 hover:text-amber-900 ${
+                  dropHighlightId === f.id ? 'bg-amber-100 text-amber-900 ring-1 ring-amber-300' : ''
+                }`}
               >
                 {f.name}
               </button>
             </span>
           ))}
         </nav>
+
+        {selectionCount > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-orange-200 bg-orange-50/80 px-3 py-2">
+            <span className="text-sm font-semibold text-orange-950">
+              {selectionCount}{' '}
+              {t('selecionado(s)', 'seleccionado(s)', 'selected')}
+            </span>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setShowMovePicker((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-orange-300 bg-white px-2.5 py-1 text-xs font-semibold text-orange-900 hover:bg-orange-100 disabled:opacity-40"
+            >
+              <FolderInput className="h-3.5 w-3.5" />
+              {t('Mover para…', 'Mover a…', 'Move to…')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedFolderIds([]);
+                setSelectedDocIds([]);
+              }}
+              className="text-xs font-medium text-orange-800 underline"
+            >
+              {t('Limpar', 'Limpiar', 'Clear')}
+            </button>
+            {(folders.length > 0 || documents.length > 0) &&
+              selectionCount < folders.length + documents.length && (
+                <button
+                  type="button"
+                  onClick={selectAllVisible}
+                  className="text-xs font-medium text-orange-800 underline"
+                >
+                  {t('Selecionar tudo', 'Seleccionar todo', 'Select all')}
+                </button>
+              )}
+          </div>
+        )}
+
+        {showMovePicker && selectionCount > 0 && (
+          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t('Destino', 'Destino', 'Destination')}
+            </p>
+            <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void moveItems(
+                    { folderIds: selectedFolderIds, documentIds: selectedDocIds },
+                    null,
+                  )
+                }
+                className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium hover:border-amber-300 hover:bg-amber-50"
+              >
+                {t('Raiz', 'Raíz', 'Root')}
+              </button>
+              {allFolders
+                .filter((f) => !selectedFolderIds.includes(f.id))
+                .map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      void moveItems(
+                        { folderIds: selectedFolderIds, documentIds: selectedDocIds },
+                        f.id,
+                      )
+                    }
+                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium hover:border-amber-300 hover:bg-amber-50"
+                  >
+                    {f.name}
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center gap-2 text-slate-500">
@@ -569,126 +768,39 @@ function StudioHubInner() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {folders.map((f) => (
-              <div
-                key={f.id}
-                className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-amber-300 hover:shadow-md"
-              >
-                <button type="button" onClick={() => enterFolder(f)} className="flex min-w-0 flex-1 items-start gap-3 text-left">
-                  <Folder className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-                  <div>
-                    <p className="font-semibold text-slate-900">{f.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {t('Pasta', 'Carpeta', 'Folder')}
-                      {f.visibility === 'company'
-                        ? ` · ${t('toda a empresa', 'toda la empresa', 'whole company')}`
-                        : ` · ${t('privada', 'privada', 'private')}`}
-                    </p>
-                  </div>
-                </button>
-                <div className="flex shrink-0 flex-col gap-1">
-                  {canManageItem(f.access) && (
-                    <>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        title={t('Renomear', 'Renombrar', 'Rename')}
-                        onClick={() => void renameFolder(f)}
-                        className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        title={t('Apagar', 'Borrar', 'Delete')}
-                        onClick={() => void deleteFolder(f)}
-                        className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-700 hover:bg-rose-100 disabled:opacity-40"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </>
-                  )}
-                  {(f.access === 'owner' || f.access === 'admin' || !f.access) && (
-                    <button
-                      type="button"
-                      title={t('Compartilhar pasta', 'Compartir carpeta', 'Share folder')}
-                      onClick={() => setShareTarget({ folderId: f.id, title: f.name })}
-                      className="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-amber-50 p-2 text-amber-800 hover:bg-amber-100"
-                    >
-                      <Share2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-            {documents.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-300 hover:shadow-md"
-              >
-                <Link href={`/hub/studio/${doc.id}`} className="flex min-w-0 flex-1 items-start gap-3">
-                  <FileText className="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-slate-900">{doc.title}</p>
-                    <p className="text-xs text-slate-500">
-                      {doc.format} · {new Date(doc.updatedAt).toLocaleString(locale === 'en' ? 'en' : locale)}
-                      {doc.updatedBy
-                        ? ` · ${doc.updatedBy.name?.trim() || doc.updatedBy.email}`
-                        : ''}
-                      {doc.visibility === 'company'
-                        ? ` · ${t('toda a empresa', 'toda la empresa', 'whole company')}`
-                        : ` · ${t('privado', 'privado', 'private')}`}
-                    </p>
-                  </div>
-                </Link>
-                <div className="flex shrink-0 flex-col gap-1">
-                  {canManageItem(doc.access) && (
-                    <>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        title={t('Renomear', 'Renombrar', 'Rename')}
-                        onClick={() => void renameDocument(doc)}
-                        className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        title={t('Apagar', 'Borrar', 'Delete')}
-                        onClick={() => void deleteDocument(doc)}
-                        className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-700 hover:bg-rose-100 disabled:opacity-40"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </>
-                  )}
-                  {(doc.access === 'owner' || doc.access === 'admin' || !doc.access) && (
-                    <button
-                      type="button"
-                      title={t('Compartilhar documento', 'Compartir documento', 'Share document')}
-                      onClick={() => setShareTarget({ documentId: doc.id, title: doc.title })}
-                      className="inline-flex items-center justify-center rounded-lg border border-orange-200 bg-orange-50 p-2 text-orange-800 hover:bg-orange-100"
-                    >
-                      <Share2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-            {folders.length === 0 && documents.length === 0 && (
-              <p className="col-span-full text-sm text-slate-500">
-                {t(
-                  'Pasta vazia. Crie um documento a partir de um template.',
-                  'Carpeta vacía. Cree un documento desde una plantilla.',
-                  'Empty folder. Create a document from a template.',
-                )}
-              </p>
-            )}
-          </div>
+          <StudioLibraryGrid
+            locale={locale}
+            folders={folders}
+            documents={documents}
+            busy={busy}
+            selectedFolderIds={selectedFolderIds}
+            selectedDocIds={selectedDocIds}
+            dropHighlightId={dropHighlightId}
+            onToggleFolder={toggleFolderSelect}
+            onToggleDoc={toggleDocSelect}
+            onEnterFolder={enterFolder}
+            onRenameFolder={(f) => void renameFolder(f)}
+            onDeleteFolder={(f) => void deleteFolder(f)}
+            onShareFolder={(f) => setShareTarget({ folderId: f.id, title: f.name })}
+            onRenameDoc={(d) => void renameDocument(d)}
+            onDeleteDoc={(d) => void deleteDocument(d)}
+            onShareDoc={(d) => setShareTarget({ documentId: d.id, title: d.title })}
+            onDragStart={(payload) => {
+              dragPayloadRef.current = payload;
+            }}
+            onDragEnd={() => {
+              dragPayloadRef.current = null;
+              setDropHighlightId(null);
+            }}
+            onDragOverFolder={(targetId) => setDropHighlightId(targetId)}
+            onDropOnFolder={(targetId, payload) => {
+              dragPayloadRef.current = payload;
+              setDropHighlightId(targetId);
+              handleDropTarget(targetId);
+            }}
+            canManage={canManageItem}
+            t={t}
+          />
         )}
       </main>
 
