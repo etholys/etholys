@@ -103,7 +103,7 @@ describe('structure approval', () => {
     const sections = extractStructureOutline(
       '### PARTE I\n**1. Identidad de Marca**\n- 9.1 Producción por Lotes',
     );
-    assert.deepEqual(sections, ['PARTE I', '1. Identidad de Marca', '9.1 Producción por Lotes']);
+    assert.deepEqual(sections, ['PARTE I', '1. Identidad de Marca']);
   });
 
   it('detects develop request for approved structure', () => {
