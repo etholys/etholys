@@ -10,6 +10,7 @@ import {
 } from '@/lib/studio/access';
 import { recordStudioActivity, truncatePreview } from '@/lib/studio/activity';
 import { buildStudioSystemPrompt, parseStudioCopilotJson } from '@/lib/studio/agent';
+import { buildStudioCopilotUserText } from '@/lib/studio/copilot-history';
 import { shouldTrustClientStudioCanvas } from '@/lib/studio/document-scope';
 import {
   applyStudioCanvasPatches,
@@ -107,6 +108,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const who = actorLabel(user);
 
+  const priorMessages = aiSessionId
+    ? await prisma.aiAdvisorMessage.findMany({
+        where: { sessionId: aiSessionId },
+        orderBy: { createdAt: 'asc' },
+        take: 24,
+        select: { role: true, content: true },
+      })
+    : [];
+
   await prisma.aiAdvisorMessage.create({
     data: {
       sessionId: aiSessionId,
@@ -169,13 +179,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       ? `[Âmbito de edição — só estes blockId: ${targetBlockIds.join(', ')}]\n\n${message}`
       : message;
 
+  const fullUserText = buildStudioCopilotUserText(priorMessages, scopedUserText, locale);
+
   let raw: string;
   try {
     const { text, finishReason } = await llmGenerateContent({
       systemInstruction: system,
-      userText: multimodalParts.length ? undefined : scopedUserText,
+      userText: multimodalParts.length ? undefined : fullUserText,
       userParts: multimodalParts.length
-        ? [{ text: scopedUserText }, ...multimodalParts]
+        ? [{ text: fullUserText }, ...multimodalParts]
         : undefined,
       maxOutputTokens: 8000,
       temperature: 0.1,
