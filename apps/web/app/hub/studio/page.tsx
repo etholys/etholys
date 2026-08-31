@@ -509,112 +509,64 @@ function StudioHubInner() {
   return (
     <div className="min-h-screen bg-[#f4f0ea]">
       <header className="border-b border-stone-200/80 bg-[#faf7f2]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6">
+          <div className="flex items-center gap-2">
             <Link
               href="/hub"
-              className="inline-flex items-center gap-2 text-sm font-medium text-stone-700 hover:text-orange-800"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-orange-800"
             >
               <ArrowLeft className="h-4 w-4" />
               Hub
             </Link>
-            <div className="flex items-center gap-2 text-stone-900">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-sm">
-                <PenLine className="h-4 w-4" />
-              </span>
-              <div>
-                <span className="font-bold tracking-tight">Studio</span>
-                <span className="ml-2 rounded-full bg-stone-900 px-2 py-0.5 text-[10px] font-semibold text-stone-50">
-                  {t('Redação + Desenho', 'Redacción + Diseño', 'Write + Design')}
-                </span>
-              </div>
-            </div>
+            <span className="text-stone-300">/</span>
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-stone-900">
+              <PenLine className="h-4 w-4 text-orange-600" />
+              Studio
+            </span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               disabled={!effectiveCompanyId || !folderId}
               onClick={() => setShowFolderContext(true)}
               title={t('Contexto IA desta pasta', 'Contexto IA de esta carpeta', 'AI context for this folder')}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
             >
-              <BookMarked className="h-4 w-4" />
+              <BookMarked className="h-3.5 w-3.5" />
               {t('Contexto IA', 'Contexto IA', 'AI context')}
             </button>
             <button
               type="button"
               disabled={!effectiveCompanyId}
               onClick={() => void openBrand()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
             >
-              <Palette className="h-4 w-4" />
+              <Palette className="h-3.5 w-3.5" />
               {t('Marca', 'Marca', 'Brand')}
             </button>
             <button
               type="button"
               disabled={busy || !effectiveCompanyId}
               onClick={openNewFolder}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
             >
-              <FolderPlus className="h-4 w-4" />
+              <FolderPlus className="h-3.5 w-3.5" />
               {t('Pasta', 'Carpeta', 'Folder')}
             </button>
             <button
               type="button"
               disabled={busy || !effectiveCompanyId}
-              onClick={() => void createDoc('blank-report')}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm font-semibold text-orange-900 hover:bg-orange-50 disabled:opacity-50"
-            >
-              <FilePlus2 className="h-4 w-4" />
-              {t('Em branco', 'En blanco', 'Blank')}
-            </button>
-            <button
-              type="button"
-              disabled={busy || !effectiveCompanyId}
               onClick={() => setShowTemplates(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-lg bg-orange-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-orange-500 disabled:opacity-50"
             >
-              <FilePlus2 className="h-4 w-4" />
-              {t('Novo documento', 'Nuevo documento', 'New document')}
+              <FilePlus2 className="h-3.5 w-3.5" />
+              {t('Novo', 'Nuevo', 'New')}
             </button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <div className="mb-8 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-stone-900 [font-family:var(--font-etholys-display),ui-sans-serif,system-ui,sans-serif]">
-              {t('Biblioteca de documentos', 'Biblioteca de documentos', 'Document library')}
-            </h1>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-stone-600">
-              {t(
-                'Redação tipo Word e Desenho tipo Canva/Gamma — no mesmo documento. Vincule a NEXUS, SIEP, FUNDHUB e a IA usa o contexto.',
-                'Redacción tipo Word y Diseño tipo Canva/Gamma — en el mismo documento. Vincule a NEXUS, SIEP, FUNDHUB y la IA usa el contexto.',
-                'Word-like Write and Canva/Gamma Design — same document. Link NEXUS, SIEP, FUNDHUB and AI uses that context.',
-              )}
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-2 self-end">
-            <div className="rounded-2xl border border-orange-200/80 bg-gradient-to-br from-orange-50 to-amber-50 px-3 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-700">
-                {t('Redação', 'Redacción', 'Write')}
-              </p>
-              <p className="mt-1 text-xs leading-snug text-stone-700">
-                {t('Texto contínuo, faixa de formato', 'Texto continuo, cinta de formato', 'Flowing text, format ribbon')}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-3 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-violet-700">
-                {t('Desenho', 'Diseño', 'Design')}
-              </p>
-              <p className="mt-1 text-xs leading-snug text-stone-700">
-                {t('Layout com IA + brand kit', 'Layout con IA + brand kit', 'AI layout + brand kit')}
-              </p>
-            </div>
-          </div>
-        </div>
-
+      <main className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
         <nav
           className="mb-4 flex flex-wrap items-center gap-1 text-sm text-slate-600"
           onDragLeave={() => setDropHighlightId(null)}

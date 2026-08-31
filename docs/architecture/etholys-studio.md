@@ -42,7 +42,109 @@
 | **F5** | Presença colaborativa + aviso de edição remota | ✅ heartbeat Postgres + avatars + reload |
 | **F6** | Sync suave + auto-save + gestão de blocos | ✅ pull remoto se limpo; autosave 8s; mover/apagar |
 | **F6.1** | Camadas Conteúdo/Desenho + ferramentas por camada | ✅ galeria dual; tabelas Excel; ribbon Word; toolbar Canva |
-| **F7** | OT / CRDT (Yjs) para edição simultânea no mesmo bloco | Seguinte |
+| **F7** | OT / CRDT (Yjs) para edição simultânea no mesmo bloco | Seguinte (infra colaboração) |
+| **F8** | **Layout IDE tipo Cursor** — barra fina + laterais minimizáveis | 📋 Pipeline (após copilot P1–P5) |
+
+### Copilot / co-edição (2026-08 — concluído antes de F8)
+
+| # | Entrega | Estado |
+|---|---------|--------|
+| T1 | Mensagens nativas multi-turn (`chatMessages[]`) | ✅ |
+| T2–T3 | Modos + botões + estado de sessão (aprovar/aplicar/migrar) | ✅ |
+| T4 | Migração de conteúdo para estrutura aprovada | ✅ |
+| P1 | UI modos + barra de acções de estrutura | ✅ |
+| P2 | Selecção visual (página/bloco + mira) | ✅ |
+| P3 | Canvas sync (preview, scroll, highlight pós-patch) | ✅ |
+| P4 | Polish chat (Esc, Ctrl+Enter, anexos compactos, status) | ✅ |
+| P5 | Migração heurística (docs grandes) | ✅ |
+
+**F8 não substitui nem adianta este trabalho** — reorganiza só a shell do editor quando a co-edição estiver estável.
+
+---
+
+## 2.1 F8 — Layout IDE (referência: Cursor)
+
+**Objectivo:** sensação de IDE / Canvas profissional — documento no centro, ferramentas nas margens, chrome mínimo.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  barra fina (32px): voltar · título · guardar · export · partilhar · ⋮  │
+├──────┬──────────────────────────────────────────────────────────┬──────┤
+│ ◀    │                                                          │    ▶ │
+│ chat │              CANVAS — só páginas / folhas                │ tool │
+│ IA   │              (scroll, filmstrip opcional em baixo)       │ bar  │
+│      │                                                          │      │
+│ [≡]  │                                                          │ [≡]  │
+└──────┴──────────────────────────────────────────────────────────┴──────┘
+     ↑ minimizado = faixa estreita (~40px) com ícone para expandir
+```
+
+### Barra superior fina (comandos globais do documento)
+
+Consolidar acções **transversais** que hoje estão espalhadas no header alto:
+
+| Grupo | Acções (já existem ou a acrescentar) |
+|-------|--------------------------------------|
+| **Ficheiro** | Guardar, histórico/versões, **duplicar**, **mover para pasta**, **apagar documento**, voltar à biblioteca |
+| **Exportar** | PDF, DOCX, PPTX, XLSX (submenu ou popover) |
+| **Partilha** | Partilhar, comentários, presença |
+| **Página** | Tamanho (A4/A3/Slide), orientação, margens, numeração |
+| **Conta / doc** | Título inline, estado auto-save, último editor |
+| **Mais (⋮)** | Plantilla, ligações Etholys, contexto de pasta, apresentador (slides) |
+
+Estilo: **uma linha**, ícones + labels curtos ou só ícones com tooltip; sem ribbon duplicado no topo.
+
+### Barra lateral esquerda — Chat IA (minimizável)
+
+- Composer **único integrado** (estilo Cursor): dropdown de modo + atalhos rápidos + textarea + ícones na mesma caixa.
+- Sem hero «IA de redacción», sem faixa «Conteúdo rápido» separada — atalhos dentro do menu do modo.
+- **Minimizado:** faixa vertical com ícone `MessageSquare`; clique expande.
+
+### Barra lateral direita — Edição (minimizável)
+
+Mover para cá ferramentas que **não** são do documento em si:
+
+| Modo write | Modo design |
+|------------|-------------|
+| Ribbon Word (tipo, negrito, listas, alinhamento) | Toolbar Canva (camadas, alinhar, cores) |
+| Inserir tabela / imagem | IA desenho / media |
+| Estilo de bloco seleccionado | Storyboard / cenas |
+| Atalhos de secção (Ctrl+Enter nova secção) | Moldes de página |
+
+**Minimizado:** faixa com ícone `PenTool` / `Layout`; expandir mostra o painel completo.
+O centro **nunca** mostra ribbon flutuante sobre o canvas — só o documento.
+
+### Zona central — apenas documento
+
+- Canvas full-height entre as duas barras.
+- Filmstrip de páginas: barra inferior **dentro** do canvas (estilo Word), não no header.
+- Selecção IA (mira), highlight pós-patch e scroll-spy mantêm-se no canvas.
+
+### APIs / componentes (implementação futura)
+
+| Peça nova | Notas |
+|-----------|--------|
+| `StudioEditorShell.tsx` | Layout 3 colunas + top bar; estado `leftOpen`, `rightOpen`, widths |
+| `StudioTopCommandBar.tsx` | Extrair do `page.tsx`; acciones ficheiro + export + partilha |
+| `StudioRightToolPanel.tsx` | Ribbon write + toolbar design condicional |
+| `POST …/duplicate` | Duplicar `StudioDocument` (+ sessão IA opcional nova) |
+| Apagar | Já pode existir — expor na top bar com confirmação |
+
+### Biblioteca (`/hub/studio`)
+
+- **Sem hero marketing** — breadcrumb + grelha de pastas/docs; barra superior fina (Hub / Studio + acções).
+- «Em branco» só na galeria Criar (não duplicar no header).
+- Alinhado com F8: chrome mínimo, conteúdo primeiro.
+
+### Ordem de implementação sugerida (F8)
+
+1. **Shell + barras minimizáveis** (sem mudar lógica de edição)
+2. **Top bar fina** + mover acções existentes
+3. **Painel direito** — extrair ribbon/toolbar do canvas
+4. **Duplicar / apagar / mover** na top bar
+5. Polish visual (tokens Cursor-like: cinzas, bordas subtis, ícones 16px)
+
+**Pré-requisito:** F7 ou aceitar que F8 é só UX shell (pode ir em paralelo com F7 se necessário, mas **depois** do copilot P1–P5).
 
 ---
 

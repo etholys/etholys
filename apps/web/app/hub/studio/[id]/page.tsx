@@ -76,8 +76,8 @@ import { DocumentLinksPanel } from '@/components/studio/DocumentLinksPanel';
 import { StudioDocumentTitle } from '@/components/studio/StudioDocumentTitle';
 import { StudioWriteRibbon } from '@/components/studio/StudioWriteRibbon';
 import { StudioDesignAiPanel } from '@/components/studio/StudioDesignAiPanel';
-import { StudioWriteQuickActions } from '@/components/studio/StudioWriteQuickActions';
-import { StudioVideoTimeline } from '@/components/studio/StudioVideoTimeline';
+import { StudioCopilotComposer } from '@/components/studio/StudioCopilotComposer';
+import { StudioChatAttachmentChips } from '@/components/studio/StudioChatAttachmentChips';
 import { StudioPageFilmstrip } from '@/components/studio/StudioPageFilmstrip';
 import { StudioStoryboardPlayer } from '@/components/studio/StudioStoryboardPlayer';
 import { StudioPresenterMode } from '@/components/studio/StudioPresenterMode';
@@ -106,9 +106,6 @@ import {
 import type { StudioCopilotAction, StudioCopilotMode } from '@/lib/studio/copilot-modes';
 import { actionUserMessage } from '@/lib/studio/copilot-modes';
 import { StudioCollapsedChatContent } from '@/components/studio/StudioCollapsedChatContent';
-import { StudioCopilotModeBar } from '@/components/studio/StudioCopilotModeBar';
-import { StudioCopilotStatusBar } from '@/components/studio/StudioCopilotStatusBar';
-import { StudioChatAttachmentChips } from '@/components/studio/StudioChatAttachmentChips';
 import { StudioStructureActionBar } from '@/components/studio/StudioStructureActionBar';
 import { StudioSelectionScopeBar } from '@/components/studio/StudioSelectionScopeBar';
 import {
@@ -123,6 +120,7 @@ import {
 import { canvasWarrantsStructureMigration } from '@/lib/studio/structure-migrate';
 import type { StudioStructureSessionState } from '@/lib/studio/structure-apply';
 import { parseStudioChatMessageContent } from '@/lib/studio/chat-message-display';
+import { copilotStatusHint } from '@/lib/studio/copilot-status';
 
 type ChatMsg = {
   id: string;
@@ -705,6 +703,11 @@ export default function StudioDocumentPage() {
       : undefined;
     return { apply, migrate };
   }, [canvas, structureSessionState]);
+
+  const composerStatusHint = useMemo(() => {
+    const loc = locale === 'en' || locale === 'es' ? locale : 'pt';
+    return copilotStatusHint(copilotMode, structureSessionState, loc);
+  }, [copilotMode, structureSessionState, locale]);
 
   const focusAiEditedBlocks = useCallback(
     (blockIds: string[], canvasOverride?: StudioCanvasState | null) => {
@@ -2187,61 +2190,13 @@ export default function StudioDocumentPage() {
             />
           ) : (
           <>
-          <StudioCopilotModeBar
-            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
-            mode={copilotMode}
-            hasSelection={aiTargetBlockIds.length > 0}
-            disabled={chatBusy || !canEdit}
-            onChange={(m) => setCopilotMode(m)}
-          />
-          <StudioCopilotStatusBar
-            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
-            mode={copilotMode}
-            structureState={structureSessionState}
-          />
-          <StudioWriteQuickActions
-            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
-            disabled={chatBusy || !canEdit}
-            onRun={(prompt) => {
-              setInput(prompt);
-              void sendChat({ text: prompt });
-            }}
-          />
-          <div className="hidden border-b border-stone-200 px-4 py-3 lg:block">
-            <h2 className="text-sm font-bold text-stone-900">
-              {t('IA de redação', 'IA de redacción', 'Writing AI')}
-            </h2>
-            <p className="mt-0.5 text-xs text-stone-500">
-              {t(
-                'Seleciona secções (mira) e pede reescritas cirúrgicas. Enter = linha · Ctrl+Enter = enviar.',
-                'Selecciona secciones (mira) y pide reescrituras quirúrgicas. Enter = línea · Ctrl+Enter = enviar.',
-                'Select sections (crosshair) and ask for surgical rewrites. Enter = line · Ctrl+Enter = send.',
-              )}
-            </p>
-            {canvas && (
-              <StudioSelectionScopeBar
-                locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
-                canvas={canvas}
-                selectedBlockIds={aiTargetBlockIds}
-                activePageId={activePageId}
-                disabled={chatBusy || !canEdit}
-                onChange={setAiTargetBlockIds}
-              />
-            )}
-            {folderContextCount > 0 && (
-              <p className="mt-1 text-[11px] font-medium text-amber-800">
-                {folderContextCount}{' '}
-                {t('ficheiros de contexto da pasta', 'archivos de contexto de carpeta', 'folder context files')}
-              </p>
-            )}
-          </div>
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
             {messages.length === 0 && (
-              <p className="text-sm text-slate-500">
+              <p className="text-xs text-stone-400">
                 {t(
-                  'Dica: passa o rato num bloco → mira → «usar na IA». Ex.: «reescreve só isto com tom mais formal».',
-                  'Tip: pasa el ratón por un bloque → mira → «usar en IA». Ej.: «reescribe solo esto con tono más formal».',
-                  'Tip: hover a block → crosshair → “use for AI”. E.g. “rewrite only this more formally”.',
+                  'Mira num bloco para editar só essa secção.',
+                  'Mira en un bloque para editar solo esa sección.',
+                  'Crosshair a block to edit that section only.',
                 )}
               </p>
             )}
@@ -2334,121 +2289,70 @@ export default function StudioDocumentPage() {
             )}
             <div ref={chatEndRef} />
           </div>
-          <div className="border-t border-slate-100 p-3">
-            <StudioChatAttachmentChips
-              locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
-              names={pendingFiles.map((f) => f.name)}
-              editable
-              onRemove={(i) => setPendingFiles((p) => p.filter((_, j) => j !== i))}
-            />
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-1">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  multiple
-                  accept=".pdf,.txt,.md,.csv,.json,.docx,image/png,image/jpeg,image/webp,image/gif"
-                  onChange={(e) => {
-                    const list = e.target.files ? Array.from(e.target.files) : [];
-                    e.target.value = '';
-                    if (list.length) setPendingFiles((prev) => [...prev, ...list].slice(0, 6));
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={chatBusy || !canEdit}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="rounded-lg border border-slate-200 p-1.5 text-slate-600 disabled:opacity-40"
-                  title={t('Anexar', 'Adjuntar', 'Attach')}
-                >
-                  <Paperclip className="h-4 w-4" />
-                </button>
-                {docFolderId && (
-                  <button
-                    type="button"
-                    onClick={() => setShowFolderContext(true)}
-                    className="rounded-lg border border-slate-200 p-1.5 text-slate-600"
-                    title={t('Contexto da pasta', 'Contexto de carpeta', 'Folder context')}
-                  >
-                    <BookMarked className="h-4 w-4" />
-                  </button>
-                )}
-                {dictationSupported && (
-                  <button
-                    type="button"
-                    disabled={chatBusy || !canEdit}
-                    onClick={() => toggleDictation()}
-                    title={
-                      dictating
-                        ? t('Parar ditado', 'Detener dictado', 'Stop dictation')
-                        : t('Ditar (microfone)', 'Dictar (micrófono)', 'Dictate (microphone)')
-                    }
-                    className={`rounded-lg border p-1.5 disabled:opacity-40 ${
-                      dictating
-                        ? 'border-red-300 bg-red-50 text-red-700 animate-pulse'
-                        : 'border-slate-200 text-slate-600 hover:border-orange-300 hover:bg-orange-50'
-                    }`}
-                  >
-                    {dictating ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                  </button>
-                )}
-                <span className="ml-auto text-[10px] text-slate-400">
-                  {t('Ctrl+Enter enviar · Esc cancelar', 'Ctrl+Enter enviar · Esc cancelar', 'Ctrl+Enter send · Esc cancel')}
-                </span>
-              </div>
-              <div className="flex items-end gap-2">
-                <div className="relative min-w-0 flex-1">
-                  <textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    disabled={chatBusy || !canEdit}
-                    rows={3}
-                    placeholder={
-                      dictating
-                        ? t('A ouvir… fale agora', 'Escuchando… hable ahora', 'Listening… speak now')
-                        : t(
-                            'Instruções para a IA…',
-                            'Instrucciones para la IA…',
-                            'Instructions for AI…',
-                          )
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                        e.preventDefault();
-                        if (dictating) stopDictation();
-                        if (input.trim() || pendingFiles.length) void sendChat();
-                      }
-                      if (e.key === 'Escape' && pendingStructureActions.includes('cancel_plan')) {
-                        e.preventDefault();
-                        void sendChat({ action: 'cancel_plan', mode: 'discuss' });
-                      }
-                    }}
-                    className="min-h-[72px] w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed outline-none focus:border-orange-400"
-                  />
-                  {dictating && dictationInterim && (
-                    <p className="pointer-events-none absolute bottom-2 left-3 right-3 truncate text-[11px] italic text-orange-700/80">
-                      {dictationInterim}
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  disabled={
-                    chatBusy || loading || (!input.trim() && !pendingFiles.length) || !canEdit
-                  }
-                  onClick={() => {
-                    if (dictating) stopDictation();
-                    void sendChat();
-                  }}
-                  className="shrink-0 rounded-lg bg-orange-600 p-2.5 text-white disabled:opacity-40"
-                  title="Ctrl+Enter"
-                >
-                  {chatBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                </button>
-              </div>
+          {canvas && aiTargetBlockIds.length > 0 && (
+            <div className="border-t border-stone-100 px-3 py-2">
+              <StudioSelectionScopeBar
+                locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+                canvas={canvas}
+                selectedBlockIds={aiTargetBlockIds}
+                activePageId={activePageId}
+                disabled={chatBusy || !canEdit}
+                onChange={setAiTargetBlockIds}
+              />
             </div>
-          </div>
+          )}
+          <StudioCopilotComposer
+            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+            mode={copilotMode}
+            hasSelection={aiTargetBlockIds.length > 0}
+            disabled={chatBusy || !canEdit}
+            chatBusy={chatBusy}
+            loading={loading}
+            canEdit={canEdit}
+            input={input}
+            onInputChange={setInput}
+            onSend={() => {
+              if (dictating) stopDictation();
+              void sendChat();
+            }}
+            onModeChange={setCopilotMode}
+            onQuickPrompt={(prompt) => {
+              setInput(prompt);
+              void sendChat({ text: prompt, mode: copilotMode });
+            }}
+            onAttachClick={() => fileInputRef.current?.click()}
+            onFolderContextClick={() => setShowFolderContext(true)}
+            showFolderContext={!!docFolderId}
+            dictationSupported={dictationSupported}
+            dictating={dictating}
+            dictationInterim={dictationInterim}
+            onToggleDictation={() => toggleDictation()}
+            pendingFileNames={pendingFiles.map((f) => f.name)}
+            onRemovePendingFile={(i) => setPendingFiles((p) => p.filter((_, j) => j !== i))}
+            statusHint={composerStatusHint}
+            onEscapeCancel={
+              pendingStructureActions.includes('cancel_plan')
+                ? () => void sendChat({ action: 'cancel_plan', mode: 'discuss' })
+                : consent
+                  ? () => {
+                      setConsent(null);
+                      setPendingPrompt(null);
+                    }
+                  : undefined
+            }
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            multiple
+            accept=".pdf,.txt,.md,.csv,.json,.docx,image/png,image/jpeg,image/webp,image/gif"
+            onChange={(e) => {
+              const list = e.target.files ? Array.from(e.target.files) : [];
+              e.target.value = '';
+              if (list.length) setPendingFiles((prev) => [...prev, ...list].slice(0, 6));
+            }}
+          />
           </>
           )}
         </aside>
