@@ -38,6 +38,9 @@ type Props = {
   onSplitAfter?: (afterText: string) => void;
   /** Delete no fim — fundir com o bloco seguinte */
   onMergeWithNext?: () => void;
+  /** Seta ↑ no início → bloco anterior */
+  onFocusPrev?: () => void;
+};
 
 /**
  * Editor rico (TipTap) para modo Redação — seleção real + ribbon + teclas tipo Docs.
