@@ -1,0 +1,453 @@
+'use client';
+
+import {
+  Heading1,
+  ImagePlus,
+  LayoutTemplate,
+  Megaphone,
+  Pencil,
+  Presentation,
+  Table2,
+  Type,
+} from 'lucide-react';
+import type {
+  StudioBlockKind,
+  StudioMarginPresetId,
+  StudioPageMarginsMm,
+  StudioPageOrientation,
+  StudioPageSize,
+  StudioHeaderFooter,
+  StudioStudioMode,
+} from '@/lib/studio/types';
+import {
+  STUDIO_MARGIN_PRESETS,
+  STUDIO_PAGE_SIZES,
+  matchStudioMarginPreset,
+} from '@/lib/studio/types';
+
+export type StudioToolsPanelLabels = {
+  page: string;
+  size: string;
+  orientation: string;
+  portrait: string;
+  landscape: string;
+  margins: string;
+  normal: string;
+  narrow: string;
+  moderate: string;
+  wide: string;
+  custom: string;
+  top: string;
+  right: string;
+  bottom: string;
+  left: string;
+  allSides: string;
+  insert: string;
+  text: string;
+  heading: string;
+  list: string;
+  callout: string;
+  table: string;
+  newSlide: string;
+  diagram: string;
+  image: string;
+  designTools: string;
+  drawBoard: string;
+  molds: string;
+  textBox: string;
+  titleBox: string;
+  contentLayer: string;
+  designLayer: string;
+  header: string;
+  footer: string;
+  pageNumbers: string;
+  pageBackground: string;
+  aiScope: string;
+};
+
+type Props = {
+  mode: StudioStudioMode;
+  section: 'insert' | 'page' | 'elements' | 'visual';
+  pageSize: StudioPageSize;
+  orientation: StudioPageOrientation;
+  margins: StudioPageMarginsMm;
+  disabled?: boolean;
+  pageCount: number;
+  labels: StudioToolsPanelLabels;
+  onPageSize: (size: StudioPageSize) => void;
+  onOrientation: (o: StudioPageOrientation) => void;
+  onMargins: (m: StudioPageMarginsMm) => void;
+  onInsert: (kind: StudioBlockKind | 'image') => void;
+  onOpenMolds?: () => void;
+  onAddPage?: () => void;
+  headerFooter?: StudioHeaderFooter;
+  onHeaderFooter?: (hf: StudioHeaderFooter) => void;
+  pageBackgroundColor?: string | null;
+  onPageBackgroundColor?: (color: string | null) => void;
+};
+
+export function StudioToolsPanelBody({
+  mode,
+  section,
+  pageSize,
+  orientation,
+  margins,
+  disabled,
+  pageCount,
+  labels,
+  onPageSize,
+  onOrientation,
+  onMargins,
+  onInsert,
+  onOpenMolds,
+  onAddPage,
+  headerFooter,
+  onHeaderFooter,
+  pageBackgroundColor,
+  onPageBackgroundColor,
+}: Props) {
+  const isDesign = mode === 'design';
+  const preset = matchStudioMarginPreset(margins);
+
+  const presetLabel = (id: StudioMarginPresetId) => {
+    if (id === 'narrow') return labels.narrow;
+    if (id === 'moderate') return labels.moderate;
+    if (id === 'wide') return labels.wide;
+    if (id === 'custom') return labels.custom;
+    return labels.normal;
+  };
+
+  function applyPreset(id: string) {
+    const found = STUDIO_MARGIN_PRESETS.find((p) => p.id === id);
+    if (found) onMargins({ ...found.mm });
+  }
+
+  function setSide(side: keyof StudioPageMarginsMm, value: string) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return;
+    onMargins({ ...margins, [side]: Math.min(60, Math.max(5, n)) });
+  }
+
+  if (section === 'page') {
+    return (
+      <div className="space-y-3 p-3">
+        <label className="flex flex-col gap-1 text-[10px] font-semibold text-slate-500">
+          {labels.size}
+          <select
+            value={pageSize}
+            disabled={disabled}
+            onChange={(e) => onPageSize(e.target.value as StudioPageSize)}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800"
+          >
+            {STUDIO_PAGE_SIZES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex flex-col gap-1 text-[10px] font-semibold text-slate-500">
+          {labels.orientation}
+          <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onOrientation('portrait')}
+              className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold ${
+                orientation === 'portrait' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              {labels.portrait}
+            </button>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onOrientation('landscape')}
+              className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold ${
+                orientation === 'landscape' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              {labels.landscape}
+            </button>
+          </div>
+        </div>
+        <label className="flex flex-col gap-1 text-[10px] font-semibold text-slate-500">
+          {labels.margins}
+          <select
+            value={preset}
+            disabled={disabled}
+            onChange={(e) => {
+              if (e.target.value === 'custom') return;
+              applyPreset(e.target.value);
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800"
+          >
+            {STUDIO_MARGIN_PRESETS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {presetLabel(p.id)} ({p.mm.top} mm)
+              </option>
+            ))}
+            <option value="custom">{presetLabel('custom')}</option>
+          </select>
+        </label>
+        <div className="grid grid-cols-2 gap-1.5">
+          {(
+            [
+              ['top', labels.top],
+              ['bottom', labels.bottom],
+              ['left', labels.left],
+              ['right', labels.right],
+            ] as const
+          ).map(([side, label]) => (
+            <label key={side} className="flex flex-col gap-0.5 text-[10px] font-semibold text-slate-500">
+              {label}
+              <input
+                type="number"
+                min={5}
+                max={60}
+                step={1}
+                disabled={disabled}
+                value={margins[side]}
+                onChange={(e) => setSide(side, e.target.value)}
+                className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-800"
+              />
+            </label>
+          ))}
+        </div>
+        {!disabled && (
+          <button
+            type="button"
+            onClick={() =>
+              onMargins({
+                top: margins.top,
+                right: margins.top,
+                bottom: margins.top,
+                left: margins.top,
+              })
+            }
+            className="text-[10px] font-semibold text-orange-700 hover:underline"
+          >
+            {labels.allSides}
+          </button>
+        )}
+        <p className="text-[10px] text-slate-400">
+          {pageCount} {labels.page.toLowerCase()}(s) · {pageSize}
+        </p>
+        {!isDesign && onHeaderFooter && (
+          <div className="space-y-2 border-t border-slate-100 pt-3">
+            <label className="flex flex-col gap-0.5 text-[10px] font-semibold text-slate-500">
+              {labels.header}
+              <input
+                type="text"
+                disabled={disabled}
+                value={headerFooter?.header || ''}
+                onChange={(e) => onHeaderFooter({ ...(headerFooter || {}), header: e.target.value })}
+                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-800"
+              />
+            </label>
+            <label className="flex flex-col gap-0.5 text-[10px] font-semibold text-slate-500">
+              {labels.footer}
+              <input
+                type="text"
+                disabled={disabled}
+                value={headerFooter?.footer || ''}
+                onChange={(e) => onHeaderFooter({ ...(headerFooter || {}), footer: e.target.value })}
+                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-800"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-600">
+              <input
+                type="checkbox"
+                disabled={disabled}
+                checked={headerFooter?.showPageNumbers ?? false}
+                onChange={(e) =>
+                  onHeaderFooter({
+                    ...(headerFooter || {}),
+                    showPageNumbers: e.target.checked,
+                  })
+                }
+              />
+              {labels.pageNumbers}
+            </label>
+          </div>
+        )}
+        {isDesign && onPageBackgroundColor && (
+          <label className="flex flex-col gap-1 text-[10px] font-semibold text-slate-500">
+            {labels.pageBackground}
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                disabled={disabled}
+                value={pageBackgroundColor || '#ffffff'}
+                onChange={(e) => onPageBackgroundColor(e.target.value)}
+                className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-white p-0.5"
+              />
+              <input
+                type="text"
+                disabled={disabled}
+                value={pageBackgroundColor || '#ffffff'}
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  if (/^#[0-9A-Fa-f]{6}$/.test(v)) onPageBackgroundColor(v);
+                }}
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1 font-mono text-[10px] text-slate-800"
+              />
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onPageBackgroundColor(null)}
+                className="rounded border border-slate-200 px-1.5 py-1 text-[9px] font-bold text-slate-500 hover:bg-slate-50"
+              >
+                ×
+              </button>
+            </div>
+          </label>
+        )}
+      </div>
+    );
+  }
+
+  if (section === 'insert') {
+    return (
+      <div className="space-y-2 p-3">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-orange-600">{labels.contentLayer}</p>
+        <div className="grid grid-cols-2 gap-1.5">
+          {(
+            [
+              ['paragraph', labels.text],
+              ['heading', labels.heading],
+              ['bullets', labels.list],
+              ['callout', labels.callout],
+              ['table', labels.table],
+            ] as const
+          ).map(([kind, label]) => (
+            <button
+              key={kind}
+              type="button"
+              disabled={disabled}
+              onClick={() => onInsert(kind)}
+              className="rounded-lg border border-slate-200 px-2 py-1.5 text-left text-[11px] font-semibold text-slate-700 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-50"
+            >
+              {kind === 'table' ? (
+                <span className="inline-flex items-center gap-1">
+                  <Table2 className="h-3 w-3" /> {label}
+                </span>
+              ) : (
+                label
+              )}
+            </button>
+          ))}
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onInsert('image')}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-50"
+          >
+            <ImagePlus className="h-3.5 w-3.5" />
+            {labels.image}
+          </button>
+          {onAddPage && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={onAddPage}
+              className="inline-flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50/60 px-2 py-1.5 text-[11px] font-semibold text-orange-900 hover:bg-orange-100 disabled:opacity-50"
+            >
+              <Presentation className="h-3.5 w-3.5" />
+              {labels.newSlide}
+            </button>
+          )}
+        </div>
+        <p className="text-[10px] text-slate-400">{labels.aiScope}</p>
+      </div>
+    );
+  }
+
+  if (section === 'elements') {
+    return (
+      <div className="space-y-3 p-3">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-violet-500">{labels.designLayer}</p>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onInsert('paragraph')}
+            className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2 py-2 text-[11px] font-semibold text-violet-950 hover:bg-violet-50 disabled:opacity-50"
+          >
+            <Type className="h-3.5 w-3.5" />
+            {labels.textBox}
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onInsert('heading')}
+            className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2 py-2 text-[11px] font-semibold text-violet-950 hover:bg-violet-50 disabled:opacity-50"
+          >
+            <Heading1 className="h-3.5 w-3.5" />
+            {labels.titleBox}
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onInsert('callout')}
+            className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2 py-2 text-[11px] font-semibold text-violet-950 hover:bg-violet-50 disabled:opacity-50"
+          >
+            <Megaphone className="h-3.5 w-3.5" />
+            {labels.callout}
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onInsert('image')}
+            className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2 py-2 text-[11px] font-semibold text-violet-950 hover:bg-violet-50 disabled:opacity-50"
+          >
+            <ImagePlus className="h-3.5 w-3.5" />
+            {labels.image}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-violet-500">{labels.designTools}</p>
+      <div className="grid grid-cols-1 gap-1.5">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onInsert('diagram')}
+          className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-2.5 text-left text-[11px] font-bold text-violet-950 hover:bg-violet-100 disabled:opacity-50"
+        >
+          <Pencil className="h-4 w-4 shrink-0" />
+          <span>
+            {labels.drawBoard}
+            <span className="mt-0.5 block text-[10px] font-medium text-violet-700/80">Excalidraw</span>
+          </span>
+        </button>
+        {onAddPage && (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onAddPage}
+            className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50/50 px-2.5 py-2 text-[11px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+          >
+            <Presentation className="h-3.5 w-3.5" />
+            {labels.newSlide}
+          </button>
+        )}
+        {onOpenMolds && (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onOpenMolds}
+            className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-violet-900 hover:bg-violet-50 disabled:opacity-50"
+          >
+            <LayoutTemplate className="h-3.5 w-3.5" />
+            {labels.molds}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

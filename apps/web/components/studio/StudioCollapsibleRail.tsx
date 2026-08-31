@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { PanelLeftClose } from 'lucide-react';
 
 type Props = {
   open: boolean;
@@ -34,24 +34,16 @@ export function StudioCollapsibleRail({
   if (!open) {
     return (
       <aside
-        className={`flex w-10 shrink-0 flex-col items-center border-r py-2 ${railBg}`}
+        className={`flex w-9 shrink-0 flex-col items-center border-r py-1.5 ${railBg}`}
         title={title}
       >
         <button
           type="button"
           onClick={onToggle}
-          className={`rounded-lg p-2 ${btnClass}`}
+          className={`rounded-md p-1.5 ${btnClass}`}
           aria-label={title}
         >
           {icon}
-        </button>
-        <button
-          type="button"
-          onClick={onToggle}
-          className={`mt-1 rounded-md p-1 ${btnClass}`}
-          title={title}
-        >
-          <PanelLeftOpen className="h-3.5 w-3.5" />
         </button>
       </aside>
     );

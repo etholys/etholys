@@ -20,6 +20,7 @@ import type { StudioBlockKind, StudioBlockStyle } from '@/lib/studio/types';
 
 type Props = {
   disabled?: boolean;
+  layout?: 'bar' | 'panel';
   onWrap: (before: string, after: string) => void;
   onCommand?: (cmd: 'orderedList' | 'link') => void;
   onKind: (kind: StudioBlockKind) => void;
@@ -43,6 +44,7 @@ type Props = {
 
 export function StudioWriteRibbon({
   disabled,
+  layout = 'bar',
   onWrap,
   onCommand,
   onKind,
@@ -53,6 +55,95 @@ export function StudioWriteRibbon({
   const [moreOpen, setMoreOpen] = useState(false);
   const btn =
     'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-40';
+
+  if (layout === 'panel') {
+    return (
+      <div className="space-y-3 p-3">
+        <div className="flex flex-wrap items-center gap-1">
+          <div className="flex shrink-0 items-center rounded-md border border-stone-200 bg-white p-0.5">
+            <button type="button" disabled={disabled} title={labels.bold} className={btn} onClick={() => onWrap('**', '**')}>
+              <Bold className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" disabled={disabled} title={labels.italic} className={btn} onClick={() => onWrap('_', '_')}>
+              <Italic className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" disabled={disabled} title={labels.underline} className={btn} onClick={() => onWrap('<u>', '</u>')}>
+              <Underline className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center rounded-md border border-stone-200 bg-white p-0.5">
+            <button type="button" disabled={disabled} title={labels.heading} className={btn} onClick={() => onKind('heading')}>
+              <Heading2 className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" disabled={disabled} title={labels.body} className={btn} onClick={() => onKind('paragraph')}>
+              <Type className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" disabled={disabled} title={labels.list} className={btn} onClick={() => onKind('bullets')}>
+              <List className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" disabled={disabled} title={labels.orderedList} className={btn} onClick={() => onCommand?.('orderedList')}>
+              <ListOrdered className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" disabled={disabled} title={labels.link} className={btn} onClick={() => onCommand?.('link')}>
+              <Link2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
+          <div className="flex items-center gap-0.5 rounded-md border border-stone-200 bg-white p-0.5">
+            <button type="button" disabled={disabled} className={btn} onClick={() => onStyle({ align: 'left' })}>
+              <AlignLeft className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" disabled={disabled} className={btn} onClick={() => onStyle({ align: 'center' })}>
+              <AlignCenter className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" disabled={disabled} className={btn} onClick={() => onStyle({ align: 'right' })}>
+              <AlignRight className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" disabled={disabled} className={btn} onClick={() => onStyle({ align: 'justify' })}>
+              <AlignJustify className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="flex items-center gap-0.5 rounded-md border border-stone-200 bg-white p-0.5">
+            {(['sm', 'md', 'lg', 'xl'] as const).map((textScale) => (
+              <button
+                key={textScale}
+                type="button"
+                disabled={disabled}
+                onClick={() => onStyle({ textScale })}
+                className="h-7 min-w-[1.75rem] rounded px-1 text-[9px] font-bold text-slate-600 hover:bg-stone-50 disabled:opacity-40"
+              >
+                {textScale.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-0.5 rounded-md border border-stone-200 bg-white p-0.5">
+            {(
+              [
+                ['none', '—'],
+                ['subtle', 'S'],
+                ['card', 'C'],
+                ['accent', 'A'],
+              ] as const
+            ).map(([frame, short]) => (
+              <button
+                key={frame}
+                type="button"
+                disabled={disabled}
+                title={frame}
+                onClick={() => onStyle({ frame })}
+                className="h-7 min-w-[1.5rem] rounded px-1 text-[9px] font-bold text-slate-600 hover:bg-stone-50 disabled:opacity-40"
+              >
+                {short}
+              </button>
+            ))}
+          </div>
+        </div>
+        {trailing ? <div className="flex flex-wrap items-center gap-1.5">{trailing}</div> : null}
+        <p className="text-[10px] leading-snug text-stone-500">{labels.hint}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="sticky top-0 z-30 border-b border-stone-200/70 bg-[#f7f4ef]/95 backdrop-blur-sm">

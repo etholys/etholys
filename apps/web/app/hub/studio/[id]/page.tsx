@@ -71,10 +71,12 @@ import { StudioBlockEditor } from '@/components/studio/StudioBlockEditor';
 import { StudioDesignPlacedBlock } from '@/components/studio/StudioDesignPlacedBlock';
 import { getStudioWriteFocus, requestStudioWriteBlockFocus, runStudioWriteCommand } from '@/lib/studio/write-editor-bus';
 import { StudioSheet } from '@/components/studio/StudioSheet';
-import { StudioToolsSidebar } from '@/components/studio/StudioToolsSidebar';
+import {
+  StudioCascadeToolsRail,
+  type CascadeSection,
+} from '@/components/studio/StudioCascadeToolsRail';
 import { DocumentLinksPanel } from '@/components/studio/DocumentLinksPanel';
 import { StudioDocumentTitle } from '@/components/studio/StudioDocumentTitle';
-import { StudioWriteRibbon } from '@/components/studio/StudioWriteRibbon';
 import { StudioDesignAiPanel } from '@/components/studio/StudioDesignAiPanel';
 import { StudioCopilotComposer } from '@/components/studio/StudioCopilotComposer';
 import { StudioCollapsibleRail } from '@/components/studio/StudioCollapsibleRail';
@@ -124,8 +126,10 @@ import type { StudioStructureSessionState } from '@/lib/studio/structure-apply';
 import { parseStudioChatMessageContent } from '@/lib/studio/chat-message-display';
 import { copilotStatusHint } from '@/lib/studio/copilot-status';
 import {
+  readStudioCascadeSection,
   readStudioChatPanelOpen,
   readStudioToolsPanelOpen,
+  writeStudioCascadeSection,
   writeStudioChatPanelOpen,
   writeStudioToolsPanelOpen,
 } from '@/lib/studio/editor-panel-prefs';
@@ -211,7 +215,8 @@ export default function StudioDocumentPage() {
   const [commentBlockId, setCommentBlockId] = useState<string | null>(null);
   const [openCommentCount, setOpenCommentCount] = useState(0);
   const [activePageId, setActivePageId] = useState<string | null>(null);
-  const [toolsOpen, setToolsOpen] = useState(true);
+  const [toolsPanelOpen, setToolsPanelOpen] = useState(true);
+  const [cascadeSection, setCascadeSection] = useState<CascadeSection>('format');
   const [chatPanelOpen, setChatPanelOpen] = useState(true);
   const [duplicating, setDuplicating] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -270,7 +275,8 @@ export default function StudioDocumentPage() {
 
   useEffect(() => {
     setChatPanelOpen(readStudioChatPanelOpen());
-    setToolsOpen(readStudioToolsPanelOpen());
+    setToolsPanelOpen(readStudioToolsPanelOpen());
+    setCascadeSection(readStudioCascadeSection());
   }, []);
 
   useEffect(() => {
@@ -278,8 +284,12 @@ export default function StudioDocumentPage() {
   }, [chatPanelOpen]);
 
   useEffect(() => {
-    writeStudioToolsPanelOpen(toolsOpen);
-  }, [toolsOpen]);
+    writeStudioToolsPanelOpen(toolsPanelOpen);
+  }, [toolsPanelOpen]);
+
+  useEffect(() => {
+    writeStudioCascadeSection(cascadeSection);
+  }, [cascadeSection]);
 
   useEffect(() => {
     dirtyRef.current = dirty;
@@ -1462,7 +1472,13 @@ export default function StudioDocumentPage() {
   }
 
   function setStudioMode(mode: StudioStudioMode) {
-    setToolsOpen(true);
+    setToolsPanelOpen(true);
+    if (mode === 'write' && (cascadeSection === 'elements' || cascadeSection === 'visual')) {
+      setCascadeSection('format');
+    }
+    if (mode === 'design' && (cascadeSection === 'format' || cascadeSection === 'insert')) {
+      setCascadeSection('elements');
+    }
     applyCanvas((prev) => {
       const next = { ...prev, studioMode: mode };
       if (mode === 'write') return layoutWriteDocument(next);
@@ -1825,12 +1841,12 @@ export default function StudioDocumentPage() {
   const activePageIndex = sortedPages.findIndex((p) => p.id === activePageId);
   const headerIconBtn =
     studioMode === 'design'
-      ? 'rounded-lg border border-violet-700 bg-violet-950 p-2 text-violet-200 hover:bg-violet-900 disabled:opacity-40'
-      : 'rounded-lg border border-stone-200 bg-white p-2 text-stone-700 hover:bg-stone-50 disabled:opacity-40';
+      ? 'rounded-md border border-violet-700 bg-violet-950 p-1.5 text-violet-200 hover:bg-violet-900 disabled:opacity-40'
+      : 'rounded-md border border-stone-200 bg-white p-1.5 text-stone-700 hover:bg-stone-50 disabled:opacity-40';
   const headerTextBtn =
     studioMode === 'design'
-      ? 'inline-flex items-center gap-1 rounded-lg border border-violet-700 bg-violet-950 px-2 py-1.5 text-xs font-medium text-violet-100 hover:bg-violet-900 disabled:opacity-40'
-      : 'inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-40';
+      ? 'inline-flex items-center gap-1 rounded-md border border-violet-700 bg-violet-950 p-1.5 text-[11px] font-medium text-violet-100 hover:bg-violet-900 disabled:opacity-40'
+      : 'inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white p-1.5 text-[11px] font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-40';
 
   function selectPage(pageId: string) {
     setActivePageId(pageId);
@@ -1876,9 +1892,7 @@ export default function StudioDocumentPage() {
     }
   }
 
-  const canDeleteDoc = canDeleteStudioDocument(
-    access as import('@/lib/studio/access-levels').StudioAccessLevel,
-  );
+  const canDeleteDoc = canDeleteStudioDocument(access as StudioAccessLevel);
 
   return (
     <div
@@ -1889,7 +1903,7 @@ export default function StudioDocumentPage() {
       }`}
     >
       <header
-        className={`flex shrink-0 items-center gap-2 px-3 py-1.5 sm:px-4 ${
+        className={`flex shrink-0 items-center gap-1.5 px-2 py-1 sm:px-3 ${
           studioMode === 'design'
             ? 'border-b border-violet-900/60 bg-[#120c1a] text-violet-50'
             : 'border-b border-stone-300/80 bg-[#f7f4ef] text-stone-900'
@@ -1898,14 +1912,14 @@ export default function StudioDocumentPage() {
         <div className="flex min-w-0 flex-1 items-center gap-2">
             <Link
               href={libraryHref}
-              className={`shrink-0 rounded-lg p-1.5 ${
+              className={`shrink-0 rounded-md p-1 ${
                 studioMode === 'design'
                   ? 'text-violet-300 hover:bg-violet-900/50'
                   : 'text-stone-600 hover:bg-stone-200/60'
               }`}
               title={t('Voltar à pasta', 'Volver a la carpeta', 'Back to folder')}
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-4 w-4" />
             </Link>
             <StudioDocumentTitle
               value={title}
@@ -1932,7 +1946,7 @@ export default function StudioDocumentPage() {
             type="button"
             disabled={!canEdit}
             onClick={() => setStudioMode('write')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold transition ${
               studioMode === 'write'
                 ? 'bg-white text-stone-900 shadow-sm'
                 : studioMode === 'design'
@@ -1947,7 +1961,7 @@ export default function StudioDocumentPage() {
             type="button"
             disabled={!canEdit}
             onClick={() => setStudioMode('design')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold transition ${
               studioMode === 'design'
                 ? 'bg-violet-600 text-white shadow-sm'
                 : 'text-stone-600 hover:text-stone-900'
@@ -2056,23 +2070,18 @@ export default function StudioDocumentPage() {
             type="button"
             onClick={() => setShowLinks(true)}
             title={t('Vincular a sistemas', 'Vincular a sistemas', 'Link to systems')}
-            className={
-              studioMode === 'design'
-                ? 'inline-flex items-center gap-1 rounded-lg border border-orange-700/60 bg-orange-950/40 px-2 py-1.5 text-xs font-medium text-orange-200 hover:bg-orange-900/50'
-                : 'inline-flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2 py-1.5 text-xs font-medium text-orange-900 hover:bg-orange-100'
-            }
+            className={headerIconBtn}
           >
             <Link2 className="h-3.5 w-3.5" />
-            {t('Vincular', 'Vincular', 'Link')}
           </button>
           {(access === 'owner' || access === 'admin') && companyId && (
             <button
               type="button"
               onClick={() => setShareOpen(true)}
-              className={headerTextBtn}
+              className={`${headerIconBtn} hidden sm:inline-flex`}
             >
               <Share2 className="h-3.5 w-3.5" />
-              {t('Partilhar', 'Compartir', 'Share')}
+              <span className="hidden lg:inline">{t('Partilhar', 'Compartir', 'Share')}</span>
             </button>
           )}
           <div className="relative">
@@ -2080,11 +2089,11 @@ export default function StudioDocumentPage() {
               type="button"
               disabled={!!exporting}
               onClick={() => setExportOpen((v) => !v)}
-              className={headerTextBtn}
+              className={headerIconBtn}
             >
               {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
-              {t('Exportar', 'Exportar', 'Export')}
-              <ChevronDown className="h-3.5 w-3.5" />
+              <span className="hidden lg:inline">{t('Exportar', 'Exportar', 'Export')}</span>
+              <ChevronDown className="hidden h-3 w-3 lg:block" />
             </button>
             {exportOpen && (
               <div className="absolute right-0 top-full z-50 mt-1 min-w-[8rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
@@ -2105,22 +2114,26 @@ export default function StudioDocumentPage() {
               </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => setToolsOpen((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-medium ${
-              toolsOpen
-                ? studioMode === 'design'
-                  ? 'border-fuchsia-400 bg-fuchsia-950/60 text-fuchsia-100'
-                  : 'border-orange-300 bg-orange-50 text-orange-900'
-                : studioMode === 'design'
-                  ? 'border-violet-700 bg-violet-950 text-violet-100 hover:bg-violet-900'
-                  : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
-            }`}
-          >
-            <LayoutTemplate className="h-3.5 w-3.5" />
-            {t('Ferramentas', 'Herramientas', 'Tools')}
-          </button>
+          {studioMode === 'design' && isPresentationDeck && (
+            <>
+              <button
+                type="button"
+                onClick={() => setSlideFocusMode((v) => !v)}
+                title={t('Foco slide', 'Foco slide', 'Slide focus')}
+                className={`${headerIconBtn} ${slideFocusMode ? 'ring-1 ring-fuchsia-400' : ''}`}
+              >
+                <Monitor className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPresenterOpen(true)}
+                title={t('Apresentar', 'Presentar', 'Present')}
+                className={headerIconBtn}
+              >
+                <Presentation className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
           <StudioDocMoreMenu
             locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
             disabled={!canEdit}
@@ -2133,7 +2146,7 @@ export default function StudioDocumentPage() {
             type="button"
             disabled={saving || !dirty || !canEdit}
             onClick={() => void save()}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-40 ${
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-white disabled:opacity-40 ${
               studioMode === 'design' ? 'bg-fuchsia-600 hover:bg-fuchsia-500' : 'bg-slate-900'
             }`}
           >
@@ -2450,48 +2463,6 @@ export default function StudioDocumentPage() {
             }
           }
         >
-          {studioMode === 'write' && (
-            <StudioWriteRibbon
-              disabled={!canEdit}
-              onWrap={ribbonWrap}
-              onCommand={ribbonCommand}
-              onKind={ribbonKind}
-              onStyle={ribbonStyle}
-              trailing={
-                <>
-                  <button
-                    type="button"
-                    disabled={!canEdit}
-                    onClick={addPage}
-                    className="inline-flex items-center gap-1 rounded-md border border-stone-300 bg-white px-2 py-1 text-[10px] font-semibold text-stone-700"
-                  >
-                    <Plus className="h-3 w-3" />
-                    {t('Folha', 'Hoja', 'Page')}
-                  </button>
-                  <span className="text-[10px] text-stone-500">
-                    {canvas.pages.length} · {pageSize}
-                  </span>
-                </>
-              }
-              labels={{
-                format: t('Formato', 'Formato', 'Format'),
-                bold: t('Negrito', 'Negrita', 'Bold'),
-                italic: t('Itálico', 'Cursiva', 'Italic'),
-                underline: t('Sublinhado', 'Subrayado', 'Underline'),
-                heading: t('Título', 'Título', 'Heading'),
-                body: t('Corpo', 'Cuerpo', 'Body'),
-                list: t('Lista', 'Lista', 'List'),
-                orderedList: t('Lista num.', 'Lista num.', 'Numbered list'),
-                link: t('Hiperligação', 'Enlace', 'Link'),
-                hint: t(
-                  'Ctrl+Enter nova secção · setas entre secções · Excel/tabelas na barra lateral',
-                  'Ctrl+Enter nueva sección · flechas entre secciones · Excel/tablas en barra lateral',
-                  'Ctrl+Enter new section · arrows between sections · Excel/tables in sidebar',
-                ),
-                more: t('Mais', 'Más', 'More'),
-              }}
-            />
-          )}
           <div className="mx-auto flex max-w-[720px] flex-wrap items-center gap-2 px-1 pb-2 sm:hidden">
             <button
               type="button"
@@ -2506,144 +2477,6 @@ export default function StudioDocumentPage() {
               {canvas.pages.length} {t('folha(s)', 'hoja(s)', 'page(s)')} · {pageSize}
             </span>
           </div>
-          {canEdit && studioMode === 'design' && !toolsOpen && (
-            <div className="mx-auto mb-3 flex w-full max-w-[720px] flex-wrap items-center gap-1 rounded-lg border border-violet-200/80 bg-violet-950/40 px-2 py-1.5">
-              <span className="px-1 text-[10px] font-bold uppercase tracking-wide text-violet-600">
-                {t('Desenho', 'Diseño', 'Design')}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  const pageId = activePageId || canvas.pages[0]?.id;
-                  if (pageId) addBlock(pageId, 'paragraph');
-                }}
-                className="rounded-md border border-violet-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-violet-900 hover:bg-violet-100"
-              >
-                {t('Caixa de texto', 'Caja de texto', 'Text box')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const pageId = activePageId || canvas.pages[0]?.id;
-                  if (pageId) addBlock(pageId, 'heading');
-                }}
-                className="rounded-md border border-violet-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-violet-900 hover:bg-violet-100"
-              >
-                {t('Título', 'Título', 'Title')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const pageId = activePageId || canvas.pages[0]?.id;
-                  if (pageId) addBlock(pageId, 'diagram');
-                }}
-                className="inline-flex items-center gap-1 rounded-md border border-violet-300 bg-white px-2 py-1.5 text-[11px] font-bold text-violet-950 hover:bg-violet-100"
-              >
-                {t('Quadro de desenho', 'Lienzo de dibujo', 'Drawing board')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const pageId = activePageId || canvas.pages[0]?.id;
-                  if (!pageId) return;
-                  setImageTargetPageId(pageId);
-                  setActivePageId(pageId);
-                  imageInputRef.current?.click();
-                }}
-                className="rounded-md border border-violet-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-violet-900 hover:bg-violet-100"
-              >
-                {t('Imagem', 'Imagen', 'Image')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowMolds(true);
-                  void loadMolds();
-                }}
-                className="rounded-md border border-violet-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-violet-900 hover:bg-violet-100"
-              >
-                {t('Moldes', 'Moldes', 'Molds')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const pageId = activePageId || canvas.pages[0]?.id;
-                  if (!pageId) return;
-                  applyCanvas((prev) => ({
-                    ...prev,
-                    pages: prev.pages.map((p) => {
-                      if (p.id !== pageId) return p;
-                      const sorted = p.blocks.slice().sort((a, b) => a.order - b.order);
-                      return {
-                        ...p,
-                        blocks: sorted.map((b, j) => ({
-                          ...b,
-                          layout: {
-                            xPct: j === 0 ? 8 : 6,
-                            yPct: Math.min(78, 10 + j * 16),
-                            wPct: j === 0 ? 84 : 88,
-                          },
-                        })),
-                      };
-                    }),
-                  }));
-                }}
-                className="rounded-md border border-violet-300 bg-violet-600 px-2 py-1.5 text-[11px] font-bold text-white hover:bg-violet-500"
-              >
-                {t('Posicionar na folha', 'Posicionar en hoja', 'Place on page')}
-              </button>
-              <span className="px-1 text-[10px] text-violet-600/80">
-                {t('Arrastar · redimensionar · grelha 2%', 'Arrastrar · redimensionar · cuadrícula 2%', 'Drag · resize · 2% grid')}
-              </span>
-              {aiTargetBlockIds.length > 0 && (
-                <>
-                  <span className="mx-1 h-4 w-px bg-violet-200" />
-                  <Layers className="h-3.5 w-3.5 text-violet-600" />
-                  <button
-                    type="button"
-                    title={t('Trazer para a frente', 'Traer al frente', 'Bring forward')}
-                    onClick={() => bumpBlockLayer(1)}
-                    className="rounded-md border border-violet-200 bg-white p-1.5 text-violet-900 hover:bg-violet-100"
-                  >
-                    <ChevronUp className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    title={t('Enviar para trás', 'Enviar atrás', 'Send backward')}
-                    onClick={() => bumpBlockLayer(-1)}
-                    className="rounded-md border border-violet-200 bg-white p-1.5 text-violet-900 hover:bg-violet-100"
-                  >
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  </button>
-                </>
-              )}
-              {isPresentationDeck && (
-                <>
-                  <span className="mx-1 h-4 w-px bg-violet-200" />
-                  <button
-                    type="button"
-                    onClick={() => setSlideFocusMode((v) => !v)}
-                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-[11px] font-semibold ${
-                      slideFocusMode
-                        ? 'border-fuchsia-400 bg-fuchsia-600 text-white'
-                        : 'border-violet-200 bg-white text-violet-900 hover:bg-violet-100'
-                    }`}
-                  >
-                    <Monitor className="h-3.5 w-3.5" />
-                    {t('Foco slide', 'Foco slide', 'Slide focus')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPresenterOpen(true)}
-                    className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-violet-900 hover:bg-violet-100"
-                  >
-                    <Presentation className="h-3.5 w-3.5" />
-                    {t('Apresentar', 'Presentar', 'Present')}
-                  </button>
-                </>
-              )}
-            </div>
-          )}
 
           <input
             ref={imageInputRef}
@@ -3099,11 +2932,13 @@ export default function StudioDocumentPage() {
         )}
         </div>
 
-        <StudioToolsSidebar
-          open={toolsOpen}
-          onOpenChange={setToolsOpen}
+        <StudioCascadeToolsRail
           mode={studioMode}
           onModeChange={setStudioMode}
+          panelOpen={toolsPanelOpen}
+          onPanelOpenChange={setToolsPanelOpen}
+          section={cascadeSection}
+          onSectionChange={setCascadeSection}
           pageSize={pageSize}
           orientation={orientation}
           margins={marginsMm}
@@ -3137,29 +2972,39 @@ export default function StudioDocumentPage() {
             }
             addBlock(pageId, kind);
           }}
-          labels={{
-            tools: t('Ferramentas', 'Herramientas', 'Tools'),
-            collapse: t('Minimizar', 'Minimizar', 'Collapse'),
-            expand: t('Abrir ferramentas', 'Abrir herramientas', 'Open tools'),
-            mode: t('Etapa', 'Etapa', 'Stage'),
+          onWrap={ribbonWrap}
+          onCommand={ribbonCommand}
+          onKind={ribbonKind}
+          onStyle={ribbonStyle}
+          branchLabels={{
             write: t('Redação', 'Redacción', 'Write'),
-            writeHint: t(
-              'Word · Excel · PPT · PDF',
-              'Word · Excel · PPT · PDF',
-              'Word · Excel · PPT · PDF',
-            ),
-            writeIntro: t(
-              'Redação contínua, tabelas, export PDF/DOCX/PPTX. IA à esquerda.',
-              'Redacción continua, tablas, export PDF/DOCX/PPTX. IA a la izquierda.',
-              'Continuous writing, tables, PDF/DOCX/PPTX export. AI on the left.',
-            ),
             design: t('Desenho', 'Diseño', 'Design'),
-            designHint: t('Canva · Gamma · InDesign', 'Canva · Gamma · InDesign', 'Canva · Gamma · InDesign'),
-            designIntro: t(
-              'Caixas de texto, imagens IA, storyboard vídeo + timeline. IA de desenho.',
-              'Cajas de texto, imágenes IA, storyboard vídeo + timeline. IA de diseño.',
-              'Text boxes, AI images, video storyboard + timeline. Design AI.',
+          }}
+          sectionTitles={{
+            format: t('Formato', 'Formato', 'Format'),
+            insert: t('Inserir', 'Insertar', 'Insert'),
+            page: t('Página', 'Página', 'Page'),
+            elements: t('Elementos', 'Elementos', 'Elements'),
+            visual: t('Visuais', 'Visuales', 'Visual'),
+          }}
+          ribbonLabels={{
+            format: t('Formato', 'Formato', 'Format'),
+            bold: t('Negrito', 'Negrita', 'Bold'),
+            italic: t('Itálico', 'Cursiva', 'Italic'),
+            underline: t('Sublinhado', 'Subrayado', 'Underline'),
+            heading: t('Título', 'Título', 'Heading'),
+            body: t('Corpo', 'Cuerpo', 'Body'),
+            list: t('Lista', 'Lista', 'List'),
+            orderedList: t('Lista num.', 'Lista num.', 'Numbered list'),
+            link: t('Hiperligação', 'Enlace', 'Link'),
+            hint: t(
+              'Ctrl+Enter nova secção · setas entre secções · Excel/tabelas na barra lateral',
+              'Ctrl+Enter nueva sección · flechas entre secciones · Excel/tablas en barra lateral',
+              'Ctrl+Enter new section · arrows between sections · Excel/tables in sidebar',
             ),
+            more: t('Mais', 'Más', 'More'),
+          }}
+          panelLabels={{
             page: t('Página', 'Página', 'Page'),
             size: t('Tamanho', 'Tamaño', 'Size'),
             orientation: t('Orientação', 'Orientación', 'Orientation'),
