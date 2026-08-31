@@ -1790,6 +1790,8 @@ model NexusAtEngagement {
   sponsorCompanyId  String?
   /// Setor económico principal do programa (filtros, playbook, relatórios)
   primarySectorId   String?
+  /// Setores do programa AT (array JSON de ids — pode abranger várias áreas)
+  sectorIds         Json?
   /// Rede NEXUS opcional (pré-agrupa empresas)
   networkId         String?
   /// Projeto SIEP / institucional do contratante (opcional)

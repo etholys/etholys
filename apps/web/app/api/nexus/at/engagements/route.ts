@@ -158,6 +158,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Setor económico inválido.' }, { status: 400 });
   }
 
+  const sectorIdsRaw = Array.isArray(body.sectorIds) ? (body.sectorIds as unknown[]) : [];
+  const sectorIds = [
+    ...new Set(
+      sectorIdsRaw
+        .map((x) => normalizeEconomicSectorId(String(x || '').trim()))
+        .filter(Boolean) as string[]
+    ),
+  ];
+  if (sectorIds.length === 0 && primarySectorId) sectorIds.push(primarySectorId);
+  const primary = primarySectorId || sectorIds[0] || null;
+
   const parseDate = (raw: unknown) => {
     if (!raw) return null;
     const d = new Date(String(raw));
@@ -182,7 +193,8 @@ export async function POST(req: NextRequest) {
       status: 'ACTIVE',
       operatorCompanyId,
       sponsorCompanyId,
-      primarySectorId,
+      primarySectorId: primary,
+      sectorIds: sectorIds.length > 0 ? sectorIds : undefined,
       networkId,
       siepProjectId: siepProjectId || null,
       description,

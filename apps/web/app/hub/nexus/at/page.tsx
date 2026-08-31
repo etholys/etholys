@@ -49,7 +49,7 @@ type Agenda = {
 
 type InboxTab = 'all' | 'overdue' | 'today' | 'week';
 
-type PickedClient = { key: string; id?: string; name: string; shortName?: string; sectorId?: string };
+type PickedClient = { key: string; id?: string; name: string; shortName?: string };
 
 export default function NexusAtPage() {
   const router = useRouter();
@@ -61,7 +61,7 @@ export default function NexusAtPage() {
   const [sectorGroups, setSectorGroups] = useState<Array<{ id: string; label: { es: string; pt: string; en: string } }>>([]);
   const [sectorPortfolio, setSectorPortfolio] = useState<SectorPortfolioRow[]>([]);
   const [sectorFilter, setSectorFilter] = useState<string>('all');
-  const [primarySectorId, setPrimarySectorId] = useState('');
+  const [selectedSectorIds, setSelectedSectorIds] = useState<string[]>([]);
 
   const [services, setServices] = useState<Service[]>([]);
   const [inbox, setInbox] = useState<AtCaseCardModel[]>([]);
@@ -84,11 +84,6 @@ export default function NexusAtPage() {
   const [title, setTitle] = useState('');
   const [contractRef, setContractRef] = useState('');
   const [operatorCompanyId, setOperatorCompanyId] = useState('');
-  const [picked, setPicked] = useState<PickedClient[]>([]);
-  const [clientQuery, setClientQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<Company[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [firstProjectName, setFirstProjectName] = useState('');
 
   const [sponsor, setSponsor] = useState<PickedClient | null>(null);
   const [sponsorQuery, setSponsorQuery] = useState('');
@@ -139,28 +134,6 @@ export default function NexusAtPage() {
 
   useEffect(() => {
     if (!showForm) return;
-    const q = clientQuery.trim();
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const r = await fetch(`/api/nexus/at/client-companies?q=${encodeURIComponent(q)}&take=20`);
-        const d = await r.json();
-        if (!cancelled && r.ok) setSuggestions(d.companies || []);
-      } catch {
-        if (!cancelled) setSuggestions([]);
-      } finally {
-        if (!cancelled) setSearching(false);
-      }
-    }, 220);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [clientQuery, showForm]);
-
-  useEffect(() => {
-    if (!showForm) return;
     const q = sponsorQuery.trim();
     let cancelled = false;
     const t = setTimeout(async () => {
@@ -179,7 +152,8 @@ export default function NexusAtPage() {
   }, [sponsorQuery, showForm]);
 
   useEffect(() => {
-    if (!sponsor?.id) {
+    const ids = [...new Set([sponsor?.id, operatorCompanyId].filter(Boolean) as string[])];
+    if (ids.length === 0) {
       setSiepProjects([]);
       setSiepProjectId('');
       return;
@@ -188,7 +162,9 @@ export default function NexusAtPage() {
     (async () => {
       setLoadingSiep(true);
       try {
-        const r = await fetch(`/api/nexus/at/siep-projects?companyId=${encodeURIComponent(sponsor.id!)}`);
+        const r = await fetch(
+          `/api/nexus/at/siep-projects?companyIds=${encodeURIComponent(ids.join(','))}`
+        );
         const d = await r.json();
         if (!cancelled && r.ok) setSiepProjects(d.projects || []);
       } catch {
@@ -200,55 +176,33 @@ export default function NexusAtPage() {
     return () => {
       cancelled = true;
     };
-  }, [sponsor?.id]);
+  }, [sponsor?.id, operatorCompanyId]);
 
-  const pickedIds = useMemo(() => new Set(picked.map((p) => p.id).filter(Boolean) as string[]), [picked]);
+  const pickSponsor = (c: Company) => {
+    if (c.id === operatorCompanyId) return;
+    setSponsor({ key: c.id, id: c.id, name: c.name, shortName: c.shortName });
+    setSponsorQuery('');
+  };
+
+  const primarySectorId = selectedSectorIds[0] || '';
+
+  const toggleSector = (id: string) => {
+    setSelectedSectorIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   const sectorSelectGroups = useMemo(
     () => groupSectorsForSelect(sectorCatalog, sectorGroups as never, loc),
     [sectorCatalog, sectorGroups, loc]
   );
 
-  const addExisting = (c: Company) => {
-    if (c.id === operatorCompanyId) return;
-    if (sponsor?.id === c.id) return;
-    if (pickedIds.has(c.id)) return;
-    setPicked((prev) => [
-      ...prev,
-      {
-        key: c.id,
-        id: c.id,
-        name: c.name,
-        shortName: c.shortName,
-        sectorId: c.sectorId || primarySectorId || undefined,
-      },
-    ]);
-    setClientQuery('');
-  };
-
-  const addNewByName = () => {
-    const name = clientQuery.trim();
-    if (name.length < 2) return;
-    const key = `new:${name.toLowerCase()}`;
-    if (picked.some((p) => p.key === key || p.name.toLowerCase() === name.toLowerCase())) {
-      setClientQuery('');
-      return;
-    }
-    setPicked((prev) => [
-      ...prev,
-      { key, name, sectorId: primarySectorId || undefined },
-    ]);
-    setClientQuery('');
-  };
-
-  const removePicked = (key: string) => setPicked((prev) => prev.filter((p) => p.key !== key));
-
-  const pickSponsor = (c: Company) => {
-    if (c.id === operatorCompanyId) return;
-    setSponsor({ key: c.id, id: c.id, name: c.name, shortName: c.shortName });
-    setSponsorQuery('');
-    setPicked((prev) => prev.filter((p) => p.id !== c.id));
-  };
+  const companyNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of myCompanies) m.set(c.id, c.shortName || c.name);
+    if (sponsor?.id) m.set(sponsor.id, sponsor.shortName || sponsor.name);
+    return m;
+  }, [myCompanies, sponsor]);
 
   const createSponsorByName = async () => {
     const name = sponsorQuery.trim();
@@ -277,10 +231,6 @@ export default function NexusAtPage() {
     setSaving(true);
     setError(null);
     try {
-      const clientCompanyIds = picked.filter((p) => p.id).map((p) => p.id!) as string[];
-      const newClients = picked
-        .filter((p) => !p.id)
-        .map((p) => ({ name: p.name, shortName: p.shortName, sectorId: p.sectorId }));
       const r = await fetch('/api/nexus/at/engagements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -289,8 +239,9 @@ export default function NexusAtPage() {
           kind: 'CONTRACT',
           operatorCompanyId,
           primarySectorId: primarySectorId || undefined,
-          clientCompanyIds,
-          newClients,
+          sectorIds: selectedSectorIds,
+          clientCompanyIds: [],
+          newClients: [],
           contractRef: contractRef.trim() || undefined,
           sponsorCompanyId: sponsor?.id || undefined,
           newSponsor: sponsor && !sponsor.id ? { name: sponsor.name, shortName: sponsor.shortName } : undefined,
@@ -300,19 +251,7 @@ export default function NexusAtPage() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || (es ? 'No se pudo crear' : 'Falha ao criar'));
 
-      await Promise.all(
-        picked
-          .filter((p) => p.id && p.sectorId)
-          .map((p) =>
-            fetch(`/api/nexus/at/client-companies/${encodeURIComponent(p.id!)}/sector`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sectorId: p.sectorId }),
-            })
-          )
-      );
-
-      const projectName = firstProjectName.trim() || (es ? 'Entrega' : 'Entrega');
+      const projectName = es ? 'Diagnóstico inicial' : 'Diagnóstico inicial';
       await fetch(`/api/nexus/at/engagements/${encodeURIComponent(d.engagement.id)}/projects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -322,12 +261,10 @@ export default function NexusAtPage() {
       setShowForm(false);
       setTitle('');
       setContractRef('');
-      setPicked([]);
-      setFirstProjectName('');
       setSponsor(null);
       setSiepProjectId('');
-      setPrimarySectorId('');
-      router.push(`/hub/nexus/at/${d.engagement.id}`);
+      setSelectedSectorIds([]);
+      router.push(`/hub/nexus/at/${d.engagement.id}?import=1`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
     } finally {
@@ -357,10 +294,6 @@ export default function NexusAtPage() {
     );
   }, [services, sectorFilter]);
 
-  const filteredSuggestions = suggestions.filter(
-    (c) => c.id !== operatorCompanyId && c.id !== sponsor?.id && !pickedIds.has(c.id)
-  );
-
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -368,11 +301,6 @@ export default function NexusAtPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
             {es ? 'Asistencia técnica' : 'Assistência técnica'}
           </h1>
-          <p className="mt-0.5 text-sm text-slate-500">
-            {es
-              ? 'Consultoría y AT por sector económico — incubadora, contrato, empresas atendidas.'
-              : 'Consultoria e AT por setor económico — incubadora, contrato, empresas atendidas.'}
-          </p>
         </div>
         <button
           type="button"
@@ -465,16 +393,9 @@ export default function NexusAtPage() {
             className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
           >
             <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  {es ? 'Nuevo contrato / servicio' : 'Novo contrato / serviço'}
-                </h2>
-                <p className="mt-1 text-xs text-slate-500">
-                  {es
-                    ? 'Quien paga (contratante) ≠ empresas que atendéis. Podéis vincular un proyecto SIEP de la institución.'
-                    : 'Quem paga (contratante) ≠ empresas que atendem. Podem vincular um projeto SIEP da instituição.'}
-                </p>
-              </div>
+              <h2 className="text-lg font-semibold text-slate-900">
+                {es ? 'Nuevo contrato / servicio' : 'Novo contrato / serviço'}
+              </h2>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
@@ -496,25 +417,41 @@ export default function NexusAtPage() {
                 />
               </label>
 
-              <label className="block text-sm font-medium text-slate-700">
-                {es ? 'Sector económico del programa' : 'Setor económico do programa'}
-                <select
-                  value={primarySectorId}
-                  onChange={(e) => setPrimarySectorId(e.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
-                >
-                  <option value="">{es ? '— seleccionar —' : '— selecionar —'}</option>
+              <div>
+                <p className="text-sm font-medium text-slate-700">
+                  {es ? 'Sectores del programa' : 'Setores do programa'}
+                  <span className="ml-1 font-normal text-slate-400">
+                    ({selectedSectorIds.length})
+                  </span>
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  {es ? 'Puede elegir varias áreas de intervención.' : 'Pode escolher várias áreas de intervenção.'}
+                </p>
+                <div className="mt-2 max-h-44 space-y-2 overflow-y-auto rounded-lg border border-slate-200 p-2">
                   {sectorSelectGroups.map((g) => (
-                    <optgroup key={g.groupId} label={g.groupLabel}>
-                      {g.sectors.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.label}
-                        </option>
-                      ))}
-                    </optgroup>
+                    <div key={g.groupId}>
+                      <p className="text-[10px] font-semibold uppercase text-slate-400">{g.groupLabel}</p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {g.sectors.map((s) => {
+                          const on = selectedSectorIds.includes(s.id);
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => toggleSector(s.id)}
+                              className={`rounded-md px-2 py-1 text-xs font-medium ${
+                                on ? 'bg-teal-800 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              {s.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   ))}
-                </select>
-              </label>
+                </div>
+              </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm font-medium text-slate-700">
@@ -544,12 +481,7 @@ export default function NexusAtPage() {
 
               <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-3">
                 <p className="text-sm font-medium text-slate-800">
-                  {es ? 'Cliente contratante (quien paga)' : 'Cliente contratante (quem paga)'}
-                </p>
-                <p className="mt-0.5 text-[11px] text-slate-500">
-                  {es
-                    ? 'Incubadora, institución, donante… no es la MIPYME atendida.'
-                    : 'Incubadora, instituição, doador… não é a MIPYME atendida.'}
+                  {es ? 'Cliente contratante' : 'Cliente contratante'}
                 </p>
                 {sponsor ? (
                   <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm">
@@ -627,159 +559,48 @@ export default function NexusAtPage() {
                   <select
                     value={siepProjectId}
                     onChange={(e) => setSiepProjectId(e.target.value)}
-                    disabled={!sponsor?.id || loadingSiep}
+                    disabled={loadingSiep}
                     className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 disabled:opacity-50"
                   >
                     <option value="">
-                      {!sponsor
+                      {loadingSiep
                         ? es
-                          ? 'Primero elige el contratante'
-                          : 'Primeiro escolhe o contratante'
-                        : loadingSiep
+                          ? 'Cargando…'
+                          : 'A carregar…'
+                        : siepProjects.length === 0
                           ? es
-                            ? 'Cargando…'
-                            : 'A carregar…'
-                          : siepProjects.length === 0
-                            ? es
-                              ? '— sin proyectos SIEP en esa empresa —'
-                              : '— sem projetos SIEP nessa empresa —'
-                            : es
-                              ? '— sin proyecto —'
-                              : '— sem projeto —'}
+                            ? '— sin proyectos SIEP —'
+                            : '— sem projetos SIEP —'
+                          : es
+                            ? '— sin proyecto —'
+                            : '— sem projeto —'}
                     </option>
                     {siepProjects.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.code ? `${p.code} · ` : ''}
                         {p.name}
+                        {companyNameById.get(p.companyId)
+                          ? ` (${companyNameById.get(p.companyId)})`
+                          : ''}
                       </option>
                     ))}
                   </select>
+                  {!loadingSiep && siepProjects.length === 0 && (
+                    <Link
+                      href="/siep/projects"
+                      className="mt-1 inline-block text-[11px] font-medium text-teal-800 hover:underline"
+                    >
+                      {es ? 'Crear proyecto en SIEP →' : 'Criar projeto no SIEP →'}
+                    </Link>
+                  )}
                 </label>
               </div>
 
-              <div>
-                <p className="text-sm font-medium text-slate-700">
-                  {es ? 'Empresas atendidas (beneficiarias)' : 'Empresas atendidas (beneficiárias)'}
-                  <span className="ml-1 font-normal text-slate-400">({picked.length})</span>
-                </p>
-                <p className="mt-0.5 text-[11px] text-slate-500">
-                  {es
-                    ? 'MIPYMEs que recibís en este contrato. Trabajo separado por cada una.'
-                    : 'MIPYMEs que atendem neste contrato. Trabalho separado por cada uma.'}
-                </p>
-                {picked.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {picked.map((p) => (
-                      <span
-                        key={p.key}
-                        className="inline-flex flex-wrap items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-800"
-                      >
-                        {p.shortName || p.name}
-                        {p.sectorId && (
-                          <span className="rounded bg-teal-100 px-1.5 py-0.5 text-[10px] text-teal-900">
-                            {sectorBadgeLabel(p.sectorId, loc)}
-                          </span>
-                        )}
-                        {!p.id && (
-                          <span className="text-[10px] uppercase text-emerald-700">
-                            {es ? 'nueva' : 'nova'}
-                          </span>
-                        )}
-                        <select
-                          value={p.sectorId || primarySectorId || ''}
-                          onChange={(e) =>
-                            setPicked((prev) =>
-                              prev.map((x) =>
-                                x.key === p.key ? { ...x, sectorId: e.target.value || undefined } : x
-                              )
-                            )
-                          }
-                          className="max-w-[8rem] rounded border-0 bg-white py-0 text-[10px] text-slate-600"
-                        >
-                          <option value="">{es ? 'Sector' : 'Setor'}</option>
-                          {sectorCatalog.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.label[loc]}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => removePicked(p.key)}
-                          className="text-slate-400 hover:text-slate-700"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div className="relative mt-2">
-                  <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                  <input
-                    value={clientQuery}
-                    onChange={(e) => setClientQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (filteredSuggestions[0]) addExisting(filteredSuggestions[0]);
-                        else addNewByName();
-                      }
-                    }}
-                    className="w-full rounded-lg border border-slate-200 py-2 pl-8 pr-3 text-sm outline-none focus:border-slate-400"
-                    placeholder={
-                      es
-                        ? 'Buscar o escribir MIPYME y Enter…'
-                        : 'Pesquisar ou escrever MIPYME e Enter…'
-                    }
-                  />
-                </div>
-                {(clientQuery.trim().length > 0 || searching) && (
-                  <ul className="mt-1 max-h-40 overflow-y-auto rounded-lg border border-slate-100 bg-slate-50">
-                    {filteredSuggestions.map((c) => (
-                      <li key={c.id}>
-                        <button
-                          type="button"
-                          onClick={() => addExisting(c)}
-                          className="flex w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-white"
-                        >
-                          <span className="font-medium">{c.shortName || c.name}</span>
-                          {c.shortName && c.shortName !== c.name && (
-                            <span className="ml-2 text-slate-400">{c.name}</span>
-                          )}
-                        </button>
-                      </li>
-                    ))}
-                    {clientQuery.trim().length >= 2 && (
-                      <li>
-                        <button
-                          type="button"
-                          onClick={addNewByName}
-                          className="flex w-full items-center gap-1 px-3 py-2 text-left text-sm font-medium text-emerald-800 hover:bg-white"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          {es ? `Crear «${clientQuery.trim()}»` : `Criar «${clientQuery.trim()}»`}
-                        </button>
-                      </li>
-                    )}
-                  </ul>
-                )}
+              <div className="rounded-lg border border-teal-100 bg-teal-50/60 px-3 py-2.5 text-xs text-teal-950">
+                {es
+                  ? 'Primero defines el marco legal (contrato, contratante, sectores). Después importas las MIPYMEs beneficiarias — cada una tendrá su proceso individual.'
+                  : 'Primeiro defines o marco legal (contrato, contratante, setores). Depois importas as MIPYMEs beneficiárias — cada uma terá o seu processo individual.'}
               </div>
-
-              <label className="block text-sm font-medium text-slate-700">
-                {es ? 'Línea de trabajo AT (opcional)' : 'Linha de trabalho AT (opcional)'}
-                <input
-                  value={firstProjectName}
-                  onChange={(e) => setFirstProjectName(e.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
-                  placeholder={es ? 'Ej. Diagnóstico / Fase 1' : 'Ex. Diagnóstico / Fase 1'}
-                />
-                <span className="mt-1 block text-[11px] font-normal text-slate-400">
-                  {es
-                    ? 'No es el proyecto SIEP: es la carpeta interna de casos en este servicio.'
-                    : 'Não é o projeto SIEP: é a pasta interna de casos neste serviço.'}
-                </span>
-              </label>
 
               {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -793,11 +614,17 @@ export default function NexusAtPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={saving || title.trim().length < 2 || !operatorCompanyId || !primarySectorId}
+                  disabled={saving || title.trim().length < 2 || !operatorCompanyId || selectedSectorIds.length === 0}
                   onClick={create}
                   className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40"
                 >
-                  {saving ? (es ? 'Creando…' : 'A criar…') : es ? 'Crear y abrir' : 'Criar e abrir'}
+                  {saving
+                    ? es
+                      ? 'Creando…'
+                      : 'A criar…'
+                    : es
+                      ? 'Criar marco legal'
+                      : 'Criar marco legal'}
                 </button>
               </div>
             </div>

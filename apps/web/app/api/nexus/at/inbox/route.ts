@@ -9,7 +9,7 @@ import {
   listAtInboxForTenant,
   listEngagementsForTenant,
 } from '@/lib/nexus-at';
-import { parseCompanySectorId } from '@/lib/nexus-economic-sectors';
+import { parseCompanySectorId, parseEngagementSectorIds } from '@/lib/nexus-economic-sectors';
 
 /** Inbox AT + serviços com contagem de casos abertos. */
 export async function GET() {
@@ -48,18 +48,19 @@ export async function GET() {
 
   const services = engagements.map((e) => {
     const clients = clientCompanyIds(e);
+    const storedSectors = parseEngagementSectorIds(e.sectorIds);
     const clientSectors = clients
       .map((cid) => sectorByCompany.get(cid))
       .filter(Boolean) as string[];
-    const sectorMix = [...new Set(clientSectors)];
-    const programSector = e.primarySectorId || sectorMix[0] || null;
+    const sectorMix = [...new Set([...storedSectors, ...clientSectors])];
+    const programSector = e.primarySectorId || storedSectors[0] || sectorMix[0] || null;
 
-    if (programSector) {
-      const row = sectorPortfolio.get(programSector) || { companies: 0, contracts: 0, openCases: 0 };
+    for (const sid of storedSectors.length > 0 ? storedSectors : programSector ? [programSector] : []) {
+      const row = sectorPortfolio.get(sid) || { companies: 0, contracts: 0, openCases: 0 };
       row.contracts += 1;
       row.companies += clients.length;
       row.openCases += openCounts.get(e.id) || 0;
-      sectorPortfolio.set(programSector, row);
+      sectorPortfolio.set(sid, row);
     }
 
     return {
@@ -68,6 +69,7 @@ export async function GET() {
       clientCount: clients.length,
       projectCount: e.projects.length,
       primarySectorId: e.primarySectorId || programSector,
+      sectorIds: storedSectors,
       sectorMix,
       members: e.members.map((m) => ({
         ...m,

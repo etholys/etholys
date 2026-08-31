@@ -5,22 +5,32 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 
 /**
- * Projetos SIEP de uma empresa (contratante) para vincular ao serviço AT.
- * Operadores precisam ver projetos da incubadora/instituição mesmo sem membership.
+ * Projetos SIEP para vincular ao serviço AT.
+ * Aceita companyId único ou companyIds (vírgula) — ex.: contratante + operador.
  */
 export async function GET(req: NextRequest) {
   const tenant = await getUserCompanyIds();
   if (!tenant) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const companyId = String(req.nextUrl.searchParams.get('companyId') || '').trim();
+  const single = String(req.nextUrl.searchParams.get('companyId') || '').trim();
+  const multi = String(req.nextUrl.searchParams.get('companyIds') || '').trim();
   const q = String(req.nextUrl.searchParams.get('q') || '').trim();
-  if (!companyId) {
+
+  const requested = [
+    ...new Set(
+      [...(multi ? multi.split(',') : []), ...(single ? [single] : [])]
+        .map((id) => id.trim())
+        .filter(Boolean)
+    ),
+  ];
+
+  if (requested.length === 0) {
     return NextResponse.json({ error: 'companyId obrigatório.' }, { status: 400 });
   }
 
   const projects = await prisma.project.findMany({
     where: {
-      companyId,
+      companyId: { in: requested },
       isActive: true,
       ...(q
         ? {
@@ -40,7 +50,7 @@ export async function GET(req: NextRequest) {
       company: { select: { id: true, shortName: true, name: true } },
     },
     orderBy: { updatedAt: 'desc' },
-    take: 40,
+    take: 60,
   });
 
   return NextResponse.json({ projects });

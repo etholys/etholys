@@ -278,3 +278,14 @@ export function listSectorCatalog(): SectorCatalogRow[] {
 export function listSectorGroups() {
   return NEXUS_ECONOMIC_SECTOR_GROUPS;
 }
+
+export function parseEngagementSectorIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [
+    ...new Set(
+      raw
+        .map((x) => (typeof x === 'string' ? normalizeEconomicSectorId(x) : null))
+        .filter(Boolean) as string[]
+    ),
+  ];
+}

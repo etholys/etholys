@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { ArrowLeft, Plus, Search, X } from 'lucide-react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { ArrowLeft, FileSpreadsheet, Plus, Search, X } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { NexusAtCaseCard, type AtCaseCardModel } from '@/components/nexus/NexusAtCaseCard';
 import { NexusAtSectorPlaybook, sectorBadgeLabel } from '@/components/nexus/NexusAtSectorPlaybook';
 import { NexusAtClientDossier } from '@/components/nexus/NexusAtClientDossier';
+import { NexusAtBulkImport } from '@/components/nexus/NexusAtBulkImport';
 import { AT_CASE_KIND_LABELS, type AtCaseKind } from '@/lib/nexus-at-shared';
 import {
   buildAtBriefTemplate,
@@ -49,6 +50,7 @@ type Service = {
 
 export default function NexusAtServicePage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = typeof params.id === 'string' ? params.id : '';
   const { locale } = useApp();
   const es = locale === 'es';
@@ -85,6 +87,7 @@ export default function NexusAtServicePage() {
   const [suggestions, setSuggestions] = useState<Company[]>([]);
   const [addingMember, setAddingMember] = useState(false);
   const [showAddCompany, setShowAddCompany] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   const [sectorCatalog, setSectorCatalog] = useState<
     Array<{ id: string; label: { es: string; pt: string; en: string } }>
@@ -126,6 +129,10 @@ export default function NexusAtServicePage() {
   }, [load]);
 
   useEffect(() => {
+    if (searchParams.get('import') === '1') setShowBulkImport(true);
+  }, [searchParams]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
@@ -164,6 +171,10 @@ export default function NexusAtServicePage() {
     () => (service?.members || []).filter((m) => m.memberRole === 'client'),
     [service]
   );
+
+  useEffect(() => {
+    if (!loading && isOperator && clients.length === 0) setShowBulkImport(true);
+  }, [loading, isOperator, clients.length]);
 
   const playbookSectorId = useMemo(() => {
     if (!service) return null;
@@ -516,20 +527,52 @@ export default function NexusAtServicePage() {
                 {es ? 'Empresas atendidas' : 'Empresas atendidas'}
               </p>
               {isOperator && (
-                <button
-                  type="button"
-                  onClick={() => setShowAddCompany((v) => !v)}
-                  className="text-xs font-medium text-slate-600 hover:text-slate-900"
-                >
-                  {showAddCompany ? (es ? 'Cerrar' : 'Fechar') : es ? '+ Empresa' : '+ Empresa'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBulkImport((v) => !v);
+                      setShowAddCompany(false);
+                    }}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-teal-800 hover:text-teal-950"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    {showBulkImport
+                      ? es
+                        ? 'Ocultar importación'
+                        : 'Ocultar importação'
+                      : es
+                        ? 'Importar lista'
+                        : 'Importar lista'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddCompany((v) => !v);
+                      setShowBulkImport(false);
+                    }}
+                    className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                  >
+                    {showAddCompany ? (es ? 'Cerrar' : 'Fechar') : es ? '+ Empresa' : '+ Empresa'}
+                  </button>
+                </div>
               )}
             </div>
+            {isOperator && showBulkImport && (
+              <div className="mb-3">
+                <NexusAtBulkImport
+                  engagementId={id}
+                  es={es}
+                  defaultSectorId={service.primarySectorId}
+                  onDone={() => void load()}
+                />
+              </div>
+            )}
             {clients.length === 0 ? (
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-slate-500">
                 {es
-                  ? 'Añade las empresas que entran en este contrato.'
-                  : 'Adiciona as empresas deste contrato.'}
+                  ? 'Importa la lista de MIPYMEs beneficiarias. Cada empresa tendrá su propio proceso de diagnóstico e incubación.'
+                  : 'Importa a lista de MIPYMEs beneficiárias. Cada empresa terá o seu próprio processo de diagnóstico e incubação.'}
               </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">

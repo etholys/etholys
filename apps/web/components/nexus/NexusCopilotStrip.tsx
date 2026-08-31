@@ -33,6 +33,7 @@ export function NexusCopilotStrip() {
   const hideStrip = useMemo(
     () =>
       pathname?.includes('/hub/nexus/coach') ||
+      pathname?.startsWith('/hub/nexus/at') ||
       pathname === '/hub/nexus/journey' ||
       pathname?.startsWith('/hub/nexus/journey/') ||
       pathname === '/hub/nexus' ||
