@@ -35,7 +35,7 @@ export function StudioDocumentTitle({
   if (!canEdit) {
     return (
       <p
-        className={`min-w-0 flex-1 truncate text-base font-semibold sm:text-lg ${
+        className={`min-w-0 flex-1 truncate text-sm font-medium ${
           isDesign ? 'text-violet-50' : 'text-stone-900'
         }`}
       >
@@ -56,14 +56,14 @@ export function StudioDocumentTitle({
         }
       }}
       title={editHint}
-      className={`group relative flex min-w-[10rem] flex-1 cursor-text items-center gap-2 rounded-lg border px-2 py-1 transition ${
+      className={`group relative flex min-w-0 max-w-[min(100%,28rem)] flex-1 cursor-text items-center gap-1 rounded px-1 py-0.5 transition ${
         isDesign
           ? 'border-transparent hover:border-violet-600 hover:bg-violet-950/60 focus-within:border-violet-500 focus-within:bg-violet-950/80 focus-within:ring-2 focus-within:ring-violet-500/40'
           : 'border-transparent hover:border-stone-300 hover:bg-white/70 focus-within:border-orange-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-200/80'
       }`}
     >
       <Pencil
-        className={`h-3.5 w-3.5 shrink-0 opacity-0 transition group-hover:opacity-60 group-focus-within:opacity-80 ${
+        className={`h-3 w-3 shrink-0 opacity-0 transition group-hover:opacity-50 group-focus-within:opacity-70 ${
           isDesign ? 'text-violet-300' : 'text-orange-600'
         }`}
         aria-hidden
@@ -77,7 +77,7 @@ export function StudioDocumentTitle({
         onClick={(e) => e.stopPropagation()}
         placeholder={placeholder}
         aria-label={editHint}
-        className={`min-w-0 w-full cursor-text border-0 bg-transparent text-base font-semibold outline-none focus:ring-0 sm:text-lg ${
+        className={`min-w-0 w-full cursor-text border-0 bg-transparent text-sm font-medium outline-none focus:ring-0 ${
           isDesign
             ? 'text-violet-50 placeholder:text-violet-400'
             : 'text-stone-900 placeholder:text-stone-400'

@@ -8,19 +8,14 @@ import {
   Loader2,
   Save,
   Send,
-  PenLine,
   Check,
   X,
-  FileDown,
   FileType,
-  Share2,
   Paperclip,
-  BookMarked,
   Undo2,
   Redo2,
   History,
   Plus,
-  LayoutTemplate,
   MessageSquare,
   Mic,
   MicOff,
@@ -31,12 +26,9 @@ import {
   AlignCenter,
   AlignRight,
   AlignJustify,
-  Link2,
-  Wand2,
   Table2,
   Layers,
   ChevronUp,
-  ChevronDown,
   Play,
   Monitor,
   Presentation,
@@ -218,7 +210,6 @@ export default function StudioDocumentPage() {
   const [cascadeSection, setCascadeSection] = useState<CascadeSection>('format');
   const [chatPanelOpen, setChatPanelOpen] = useState(true);
   const [duplicating, setDuplicating] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
   const [presence, setPresence] = useState<
     Array<{
       userId: string;
@@ -1840,12 +1831,16 @@ export default function StudioDocumentPage() {
   const activePageIndex = sortedPages.findIndex((p) => p.id === activePageId);
   const headerIconBtn =
     studioMode === 'design'
-      ? 'rounded-md border border-violet-700 bg-violet-950 p-1.5 text-violet-200 hover:bg-violet-900 disabled:opacity-40'
-      : 'rounded-md border border-stone-200 bg-white p-1.5 text-stone-700 hover:bg-stone-50 disabled:opacity-40';
-  const headerTextBtn =
-    studioMode === 'design'
-      ? 'inline-flex items-center gap-1 rounded-md border border-violet-700 bg-violet-950 p-1.5 text-[11px] font-medium text-violet-100 hover:bg-violet-900 disabled:opacity-40'
-      : 'inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white p-1.5 text-[11px] font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-40';
+      ? 'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-violet-300 hover:bg-violet-900/50 disabled:opacity-30'
+      : 'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-stone-600 hover:bg-stone-200/60 disabled:opacity-30';
+  const saveTitle =
+    autoSaveState === 'saving'
+      ? t('A guardar…', 'Guardando…', 'Saving…')
+      : autoSaveState === 'saved'
+        ? t('Guardado', 'Guardado', 'Saved')
+        : dirty
+          ? t('Guardar alterações', 'Guardar cambios', 'Save changes')
+          : t('Guardar', 'Guardar', 'Save');
 
   function selectPage(pageId: string) {
     setActivePageId(pageId);
@@ -1902,23 +1897,23 @@ export default function StudioDocumentPage() {
       }`}
     >
       <header
-        className={`flex shrink-0 items-center gap-1.5 px-2 py-1 sm:px-3 ${
+        className={`flex h-9 shrink-0 items-center gap-1 border-b px-1.5 sm:px-2 ${
           studioMode === 'design'
-            ? 'border-b border-violet-900/60 bg-[#120c1a] text-violet-50'
-            : 'border-b border-stone-300/80 bg-[#f7f4ef] text-stone-900'
+            ? 'border-violet-900/60 bg-[#120c1a] text-violet-50'
+            : 'border-stone-300/80 bg-[#f7f4ef] text-stone-900'
         }`}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
             <Link
               href={libraryHref}
-              className={`shrink-0 rounded-md p-1 ${
+              className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded ${
                 studioMode === 'design'
-                  ? 'text-violet-300 hover:bg-violet-900/50'
-                  : 'text-stone-600 hover:bg-stone-200/60'
+                  ? 'text-violet-400 hover:bg-violet-900/50'
+                  : 'text-stone-500 hover:bg-stone-200/60'
               }`}
               title={t('Voltar à pasta', 'Volver a la carpeta', 'Back to folder')}
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3.5 w-3.5" />
             </Link>
             <StudioDocumentTitle
               value={title}
@@ -1936,51 +1931,16 @@ export default function StudioDocumentPage() {
             />
         </div>
 
-        <div
-          className={`hidden shrink-0 rounded-lg p-0.5 sm:flex ${
-            studioMode === 'design' ? 'bg-violet-950 ring-1 ring-violet-700' : 'bg-stone-200/80 ring-1 ring-stone-300'
-          }`}
-        >
-          <button
-            type="button"
-            disabled={!canEdit}
-            onClick={() => setStudioMode('write')}
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold transition ${
-              studioMode === 'write'
-                ? 'bg-white text-stone-900 shadow-sm'
-                : studioMode === 'design'
-                  ? 'text-violet-300 hover:text-white'
-                  : 'text-stone-600'
-            }`}
-          >
-            <PenLine className="h-3.5 w-3.5" />
-            {t('Redação', 'Redacción', 'Write')}
-          </button>
-          <button
-            type="button"
-            disabled={!canEdit}
-            onClick={() => setStudioMode('design')}
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold transition ${
-              studioMode === 'design'
-                ? 'bg-violet-600 text-white shadow-sm'
-                : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            <Wand2 className="h-3.5 w-3.5" />
-            {t('Desenho', 'Diseño', 'Design')}
-          </button>
-        </div>
-
         {presence.filter((p) => !p.isSelf).length > 0 && (
-          <div className="flex items-center -space-x-1.5 pr-1" title={t('Online agora', 'En línea ahora', 'Online now')}>
+          <div className="hidden items-center -space-x-1 sm:flex" title={t('Online agora', 'En línea ahora', 'Online now')}>
             {presence
               .filter((p) => !p.isSelf)
-              .slice(0, 5)
+              .slice(0, 4)
               .map((p) => (
                 <span
                   key={p.userId}
                   title={`${p.name || p.email} · ${p.status === 'editing' ? t('a editar', 'editando', 'editing') : t('a ver', 'viendo', 'viewing')}`}
-                  className={`inline-flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold ${
+                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full border border-white text-[8px] font-bold ${
                     p.status === 'editing'
                       ? 'bg-orange-500 text-white'
                       : 'bg-slate-500 text-white'
@@ -1991,32 +1951,32 @@ export default function StudioDocumentPage() {
               ))}
           </div>
         )}
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+        <div className="flex shrink-0 flex-nowrap items-center gap-0.5">
           <button
             type="button"
             disabled={!canEdit || !undoStack.length}
             onClick={undo}
-            title="Undo"
+            title={t('Desfazer', 'Deshacer', 'Undo')}
             className={headerIconBtn}
           >
-            <Undo2 className="h-4 w-4" />
+            <Undo2 className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             disabled={!canEdit || !redoStack.length}
             onClick={redo}
-            title="Redo"
+            title={t('Refazer', 'Rehacer', 'Redo')}
             className={headerIconBtn}
           >
-            <Redo2 className="h-4 w-4" />
+            <Redo2 className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={() => openHistory('activity')}
             title={t('Atividade e versões', 'Actividad y versiones', 'Activity & versions')}
-            className={headerIconBtn}
+            className={`${headerIconBtn} hidden md:inline-flex`}
           >
-            <History className="h-4 w-4" />
+            <History className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
@@ -2025,101 +1985,22 @@ export default function StudioDocumentPage() {
               setShowComments(true);
             }}
             title={t('Comentários', 'Comentarios', 'Comments')}
-            className={`relative ${headerIconBtn}`}
+            className={`relative ${headerIconBtn} hidden md:inline-flex`}
           >
-            <MessageSquare className="h-4 w-4" />
+            <MessageSquare className="h-3.5 w-3.5" />
             {openCommentCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-600 px-1 text-[9px] font-bold text-white">
+              <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-violet-600 px-0.5 text-[8px] font-bold text-white">
                 {openCommentCount}
               </span>
             )}
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setShowMolds(true);
-              void loadMolds();
-            }}
-            title={t('Moldes / templates', 'Moldes / plantillas', 'Molds / templates')}
-            className={headerIconBtn}
-          >
-            <LayoutTemplate className="h-4 w-4" />
-          </button>
-          {canEdit && companyId && (
-            <button
-              type="button"
-              disabled={savingTemplate}
-              onClick={() => void saveAsCompanyTemplate()}
-              title={t(
-                'Guardar como plantilla da empresa',
-                'Guardar como plantilla de la empresa',
-                'Save as company template',
-              )}
-              className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-40"
-            >
-              {savingTemplate ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <BookMarked className="h-3.5 w-3.5" />
-              )}
-              {t('Plantilla', 'Plantilla', 'Template')}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setShowLinks(true)}
-            title={t('Vincular a sistemas', 'Vincular a sistemas', 'Link to systems')}
-            className={headerIconBtn}
-          >
-            <Link2 className="h-3.5 w-3.5" />
-          </button>
-          {(access === 'owner' || access === 'admin') && companyId && (
-            <button
-              type="button"
-              onClick={() => setShareOpen(true)}
-              className={`${headerIconBtn} hidden sm:inline-flex`}
-            >
-              <Share2 className="h-3.5 w-3.5" />
-              <span className="hidden lg:inline">{t('Partilhar', 'Compartir', 'Share')}</span>
-            </button>
-          )}
-          <div className="relative">
-            <button
-              type="button"
-              disabled={!!exporting}
-              onClick={() => setExportOpen((v) => !v)}
-              className={headerIconBtn}
-            >
-              {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
-              <span className="hidden lg:inline">{t('Exportar', 'Exportar', 'Export')}</span>
-              <ChevronDown className="hidden h-3 w-3 lg:block" />
-            </button>
-            {exportOpen && (
-              <div className="absolute right-0 top-full z-50 mt-1 min-w-[8rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                {(['docx', 'xlsx', 'pptx', 'pdf'] as const).map((fmt) => (
-                  <button
-                    key={fmt}
-                    type="button"
-                    disabled={!!exporting}
-                    onClick={() => {
-                      setExportOpen(false);
-                      void exportFile(fmt);
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-                  >
-                    {fmt.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
           {studioMode === 'design' && isPresentationDeck && (
             <>
               <button
                 type="button"
                 onClick={() => setSlideFocusMode((v) => !v)}
                 title={t('Foco slide', 'Foco slide', 'Slide focus')}
-                className={`${headerIconBtn} ${slideFocusMode ? 'ring-1 ring-fuchsia-400' : ''}`}
+                className={`${headerIconBtn} ${slideFocusMode ? 'text-fuchsia-300' : ''}`}
               >
                 <Monitor className="h-3.5 w-3.5" />
               </button>
@@ -2133,32 +2014,44 @@ export default function StudioDocumentPage() {
               </button>
             </>
           )}
-          <StudioDocMoreMenu
-            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
-            disabled={!canEdit}
-            canDelete={canDeleteDoc}
-            duplicating={duplicating}
-            onDuplicate={() => void duplicateDocument()}
-            onDelete={() => void deleteDocument()}
-          />
           <button
             type="button"
             disabled={saving || !dirty || !canEdit}
             onClick={() => void save()}
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-white disabled:opacity-40 ${
-              studioMode === 'design' ? 'bg-fuchsia-600 hover:bg-fuchsia-500' : 'bg-slate-900'
+            title={saveTitle}
+            className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded disabled:opacity-30 ${
+              studioMode === 'design'
+                ? 'bg-fuchsia-600 text-white hover:bg-fuchsia-500'
+                : 'bg-stone-800 text-white hover:bg-stone-700'
             }`}
           >
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            {t('Guardar', 'Guardar', 'Save')}
+            {saving || autoSaveState === 'saving' ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
           </button>
-          {autoSaveState !== 'idle' && (
-            <span className="text-[10px] font-medium text-slate-500">
-              {autoSaveState === 'saving'
-                ? t('A guardar…', 'Guardando…', 'Saving…')
-                : t('Guardado', 'Guardado', 'Saved')}
-            </span>
-          )}
+          <StudioDocMoreMenu
+            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+            variant={studioMode === 'design' ? 'design' : 'write'}
+            disabled={!canEdit}
+            canDelete={canDeleteDoc}
+            canShare={(access === 'owner' || access === 'admin') && !!companyId}
+            canTemplate={canEdit && !!companyId}
+            duplicating={duplicating}
+            savingTemplate={savingTemplate}
+            exporting={!!exporting}
+            onDuplicate={() => void duplicateDocument()}
+            onDelete={() => void deleteDocument()}
+            onShare={() => setShareOpen(true)}
+            onLink={() => setShowLinks(true)}
+            onMolds={() => {
+              setShowMolds(true);
+              void loadMolds();
+            }}
+            onSaveTemplate={() => void saveAsCompanyTemplate()}
+            onExport={(fmt) => void exportFile(fmt)}
+          />
         </div>
       </header>
 
