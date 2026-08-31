@@ -129,7 +129,7 @@ import {
   writeStudioChatPanelOpen,
   writeStudioToolsPanelOpen,
 } from '@/lib/studio/editor-panel-prefs';
-import { canDeleteStudioDocument } from '@/lib/studio/share';
+import { canDeleteStudioDocument, type StudioAccessLevel } from '@/lib/studio/access-levels';
 
 type ChatMsg = {
   id: string;
@@ -1858,7 +1858,7 @@ export default function StudioDocumentPage() {
   }
 
   async function deleteDocument() {
-    if (!id || !canDeleteStudioDocument(access as 'owner' | 'admin' | 'editor' | 'viewer' | 'none')) return;
+    if (!id || !canDeleteStudioDocument(access as StudioAccessLevel)) return;
     const msg = t(
       'Apagar este documento? Esta ação não pode ser desfeita.',
       '¿Eliminar este documento? Esta acción no se puede deshacer.',
@@ -1877,7 +1877,7 @@ export default function StudioDocumentPage() {
   }
 
   const canDeleteDoc = canDeleteStudioDocument(
-    access as 'owner' | 'admin' | 'editor' | 'viewer' | 'none',
+    access as import('@/lib/studio/access-levels').StudioAccessLevel,
   );
 
   return (
