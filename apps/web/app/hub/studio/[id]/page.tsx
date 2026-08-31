@@ -107,6 +107,8 @@ import type { StudioCopilotAction, StudioCopilotMode } from '@/lib/studio/copilo
 import { actionUserMessage } from '@/lib/studio/copilot-modes';
 import { StudioCollapsedChatContent } from '@/components/studio/StudioCollapsedChatContent';
 import { StudioCopilotModeBar } from '@/components/studio/StudioCopilotModeBar';
+import { StudioCopilotStatusBar } from '@/components/studio/StudioCopilotStatusBar';
+import { StudioChatAttachmentChips } from '@/components/studio/StudioChatAttachmentChips';
 import { StudioStructureActionBar } from '@/components/studio/StudioStructureActionBar';
 import { StudioSelectionScopeBar } from '@/components/studio/StudioSelectionScopeBar';
 import {
@@ -120,6 +122,7 @@ import {
 } from '@/lib/studio/canvas-patch-preview';
 import { canvasWarrantsStructureMigration } from '@/lib/studio/structure-migrate';
 import type { StudioStructureSessionState } from '@/lib/studio/structure-apply';
+import { parseStudioChatMessageContent } from '@/lib/studio/chat-message-display';
 
 type ChatMsg = {
   id: string;
@@ -127,6 +130,8 @@ type ChatMsg = {
   content: string;
   createdAt?: string;
   actorName?: string | null;
+  attachmentNames?: string[];
+  scopeLabel?: string;
 };
 type VersionRow = {
   id: string;
@@ -599,13 +604,19 @@ export default function StudioDocumentPage() {
               content: string;
               createdAt?: string;
               actor?: { name?: string | null; email?: string | null } | null;
-            }) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              createdAt: m.createdAt,
-              actorName: m.actor?.name?.trim() || m.actor?.email || null,
-            }),
+            }) => {
+              const parsed =
+                m.role === 'user' ? parseStudioChatMessageContent(m.content) : { text: m.content };
+              return {
+                id: m.id,
+                role: m.role,
+                content: parsed.text,
+                createdAt: m.createdAt,
+                actorName: m.actor?.name?.trim() || m.actor?.email || null,
+                attachmentNames: parsed.attachmentNames,
+                scopeLabel: parsed.scopeLabel,
+              };
+            },
           ),
         );
         if (md.copilotSession) {
@@ -781,6 +792,33 @@ export default function StudioDocumentPage() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [canvas, activePageId]);
+
+  /** Esc — cancelar plano pendiente ou consentimento IA. */
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+      if ((e.target as HTMLElement | null)?.closest('[role="dialog"]')) return;
+
+      if (consent) {
+        e.preventDefault();
+        setConsent(null);
+        setPendingPrompt(null);
+        return;
+      }
+
+      if (
+        pendingStructureActions.includes('cancel_plan') &&
+        !chatBusy &&
+        canEdit &&
+        activeDocIdRef.current === id
+      ) {
+        e.preventDefault();
+        void sendChat({ action: 'cancel_plan', mode: 'discuss' });
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [consent, pendingStructureActions, chatBusy, canEdit, id]);
 
   // Presença + deteção de edição remota (F5)
   useEffect(() => {
@@ -1132,31 +1170,42 @@ export default function StudioDocumentPage() {
     action?: StudioCopilotAction;
     mode?: StudioCopilotMode;
   }) {
+    const filesToSend = [...pendingFiles];
     const text = (opts?.text ?? input).trim();
     const sendMode = opts?.mode ?? copilotMode;
-    if ((!text && !opts?.action) || !canvas || chatBusy || loading || activeDocIdRef.current !== id) {
+    if (
+      (!text && !opts?.action && !filesToSend.length) ||
+      !canvas ||
+      chatBusy ||
+      loading ||
+      activeDocIdRef.current !== id
+    ) {
       return;
     }
     setChatBusy(true);
     setConsent(null);
     setInput('');
-    const filesToSend = [...pendingFiles];
     setPendingFiles([]);
     const tempId = `local-${Date.now()}`;
-    const attachNote =
-      filesToSend.length > 0
-        ? `\n\n[${filesToSend.length} anexo(s): ${filesToSend.map((f) => f.name).join(', ')}]`
-        : '';
-    const scopeNote =
+    const scopeLabel =
       aiTargetBlockIds.length > 0
-        ? `\n\n[${t('Âmbito', 'Ámbito', 'Scope')}: ${aiTargetBlockIds.map(blockLabel).join(' · ')}]`
-        : '';
+        ? aiTargetBlockIds.map(blockLabel).join(' · ')
+        : undefined;
     const userLine =
       text ||
       (opts?.action
         ? actionUserMessage(opts.action, locale === 'en' || locale === 'es' ? locale : 'pt')
         : '');
-    setMessages((m) => [...m, { id: tempId, role: 'user', content: userLine + attachNote + scopeNote }]);
+    setMessages((m) => [
+      ...m,
+      {
+        id: tempId,
+        role: 'user',
+        content: userLine,
+        attachmentNames: filesToSend.length ? filesToSend.map((f) => f.name) : undefined,
+        scopeLabel,
+      },
+    ]);
 
     try {
       const attachmentIds: string[] = [];
@@ -2145,6 +2194,11 @@ export default function StudioDocumentPage() {
             disabled={chatBusy || !canEdit}
             onChange={(m) => setCopilotMode(m)}
           />
+          <StudioCopilotStatusBar
+            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+            mode={copilotMode}
+            structureState={structureSessionState}
+          />
           <StudioWriteQuickActions
             locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
             disabled={chatBusy || !canEdit}
@@ -2202,7 +2256,9 @@ export default function StudioDocumentPage() {
                 />
               </div>
             )}
-            {messages.map((m) => (
+            {messages.map((m) => {
+              const loc = locale === 'en' || locale === 'es' ? locale : 'pt';
+              return (
               <div
                 key={m.id}
                 className={`rounded-xl px-3 py-2 text-sm ${
@@ -2221,16 +2277,22 @@ export default function StudioDocumentPage() {
                     </span>
                   )}
                 </div>
-                {m.role === 'user' ? (
-                  <StudioCollapsedChatContent
-                    content={m.content}
-                    locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
-                  />
+                {m.role === 'user' || m.role === 'assistant' ? (
+                  <StudioCollapsedChatContent content={m.content} locale={loc} />
                 ) : (
                   <div className="whitespace-pre-wrap">{m.content}</div>
                 )}
+                {m.attachmentNames?.length ? (
+                  <StudioChatAttachmentChips locale={loc} names={m.attachmentNames} />
+                ) : null}
+                {m.scopeLabel ? (
+                  <p className="mt-1 text-[10px] font-medium text-orange-800/80">
+                    {t('Âmbito', 'Ámbito', 'Scope')}: {m.scopeLabel}
+                  </p>
+                ) : null}
               </div>
-            ))}
+            );
+            })}
             {consent && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950">
                 <p className="font-semibold">{consent.question}</p>
@@ -2273,22 +2335,12 @@ export default function StudioDocumentPage() {
             <div ref={chatEndRef} />
           </div>
           <div className="border-t border-slate-100 p-3">
-            {pendingFiles.length > 0 && (
-              <ul className="mb-2 flex flex-wrap gap-1.5">
-                {pendingFiles.map((f, i) => (
-                  <li
-                    key={`${f.name}-${i}`}
-                    className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px]"
-                  >
-                    <Paperclip className="h-3 w-3" />
-                    <span className="max-w-[9rem] truncate">{f.name}</span>
-                    <button type="button" onClick={() => setPendingFiles((p) => p.filter((_, j) => j !== i))}>
-                      <X className="h-3 w-3" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <StudioChatAttachmentChips
+              locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+              names={pendingFiles.map((f) => f.name)}
+              editable
+              onRemove={(i) => setPendingFiles((p) => p.filter((_, j) => j !== i))}
+            />
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-1">
                 <input
@@ -2342,7 +2394,7 @@ export default function StudioDocumentPage() {
                   </button>
                 )}
                 <span className="ml-auto text-[10px] text-slate-400">
-                  {t('Ctrl+Enter enviar', 'Ctrl+Enter enviar', 'Ctrl+Enter send')}
+                  {t('Ctrl+Enter enviar · Esc cancelar', 'Ctrl+Enter enviar · Esc cancelar', 'Ctrl+Enter send · Esc cancel')}
                 </span>
               </div>
               <div className="flex items-end gap-2">
@@ -2365,7 +2417,11 @@ export default function StudioDocumentPage() {
                       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                         e.preventDefault();
                         if (dictating) stopDictation();
-                        void sendChat();
+                        if (input.trim() || pendingFiles.length) void sendChat();
+                      }
+                      if (e.key === 'Escape' && pendingStructureActions.includes('cancel_plan')) {
+                        e.preventDefault();
+                        void sendChat({ action: 'cancel_plan', mode: 'discuss' });
                       }
                     }}
                     className="min-h-[72px] w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed outline-none focus:border-orange-400"
@@ -2378,7 +2434,9 @@ export default function StudioDocumentPage() {
                 </div>
                 <button
                   type="button"
-                  disabled={chatBusy || loading || !input.trim() || !canEdit}
+                  disabled={
+                    chatBusy || loading || (!input.trim() && !pendingFiles.length) || !canEdit
+                  }
                   onClick={() => {
                     if (dictating) stopDictation();
                     void sendChat();
