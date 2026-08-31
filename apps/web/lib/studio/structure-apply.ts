@@ -25,7 +25,7 @@ const STRUCTURE_PROPOSAL_MARKERS = [
 ];
 
 const DEVELOP_REQUEST_RE =
-  /\b(desarroll(?:a|ar|es|e)|implement(?:a|ar|es|e)|aplic(?:a|ar|as|ado)|escrib(?:e|ir|a)|redact(?:a|ar)|aplica la estructura|desarrolla la estructura|desenvolv(?:e|er|a)|implementa a estrutura|apply the structure|develop the structure|write out the structure|fill in the structure|crea(?:r)? (?:las )?secciones)\b/i;
+  /\b(desarroll\w*|implement\w*|aplic\w*|escrib\w*|redact\w*|desenvolv\w*|apply the structure|develop the structure|write out the structure|fill in the structure|crea(?:r)? (?:las )?secciones)\b/i;
 
 const APPROVED_REF_RE =
   /\b(estructura aprobada|estructura que (?:est[aá]|qued[oó]) aprobada|la estructura que aprob|approved structure|estrutura aprovada)\b/i;
@@ -150,7 +150,12 @@ export function isStructureDevelopRequest(message: string): boolean {
   ) {
     return true;
   }
-  if (/desarroll(?:a|ar|es|e) (?:esa|la|esta|lo)/.test(n)) return true;
+  if (/\bdesarroll\w*/.test(n) && /\b(esa|la|esta|lo)\b/.test(n) && /estructura|estrutura|structure/.test(n)) {
+    return true;
+  }
+  if (/\bdesenvolv\w*/.test(n) && /\b(essa|esta|a)\b/.test(n) && /estrutura|structure/.test(n)) {
+    return true;
+  }
   if (/lo que estoy pidiendo/.test(n) && /estructura|desarroll|aplic|implement/.test(n)) return true;
 
   return false;

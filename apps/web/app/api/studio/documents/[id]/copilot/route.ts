@@ -383,7 +383,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   } else if (action === 'migrate_structure' && proposalText) {
     patches = buildStructureMigrationPatches(canvas, proposalText);
   } else if (
-    (structureApproval || structureDevelop) &&
+    (structureApproval || structureDevelop || effectiveMode === 'apply') &&
     proposalText &&
     !patches.length
   ) {

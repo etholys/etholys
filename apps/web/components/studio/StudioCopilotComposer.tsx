@@ -95,7 +95,7 @@ export function StudioCopilotComposer({
   const canSend = !!canEdit && !chatBusy && !loading && (input.trim().length > 0 || pendingFileNames.length > 0);
 
   return (
-    <div className="border-t border-stone-200/80 bg-[#faf8f5] p-3">
+    <div className="shrink-0 border-t border-stone-200/80 bg-[#faf8f5] p-2">
       <StudioChatAttachmentChips
         locale={loc}
         names={pendingFileNames}
@@ -104,22 +104,22 @@ export function StudioCopilotComposer({
       />
       <div
         ref={rootRef}
-        className="rounded-xl border border-stone-200/90 bg-white shadow-sm ring-1 ring-stone-100"
+        className="overflow-hidden rounded-lg border border-stone-200/90 bg-white shadow-sm"
       >
-        <div className="flex items-center gap-2 border-b border-stone-100 px-2.5 py-1.5">
-          <div className="relative">
+        <div className="flex min-w-0 items-center gap-1 border-b border-stone-100 px-2 py-1">
+          <div className="relative min-w-0">
             <button
               type="button"
               disabled={disabled}
               onClick={() => setMenuOpen((v) => !v)}
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-40"
+              className="inline-flex max-w-full items-center gap-1 truncate rounded px-1 py-0.5 text-[11px] font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-40"
             >
-              <ModeIcon className="h-3.5 w-3.5 text-stone-500" />
-              <span>{modeLabel(mode, loc)}</span>
-              <ChevronDown className="h-3 w-3 text-stone-400" />
+              <ModeIcon className="h-3 w-3 shrink-0 text-stone-500" />
+              <span className="truncate">{modeLabel(mode, loc)}</span>
+              <ChevronDown className="h-3 w-3 shrink-0 text-stone-400" />
             </button>
             {menuOpen && (
-              <div className="absolute bottom-full left-0 z-30 mb-1 min-w-[11rem] rounded-lg border border-stone-200 bg-white py-1 shadow-lg">
+              <div className="absolute bottom-full left-0 z-30 mb-1 max-h-[min(60vh,320px)] min-w-[10rem] overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 shadow-lg">
                 {STUDIO_COPILOT_MODES.map((id) => {
                   const Icon = MODE_ICONS[id];
                   const dimmed = id === 'edit_selection' && !hasSelection;
@@ -132,17 +132,17 @@ export function StudioCopilotComposer({
                         onModeChange(id);
                         setMenuOpen(false);
                       }}
-                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs ${
+                      className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] ${
                         mode === id ? 'bg-orange-50 font-semibold text-orange-900' : 'text-stone-700 hover:bg-stone-50'
                       } ${dimmed ? 'cursor-not-allowed opacity-40' : ''}`}
                     >
-                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                      <Icon className="h-3 w-3 shrink-0" />
                       {modeLabel(id, loc)}
                     </button>
                   );
                 })}
                 <div className="my-1 border-t border-stone-100" />
-                <p className="px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
+                <p className="px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-stone-400">
                   {loc === 'es' ? 'Atajos' : loc === 'en' ? 'Shortcuts' : 'Atalhos'}
                 </p>
                 {quickPrompts.map((q) => {
@@ -156,37 +156,31 @@ export function StudioCopilotComposer({
                         onQuickPrompt(q.prompt);
                         setMenuOpen(false);
                       }}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] text-stone-700 hover:bg-stone-50 disabled:opacity-40"
                     >
-                      <QIcon className="h-3.5 w-3.5 shrink-0 text-orange-600" />
-                      {q.label}
+                      <QIcon className="h-3 w-3 shrink-0 text-orange-600" />
+                      <span className="truncate">{q.label}</span>
                     </button>
                   );
                 })}
               </div>
             )}
           </div>
-          <span className="ml-auto text-[10px] text-stone-400">
-            {loc === 'es'
-              ? 'Ctrl+Enter · Esc'
-              : loc === 'en'
-                ? 'Ctrl+Enter · Esc'
-                : 'Ctrl+Enter · Esc'}
-          </span>
+          <span className="ml-auto shrink-0 text-[9px] text-stone-400">Ctrl+↵</span>
         </div>
 
         {statusHint ? (
-          <p className="border-b border-stone-50 px-3 py-1.5 text-[11px] leading-snug text-stone-500">
+          <p className="border-b border-stone-50 px-2 py-1 text-[10px] leading-snug text-stone-500">
             {statusHint}
           </p>
         ) : null}
 
-        <div className="relative px-3 pt-2">
+        <div className="relative px-2 pt-1.5">
           <textarea
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
             disabled={disabled || !canEdit}
-            rows={3}
+            rows={2}
             placeholder={
               dictating
                 ? loc === 'es'
@@ -210,33 +204,33 @@ export function StudioCopilotComposer({
                 onEscapeCancel();
               }
             }}
-            className="min-h-[68px] w-full resize-none border-0 bg-transparent px-0 py-0 text-sm leading-relaxed text-stone-900 outline-none placeholder:text-stone-400"
+            className="min-h-[52px] w-full resize-none border-0 bg-transparent px-0 py-0 text-[13px] leading-snug text-stone-900 outline-none placeholder:text-stone-400"
           />
           {dictating && dictationInterim ? (
-            <p className="pointer-events-none absolute bottom-1 left-3 right-3 truncate text-[11px] italic text-orange-700/80">
+            <p className="pointer-events-none absolute bottom-0.5 left-2 right-2 truncate text-[10px] italic text-orange-700/80">
               {dictationInterim}
             </p>
           ) : null}
         </div>
 
-        <div className="flex items-center gap-1 px-2 pb-2 pt-1">
+        <div className="flex items-center gap-0.5 px-1.5 pb-1.5 pt-0.5">
           <button
             type="button"
             disabled={disabled || !canEdit}
             onClick={onAttachClick}
-            className="rounded-md p-1.5 text-stone-500 hover:bg-stone-100 disabled:opacity-40"
+            className="rounded p-1 text-stone-500 hover:bg-stone-100 disabled:opacity-40"
             title={loc === 'es' ? 'Adjuntar' : loc === 'en' ? 'Attach' : 'Anexar'}
           >
-            <Paperclip className="h-4 w-4" />
+            <Paperclip className="h-3.5 w-3.5" />
           </button>
           {showFolderContext && onFolderContextClick ? (
             <button
               type="button"
               onClick={onFolderContextClick}
-              className="rounded-md p-1.5 text-stone-500 hover:bg-stone-100"
+              className="rounded p-1 text-stone-500 hover:bg-stone-100"
               title={loc === 'es' ? 'Contexto carpeta' : loc === 'en' ? 'Folder context' : 'Contexto pasta'}
             >
-              <BookMarked className="h-4 w-4" />
+              <BookMarked className="h-3.5 w-3.5" />
             </button>
           ) : null}
           {dictationSupported && onToggleDictation ? (
@@ -244,22 +238,22 @@ export function StudioCopilotComposer({
               type="button"
               disabled={disabled || !canEdit}
               onClick={onToggleDictation}
-              className={`rounded-md p-1.5 disabled:opacity-40 ${
+              className={`rounded p-1 disabled:opacity-40 ${
                 dictating ? 'text-red-600 animate-pulse' : 'text-stone-500 hover:bg-stone-100'
               }`}
               title={loc === 'es' ? 'Dictar' : loc === 'en' ? 'Dictate' : 'Ditar'}
             >
-              {dictating ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              {dictating ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
             </button>
           ) : null}
           <button
             type="button"
             disabled={!canSend}
             onClick={onSend}
-            className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-stone-900 text-white hover:bg-stone-800 disabled:opacity-30"
+            className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-md bg-stone-900 text-white hover:bg-stone-800 disabled:opacity-30"
             title="Ctrl+Enter"
           >
-            {chatBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {chatBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
           </button>
         </div>
       </div>

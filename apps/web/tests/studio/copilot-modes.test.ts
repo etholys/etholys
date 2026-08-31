@@ -39,5 +39,9 @@ describe('copilot modes', () => {
 describe('develop request (modes import re-export check)', () => {
   it('detects develop phrasing', () => {
     assert.equal(isStructureDevelopRequest('desarrolles esa estructura aprobada'), true);
+    assert.equal(
+      isStructureDevelopRequest('desarrollo de forma detallada esa estructura'),
+      true,
+    );
   });
 });

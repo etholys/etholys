@@ -229,6 +229,7 @@ export default function StudioDocumentPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const moldFileRef = useRef<HTMLInputElement | null>(null);
   const dragging = useRef(false);
+  const chatDragStart = useRef({ x: 0, w: 320 });
   const skipHistory = useRef(false);
   const clientIdRef = useRef(
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -990,7 +991,8 @@ export default function StudioDocumentPage() {
   useEffect(() => {
     function onMove(e: MouseEvent) {
       if (!dragging.current) return;
-      const next = Math.min(640, Math.max(280, e.clientX));
+      const delta = e.clientX - chatDragStart.current.x;
+      const next = Math.min(520, Math.max(260, chatDragStart.current.w + delta));
       setChatWidth(next);
     }
     function onUp() {
@@ -1267,41 +1269,68 @@ export default function StudioDocumentPage() {
         }),
       });
       const d = await r.json();
-      if (!shouldApplyStudioDocumentFetch(chatDocId, id, chatEpoch, docEpochRef.current)) return;
       if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
 
-      if (d.canvasState) {
-        applyCanvas(() => layoutWriteDocument(normalizeStudioCanvas(d.canvasState)), true);
-      }
-      if (typeof d.title === 'string' && d.title) setTitle(d.title);
-      if (d.copilotSession) {
-        if (typeof d.copilotSession.mode === 'string') {
-          setCopilotMode(d.copilotSession.mode as StudioCopilotMode);
+      const staleResponse = !shouldApplyStudioDocumentFetch(chatDocId, id, chatEpoch, docEpochRef.current);
+
+      if (!staleResponse) {
+        if (d.canvasState) {
+          applyCanvas(() => layoutWriteDocument(normalizeStudioCanvas(d.canvasState)), true);
         }
-        setPendingStructureActions(
-          Array.isArray(d.copilotSession.pendingActions) ? d.copilotSession.pendingActions : [],
-        );
-        setStructureSessionState(
-          d.copilotSession.structureState && typeof d.copilotSession.structureState === 'object'
-            ? (d.copilotSession.structureState as StudioStructureSessionState)
-            : null,
-        );
+        if (typeof d.title === 'string' && d.title) setTitle(d.title);
+        if (d.copilotSession) {
+          if (typeof d.copilotSession.mode === 'string') {
+            setCopilotMode(d.copilotSession.mode as StudioCopilotMode);
+          }
+          setPendingStructureActions(
+            Array.isArray(d.copilotSession.pendingActions) ? d.copilotSession.pendingActions : [],
+          );
+          setStructureSessionState(
+            d.copilotSession.structureState && typeof d.copilotSession.structureState === 'object'
+              ? (d.copilotSession.structureState as StudioStructureSessionState)
+              : null,
+          );
+        }
+        const patchedIds = Array.isArray(d.patchedBlockIds)
+          ? d.patchedBlockIds.filter((x: unknown): x is string => typeof x === 'string')
+          : [];
+        if (patchedIds.length) {
+          const nextForFocus = d.canvasState
+            ? normalizeStudioCanvas(d.canvasState)
+            : canvasRef.current;
+          focusAiEditedBlocks(patchedIds, nextForFocus);
+        }
       }
-      const patchedIds = Array.isArray(d.patchedBlockIds)
-        ? d.patchedBlockIds.filter((x: unknown): x is string => typeof x === 'string')
-        : [];
-      if (patchedIds.length) {
-        const nextForFocus = d.canvasState
-          ? normalizeStudioCanvas(d.canvasState)
-          : canvasRef.current;
-        focusAiEditedBlocks(patchedIds, nextForFocus);
+
+      let assistantContent = d.message || '…';
+      if (
+        !staleResponse &&
+        sendMode === 'apply' &&
+        (d.patchCount === 0 || d.patchCount === undefined) &&
+        !d.consentRequest
+      ) {
+        assistantContent +=
+          locale === 'es'
+            ? '\n\n⚠️ No se aplicaron cambios al documento. Prueba «Aplicar estructura» si hay un plan aprobado, o selecciona una sección con la mira.'
+            : locale === 'en'
+              ? '\n\n⚠️ No changes were applied to the document. Try «Apply structure» if a plan was approved, or select a section with the crosshair.'
+              : '\n\n⚠️ Não foram aplicadas alterações ao documento. Tenta «Aplicar estrutura» se há plano aprovado, ou seleciona uma secção com a mira.';
       }
+      if (staleResponse) {
+        assistantContent +=
+          locale === 'es'
+            ? '\n\n_(Respuesta descartada: navegaste a otro documento durante la petición.)_'
+            : locale === 'en'
+              ? '\n\n_(Response discarded: you navigated away during the request.)_'
+              : '\n\n_(Resposta descartada: mudaste de documento durante o pedido.)_';
+      }
+
       setMessages((m) => [
         ...m,
         {
           id: `a-${Date.now()}`,
           role: 'assistant',
-          content: d.message || '…',
+          content: assistantContent,
           createdAt: new Date().toISOString(),
         },
       ]);
@@ -1312,8 +1341,10 @@ export default function StudioDocumentPage() {
       } else {
         setPendingPrompt(null);
       }
-      void loadActivity();
-      void loadVersions();
+      if (!staleResponse) {
+        void loadActivity();
+        void loadVersions();
+      }
     } catch (e: unknown) {
       setMessages((m) => [
         ...m,
@@ -2112,7 +2143,7 @@ export default function StudioDocumentPage() {
           icon={<MessageSquare className="h-4 w-4" />}
         >
         <aside
-          className={`flex max-h-[38vh] min-h-0 w-full flex-1 flex-col lg:max-h-none lg:h-auto ${
+          className={`flex h-full min-h-0 w-full flex-col overflow-hidden ${
             studioMode === 'design'
               ? 'border-b border-violet-900/50 lg:border-b-0'
               : 'border-b border-stone-200 lg:border-b-0'
@@ -2148,7 +2179,7 @@ export default function StudioDocumentPage() {
             />
           ) : (
           <>
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-2 py-2">
             {messages.length === 0 && (
               <p className="text-xs text-stone-400">
                 {t(
@@ -2320,8 +2351,9 @@ export default function StudioDocumentPage() {
         <div
           role="separator"
           aria-orientation="vertical"
-          onMouseDown={() => {
+          onMouseDown={(e) => {
             dragging.current = true;
+            chatDragStart.current = { x: e.clientX, w: chatWidth };
           }}
           className={`hidden w-1 shrink-0 cursor-col-resize lg:block ${
             studioMode === 'design' ? 'bg-violet-900 hover:bg-violet-500' : 'bg-stone-300 hover:bg-orange-400'

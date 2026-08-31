@@ -51,7 +51,7 @@ export function StudioCollapsibleRail({
 
   return (
     <aside
-      className={`relative flex shrink-0 flex-col ${railBg}`}
+      className={`relative flex h-full min-h-0 shrink-0 flex-col ${railBg}`}
       style={{ width: widthPx, maxWidth: '100%' }}
     >
       <button
