@@ -43,7 +43,8 @@
 | **F6** | Sync suave + auto-save + gestão de blocos | ✅ pull remoto se limpo; autosave 8s; mover/apagar |
 | **F6.1** | Camadas Conteúdo/Desenho + ferramentas por camada | ✅ galeria dual; tabelas Excel; ribbon Word; toolbar Canva |
 | **F7** | OT / CRDT (Yjs) para edição simultânea no mesmo bloco | Seguinte (infra colaboração) |
-| **F8** | **Layout IDE tipo Cursor** — barra fina + laterais minimizáveis | 📋 Pipeline (após copilot P1–P5) |
+| **F8** | **Layout IDE tipo Cursor** — barra fina + laterais minimizáveis | 🔄 Em curso |
+| **F9** | **Content Creator Studio** — hub de tipos de conteúdo (texto, design, animação, vídeo) | 📋 Futuro — ver [etholys-content-creator-studio.md](./etholys-content-creator-studio.md) |
 
 ### Copilot / co-edição (2026-08 — concluído antes de F8)
 
@@ -138,13 +139,14 @@ O centro **nunca** mostra ribbon flutuante sobre o canvas — só o documento.
 
 ### Ordem de implementação sugerida (F8)
 
-1. **Shell + barras minimizáveis** (sem mudar lógica de edição)
-2. **Top bar fina** + mover acções existentes
-3. **Painel direito** — extrair ribbon/toolbar do canvas
-4. **Duplicar / apagar / mover** na top bar
+1. ✅ Biblioteca sem hero marketing + header fino
+2. ✅ Chat colapsável (rail esquerdo) + composer integrado (Cursor)
+3. ✅ Barra superior do editor mais compacta + menu ⋮ (duplicar / apagar)
+4. 🔄 Painel direito — ribbon write sempre na sidebar (não sobre o canvas)
 5. Polish visual (tokens Cursor-like: cinzas, bordas subtis, ícones 16px)
+6. Persistir larguras + estado painéis (`localStorage` — parcial)
 
-**Pré-requisito:** F7 ou aceitar que F8 é só UX shell (pode ir em paralelo com F7 se necessário, mas **depois** do copilot P1–P5).
+**Pré-requisito para F9 (Content Creator):** F8 + redação e desenho «impecáveis».
 
 ---
 

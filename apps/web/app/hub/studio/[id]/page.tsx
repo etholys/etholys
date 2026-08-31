@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Loader2,
@@ -77,6 +77,8 @@ import { StudioDocumentTitle } from '@/components/studio/StudioDocumentTitle';
 import { StudioWriteRibbon } from '@/components/studio/StudioWriteRibbon';
 import { StudioDesignAiPanel } from '@/components/studio/StudioDesignAiPanel';
 import { StudioCopilotComposer } from '@/components/studio/StudioCopilotComposer';
+import { StudioCollapsibleRail } from '@/components/studio/StudioCollapsibleRail';
+import { StudioDocMoreMenu } from '@/components/studio/StudioDocMoreMenu';
 import { StudioChatAttachmentChips } from '@/components/studio/StudioChatAttachmentChips';
 import { StudioPageFilmstrip } from '@/components/studio/StudioPageFilmstrip';
 import { StudioStoryboardPlayer } from '@/components/studio/StudioStoryboardPlayer';
@@ -121,6 +123,13 @@ import { canvasWarrantsStructureMigration } from '@/lib/studio/structure-migrate
 import type { StudioStructureSessionState } from '@/lib/studio/structure-apply';
 import { parseStudioChatMessageContent } from '@/lib/studio/chat-message-display';
 import { copilotStatusHint } from '@/lib/studio/copilot-status';
+import {
+  readStudioChatPanelOpen,
+  readStudioToolsPanelOpen,
+  writeStudioChatPanelOpen,
+  writeStudioToolsPanelOpen,
+} from '@/lib/studio/editor-panel-prefs';
+import { canDeleteStudioDocument } from '@/lib/studio/share';
 
 type ChatMsg = {
   id: string;
@@ -157,6 +166,7 @@ const MAX_UNDO = 40;
 
 export default function StudioDocumentPage() {
   const params = useParams();
+  const router = useRouter();
   const id = String(params?.id || '');
   const { locale, activeCompanyId, setActiveCompanyId } = useApp();
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
@@ -201,7 +211,9 @@ export default function StudioDocumentPage() {
   const [commentBlockId, setCommentBlockId] = useState<string | null>(null);
   const [openCommentCount, setOpenCommentCount] = useState(0);
   const [activePageId, setActivePageId] = useState<string | null>(null);
-  const [toolsOpen, setToolsOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(true);
+  const [chatPanelOpen, setChatPanelOpen] = useState(true);
+  const [duplicating, setDuplicating] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [presence, setPresence] = useState<
     Array<{
@@ -255,6 +267,19 @@ export default function StudioDocumentPage() {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [imageTargetPageId, setImageTargetPageId] = useState<string | null>(null);
   const [brandPrimary, setBrandPrimary] = useState('#ea580c');
+
+  useEffect(() => {
+    setChatPanelOpen(readStudioChatPanelOpen());
+    setToolsOpen(readStudioToolsPanelOpen());
+  }, []);
+
+  useEffect(() => {
+    writeStudioChatPanelOpen(chatPanelOpen);
+  }, [chatPanelOpen]);
+
+  useEffect(() => {
+    writeStudioToolsPanelOpen(toolsOpen);
+  }, [toolsOpen]);
 
   useEffect(() => {
     dirtyRef.current = dirty;
@@ -1816,6 +1841,45 @@ export default function StudioDocumentPage() {
     });
   }
 
+  async function duplicateDocument() {
+    if (!id || duplicating) return;
+    setDuplicating(true);
+    try {
+      const q = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
+      const r = await fetch(`/api/studio/documents/${id}/duplicate${q}`, { method: 'POST' });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+      if (d.document?.id) router.push(`/hub/studio/${d.document.id}`);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setDuplicating(false);
+    }
+  }
+
+  async function deleteDocument() {
+    if (!id || !canDeleteStudioDocument(access as 'owner' | 'admin' | 'editor' | 'viewer' | 'none')) return;
+    const msg = t(
+      'Apagar este documento? Esta ação não pode ser desfeita.',
+      '¿Eliminar este documento? Esta acción no se puede deshacer.',
+      'Delete this document? This cannot be undone.',
+    );
+    if (!confirm(msg)) return;
+    try {
+      const q = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
+      const r = await fetch(`/api/studio/documents/${id}${q}`, { method: 'DELETE' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+      router.push(libraryHref);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro');
+    }
+  }
+
+  const canDeleteDoc = canDeleteStudioDocument(
+    access as 'owner' | 'admin' | 'editor' | 'viewer' | 'none',
+  );
+
   return (
     <div
       className={`flex h-screen flex-col ${
@@ -1825,14 +1889,13 @@ export default function StudioDocumentPage() {
       }`}
     >
       <header
-        className={`flex shrink-0 flex-col gap-2 px-3 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4 ${
+        className={`flex shrink-0 items-center gap-2 px-3 py-1.5 sm:px-4 ${
           studioMode === 'design'
             ? 'border-b border-violet-900/60 bg-[#120c1a] text-violet-50'
             : 'border-b border-stone-300/80 bg-[#f7f4ef] text-stone-900'
         }`}
       >
-        <div className="flex w-full min-w-0 flex-col gap-0.5 sm:w-auto sm:flex-1">
-          <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
             <Link
               href={libraryHref}
               className={`shrink-0 rounded-lg p-1.5 ${
@@ -1858,34 +1921,10 @@ export default function StudioDocumentPage() {
               placeholder={t('Sem título', 'Sin título', 'Untitled')}
               editHint={t('Clique para editar o nome', 'Clic para editar el nombre', 'Click to edit name')}
             />
-          </div>
-          {(lastEditedBy || lastEditedAt) && (
-            <p
-              className={`truncate pl-9 text-[10px] ${
-                studioMode === 'design' ? 'text-violet-400' : 'text-stone-500'
-              }`}
-            >
-              {t('Última edição', 'Última edición', 'Last edit')}
-              {lastEditedBy ? `: ${lastEditedBy}` : ''}
-              {lastEditedAt
-                ? ` · ${new Date(lastEditedAt).toLocaleString(locale === 'en' ? 'en' : locale)}`
-                : ''}
-            </p>
-          )}
-          {studioMode === 'write' && sortedPages.length > 1 && (
-            <p className="truncate pl-9 text-[10px] font-medium text-orange-700/90">
-              {t('Folha', 'Hoja', 'Page')}{' '}
-              {(activePageIndex >= 0 ? activePageIndex : 0) + 1} / {sortedPages.length}
-              <span className="font-normal text-stone-500">
-                {' '}
-                · {t('PageUp/Down ou Alt+↑↓', 'RePág/AvPág o Alt+↑↓', 'PageUp/Down or Alt+↑↓')}
-              </span>
-            </p>
-          )}
         </div>
 
         <div
-          className={`flex rounded-xl p-1 ${
+          className={`hidden shrink-0 rounded-lg p-0.5 sm:flex ${
             studioMode === 'design' ? 'bg-violet-950 ring-1 ring-violet-700' : 'bg-stone-200/80 ring-1 ring-stone-300'
           }`}
         >
@@ -1939,7 +1978,7 @@ export default function StudioDocumentPage() {
               ))}
           </div>
         )}
-        <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
           <button
             type="button"
             disabled={!canEdit || !undoStack.length}
@@ -2082,6 +2121,14 @@ export default function StudioDocumentPage() {
             <LayoutTemplate className="h-3.5 w-3.5" />
             {t('Ferramentas', 'Herramientas', 'Tools')}
           </button>
+          <StudioDocMoreMenu
+            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+            disabled={!canEdit}
+            canDelete={canDeleteDoc}
+            duplicating={duplicating}
+            onDuplicate={() => void duplicateDocument()}
+            onDelete={() => void deleteDocument()}
+          />
           <button
             type="button"
             disabled={saving || !dirty || !canEdit}
@@ -2151,14 +2198,20 @@ export default function StudioDocumentPage() {
       )}
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        {/* Painel esquerdo: IA de redação OU IA de desenho */}
+        <StudioCollapsibleRail
+          open={chatPanelOpen}
+          onToggle={() => setChatPanelOpen((v) => !v)}
+          widthPx={chatWidth}
+          variant={studioMode === 'design' ? 'design' : 'write'}
+          title={t('Chat IA', 'Chat IA', 'AI chat')}
+          icon={<MessageSquare className="h-4 w-4" />}
+        >
         <aside
-          className={`flex max-h-[38vh] w-full shrink-0 flex-col lg:max-h-none lg:h-auto lg:w-[var(--studio-chat-w)] ${
+          className={`flex max-h-[38vh] min-h-0 w-full flex-1 flex-col lg:max-h-none lg:h-auto ${
             studioMode === 'design'
-              ? 'border-b border-violet-900/50 lg:border-b-0 lg:border-r lg:border-violet-900/50'
-              : 'border-b border-stone-200 bg-[#faf8f5] lg:border-b-0 lg:border-r'
+              ? 'border-b border-violet-900/50 lg:border-b-0'
+              : 'border-b border-stone-200 lg:border-b-0'
           }`}
-          style={{ ['--studio-chat-w' as string]: `${chatWidth}px` }}
         >
           {studioMode === 'design' ? (
             <StudioDesignAiPanel
@@ -2356,19 +2409,21 @@ export default function StudioDocumentPage() {
           </>
           )}
         </aside>
+        </StudioCollapsibleRail>
 
-        {/* Resize handle */}
+        {chatPanelOpen && (
         <div
           role="separator"
           aria-orientation="vertical"
           onMouseDown={() => {
             dragging.current = true;
           }}
-          className={`hidden w-1.5 shrink-0 cursor-col-resize lg:block ${
+          className={`hidden w-1 shrink-0 cursor-col-resize lg:block ${
             studioMode === 'design' ? 'bg-violet-900 hover:bg-violet-500' : 'bg-stone-300 hover:bg-orange-400'
           }`}
           title={t('Arrastar para redimensionar', 'Arrastrar para redimensionar', 'Drag to resize')}
         />
+        )}
 
         {/* Documento + ferramentas laterais */}
         <div className="flex min-h-0 min-w-0 flex-1">
