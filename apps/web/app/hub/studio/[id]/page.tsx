@@ -1700,6 +1700,84 @@ export default function StudioDocumentPage() {
     }
   }
 
+  function splitBlockAfter(pageId: string, blockId: string, afterText: string) {
+    let newId = '';
+    applyCanvas((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) => {
+        if (p.id !== pageId) return p;
+        const blocks = p.blocks.slice().sort((a, b) => a.order - b.order);
+        const idx = blocks.findIndex((b) => b.id === blockId);
+        if (idx < 0) return p;
+        newId = `block-${Date.now()}-${idx + 1}`;
+        const next = [
+          ...blocks.slice(0, idx + 1),
+          { id: newId, kind: 'paragraph' as const, text: afterText, order: idx + 1 },
+          ...blocks.slice(idx + 1),
+        ].map((b, i) => ({ ...b, order: i }));
+        return { ...p, blocks: next };
+      }),
+    }));
+    if (newId) {
+      window.setTimeout(() => requestStudioWriteBlockFocus(newId, 0), 40);
+    }
+  }
+
+  function mergeBlockWithNext(pageId: string, blockId: string) {
+    const textish = (kind: string) =>
+      kind === 'paragraph' || kind === 'bullets' || kind === 'callout' || kind === 'heading';
+    let focusId: string | null = null;
+    let caretOffset = 0;
+    applyCanvas((prev) => {
+      const sortedPages = prev.pages.slice().sort((a, b) => a.order - b.order);
+      const flat: Array<{ pageId: string; block: StudioBlock }> = [];
+      for (const p of sortedPages) {
+        for (const b of p.blocks.slice().sort((a, b) => a.order - b.order)) {
+          flat.push({ pageId: p.id, block: b });
+        }
+      }
+      const globalIdx = flat.findIndex((x) => x.pageId === pageId && x.block.id === blockId);
+      if (globalIdx < 0 || globalIdx >= flat.length - 1) return prev;
+      const curEntry = flat[globalIdx]!;
+      const nextEntry = flat[globalIdx + 1]!;
+      const curB = curEntry.block;
+      const nextB = nextEntry.block;
+      if (!textish(curB.kind) || !textish(nextB.kind)) return prev;
+
+      const curText = String(curB.text || '');
+      const nextText = String(nextB.text || '');
+      const joiner =
+        curB.kind === 'bullets'
+          ? '\n'
+          : curText.length && !curText.endsWith('\n')
+            ? '\n'
+            : '';
+      caretOffset = curText.length + joiner.length;
+      const mergedText = `${curText}${joiner}${nextText}`;
+      focusId = curB.id;
+
+      return {
+        ...prev,
+        pages: sortedPages.map((p) => {
+          const touchesCur = p.id === curEntry.pageId;
+          const touchesNext = p.id === nextEntry.pageId;
+          if (!touchesCur && !touchesNext) return p;
+          let blocks = p.blocks.slice().sort((a, b) => a.order - b.order);
+          if (touchesCur) {
+            blocks = blocks.map((b) => (b.id === curB.id ? { ...b, text: mergedText } : b));
+          }
+          if (touchesNext) {
+            blocks = blocks.filter((b) => b.id !== nextB.id);
+          }
+          return { ...p, blocks: blocks.map((b, i) => ({ ...b, order: i })) };
+        }),
+      };
+    });
+    if (focusId) {
+      window.setTimeout(() => requestStudioWriteBlockFocus(focusId!, caretOffset), 40);
+    }
+  }
+
   function moveBlock(pageId: string, blockId: string, dir: -1 | 1) {
     applyCanvas((prev) => ({
       ...prev,
@@ -2454,7 +2532,7 @@ export default function StudioDocumentPage() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div
           ref={canvasScrollRef}
-          className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4"
+          className={`min-h-0 flex-1 overflow-y-auto p-3 sm:p-4 ${studioMode === 'write' ? 'studio-write-flow' : ''}`}
           style={
             {
               ['--studio-brand' as string]: brandPrimary,
@@ -2790,6 +2868,16 @@ export default function StudioDocumentPage() {
                                 canEdit &&
                                 (blockIdx > 0 || idxDisplay > 0)
                                   ? () => mergeBlockWithPrev(page.id, block.id)
+                                  : undefined
+                              }
+                              onSplitAfter={
+                                studioMode === 'write' && canEdit
+                                  ? (afterText) => splitBlockAfter(page.id, block.id, afterText)
+                                  : undefined
+                              }
+                              onMergeWithNext={
+                                studioMode === 'write' && canEdit
+                                  ? () => mergeBlockWithNext(page.id, block.id)
                                   : undefined
                               }
                               onFocusNext={

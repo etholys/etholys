@@ -148,6 +148,8 @@ type Props = {
   onInsertAfter?: () => void;
   onBackspaceEmpty?: () => void;
   onMergeWithPrev?: () => void;
+  onSplitAfter?: (afterText: string) => void;
+  onMergeWithNext?: () => void;
   onFocusNext?: () => void;
   onFocusPrev?: () => void;
   /** Gera ilustração IA para bloco image (modo Desenho) */
@@ -207,6 +209,8 @@ export function StudioBlockEditor({
   onInsertAfter,
   onBackspaceEmpty,
   onMergeWithPrev,
+  onSplitAfter,
+  onMergeWithNext,
   onFocusNext,
   onFocusPrev,
   onGenerateImage,
@@ -830,6 +834,8 @@ export function StudioBlockEditor({
             onInsertAfter={onInsertAfter}
             onBackspaceEmpty={onBackspaceEmpty}
             onMergeWithPrev={onMergeWithPrev}
+            onSplitAfter={onSplitAfter}
+            onMergeWithNext={onMergeWithNext}
             onFocusNext={onFocusNext}
             onFocusPrev={onFocusPrev}
             className={`studio-rich-editor min-h-[1.5em] w-full outline-none ${

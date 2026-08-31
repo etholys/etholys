@@ -34,9 +34,10 @@ type Props = {
   onMergeWithPrev?: () => void;
   /** Seta ↓ no fim → bloco seguinte */
   onFocusNext?: () => void;
-  /** Seta ↑ no início → bloco anterior */
-  onFocusPrev?: () => void;
-};
+  /** Enter — novo parágrafo (split); Shift+Enter — quebra de linha */
+  onSplitAfter?: (afterText: string) => void;
+  /** Delete no fim — fundir com o bloco seguinte */
+  onMergeWithNext?: () => void;
 
 /**
  * Editor rico (TipTap) para modo Redação — seleção real + ribbon + teclas tipo Docs.
@@ -56,6 +57,8 @@ export function StudioRichTextEditor({
   onMergeWithPrev,
   onFocusNext,
   onFocusPrev,
+  onSplitAfter,
+  onMergeWithNext,
 }: Props) {
   const cbs = useRef({
     onChange,
@@ -64,6 +67,8 @@ export function StudioRichTextEditor({
     onMergeWithPrev,
     onFocusNext,
     onFocusPrev,
+    onSplitAfter,
+    onMergeWithNext,
   });
   cbs.current = {
     onChange,
@@ -72,6 +77,8 @@ export function StudioRichTextEditor({
     onMergeWithPrev,
     onFocusNext,
     onFocusPrev,
+    onSplitAfter,
+    onMergeWithNext,
   };
   /** Evita que o efeito de sync prop→editor restaure texto obsoleto ao mudar para o chat. */
   const lastEmittedRef = useRef(text);
@@ -84,6 +91,7 @@ export function StudioRichTextEditor({
         codeBlock: false,
         blockquote: false,
         horizontalRule: false,
+        hardBreak: { keepMarks: true },
       }),
       Underline,
       Placeholder.configure({
@@ -106,6 +114,31 @@ export function StudioRichTextEditor({
           event.preventDefault();
           cbs.current.onInsertAfter?.();
           return true;
+        }
+        if (event.key === 'Enter' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+          if (event.shiftKey) return false;
+          if (cbs.current.onSplitAfter) {
+            const { empty, $from } = view.state.selection;
+            if (empty) {
+              const plain = view.state.doc.textContent;
+              const offset = $from.parentOffset;
+              const before = plain.slice(0, offset);
+              const after = plain.slice(offset);
+              event.preventDefault();
+              cbs.current.onChange(before);
+              cbs.current.onSplitAfter(after);
+              return true;
+            }
+          }
+        }
+        if (event.key === 'Delete' && cbs.current.onMergeWithNext) {
+          const plain = view.state.doc.textContent;
+          const { empty, $to } = view.state.selection;
+          if (empty && $to.parentOffset >= $to.parent.content.size && plain.trim()) {
+            event.preventDefault();
+            cbs.current.onMergeWithNext();
+            return true;
+          }
         }
         if (event.key === 'Backspace') {
           const plain = view.state.doc.textContent;

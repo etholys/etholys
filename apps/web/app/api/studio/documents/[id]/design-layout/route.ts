@@ -26,7 +26,8 @@ export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> | { id: string } },
 ) {
-  const session = await getServerSession(authOptions);
+  try {
+    const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -138,4 +139,11 @@ export async function POST(
     canvasState: nextCanvas,
     document: { id: updated.id, updatedAt: updated.updatedAt },
   });
+  } catch (e: unknown) {
+    console.error('[studio design-layout]', e);
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Erro interno ao diagramar.' },
+      { status: 500 },
+    );
+  }
 }

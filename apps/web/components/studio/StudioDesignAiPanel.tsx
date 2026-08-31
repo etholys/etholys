@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { StudioCanvasState } from '@/lib/studio/types';
 import type { StudioDesignGenerateMode } from '@/lib/studio/design-media-ai';
+import { parseStudioApiResponse } from '@/lib/studio/api-response';
 
 type Props = {
   documentId: string;
@@ -210,6 +211,7 @@ function loc<T extends { pt: string; es: string; en: string }>(locale: string, o
 
 export function StudioDesignAiPanel({
   documentId,
+  companyId,
   locale,
   canEdit,
   disabled,
@@ -241,18 +243,25 @@ export function StudioDesignAiPanel({
     setBusy(true);
     setError(null);
     try {
-      const r = await fetch(`/api/studio/documents/${documentId}/design-generate`, {
+      const q = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
+      const wantsImages = tab === 'images' || tab === 'video';
+      const r = await fetch(`/api/studio/documents/${documentId}/design-generate${q}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({
           mode: tab,
           prompt: text,
           locale,
-          generateImages: active.generateImages !== false,
+          generateImages: wantsImages,
         }),
       });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Erro');
+      const d = await parseStudioApiResponse<{
+        error?: string;
+        canvasState?: StudioCanvasState;
+        message?: string;
+      }>(r);
+      if (!r.ok) throw new Error(d.error || `Erro HTTP ${r.status}`);
       if (d.canvasState) {
         onApplied(d.canvasState, d.message || '');
         setLastMsg(d.message || null);

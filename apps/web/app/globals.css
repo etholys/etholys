@@ -126,3 +126,11 @@
   caret-color: #ea580c;
 }
 
+/* Modo redação — fluxo contínuo tipo Word */
+.studio-write-flow .studio-rich-editor.ProseMirror p {
+  margin: 0;
+}
+.studio-write-flow .studio-rich-editor.ProseMirror p + p {
+  margin-top: 0.35em;
+}
+

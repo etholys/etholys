@@ -150,7 +150,7 @@ export function StudioDesignPlacedBlock({
           />
         </>
       ) : null}
-      <div className="rounded-md bg-white/0 ring-1 ring-transparent transition group-hover/place:ring-violet-400/50 group-hover/place:shadow-[0_8px_24px_rgba(76,29,149,0.18)]">
+      <div className="rounded-md bg-white/0 ring-1 ring-transparent transition group-hover/place:ring-violet-400/50 group-focus-within/place:ring-violet-400/70 group-hover/place:shadow-[0_8px_24px_rgba(76,29,149,0.18)]">
         {children}
       </div>
     </div>
