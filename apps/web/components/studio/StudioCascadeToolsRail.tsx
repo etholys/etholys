@@ -5,6 +5,7 @@ import {
   Bold,
   FileText,
   Layers,
+  LayoutGrid,
   PenLine,
   PlusSquare,
   Sparkles,
@@ -14,6 +15,7 @@ import {
 import type {
   StudioBlockKind,
   StudioBlockStyle,
+  StudioPage,
   StudioPageMarginsMm,
   StudioPageOrientation,
   StudioPageSize,
@@ -22,6 +24,7 @@ import type {
 } from '@/lib/studio/types';
 import { StudioToolsPanelBody, type StudioToolsPanelLabels } from '@/components/studio/StudioToolsPanelBody';
 import { StudioWriteRibbon } from '@/components/studio/StudioWriteRibbon';
+import type { PageSelectionState } from '@/lib/studio/selection-scope';
 
 export type CascadeSection = 'format' | 'insert' | 'page' | 'elements' | 'visual';
 
@@ -69,6 +72,12 @@ type Props = {
   onStyle: (partial: StudioBlockStyle) => void;
   sectionTitles: Record<CascadeSection, string>;
   branchLabels: { write: string; design: string };
+  pages: StudioPage[];
+  activePageId: string | null;
+  locale: string;
+  onSelectPage: (pageId: string) => void;
+  pageAiSelection?: Record<string, PageSelectionState>;
+  onToggleAiPage?: (pageId: string) => void;
 };
 
 const WRITE_SECTIONS: CascadeSection[] = ['format', 'insert', 'page'];
@@ -79,6 +88,7 @@ function sectionIcon(section: CascadeSection) {
   if (section === 'insert') return PlusSquare;
   if (section === 'elements') return Layers;
   if (section === 'visual') return Wand2;
+  if (section === 'page') return LayoutGrid;
   return FileText;
 }
 
@@ -112,6 +122,12 @@ export function StudioCascadeToolsRail({
   onStyle,
   sectionTitles,
   branchLabels,
+  pages,
+  activePageId,
+  locale,
+  onSelectPage,
+  pageAiSelection,
+  onToggleAiPage,
 }: Props) {
   const isDesign = mode === 'design';
   const subSections = isDesign ? DESIGN_SECTIONS : WRITE_SECTIONS;
@@ -224,6 +240,12 @@ export function StudioCascadeToolsRail({
                   onHeaderFooter={onHeaderFooter}
                   pageBackgroundColor={pageBackgroundColor}
                   onPageBackgroundColor={onPageBackgroundColor}
+                  pages={pages}
+                  activePageId={activePageId}
+                  locale={locale}
+                  onSelectPage={onSelectPage}
+                  pageAiSelection={pageAiSelection}
+                  onToggleAiPage={onToggleAiPage}
                 />
               )
             )}

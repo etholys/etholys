@@ -13,6 +13,7 @@ import {
 import type {
   StudioBlockKind,
   StudioMarginPresetId,
+  StudioPage,
   StudioPageMarginsMm,
   StudioPageOrientation,
   StudioPageSize,
@@ -24,9 +25,12 @@ import {
   STUDIO_PAGE_SIZES,
   matchStudioMarginPreset,
 } from '@/lib/studio/types';
+import { StudioPagesList } from '@/components/studio/StudioPagesList';
+import type { PageSelectionState } from '@/lib/studio/selection-scope';
 
 export type StudioToolsPanelLabels = {
   page: string;
+  pageSetup: string;
   size: string;
   orientation: string;
   portrait: string;
@@ -84,6 +88,12 @@ type Props = {
   onHeaderFooter?: (hf: StudioHeaderFooter) => void;
   pageBackgroundColor?: string | null;
   onPageBackgroundColor?: (color: string | null) => void;
+  pages?: StudioPage[];
+  activePageId?: string | null;
+  locale?: string;
+  onSelectPage?: (pageId: string) => void;
+  pageAiSelection?: Record<string, PageSelectionState>;
+  onToggleAiPage?: (pageId: string) => void;
 };
 
 export function StudioToolsPanelBody({
@@ -105,6 +115,12 @@ export function StudioToolsPanelBody({
   onHeaderFooter,
   pageBackgroundColor,
   onPageBackgroundColor,
+  pages,
+  activePageId,
+  locale = 'pt',
+  onSelectPage,
+  pageAiSelection,
+  onToggleAiPage,
 }: Props) {
   const isDesign = mode === 'design';
   const preset = matchStudioMarginPreset(margins);
@@ -130,7 +146,25 @@ export function StudioToolsPanelBody({
 
   if (section === 'page') {
     return (
-      <div className="space-y-3 p-3">
+      <div className="space-y-4 p-3">
+        {pages && pages.length > 0 && onSelectPage && (
+          <StudioPagesList
+            pages={pages}
+            activePageId={activePageId || null}
+            locale={locale}
+            variant={isDesign ? 'design' : 'write'}
+            onSelect={onSelectPage}
+            onAddPage={onAddPage}
+            canEdit={!disabled}
+            pageAiSelection={pageAiSelection}
+            onToggleAiPage={onToggleAiPage}
+          />
+        )}
+
+        <div className={`space-y-3 ${pages && pages.length > 0 ? 'border-t pt-3' : ''} ${isDesign ? 'border-violet-800/40' : 'border-stone-200'}`}>
+          <p className={`text-[10px] font-bold uppercase tracking-wide ${isDesign ? 'text-violet-400' : 'text-stone-500'}`}>
+            {labels.pageSetup}
+          </p>
         <label className="flex flex-col gap-1 text-[10px] font-semibold text-slate-500">
           {labels.size}
           <select
@@ -303,6 +337,7 @@ export function StudioToolsPanelBody({
             </div>
           </label>
         )}
+        </div>
       </div>
     );
   }

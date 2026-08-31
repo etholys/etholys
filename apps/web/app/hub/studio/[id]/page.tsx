@@ -82,7 +82,6 @@ import { StudioCopilotComposer } from '@/components/studio/StudioCopilotComposer
 import { StudioCollapsibleRail } from '@/components/studio/StudioCollapsibleRail';
 import { StudioDocMoreMenu } from '@/components/studio/StudioDocMoreMenu';
 import { StudioChatAttachmentChips } from '@/components/studio/StudioChatAttachmentChips';
-import { StudioPageFilmstrip } from '@/components/studio/StudioPageFilmstrip';
 import { StudioStoryboardPlayer } from '@/components/studio/StudioStoryboardPlayer';
 import { StudioPresenterMode } from '@/components/studio/StudioPresenterMode';
 import {
@@ -2874,32 +2873,6 @@ export default function StudioDocumentPage() {
               })}
           </div>
         </div>
-        {studioMode === 'design' && isPresentationDeck && (
-          <StudioPageFilmstrip
-            pages={canvas.pages}
-            activePageId={activePageId}
-            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
-            variant="design"
-            canEdit={canEdit}
-            onAddPage={canEdit ? addPage : undefined}
-            onSelect={selectPage}
-            pageAiSelection={pageAiSelectionMap}
-            onToggleAiPage={canEdit ? togglePageForAi : undefined}
-          />
-        )}
-        {studioMode === 'write' && canvas.pages.length > 1 && (
-          <StudioPageFilmstrip
-            pages={canvas.pages}
-            activePageId={activePageId}
-            locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
-            variant="write"
-            canEdit={canEdit}
-            onAddPage={canEdit ? addPage : undefined}
-            onSelect={selectPage}
-            pageAiSelection={pageAiSelectionMap}
-            onToggleAiPage={canEdit ? togglePageForAi : undefined}
-          />
-        )}
         {studioMode === 'design' && videoScenes.length > 0 && (
           <>
             <div className="flex items-center justify-end gap-2 border-t border-violet-900/30 bg-[#0c0814] px-3 py-1">
@@ -2976,6 +2949,12 @@ export default function StudioDocumentPage() {
           onCommand={ribbonCommand}
           onKind={ribbonKind}
           onStyle={ribbonStyle}
+          pages={canvas.pages}
+          activePageId={activePageId}
+          locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
+          onSelectPage={selectPage}
+          pageAiSelection={pageAiSelectionMap}
+          onToggleAiPage={canEdit ? togglePageForAi : undefined}
           branchLabels={{
             write: t('Redação', 'Redacción', 'Write'),
             design: t('Desenho', 'Diseño', 'Design'),
@@ -2983,7 +2962,10 @@ export default function StudioDocumentPage() {
           sectionTitles={{
             format: t('Formato', 'Formato', 'Format'),
             insert: t('Inserir', 'Insertar', 'Insert'),
-            page: t('Página', 'Página', 'Page'),
+            page:
+              studioMode === 'design'
+                ? t('Slides', 'Slides', 'Slides')
+                : t('Folhas', 'Hojas', 'Pages'),
             elements: t('Elementos', 'Elementos', 'Elements'),
             visual: t('Visuais', 'Visuales', 'Visual'),
           }}
@@ -3006,6 +2988,7 @@ export default function StudioDocumentPage() {
           }}
           panelLabels={{
             page: t('Página', 'Página', 'Page'),
+            pageSetup: t('Configuração', 'Configuración', 'Setup'),
             size: t('Tamanho', 'Tamaño', 'Size'),
             orientation: t('Orientação', 'Orientación', 'Orientation'),
             portrait: t('Retrato', 'Vertical', 'Portrait'),
