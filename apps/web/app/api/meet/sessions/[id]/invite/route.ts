@@ -2,8 +2,12 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { getMeetSessionForCompany } from '@/lib/meet/create-session';
-import { sendMeetInviteEmail } from '@/lib/meet/send-meet-email';
+import {
+  getMeetSessionForCompany,
+  isMeetSessionOwner,
+  meetSeriesMasterId,
+} from '@/lib/meet/create-session';
+import { sendMeetSessionInvites } from '@/lib/meet/send-session-invites';
 import { prisma } from '@/lib/prisma';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -28,6 +32,9 @@ export async function POST(req: Request, ctx: Ctx) {
     if (!session || !session.meetingUrl) {
       return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
     }
+    if (!isMeetSessionOwner(session, tenant.userId)) {
+      return NextResponse.json({ error: 'Só o organizador pode enviar convites' }, { status: 403 });
+    }
 
     const emails = (body.emails ?? [])
       .map((e) => e.trim().toLowerCase())
@@ -36,27 +43,34 @@ export async function POST(req: Request, ctx: Ctx) {
       return NextResponse.json({ error: 'emails requeridos' }, { status: 400 });
     }
 
-    const results: { email: string; sent: boolean; error?: string }[] = [];
+    const masterId = meetSeriesMasterId(session);
     for (const email of emails) {
-      const existing = session.participants.find((p) => p.email === email);
+      const existing = session.participants.find(
+        (p) => (p.email || p.user?.email || '').toLowerCase() === email,
+      );
       if (!existing) {
         await prisma.meetParticipant.create({
-          data: { sessionId: session.id, email, role: 'guest' },
+          data: { sessionId: masterId, email, role: 'guest' },
         });
       }
-      const r = await sendMeetInviteEmail({
-        to: email,
-        title: session.title,
-        meetingUrl: session.meetingUrl,
-        sessionId: session.id,
-        scheduledAt: session.scheduledAt,
-        endsAt: session.endsAt,
-        locale: body.locale,
-      });
-      results.push({ email, ...r });
     }
 
-    return NextResponse.json({ results });
+    const refreshed = await getMeetSessionForCompany(id, companyId);
+    const meetingUrl = refreshed?.meetingUrl || session.meetingUrl;
+    const results = await sendMeetSessionInvites({
+      session: {
+        id: masterId,
+        title: session.title,
+        meetingUrl,
+        scheduledAt: session.scheduledAt,
+        endsAt: session.endsAt,
+      },
+      emails,
+      locale: body.locale,
+      hostName: session.createdBy?.name || session.createdBy?.email || null,
+    });
+
+    return NextResponse.json({ results, session: refreshed });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Error interno';
     return NextResponse.json({ error: msg }, { status: 500 });

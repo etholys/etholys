@@ -2,7 +2,16 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { getMeetSessionForCompany, deleteMeetSessionScoped, updateMeetSessionScoped } from '@/lib/meet/create-session';
+import {
+  getMeetSessionForCompany,
+  deleteMeetSessionScoped,
+  updateMeetSessionScoped,
+  syncMeetParticipants,
+  isMeetSessionOwner,
+  meetSeriesMasterId,
+  collectMeetGuestEmails,
+} from '@/lib/meet/create-session';
+import { sendMeetSessionInvites } from '@/lib/meet/send-session-invites';
 import { prisma } from '@/lib/prisma';
 import type { MeetEditScope } from '@/lib/meet/create-session';
 
@@ -28,15 +37,9 @@ export async function GET(req: Request, ctx: Ctx) {
   }
 }
 
-function isMeetOwner(
-  session: { createdById: string | null; participants: { userId: string | null; role: string }[] },
-  userId: string,
-): boolean {
-  if (session.createdById === userId) return true;
-  return session.participants.some((p) => p.userId === userId && (p.role === 'host' || p.role === 'cohost'));
-}
+type MeetSessionRecord = NonNullable<Awaited<ReturnType<typeof getMeetSessionForCompany>>>;
 
-/** Atualiza metadados / status da sessão. */
+/** Atualiza metadados / status / participantes da sessão. */
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
     const tenant = await getUserCompanyIds();
@@ -52,8 +55,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
       endsAt?: string | null;
       recordingUrl?: string | null;
       transcriptText?: string | null;
-      /** this | following | series — para editar recorrências */
       editScope?: MeetEditScope;
+      inviteEmails?: string[];
+      removeParticipantIds?: string[];
+      projectId?: string | null;
+      sendInvites?: boolean;
+      notifyAttendees?: boolean;
+      locale?: string;
     };
     const companyId = body.companyId?.trim();
     if (!companyId || !tenant.companyIds.includes(companyId)) {
@@ -68,7 +76,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
       body.description !== undefined ||
       body.scheduledAt !== undefined ||
       body.endsAt !== undefined;
-    if (editingMeta && !isMeetOwner(existing, tenant.userId)) {
+    const editingParticipants =
+      (body.inviteEmails?.length ?? 0) > 0 ||
+      (body.removeParticipantIds?.length ?? 0) > 0 ||
+      body.projectId !== undefined;
+
+    if ((editingMeta || editingParticipants) && !isMeetSessionOwner(existing, tenant.userId)) {
       return NextResponse.json({ error: 'Só o organizador pode editar' }, { status: 403 });
     }
 
@@ -137,10 +150,6 @@ export async function PATCH(req: Request, ctx: Ctx) {
           : null;
     }
 
-    if (Object.keys(data).length === 0) {
-      return NextResponse.json({ error: 'Nada para actualizar' }, { status: 400 });
-    }
-
     const editScope: MeetEditScope =
       body.editScope === 'following' || body.editScope === 'series' ? body.editScope : 'this';
     const editingScheduleOrMeta =
@@ -148,6 +157,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
       data.description !== undefined ||
       data.scheduledAt !== undefined ||
       data.endsAt !== undefined;
+
+    let session: MeetSessionRecord = existing;
 
     if (editingScheduleOrMeta) {
       const scoped = await updateMeetSessionScoped({
@@ -160,9 +171,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
         endsAt: data.endsAt,
       });
       if (!scoped) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+      const afterScoped = await getMeetSessionForCompany(scoped.id, companyId);
+      if (!afterScoped) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+      session = afterScoped;
 
       if (data.status || data.recordingUrl !== undefined || data.transcriptText !== undefined) {
-        const session = await prisma.meetSession.update({
+        await prisma.meetSession.update({
           where: { id },
           data: {
             ...(data.status
@@ -171,31 +185,78 @@ export async function PATCH(req: Request, ctx: Ctx) {
             ...(data.recordingUrl !== undefined ? { recordingUrl: data.recordingUrl } : {}),
             ...(data.transcriptText !== undefined ? { transcriptText: data.transcriptText } : {}),
           },
-          include: {
-            createdBy: { select: { id: true, name: true, email: true } },
-            participants: {
-              orderBy: { invitedAt: 'asc' },
-              include: { user: { select: { id: true, name: true, email: true } } },
-            },
-          },
         });
-        return NextResponse.json({ session, editScope });
+        const afterStatus = await getMeetSessionForCompany(id, companyId);
+        if (!afterStatus) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+        session = afterStatus;
       }
-      return NextResponse.json({ session: scoped, editScope });
+    } else if (Object.keys(data).length > 0) {
+      await prisma.meetSession.update({
+        where: { id },
+        data,
+      });
+      const afterData = await getMeetSessionForCompany(id, companyId);
+      if (!afterData) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+      session = afterData;
     }
 
-    const session = await prisma.meetSession.update({
-      where: { id },
-      data,
-      include: {
-        createdBy: { select: { id: true, name: true, email: true } },
-        participants: {
-          orderBy: { invitedAt: 'asc' },
-          include: { user: { select: { id: true, name: true, email: true } } },
-        },
-      },
-    });
-    return NextResponse.json({ session, editScope: 'this' as const });
+    if (editingParticipants) {
+      const synced = await syncMeetParticipants({
+        sessionId: id,
+        companyId,
+        addEmails: body.inviteEmails,
+        removeParticipantIds: body.removeParticipantIds,
+        projectId: body.projectId,
+      });
+      if (!synced) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+      session = synced;
+    }
+
+    const inviteResults: { email: string; sent: boolean; error?: string }[] = [];
+    const masterId = meetSeriesMasterId(session);
+    const master = await getMeetSessionForCompany(masterId, companyId);
+    const meetingUrl = master?.meetingUrl || session.meetingUrl;
+
+    if (meetingUrl && (body.sendInvites || body.notifyAttendees)) {
+      const hostName = session.createdBy?.name || session.createdBy?.email || null;
+      const newEmails = (body.inviteEmails ?? [])
+        .map((e) => e.trim().toLowerCase())
+        .filter((e) => e.includes('@'));
+      const allGuests = collectMeetGuestEmails(master?.participants ?? session.participants ?? []);
+
+      const targets = body.notifyAttendees
+        ? allGuests
+        : body.sendInvites
+          ? newEmails
+          : [];
+
+      if (targets.length > 0) {
+        inviteResults.push(
+          ...(await sendMeetSessionInvites({
+            session: {
+              id: masterId,
+              title: session.title,
+              meetingUrl,
+              scheduledAt: session.scheduledAt,
+              endsAt: session.endsAt,
+            },
+            emails: targets,
+            locale: body.locale,
+            hostName,
+          })),
+        );
+      }
+    }
+
+    if (
+      !editingScheduleOrMeta &&
+      !editingParticipants &&
+      Object.keys(data).length === 0
+    ) {
+      return NextResponse.json({ error: 'Nada para actualizar' }, { status: 400 });
+    }
+
+    return NextResponse.json({ session, editScope, inviteResults });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Error interno';
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -216,7 +277,7 @@ export async function DELETE(req: Request, ctx: Ctx) {
 
     const existing = await getMeetSessionForCompany(id, companyId);
     if (!existing) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
-    if (!isMeetOwner(existing, tenant.userId)) {
+    if (!isMeetSessionOwner(existing, tenant.userId)) {
       return NextResponse.json({ error: 'Só o organizador pode apagar' }, { status: 403 });
     }
 

@@ -138,6 +138,8 @@ function MeetHubContent() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [shareSession, setShareSession] = useState<{ id: string; meetingUrl: string } | null>(null);
   const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
+  const [detailSessionFull, setDetailSessionFull] = useState<MeetEventDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [calBusyId, setCalBusyId] = useState<string | null>(null);
   const [jitsiStatus, setJitsiStatus] = useState<{ baseUrl: string; isDemo: boolean } | null>(null);
   const [connections, setConnections] = useState<{
@@ -497,15 +499,44 @@ function MeetHubContent() {
   }).format(selectedDate);
 
   const detailSession = useMemo(
-    () => sessions.find((session) => session.id === detailSessionId) || null,
-    [sessions, detailSessionId],
+    () => detailSessionFull || sessions.find((session) => session.id === detailSessionId) || null,
+    [detailSessionFull, sessions, detailSessionId],
   );
 
+  useEffect(() => {
+    if (!detailSessionId || !companyId) {
+      setDetailSessionFull(null);
+      return;
+    }
+    let cancelled = false;
+    setDetailLoading(true);
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/meet/sessions/${detailSessionId}?companyId=${encodeURIComponent(companyId)}`,
+        );
+        const data = (await response.json()) as { session?: MeetEventDetail; error?: string };
+        if (!cancelled && response.ok && data.session) {
+          setDetailSessionFull(data.session);
+        }
+      } catch {
+        /* fallback to list row */
+      } finally {
+        if (!cancelled) setDetailLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [detailSessionId, companyId]);
+
   function openSessionDetail(sessionId: string) {
+    setDetailSessionFull(null);
     setDetailSessionId(sessionId);
   }
 
   function handleDetailUpdated(session: MeetEventDetail) {
+    setDetailSessionFull(session);
     setSessions((prev) =>
       prev.map((row) =>
         row.id === session.id
@@ -527,6 +558,7 @@ function MeetHubContent() {
   function handleDetailDeleted(sessionId: string) {
     setSessions((prev) => prev.filter((row) => row.id !== sessionId));
     setDetailSessionId(null);
+    setDetailSessionFull(null);
   }
 
   return (
@@ -1027,10 +1059,19 @@ function MeetHubContent() {
             session={detailSession}
             currentUserId={currentUserId}
             googleCalendarReady={Boolean(connections?.google.ready)}
-            onClose={() => setDetailSessionId(null)}
+            projects={projects}
+            onClose={() => {
+              setDetailSessionId(null);
+              setDetailSessionFull(null);
+            }}
             onUpdated={handleDetailUpdated}
             onDeleted={handleDetailDeleted}
           />
+        )}
+        {detailSessionId && detailLoading && !detailSession && companyId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/20">
+            <Loader2 className="h-8 w-8 animate-spin text-teal-700" />
+          </div>
         )}
 
       </main>
