@@ -171,7 +171,7 @@ export function StudioSheet({
           </div>
         ) : null}
         <div
-          className={`flex min-h-0 flex-col ${compact ? 'gap-1.5' : 'gap-3.5'} ${freeform ? 'relative min-h-full' : ''}`}
+          className={`flex min-h-0 flex-col ${compact ? 'gap-0' : 'gap-3.5'} ${freeform ? 'relative min-h-full' : ''}`}
         >
           {children}
         </div>
@@ -186,15 +186,17 @@ export function StudioSheet({
         )}
       </div>
 
-      <div
-        className="pointer-events-none absolute z-[1] rounded-[1px] border border-dashed border-slate-200/70"
-        style={{
-          top: pad.top,
-          right: pad.right,
-          bottom: isFixed ? pad.bottom : Math.max(pad.bottom, 24),
-          left: pad.left,
-        }}
-      />
+      {!compact ? (
+        <div
+          className="pointer-events-none absolute z-[1] rounded-[1px] border border-dashed border-slate-200/70"
+          style={{
+            top: pad.top,
+            right: pad.right,
+            bottom: isFixed ? pad.bottom : Math.max(pad.bottom, 24),
+            left: pad.left,
+          }}
+        />
+      ) : null}
 
       <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center">
         <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-medium tracking-[0.14em] text-slate-400">

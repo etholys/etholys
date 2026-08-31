@@ -101,7 +101,7 @@
   min-height: min(58vh, 520px);
 }
 .studio-rich-editor.ProseMirror p {
-  margin: 0.25em 0;
+  margin: 0.1em 0;
 }
 .studio-rich-editor.ProseMirror h1,
 .studio-rich-editor.ProseMirror h2,

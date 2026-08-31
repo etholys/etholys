@@ -147,6 +147,7 @@ type Props = {
   writeMode?: boolean;
   onInsertAfter?: () => void;
   onBackspaceEmpty?: () => void;
+  onMergeWithPrev?: () => void;
   onFocusNext?: () => void;
   onFocusPrev?: () => void;
   /** Gera ilustração IA para bloco image (modo Desenho) */
@@ -205,6 +206,7 @@ export function StudioBlockEditor({
   writeMode = false,
   onInsertAfter,
   onBackspaceEmpty,
+  onMergeWithPrev,
   onFocusNext,
   onFocusPrev,
   onGenerateImage,
@@ -213,7 +215,9 @@ export function StudioBlockEditor({
   expandHeight,
   labels,
 }: Props) {
-  const styleWrap = `${studioBlockAlignClass(block.style)} ${studioBlockFrameClass(block.style)}`.trim();
+  const styleWrap = writeMode
+    ? studioBlockAlignClass(block.style)
+    : `${studioBlockAlignClass(block.style)} ${studioBlockFrameClass(block.style)}`.trim();
   const scaleCls = studioBlockScaleClass(block.style, block.kind);
 
   const isDiagram = block.kind === 'diagram';
@@ -803,9 +807,9 @@ export function StudioBlockEditor({
   return (
     <div
       ref={rootRef}
-      className={`group relative w-full rounded-lg transition ${
-        aiSelected ? 'ring-2 ring-orange-400 ring-offset-2 bg-orange-50/40' : ''
-      }`}
+      className={`group relative w-full ${
+        writeMode ? '' : 'rounded-lg transition'
+      } ${aiSelected && !writeMode ? 'ring-2 ring-orange-400 ring-offset-2 bg-orange-50/40' : ''}`}
     >
       {aiSelected && (
         <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
@@ -825,6 +829,7 @@ export function StudioBlockEditor({
             onChange={onChange}
             onInsertAfter={onInsertAfter}
             onBackspaceEmpty={onBackspaceEmpty}
+            onMergeWithPrev={onMergeWithPrev}
             onFocusNext={onFocusNext}
             onFocusPrev={onFocusPrev}
             className={`studio-rich-editor min-h-[1.5em] w-full outline-none ${

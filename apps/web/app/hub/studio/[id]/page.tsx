@@ -226,6 +226,7 @@ export default function StudioDocumentPage() {
   } | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const moldFileRef = useRef<HTMLInputElement | null>(null);
   const dragging = useRef(false);
@@ -248,6 +249,7 @@ export default function StudioDocumentPage() {
   const saveAgainRef = useRef(false);
   const saveEpochRef = useRef(0);
   const writeReflowTimerRef = useRef<number | null>(null);
+  const activePageSpyTimerRef = useRef<number | null>(null);
   const canvasScrollRef = useRef<HTMLDivElement | null>(null);
   const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [dictationInterim, setDictationInterim] = useState('');
@@ -365,11 +367,15 @@ export default function StudioDocumentPage() {
   );
 
   const scheduleWriteReflow = useCallback(
-    (delay = 300) => {
+    (delay = 900) => {
       if (canvasRef.current?.studioMode !== 'write') return;
       if (writeReflowTimerRef.current) window.clearTimeout(writeReflowTimerRef.current);
       writeReflowTimerRef.current = window.setTimeout(() => {
         writeReflowTimerRef.current = null;
+        if (getStudioWriteFocus()) {
+          scheduleWriteReflow(500);
+          return;
+        }
         const focusId = getStudioWriteFocus()?.blockId;
         const snap = canvasRef.current;
         if (!snap || snap.studioMode === 'design') return;
@@ -388,6 +394,7 @@ export default function StudioDocumentPage() {
   useEffect(() => {
     return () => {
       if (writeReflowTimerRef.current) window.clearTimeout(writeReflowTimerRef.current);
+      if (activePageSpyTimerRef.current) window.clearTimeout(activePageSpyTimerRef.current);
     };
   }, []);
 
@@ -691,8 +698,15 @@ export default function StudioDocumentPage() {
   }, [load]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, consent]);
+    const scroller = chatScrollRef.current;
+    const hasContent =
+      messages.length > 0 || !!consent || pendingStructureActions.length > 0;
+    if (!hasContent) {
+      if (scroller) scroller.scrollTop = 0;
+      return;
+    }
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages, consent, pendingStructureActions.length]);
 
   useEffect(() => {
     if (aiTargetBlockIds.length > 0) {
@@ -785,7 +799,13 @@ export default function StudioDocumentPage() {
             best = { id: pageId, ratio: e.intersectionRatio };
           }
         }
-        if (best) setActivePageId(best.id);
+        if (best) {
+          if (activePageSpyTimerRef.current) window.clearTimeout(activePageSpyTimerRef.current);
+          activePageSpyTimerRef.current = window.setTimeout(() => {
+            activePageSpyTimerRef.current = null;
+            setActivePageId(best!.id);
+          }, 120);
+        }
       },
       { root, threshold: [0.25, 0.5, 0.75] },
     );
@@ -1079,9 +1099,6 @@ export default function StudioDocumentPage() {
       };
       return next;
     });
-    if (patch.text !== undefined && canvasRef.current?.studioMode === 'write') {
-      scheduleWriteReflow();
-    }
   }
 
   async function generateBlockImage(pageId: string, blockId: string, prompt?: string) {
@@ -1627,6 +1644,62 @@ export default function StudioDocumentPage() {
     }
   }
 
+  function mergeBlockWithPrev(pageId: string, blockId: string) {
+    const textish = (kind: string) =>
+      kind === 'paragraph' || kind === 'bullets' || kind === 'callout' || kind === 'heading';
+    let prevId: string | null = null;
+    let caretOffset = 0;
+    applyCanvas((prev) => {
+      const sortedPages = prev.pages.slice().sort((a, b) => a.order - b.order);
+      const flat: Array<{ pageId: string; block: StudioBlock }> = [];
+      for (const p of sortedPages) {
+        for (const b of p.blocks.slice().sort((a, b) => a.order - b.order)) {
+          flat.push({ pageId: p.id, block: b });
+        }
+      }
+      const globalIdx = flat.findIndex((x) => x.pageId === pageId && x.block.id === blockId);
+      if (globalIdx <= 0) return prev;
+      const prevEntry = flat[globalIdx - 1]!;
+      const curEntry = flat[globalIdx]!;
+      const prevB = prevEntry.block;
+      const curB = curEntry.block;
+      if (!textish(prevB.kind) || !textish(curB.kind)) return prev;
+      if (prevB.imageUrl || curB.imageUrl) return prev;
+
+      const prevText = String(prevB.text || '');
+      const curText = String(curB.text || '');
+      caretOffset = prevText.length;
+      const joiner =
+        prevB.kind === 'bullets'
+          ? '\n'
+          : prevText.length && !prevText.endsWith('\n')
+            ? '\n'
+            : '';
+      const mergedText = `${prevText}${joiner}${curText}`;
+      prevId = prevB.id;
+
+      return {
+        ...prev,
+        pages: sortedPages.map((p) => {
+          const touchesPrev = p.id === prevEntry.pageId;
+          const touchesCur = p.id === curEntry.pageId;
+          if (!touchesPrev && !touchesCur) return p;
+          let blocks = p.blocks.slice().sort((a, b) => a.order - b.order);
+          if (touchesPrev) {
+            blocks = blocks.map((b) => (b.id === prevB.id ? { ...b, text: mergedText } : b));
+          }
+          if (touchesCur) {
+            blocks = blocks.filter((b) => b.id !== curB.id);
+          }
+          return { ...p, blocks: blocks.map((b, i) => ({ ...b, order: i })) };
+        }),
+      };
+    });
+    if (prevId) {
+      window.setTimeout(() => requestStudioWriteBlockFocus(prevId!, caretOffset), 40);
+    }
+  }
+
   function moveBlock(pageId: string, blockId: string, dir: -1 | 1) {
     applyCanvas((prev) => ({
       ...prev,
@@ -1872,6 +1945,9 @@ export default function StudioDocumentPage() {
         : dirty
           ? t('Guardar alterações', 'Guardar cambios', 'Save changes')
           : t('Guardar', 'Guardar', 'Save');
+
+  const hasChatContent =
+    messages.length > 0 || !!consent || pendingStructureActions.length > 0;
 
   function selectPage(pageId: string) {
     setActivePageId(pageId);
@@ -2143,7 +2219,7 @@ export default function StudioDocumentPage() {
           icon={<MessageSquare className="h-4 w-4" />}
         >
         <aside
-          className={`flex h-full min-h-0 w-full flex-col overflow-hidden ${
+          className={`flex min-h-0 flex-1 flex-col overflow-hidden ${
             studioMode === 'design'
               ? 'border-b border-violet-900/50 lg:border-b-0'
               : 'border-b border-stone-200 lg:border-b-0'
@@ -2179,8 +2255,18 @@ export default function StudioDocumentPage() {
             />
           ) : (
           <>
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-2 py-2">
-            {messages.length === 0 && (
+          <div
+            className={`flex min-h-0 flex-col overflow-hidden ${
+              hasChatContent ? 'flex-1' : 'shrink-0 justify-end'
+            }`}
+          >
+          <div
+            ref={chatScrollRef}
+            className={`min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain px-2 py-2 ${
+              hasChatContent ? 'flex-1 space-y-2' : 'shrink-0 space-y-2'
+            }`}
+          >
+            {!hasChatContent && (
               <p className="text-xs text-stone-400">
                 {t(
                   'Mira num bloco para editar só essa secção.',
@@ -2205,7 +2291,7 @@ export default function StudioDocumentPage() {
               return (
               <div
                 key={m.id}
-                className={`rounded-xl px-3 py-2 text-sm ${
+                className={`min-w-0 max-w-full overflow-hidden rounded-xl px-3 py-2 text-sm ${
                   m.role === 'user' ? 'ml-4 bg-orange-50 text-slate-900' : 'mr-2 bg-slate-50 text-slate-800'
                 }`}
               >
@@ -2224,7 +2310,7 @@ export default function StudioDocumentPage() {
                 {m.role === 'user' || m.role === 'assistant' ? (
                   <StudioCollapsedChatContent content={m.content} locale={loc} />
                 ) : (
-                  <div className="whitespace-pre-wrap">{m.content}</div>
+                  <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{m.content}</div>
                 )}
                 {m.attachmentNames?.length ? (
                   <StudioChatAttachmentChips locale={loc} names={m.attachmentNames} />
@@ -2279,7 +2365,7 @@ export default function StudioDocumentPage() {
             <div ref={chatEndRef} />
           </div>
           {canvas && aiTargetBlockIds.length > 0 && (
-            <div className="border-t border-stone-100 px-3 py-2">
+            <div className="shrink-0 border-t border-stone-100 px-3 py-2">
               <StudioSelectionScopeBar
                 locale={locale === 'en' || locale === 'es' ? locale : 'pt'}
                 canvas={canvas}
@@ -2330,6 +2416,7 @@ export default function StudioDocumentPage() {
                   : undefined
             }
           />
+          </div>
           <input
             ref={fileInputRef}
             type="file"
@@ -2650,11 +2737,7 @@ export default function StudioDocumentPage() {
                           <div
                             key={block.id}
                             data-studio-block-id={block.id}
-                            className={`shrink-0 transition-shadow duration-500 ${
-                              aiEditedBlockIds.includes(block.id)
-                                ? 'rounded-lg ring-2 ring-emerald-500 ring-offset-2 ring-offset-[#ebe6dc] shadow-[0_0_0_4px_rgba(16,185,129,0.15)]'
-                                : ''
-                            }`}
+                            className={`shrink-0 ${aiEditedBlockIds.includes(block.id) ? 'rounded-lg ring-2 ring-emerald-500 ring-offset-2 ring-offset-[#ebe6dc] shadow-[0_0_0_4px_rgba(16,185,129,0.15)] transition-shadow duration-500' : ''}`}
                           >
                             <StudioDesignPlacedBlock
                               freeform={studioMode === 'design'}
@@ -2700,6 +2783,13 @@ export default function StudioDocumentPage() {
                               onBackspaceEmpty={
                                 studioMode === 'write' && canEdit && arr.length > 1
                                   ? () => removeEmptyBlockFocusPrev(page.id, block.id)
+                                  : undefined
+                              }
+                              onMergeWithPrev={
+                                studioMode === 'write' &&
+                                canEdit &&
+                                (blockIdx > 0 || idxDisplay > 0)
+                                  ? () => mergeBlockWithPrev(page.id, block.id)
                                   : undefined
                               }
                               onFocusNext={

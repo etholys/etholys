@@ -11,6 +11,7 @@ import {
   studioTextToEditorHtml,
 } from '@/lib/studio/rich-text';
 import {
+  consumeStudioWriteBlockCaret,
   getStudioWriteFocus,
   setStudioWriteFocus,
   subscribeStudioWriteBlockFocus,
@@ -29,6 +30,8 @@ type Props = {
   onInsertAfter?: () => void;
   /** Backspace no início de bloco vazio */
   onBackspaceEmpty?: () => void;
+  /** Backspace no início de bloco com texto — fundir com o anterior */
+  onMergeWithPrev?: () => void;
   /** Seta ↓ no fim → bloco seguinte */
   onFocusNext?: () => void;
   /** Seta ↑ no início → bloco anterior */
@@ -50,11 +53,26 @@ export function StudioRichTextEditor({
   onChange,
   onInsertAfter,
   onBackspaceEmpty,
+  onMergeWithPrev,
   onFocusNext,
   onFocusPrev,
 }: Props) {
-  const cbs = useRef({ onChange, onInsertAfter, onBackspaceEmpty, onFocusNext, onFocusPrev });
-  cbs.current = { onChange, onInsertAfter, onBackspaceEmpty, onFocusNext, onFocusPrev };
+  const cbs = useRef({
+    onChange,
+    onInsertAfter,
+    onBackspaceEmpty,
+    onMergeWithPrev,
+    onFocusNext,
+    onFocusPrev,
+  });
+  cbs.current = {
+    onChange,
+    onInsertAfter,
+    onBackspaceEmpty,
+    onMergeWithPrev,
+    onFocusNext,
+    onFocusPrev,
+  };
   /** Evita que o efeito de sync prop→editor restaure texto obsoleto ao mudar para o chat. */
   const lastEmittedRef = useRef(text);
 
@@ -89,13 +107,20 @@ export function StudioRichTextEditor({
           cbs.current.onInsertAfter?.();
           return true;
         }
-        if (event.key === 'Backspace' && cbs.current.onBackspaceEmpty) {
-          const plain = view.state.doc.textContent.trim();
+        if (event.key === 'Backspace') {
+          const plain = view.state.doc.textContent;
           const { empty, $from } = view.state.selection;
-          if (plain === '' && empty && $from.parentOffset === 0) {
-            event.preventDefault();
-            cbs.current.onBackspaceEmpty();
-            return true;
+          if (empty && $from.parentOffset === 0) {
+            if (!plain.trim() && cbs.current.onBackspaceEmpty) {
+              event.preventDefault();
+              cbs.current.onBackspaceEmpty();
+              return true;
+            }
+            if (plain.trim() && cbs.current.onMergeWithPrev) {
+              event.preventDefault();
+              cbs.current.onMergeWithPrev();
+              return true;
+            }
           }
         }
         if (event.key === 'ArrowDown' && !event.shiftKey && cbs.current.onFocusNext) {
@@ -158,7 +183,13 @@ export function StudioRichTextEditor({
   useEffect(() => {
     return subscribeStudioWriteBlockFocus((id) => {
       if (id !== blockId || !editor || editor.isDestroyed) return;
-      editor.commands.focus('end');
+      const caret = consumeStudioWriteBlockCaret(blockId);
+      if (typeof caret === 'number') {
+        const pos = Math.min(Math.max(1, caret + 1), editor.state.doc.content.size);
+        editor.chain().focus().setTextSelection(pos).run();
+      } else {
+        editor.commands.focus('end');
+      }
       setStudioWriteFocus({ editor, blockId, pageId });
     });
   }, [editor, blockId, pageId]);

@@ -86,7 +86,7 @@ export function StudioStructureActionBar({
             : 'Plano de estrutura pendente'}
       </p>
       {(showApplyPreview || showMigratePreview) && (
-        <div className="mb-2 space-y-1 rounded-lg border border-orange-100 bg-white/80 px-2.5 py-2 text-xs text-stone-700">
+        <div className="mb-2 space-y-1 overflow-hidden rounded-lg border border-orange-100 bg-white/80 px-2.5 py-2 text-xs text-stone-700">
           <p className="font-semibold text-orange-900">
             {loc === 'es'
               ? 'Vista previa antes de aplicar'
@@ -95,7 +95,7 @@ export function StudioStructureActionBar({
                 : 'Pré-visualização antes de aplicar'}
           </p>
           {showApplyPreview && (
-            <p>
+            <p className="break-words [overflow-wrap:anywhere]">
               <span className="font-medium text-orange-800">
                 {loc === 'es' ? 'Aplicar:' : loc === 'en' ? 'Apply:' : 'Aplicar:'}
               </span>{' '}
@@ -103,7 +103,7 @@ export function StudioStructureActionBar({
             </p>
           )}
           {showMigratePreview && structurePreview?.migrate && (
-            <p>
+            <p className="break-words [overflow-wrap:anywhere]">
               <span className="font-medium text-amber-900">
                 {loc === 'es' ? 'Migrar:' : loc === 'en' ? 'Migrate:' : 'Migrar:'}
               </span>{' '}

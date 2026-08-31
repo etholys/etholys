@@ -41,9 +41,20 @@ export function subscribeStudioWriteFocus(fn: () => void): () => void {
   return () => listeners.delete(fn);
 }
 
-/** Pede foco ao TipTap de um bloco (após criar secção / setas). */
-export function requestStudioWriteBlockFocus(blockId: string) {
+let pendingCaret: { blockId: string; offset?: number } | null = null;
+
+/** Pede foco ao TipTap de um bloco (após criar secção / setas / merge). */
+export function requestStudioWriteBlockFocus(blockId: string, charOffset?: number) {
+  pendingCaret = { blockId, offset: charOffset };
   focusTargetListeners.forEach((l) => l(blockId));
+}
+
+/** Offset de carácter para o próximo foco pedido a este bloco (consumido uma vez). */
+export function consumeStudioWriteBlockCaret(blockId: string): number | undefined {
+  if (pendingCaret?.blockId !== blockId) return undefined;
+  const offset = pendingCaret.offset;
+  pendingCaret = null;
+  return offset;
 }
 
 export function subscribeStudioWriteBlockFocus(fn: (blockId: string) => void): () => void {
