@@ -35,7 +35,7 @@ export function MeetJoinSetupDialog({
 }: Props) {
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
 
-  const canCloud = cloudStorageReady && whisperAvailable;
+  const canCloud = cloudStorageReady;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">

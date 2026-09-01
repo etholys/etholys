@@ -14,9 +14,13 @@ export type WhisperTimedSegment = {
  * Requer OPENAI_API_KEY (ou MEET_TRANSCRIBE_API_KEY).
  */
 export function isMeetTranscribeConfigured(): boolean {
-  return Boolean(
-    (process.env.MEET_TRANSCRIBE_API_KEY || process.env.OPENAI_API_KEY || '').trim(),
-  );
+  const openAiKey = (
+    process.env.MEET_TRANSCRIBE_API_KEY ||
+    process.env.OPENAI_API_KEY ||
+    ''
+  ).trim();
+  if (openAiKey) return true;
+  return Boolean((process.env.GEMINI_API_KEY || '').trim());
 }
 
 function getTranscribeConfig(): { apiKey: string; baseUrl: string; model: string } {
@@ -68,6 +72,15 @@ export async function transcribeMeetRecording(opts: {
   /** Nomes / glossário para Whisper melhorar reconhecimento */
   promptHint?: string;
 }): Promise<MeetWhisperResult> {
+  const openAiKey = (
+    process.env.MEET_TRANSCRIBE_API_KEY ||
+    process.env.OPENAI_API_KEY ||
+    ''
+  ).trim();
+  if (!openAiKey && (process.env.GEMINI_API_KEY || '').trim()) {
+    return transcribeWithGemini(opts);
+  }
+
   const { apiKey, baseUrl, model } = getTranscribeConfig();
   const { buffer, contentType } = await downloadMeetRecordingBuffer(opts.recordingUrlOrKey);
 
@@ -137,6 +150,84 @@ export async function transcribeMeetRecording(opts: {
     : [{ id: 0, start: 0, end: 0, text }];
 
   return { text: text.slice(0, 100_000), model, segments };
+}
+
+async function transcribeWithGemini(opts: {
+  recordingUrlOrKey: string;
+  languageHint?: string;
+  promptHint?: string;
+}): Promise<MeetWhisperResult> {
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+  if (!apiKey) {
+    throw new Error('A transcrição automática não está disponível neste momento.');
+  }
+  const model = (
+    process.env.MEET_TRANSCRIBE_MODEL ||
+    process.env.GEMINI_MODEL ||
+    'gemini-2.0-flash'
+  )
+    .trim()
+    .replace(/^models\//, '');
+  const { buffer, contentType } = await downloadMeetRecordingBuffer(opts.recordingUrlOrKey);
+
+  const maxBytes = Number(process.env.MEET_TRANSCRIBE_MAX_BYTES || 24 * 1024 * 1024);
+  if (buffer.byteLength > maxBytes) {
+    const mb = Math.round(buffer.byteLength / 1024 / 1024);
+    const lim = Math.round(maxBytes / 1024 / 1024);
+    throw new Error(
+      `A gravação é demasiado grande (${mb} MB; limite ~${lim} MB). Envie só o áudio ou um ficheiro mais curto.`,
+    );
+  }
+
+  const lang = (opts.languageHint || 'pt').slice(0, 8);
+  const prompt = [
+    `Transcreva este áudio de reunião em ${lang}.`,
+    'Devolva apenas o texto transcrito, sem comentários nem formatação extra.',
+    opts.promptHint?.trim() ? `Contexto: ${opts.promptHint.trim().slice(0, 400)}` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                inline_data: {
+                  mime_type: contentType || 'audio/webm',
+                  data: buffer.toString('base64'),
+                },
+              },
+              { text: prompt },
+            ],
+          },
+        ],
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    await res.text().catch(() => '');
+    throw new Error('Não foi possível transcrever a gravação.');
+  }
+
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const text = (data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '')
+    .trim();
+  if (text.length < 5) throw new Error('Transcrição vazia ou demasiado curta');
+
+  return {
+    text: text.slice(0, 100_000),
+    model: `gemini:${model}`,
+    segments: [{ id: 0, start: 0, end: 0, text }],
+  };
 }
 
 async function transcribePlainTextFallback(opts: {
