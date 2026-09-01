@@ -1,6 +1,6 @@
 /**
- * Document Picture-in-Picture: move o contentor da sala para uma janela flutuante
- * (continua a mesma sessão Jitsi — sem segundo join).
+ * Document Picture-in-Picture: janela flutuante do sistema (Chrome/Edge 116+).
+ * Move o contentor da sala sem recriar o iframe Jitsi.
  */
 
 export function supportsDocumentPictureInPicture(): boolean {
@@ -9,21 +9,19 @@ export function supportsDocumentPictureInPicture(): boolean {
 
 type PipApi = {
   requestWindow: (opts?: { width?: number; height?: number }) => Promise<Window>;
+  window?: Window | null;
 };
 
-export async function openMeetDocumentPip(opts: {
-  stageEl: HTMLElement;
-  homeEl: HTMLElement;
-  onClose?: () => void;
-}): Promise<Window> {
-  const api = (window as Window & { documentPictureInPicture?: PipApi }).documentPictureInPicture;
-  if (!api) {
-    throw new Error('Document Picture-in-Picture not supported');
+function copyStylesToPipWindow(pipWindow: Window) {
+  const head = pipWindow.document.head;
+  for (const link of Array.from(document.querySelectorAll('link[rel="stylesheet"]'))) {
+    const href = link.getAttribute('href');
+    if (!href) continue;
+    const clone = pipWindow.document.createElement('link');
+    clone.rel = 'stylesheet';
+    clone.href = href;
+    head.appendChild(clone);
   }
-
-  const pipWindow = await api.requestWindow({ width: 480, height: 320 });
-  const { stageEl, homeEl, onClose } = opts;
-
   try {
     for (const sheet of Array.from(document.styleSheets)) {
       try {
@@ -33,23 +31,51 @@ export async function openMeetDocumentPip(opts: {
         let text = '';
         for (const rule of Array.from(rules)) text += `${rule.cssText}\n`;
         style.textContent = text;
-        pipWindow.document.head.appendChild(style);
+        head.appendChild(style);
       } catch {
-        /* CSS cross-origin — ignorar */
+        /* CSS cross-origin */
       }
     }
   } catch {
     /* ignore */
   }
+}
+
+export async function openMeetDocumentPip(opts: {
+  stageEl: HTMLElement;
+  homeEl: HTMLElement;
+  onClose?: () => void;
+  width?: number;
+  height?: number;
+}): Promise<Window> {
+  const api = (window as Window & { documentPictureInPicture?: PipApi }).documentPictureInPicture;
+  if (!api) {
+    throw new Error('Document Picture-in-Picture not supported');
+  }
+
+  if (api.window && !api.window.closed) {
+    api.window.focus();
+    return api.window;
+  }
+
+  const pipWindow = await api.requestWindow({
+    width: opts.width ?? 420,
+    height: opts.height ?? 280,
+  });
+  const { stageEl, homeEl, onClose } = opts;
+
+  copyStylesToPipWindow(pipWindow);
 
   pipWindow.document.documentElement.style.height = '100%';
   pipWindow.document.body.style.margin = '0';
   pipWindow.document.body.style.height = '100%';
-  pipWindow.document.body.style.background = '#202124';
+  pipWindow.document.body.style.background = '#0f172a';
   pipWindow.document.body.style.overflow = 'hidden';
 
   stageEl.style.width = '100%';
   stageEl.style.height = '100%';
+  stageEl.style.position = 'relative';
+  stageEl.style.inset = '';
   pipWindow.document.body.appendChild(stageEl);
 
   const restore = () => {
@@ -57,10 +83,22 @@ export async function openMeetDocumentPip(opts: {
       homeEl.appendChild(stageEl);
       stageEl.style.width = '';
       stageEl.style.height = '';
+      stageEl.style.position = '';
+      stageEl.style.inset = '';
     }
     onClose?.();
   };
 
   pipWindow.addEventListener('pagehide', restore, { once: true });
   return pipWindow;
+}
+
+export function closeMeetDocumentPipWindow(pipWindow: Window | null | undefined) {
+  if (pipWindow && !pipWindow.closed) {
+    try {
+      pipWindow.close();
+    } catch {
+      /* ignore */
+    }
+  }
 }

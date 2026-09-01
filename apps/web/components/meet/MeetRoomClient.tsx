@@ -36,6 +36,11 @@ import {
   startMeetLocalRecorder,
   type MeetLocalRecorder,
 } from '@/lib/meet/local-recorder';
+import {
+  closeMeetDocumentPipWindow,
+  openMeetDocumentPip,
+  supportsDocumentPictureInPicture,
+} from '@/lib/meet/document-pip';
 
 type SessionRow = {
   id: string;
@@ -143,6 +148,9 @@ export function MeetRoomClient({ sessionId }: Props) {
     liveTranscriptionEnabled: false,
   });
   const [pipActive, setPipActive] = useState(false);
+  const [pipMode, setPipMode] = useState<'none' | 'document' | 'css'>('none');
+  const [conferenceReady, setConferenceReady] = useState(false);
+  const [autoFloat, setAutoFloat] = useState(true);
   const [layoutMode, setLayoutMode] = useState<MeetLayoutMode>('speaker');
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
   const [transcriptCopied, setTranscriptCopied] = useState(false);
@@ -153,8 +161,14 @@ export function MeetRoomClient({ sessionId }: Props) {
   const closingRef = useRef(false);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const localRecorderRef = useRef<MeetLocalRecorder | null>(null);
+  const stageSlotRef = useRef<HTMLDivElement>(null);
   const stageHomeRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const pipWindowRef = useRef<Window | null>(null);
+  const pipModeRef = useRef<'none' | 'document' | 'css'>('none');
+  const conferenceReadyRef = useRef(false);
+  const autoFloatRef = useRef(true);
+  const pipEnteringRef = useRef(false);
   const segmentsRef = useRef<TranscriptSegment[]>([]);
   const transcriptionStartedAtRef = useRef<number | null>(null);
 
@@ -283,6 +297,145 @@ export function MeetRoomClient({ sessionId }: Props) {
     return () => {
       localRecorderRef.current?.destroy();
       localRecorderRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    autoFloatRef.current = autoFloat;
+  }, [autoFloat]);
+
+  useEffect(() => {
+    conferenceReadyRef.current = conferenceReady;
+  }, [conferenceReady]);
+
+  const restoreStageFromPip = useCallback(() => {
+    const stage = stageHomeRef.current;
+    const slot = stageSlotRef.current;
+    if (stage && slot && stage.parentElement !== slot) {
+      slot.appendChild(stage);
+      stage.style.width = '';
+      stage.style.height = '';
+      stage.style.position = '';
+      stage.style.inset = '';
+    }
+    closeMeetDocumentPipWindow(pipWindowRef.current);
+    pipWindowRef.current = null;
+    pipModeRef.current = 'none';
+    setPipMode('none');
+    setPipActive(false);
+  }, []);
+
+  const enterDocumentPip = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const stage = stageHomeRef.current;
+      const slot = stageSlotRef.current;
+      if (!stage || !slot || !conferenceReadyRef.current) return false;
+      if (pipEnteringRef.current) return false;
+      if (pipModeRef.current === 'document' && pipWindowRef.current && !pipWindowRef.current.closed) {
+        pipWindowRef.current.focus();
+        return true;
+      }
+
+      pipEnteringRef.current = true;
+      try {
+        if (supportsDocumentPictureInPicture()) {
+          try {
+            const pipWin = await openMeetDocumentPip({
+              stageEl: stage,
+              homeEl: slot,
+              onClose: restoreStageFromPip,
+            });
+            pipWindowRef.current = pipWin;
+            pipModeRef.current = 'document';
+            setPipMode('document');
+            setPipActive(true);
+            setPanelOpen(false);
+            return true;
+          } catch (err) {
+            if (!opts?.silent) {
+              const msg = err instanceof Error ? err.message : '';
+              setError(
+                t(
+                  `Flutuante do sistema indisponível (${msg || 'sem permissão'}). Usa Chrome/Edge ou clica outra vez.`,
+                  `Flotante del sistema no disponible (${msg || 'sin permiso'}). Usa Chrome/Edge o pulsa otra vez.`,
+                  `System float unavailable (${msg || 'no permission'}). Use Chrome/Edge or try again.`,
+                ),
+              );
+            }
+          }
+        }
+
+        pipModeRef.current = 'css';
+        setPipMode('css');
+        setPipActive(true);
+        setPanelOpen(false);
+        if (!opts?.silent && !supportsDocumentPictureInPicture()) {
+          setError(
+            t(
+              'Este browser não suporta janela flutuante fora do separador. Usa Chrome ou Edge para flutuante automático.',
+              'Este navegador no soporta ventana flotante fuera de la pestaña. Usa Chrome o Edge para flotante automático.',
+              'This browser does not support floating outside the tab. Use Chrome or Edge for auto float.',
+            ),
+          );
+        }
+        return true;
+      } finally {
+        pipEnteringRef.current = false;
+      }
+    },
+    [restoreStageFromPip, t],
+  );
+
+  const exitFloating = useCallback(() => {
+    if (pipModeRef.current === 'document') {
+      closeMeetDocumentPipWindow(pipWindowRef.current);
+      restoreStageFromPip();
+      return;
+    }
+    restoreStageFromPip();
+  }, [restoreStageFromPip]);
+
+  useEffect(() => {
+    const tryAutoFloat = () => {
+      if (!autoFloatRef.current || !conferenceReadyRef.current) return;
+      if (pipModeRef.current !== 'none') return;
+      void enterDocumentPip({ silent: true });
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        tryAutoFloat();
+        return;
+      }
+      if (
+        document.visibilityState === 'visible' &&
+        pipModeRef.current === 'document' &&
+        pipWindowRef.current &&
+        !pipWindowRef.current.closed
+      ) {
+        closeMeetDocumentPipWindow(pipWindowRef.current);
+        restoreStageFromPip();
+      }
+    };
+
+    const onBlur = () => {
+      window.setTimeout(() => {
+        if (document.visibilityState === 'hidden') tryAutoFloat();
+      }, 80);
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [enterDocumentPip, restoreStageFromPip]);
+
+  useEffect(() => {
+    return () => {
+      closeMeetDocumentPipWindow(pipWindowRef.current);
+      pipWindowRef.current = null;
     };
   }, []);
 
@@ -597,17 +750,19 @@ export function MeetRoomClient({ sessionId }: Props) {
     }
   }
 
-  function openFloatingWindow() {
+  async function openFloatingWindow() {
     setError(null);
-    // Flutuante na mesma página (CSS). Mover o iframe Jitsi para Document PiP
-    // recarrega a sala e volta ao ecrã de pré-entrada.
-    setPipActive((active) => !active);
-    if (!pipActive) setPanelOpen(false);
+    if (pipActive) {
+      exitFloating();
+      return;
+    }
+    await enterDocumentPip();
   }
 
   const endInFlight = useRef(false);
 
   function tearDownConference() {
+    exitFloating();
     try {
       conferenceRef.current?.stopTranscription();
     } catch {
@@ -891,11 +1046,19 @@ export function MeetRoomClient({ sessionId }: Props) {
                 ? 'bg-teal-400 text-slate-950 hover:bg-teal-300'
                 : 'bg-slate-800/95 text-white/90 hover:bg-slate-700'
             }`}
-            title={t(
-              'Janela flutuante nesta página (não recarrega a sala)',
-              'Ventana flotante en esta página (no recarga la sala)',
-              'Floating window on this page (does not reload the room)',
-            )}
+            title={
+              supportsDocumentPictureInPicture()
+                ? t(
+                    'Janela flutuante do sistema (Chrome/Edge). Activa automaticamente ao mudar de separador.',
+                    'Ventana flotante del sistema (Chrome/Edge). Se activa al cambiar de pestaña.',
+                    'System floating window (Chrome/Edge). Auto-activates when you switch tabs.',
+                  )
+                : t(
+                    'Flutuante nesta página (browser limitado)',
+                    'Flotante en esta página (navegador limitado)',
+                    'Float on this page (limited browser)',
+                  )
+            }
           >
             <PictureInPicture2 className="h-3.5 w-3.5" strokeWidth={1.75} />
             <span className="hidden sm:inline">
@@ -1020,23 +1183,59 @@ export function MeetRoomClient({ sessionId }: Props) {
         <main className="relative min-w-0 flex-1 px-3 pb-3 pt-14 sm:px-4 sm:pb-4">
           {pipActive && (
             <div className="mb-3 rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-xs text-white/60">
-              {t(
-                'Modo flutuante: a sala está no canto. Clica outra vez em Flotante para voltar ao ecrã completo.',
-                'Modo flotante: la sala está en la esquina. Pulsa otra vez Flotante para volver a pantalla completa.',
-                'Float mode: the room is in the corner. Click Float again to return to full screen.',
-              )}
+              {pipMode === 'document'
+                ? t(
+                    'Sala na janela flutuante do sistema. Volta a este separador para repor o ecrã completo.',
+                    'Sala en la ventana flotante del sistema. Vuelve a esta pestaña para pantalla completa.',
+                    'Meeting is in the system floating window. Return to this tab for full screen.',
+                  )
+                : t(
+                    'Flutuante limitado nesta página — usa Chrome/Edge para janela fora do browser.',
+                    'Flotante limitado en esta página — usa Chrome/Edge para ventana fuera del navegador.',
+                    'Limited float on this page — use Chrome/Edge for a window outside the browser.',
+                  )}
+              <label className="mt-2 flex items-center gap-2 text-[11px] text-white/50">
+                <input
+                  type="checkbox"
+                  checked={autoFloat}
+                  onChange={(event) => setAutoFloat(event.target.checked)}
+                  className="rounded border-white/20"
+                />
+                {t(
+                  'Flutuante automático ao mudar de separador ou app',
+                  'Flotante automático al cambiar de pestaña o app',
+                  'Auto float when switching tab or app',
+                )}
+              </label>
             </div>
           )}
           <div
-            ref={stageHomeRef}
+            ref={stageSlotRef}
             className={
-              pipActive
-                ? `fixed bottom-4 z-50 h-[220px] w-[min(92vw,360px)] overflow-hidden rounded-2xl bg-slate-950 shadow-2xl ring-2 ring-teal-400/50 ${
-                    panelOpen ? 'right-[23.5rem]' : 'right-14'
-                  }`
-                : 'relative h-full w-full overflow-hidden rounded-2xl bg-slate-950'
+              pipMode === 'document' && pipActive
+                ? 'relative flex min-h-[min(70vh,640px)] w-full items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/15 bg-slate-950/80'
+                : 'relative min-h-[min(70vh,640px)] w-full'
             }
           >
+            {pipMode === 'document' && pipActive && (
+              <p className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-white/45">
+                {t(
+                  'A reunião está na janela flutuante CHORUS',
+                  'La reunión está en la ventana flotante CHORUS',
+                  'The meeting is in the CHORUS floating window',
+                )}
+              </p>
+            )}
+            <div
+              ref={stageHomeRef}
+              className={
+                pipMode === 'css' && pipActive
+                  ? `fixed bottom-4 z-50 h-[220px] w-[min(92vw,360px)] overflow-hidden rounded-2xl bg-slate-950 shadow-2xl ring-2 ring-teal-400/50 ${
+                      panelOpen ? 'right-[23.5rem]' : 'right-14'
+                    }`
+                  : 'relative h-full min-h-[min(70vh,640px)] w-full overflow-hidden rounded-2xl bg-slate-950'
+              }
+            >
             <div ref={stageRef} className="relative h-full w-full">
               {session.meetingUrl && canEmbedJitsiInIframe(session.meetingUrl) ? (
                 <MeetConferenceFrame
@@ -1045,6 +1244,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                   title={session.title}
                   locale={locale}
                   onReady={() => {
+                    setConferenceReady(true);
                     if (!features.liveTranscriptionEnabled) return;
                     // STT em fundo — painel fica fechado até o utilizador abrir
                     window.setTimeout(() => {
@@ -1113,6 +1313,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                   {t('Sala sem URL.', 'Sala sin URL.', 'Room has no URL.')}
                 </div>
               )}
+            </div>
             </div>
           </div>
         </main>
