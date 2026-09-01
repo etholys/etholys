@@ -1,20 +1,20 @@
 'use client';
 
-import { Mic, HardDrive, Sparkles, Video } from 'lucide-react';
+import { Cloud, Mic, Video } from 'lucide-react';
 import type { MeetSpeechLanguage } from '@/lib/meet/language';
 import { meetSpeechLanguageLabel } from '@/lib/meet/language';
 
 export type MeetJoinSetupPrefs = {
   language: MeetSpeechLanguage;
+  enableCloudRecording: boolean;
   enableLiveTranscript: boolean;
-  enableLocalRecording: boolean;
-  enableWhisperOnEnd: boolean;
 };
 
 type Props = {
   locale: string;
   meetingTitle: string;
   isHost: boolean;
+  cloudStorageReady: boolean;
   whisperAvailable: boolean;
   liveTranscriptionAvailable: boolean;
   prefs: MeetJoinSetupPrefs;
@@ -26,6 +26,7 @@ export function MeetJoinSetupDialog({
   locale,
   meetingTitle,
   isHost,
+  cloudStorageReady,
   whisperAvailable,
   liveTranscriptionAvailable,
   prefs,
@@ -33,6 +34,8 @@ export function MeetJoinSetupDialog({
   onConfirm,
 }: Props) {
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
+
+  const canCloud = cloudStorageReady && whisperAvailable;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
@@ -56,7 +59,7 @@ export function MeetJoinSetupDialog({
         </div>
 
         <label className="mt-5 block text-xs font-medium text-slate-600">
-          {t('Idioma principal da reunião', 'Idioma principal de la reunión', 'Main meeting language')}
+          {t('Idioma da reunião', 'Idioma de la reunión', 'Meeting language')}
           <select
             value={prefs.language}
             onChange={(e) =>
@@ -70,102 +73,81 @@ export function MeetJoinSetupDialog({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-[11px] text-slate-500">
-            {t(
-              'Usado na gravação e na transcrição. Evite misturar idiomas.',
-              'Usado en la grabación y la transcripción. Evite mezclar idiomas.',
-              'Used for recording and transcription. Avoid mixing languages.',
-            )}
-          </p>
         </label>
 
-        <div className="mt-4 space-y-2">
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-3 py-3 hover:bg-slate-50">
-            <input
-              type="checkbox"
-              checked={prefs.enableLocalRecording}
-              onChange={(e) => {
-                const enableLocalRecording = e.target.checked;
-                onChange({
-                  ...prefs,
-                  enableLocalRecording,
-                  enableWhisperOnEnd: enableLocalRecording ? prefs.enableWhisperOnEnd : false,
-                });
-              }}
-              className="mt-0.5 rounded border-slate-300 text-teal-700"
-            />
-            <span className="min-w-0">
-              <span className="flex items-center gap-1.5 text-sm font-medium text-slate-800">
-                <HardDrive className="h-4 w-4 text-slate-500" />
-                {t('Gravar no PC', 'Grabar en el PC', 'Record on this PC')}
-              </span>
-              <span className="mt-0.5 block text-xs text-slate-500">
-                {t(
-                  'Recomendado — áudio para transcrição de qualidade após a reunião.',
-                  'Recomendado — audio para transcripción de calidad tras la reunión.',
-                  'Recommended — audio for quality post-meeting transcription.',
-                )}
-              </span>
-            </span>
-          </label>
-
-          {whisperAvailable && (
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-teal-200 bg-teal-50/50 px-3 py-3">
+        {isHost && (
+          <div className="mt-4 space-y-2">
+            <label
+              className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 ${
+                canCloud
+                  ? 'border-teal-200 bg-teal-50/60 hover:bg-teal-50'
+                  : 'border-slate-200 bg-slate-50 opacity-70'
+              }`}
+            >
               <input
                 type="checkbox"
-                checked={prefs.enableWhisperOnEnd}
+                checked={prefs.enableCloudRecording && canCloud}
+                disabled={!canCloud}
                 onChange={(e) =>
-                  onChange({ ...prefs, enableWhisperOnEnd: e.target.checked })
-                }
-                disabled={!prefs.enableLocalRecording}
-                className="mt-0.5 rounded border-slate-300 text-teal-700 disabled:opacity-40"
-              />
-              <span className="min-w-0">
-                <span className="flex items-center gap-1.5 text-sm font-medium text-teal-900">
-                  <Sparkles className="h-4 w-4" />
-                  {t(
-                    'Transcrição automática após a reunião',
-                    'Transcripción automática tras la reunión',
-                    'Automatic transcript after the meeting',
-                  )}
-                </span>
-                <span className="mt-0.5 block text-xs text-teal-800/80">
-                  {t(
-                    'Ao parar a gravação, envia para o CHORUS e gera texto por participante.',
-                    'Al detener la grabación, sube a CHORUS y genera texto por participante.',
-                    'When you stop recording, uploads to CHORUS and generates per-speaker text.',
-                  )}
-                </span>
-              </span>
-            </label>
-          )}
-
-          {liveTranscriptionAvailable && (
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-3 py-3 hover:bg-slate-50">
-              <input
-                type="checkbox"
-                checked={prefs.enableLiveTranscript}
-                onChange={(e) =>
-                  onChange({ ...prefs, enableLiveTranscript: e.target.checked })
+                  onChange({ ...prefs, enableCloudRecording: e.target.checked })
                 }
                 className="mt-0.5 rounded border-slate-300 text-teal-700"
               />
               <span className="min-w-0">
-                <span className="flex items-center gap-1.5 text-sm font-medium text-slate-800">
-                  <Mic className="h-4 w-4 text-slate-500" />
-                  {t('Transcrição ao vivo (limitada)', 'Transcripción en vivo (limitada)', 'Live transcript (limited)')}
-                </span>
-                <span className="mt-0.5 block text-xs text-amber-700">
+                <span className="flex items-center gap-1.5 text-sm font-semibold text-teal-900">
+                  <Cloud className="h-4 w-4" />
                   {t(
-                    'Qualidade inferior — pode errar. Prefira gravar e transcrever depois.',
-                    'Calidad inferior — puede fallar. Prefiera grabar y transcribir después.',
-                    'Lower quality — may be inaccurate. Prefer recording and transcribing afterwards.',
+                    'Gravar e transcrever na nuvem',
+                    'Grabar y transcribir en la nube',
+                    'Record & transcribe in the cloud',
+                  )}
+                </span>
+                <span className="mt-0.5 block text-xs text-teal-900/80">
+                  {t(
+                    'Automático — grava ao entrar, envia para o CHORUS e gera transcrição ao sair (encerrar, fechar ou sair da sala).',
+                    'Automático — graba al entrar, sube a CHORUS y transcribe al salir (finalizar, cerrar o salir de la sala).',
+                    'Automatic — records when you join, uploads to CHORUS, and transcribes when you leave (end, close tab, or leave room).',
                   )}
                 </span>
               </span>
             </label>
-          )}
-        </div>
+            {!canCloud && (
+              <p className="text-xs text-amber-800">
+                {t(
+                  'Armazenamento na nuvem indisponível. Contacte o administrador.',
+                  'Almacenamiento en la nube no disponible. Contacte al administrador.',
+                  'Cloud storage unavailable. Contact your administrator.',
+                )}
+              </p>
+            )}
+          </div>
+        )}
+
+        {liveTranscriptionAvailable && (
+          <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-3 py-3 hover:bg-slate-50">
+            <input
+              type="checkbox"
+              checked={prefs.enableLiveTranscript}
+              onChange={(e) =>
+                onChange({ ...prefs, enableLiveTranscript: e.target.checked })
+              }
+              className="mt-0.5 rounded border-slate-300 text-teal-700"
+            />
+            <span className="min-w-0">
+              <span className="flex items-center gap-1.5 text-sm font-medium text-slate-800">
+                <Mic className="h-4 w-4 text-slate-500" />
+                {t('Transcrição ao vivo (opcional)', 'Transcripción en vivo (opcional)', 'Live transcript (optional)')}
+              </span>
+              <span className="mt-0.5 block text-xs text-amber-700">
+                {t(
+                  'Qualidade inferior — só se precisar de texto em tempo real.',
+                  'Calidad inferior — solo si necesita texto en tiempo real.',
+                  'Lower quality — only if you need real-time text.',
+                )}
+              </span>
+            </span>
+          </label>
+        )}
 
         <button
           type="button"

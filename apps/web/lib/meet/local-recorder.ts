@@ -4,7 +4,11 @@
  */
 
 export type MeetLocalRecorder = {
-  stop: () => Promise<{ blob: Blob; fileName: string; savedWithPicker: boolean }>;
+  stop: (opts?: { saveToDisk?: boolean }) => Promise<{
+    blob: Blob;
+    fileName: string;
+    savedWithPicker: boolean;
+  }>;
   destroy: () => void;
 };
 
@@ -182,10 +186,11 @@ export async function startMeetLocalRecorder(opts?: {
   }
 
   const recorder: MeetLocalRecorder = {
-    async stop() {
+    async stop(opts) {
       const blob = await finalizeRecording();
       cleanup();
-      const savedWithPicker = await saveBlob(blob, fileName);
+      const saveToDisk = opts?.saveToDisk !== false;
+      const savedWithPicker = saveToDisk ? await saveBlob(blob, fileName) : false;
       return { blob, fileName, savedWithPicker };
     },
     destroy() {

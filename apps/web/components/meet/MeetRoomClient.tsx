@@ -6,9 +6,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   ArrowLeft,
+  Cloud,
   ExternalLink,
   FileText,
-  HardDrive,
   Info,
   LayoutGrid,
   Loader2,
@@ -42,7 +42,7 @@ import {
   type MeetJoinSetupPrefs,
 } from '@/components/meet/MeetJoinSetupDialog';
 import { resolveMeetSpeechLanguage, type MeetSpeechLanguage } from '@/lib/meet/language';
-import { uploadMeetRecordingFile } from '@/lib/meet/upload-recording-client';
+import { uploadAndTranscribeMeetRecording } from '@/lib/meet/finalize-cloud-recording';
 
 type SessionRow = {
   id: string;
@@ -145,6 +145,7 @@ export function MeetRoomClient({ sessionId }: Props) {
   const [transcriptionWaiting, setTranscriptionWaiting] = useState(false);
   const [recordingOn, setRecordingOn] = useState(false);
   const [recordingBusy, setRecordingBusy] = useState(false);
+  const [cloudSyncing, setCloudSyncing] = useState(false);
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [participantCount, setParticipantCount] = useState(0);
   const [dominantSpeaker, setDominantSpeaker] = useState<string | null>(null);
@@ -152,13 +153,13 @@ export function MeetRoomClient({ sessionId }: Props) {
   const [features, setFeatures] = useState({
     liveTranscriptionEnabled: false,
     whisperTranscriptionEnabled: false,
+    cloudStorageReady: false,
   });
   const [joinSetupDone, setJoinSetupDone] = useState(false);
   const [joinPrefs, setJoinPrefs] = useState<MeetJoinSetupPrefs>(() => ({
     language: 'auto',
+    enableCloudRecording: true,
     enableLiveTranscript: false,
-    enableLocalRecording: true,
-    enableWhisperOnEnd: true,
   }));
   const joinPrefsRef = useRef(joinPrefs);
   useEffect(() => {
@@ -196,6 +197,8 @@ export function MeetRoomClient({ sessionId }: Props) {
   const closingRef = useRef(false);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const localRecorderRef = useRef<MeetLocalRecorder | null>(null);
+  const recordingFinalizeRef = useRef(false);
+  const hadParticipantsRef = useRef(false);
   const stageSlotRef = useRef<HTMLDivElement>(null);
   const stageHomeRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -276,6 +279,7 @@ export function MeetRoomClient({ sessionId }: Props) {
           setFeatures({
             liveTranscriptionEnabled: Boolean(d.liveTranscriptionEnabled),
             whisperTranscriptionEnabled: Boolean(d.whisperTranscriptionEnabled),
+            cloudStorageReady: Boolean(d.cloudStorageReady),
           }),
         ),
       fetch(
@@ -300,6 +304,28 @@ export function MeetRoomClient({ sessionId }: Props) {
       // A sala continua funcional mesmo se o estado auxiliar ainda não estiver disponível.
     });
   }, [companyId, sessionId]);
+
+  useEffect(() => {
+    if (!recordingOn || !joinPrefsRef.current.enableCloudRecording) return;
+    const flush = () => {
+      void stopRecording({ cloudAuto: true, quiet: true });
+    };
+    window.addEventListener('pagehide', flush);
+    return () => window.removeEventListener('pagehide', flush);
+  }, [recordingOn]);
+
+  useEffect(() => {
+    if (participantCount > 0) hadParticipantsRef.current = true;
+  }, [participantCount]);
+
+  useEffect(() => {
+    if (!recordingOn || !joinPrefs.enableCloudRecording || !conferenceReady) return;
+    if (!hadParticipantsRef.current || participantCount > 0) return;
+    const id = window.setTimeout(() => {
+      void stopRecording({ cloudAuto: true, quiet: true });
+    }, 2000);
+    return () => window.clearTimeout(id);
+  }, [participantCount, recordingOn, joinPrefs.enableCloudRecording, conferenceReady]);
 
   useEffect(() => {
     if (!companyId || !session || session.status === 'live' || session.status === 'ended') return;
@@ -626,8 +652,10 @@ export function MeetRoomClient({ sessionId }: Props) {
   function confirmJoinSetup() {
     const prefs = joinPrefsRef.current;
     setJoinSetupDone(true);
-    if (prefs.enableLocalRecording) {
-      window.setTimeout(() => void startLocalRecording(), 400);
+    const cloudReady =
+      features.cloudStorageReady && features.whisperTranscriptionEnabled;
+    if (prefs.enableCloudRecording && cloudReady) {
+      window.setTimeout(() => void startCloudRecording(), 400);
     }
   }
 
@@ -667,9 +695,9 @@ export function MeetRoomClient({ sessionId }: Props) {
     conferenceRef.current?.startTranscription();
   }
 
-  async function startLocalRecording() {
+  async function startCloudRecording() {
     setError(null);
-    if (recordingOn || recordingBusy) return;
+    if (recordingOn || recordingBusy || recordingFinalizeRef.current) return;
     setRecordingBusy(true);
     try {
       const { recorder } = await startMeetLocalRecorder({
@@ -681,16 +709,15 @@ export function MeetRoomClient({ sessionId }: Props) {
       localRecorderRef.current = null;
       setRecordingOn(false);
       if (err instanceof DOMException && err.name === 'AbortError') {
-        /* utilizador cancelou o picker / partilha — silêncio */
         return;
       }
       setError(
         err instanceof Error
           ? err.message
           : t(
-              'Não foi possível iniciar a gravação neste PC.',
-              'No se pudo iniciar la grabación en este PC.',
-              'Could not start recording on this PC.',
+              'Não foi possível iniciar a gravação na nuvem.',
+              'No se pudo iniciar la grabación en la nube.',
+              'Could not start cloud recording.',
             ),
       );
     } finally {
@@ -698,95 +725,86 @@ export function MeetRoomClient({ sessionId }: Props) {
     }
   }
 
-  async function stopRecording() {
+  async function stopRecording(opts?: { cloudAuto?: boolean; quiet?: boolean }) {
     const recorder = localRecorderRef.current;
-    if (!recorder) {
-      setRecordingOn(false);
+    if (!recorder || recordingFinalizeRef.current) {
+      if (!recorder) setRecordingOn(false);
       return;
     }
+    const cloudMode =
+      joinPrefsRef.current.enableCloudRecording &&
+      features.cloudStorageReady &&
+      features.whisperTranscriptionEnabled;
+    const autoCloud = opts?.cloudAuto ?? cloudMode;
+
     setRecordingBusy(true);
+    if (autoCloud) setCloudSyncing(true);
     try {
-      const result = await recorder.stop();
+      const result = await recorder.stop({ saveToDisk: !autoCloud });
       localRecorderRef.current = null;
       setRecordingOn(false);
       if (result.blob.size <= 0) {
-        setError(
-          t(
-            'A gravação terminou sem dados. Ao iniciar, escolhe a aba ou janela do CHORUS.',
-            'La grabación terminó sin datos. Al iniciar, elige la pestaña o ventana de CHORUS.',
-            'Recording finished with no data. When starting, pick the CHORUS tab or window.',
-          ),
-        );
-        return;
-      }
-      setError(null);
-      // Upload Whisper quando o organizador optou na entrada
-      if (companyId && result.blob.size > 0) {
-        const autoWhisper = joinPrefsRef.current.enableWhisperOnEnd && features.whisperTranscriptionEnabled;
-        const wantUpload =
-          autoWhisper ||
-          window.confirm(
+        if (!opts?.quiet) {
+          setError(
             t(
-              'Gravação guardada. Enviar para gerar a transcrição?',
-              'Grabación guardada. ¿Subir para generar la transcripción?',
-              'Recording saved. Upload to generate the transcript?',
+              'A gravação terminou sem dados. Ao iniciar, escolhe a aba ou janela do CHORUS.',
+              'La grabación terminó sin datos. Al iniciar, elige la pestaña o ventana de CHORUS.',
+              'Recording finished with no data. When starting, pick the CHORUS tab or window.',
             ),
           );
-        if (wantUpload) {
-          try {
-            const fileName = result.fileName || `chorus-${sessionId}.webm`;
-            const contentType = result.blob.type || 'video/webm';
-            const file = new File([result.blob], fileName, { type: contentType });
-            await uploadMeetRecordingFile({ sessionId, companyId, file });
-            const tr = await fetch(`/api/meet/sessions/${sessionId}/transcribe`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                companyId,
-                locale,
-                languageHint: meetingSpeechLang,
-                finalize: false,
-                diarize: true,
-              }),
-            });
-            if (tr.ok) {
-              setError(
-                t(
-                  'Gravação enviada. A transcrição está a ser gerada — veja o resumo ao sair.',
-                  'Grabación enviada. La transcripción se está generando — vea el recap al salir.',
-                  'Recording uploaded. The transcript is being generated — check the recap when you leave.',
-                ),
-              );
-            } else {
-              setError(
-                t(
-                  'Gravação pronta. Abra o resumo e use Transcrever se ainda não houver texto.',
-                  'Grabación lista. Abra el recap y use Transcribir si aún no hay texto.',
-                  'Cloud recording is ready. Open the recap and use Transcribe if there is no text yet.',
-                ),
-              );
-            }
-          } catch (upErr) {
+        }
+        return;
+      }
+      if (!opts?.quiet) setError(null);
+
+      if (companyId && autoCloud) {
+        recordingFinalizeRef.current = true;
+        try {
+          const fileName = result.fileName || `chorus-${sessionId}.webm`;
+          await uploadAndTranscribeMeetRecording({
+            sessionId,
+            companyId,
+            blob: result.blob,
+            fileName,
+            locale,
+            languageHint: meetingSpeechLang,
+            whisperEnabled: features.whisperTranscriptionEnabled,
+          });
+          if (!opts?.quiet) {
+            setError(
+              t(
+                'Gravação enviada. A transcrição está a ser gerada no CHORUS.',
+                'Grabación enviada. La transcripción se está generando en CHORUS.',
+                'Recording uploaded. Transcript is being generated in CHORUS.',
+              ),
+            );
+          }
+        } catch (upErr) {
+          recordingFinalizeRef.current = false;
+          if (!opts?.quiet) {
             setError(
               upErr instanceof Error
                 ? upErr.message
                 : t(
-                    'Não foi possível enviar a gravação. Fica no teu PC — podes fazer upload no recap.',
-                    'No se pudo subir la grabación. Queda en tu PC — puedes subirla en el recap.',
-                    'Could not upload the recording. It remains on your PC — you can upload it in the recap.',
+                    'Não foi possível enviar a gravação. Tente novamente no resumo.',
+                    'No se pudo subir la grabación. Inténtelo de nuevo en el recap.',
+                    'Could not upload the recording. Try again from the recap.',
                   ),
             );
           }
         }
       }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : t('Falha ao guardar a gravação.', 'Error al guardar la grabación.', 'Failed to save recording.'),
-      );
+      if (!opts?.quiet) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : t('Falha ao terminar a gravação.', 'Error al finalizar la grabación.', 'Failed to stop recording.'),
+        );
+      }
     } finally {
       setRecordingBusy(false);
+      setCloudSyncing(false);
     }
   }
 
@@ -842,12 +860,10 @@ export function MeetRoomClient({ sessionId }: Props) {
       }
       if (recordingOn && localRecorderRef.current) {
         try {
-          await localRecorderRef.current.stop();
+          await stopRecording({ cloudAuto: true, quiet: true });
         } catch {
           /* ignore */
         }
-        localRecorderRef.current = null;
-        setRecordingOn(false);
       }
 
       let transcript = joinPrefsRef.current.enableLiveTranscript
@@ -931,7 +947,7 @@ export function MeetRoomClient({ sessionId }: Props) {
     closingRef.current = true;
     if (recordingOn && localRecorderRef.current) {
       try {
-        await stopRecording();
+        await stopRecording({ cloudAuto: true, quiet: true });
       } catch {
         /* ignore */
       }
@@ -1120,34 +1136,30 @@ export function MeetRoomClient({ sessionId }: Props) {
                 : t('Flutuante', 'Flotante', 'Float')}
             </span>
           </button>
-          {recordingOn ? (
-            <button
-              type="button"
-              onClick={() => void stopRecording()}
-              disabled={recordingBusy || ending}
-              className="inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-rose-500 disabled:opacity-60"
-            >
-              <Square className="h-3 w-3" />
-              {t('Parar gravação', 'Detener grabación', 'Stop recording')}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void startLocalRecording()}
-              disabled={recordingBusy || ending}
-              className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm hover:bg-slate-700 disabled:opacity-60"
+          {joinPrefs.enableCloudRecording && (recordingOn || cloudSyncing) ? (
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium shadow-sm ${
+                cloudSyncing
+                  ? 'bg-amber-600/90 text-white'
+                  : 'bg-rose-600 text-white'
+              }`}
               title={t(
-                'Primeiro escolhe onde guardar; depois a aba/janela da reunião',
-                'Primero elige dónde guardar; luego la pestaña/ventana de la reunión',
-                'First choose where to save; then the meeting tab/window',
+                'Gravação na nuvem CHORUS — termina automaticamente ao sair',
+                'Grabación en la nube CHORUS — termina al salir',
+                'CHORUS cloud recording — stops automatically when you leave',
               )}
             >
-              <HardDrive className="h-3.5 w-3.5 text-white/75" strokeWidth={1.75} />
-              {recordingBusy
-                ? t('A preparar…', 'Preparando…', 'Preparing…')
-                : t('Gravar', 'Grabar', 'Record')}
-            </button>
-          )}
+              <Cloud className="h-3.5 w-3.5" strokeWidth={1.75} />
+              <span className="hidden sm:inline">
+                {cloudSyncing
+                  ? t('A enviar…', 'Enviando…', 'Uploading…')
+                  : t('A gravar', 'Grabando', 'Recording')}
+              </span>
+              {recordingOn && !cloudSyncing && (
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+              )}
+            </span>
+          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -1508,17 +1520,23 @@ export function MeetRoomClient({ sessionId }: Props) {
               </div>
 
               <p className="text-[10px] leading-relaxed text-white/35">
-                {joinPrefs.enableLiveTranscript
+                {joinPrefs.enableCloudRecording
                   ? t(
-                      'Transcrição ao vivo (qualidade limitada). Para texto mais fiável, grave e use Transcrever no resumo.',
-                      'Transcripción en vivo (calidad limitada). Para texto más fiable, grabe y use Transcribir en el recap.',
-                      'Live transcript (limited quality). For more reliable text, record and use Transcribe in the recap.',
+                      'Gravação na nuvem activa — ao sair, o áudio é enviado e transcrito automaticamente.',
+                      'Grabación en la nube activa — al salir, el audio se sube y transcribe automáticamente.',
+                      'Cloud recording active — when you leave, audio uploads and transcribes automatically.',
                     )
-                  : t(
-                      'Grave nesta sessão e active a transcrição automática na entrada para um resumo após a reunião.',
-                      'Grabe en esta sesión y active la transcripción automática al entrar para un resumen tras la reunión.',
-                      'Record in this session and enable automatic transcription when joining for a post-meeting recap.',
-                    )}
+                  : joinPrefs.enableLiveTranscript
+                    ? t(
+                        'Transcrição ao vivo (qualidade limitada). Para texto fiável, active a gravação na nuvem ao entrar.',
+                        'Transcripción en vivo (calidad limitada). Para texto fiable, active la grabación en la nube al entrar.',
+                        'Live transcript (limited quality). For reliable text, enable cloud recording when joining.',
+                      )
+                    : t(
+                        'Active «Gravar e transcrever na nuvem» ao entrar para um resumo automático após a reunião.',
+                        'Active «Grabar y transcribir en la nube» al entrar para un resumen automático tras la reunión.',
+                        'Enable «Record & transcribe in the cloud» when joining for an automatic post-meeting recap.',
+                      )}
               </p>
             </div>
           </aside>
@@ -1530,6 +1548,7 @@ export function MeetRoomClient({ sessionId }: Props) {
           locale={locale}
           meetingTitle={session.title}
           isHost={isHost}
+          cloudStorageReady={features.cloudStorageReady}
           whisperAvailable={features.whisperTranscriptionEnabled}
           liveTranscriptionAvailable={features.liveTranscriptionEnabled}
           prefs={joinPrefs}

@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getJitsiBaseUrl, isJitsiDemoEmbedHost } from '@/lib/forge/jitsi-config';
 import { isMeetTranscribeConfigured } from '@/lib/meet/transcribe';
+import { isMeetRecordingStorageReady } from '@/lib/meet/recording-storage';
 
 /**
  * Estado do motor de vídeo (Jitsi) — para o Hub Meet e ops.
@@ -16,6 +17,7 @@ export async function GET() {
     isDemo,
     liveTranscriptionEnabled: process.env.MEET_LIVE_TRANSCRIPTION_ENABLED === '1',
     whisperTranscriptionEnabled: isMeetTranscribeConfigured(),
+    cloudStorageReady: isMeetRecordingStorageReady(),
     cloudRecordingEnabled: process.env.MEET_CLOUD_RECORDING_ENABLED === '1',
     message: isDemo
       ? 'Servidor de vídeo em modo demo: as chamadas são limitadas.'
