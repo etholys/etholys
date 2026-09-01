@@ -34,9 +34,7 @@ function meetClientReady(): boolean {
 
 export function assertMeetPrismaReady() {
   if (!meetClientReady()) {
-    throw new Error(
     throw new Error('Meet indisponível de momento. Tente novamente.');
-    );
   }
 }
 
