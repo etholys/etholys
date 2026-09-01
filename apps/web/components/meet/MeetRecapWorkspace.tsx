@@ -22,6 +22,7 @@ import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { CompanyRequiredPanel } from '@/components/hub/CompanyRequiredPanel';
 import { meetRecapPath, meetRecapsPath, meetHubJoinPath } from '@/lib/meet/types';
 import { resolveMeetSpeechLanguage } from '@/lib/meet/language';
+import { uploadMeetRecordingFile } from '@/lib/meet/upload-recording-client';
 
 type RecapListRow = {
   id: string;
@@ -262,46 +263,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
     setUploadBusy(true);
     setError(null);
     try {
-      const presign = await fetch(`/api/meet/sessions/${sessionId}/recording`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId,
-          action: 'presign',
-          fileName: file.name,
-          contentType: file.type || 'application/octet-stream',
-        }),
-      });
-      const signed = (await presign.json()) as {
-        error?: string;
-        uploadUrl?: string;
-        storageKey?: string;
-        publicUrl?: string | null;
-      };
-      if (!presign.ok) throw new Error(signed.error || 'Presign failed');
-      if (!signed.uploadUrl || !signed.storageKey) throw new Error('Presign incomplete');
-
-      const put = await fetch(signed.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-        body: file,
-      });
-      if (!put.ok) throw new Error(`Upload failed (${put.status})`);
-
-      const confirm = await fetch(`/api/meet/sessions/${sessionId}/recording`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId,
-          action: 'confirm',
-          storageKey: signed.storageKey,
-          recordingUrl: signed.publicUrl || undefined,
-        }),
-      });
-      if (!confirm.ok) {
-        const c = (await confirm.json().catch(() => ({}))) as { error?: string };
-        throw new Error(c.error || 'Confirm failed');
-      }
+      await uploadMeetRecordingFile({ sessionId, companyId, file });
       await loadDetail();
       await loadList();
     } catch (e) {

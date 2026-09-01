@@ -42,6 +42,7 @@ import {
   type MeetJoinSetupPrefs,
 } from '@/components/meet/MeetJoinSetupDialog';
 import { resolveMeetSpeechLanguage, type MeetSpeechLanguage } from '@/lib/meet/language';
+import { uploadMeetRecordingFile } from '@/lib/meet/upload-recording-client';
 
 type SessionRow = {
   id: string;
@@ -730,44 +731,8 @@ export function MeetRoomClient({ sessionId }: Props) {
           try {
             const fileName = result.fileName || `chorus-${sessionId}.webm`;
             const contentType = result.blob.type || 'video/webm';
-            const presign = await fetch(`/api/meet/sessions/${sessionId}/recording`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                companyId,
-                action: 'presign',
-                fileName,
-                contentType,
-              }),
-            });
-            const signed = (await presign.json()) as {
-              error?: string;
-              uploadUrl?: string;
-              storageKey?: string;
-              publicUrl?: string | null;
-            };
-            if (!presign.ok) throw new Error(signed.error || 'Presign failed');
-            if (!signed.uploadUrl || !signed.storageKey) throw new Error('Presign incomplete');
-            const put = await fetch(signed.uploadUrl, {
-              method: 'PUT',
-              headers: { 'Content-Type': contentType },
-              body: result.blob,
-            });
-            if (!put.ok) throw new Error(`Upload failed (${put.status})`);
-            const confirm = await fetch(`/api/meet/sessions/${sessionId}/recording`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                companyId,
-                action: 'confirm',
-                storageKey: signed.storageKey,
-                recordingUrl: signed.publicUrl || undefined,
-              }),
-            });
-            if (!confirm.ok) {
-              const conf = (await confirm.json().catch(() => ({}))) as { error?: string };
-              throw new Error(conf.error || 'Confirm failed');
-            }
+            const file = new File([result.blob], fileName, { type: contentType });
+            await uploadMeetRecordingFile({ sessionId, companyId, file });
             const tr = await fetch(`/api/meet/sessions/${sessionId}/transcribe`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },

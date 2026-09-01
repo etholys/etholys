@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
@@ -7,10 +8,55 @@ import { prisma } from '@/lib/prisma';
 import {
   isMeetRecordingStorageReady,
   presignMeetRecordingUpload,
+  putMeetRecordingBuffer,
   resolveMeetRecordingUrl,
 } from '@/lib/meet/recording-storage';
 
 type Ctx = { params: Promise<{ id: string }> };
+
+async function handleDirectUpload(req: Request, sessionId: string) {
+  const tenant = await getUserCompanyIds();
+  if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+
+  const form = await req.formData();
+  const companyId = String(form.get('companyId') || '').trim();
+  const file = form.get('file');
+
+  if (!companyId || !tenant.companyIds.includes(companyId)) {
+    return NextResponse.json({ error: 'companyId inválido' }, { status: 400 });
+  }
+  if (!(file instanceof File) || file.size <= 0) {
+    return NextResponse.json({ error: 'Ficheiro de gravação obrigatório' }, { status: 400 });
+  }
+
+  const session = await getMeetSessionForCompany(sessionId, companyId);
+  if (!session) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+
+  if (!isMeetRecordingStorageReady()) {
+    return NextResponse.json(
+      { error: 'Armazenamento de gravações indisponível de momento.' },
+      { status: 503 },
+    );
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const fileName = (file.name || `meet-${sessionId}.webm`).trim();
+  const contentType = (file.type || 'video/webm').trim();
+  const { storageKey, recordingUrl } = await putMeetRecordingBuffer({
+    sessionId,
+    fileName,
+    contentType,
+    body: buffer,
+  });
+
+  const updated = await prisma.meetSession.update({
+    where: { id: sessionId },
+    data: { recordingUrl: recordingUrl.slice(0, 2000) },
+    select: { id: true, recordingUrl: true },
+  });
+
+  return NextResponse.json({ ok: true, session: updated, storageKey });
+}
 
 /**
  * GET — estado de storage + recordingUrl actual
@@ -42,10 +88,15 @@ export async function GET(req: Request, ctx: Ctx) {
 
 export async function POST(req: Request, ctx: Ctx) {
   try {
+    const { id } = await ctx.params;
+    const contentType = req.headers.get('content-type') || '';
+    if (contentType.includes('multipart/form-data')) {
+      return await handleDirectUpload(req, id);
+    }
+
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const { id } = await ctx.params;
     const body = (await req.json()) as {
       companyId?: string;
       action?: 'presign' | 'confirm';
