@@ -43,6 +43,11 @@ import {
 } from '@/components/meet/MeetJoinSetupDialog';
 import { resolveMeetSpeechLanguage, type MeetSpeechLanguage } from '@/lib/meet/language';
 import { uploadAndTranscribeMeetRecording } from '@/lib/meet/finalize-cloud-recording';
+import {
+  closeMeetDocumentPipWindow,
+  openMeetDocumentPip,
+  supportsDocumentPictureInPicture,
+} from '@/lib/meet/document-pip';
 
 type SessionRow = {
   id: string;
