@@ -1445,9 +1445,18 @@ export default function StudioDocumentPage() {
       return;
     }
     if (d.document?.canvasState) {
-      applyCanvas(() => normalizeStudioCanvas(d.document.canvasState), true);
-      if (typeof d.document.title === 'string') setTitle(d.document.title);
+      const normalized = normalizeStudioCanvas(d.document.canvasState);
+      skipHistory.current = true;
+      canvasRef.current = normalized;
+      setCanvas(normalized);
+      skipHistory.current = false;
+      dirtyRef.current = false;
       setDirty(false);
+      void persistCanvas({ quiet: true, forceSnap: normalized });
+      if (typeof d.document.title === 'string') {
+        titleRef.current = d.document.title;
+        setTitle(d.document.title);
+      }
     }
     setShowHistory(false);
     void loadVersions();

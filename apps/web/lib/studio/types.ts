@@ -416,9 +416,8 @@ export function applyStudioCanvasPatches(
   const pages = canvas.pages.map((page) => ({
     ...page,
     blocks: page.blocks.map((block) => {
-      const patch = patches.find(
-        (p) => p.blockId === block.id && (!p.pageId || p.pageId === page.id),
-      );
+      // blockId é único no documento; pageId nos patches pode ficar obsoleto após reflow
+      const patch = patches.find((p) => p.blockId === block.id);
       if (!patch) return block;
       return {
         ...block,
