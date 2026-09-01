@@ -730,16 +730,16 @@ function MeetHubContent() {
                       <span>
                         <span className="block text-sm font-medium text-slate-900">
                           {t(
-                            'Captura externa (Zoom/Teams)',
-                            'Captura externa (Zoom/Teams)',
-                            'External capture (Zoom/Teams)',
+                            'Gravar Zoom/Teams na nuvem CHORUS',
+                            'Grabar Zoom/Teams en la nube CHORUS',
+                            'Record Zoom/Teams to CHORUS cloud',
                           )}
                         </span>
                         <span className="block text-xs text-slate-500">
                           {t(
-                            'Gravar ecrã + transcrever reuniões fora do Etholys',
-                            'Grabar pantalla + transcribir reuniones fuera de Etholys',
-                            'Record screen + transcribe meetings outside Etholys',
+                            'Mesmo fluxo da sala interna — transcrição com participantes',
+                            'Mismo flujo que la sala interna — transcripción con participantes',
+                            'Same flow as internal room — transcript with speakers',
                           )}
                         </span>
                       </span>
@@ -1282,9 +1282,9 @@ function MeetingGroup({
                       href={meetCapturePath({ companyId, sessionId: s.id })}
                       className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-800 hover:bg-violet-100"
                       title={t(
-                        'Gravar ecrã + transcrever (Zoom/Teams/outro)',
-                        'Grabar pantalla + transcribir (Zoom/Teams/otro)',
-                        'Record screen + transcribe (Zoom/Teams/other)',
+                        'Gravar na nuvem CHORUS (Zoom/Teams/outro)',
+                        'Grabar en la nube CHORUS (Zoom/Teams/otro)',
+                        'Record to CHORUS cloud (Zoom/Teams/other)',
                       )}
                     >
                       <MonitorUp className="mr-1 inline h-3 w-3" />
