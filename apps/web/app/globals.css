@@ -93,6 +93,30 @@
   }
 }
 
+/*
+ * Modal overlays — tall floating panels must scroll at 100% browser zoom.
+ * Targets the common pattern: fixed inset-0 flex … justify-center > panel
+ */
+@layer components {
+  div.fixed.inset-0.flex.items-center.justify-center:not([data-modal-scroll='off']) > div,
+  div.fixed.inset-0.flex.items-center.justify-center:not([data-modal-scroll='off']) > form,
+  div.fixed.inset-0.flex.items-end.justify-center:not([data-modal-scroll='off']) > div,
+  div.fixed.inset-0.flex.items-end.justify-center:not([data-modal-scroll='off']) > form,
+  div.fixed.inset-0.flex.items-end.sm\:items-center.justify-center:not([data-modal-scroll='off']) > div,
+  div.fixed.inset-0.flex.items-end.sm\:items-center.justify-center:not([data-modal-scroll='off']) > form {
+    max-height: min(90dvh, calc(100vh - 2rem));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  div.fixed.inset-0.flex.items-center.justify-center:not([data-modal-scroll='off']),
+  div.fixed.inset-0.flex.items-end.justify-center:not([data-modal-scroll='off']),
+  div.fixed.inset-0.flex.items-end.sm\:items-center.justify-center:not([data-modal-scroll='off']) {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 /* Etholys Studio — TipTap (modo Redação) */
 .studio-rich-editor.ProseMirror {
   min-height: 1.5em;

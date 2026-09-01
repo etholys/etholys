@@ -1034,7 +1034,7 @@ export default function BudgetPlanning() {
       {showExecuteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[min(90dvh,calc(100vh-2rem))] overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-bold text-gray-900 mb-2">
@@ -1099,8 +1099,8 @@ export default function BudgetPlanning() {
 
       {/* Item edit/create modal */}
       {editingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[min(90dvh,calc(100vh-2rem))] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-gray-900 mb-4">
               {(editingItem as any).id ? L(ml('Edit Item', 'Editar Ítem', 'Editar Item')) : L(ml('New Item', 'Nuevo Ítem', 'Novo Item'))}
             </h3>
