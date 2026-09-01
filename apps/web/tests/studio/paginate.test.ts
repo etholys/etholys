@@ -75,8 +75,15 @@ describe('studio paginate', () => {
             },
       ),
     };
-    const reflowed = reflowStudioDocument(edited, { pageTitlePrefix: 'Página' });
+    const reflowed = reflowStudioDocument(edited, { pageTitlePrefix: 'Página', joinChops: false });
     assert.ok(reflowed.pages.length > 1);
     assert.ok(studioCanvasTextLength(reflowed) >= studioCanvasTextLength(merged));
+  });
+
+  it('reflow without joinChops preserves total text on over-paginated source', () => {
+    const src = makeOverPaginated(98);
+    const beforeLen = studioCanvasTextLength(src);
+    const reflowed = reflowStudioDocument(src, { pageTitlePrefix: 'Página', joinChops: false });
+    assert.equal(studioCanvasTextLength(reflowed), beforeLen);
   });
 });

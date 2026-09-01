@@ -248,7 +248,6 @@ export default function StudioDocumentPage() {
   const saveLockRef = useRef(false);
   const saveAgainRef = useRef(false);
   const saveEpochRef = useRef(0);
-  const writeReflowTimerRef = useRef<number | null>(null);
   const textEditBaselineRef = useRef<StudioCanvasState | null>(null);
   const activePageSpyTimerRef = useRef<number | null>(null);
   const canvasScrollRef = useRef<HTMLDivElement | null>(null);
@@ -367,35 +366,8 @@ export default function StudioDocumentPage() {
     [pushHistory],
   );
 
-  const scheduleWriteReflow = useCallback(
-    (delay = 900) => {
-      if (canvasRef.current?.studioMode !== 'write') return;
-      if (writeReflowTimerRef.current) window.clearTimeout(writeReflowTimerRef.current);
-      writeReflowTimerRef.current = window.setTimeout(() => {
-        writeReflowTimerRef.current = null;
-        if (getStudioWriteFocus()) {
-          scheduleWriteReflow(500);
-          return;
-        }
-        const focusId = getStudioWriteFocus()?.blockId;
-        const snap = canvasRef.current;
-        if (!snap || snap.studioMode === 'design') return;
-        const laid = reflowStudioDocument(snap, {
-          pageTitlePrefix: t('Página', 'Página', 'Page'),
-          marginsMm: snap.marginsMm,
-          joinChops: false,
-        });
-        if (JSON.stringify(laid.pages) === JSON.stringify(snap.pages)) return;
-        applyCanvas(() => laid, false);
-        if (focusId) window.setTimeout(() => requestStudioWriteBlockFocus(focusId), 50);
-      }, delay);
-    },
-    [applyCanvas, t],
-  );
-
   useEffect(() => {
     return () => {
-      if (writeReflowTimerRef.current) window.clearTimeout(writeReflowTimerRef.current);
       if (activePageSpyTimerRef.current) window.clearTimeout(activePageSpyTimerRef.current);
     };
   }, []);
@@ -1095,6 +1067,24 @@ export default function StudioDocumentPage() {
   ) {
     const isTextOnly = Object.keys(patch).length === 1 && patch.text !== undefined;
     applyCanvas((prev) => {
+      if (patch.text !== undefined) {
+        const page = prev.pages.find((p) => p.id === pageId);
+        const block = page?.blocks.find((b) => b.id === blockId);
+        if (block) {
+          const prevText = String(block.text || '');
+          const nextText = String(patch.text);
+          const focus = getStudioWriteFocus();
+          // Rejeita wipe acidental (editor a serializar vazio com conteúdo visível).
+          if (
+            focus?.blockId === blockId &&
+            prevText.trim().length >= 8 &&
+            !nextText.trim() &&
+            prevText.length > 32
+          ) {
+            return prev;
+          }
+        }
+      }
       let next = {
         ...prev,
         pages: prev.pages.map((p) =>
@@ -2745,12 +2735,6 @@ export default function StudioDocumentPage() {
                     }`}
                     onFocusCapture={() => setActivePageId(page.id)}
                     onMouseDown={() => setActivePageId(page.id)}
-                    onBlurCapture={(e) => {
-                      if (studioMode !== 'write' || !canEdit) return;
-                      const next = e.relatedTarget as Node | null;
-                      if (next && e.currentTarget.contains(next)) return;
-                      scheduleWriteReflow();
-                    }}
                   >
                     <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5" style={{ width }}>
                       <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">

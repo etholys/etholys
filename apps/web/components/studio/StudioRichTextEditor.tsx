@@ -8,6 +8,9 @@ import Placeholder from '@tiptap/extension-placeholder';
 import TextAlign from '@tiptap/extension-text-align';
 import {
   studioEditorHtmlToText,
+  studioEditorSelectionAtDocEnd,
+  studioEditorSelectionAtDocStart,
+  studioSafeEditorSerializedText,
   studioTextToEditorHtml,
 } from '@/lib/studio/rich-text';
 import {
@@ -86,6 +89,13 @@ export function StudioRichTextEditor({
   /** Evita que o efeito de sync prop→editor restaure texto obsoleto ao mudar para o chat. */
   const lastEmittedRef = useRef(text);
 
+  const emitSerialized = (ed: { getHTML: () => string; state: { doc: { textContent: string } } }) => {
+    const safe = studioSafeEditorSerializedText(ed.getHTML(), ed.state.doc.textContent.length);
+    if (safe === null) return;
+    lastEmittedRef.current = safe;
+    cbs.current.onChange(safe);
+  };
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -137,7 +147,10 @@ export function StudioRichTextEditor({
         if (event.key === 'Delete' && cbs.current.onMergeWithNext) {
           const plain = view.state.doc.textContent;
           const { empty, $to } = view.state.selection;
-          if (empty && $to.parentOffset >= $to.parent.content.size && plain.trim()) {
+          if (
+            studioEditorSelectionAtDocEnd($to, empty) &&
+            plain.trim()
+          ) {
             event.preventDefault();
             cbs.current.onMergeWithNext();
             return true;
@@ -146,7 +159,7 @@ export function StudioRichTextEditor({
         if (event.key === 'Backspace') {
           const plain = view.state.doc.textContent;
           const { empty, $from } = view.state.selection;
-          if (empty && $from.parentOffset === 0) {
+          if (studioEditorSelectionAtDocStart($from, empty)) {
             if (!plain.trim() && cbs.current.onBackspaceEmpty) {
               event.preventDefault();
               cbs.current.onBackspaceEmpty();
@@ -181,17 +194,13 @@ export function StudioRichTextEditor({
       },
     },
     onUpdate: ({ editor: ed }) => {
-      const latest = studioEditorHtmlToText(ed.getHTML());
-      lastEmittedRef.current = latest;
-      cbs.current.onChange(latest);
+      emitSerialized(ed);
     },
     onFocus: ({ editor: ed }) => {
       setStudioWriteFocus({ editor: ed, blockId, pageId });
     },
     onBlur: ({ editor: ed }) => {
-      const latest = studioEditorHtmlToText(ed.getHTML());
-      lastEmittedRef.current = latest;
-      cbs.current.onChange(latest);
+      emitSerialized(ed);
       requestAnimationFrame(() => {
         const f = getStudioWriteFocus();
         if (f?.editor === ed) setStudioWriteFocus(null);

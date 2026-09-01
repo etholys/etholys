@@ -56,6 +56,46 @@ export function studioEditorHtmlToText(html: string): string {
     .trimEnd();
 }
 
+/** TipTap/ProseMirror: cursor no início absoluto do bloco (não entre `<p>` internos). */
+export function studioEditorSelectionAtDocStart(
+  $from: { parentOffset: number; depth: number; index: (d: number) => number },
+  empty: boolean,
+): boolean {
+  if (!empty || $from.parentOffset !== 0) return false;
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.index(d - 1) !== 0) return false;
+  }
+  return true;
+}
+
+/** TipTap/ProseMirror: cursor no fim absoluto do bloco (não entre `<p>` internos). */
+export function studioEditorSelectionAtDocEnd(
+  $to: {
+    parentOffset: number;
+    depth: number;
+    index: (d: number) => number;
+    node: (d: number) => { childCount: number };
+    parent: { content: { size: number } };
+  },
+  empty: boolean,
+): boolean {
+  if (!empty || $to.parentOffset < $to.parent.content.size) return false;
+  for (let d = $to.depth; d > 0; d--) {
+    if ($to.index(d - 1) < $to.node(d - 1).childCount - 1) return false;
+  }
+  return true;
+}
+
+/**
+ * Evita persistir texto vazio quando o editor ainda tem conteúdo (glitch HTML→md).
+ * Devolve null quando a serialização parece ter apagado o bloco por engano.
+ */
+export function studioSafeEditorSerializedText(html: string, plainTextLength: number): string | null {
+  const latest = studioEditorHtmlToText(html);
+  if (!latest.trim() && plainTextLength > 0) return null;
+  return latest;
+}
+
 /** Texto plano para IA / pesquisa. */
 export function studioBlockPlainText(text: string): string {
   if (!text) return '';
