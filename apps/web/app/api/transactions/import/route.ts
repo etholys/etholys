@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
+import { getUserCompanyIds } from '@/lib/tenant';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
 import {
@@ -13,6 +12,13 @@ import {
   imageMimeFromFilename,
 } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
+import { getCompanyEntitlements, companyHasAddon } from '@/lib/billing/company-entitlements';
+import {
+  ATLAS_SMART_IMPORT_SKU,
+  isSpreadsheetImportFile,
+  parseAtlasTransactionWorkbook,
+  type AtlasImportTransaction,
+} from '@/lib/atlas/transaction-import';
 
 const SYSTEM_PROMPT = `You are a financial transaction parser. Input may be CSV/Excel text, OR a PDF/image of bank statements, invoices, receipts, credit card summaries, or accounting reports (Spanish, Portuguese, English, or mixed).
 
@@ -60,12 +66,30 @@ type PreparedForLlm =
   | { mode: 'vision'; userText: string; imageBase64: string }
   | { mode: 'pdf'; userText: string; pdfBase64: string; fallbackUserText: string };
 
+function sanitizeTx(t: Partial<AtlasImportTransaction> & Record<string, unknown>): AtlasImportTransaction | null {
+  const amount = Math.abs(parseFloat(String(t.amount)) || 0);
+  if (amount <= 0) return null;
+  const type = ['INCOME', 'EXPENSE', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(String(t.type))
+    ? (t.type as AtlasImportTransaction['type'])
+    : 'EXPENSE';
+  return {
+    title: String(t.title || ''),
+    description: t.description ? String(t.description) : null,
+    type,
+    amount,
+    currency: String(t.currency || 'USD'),
+    category: String(t.category || ''),
+    date: String(t.date || new Date().toISOString().slice(0, 10)).slice(0, 10),
+    note: t.note ? String(t.note) : null,
+    executionStatus: t.executionStatus === 'FORECAST' ? 'FORECAST' : 'EXECUTED',
+  };
+}
+
 async function extractFileContent(file: File): Promise<PreparedForLlm> {
   const name = file.name.toLowerCase();
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  // PDF: enviar o ficheiro à IA (digitalizações e layout). pdf-parse só como apoio.
   if (name.endsWith('.pdf')) {
     let txt = '';
     try {
@@ -80,7 +104,7 @@ async function extractFileContent(file: File): Promise<PreparedForLlm> {
     if (buffer.length > MAX_INLINE_PDF_BYTES) {
       if (!txt || txt.length < 40) {
         throw new Error(
-          'PDF demasiado grande para envio à IA e sem texto extraível. Reduza o ficheiro (menos páginas) ou exporte para Excel/CSV.'
+          'PDF demasiado grande para envio à IA e sem texto extraível. Reduza o ficheiro (menos páginas) ou exporte para Excel/CSV.',
         );
       }
       return { mode: 'text', userText: fallbackUserText };
@@ -99,20 +123,19 @@ async function extractFileContent(file: File): Promise<PreparedForLlm> {
     };
   }
 
-  // Imagens → IA multimodal
   if (name.match(/\.(jpg|jpeg|png|webp|gif|bmp|tiff?)$/)) {
     return {
       mode: 'vision',
-      userText: 'Extract all transactions from this receipt/invoice/document. Respond with JSON only as instructed in the system prompt.',
+      userText:
+        'Extract all transactions from this receipt/invoice/document. Respond with JSON only as instructed in the system prompt.',
       imageBase64: buffer.toString('base64'),
     };
   }
 
-  // Excel / XLSX / XLS
   if (name.match(/\.(xlsx?|ods)$/)) {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     let text = '';
-    workbook.SheetNames.forEach(sheetName => {
+    workbook.SheetNames.forEach((sheetName) => {
       const sheet = workbook.Sheets[sheetName];
       text += `Sheet: ${sheetName}\n`;
       text += XLSX.utils.sheet_to_csv(sheet) + '\n\n';
@@ -123,7 +146,6 @@ async function extractFileContent(file: File): Promise<PreparedForLlm> {
     };
   }
 
-  // CSV / TXT
   if (name.match(/\.(csv|tsv|txt)$/)) {
     const text = buffer.toString('utf-8');
     return {
@@ -132,7 +154,6 @@ async function extractFileContent(file: File): Promise<PreparedForLlm> {
     };
   }
 
-  // DOCX
   if (name.endsWith('.docx')) {
     let text = '';
     try {
@@ -151,14 +172,110 @@ async function extractFileContent(file: File): Promise<PreparedForLlm> {
   throw new Error(`Unsupported file type: ${name}`);
 }
 
+function llmBillingResponse(message: string) {
+  const billing = /LLM_BILLING|credit balance|insufficient.?quota|purchase credits/i.test(message);
+  return NextResponse.json(
+    {
+      error: billing
+        ? 'La importación con IA no está disponible (sin créditos). Use el formato ATLAS (planilla) — no requiere IA.'
+        : message || 'Error processing file with AI',
+      code: billing ? 'LLM_CREDITS' : 'AI_ERROR',
+      hint: 'template',
+    },
+    { status: billing ? 402 : 502 },
+  );
+}
+
+async function assertAiImportAllowed(companyId: string | null) {
+  if (!companyId) return { ok: true as const };
+  const ent = await getCompanyEntitlements(companyId);
+  if (!ent.billingEnforced) return { ok: true as const };
+  if (companyHasAddon(ent, ATLAS_SMART_IMPORT_SKU)) return { ok: true as const };
+  return {
+    ok: false as const,
+    response: NextResponse.json(
+      {
+        error:
+          'La importación con IA es una función Premium (ATLAS Smart Import). Use el formato ATLAS sin IA, o contrate el add-on en Facturación.',
+        code: 'ADDON_REQUIRED',
+        sku: ATLAS_SMART_IMPORT_SKU,
+        hint: 'template',
+      },
+      { status: 402 },
+    ),
+  };
+}
+
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    const tenant = await getUserCompanyIds();
+    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
     const formData = await req.formData();
-    const file = formData.get('file') as File;
+    const file = formData.get('file') as File | null;
     if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+
+    const modeRaw = String(formData.get('mode') || '').toLowerCase();
+    const companyIdRaw = String(formData.get('companyId') || '').trim();
+    const companyId = tenant.companyIds.includes(companyIdRaw) ? companyIdRaw : tenant.companyIds[0] ?? null;
+
+    const runTemplate = async () => {
+      if (!isSpreadsheetImportFile(file.name)) {
+        return NextResponse.json(
+          {
+            error:
+              'El formato ATLAS acepta Excel o CSV. Para PDF, fotos o extractos bancarios use la importación con IA (Premium).',
+            code: 'UNSUPPORTED',
+            hint: 'ai',
+          },
+          { status: 400 },
+        );
+      }
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const parsed = parseAtlasTransactionWorkbook(buffer);
+      if (!parsed.ok) {
+        return NextResponse.json(
+          {
+            error: parsed.error,
+            code: parsed.code,
+            missing: parsed.missing,
+            hint: parsed.code === 'NOT_ATLAS_TEMPLATE' ? 'template' : undefined,
+          },
+          { status: 400 },
+        );
+      }
+      return NextResponse.json({
+        mode: 'template',
+        transactions: parsed.transactions,
+        summary: parsed.summary,
+        warnings: parsed.warnings,
+        mappedColumns: parsed.mappedColumns,
+        fileName: file.name,
+      });
+    };
+
+    if (modeRaw === 'template') {
+      return runTemplate();
+    }
+
+    if (!modeRaw && isSpreadsheetImportFile(file.name)) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const parsed = parseAtlasTransactionWorkbook(buffer);
+      if (parsed.ok) {
+        return NextResponse.json({
+          mode: 'template',
+          transactions: parsed.transactions,
+          summary: parsed.summary,
+          warnings: parsed.warnings,
+          mappedColumns: parsed.mappedColumns,
+          fileName: file.name,
+        });
+      }
+      // Planilla que no es el formato ATLAS: cae a IA (compatibilidad).
+    }
+
+    const gate = await assertAiImportAllowed(companyId);
+    if (!gate.ok) return gate.response;
 
     const prepared = await extractFileContent(file);
 
@@ -171,7 +288,7 @@ export async function POST(req: Request) {
           prepared.userText,
           prepared.imageBase64,
           imageMimeFromFilename(file.name),
-          { maxOutputTokens: importMaxOut }
+          { maxOutputTokens: importMaxOut },
         );
       } else if (prepared.mode === 'pdf') {
         try {
@@ -189,10 +306,7 @@ export async function POST(req: Request) {
       }
     } catch (e: any) {
       console.error('AI import error:', e);
-      return NextResponse.json(
-        { error: e?.message || 'Error processing file with AI' },
-        { status: 502 }
-      );
+      return llmBillingResponse(e?.message || '');
     }
 
     let parsed: unknown;
@@ -205,21 +319,13 @@ export async function POST(req: Request) {
     }
 
     const p = parsed as { transactions?: any[]; summary?: string };
-
-    // Validate & clean transactions
-    const txs = (p.transactions || []).map((t: any) => ({
-      title: t.title || '',
-      description: t.description || null,
-      type: ['INCOME', 'EXPENSE', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(t.type) ? t.type : 'EXPENSE',
-      amount: Math.abs(parseFloat(t.amount) || 0),
-      currency: t.currency || 'USD',
-      category: t.category || '',
-      date: t.date || new Date().toISOString().slice(0, 10),
-    })).filter((t: any) => t.amount > 0);
+    const txs = (p.transactions || []).map((t: any) => sanitizeTx(t)).filter(Boolean) as AtlasImportTransaction[];
 
     return NextResponse.json({
+      mode: 'ai',
       transactions: txs,
       summary: p.summary || `${txs.length} transaction(s) found`,
+      warnings: [],
       fileName: file.name,
     });
   } catch (error: any) {

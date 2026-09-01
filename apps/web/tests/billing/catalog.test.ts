@@ -17,6 +17,7 @@ test('catalog covers plans, systems, add-ons, licenses and commissions', () => {
   assert.ok(getSku('sys.ATLAS'));
   assert.ok(getSku('plan.institucional'));
   assert.ok(getSku('addon.siep.smart_import'));
+  assert.ok(getSku('addon.atlas.smart_import'));
   assert.ok(getSku('commission.fundhub.success_fee'));
 });
 
@@ -49,6 +50,8 @@ test('commission bps on captured funds', () => {
 test('addons declare parent system', () => {
   const smart = getSku('addon.siep.smart_import')!;
   assert.deepEqual(smart.requiresSystems, ['SIEP']);
+  const atlasSmart = getSku('addon.atlas.smart_import')!;
+  assert.deepEqual(atlasSmart.requiresSystems, ['ATLAS']);
   const fee = getSku('commission.fundhub.success_fee')!;
   assert.deepEqual(fee.requiresSystems, ['FUNDHUB']);
   assert.equal(fee.commissionBps, 250);

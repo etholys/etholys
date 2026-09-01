@@ -9,8 +9,9 @@ import {
   ArrowUpRight, ArrowDownRight, RefreshCw, PieChart, BarChart3,
   Building2, FolderKanban, Tag, Download, X, Search,
   Pencil, CheckSquare, Square, CalendarClock, Repeat, Eye, EyeOff,
-  Clock, CheckCircle2, PlusCircle, Upload, FileText, Loader2, Wallet
+  Clock, CheckCircle2, PlusCircle, Upload, FileText, Loader2, Wallet, FileSpreadsheet
 } from 'lucide-react';
+import { FinanceImportModal } from '@/components/finance/FinanceImportModal';
 
 const BudgetPlanning = dynamic(() => import('@/components/finance/BudgetPlanning'), { ssr: false, loading: () => <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div> });
 
@@ -86,10 +87,6 @@ export default function FinancePage() {
 
   // Import modal state
   const [showImport, setShowImport] = useState(false);
-  const [importLoading, setImportLoading] = useState(false);
-  const [importPreview, setImportPreview] = useState<any[] | null>(null);
-  const [importSummary, setImportSummary] = useState('');
-  const [importFileName, setImportFileName] = useState('');
 
   // Dynamic categories
   const [customCategories, setCustomCategories] = useState<any[]>([]);
@@ -363,75 +360,6 @@ export default function FinancePage() {
     fetchData();
   };
 
-  // Import handlers
-  const handleImportFile = async (file: File) => {
-    setImportLoading(true);
-    setImportPreview(null);
-    setImportSummary('');
-    setImportFileName(file.name);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch('/api/transactions/import', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Import failed');
-      setImportPreview(data.transactions || []);
-      setImportSummary(data.summary || '');
-    } catch (err: any) {
-      alert(err.message || 'Error importing file');
-    }
-    setImportLoading(false);
-  };
-
-  const confirmImport = async () => {
-    if (!importPreview || importPreview.length === 0) return;
-    const compId = activeCompanyId || companies[0]?.id;
-    if (!compId) { alert('No hay empresa seleccionada. Selecciona una empresa primero.'); return; }
-    setImportLoading(true);
-    try {
-      const items = importPreview.map(t => ({
-        companyId: compId,
-        type: t.type,
-        amount: t.amount,
-        currency: t.currency,
-        title: t.title,
-        description: t.description,
-        category: t.category,
-        date: t.date ? new Date(t.date).toISOString() : new Date().toISOString(),
-        registerAsExecuted: true,
-      }));
-      const res = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al importar');
-      const count = data.created?.length ?? data.transaction ? 1 : items.length;
-      setShowImport(false);
-      setImportPreview(null);
-      setImportSummary('');
-      setImportFileName('');
-      fetchData();
-    } catch (err: any) {
-      alert(err.message || 'Error al importar transacciones');
-    } finally {
-      setImportLoading(false);
-    }
-  };
-
-  const removeImportRow = (idx: number) => {
-    if (!importPreview) return;
-    setImportPreview(importPreview.filter((_, i) => i !== idx));
-  };
-
-  const updateImportRow = (idx: number, field: string, value: any) => {
-    if (!importPreview) return;
-    const copy = [...importPreview];
-    copy[idx] = { ...copy[idx], [field]: value };
-    setImportPreview(copy);
-  };
-
   const handleDelete = async (id: string) => {
     if (!confirm(L(ml('Delete this transaction?','¿Eliminar esta transacción?','Excluir esta transação?')))) return;
     await fetch(`/api/transactions?id=${id}`, { method: 'DELETE' });
@@ -614,7 +542,14 @@ export default function FinancePage() {
           </div>
           {/* Actions */}
           <div className="flex items-center gap-2">
-            <button onClick={() => { setShowImport(true); setImportPreview(null); setImportSummary(''); setImportFileName(''); }} className="flex items-center gap-1.5 px-3 py-2 text-sm bg-white border rounded-lg hover:bg-gray-50 transition text-gray-600">
+            <a
+              href={`/api/transactions/import/template?format=xlsx&locale=${encodeURIComponent(locale)}`}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-white border rounded-lg hover:bg-gray-50 transition text-gray-600"
+              title={L(ml('Download ATLAS import template','Descargar modelo ATLAS','Baixar modelo ATLAS'))}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />{L(ml('Template','Modelo','Modelo'))}
+            </a>
+            <button onClick={() => setShowImport(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm bg-white border rounded-lg hover:bg-gray-50 transition text-gray-600">
               <Upload className="w-3.5 h-3.5" />{L(ml('Import','Importar','Importar'))}
             </button>
             <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-2 text-sm bg-white border rounded-lg hover:bg-gray-50 transition text-gray-600">
@@ -1351,99 +1286,14 @@ export default function FinancePage() {
         </div>
       )}
 
-      {/* IMPORT MODAL */}
       {showImport && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div onClick={e => e.stopPropagation()} className="bg-white rounded-xl w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Upload className="w-5 h-5 text-teal-600" />{L(ml('Import Transactions','Importar Transacciones','Importar Transações'))}
-              </h3>
-              <button type="button" onClick={() => setShowImport(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              {!importPreview && !importLoading && (
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600">
-                    {L(ml(
-                      'Upload a file and AI will automatically read and extract transactions. Supports: PDF, Excel, CSV, images of receipts/invoices.',
-                      'Sube un archivo y la IA leerá e interpretará automáticamente las transacciones. Soporta: PDF, Excel, CSV, imágenes de comprobantes/facturas.',
-                      'Envie um arquivo e a IA lerá e interpretará automaticamente as transações. Suporta: PDF, Excel, CSV, imagens de comprovantes/faturas.'
-                    ))}
-                  </p>
-                  <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-teal-400 hover:bg-teal-50/50 transition">
-                    <FileText className="w-10 h-10 text-gray-300 mb-2" />
-                    <span className="text-sm text-gray-500 font-medium">{L(ml('Click to select file','Clic para seleccionar archivo','Clique para selecionar arquivo'))}</span>
-                    <span className="text-xs text-gray-400 mt-1">PDF, XLSX, XLS, CSV, JPG, PNG, DOCX</span>
-                    <input type="file" className="hidden" accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.webp,.docx,.txt" onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); }} />
-                  </label>
-                </div>
-              )}
-              {importLoading && (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Loader2 className="w-10 h-10 text-teal-600 animate-spin mb-3" />
-                  <p className="text-sm text-gray-600 font-medium">{L(ml('AI is reading the file...','La IA está leyendo el archivo...','A IA está lendo o arquivo...'))}</p>
-                  <p className="text-xs text-gray-400 mt-1">{importFileName}</p>
-                </div>
-              )}
-              {importPreview && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-700">
-                      <span className="font-semibold text-teal-700">{importPreview.length}</span> {L(ml('transactions found','transacciones encontradas','transações encontradas'))}
-                      {importSummary && <span className="text-gray-400 ml-2">— {importSummary}</span>}
-                    </p>
-                    <button onClick={() => { setImportPreview(null); setImportSummary(''); }} className="text-xs text-gray-500 hover:text-gray-700">{L(ml('Upload different file','Subir otro archivo','Enviar outro arquivo'))}</button>
-                  </div>
-                  <div className="border rounded-lg overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-2 py-2 text-left font-medium text-gray-500">{L(ml('Title','Título','Título'))}</th>
-                          <th className="px-2 py-2 text-left font-medium text-gray-500">Tipo</th>
-                          <th className="px-2 py-2 text-right font-medium text-gray-500">{L(ml('Amount','Monto','Valor'))}</th>
-                          <th className="px-2 py-2 text-left font-medium text-gray-500">{L(ml('Currency','Moneda','Moeda'))}</th>
-                          <th className="px-2 py-2 text-left font-medium text-gray-500">{L(ml('Category','Categoría','Categoria'))}</th>
-                          <th className="px-2 py-2 text-left font-medium text-gray-500">{L(ml('Date','Fecha','Data'))}</th>
-                          <th className="px-2 py-2 w-8" />
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {importPreview.map((t, i) => (
-                          <tr key={i} className="hover:bg-gray-50">
-                            <td className="px-2 py-1.5"><input value={t.title} onChange={e => updateImportRow(i, 'title', e.target.value)} className="w-full px-1 py-0.5 border rounded text-xs" /></td>
-                            <td className="px-2 py-1.5">
-                              <select value={t.type} onChange={e => updateImportRow(i, 'type', e.target.value)} className="px-1 py-0.5 border rounded text-xs">
-                                {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{L(v.labels)}</option>)}
-                              </select>
-                            </td>
-                            <td className="px-2 py-1.5"><input type="number" step="0.01" value={t.amount} onChange={e => updateImportRow(i, 'amount', parseFloat(e.target.value) || 0)} className="w-20 px-1 py-0.5 border rounded text-xs text-right" /></td>
-                            <td className="px-2 py-1.5">
-                              <select value={t.currency} onChange={e => updateImportRow(i, 'currency', e.target.value)} className="px-1 py-0.5 border rounded text-xs">
-                                <option value="USD">USD</option><option value="UYU">UYU</option><option value="BRL">BRL</option><option value="EUR">EUR</option><option value="ARS">ARS</option>
-                              </select>
-                            </td>
-                            <td className="px-2 py-1.5"><input value={t.category} onChange={e => updateImportRow(i, 'category', e.target.value)} className="w-24 px-1 py-0.5 border rounded text-xs" /></td>
-                            <td className="px-2 py-1.5"><input type="date" value={t.date} onChange={e => updateImportRow(i, 'date', e.target.value)} className="px-1 py-0.5 border rounded text-xs" /></td>
-                            <td className="px-2 py-1.5">
-                              <button onClick={() => removeImportRow(i)} className="p-0.5 text-gray-300 hover:text-red-500"><X className="w-3 h-3" /></button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-2">
-                    <button type="button" onClick={() => setShowImport(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">{L(ml('Cancel','Cancelar','Cancelar'))}</button>
-                    <button type="button" onClick={confirmImport} disabled={importPreview.length === 0 || importLoading} className="px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5" />{L(ml('Confirm & Import','Confirmar e Importar','Confirmar e Importar'))} ({importPreview.length})
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <FinanceImportModal
+          locale={locale}
+          activeCompanyId={activeCompanyId}
+          companies={companies}
+          onClose={() => setShowImport(false)}
+          onImported={fetchData}
+        />
       )}
 
       {/* PAYMENT MODAL */}
