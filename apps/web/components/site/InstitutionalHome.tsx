@@ -16,9 +16,9 @@ const SYSTEMS: Array<{
     name: 'ATLAS',
     accent: '#0D9488',
     tagline: {
-      es: 'ERP 360° — finanzas, RRHH, inventario y operaciones',
-      pt: 'ERP 360° — finanças, RH, inventário e operações',
-      en: 'ERP 360° — finance, HR, inventory and operations',
+      es: 'La casa: finanzas, personas, compras, stock y operación diaria.',
+      pt: 'A casa: finanças, pessoas, compras, stock e operação do dia a dia.',
+      en: 'The home base: finance, people, purchasing, stock and daily operations.',
     },
   },
   {
@@ -26,9 +26,9 @@ const SYSTEMS: Array<{
     name: 'SIEP',
     accent: '#4F46E5',
     tagline: {
-      es: 'Ejecución e innovación de proyectos',
-      pt: 'Execução e inovação de projetos',
-      en: 'Project execution and innovation',
+      es: 'Los programas: portafolio, ejecución, evidencias y relación con quien financia.',
+      pt: 'Os programas: portefólio, execução, evidências e relação com quem financia.',
+      en: 'Programs: portfolio, execution, evidence and funder relations.',
     },
   },
   {
@@ -36,9 +36,9 @@ const SYSTEMS: Array<{
     name: 'FUNDHUB',
     accent: '#D97706',
     tagline: {
-      es: 'Captación inteligente de recursos',
-      pt: 'Captação inteligente de recursos',
-      en: 'Intelligent fundraising',
+      es: 'Los fondos: encontrar convocatorias, redactar, postular y gestionar lo que ya se administra.',
+      pt: 'Os fundos: encontrar concursos, redigir, candidatar e gerir o que já se administra.',
+      en: 'Funds: find calls, draft, apply and manage what you already administer.',
     },
   },
   {
@@ -46,9 +46,9 @@ const SYSTEMS: Array<{
     name: 'NEXUS',
     accent: '#2563EB',
     tagline: {
-      es: 'Desarrollo MIPYME con IA',
-      pt: 'Desenvolvimento MIPYME com IA',
-      en: 'MSME development with AI',
+      es: 'Las empresas que atiende: diagnóstico, ruta y asistencia técnica a escala.',
+      pt: 'As empresas que atende: diagnóstico, rota e assistência técnica à escala.',
+      en: 'The businesses you serve: diagnosis, pathway and technical assistance at scale.',
     },
   },
   {
@@ -56,9 +56,9 @@ const SYSTEMS: Array<{
     name: 'FORGE',
     accent: '#7C3AED',
     tagline: {
-      es: 'Aprendizaje, juegos y conexiones',
-      pt: 'Aprendizagem, jogos e conexões',
-      en: 'Learning, games and connections',
+      es: 'La formación: cursos, actividades, juegos y el rastro de quien aprende.',
+      pt: 'A formação: cursos, actividades, jogos e o rasto de quem aprende.',
+      en: 'Learning: courses, activities, games and the trail of who learns.',
     },
   },
   {
@@ -66,44 +66,9 @@ const SYSTEMS: Array<{
     name: 'PRISM',
     accent: '#E11D48',
     tagline: {
-      es: 'Inteligencia ejecutiva y BI',
-      pt: 'Inteligência executiva e BI',
-      en: 'Executive intelligence and BI',
-    },
-  },
-];
-
-const TOOLS: Array<{ name: string; blurb: Record<Locale, string> }> = [
-  {
-    name: 'Advisor',
-    blurb: {
-      es: 'Alertas y prioridades transversales',
-      pt: 'Alertas e prioridades transversais',
-      en: 'Cross-system alerts and priorities',
-    },
-  },
-  {
-    name: 'Studio',
-    blurb: {
-      es: 'Documentos con IA',
-      pt: 'Documentos com IA',
-      en: 'AI-assisted documents',
-    },
-  },
-  {
-    name: 'Meet',
-    blurb: {
-      es: 'Reuniones y videollamadas',
-      pt: 'Reuniões e videochamadas',
-      en: 'Meetings and video calls',
-    },
-  },
-  {
-    name: 'CARTA',
-    blurb: {
-      es: 'Gobernanza y aprobaciones',
-      pt: 'Governança e aprovações',
-      en: 'Governance and approvals',
+      es: 'La mirada de quien decide, cuando hay datos que mirar.',
+      pt: 'O olhar de quem decide, quando há dados para olhar.',
+      en: 'The decision-maker’s view, when there is data worth seeing.',
     },
   },
 ];
@@ -112,70 +77,163 @@ function copy(locale: Locale) {
   const es = locale === 'es';
   const pt = locale === 'pt';
   return {
-    navEcosystem: es ? 'Ecosistema' : pt ? 'Ecossistema' : 'Ecosystem',
+    navAbout: es ? 'Quiénes somos' : pt ? 'Quem somos' : 'About',
+    navServices: es ? 'Servicios' : pt ? 'Serviços' : 'Services',
     navSystems: es ? 'Sistemas' : pt ? 'Sistemas' : 'Systems',
-    navTools: 'Tools',
-    navHow: es ? 'Cómo funciona' : pt ? 'Como funciona' : 'How it works',
     enter: es ? 'Entrar' : pt ? 'Entrar' : 'Sign in',
     demo: es ? 'Solicitar demostración' : pt ? 'Solicitar demonstração' : 'Request a demo',
+
     headline: es
-      ? 'Un ecosistema para gestionar, financiar, ejecutar, aprender y decidir mejor.'
+      ? 'El trabajo que ya hacen. Convertido en algo que pueden licenciar y repetir.'
       : pt
-        ? 'Um ecossistema para gerir, financiar, executar, aprender e decidir melhor.'
-        : 'An ecosystem to manage, fund, execute, learn and decide better.',
+        ? 'O trabalho que já fazem. Convertido em algo que podem licenciar e repetir.'
+        : 'The work you already do. Turned into something you can license and do again.',
     support: es
-      ? 'Seis sistemas independientes, herramientas transversales y una sola capa de acceso. Active solo lo que su organización necesita.'
+      ? 'No vendemos otra herramienta de gestión. Diseñamos, construimos y licenciamos la solución del trabajo que su institución vuelve a hacer — en pantalla, en el campo, o en las dos.'
       : pt
-        ? 'Seis sistemas independentes, ferramentas transversais e uma única camada de acesso. Ative apenas o que a sua organização precisa.'
-        : 'Six independent systems, cross-cutting tools, and one access layer. Activate only what your organization needs.',
-    ctaPrimary: es ? 'Conocer el ecosistema' : pt ? 'Conhecer o ecossistema' : 'Explore the ecosystem',
-    ctaSecondary: es ? 'Ver los 6 sistemas' : pt ? 'Ver os 6 sistemas' : 'See the 6 systems',
-    systemsKicker: es ? 'Productos licenciables' : pt ? 'Produtos licenciáveis' : 'Licensable products',
-    systemsTitle: es
-      ? 'Productos distintos. Una experiencia coherente.'
+        ? 'Não vendemos mais uma ferramenta de gestão. Desenhamos, construímos e licenciamos a solução do trabalho que a vossa instituição volta a fazer — no ecrã, no campo, ou nos dois.'
+        : 'We don’t sell another management tool. We design, build and license the solution to the work your institution keeps doing — on screen, in the field, or both.',
+
+    aboutKicker: es ? 'Quiénes somos' : pt ? 'Quem somos' : 'About',
+    aboutTitle: es ? 'Fábrica de Soluciones' : pt ? 'Fábrica de Soluções' : 'Solutions Factory',
+    aboutBody: es
+      ? 'Etholys cobra a la institución que firma. Diseña, construye y licencia lo que esa institución necesita para ejecutar — y para no volver a inventarlo: la casa, los programas, los fondos, las empresas que atiende, la formación. Cuando el problema está en el campo, la solución incluye el método y el equipo, no solo la pantalla.'
       : pt
-        ? 'Produtos distintos. Uma experiência coerente.'
-        : 'Distinct products. One coherent experience.',
-    systemsLead: es
-      ? 'Cada sistema se vende y funciona por separado. Cuando combina varios, los datos se cruzan sin duplicar información.'
-      : pt
-        ? 'Cada sistema vende-se e funciona em separado. Quando combina vários, os dados cruzam-se sem duplicar informação.'
-        : 'Each system sells and runs on its own. Combine several and data connects without duplication.',
-    howKicker: es ? 'Modelo' : pt ? 'Modelo' : 'Model',
-    howTitle: es
-      ? 'Modular por diseño. Integrado por naturaleza.'
-      : pt
-        ? 'Modular por design. Integrado por natureza.'
-        : 'Modular by design. Integrated by nature.',
-    howSteps: es
+        ? 'A Etholys cobra à instituição que assina. Desenha, constrói e licencia o que essa instituição precisa para executar — e para não voltar a inventar: a casa, os programas, os fundos, as empresas que atende, a formação. Quando o problema está no campo, a solução inclui o método e a equipa, não só o ecrã.'
+        : 'Etholys bills the institution that signs. We design, build and license what that institution needs to execute — and to stop reinventing: the home base, programs, funds, the businesses it serves, learning. When the problem is in the field, the solution includes method and team, not just the screen.',
+
+    values: es
       ? [
-          ['Elija', 'Contrate solo los sistemas que necesita hoy.'],
-          ['Active', 'Un solo acceso (SSO) a todo el ecosistema contratado.'],
-          ['Conecte', 'Puentes contextuales entre finanzas, proyectos, fondos y BI.'],
+          {
+            title: 'La forma sigue el problema',
+            body: 'Software, equipo, método, o los tres. Un solo diseño, no tres proveedores.',
+          },
+          {
+            title: 'Una firma, toda la red',
+            body: 'Subproyectos, MIPYMEs y alumnos usan lo contratado. No compran Etholys.',
+          },
+          {
+            title: 'Pieza, no peaje',
+            body: 'Cada producto funciona solo. El segundo se gana; no se cobra como impuesto del primero.',
+          },
         ]
       : pt
         ? [
-            ['Escolha', 'Contrate apenas os sistemas de que precisa hoje.'],
-            ['Ative', 'Um único acesso (SSO) a todo o ecossistema contratado.'],
-            ['Ligue', 'Pontes contextuais entre finanças, projetos, fundos e BI.'],
+            {
+              title: 'A forma segue o problema',
+              body: 'Software, equipa, método, ou os três. Um só desenho, não três fornecedores.',
+            },
+            {
+              title: 'Uma firma, toda a rede',
+              body: 'Subprojetos, MIPYMEs e alunos usam o contratado. Não compram Etholys.',
+            },
+            {
+              title: 'Peça, não portagem',
+              body: 'Cada produto funciona sozinho. O segundo conquista-se; não se cobra como imposto do primeiro.',
+            },
           ]
         : [
-            ['Choose', 'License only the systems you need today.'],
-            ['Activate', 'One SSO into your contracted ecosystem.'],
-            ['Connect', 'Contextual bridges across finance, projects, funds and BI.'],
+            {
+              title: 'Form follows the problem',
+              body: 'Software, team, method, or all three. One design, not three vendors.',
+            },
+            {
+              title: 'One contract, the whole network',
+              body: 'Sub-projects, MSMEs and learners use what you license. They don’t buy Etholys.',
+            },
+            {
+              title: 'A piece, not a toll',
+              body: 'Each product works on its own. The second earns its place — not as a tax on the first.',
+            },
           ],
-    toolsKicker: 'Etholys Tools',
-    toolsTitle: es
-      ? 'Herramientas transversales en todos los sistemas'
+
+    servicesKicker: es ? 'Qué ofrecemos' : pt ? 'O que oferecemos' : 'What we offer',
+    servicesTitle: es
+      ? 'Soluciones a medida y sistemas propios'
       : pt
-        ? 'Ferramentas transversais em todos os sistemas'
-        : 'Cross-cutting tools across every system',
-    coreTitle: 'ETHOLYS Core',
-    coreBody: es
-      ? 'SSO, documentos, notificaciones, permisos, i18n y chat — la base común incluida en cada contratación.'
+        ? 'Soluções à medida e sistemas próprios'
+        : 'Tailored solutions and proprietary systems',
+    servicesLead: es
+      ? 'Contrata la solución del trabajo, en la forma que el trabajo exige, y vuelve a usarla.'
       : pt
-        ? 'SSO, documentos, notificações, permissões, i18n e chat — a base comum incluída em cada contratação.'
-        : 'SSO, documents, notifications, permissions, i18n and chat — the shared base in every license.',
+        ? 'Contrate a solução do trabalho, na forma que o trabalho exige, e volte a usá-la.'
+        : 'License the solution to the work, in the form the work demands, and use it again.',
+
+    serviceCards: es
+      ? [
+          {
+            title: 'Sistemas propios',
+            body: 'Seis productos independientes — ATLAS, SIEP, FUNDHUB, NEXUS, FORGE y PRISM — más herramientas transversales (Advisor, Studio, Meet, Work, CARTA). Contrate solo lo que necesita hoy.',
+            cta: 'Ver sistemas',
+            href: '#sistemas',
+          },
+          {
+            title: 'Soluciones personalizadas',
+            body: 'Cuando el problema está en el campo — un proceso, un equipo, una forma de producir — diseñamos la solución completa: método, dispositivo y software que deja evidencia.',
+            cta: 'Hablemos',
+            href: '#contacto',
+          },
+          {
+            title: 'Dónde corre',
+            body: 'En nuestros servidores o en los suyos. La propiedad intelectual queda en la fábrica; la institución se lleva el derecho a usar.',
+            cta: 'Solicitar demostración',
+            href: 'mailto:hola@etholys.com?subject=Demostraci%C3%B3n%20Etholys',
+          },
+        ]
+      : pt
+        ? [
+            {
+              title: 'Sistemas próprios',
+              body: 'Seis produtos independentes — ATLAS, SIEP, FUNDHUB, NEXUS, FORGE e PRISM — mais ferramentas transversais (Advisor, Studio, Meet, Work, CARTA). Contrate apenas o que precisa hoje.',
+              cta: 'Ver sistemas',
+              href: '#sistemas',
+            },
+            {
+              title: 'Soluções personalizadas',
+              body: 'Quando o problema está no campo — um processo, um equipamento, uma forma de produzir — desenhamos a solução completa: método, dispositivo e software que deixa evidência.',
+              cta: 'Fale connosco',
+              href: '#contacto',
+            },
+            {
+              title: 'Onde corre',
+              body: 'Nos nossos servidores ou nos seus. A propriedade intelectual fica na fábrica; a instituição leva o direito de usar.',
+              cta: 'Solicitar demonstração',
+              href: 'mailto:hola@etholys.com?subject=Demonstra%C3%A7%C3%A3o%20Etholys',
+            },
+          ]
+        : [
+            {
+              title: 'Proprietary systems',
+              body: 'Six independent products — ATLAS, SIEP, FUNDHUB, NEXUS, FORGE and PRISM — plus cross-cutting tools (Advisor, Studio, Meet, Work, CARTA). License only what you need today.',
+              cta: 'See systems',
+              href: '#sistemas',
+            },
+            {
+              title: 'Tailored solutions',
+              body: 'When the problem is in the field — a process, equipment, a way of producing — we design the full solution: method, device and software that leaves evidence.',
+              cta: 'Let’s talk',
+              href: '#contacto',
+            },
+            {
+              title: 'Where it runs',
+              body: 'On our servers or yours. Intellectual property stays with the factory; the institution gets the right to use.',
+              cta: 'Request a demo',
+              href: 'mailto:hola@etholys.com?subject=Etholys%20demo',
+            },
+          ],
+
+    systemsKicker: es ? 'Sistemas' : pt ? 'Sistemas' : 'Systems',
+    systemsTitle: es
+      ? 'Seis productos. Cada uno con su trabajo.'
+      : pt
+        ? 'Seis produtos. Cada um com o seu trabalho.'
+        : 'Six products. Each with its own job.',
+    systemsLead: es
+      ? 'Funcionan por separado. Cuando los combina, los datos se cruzan sin duplicar información.'
+      : pt
+        ? 'Funcionam em separado. Quando os combina, os dados cruzam-se sem duplicar informação.'
+        : 'They work on their own. Combine them and data connects without duplication.',
+
     contactKicker: es ? 'Siguiente paso' : pt ? 'Próximo passo' : 'Next step',
     contactTitle: es
       ? 'Hablemos de su organización.'
@@ -220,17 +278,17 @@ export default function InstitutionalHome() {
             ETHOLYS
           </a>
           <nav className="hidden items-center gap-7 text-sm text-white/70 md:flex" aria-label="Primary">
-            <a href="#ecosistema" className="transition hover:text-white">
-              {t.navEcosystem}
+            <a href="#sobre" className="transition hover:text-white">
+              {t.navAbout}
+            </a>
+            <a href="#servicios" className="transition hover:text-white">
+              {t.navServices}
             </a>
             <a href="#sistemas" className="transition hover:text-white">
               {t.navSystems}
             </a>
-            <a href="#tools" className="transition hover:text-white">
-              {t.navTools}
-            </a>
-            <a href="#modelo" className="transition hover:text-white">
-              {t.navHow}
+            <a href="#contacto" className="transition hover:text-white">
+              {t.demo}
             </a>
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -258,192 +316,125 @@ export default function InstitutionalHome() {
         </div>
       </header>
 
-      {/* Hero — full-bleed atmosphere */}
-      <section id="inicio" className="relative isolate min-h-[100svh] overflow-hidden">
+      {/* Hero */}
+      <section id="inicio" className="relative isolate min-h-[92svh] overflow-hidden">
         <div
           aria-hidden
           className="absolute inset-0 bg-[radial-gradient(120%_80%_at_70%_20%,rgba(13,148,136,0.28),transparent_55%),radial-gradient(90%_70%_at_10%_90%,rgba(15,23,42,0.9),transparent_50%),linear-gradient(165deg,#041018_0%,#0B1C24_42%,#07111A_100%)]"
         />
-        <div
-          aria-hidden
-          className="etholys-site-grid absolute inset-0 opacity-[0.18]"
-        />
+        <div aria-hidden className="etholys-site-grid absolute inset-0 opacity-[0.18]" />
         <div
           aria-hidden
           className="etholys-site-orbit absolute -right-[18%] top-[8%] h-[70vmin] w-[70vmin] rounded-full border border-teal-400/20"
         />
-        <div
-          aria-hidden
-          className="etholys-site-orbit-slow absolute -right-[8%] top-[22%] h-[48vmin] w-[48vmin] rounded-full border border-teal-300/10"
-        />
-        <svg
-          aria-hidden
-          className="pointer-events-none absolute inset-y-0 right-0 hidden w-[55%] opacity-40 lg:block"
-          viewBox="0 0 800 900"
-          fill="none"
-        >
-          <g stroke="rgba(94,234,212,0.35)" strokeWidth="1.2">
-            <rect x="120" y="180" width="220" height="140" rx="18" />
-            <rect x="390" y="160" width="220" height="140" rx="18" />
-            <rect x="250" y="380" width="220" height="140" rx="18" />
-            <rect x="120" y="600" width="220" height="140" rx="18" />
-            <rect x="390" y="580" width="220" height="140" rx="18" />
-            <path d="M230 320v60M500 300v80M360 520v60M230 740v0" strokeOpacity="0.5" />
-            <path d="M340 250h50M280 450h70M340 670h50" strokeOpacity="0.45" />
-          </g>
-          <g fill="rgba(45,212,191,0.12)">
-            <rect x="120" y="180" width="220" height="140" rx="18" />
-            <rect x="390" y="160" width="220" height="140" rx="18" />
-            <rect x="250" y="380" width="220" height="140" rx="18" />
-          </g>
-        </svg>
 
         <div
           id="contenido"
-          className="relative mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-end px-5 pb-16 pt-28 sm:px-8 sm:pb-24 lg:justify-center lg:pb-20"
+          className="relative mx-auto flex min-h-[92svh] max-w-6xl flex-col justify-end px-5 pb-16 pt-28 sm:px-8 sm:pb-24 lg:justify-center lg:pb-20"
         >
-          <div className="etholys-site-rise max-w-2xl">
-            <p className="font-[family-name:var(--font-etholys-display)] text-5xl font-bold tracking-[0.14em] text-white sm:text-6xl md:text-7xl">
-              ETHOLYS
-            </p>
-            <h1 className="mt-6 max-w-xl font-[family-name:var(--font-etholys-display)] text-3xl font-semibold leading-[1.15] tracking-tight text-white sm:text-4xl md:text-[2.75rem]">
+          <div className="etholys-site-rise max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-400/90">{t.factory}</p>
+            <h1 className="mt-4 font-[family-name:var(--font-etholys-display)] text-3xl font-semibold leading-[1.15] tracking-tight text-white sm:text-4xl md:text-[2.75rem]">
               {t.headline}
             </h1>
-            <p className="mt-5 max-w-lg text-base leading-relaxed text-white/65 sm:text-lg">
-              {t.support}
-            </p>
+            <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/65 sm:text-lg">{t.support}</p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <a
-                href="#ecosistema"
+                href="#sobre"
                 className="inline-flex items-center rounded-md bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-teal-400"
               >
-                {t.ctaPrimary}
+                {t.navAbout}
               </a>
               <a
-                href="#sistemas"
+                href="mailto:hola@etholys.com?subject=Demostraci%C3%B3n%20Etholys"
                 className="inline-flex items-center rounded-md border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-white/10"
               >
-                {t.ctaSecondary}
+                {t.demo}
               </a>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Ecosystem map */}
-      <section id="ecosistema" className="relative border-t border-white/10 bg-[#08131C] py-20 sm:py-28">
+      {/* About + values */}
+      <section id="sobre" className="relative border-t border-white/10 bg-[#08131C] py-20 sm:py-28">
         <div className="mx-auto max-w-6xl px-5 sm:px-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-400/90">
-            {t.navEcosystem}
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-400/90">{t.aboutKicker}</p>
+          <h2 className="mt-3 max-w-2xl font-[family-name:var(--font-etholys-display)] text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            {t.aboutTitle}
+          </h2>
+          <p className="mt-6 max-w-3xl text-base leading-relaxed text-white/65 sm:text-lg">{t.aboutBody}</p>
+
+          <div className="mt-14 grid gap-6 md:grid-cols-3">
+            {t.values.map((value) => (
+              <div key={value.title} className="border border-white/10 bg-[#0C1822] p-6">
+                <h3 className="font-[family-name:var(--font-etholys-display)] text-lg font-semibold text-white">
+                  {value.title}
+                </h3>
+                <p className="mt-3 text-sm leading-relaxed text-white/55">{value.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Services */}
+      <section id="servicios" className="border-t border-white/10 py-20 sm:py-28">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-400/90">{t.servicesKicker}</p>
+          <h2 className="mt-3 max-w-2xl font-[family-name:var(--font-etholys-display)] text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            {t.servicesTitle}
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/60">{t.servicesLead}</p>
+
+          <div className="mt-12 grid gap-6 lg:grid-cols-3">
+            {t.serviceCards.map((card) => (
+              <div key={card.title} className="flex flex-col border border-white/10 bg-[#0C1822] p-6">
+                <h3 className="font-[family-name:var(--font-etholys-display)] text-xl font-semibold text-white">
+                  {card.title}
+                </h3>
+                <p className="mt-3 flex-1 text-sm leading-relaxed text-white/55">{card.body}</p>
+                <a
+                  href={card.href}
+                  className="mt-6 inline-flex text-sm font-semibold text-teal-400 transition hover:text-teal-300"
+                >
+                  {card.cta} →
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Systems — single mention */}
+      <section id="sistemas" className="border-t border-white/10 bg-[#08131C] py-20 sm:py-28">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-400/90">{t.systemsKicker}</p>
           <h2 className="mt-3 max-w-2xl font-[family-name:var(--font-etholys-display)] text-3xl font-semibold tracking-tight text-white sm:text-4xl">
             {t.systemsTitle}
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/60">{t.systemsLead}</p>
 
-          <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-12 grid gap-px overflow-hidden border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
             {SYSTEMS.map((sys) => (
-              <a
-                key={sys.id}
-                href={`#${sys.id}`}
-                className="group block border border-white/10 bg-[#0C1822] p-5 transition hover:border-teal-400/40 hover:bg-[#0F1F2B]"
-              >
+              <div key={sys.id} className="bg-[#07111A] p-6">
                 <div className="flex items-center gap-3">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: sys.accent }} />
-                  <span className="font-[family-name:var(--font-etholys-display)] text-lg font-semibold tracking-wide text-white">
+                  <h3 className="font-[family-name:var(--font-etholys-display)] text-lg font-semibold tracking-wide text-white">
                     {sys.name}
-                  </span>
+                  </h3>
                 </div>
-                <p className="mt-3 text-sm leading-relaxed text-white/55 group-hover:text-white/75">
-                  {sys.tagline[locale]}
-                </p>
-              </a>
-            ))}
-          </div>
-
-          <div className="mt-3 border border-teal-500/30 bg-teal-500/10 px-5 py-4 text-center text-sm font-medium tracking-wide text-teal-100">
-            {t.coreTitle} — {t.coreBody}
-          </div>
-        </div>
-      </section>
-
-      {/* Systems detail */}
-      <section id="sistemas" className="border-t border-white/10 py-20 sm:py-28">
-        <div className="mx-auto max-w-6xl px-5 sm:px-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-400/90">
-            {t.systemsKicker}
-          </p>
-          <h2 className="mt-3 font-[family-name:var(--font-etholys-display)] text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            {t.navSystems}
-          </h2>
-          <div className="mt-12 divide-y divide-white/10 border-y border-white/10">
-            {SYSTEMS.map((sys, index) => (
-              <div
-                key={sys.id}
-                id={sys.id}
-                className="etholys-site-row grid gap-4 py-8 sm:grid-cols-[7rem_1fr] sm:items-baseline"
-                style={{ animationDelay: `${index * 40}ms` }}
-              >
-                <span
-                  className="font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-[0.16em]"
-                  style={{ color: sys.accent }}
-                >
-                  {sys.name}
-                </span>
-                <p className="text-lg text-white/75 sm:text-xl">{sys.tagline[locale]}</p>
+                <p className="mt-3 text-sm leading-relaxed text-white/55">{sys.tagline[locale]}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* How it works */}
-      <section id="modelo" className="border-t border-white/10 bg-[#08131C] py-20 sm:py-28">
-        <div className="mx-auto max-w-6xl px-5 sm:px-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-400/90">{t.howKicker}</p>
-          <h2 className="mt-3 max-w-2xl font-[family-name:var(--font-etholys-display)] text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            {t.howTitle}
-          </h2>
-          <ol className="mt-12 grid gap-8 md:grid-cols-3">
-            {t.howSteps.map(([title, body], i) => (
-              <li key={title} className="relative">
-                <span className="font-[family-name:var(--font-etholys-display)] text-5xl font-bold text-white/10">
-                  0{i + 1}
-                </span>
-                <h3 className="mt-2 text-xl font-semibold text-white">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-white/55">{body}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* Tools */}
-      <section id="tools" className="border-t border-white/10 py-20 sm:py-28">
-        <div className="mx-auto max-w-6xl px-5 sm:px-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-400/90">{t.toolsKicker}</p>
-          <h2 className="mt-3 max-w-2xl font-[family-name:var(--font-etholys-display)] text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            {t.toolsTitle}
-          </h2>
-          <div className="mt-12 grid gap-px overflow-hidden border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
-            {TOOLS.map((tool) => (
-              <div key={tool.name} className="bg-[#07111A] p-6">
-                <h3 className="font-[family-name:var(--font-etholys-display)] text-lg font-semibold text-white">
-                  {tool.name}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-white/55">{tool.blurb[locale]}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Contact CTA */}
+      {/* Contact */}
       <section id="contacto" className="border-t border-white/10 bg-[#041018] py-20 sm:py-28">
         <div className="mx-auto max-w-6xl px-5 sm:px-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-400/90">
-            {t.contactKicker}
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-400/90">{t.contactKicker}</p>
           <h2 className="mt-3 max-w-xl font-[family-name:var(--font-etholys-display)] text-3xl font-semibold tracking-tight text-white sm:text-4xl">
             {t.contactTitle}
           </h2>
