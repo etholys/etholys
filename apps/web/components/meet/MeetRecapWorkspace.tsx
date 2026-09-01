@@ -14,6 +14,8 @@ import {
   Download,
   Video,
   Calendar,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
@@ -88,6 +90,8 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
   const [rows, setRows] = useState<RecapListRow[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [detail, setDetail] = useState<RecapDetail | null>(null);
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [detailLoading, setDetailLoading] = useState(Boolean(sessionId));
@@ -155,6 +159,14 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
     void loadDetail();
   }, [loadDetail]);
 
+  function rowDateKey(row: RecapListRow): string | null {
+    const raw = row.endedAt || row.scheduledAt || row.endsAt;
+    if (!raw) return null;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const scored = rows
@@ -167,6 +179,12 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
         return { row, hasText };
       })
       .filter(({ row }) => {
+        if (dateFrom || dateTo) {
+          const key = rowDateKey(row);
+          if (!key) return false;
+          if (dateFrom && key < dateFrom) return false;
+          if (dateTo && key > dateTo) return false;
+        }
         if (!q) return true;
         const hay = `${row.title} ${row.summaryText || ''} ${row.transcriptText || ''}`.toLowerCase();
         return hay.includes(q);
@@ -178,7 +196,9 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
         return db - da;
       });
     return scored.map((x) => x.row);
-  }, [rows, query]);
+  }, [rows, query, dateFrom, dateTo]);
+
+  const hasActiveFilters = Boolean(query.trim() || dateFrom || dateTo);
 
   const transcriptBody = useMemo(() => {
     if (detail?.transcriptText?.trim()) return detail.transcriptText.trim();
@@ -227,6 +247,39 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
     }
   }
 
+  async function deleteTranscript(clearSummary: boolean) {
+    if (!companyId || !sessionId) return;
+    const msg = clearSummary
+      ? t(
+          'Apagar transcrição e resumo desta reunião? Não é reversível.',
+          '¿Borrar transcripción y resumen de esta reunión? No es reversible.',
+          'Delete transcript and summary for this meeting? This cannot be undone.',
+        )
+      : t(
+          'Apagar só a transcrição desta reunião? Não é reversível.',
+          '¿Borrar solo la transcripción de esta reunión? No es reversible.',
+          'Delete only the transcript for this meeting? This cannot be undone.',
+        );
+    if (!window.confirm(msg)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await fetch(
+        `/api/meet/sessions/${sessionId}/transcript?companyId=${encodeURIComponent(companyId)}&clearSummary=${clearSummary ? '1' : '0'}`,
+        { method: 'DELETE' },
+      );
+      const d = (await r.json()) as { error?: string };
+      if (!r.ok) throw new Error(d.error || 'Error');
+      await loadDetail();
+      await loadList();
+      setTab('transcript');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function downloadTranscript() {
     if (!transcriptBody || !detail) return;
     const blob = new Blob([transcriptBody], { type: 'text/plain;charset=utf-8' });
@@ -264,13 +317,6 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
             <h1 className="truncate text-base font-semibold sm:text-lg">
               {t('Transcrições e resumos', 'Transcripciones y resúmenes', 'Transcripts & summaries')}
             </h1>
-            <p className="hidden text-xs text-slate-500 sm:block">
-              {t(
-                'Todas as reuniões com texto, no estilo Otter / Read.ai',
-                'Todas las reuniones con texto, al estilo Otter / Read.ai',
-                'All meetings with text, Otter / Read.ai style',
-              )}
-            </p>
           </div>
         </div>
       </header>
@@ -291,7 +337,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
       ) : (
         <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col md:flex-row">
           <aside className="w-full shrink-0 border-b border-slate-200 bg-white md:w-[22rem] md:border-b-0 md:border-r">
-            <div className="border-b border-slate-100 p-3">
+            <div className="space-y-2 border-b border-slate-100 p-3">
               <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                 <Search className="h-4 w-4 text-slate-400" />
                 <input
@@ -301,6 +347,40 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                   className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
                 />
               </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block text-[10px] font-medium text-slate-500">
+                  {t('De', 'Desde', 'From')}
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-800"
+                  />
+                </label>
+                <label className="block text-[10px] font-medium text-slate-500">
+                  {t('Até', 'Hasta', 'To')}
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-800"
+                  />
+                </label>
+              </div>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery('');
+                    setDateFrom('');
+                    setDateTo('');
+                  }}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-teal-700 hover:text-teal-900"
+                >
+                  <X className="h-3 w-3" />
+                  {t('Limpar filtros', 'Limpiar filtros', 'Clear filters')}
+                </button>
+              )}
             </div>
             <div className="max-h-[40vh] overflow-y-auto md:max-h-none md:h-[calc(100vh-7.5rem)]">
               {listLoading ? (
@@ -309,7 +389,17 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                 </div>
               ) : filtered.length === 0 ? (
                 <p className="px-4 py-8 text-center text-sm text-slate-500">
-                  {t('Ainda não há reuniões nesta empresa.', 'Aún no hay reuniones en esta empresa.', 'No meetings in this company yet.')}
+                  {hasActiveFilters
+                    ? t(
+                        'Nenhuma reunião com estes filtros.',
+                        'Ninguna reunión con estos filtros.',
+                        'No meetings match these filters.',
+                      )
+                    : t(
+                        'Ainda não há reuniões nesta empresa.',
+                        'Aún no hay reuniones en esta empresa.',
+                        'No meetings in this company yet.',
+                      )}
                 </p>
               ) : (
                 <ul className="divide-y divide-slate-100">
@@ -493,6 +583,19 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                         <Download className="h-3.5 w-3.5" />
                         {t('Descarregar .txt', 'Descargar .txt', 'Download .txt')}
                       </button>
+                      {transcriptBody && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void deleteTranscript(Boolean(detail?.summaryText?.trim()))}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-40"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          {detail?.summaryText?.trim()
+                            ? t('Apagar transcrição e resumo', 'Borrar transcripción y resumen', 'Delete transcript & summary')
+                            : t('Apagar transcrição', 'Borrar transcripción', 'Delete transcript')}
+                        </button>
+                      )}
                     </div>
                     {segments.length > 0 ? (
                       <ol className="space-y-4">

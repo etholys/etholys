@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { getMeetSessionForCompany } from '@/lib/meet/create-session';
+import { getMeetSessionForCompany, isMeetSessionOwner } from '@/lib/meet/create-session';
 import { prisma } from '@/lib/prisma';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -126,6 +126,42 @@ export async function POST(req: Request, ctx: Ctx) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error interno';
     console.error('[meet/transcript]', error);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+/** Apaga transcrição e segmentos (só organizador). Opcionalmente limpa o resumo derivado. */
+export async function DELETE(req: Request, ctx: Ctx) {
+  try {
+    const tenant = await getUserCompanyIds();
+    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+
+    const { id } = await ctx.params;
+    const url = new URL(req.url);
+    const companyId = url.searchParams.get('companyId')?.trim();
+    const clearSummary = url.searchParams.get('clearSummary') === '1';
+    if (!companyId || !tenant.companyIds.includes(companyId)) {
+      return NextResponse.json({ error: 'companyId inválido' }, { status: 400 });
+    }
+
+    const session = await getMeetSessionForCompany(id, companyId);
+    if (!session) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+    if (!isMeetSessionOwner(session, tenant.userId)) {
+      return NextResponse.json({ error: 'Só o organizador pode apagar' }, { status: 403 });
+    }
+
+    await prisma.meetTranscriptSegment.deleteMany({ where: { sessionId: id } });
+    await prisma.meetSession.update({
+      where: { id },
+      data: {
+        transcriptText: null,
+        ...(clearSummary ? { summaryText: null } : {}),
+      },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error interno';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
