@@ -44,10 +44,19 @@ import {
 import { resolveMeetSpeechLanguage, type MeetSpeechLanguage } from '@/lib/meet/language';
 import { uploadAndTranscribeMeetRecording } from '@/lib/meet/finalize-cloud-recording';
 import {
-  closeMeetDocumentPipWindow,
   openMeetDocumentPip,
   supportsDocumentPictureInPicture,
 } from '@/lib/meet/document-pip';
+
+function closePipWindow(pipWindow: Window | null | undefined) {
+  if (pipWindow && !pipWindow.closed) {
+    try {
+      pipWindow.close();
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 type SessionRow = {
   id: string;
@@ -395,7 +404,7 @@ export function MeetRoomClient({ sessionId }: Props) {
       stage.style.position = '';
       stage.style.inset = '';
     }
-    closeMeetDocumentPipWindow(pipWindowRef.current);
+    closePipWindow(pipWindowRef.current);
     pipWindowRef.current = null;
     pipModeRef.current = 'none';
     setPipMode('none');
@@ -465,7 +474,7 @@ export function MeetRoomClient({ sessionId }: Props) {
 
   const exitFloating = useCallback(() => {
     if (pipModeRef.current === 'document') {
-      closeMeetDocumentPipWindow(pipWindowRef.current);
+      closePipWindow(pipWindowRef.current);
       restoreStageFromPip();
       return;
     }
@@ -490,7 +499,7 @@ export function MeetRoomClient({ sessionId }: Props) {
         pipWindowRef.current &&
         !pipWindowRef.current.closed
       ) {
-        closeMeetDocumentPipWindow(pipWindowRef.current);
+        closePipWindow(pipWindowRef.current);
         restoreStageFromPip();
       }
     };
@@ -511,7 +520,7 @@ export function MeetRoomClient({ sessionId }: Props) {
 
   useEffect(() => {
     return () => {
-      closeMeetDocumentPipWindow(pipWindowRef.current);
+      closePipWindow(pipWindowRef.current);
       pipWindowRef.current = null;
     };
   }, []);
