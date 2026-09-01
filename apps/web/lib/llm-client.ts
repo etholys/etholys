@@ -63,6 +63,10 @@ function isAuthLlmError(status: number, body: string): boolean {
   return /authentication_error|invalid.?api.?key|permission/i.test(body);
 }
 
+function isBillingLlmError(body: string): boolean {
+  return /credit balance|insufficient.?quota|billing|purchase credits|payment required/i.test(body);
+}
+
 /** Limite alto para JSON grande (importação SIEP, extratos). */
 export const DEFAULT_LLM_MAX_OUTPUT = 32000;
 
@@ -233,6 +237,7 @@ export async function llmGenerateContent(opts: LlmGenerateOptions): Promise<LlmG
         const err = e instanceof Error ? e : new Error(String(e));
         lastError = err;
         if (/API key|authentication_error|invalid.?api.?key/i.test(err.message)) throw err;
+        if (/LLM_BILLING:/i.test(err.message) || isBillingLlmError(err.message)) throw err;
 
         failures.push(err.message.slice(0, 200));
 
@@ -337,6 +342,11 @@ async function llmGenerateContentWithModel(
 
   const errText = await response.text();
   if (!response.ok) {
+    if (isBillingLlmError(errText)) {
+      throw new Error(
+        'LLM_BILLING: A conta da API Anthropic está sem créditos. Adicione créditos em console.anthropic.com.',
+      );
+    }
     if (isAuthLlmError(response.status, errText)) {
       throw new Error(`LLM (${model}): ${errText.slice(0, 800)}`);
     }

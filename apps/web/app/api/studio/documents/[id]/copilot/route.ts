@@ -414,14 +414,24 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[studio copilot] LLM', e);
       const timedOut = /timeout|aborted|AbortError/i.test(msg);
+      const billing = /LLM_BILLING|credit balance|purchase credits/i.test(msg);
+      const billingMsg =
+        locale === 'es'
+          ? 'La IA no está disponible: la cuenta de API de Anthropic no tiene créditos. Contacta al administrador de Etholys.'
+          : locale === 'en'
+            ? 'AI unavailable: the Anthropic API account has no credits. Contact the Etholys administrator.'
+            : 'A IA não está disponível: a conta da API Anthropic está sem créditos. Contacta o administrador Etholys.';
       return NextResponse.json(
         {
-          error: timedOut
-            ? 'A IA demorou demasiado com o anexo. Tenta de novo ou sem imagem.'
-            : 'O assistente não está disponível neste momento. Tente novamente.',
+          error: billing
+            ? billingMsg
+            : timedOut
+              ? 'A IA demorou demasiado com o anexo. Tenta de novo ou sem imagem.'
+              : 'O assistente não está disponível neste momento. Tente novamente.',
+          code: billing ? 'llm_billing' : timedOut ? 'llm_timeout' : 'llm_error',
           detail: timedOut ? msg.slice(0, 200) : undefined,
         },
-        { status: 502 },
+        { status: billing || timedOut ? 503 : 502 },
       );
     }
 
