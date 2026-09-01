@@ -21,6 +21,7 @@ import { useApp } from '@/app/providers';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { CompanyRequiredPanel } from '@/components/hub/CompanyRequiredPanel';
 import { meetRecapPath, meetRecapsPath, meetHubJoinPath } from '@/lib/meet/types';
+import { resolveMeetSpeechLanguage } from '@/lib/meet/language';
 
 type RecapListRow = {
   id: string;
@@ -53,6 +54,7 @@ type RecapDetail = {
   endedAt?: string | null;
   summaryText: string | null;
   transcriptText: string | null;
+  recordingUrl: string | null;
   projectId: string | null;
   meetingUrl: string | null;
   actionItems: ActionItem[];
@@ -99,6 +101,9 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [transcribeBusy, setTranscribeBusy] = useState(false);
+  const [transcriptSource, setTranscriptSource] = useState<'whisper' | 'live' | null>(null);
 
   const loadList = useCallback(async () => {
     if (!companyId) return;
@@ -130,7 +135,11 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
         fetch(`/api/meet/sessions/${sessionId}/transcript?companyId=${encodeURIComponent(companyId)}`),
       ]);
       const sd = (await sr.json()) as { session?: RecapDetail; error?: string };
-      const td = (await tr.json()) as { segments?: TranscriptSegment[]; transcriptText?: string };
+      const td = (await tr.json()) as {
+        segments?: TranscriptSegment[];
+        transcriptText?: string;
+        source?: 'whisper' | 'live';
+      };
       if (!sr.ok) throw new Error(sd.error || 'Error');
       const session = sd.session ?? null;
       if (session && !session.transcriptText && td.transcriptText) {
@@ -138,6 +147,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
       }
       setDetail(session);
       setSegments(Array.isArray(td.segments) ? td.segments : []);
+      setTranscriptSource(td.source === 'whisper' ? 'whisper' : td.source === 'live' ? 'live' : null);
       if (!session?.summaryText && (session?.transcriptText || (td.segments && td.segments.length))) {
         setTab('transcript');
       } else {
@@ -244,6 +254,89 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
       /* ignore */
+    }
+  }
+
+  async function uploadRecording(file: File) {
+    if (!companyId || !sessionId) return;
+    setUploadBusy(true);
+    setError(null);
+    try {
+      const presign = await fetch(`/api/meet/sessions/${sessionId}/recording`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          action: 'presign',
+          fileName: file.name,
+          contentType: file.type || 'application/octet-stream',
+        }),
+      });
+      const signed = (await presign.json()) as {
+        error?: string;
+        uploadUrl?: string;
+        storageKey?: string;
+        publicUrl?: string | null;
+      };
+      if (!presign.ok) throw new Error(signed.error || 'Presign failed');
+      if (!signed.uploadUrl || !signed.storageKey) throw new Error('Presign incomplete');
+
+      const put = await fetch(signed.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      });
+      if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+
+      const confirm = await fetch(`/api/meet/sessions/${sessionId}/recording`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          action: 'confirm',
+          storageKey: signed.storageKey,
+          recordingUrl: signed.publicUrl || undefined,
+        }),
+      });
+      if (!confirm.ok) {
+        const c = (await confirm.json().catch(() => ({}))) as { error?: string };
+        throw new Error(c.error || 'Confirm failed');
+      }
+      await loadDetail();
+      await loadList();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setUploadBusy(false);
+    }
+  }
+
+  async function runTranscribe() {
+    if (!companyId || !sessionId) return;
+    setTranscribeBusy(true);
+    setError(null);
+    try {
+      const languageHint = resolveMeetSpeechLanguage({ uiLocale: locale });
+      const r = await fetch(`/api/meet/sessions/${sessionId}/transcribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          locale,
+          languageHint,
+          finalize: false,
+          diarize: true,
+        }),
+      });
+      const d = (await r.json()) as { error?: string };
+      if (!r.ok) throw new Error(d.error || 'Error');
+      await loadDetail();
+      await loadList();
+      setTab('transcript');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setTranscribeBusy(false);
     }
   }
 
@@ -564,6 +657,52 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
 
                 {tab === 'transcript' && (
                   <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    {transcriptSource === 'live' && transcriptBody && (
+                      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        {t(
+                          'Esta transcrição veio do reconhecimento ao vivo (baixa qualidade). Para o texto correcto: apaga isto, envia a gravação .webm e clica «Transcrever com Whisper».',
+                          'Esta transcripción vino del reconocimiento en vivo (baja calidad). Para el texto correcto: bórrala, sube la grabación .webm y pulsa «Transcribir con Whisper».',
+                          'This transcript came from live recognition (low quality). For correct text: delete it, upload the .webm recording, and click «Transcribe with Whisper».',
+                        )}
+                      </div>
+                    )}
+                    <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-xs text-slate-600">
+                        {t(
+                          'Transcrição profissional = gravação de áudio/vídeo + Whisper (português). O ficheiro .crswap no PC não serve — precisa do .webm final.',
+                          'Transcripción profesional = grabación de audio/vídeo + Whisper (portugués). El archivo .crswap en el PC no sirve — necesitas el .webm final.',
+                          'Professional transcript = audio/video recording + Whisper. The .crswap file on your PC does not work — you need the final .webm.',
+                        )}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-100">
+                          {uploadBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Video className="h-3.5 w-3.5" />}
+                          {t('Enviar gravação', 'Subir grabación', 'Upload recording')}
+                          <input
+                            type="file"
+                            accept="audio/*,video/*,.webm,.mp4,.mp3,.wav,.m4a"
+                            className="hidden"
+                            disabled={uploadBusy}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) void uploadRecording(f);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                        {detail.recordingUrl && (
+                          <button
+                            type="button"
+                            disabled={transcribeBusy}
+                            onClick={() => void runTranscribe()}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+                          >
+                            {transcribeBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                            {t('Transcrever com Whisper', 'Transcribir con Whisper', 'Transcribe with Whisper')}
+                          </button>
+                        )}
+                      </div>
+                    </div>
                     <div className="mb-3 flex flex-wrap gap-2">
                       <button
                         type="button"
