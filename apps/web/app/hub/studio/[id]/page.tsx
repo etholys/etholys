@@ -2374,7 +2374,7 @@ export default function StudioDocumentPage() {
           ) : (
           <>
           <div
-            className={`flex min-h-0 flex-col overflow-hidden ${
+            className={`flex min-h-0 flex-col overflow-visible ${
               hasChatContent ? 'flex-1' : 'shrink-0 justify-end'
             }`}
           >

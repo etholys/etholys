@@ -95,7 +95,7 @@ export function StudioCopilotComposer({
   const canSend = !!canEdit && !chatBusy && !loading && (input.trim().length > 0 || pendingFileNames.length > 0);
 
   return (
-    <div className="shrink-0 border-t border-stone-200/80 bg-[#faf8f5] p-2">
+    <div className="relative z-20 shrink-0 border-t border-stone-200/80 bg-[#faf8f5] p-2">
       <StudioChatAttachmentChips
         locale={loc}
         names={pendingFileNames}
@@ -104,7 +104,7 @@ export function StudioCopilotComposer({
       />
       <div
         ref={rootRef}
-        className="overflow-hidden rounded-lg border border-stone-200/90 bg-white shadow-sm"
+        className="overflow-visible rounded-lg border border-stone-200/90 bg-white shadow-sm"
       >
         <div className="flex min-w-0 items-center gap-1 border-b border-stone-100 px-2 py-1">
           <div className="relative min-w-0">
@@ -119,7 +119,7 @@ export function StudioCopilotComposer({
               <ChevronDown className="h-3 w-3 shrink-0 text-stone-400" />
             </button>
             {menuOpen && (
-              <div className="absolute bottom-full left-0 z-30 mb-1 max-h-[min(60vh,320px)] min-w-[10rem] overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 shadow-lg">
+              <div className="absolute bottom-full left-0 z-50 mb-1 max-h-[min(60vh,320px)] min-w-[10rem] overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 shadow-lg">
                 {STUDIO_COPILOT_MODES.map((id) => {
                   const Icon = MODE_ICONS[id];
                   const dimmed = id === 'edit_selection' && !hasSelection;
