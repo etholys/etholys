@@ -338,8 +338,11 @@ export function MeetRoomClient({ sessionId }: Props) {
 
   useEffect(() => {
     return () => {
-      localRecorderRef.current?.destroy();
-      localRecorderRef.current = null;
+      const rec = localRecorderRef.current;
+      if (rec) {
+        void rec.stop().catch(() => rec.destroy());
+        localRecorderRef.current = null;
+      }
     };
   }, []);
 
@@ -669,7 +672,9 @@ export function MeetRoomClient({ sessionId }: Props) {
     if (recordingOn || recordingBusy) return;
     setRecordingBusy(true);
     try {
-      const { recorder } = await startMeetLocalRecorder();
+      const { recorder } = await startMeetLocalRecorder({
+        suggestedTitle: session?.title,
+      });
       localRecorderRef.current = recorder;
       setRecordingOn(true);
     } catch (err) {
@@ -922,9 +927,15 @@ export function MeetRoomClient({ sessionId }: Props) {
   }
 
   async function leaveToMeetHome() {
-    // Sai deste browser: flush da transcrição live só se estava activa.
     leaveQuietRef.current = true;
     closingRef.current = true;
+    if (recordingOn && localRecorderRef.current) {
+      try {
+        await stopRecording();
+      } catch {
+        /* ignore */
+      }
+    }
     if (companyId && joinPrefsRef.current.enableLiveTranscript) {
       const transcript = buildTranscriptText(segmentsRef.current);
       if (transcript) {

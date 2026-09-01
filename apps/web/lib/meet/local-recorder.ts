@@ -1,7 +1,6 @@
 /**
  * Gravação local no browser (fora do iframe Jitsi).
- * O External API `startRecording({ mode: 'local' })` falha de forma fiável dentro do iframe;
- * aqui usamos getDisplayMedia + MediaRecorder e pedimos destino com showSaveFilePicker.
+ * Grava em memória e só pede destino ao parar — evita ficheiros .webm vazios no disco.
  */
 
 export type MeetLocalRecorder = {
@@ -9,9 +8,14 @@ export type MeetLocalRecorder = {
   destroy: () => void;
 };
 
-function defaultFileName(): string {
+function defaultFileName(title?: string): string {
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-  return `chorus-${stamp}.webm`;
+  const safe =
+    (title || '')
+      .replace(/[^\w\-áàâãéêíóôõúçñ ]+/gi, '')
+      .trim()
+      .slice(0, 48) || 'chorus';
+  return `${safe}-${stamp}.webm`;
 }
 
 async function pickSaveHandle(suggestedName: string): Promise<FileSystemFileHandle | null> {
@@ -33,7 +37,6 @@ async function pickSaveHandle(suggestedName: string): Promise<FileSystemFileHand
       ],
     });
   } catch (err) {
-    // AbortError = utilizador cancelou
     if (err instanceof DOMException && err.name === 'AbortError') throw err;
     return null;
   }
@@ -51,22 +54,38 @@ function triggerDownload(blob: Blob, fileName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-export async function startMeetLocalRecorder(): Promise<{
+async function saveBlob(blob: Blob, fileName: string): Promise<boolean> {
+  if (blob.size <= 0) return false;
+  const fileHandle = await pickSaveHandle(fileName);
+  if (fileHandle) {
+    try {
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return true;
+    } catch {
+      triggerDownload(blob, fileName);
+      return false;
+    }
+  }
+  triggerDownload(blob, fileName);
+  return false;
+}
+
+export async function startMeetLocalRecorder(opts?: {
+  suggestedTitle?: string;
+}): Promise<{
   recorder: MeetLocalRecorder;
   fileName: string;
-  usedPicker: boolean;
 }> {
-  const fileName = defaultFileName();
-  const fileHandle = await pickSaveHandle(fileName);
+  const fileName = defaultFileName(opts?.suggestedTitle);
 
   const display = await navigator.mediaDevices.getDisplayMedia({
     video: {
       frameRate: 30,
-      // Preferir a aba Etholys — uma única barra de partilha no Chrome
       displaySurface: 'browser',
     } as MediaTrackConstraints,
     audio: true,
-    // Chrome / Edge
     preferCurrentTab: true,
     selfBrowserSurface: 'include',
     surfaceSwitching: 'exclude',
@@ -96,6 +115,13 @@ export async function startMeetLocalRecorder(): Promise<{
     tracks.push(...dest.stream.getAudioTracks());
   }
 
+  if (!tracks.some((t) => t.kind === 'video' && t.readyState === 'live')) {
+    display.getTracks().forEach((t) => t.stop());
+    mic?.getTracks().forEach((t) => t.stop());
+    void audioCtx?.close().catch(() => undefined);
+    throw new Error('Partilha de ecrã sem vídeo. Escolhe a aba do CHORUS com áudio.');
+  }
+
   const composed = new MediaStream(tracks);
   const mimeCandidates = [
     'video/webm;codecs=vp9,opus',
@@ -113,12 +139,6 @@ export async function startMeetLocalRecorder(): Promise<{
     if (event.data.size > 0) chunks.push(event.data);
   };
 
-  let stopResolve: ((blob: Blob) => void) | null = null;
-  mediaRecorder.onstop = () => {
-    const blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'video/webm' });
-    stopResolve?.(blob);
-  };
-
   const cleanup = () => {
     try {
       display.getTracks().forEach((t) => t.stop());
@@ -134,39 +154,50 @@ export async function startMeetLocalRecorder(): Promise<{
   };
 
   display.getVideoTracks()[0]?.addEventListener('ended', () => {
-    if (mediaRecorder.state === 'recording') mediaRecorder.stop();
+    if (mediaRecorder.state === 'recording') {
+      try {
+        mediaRecorder.requestData();
+      } catch {
+        /* ignore */
+      }
+      mediaRecorder.stop();
+    }
   });
 
   mediaRecorder.start(1000);
 
+  async function finalizeRecording(): Promise<Blob> {
+    if (mediaRecorder.state === 'recording') {
+      try {
+        mediaRecorder.requestData();
+      } catch {
+        /* ignore */
+      }
+      await new Promise<void>((resolve) => {
+        mediaRecorder.onstop = () => resolve();
+        mediaRecorder.stop();
+      });
+    }
+    return new Blob(chunks, { type: mediaRecorder.mimeType || 'video/webm' });
+  }
+
   const recorder: MeetLocalRecorder = {
     async stop() {
-      const blob =
-        mediaRecorder.state === 'inactive'
-          ? new Blob(chunks, { type: mediaRecorder.mimeType || 'video/webm' })
-          : await new Promise<Blob>((resolve) => {
-              stopResolve = resolve;
-              mediaRecorder.stop();
-            });
+      const blob = await finalizeRecording();
       cleanup();
-      let savedWithPicker = false;
-      if (fileHandle && blob.size > 0) {
-        try {
-          const writable = await fileHandle.createWritable();
-          await writable.write(blob);
-          await writable.close();
-          savedWithPicker = true;
-        } catch {
-          triggerDownload(blob, fileName);
-        }
-      } else if (blob.size > 0) {
-        triggerDownload(blob, fileName);
-      }
+      const savedWithPicker = await saveBlob(blob, fileName);
       return { blob, fileName, savedWithPicker };
     },
     destroy() {
       try {
-        if (mediaRecorder.state === 'recording') mediaRecorder.stop();
+        if (mediaRecorder.state === 'recording') {
+          try {
+            mediaRecorder.requestData();
+          } catch {
+            /* ignore */
+          }
+          mediaRecorder.stop();
+        }
       } catch {
         /* ignore */
       }
@@ -174,5 +205,5 @@ export async function startMeetLocalRecorder(): Promise<{
     },
   };
 
-  return { recorder, fileName, usedPicker: Boolean(fileHandle) };
+  return { recorder, fileName };
 }
