@@ -513,7 +513,7 @@ export default function ProjectDetailPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">{tr('project.budget')}</label>
-                  <input type="number" value={editForm?.budget ?? 0} onChange={e => setEditForm({ ...editForm, budget: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm" />
+                  <input type="number" step="0.01" min="0" value={editForm?.budget ?? 0} onChange={e => setEditForm({ ...editForm, budget: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

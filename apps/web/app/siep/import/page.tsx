@@ -92,7 +92,7 @@ const confBadge = (c: Confidence) => {
   return <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', m.cls)}>{m.icon} Confianza {m.label}</span>;
 };
 const fmtCurrency = (n: number, cur: string) =>
-  new Intl.NumberFormat('es-UY', { style: 'currency', currency: cur || 'USD', maximumFractionDigits: 0 }).format(n);
+  new Intl.NumberFormat('es-UY', { style: 'currency', currency: cur || 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 const fmtSize = (b: number) => b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`;
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -568,7 +568,7 @@ export default function SmartImportPage() {
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1">Presupuesto</label>
-        <input type="number" value={d.project.budget} onChange={e => updateProject('budget', parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+        <input type="number" step="0.01" min="0" value={d.project.budget} onChange={e => updateProject('budget', parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1">Pa&iacute;s</label>
@@ -764,10 +764,10 @@ export default function SmartImportPage() {
                     <input value={l.unit || ''} onChange={e => updateBudgetLine(i, 'unit', e.target.value)} className="w-20 px-1 py-1 rounded border border-gray-200 text-xs" placeholder="mes, viaje..." />
                   </td>
                   <td className="py-2 px-2">
-                    <input type="number" value={l.quantity} onChange={e => updateBudgetLine(i, 'quantity', parseFloat(e.target.value) || 0)} className="w-16 px-1 py-1 rounded border border-gray-200 text-xs text-right" />
+                    <input type="number" step="any" min="0" value={l.quantity} onChange={e => updateBudgetLine(i, 'quantity', parseFloat(e.target.value) || 0)} className="w-16 px-1 py-1 rounded border border-gray-200 text-xs text-right" />
                   </td>
                   <td className="py-2 px-2">
-                    <input type="number" value={l.unitCost} onChange={e => updateBudgetLine(i, 'unitCost', parseFloat(e.target.value) || 0)} className="w-24 px-1 py-1 rounded border border-gray-200 text-xs text-right" />
+                    <input type="number" step="0.01" min="0" value={l.unitCost} onChange={e => updateBudgetLine(i, 'unitCost', parseFloat(e.target.value) || 0)} className="w-24 px-1 py-1 rounded border border-gray-200 text-xs text-right" />
                   </td>
                   <td className="py-2 px-2 text-right font-medium text-xs">{fmtCurrency(l.total, d.project.currency)}</td>
                   <td className="py-2 px-2">

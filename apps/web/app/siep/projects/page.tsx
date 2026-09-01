@@ -215,7 +215,7 @@ export default function ProjectsPage() {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">{tr('project.budget')}</label><input type="number" value={form.budget} onChange={e => setForm({ ...form, budget: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">{tr('project.budget')}</label><input type="number" step="0.01" min="0" value={form.budget} onChange={e => setForm({ ...form, budget: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">{tr('general.status')}</label>
                   <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                     {statuses.map(s => <option key={s} value={s}>{tr(`status.${s.toLowerCase()}`)}</option>)}

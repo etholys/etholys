@@ -15,7 +15,7 @@ export function isLikelyDbId(id: unknown): boolean {
 
 export function formatCurrency(amount: number | null | undefined, currency: string = 'USD'): string {
   const val = amount ?? 0;
-  return new Intl.NumberFormat('es-US', { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
+  return new Intl.NumberFormat('es-US', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
 }
 
 export function formatDate(date: string | Date | null | undefined): string {
