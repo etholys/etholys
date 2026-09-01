@@ -61,7 +61,7 @@ import {
 import { StudioCommentsPanel } from '@/components/studio/StudioCommentsPanel';
 import { StudioBlockEditor } from '@/components/studio/StudioBlockEditor';
 import { StudioDesignPlacedBlock } from '@/components/studio/StudioDesignPlacedBlock';
-import { getStudioWriteFocus, requestStudioWriteBlockFocus, runStudioWriteCommand } from '@/lib/studio/write-editor-bus';
+import { getStudioWriteFocus, requestStudioWriteBlockFocus, runStudioWriteCommand, subscribeStudioWriteFocus } from '@/lib/studio/write-editor-bus';
 import { StudioSheet } from '@/components/studio/StudioSheet';
 import {
   StudioCascadeToolsRail,
@@ -249,6 +249,7 @@ export default function StudioDocumentPage() {
   const saveAgainRef = useRef(false);
   const saveEpochRef = useRef(0);
   const writeReflowTimerRef = useRef<number | null>(null);
+  const textEditBaselineRef = useRef<StudioCanvasState | null>(null);
   const activePageSpyTimerRef = useRef<number | null>(null);
   const canvasScrollRef = useRef<HTMLDivElement | null>(null);
   const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -382,6 +383,7 @@ export default function StudioDocumentPage() {
         const laid = reflowStudioDocument(snap, {
           pageTitlePrefix: t('Página', 'Página', 'Page'),
           marginsMm: snap.marginsMm,
+          joinChops: false,
         });
         if (JSON.stringify(laid.pages) === JSON.stringify(snap.pages)) return;
         applyCanvas(() => laid, false);
@@ -475,31 +477,63 @@ export default function StudioDocumentPage() {
     [canEdit, id, companyId],
   );
 
+  const commitTextEditHistory = useCallback(() => {
+    const baseline = textEditBaselineRef.current;
+    textEditBaselineRef.current = null;
+    const cur = canvasRef.current;
+    if (baseline && cur && !skipHistory.current && JSON.stringify(cur) !== JSON.stringify(baseline)) {
+      pushHistory(baseline);
+    }
+  }, [pushHistory]);
+
+  useEffect(() => {
+    return subscribeStudioWriteFocus(() => {
+      const focus = getStudioWriteFocus();
+      if (focus) {
+        if (!textEditBaselineRef.current && canvasRef.current) {
+          textEditBaselineRef.current = structuredClone(canvasRef.current);
+        }
+        return;
+      }
+      commitTextEditHistory();
+    });
+  }, [commitTextEditHistory]);
+
   const undo = useCallback(() => {
+    commitTextEditHistory();
     setUndoStack((stack) => {
-      if (!stack.length || !canvas) return stack;
+      if (!stack.length) return stack;
+      const cur = canvasRef.current;
+      if (!cur) return stack;
       const prev = stack[stack.length - 1]!;
-      setRedoStack((r) => [...r, structuredClone(canvas)]);
+      setRedoStack((r) => [...r, structuredClone(cur)]);
       skipHistory.current = true;
+      canvasRef.current = prev;
       setCanvas(prev);
       skipHistory.current = false;
+      dirtyRef.current = true;
       setDirty(true);
       return stack.slice(0, -1);
     });
-  }, [canvas]);
+  }, [commitTextEditHistory]);
 
   const redo = useCallback(() => {
+    commitTextEditHistory();
     setRedoStack((stack) => {
-      if (!stack.length || !canvas) return stack;
+      if (!stack.length) return stack;
+      const cur = canvasRef.current;
+      if (!cur) return stack;
       const next = stack[stack.length - 1]!;
-      setUndoStack((u) => [...u, structuredClone(canvas)]);
+      setUndoStack((u) => [...u, structuredClone(cur)]);
       skipHistory.current = true;
+      canvasRef.current = next;
       setCanvas(next);
       skipHistory.current = false;
+      dirtyRef.current = true;
       setDirty(true);
       return stack.slice(0, -1);
     });
-  }, [canvas]);
+  }, [commitTextEditHistory]);
 
   const loadVersions = useCallback(async () => {
     const docId = id;
@@ -1059,6 +1093,7 @@ export default function StudioDocumentPage() {
       imageEdit?: StudioBlock['imageEdit'];
     },
   ) {
+    const isTextOnly = Object.keys(patch).length === 1 && patch.text !== undefined;
     applyCanvas((prev) => {
       let next = {
         ...prev,
@@ -1098,7 +1133,7 @@ export default function StudioDocumentPage() {
         ),
       };
       return next;
-    });
+    }, !isTextOnly);
   }
 
   async function generateBlockImage(pageId: string, blockId: string, prompt?: string) {
@@ -1621,6 +1656,7 @@ export default function StudioDocumentPage() {
 
   function removeEmptyBlockFocusPrev(pageId: string, blockId: string) {
     let prevId: string | null = null;
+    textEditBaselineRef.current = null;
     applyCanvas((prev) => ({
       ...prev,
       pages: prev.pages.map((p) => {
@@ -1638,17 +1674,17 @@ export default function StudioDocumentPage() {
         };
       }),
     }));
-    scheduleWriteReflow(0);
     if (prevId) {
       window.setTimeout(() => requestStudioWriteBlockFocus(prevId!), 40);
     }
   }
 
-  function mergeBlockWithPrev(pageId: string, blockId: string) {
+  function mergeBlockWithPrev(pageId: string, blockId: string): boolean {
     const textish = (kind: string) =>
       kind === 'paragraph' || kind === 'bullets' || kind === 'callout' || kind === 'heading';
     let prevId: string | null = null;
     let caretOffset = 0;
+    let merged = false;
     applyCanvas((prev) => {
       const sortedPages = prev.pages.slice().sort((a, b) => a.order - b.order);
       const flat: Array<{ pageId: string; block: StudioBlock }> = [];
@@ -1664,6 +1700,7 @@ export default function StudioDocumentPage() {
       const prevB = prevEntry.block;
       const curB = curEntry.block;
       if (!textish(prevB.kind) || !textish(curB.kind)) return prev;
+      if (prevB.kind === 'heading' || curB.kind === 'heading') return prev;
       if (prevB.imageUrl || curB.imageUrl) return prev;
 
       const prevText = String(prevB.text || '');
@@ -1677,6 +1714,7 @@ export default function StudioDocumentPage() {
             : '';
       const mergedText = `${prevText}${joiner}${curText}`;
       prevId = prevB.id;
+      merged = true;
 
       return {
         ...prev,
@@ -1695,9 +1733,11 @@ export default function StudioDocumentPage() {
         }),
       };
     });
-    if (prevId) {
+    if (merged && prevId) {
+      textEditBaselineRef.current = null;
       window.setTimeout(() => requestStudioWriteBlockFocus(prevId!, caretOffset), 40);
     }
+    return merged;
   }
 
   function splitBlockAfter(pageId: string, blockId: string, afterText: string) {
@@ -1743,6 +1783,7 @@ export default function StudioDocumentPage() {
       const curB = curEntry.block;
       const nextB = nextEntry.block;
       if (!textish(curB.kind) || !textish(nextB.kind)) return prev;
+      if (curB.kind === 'heading' || nextB.kind === 'heading') return prev;
 
       const curText = String(curB.text || '');
       const nextText = String(nextB.text || '');
@@ -1811,7 +1852,6 @@ export default function StudioDocumentPage() {
       }),
     }));
     setAiTargetBlockIds((ids) => ids.filter((id) => id !== blockId));
-    scheduleWriteReflow(0);
   }
 
   /** Só no modo desenho: move blocos inteiros (nunca parte texto). */
@@ -2709,7 +2749,7 @@ export default function StudioDocumentPage() {
                       if (studioMode !== 'write' || !canEdit) return;
                       const next = e.relatedTarget as Node | null;
                       if (next && e.currentTarget.contains(next)) return;
-                      scheduleWriteReflow(0);
+                      scheduleWriteReflow();
                     }}
                   >
                     <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5" style={{ width }}>

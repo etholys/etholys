@@ -225,7 +225,7 @@ export function reflowStudioDocument(
   },
 ): StudioCanvasState {
   const blocks = flattenAndJoinStudioBlocks(canvas, {
-    joinChops: opts?.joinChops === true || studioLikelyOverPaginated(canvas),
+    joinChops: opts?.joinChops === true,
   });
   if (!blocks.length) {
     return {

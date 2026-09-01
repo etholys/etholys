@@ -147,7 +147,7 @@ type Props = {
   writeMode?: boolean;
   onInsertAfter?: () => void;
   onBackspaceEmpty?: () => void;
-  onMergeWithPrev?: () => void;
+  onMergeWithPrev?: () => boolean | void;
   onSplitAfter?: (afterText: string) => void;
   onMergeWithNext?: () => void;
   onFocusNext?: () => void;

@@ -31,7 +31,7 @@ type Props = {
   /** Backspace no início de bloco vazio */
   onBackspaceEmpty?: () => void;
   /** Backspace no início de bloco com texto — fundir com o anterior */
-  onMergeWithPrev?: () => void;
+  onMergeWithPrev?: () => boolean | void;
   /** Seta ↓ no fim → bloco seguinte */
   onFocusNext?: () => void;
   /** Enter — novo parágrafo (split); Shift+Enter — quebra de linha */
@@ -153,9 +153,11 @@ export function StudioRichTextEditor({
               return true;
             }
             if (plain.trim() && cbs.current.onMergeWithPrev) {
-              event.preventDefault();
-              cbs.current.onMergeWithPrev();
-              return true;
+              const merged = cbs.current.onMergeWithPrev();
+              if (merged) {
+                event.preventDefault();
+                return true;
+              }
             }
           }
         }
