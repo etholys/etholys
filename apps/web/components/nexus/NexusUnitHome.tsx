@@ -143,8 +143,6 @@ export function NexusUnitHome({
         <Link href={withNet('/hub/nexus/journey')} className="font-medium text-violet-700 underline-offset-2 hover:underline">
           {adjustStageLabel}
         </Link>
-        {' · '}
-        {t.oneFlowNote}
       </p>
 
       <div className="pt-4">
@@ -152,11 +150,7 @@ export function NexusUnitHome({
           {t.stepsHeading}
         </h2>
         <p className={cn('mb-2 text-xs text-slate-500', split ? 'text-left sm:max-w-md' : 'text-center')}>
-          {L === 'es'
-            ? 'Diagnóstico, ATLAS,Workspace… en un solo hilo, según vuestro nivel.'
-            : L === 'en'
-              ? 'Diagnosis, ATLAS, workspace—one thread, in order for your level.'
-              : 'Diagnóstico, ATLAS, Workspace… o mesmo fio, por ordem, ao teu nível.'}
+          {t.oneFlowNote}
         </p>
 
         <ol className="ml-0.5 space-y-0 border-l-2 border-violet-200/90 pl-4">
@@ -211,11 +205,9 @@ export function NexusUnitHome({
           {t.humanRhythmCta} →
         </Link>
       </p>
-      {!split ? (
-        <p className="text-center text-[11px] text-slate-400">{t.footnote}</p>
-      ) : (
-        <p className="text-left text-[11px] text-slate-400">{t.footnote}</p>
-      )}
+      {t.footnote ? (
+        <p className={cn('text-[11px] text-slate-400', split ? 'text-left' : 'text-center')}>{t.footnote}</p>
+      ) : null}
     </div>
   );
 }

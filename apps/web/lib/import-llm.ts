@@ -50,7 +50,7 @@ export async function callImportLlm(systemPrompt: string, userContent: ChatConte
 
   if (finishReason === 'MAX_TOKENS') {
     throw new Error(
-      `A IA cortou a resposta (limite de saída). Defina LLM_MAX_OUTPUT_TOKENS=32000 no .env, reinicie o servidor, ou importe ficheiros menores.`,
+      'A IA cortou a resposta. Tente um documento mais curto ou divida o ficheiro em partes.',
     );
   }
 

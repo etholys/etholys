@@ -1,6 +1,5 @@
 /**
- * Dados do assistente de contexto — alimenta priorização e feature flags.
- * Não constitui aconselhamento legal ou fiscal; o utilizador confirma com o seu contador.
+ * Company context collected at /hub/setup — used for Advisor priorities.
  */
 export const COMPANY_SECTORS = [
   { id: 'agriculture', label: { es: 'Agricultura y agroindustria', pt: 'Agricultura e agroindústria', en: 'Agriculture & agro' } },
@@ -41,7 +40,7 @@ const GOAL_TO_MODULES: Record<string, ModuleHintCode[]> = {
 };
 
 /**
- * Deduplicado, baseado em objectivos; não esconde módulos na UI (isso fica em feature flags futuros).
+ * Unique module codes derived from selected goals.
  */
 export function deriveModuleHints(ctx: CompanyContextSetup | null | undefined): ModuleHintCode[] {
   if (!ctx?.primaryGoals?.length) return [];

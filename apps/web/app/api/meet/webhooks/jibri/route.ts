@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       if (!isMeetTranscribeConfigured()) {
         return NextResponse.json({
           ...result,
-          warning: 'Gravação guardada; STT não configurado (OPENAI_API_KEY)',
+          warning: 'Gravação guardada; a transcrição automática não está disponível.',
         });
       }
       const { text } = await transcribeMeetRecording({

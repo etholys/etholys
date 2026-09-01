@@ -3,16 +3,13 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Check, Building2, Globe, Truck, ClipboardCheck, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Building2, Globe, Truck, ClipboardCheck } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { useSession } from 'next-auth/react';
 import {
   COMPANY_SECTORS,
   emptyContextSetup,
-  deriveModuleHints,
-  MODULE_HINT_LABEL,
   type CompanyContextSetup,
-  type ModuleHintCode,
 } from '@/lib/company-context-setup';
 import { isLikelyDbId } from '@/lib/utils';
 import { StateEmpty, StateError, StateLoading } from '@/components/ui/StateBlocks';
@@ -178,19 +175,15 @@ function CompanyContextSetupInner() {
             Hub
           </Link>
           <div className="text-xs text-slate-500">
-            {t('Assistente de contexto', 'Asistente de contexto', 'Context setup')} · {step + 1}/{totalSteps}
+            {t('Perfil da organização', 'Perfil de la organización', 'Organization profile')} · {step + 1}/{totalSteps}
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-2xl px-4 py-8">
         {isFirst && step === 0 && (
-          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-            {t(
-              'Bem-vindo. Estas respostas ajudam a adaptar prioridades e sugestões do Advisor — não substituem aconselhamento legal ou contabilístico.',
-              'Bienvenido. Estas respuestas adaptan sugerencias y prioridades del Advisor.',
-              'Welcome. These answers help tailor Advisor priorities— they do not replace legal or tax advice.'
-            )}
+          <p className="mb-4 text-sm text-slate-600">
+            {t('Bem-vindo.', 'Bienvenido.', 'Welcome.')}
           </p>
         )}
 
@@ -208,9 +201,6 @@ function CompanyContextSetupInner() {
               {t('Organização', 'Organización', 'Organization')}
             </h1>
             {companyName && <p className="text-sm text-slate-600">{companyName}</p>}
-            <p className="text-sm text-slate-600">
-              {t('Tipo e sector principal (pode ajustar mais tarde).', 'Tipo y sector principal (puede ajustar luego).', 'Kind and main sector (you can change later).')}
-            </p>
             <div>
               <label className="text-xs font-semibold uppercase text-slate-500">{t('Sector', 'Sector', 'Sector')}</label>
               <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -308,7 +298,7 @@ function CompanyContextSetupInner() {
               {t('Prioridades e notas', 'Prioridades y notas', 'Priorities & notes')}
             </h1>
             <p className="text-sm text-slate-600">
-              {t('Marque o que o Etholys deve priorizar nas sugestões (Advisor, resumos).', 'Marque en qué el Advisor debe centrarse.', 'Check what the Advisor should emphasise.')}
+              {t('O que é mais importante agora.', 'Qué es más importante ahora.', 'What matters most right now.')}
             </p>
             <div className="flex flex-col gap-2">
               {GOAL_IDS.map((g) => (
@@ -325,7 +315,7 @@ function CompanyContextSetupInner() {
             </div>
             <div>
               <label className="text-xs font-semibold uppercase text-slate-500">
-                {t('Notas para o Advisor (facultativo)', 'Notas para el Advisor (opcional)', 'Notes for Advisor (optional)')}
+                {t('Notas (facultativo)', 'Notas (opcional)', 'Notes (optional)')}
               </label>
               <textarea
                 className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
@@ -336,30 +326,10 @@ function CompanyContextSetupInner() {
               />
             </div>
 
-            {moduleHints.length > 0 && (
-              <div className="rounded-xl border border-teal-100 bg-teal-50/50 px-3 py-3 text-sm text-slate-800">
-                <p className="text-xs font-semibold uppercase text-teal-800">
-                  {t('Módulos sugeridos (por prioridades)', 'Módulos sugeridos (prioridades)', 'Suggested modules (from goals)')}
-                </p>
-                <ul className="mt-2 list-inside list-disc space-y-1 text-slate-700">
-                  {moduleHints.map((code) => (
-                    <li key={code}>{hintLabel(code)}</li>
-                  ))}
-                </ul>
-                <p className="mt-2 text-xs text-slate-500">
-                  {t(
-                    'Isto guia a narrativa; o acesso a cada área continua a depender de permissões da organização.',
-                    'Esto guía la narrativa; el acceso sigue según permisos.',
-                    'This guides the narrative; access to each area still depends on your org’s permissions.'
-                  )}
-                </p>
-              </div>
-            )}
-
             <div className="rounded-xl border border-amber-200/90 bg-amber-50/90 px-3 py-3 text-sm text-amber-950">
               <p>
                 {t(
-                  'As respostas do assistente não substituem aconselhamento legal, fiscal ou de compliance. Confirme com o profissional competente da sua organização.',
+                  'Estas respostas não substituem aconselhamento legal, fiscal ou de compliance. Confirme com o profissional competente da sua organização.',
                   'Estas respuestas no reemplazan asesoría legal, fiscal o de compliance.',
                   'These answers are not legal, tax, or compliance advice. Confirm with a qualified professional.'
                 )}
@@ -373,9 +343,9 @@ function CompanyContextSetupInner() {
                 />
                 <span>
                   {t(
-                    'Compreendo e confirmo a limitação acima. Posso reabrir o assistente quando o contexto da empresa mudar (ex.: passar a exportar).',
-                    'Entiendo y confirmo. Puedo volver al asistente si cambia el contexto (p. ej. exportar).',
-                    'I understand and confirm. I can revisit this if our context changes (e.g. we start exporting).'
+                    'Compreendo e confirmo. Posso atualizar este perfil se o contexto da empresa mudar.',
+                    'Entiendo y confirmo. Puedo actualizar este perfil si cambia el contexto de la empresa.',
+                    'I understand and confirm. I can update this profile if our context changes.'
                   )}
                 </span>
               </label>
@@ -421,14 +391,6 @@ function CompanyContextSetupInner() {
           </div>
         </div>
 
-        <p className="mt-6 flex items-center gap-1 text-center text-xs text-slate-500">
-          <Sparkles className="h-3.5 w-3.5" />
-          {t(
-            'A seguir, use o botão roxo (Advisor) para síntese e alertas multi-sistema; o chat flutuante à direita é para diálogo e canais de trabalho.',
-            'Luego, use el botón morado (Advisor) para alertas; el chat a la derecha es para diálogo.',
-            'Next: use the purple Advisor button for cross-system digest; the right-side chat is for work dialogue.'
-          )}
-        </p>
       </main>
     </div>
   );

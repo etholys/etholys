@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   for (const cid of allMemberIds) {
     if (!tenant.companyIds.includes(cid)) {
       return NextResponse.json(
-        { error: 'Só pode incluir empresas às quais o utilizador pertence (MVP).' },
+        { error: 'Só pode incluir empresas às quais o utilizador pertence.' },
         { status: 403 }
       );
     }

@@ -98,8 +98,9 @@ export async function POST(
     }
     raw = text;
   } catch (e: unknown) {
+    console.error('[studio design-layout] LLM', e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'LLM error' },
+      { error: 'Não foi possível gerar o layout. Tente novamente.' },
       { status: 502 },
     );
   }
@@ -108,8 +109,7 @@ export async function POST(
   if (!parsed) {
     return NextResponse.json(
       {
-        error: 'A IA não devolveu um layout válido. Tenta de novo com um brief mais claro.',
-        rawPreview: raw.slice(0, 400),
+        error: 'A IA não devolveu um layout válido. Tente de novo com um brief mais claro.',
       },
       { status: 422 },
     );

@@ -184,17 +184,16 @@ function NexusServicesInner() {
           </label>
           {selectedSiepName && (
             <p className="mt-2 text-xs text-emerald-800">
-              Contexto SIEP efetivo da empresa alvo: <strong>{selectedSiepName}</strong>
+              Projeto: <strong>{selectedSiepName}</strong>
             </p>
           )}
         </div>
       )}
 
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900">Serviços internos Etholys</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Serviços de apoio</h2>
         <p className="mt-1 text-sm text-gray-600">
-          Pedidos de execução interna (web, branding, redes…). Para atender clientes externos por contrato ou
-          projeto com várias empresas, use{' '}
+          Pedidos de execução (web, identidade, redes…). Para acompanhamento por contrato, use{' '}
           <Link href="/hub/nexus/at" className="font-medium text-violet-700 underline">
             Assistência técnica
           </Link>

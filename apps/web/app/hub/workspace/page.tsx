@@ -326,16 +326,9 @@ export default function IntegratedWorkspacePage() {
             </Link>
             <p className="text-center text-xs text-slate-500">
               {t(
-                'O Hub não mostra menu lateral aqui: o seletor de empresa fica no topo, quando houver empresas.',
-                'El Hub no muestra menú lateral aquí: el selector de empresa arriba, cuando existan empresas.',
-                "The Hub doesn't use a side menu on this page; the company selector will appear in the header once you have companies."
-              )}
-            </p>
-            <p className="text-center text-xs text-amber-800">
-              {t(
-                'O FundHub e o painel usam a mesma lista (/api/companies). Se aí vê as empresas e aqui não, clique em recarregar.',
-                'El FundHub y el panel usan la misma API. Si allí ve empresas y aquí no, use recargar.',
-                'FundHub and the workspace use the same /api/companies. If you see companies there but not here, use reload.'
+                'Se já tem empresas na conta e não aparecem aqui, recarregue a lista.',
+                'Si ya tiene empresas en la cuenta y no aparecen aquí, recargue la lista.',
+                'If you already have companies on your account and they are missing here, reload the list.'
               )}
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
@@ -388,10 +381,7 @@ export default function IntegratedWorkspacePage() {
     );
   }
 
-  const companyLine =
-    overview?.company && overview?.access
-      ? `${overview.company.name} · ${overview.access.systems.join(' · ')}`
-      : null;
+  const companyLine = overview?.company?.name ?? null;
 
   return (
     <div>
@@ -436,13 +426,6 @@ export default function IntegratedWorkspacePage() {
                   <ListTodo className="h-5 w-5 text-teal-600" />
                   {t('Hoje', 'Hoy', 'Today')}
                 </h2>
-                <p className="mt-0.5 text-xs text-slate-600">
-                  {t(
-                    'Concentração operacional: alertas, tarefas e prazos. O impacto e relatórios a financiadores estão no PRISM.',
-                    'Concentración operativa: alertas, tareas y plazos. El impacto e informes a financiadores están en PRISM.',
-                    'Operational focus: alerts, tasks, and deadlines. Impact and donor reports live under PRISM.'
-                  )}
-                </p>
               </div>
             </div>
             <div className="mb-4 flex flex-wrap gap-2">
@@ -470,7 +453,7 @@ export default function IntegratedWorkspacePage() {
             <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
               <div>
                 <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-violet-700">
-                  {t('Etholys Advisor (inbox)', 'Etholys Advisor (inbox)', 'Etholys Advisor (inbox)')}
+                  {t('Advisor', 'Advisor', 'Advisor')}
                 </p>
                 <ul className="min-h-[3rem] space-y-1.5 text-sm text-slate-800">
                   {(overview.advisor?.alerts ?? []).length > 0 ? (
@@ -510,13 +493,9 @@ export default function IntegratedWorkspacePage() {
                     ))
                   ) : (
                     <li className="rounded-lg border border-dashed border-violet-200/80 bg-violet-50/30 px-2 py-2 text-xs text-slate-600">
-                      {t(
-                        'Sem alertas do Advisor. Use «Analisar» no botão roxo (canto) ou o painel completo.',
-                        'Sin alertas del Advisor. Use Analizar en el botón violeta o el panel.',
-                        'No Advisor alerts. Use Analyze on the purple floating button, or the full panel.'
-                      )}{' '}
+                      {t('Sem alertas no momento.', 'Sin alertas por ahora.', 'No alerts right now.')}{' '}
                       <Link href="/hub/advisor" className="font-medium text-violet-700 hover:underline">
-                        /hub/advisor
+                        {t('Abrir Advisor', 'Abrir Advisor', 'Open Advisor')}
                       </Link>
                     </li>
                   )}
@@ -639,9 +618,9 @@ export default function IntegratedWorkspacePage() {
               return (
                 <p className="mt-2 text-sm text-slate-500">
                   {t(
-                    'Sem itens urgentes na fila. Use «Atualizar» ou abra os módulos abaixo.',
-                    'Sin elementos urgentes. Use «Actualizar» o abra los módulos.',
-                    'Nothing urgent in queue. Use Refresh or open the modules below.'
+                    'Sem itens urgentes.',
+                    'Sin elementos urgentes.',
+                    'Nothing urgent right now.'
                   )}
                 </p>
               );
@@ -678,11 +657,7 @@ export default function IntegratedWorkspacePage() {
                   {overview.blocks.ATLAS.balance.toFixed(0)} {overview.blocks.ATLAS.currency}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {t(
-                    'Saldo (receitas − despesas) · mesmos dados do painel',
-                    'Saldo (ingresos − gastos) · mismos datos que el panel',
-                    'Balance (income − expense) — same as dashboard'
-                  )}
+                  {t('Saldo', 'Saldo', 'Balance')}
                 </p>
                 {overview.blocks.ATLAS.invoicesOverdue > 0 && (
                   <p className="mt-2 text-sm text-amber-800">
@@ -898,9 +873,9 @@ export default function IntegratedWorkspacePage() {
                 </h2>
                 <p className="text-sm text-slate-600">
                   {t(
-                    'Inovação e prototipagem: entrada dedicada com atalhos para Lab, calculadora (ATLAS) e jornada (NEXUS).',
-                    'Innovación y prototipado: entrada con atajos a Lab, calculadora (ATLAS) y jornada (NEXUS).',
-                    'Innovation & prototyping: dedicated entry with shortcuts to Lab, calculator (ATLAS), and journey (NEXUS).'
+                    'Cursos, aprendizagem e atalhos para a jornada.',
+                    'Cursos, aprendizaje y atajos para el recorrido.',
+                    'Courses, learning, and shortcuts for the journey.'
                   )}
                 </p>
                 <Link
@@ -920,9 +895,9 @@ export default function IntegratedWorkspacePage() {
                 </h2>
                 <p className="text-sm text-slate-600">
                   {t(
-                    'Impacto, evidência e relatórios (M&E) — não confundir com o bloco «Hoje» acima.',
-                    'Impacto, evidencia e informes (M&E) — no confundir con «Hoy» arriba.',
-                    'Impact, evidence & reporting (M&E) — not the same as the «Today» block above.'
+                    'Impacto, evidência e relatórios.',
+                    'Impacto, evidencia e informes.',
+                    'Impact, evidence, and reporting.'
                   )}
                 </p>
                 <Link

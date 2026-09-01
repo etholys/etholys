@@ -109,17 +109,17 @@ function buildFailedAnalysis(
         : ''),
     summary: reason,
     sectionsFound: [],
-    sectionsMissing: ['Análise detalhada indisponível — revalide ou use «Gerar borrador del informe»'],
+    sectionsMissing: ['Análise detalhada indisponível — revalide ou use «Gerar rascunho do informe»'],
     fieldsComplete: [],
     fieldsMissing: [],
     warnings: [
       extraction?.issue || reason,
-      charCount > 0 ? `${charCount} caracteres extraídos (${extraction?.method || '?'})` : 'Nenhum texto legível extraído',
+      charCount > 0 ? `${charCount} caracteres lidos` : 'Nenhum texto legível extraído',
     ],
     improvements: hints ?? [
-      'Use «Gerar borrador del informe» (passo ③) — constrói o informe a partir dos dados do SIEP, não depende só de ler o Word',
-      'Clique «Validar estrutura (IA)» outra vez após subir .docx com títulos de secção visíveis',
-      'Carregue o manual do financiador no passo ① antes de validar',
+      'Use «Gerar rascunho do informe» para construir o conteúdo a partir dos dados do projeto',
+      'Clique «Validar estrutura» outra vez após enviar um documento com títulos de secção visíveis',
+      'Carregue o manual do financiador antes de validar',
     ],
     suggestedPeriod: inferred.suggestedPeriod,
     feedsQuarterlyReport: inferred.detectedCadence === 'monthly',
@@ -184,9 +184,9 @@ export async function analyzeDonorReportFile(
       `Só ${charCount} caracteres legíveis — insuficiente para analisar o formulário.`,
       extraction,
       [
-        'Use «Gerar borrador del informe» (passo ③) para preencher o formato com dados do projeto',
-        'Se subir plantilla: guarde como .docx com texto editável ou PDF com texto seleccionável',
-        'Formulários Word vazios (só caixas) não têm texto — isso é normal; o borrador IA preenche o conteúdo',
+        'Use «Gerar rascunho do informe» para preencher o formato com dados do projeto',
+        'Se enviar um modelo: grave como documento editável ou PDF com texto seleccionável',
+        'Formulários vazios (só caixas) não têm texto — isso é normal; o rascunho preenche o conteúdo',
       ],
     );
   }
@@ -232,13 +232,13 @@ ${textContent.slice(0, 120000)}
       confidenceReason: String(parsed.confidenceReason || 'Análise superficial — poucos campos identificados no ficheiro.'),
       interpretation: String(parsed.interpretation || parsed.summary || '').trim()
         || `Plantilla «${fileName}» reconhecida parcialmente (${charCount} caracteres). `
-        + 'Provavelmente é um formulário vazio ou com pouco texto — use «Gerar borrador del informe» para construir o conteúdo.',
+        + 'Provavelmente é um formulário vazio ou com pouco texto — use «Gerar rascunho do informe» para construir o conteúdo.',
       sectionsMissing: asStringArray(parsed.sectionsMissing).length
         ? asStringArray(parsed.sectionsMissing)
-        : ['Conteúdo preenchido do informe (use passo ③)'],
+        : ['Conteúdo preenchido do informe'],
       improvements: asStringArray(parsed.improvements).length
         ? asStringArray(parsed.improvements)
-        : ['Gerar borrador del informe com dados do SIEP (passo ③)', 'Re-validar após editar o borrador'],
+        : ['Gerar rascunho do informe com dados do projeto', 'Voltar a validar após editar o rascunho'],
     };
   }
 
@@ -266,8 +266,8 @@ export function normalizeStoredValidation(raw: unknown): (DonorFileValidation & 
     || normalized.interpretation.includes('No se pudo extraer');
   if (stale) {
     normalized.warnings.unshift('Análise incompleta ou antiga — clique «Validar estrutura (IA)» de novo.');
-    if (!normalized.improvements.some((s) => s.includes('Gerar borrador'))) {
-      normalized.improvements.unshift('Use «Gerar borrador del informe» (passo ③) para construir o informe');
+    if (!normalized.improvements.some((s) => s.toLowerCase().includes('rascunho') || s.toLowerCase().includes('borrador'))) {
+      normalized.improvements.unshift('Use «Gerar rascunho do informe» para construir o informe');
     }
   }
   return normalized;

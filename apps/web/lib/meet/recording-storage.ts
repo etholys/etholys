@@ -26,7 +26,7 @@ export async function presignMeetRecordingUpload(opts: {
   contentType: string;
 }): Promise<{ uploadUrl: string; storageKey: string; publicUrl: string | null }> {
   if (!isObjectStorageConfigured()) {
-    throw new Error('Object storage (S3/R2) não configurado — AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_BUCKET_NAME');
+    throw new Error('Armazenamento de gravações indisponível de momento.');
   }
   const { bucketName } = getBucketConfig();
   const storageKey = meetRecordingObjectKey(opts.sessionId, opts.fileName);
@@ -56,7 +56,7 @@ export async function putMeetRecordingBuffer(opts: {
   body: Buffer;
 }): Promise<{ storageKey: string; recordingUrl: string }> {
   if (!isObjectStorageConfigured()) {
-    throw new Error('Object storage (S3/R2) não configurado');
+    throw new Error('Armazenamento de gravações indisponível de momento.');
   }
   const { bucketName } = getBucketConfig();
   const storageKey = meetRecordingObjectKey(opts.sessionId, opts.fileName);
@@ -100,7 +100,7 @@ export async function downloadMeetRecordingBuffer(storageKeyOrUrl: string): Prom
     };
   }
   if (!isObjectStorageConfigured()) {
-    throw new Error('Object storage não configurado para ler a gravação');
+    throw new Error('Não foi possível ler a gravação.');
   }
   const { bucketName } = getBucketConfig();
   const s3 = createS3Client();

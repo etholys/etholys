@@ -412,8 +412,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
       raw = text;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return NextResponse.json({ error: 'LLM failed', detail: msg }, { status: 502 });
+      console.error('[studio copilot] LLM', e);
+      return NextResponse.json(
+        { error: 'O assistente não está disponível neste momento. Tente novamente.' },
+        { status: 502 },
+      );
     }
 
     payload = parseStudioCopilotJson(raw);
@@ -627,8 +630,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
   } catch (e: unknown) {
     console.error('[POST /api/studio/documents/copilot]', e);
-    const msg = e instanceof Error ? e.message : 'Erro interno no copiloto.';
-    return NextResponse.json({ error: 'Copilot failed', detail: msg }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Não foi possível concluir o pedido. Tente novamente.' },
+      { status: 500 },
+    );
   }
 }
 

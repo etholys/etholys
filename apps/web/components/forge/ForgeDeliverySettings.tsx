@@ -160,7 +160,7 @@ export function ForgeDeliverySettings({
               }`}
             >
               <p className="font-bold">Online (con videollamada)</p>
-              <p className="text-xs text-slate-600 mt-1">Jitsi integrado en la sala virtual.</p>
+              <p className="text-xs text-slate-600 mt-1">Videollamada integrada en la sala.</p>
             </button>
           </div>
           {(live.sessionFormat ?? 'online') === 'online' && (

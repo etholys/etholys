@@ -6,15 +6,11 @@ import { useApp } from '@/app/providers';
 
 type Props = {
   withNet: (path: string) => string;
-  /** Contagem rápida de casos AT abertos (opcional) */
   openAtCases?: number | null;
 };
 
-/**
- * Duas portas claras — evita misturar “melhorar a minha empresa” com “prestar AT a clientes”.
- */
 export function NexusModeChooser({ withNet, openAtCases }: Props) {
-  const { locale, activeCompanyId } = useApp();
+  const { locale } = useApp();
   const L = locale === 'es' || locale === 'en' ? locale : 'pt';
 
   const copy =
@@ -22,41 +18,35 @@ export function NexusModeChooser({ withNet, openAtCases }: Props) {
       ? {
           title: '¿Qué querés hacer ahora?',
           mineTitle: 'Mejorar mi empresa',
-          mineBody: 'Diagnóstico, ruta y copiloto IA para la empresa activa.',
-          mineCta: 'Abrir copiloto y ruta',
-          deliverTitle: 'Prestar AT a clientes',
-          deliverBody: 'Contratos con varias empresas — trabajo separado por cliente.',
-          deliverCta: 'Abrir AT a clientes',
-          tip: 'Dos trabajos distintos en el menú.',
+          mineBody: 'Diagnóstico, ruta y copiloto para la empresa activa.',
+          mineCta: 'Continuar',
+          deliverTitle: 'Prestar asistencia a clientes',
+          deliverBody: 'Trabajo separado por cliente.',
+          deliverCta: 'Abrir asistencia técnica',
         }
       : L === 'en'
         ? {
             title: 'What do you want to do now?',
             mineTitle: 'Improve my company',
-            mineBody: 'Diagnosis, roadmap and AI copilot for the active company.',
-            mineCta: 'Open copilot & path',
-            deliverTitle: 'Deliver AT to clients',
-            deliverBody: 'Contracts with several companies — separate work per client.',
-            deliverCta: 'Open AT delivery',
-            tip: 'Two different jobs in the menu.',
+            mineBody: 'Diagnosis, roadmap and copilot for the active company.',
+            mineCta: 'Continue',
+            deliverTitle: 'Support clients',
+            deliverBody: 'Separate work per client.',
+            deliverCta: 'Open technical assistance',
           }
         : {
             title: 'O que queres fazer agora?',
             mineTitle: 'Melhorar a minha empresa',
-            mineBody: 'Diagnóstico, rota e copiloto IA para a empresa ativa.',
-            mineCta: 'Abrir copiloto e rota',
-            deliverTitle: 'Prestar AT a clientes',
-            deliverBody: 'Contratos com várias empresas — trabalho separado por cliente.',
-            deliverCta: 'Abrir AT a clientes',
-            tip: 'Dois trabalhos distintos no menu.',
+            mineBody: 'Diagnóstico, rota e copiloto para a empresa ativa.',
+            mineCta: 'Continuar',
+            deliverTitle: 'Prestar assistência a clientes',
+            deliverBody: 'Trabalho separado por cliente.',
+            deliverCta: 'Abrir assistência técnica',
           };
 
   return (
     <div className="space-y-3">
-      <div>
-        <h2 className="text-base font-semibold text-slate-900">{copy.title}</h2>
-        <p className="mt-1 text-xs text-slate-500">{copy.tip}</p>
-      </div>
+      <h2 className="text-base font-semibold text-slate-900">{copy.title}</h2>
       <div className="grid gap-3 sm:grid-cols-2">
         <Link
           href={withNet('/hub/nexus/coach')}
@@ -92,15 +82,6 @@ export function NexusModeChooser({ withNet, openAtCases }: Props) {
           </span>
         </Link>
       </div>
-      {activeCompanyId && (
-        <p className="text-[11px] text-slate-400">
-          {L === 'es'
-            ? 'El selector de empresa (arriba) es solo para «Mi empresa».'
-            : L === 'en'
-              ? 'The company selector (top) is only for “My company”.'
-              : 'O seletor de empresa (cima) é só para «A minha empresa».'}
-        </p>
-      )}
     </div>
   );
 }

@@ -17,7 +17,7 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: false,
-        error: 'Falta chave LLM no .env (ANTHROPIC_API_KEY ou LLM_API_KEY)',
+        error: 'O serviço de IA não está disponível neste momento.',
       },
       { status: 502 },
     );
@@ -62,7 +62,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       modelConfigured: model,
-      hint: 'SIEP, NEXUS, FORGE, Meet e importações usam LLM_MODEL / chave LLM.',
+      hint: 'IA operacional.',
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

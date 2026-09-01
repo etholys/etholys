@@ -54,7 +54,7 @@ export async function loadFileBuffer(cloudStoragePath: string): Promise<Buffer> 
     }
   }
   if (!isS3Configured()) {
-    throw new Error('Almacenamiento S3 no configurado');
+    throw new Error('Armazenamento de ficheiros indisponível de momento.');
   }
   const s3 = createS3Client();
   const { bucketName } = getBucketConfig();

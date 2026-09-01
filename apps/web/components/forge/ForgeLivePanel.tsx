@@ -218,7 +218,7 @@ export function ForgeLivePanel({
           {iframeSrc && (
             <div className="rounded-xl overflow-hidden border border-sky-200 bg-black/5">
               <p className="px-3 py-2 text-[10px] font-bold uppercase text-sky-800 bg-sky-100/80">
-                Vista previa — sala alumnos (Jitsi)
+                Vista previa — sala de alumnos
               </p>
               <iframe
                 title="Videollamada"

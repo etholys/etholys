@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       }
       if (!isS3Configured()) {
         return NextResponse.json(
-          { error: 'Almacenamiento S3 no configurado (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_BUCKET_NAME)' },
+          { error: 'Armazenamento de ficheiros indisponível de momento.' },
           { status: 503 },
         );
       }

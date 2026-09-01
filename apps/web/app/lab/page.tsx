@@ -34,9 +34,9 @@ const tools = [
       en: 'Internal engineering agent (1 per project)',
     },
     description: {
-      es: 'Desarrolla y publica software interno Etholys, externo o OSS con políticas de reuso y deploy flexible (preview → Contabo/custom).',
-      pt: 'Desenvolve e publica software interno Etholys, externo ou OSS com políticas de reuso e deploy flexível (preview → Contabo/custom).',
-      en: 'Build and ship Etholys-internal, external, or OSS software with reuse policies and flexible deploy (preview → Contabo/custom).',
+      es: 'Desarrolla y publica software interno, externo u open source, con vista previa y publicación cuando apruebes.',
+      pt: 'Desenvolve e publica software interno, externo ou open source, com pré-visualização e publicação quando aprovar.',
+      en: 'Build and ship internal, external, or open-source software, with preview and publish when you approve.',
     },
     icon: Hammer,
     color: 'from-amber-500 to-orange-700',

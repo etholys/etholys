@@ -18,23 +18,12 @@ export default function ForgeSettingsPage() {
           {t('Definições FORGE', 'Ajustes FORGE', 'FORGE settings')}
         </h1>
         <p className="mt-1 text-sm text-gray-600">
-          {t(
-            'Preferências de cursos, certificados e gamificação. Organização e licenças ficam na administração Etholys.',
-            'Preferencias de cursos, certificados y gamificación. Organización y licencias están en administración Etholys.',
-            'Course, certificate, and gamification preferences. Organization and licenses live in Etholys administration.',
-          )}
+          {t('Cursos, certificados e gamificação.', 'Cursos, certificados y gamificación.', 'Courses, certificates, and gamification.')}
         </p>
       </header>
 
       <section className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-gray-900">{t('Módulo FORGE', 'Módulo FORGE', 'FORGE module')}</h2>
-        <p className="mt-2 text-sm text-gray-600">
-          {t(
-            'Preferências avançadas deste módulo ainda não estão disponíveis. Use os atalhos abaixo para organização e acessos.',
-            'Las preferencias avanzadas de este módulo aún no están disponibles. Use los atajos de abajo para organización y accesos.',
-            'Advanced preferences for this module are not available yet. Use the shortcuts below for organization and access.',
-          )}
-        </p>
+        <h2 className="text-sm font-semibold text-gray-900">{t('Atalhos', 'Atajos', 'Shortcuts')}</h2>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2">

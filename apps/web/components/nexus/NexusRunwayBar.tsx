@@ -19,7 +19,7 @@ function copy(locale: string) {
     return {
       title: 'Onde ficas no processo',
       detail:
-        'NEXUS é um fluxo contínuo: fase, diagnóstico, rota viva, apoio, método. Abaixo, atalhos — sem voltar a tratar a incubação como “módulo 1”.',
+        'NEXUS é um fluxo contínuo: fase, diagnóstico, rota, apoio e método.',
       continue: 'Seguinte',
       allDone: 'Rever fase e metas',
     };
@@ -28,7 +28,7 @@ function copy(locale: string) {
     return {
       title: 'Where you are in the process',
       detail:
-        'NEXUS is one flow: phase, diagnosis, live roadmap, support, method. Shortcuts below—incubation is the whole process, not “step 1.”',
+        'NEXUS is one flow: phase, diagnosis, roadmap, support, and method.',
       continue: 'Next',
       allDone: 'Review phase & goals',
     };
@@ -36,7 +36,7 @@ function copy(locale: string) {
   return {
     title: 'Onde ficas no processo',
     detail:
-      'NEXUS é um fluxo contínuo: fase, diagnóstico, rota, apoio, método. Atalhos abaixo — a incubação é o processo todo, não “etapa 1”.',
+      'NEXUS é um fluxo contínuo: fase, diagnóstico, rota, apoio e método.',
     continue: 'Seguinte',
     allDone: 'Rever fase e metas',
   };

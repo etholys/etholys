@@ -97,13 +97,12 @@ export async function POST(req: NextRequest) {
         raw.includes('nexusMirror'));
 
     const hint = missingSchemaHint
-      ? 'Base de dados desactualizada neste ambiente. Em apps/web: `npx prisma migrate deploy` e `npx prisma generate`, depois reinicie o servidor.'
+      ? 'Não foi possível criar a sessão. Tente novamente dentro de instantes.'
       : undefined;
 
     return NextResponse.json(
       {
         error: 'Não foi possível criar a sessão do assessor.',
-        detail: raw,
         ...(hint ? { hint } : {}),
       },
       { status: 500 },

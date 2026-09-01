@@ -227,9 +227,9 @@ export function MeetEventDetailPopup({
         sent
           ? t(`Convite reenviado para ${email}`, `Invitación reenviada a ${email}`, `Invite resent to ${email}`)
           : t(
-              'Convite registado (e-mail pode não ter sido enviado — falta RESEND_API_KEY)',
-              'Invitación registrada (el email puede no haberse enviado — falta RESEND_API_KEY)',
-              'Invite logged (email may not have sent — RESEND_API_KEY missing)',
+              'Convite registado. Se o e-mail não chegar, partilhe o link do convite.',
+              'Invitación registrada. Si el email no llega, comparta el enlace.',
+              'Invite saved. If the email does not arrive, share the invite link.',
             ),
       );
     } catch (err) {

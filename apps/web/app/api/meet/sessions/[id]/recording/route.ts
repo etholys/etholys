@@ -68,7 +68,7 @@ export async function POST(req: Request, ctx: Ctx) {
     if (action === 'presign') {
       if (!isMeetRecordingStorageReady()) {
         return NextResponse.json(
-          { error: 'S3/R2 não configurado (AWS_* / R2_*)' },
+          { error: 'Armazenamento de gravações indisponível de momento.' },
           { status: 503 },
         );
       }

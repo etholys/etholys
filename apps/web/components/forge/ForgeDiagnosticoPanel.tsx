@@ -13,15 +13,7 @@ type Props = {
   error: string | null;
 };
 
-export function ForgeDiagnosticoPanel({
-  ok,
-  inDocker,
-  webRoot,
-  cwd,
-  forgeCourseCount,
-  forgeDelegates,
-  error,
-}: Props) {
+export function ForgeDiagnosticoPanel({ ok, forgeCourseCount, error }: Props) {
   const ft = useForgeT();
   const displayError =
     error?.includes('forgeCourse') && error.includes('delegate')
@@ -35,25 +27,15 @@ export function ForgeDiagnosticoPanel({
       </Link>
       <h1 className="mt-4 text-2xl font-black text-slate-900">{ft('forge.diagnostico.title')}</h1>
       <p className="mt-2 text-sm text-slate-500">{ft('forge.diagnostico.subtitle')}</p>
-      <pre
-        className={`mt-6 overflow-auto rounded-xl border p-4 text-sm ${
+      <div
+        className={`mt-6 rounded-xl border px-4 py-3 text-sm ${
           ok ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-red-200 bg-red-50 text-red-900'
         }`}
       >
-        {JSON.stringify(
-          {
-            ok,
-            inDocker,
-            webRoot,
-            cwd,
-            forgeCourseCount,
-            forgeDelegates,
-            error: displayError,
-          },
-          null,
-          2
-        )}
-      </pre>
+        {ok
+          ? `${forgeCourseCount} ${ft('forge.dashboard.stat.published').toLowerCase()}.`
+          : displayError || ft('forge.diagnostico.prismaMissing')}
+      </div>
     </div>
   );
 }

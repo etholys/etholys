@@ -27,7 +27,7 @@ function getTranscribeConfig(): { apiKey: string; baseUrl: string; model: string
   ).trim();
   if (!apiKey) {
     throw new Error(
-      'Falta chave de STT (OPENAI_API_KEY ou MEET_TRANSCRIBE_API_KEY) para transcrição automática',
+      'A transcrição automática não está disponível neste momento.',
     );
   }
   const baseUrl = (
@@ -76,7 +76,7 @@ export async function transcribeMeetRecording(opts: {
     const mb = Math.round(buffer.byteLength / 1024 / 1024);
     const lim = Math.round(maxBytes / 1024 / 1024);
     throw new Error(
-      `Gravação demasiado grande para Whisper (${mb} MB; limite ~${lim} MB). Exporta só o áudio (m4a/mp3) ou corta o ficheiro e volta a tentar no CHORUS.`,
+      `A gravação é demasiado grande (${mb} MB; limite ~${lim} MB). Envie só o áudio ou um ficheiro mais curto.`,
     );
   }
 
@@ -114,7 +114,7 @@ export async function transcribeMeetRecording(opts: {
         languageHint: opts.languageHint,
       });
     }
-    throw new Error(`STT falhou (${res.status}): ${body.slice(0, 400)}`);
+    throw new Error(`Não foi possível transcrever a gravação.`);
   }
 
   const data = (await res.json()) as {
@@ -165,8 +165,8 @@ async function transcribePlainTextFallback(opts: {
     body: form,
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`STT falhou (${res.status}): ${body.slice(0, 400)}`);
+    await res.text().catch(() => '');
+    throw new Error(`Não foi possível transcrever a gravação.`);
   }
   const data = (await res.json()) as { text?: string };
   const text = (data.text || '').trim();

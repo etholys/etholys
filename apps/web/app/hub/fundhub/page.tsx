@@ -56,7 +56,7 @@ export default function FundHubPage() {
     {
       label: t('Propostas em rascunho', 'Borradores', 'Draft proposals'),
       value: String(kpi.draftProposals),
-      description: t('Na base de dados', 'En base de datos', 'In database'),
+      description: t('Em elaboração', 'En elaboración', 'In progress'),
     },
     {
       label: t('Compliance', 'Compliance', 'Compliance'),
@@ -165,7 +165,7 @@ export default function FundHubPage() {
               {t('Captação e rede', 'Captación y red', 'Funding & network')}
             </p>
             <h1 className="mt-3 text-3xl font-bold text-gray-900 md:text-4xl">
-              {t('O seu painel de oportunidades', 'Su panel de oportunidades', 'Your opportunity cockpit')}
+              {t('O seu painel de oportunidades', 'Su panel de oportunidades', 'Your opportunities dashboard')}
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-gray-600">
               {t(
@@ -287,10 +287,10 @@ export default function FundHubPage() {
         <aside className="space-y-6">
           <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-6">
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
-              {t('Diferencial FUNDHUB', 'Diferencial FUNDHUB', 'FUNDHUB edge')}
+              {t('Destaques', 'Destacados', 'Highlights')}
             </p>
             <ul className="mt-4 space-y-2 text-sm text-amber-950">
-              <li>• {t('Perfil institucional (dados SIEP + pipeline)', 'Perfil institucional (datos SIEP + pipeline)', 'Institutional profile (SIEP data + pipeline)')}</li>
+              <li>• {t('Perfil institucional alinhado com os vossos projetos', 'Perfil institucional alineado con vuestros proyectos', 'Institutional profile aligned with your projects')}</li>
               <li>• {t('Propostas com contexto da organização', 'Propuestas con contexto organizacional', 'Proposals with org context')}</li>
               <li>• {t('Parceiros e compliance no mesmo fluxo', 'Socios y compliance en el mismo flujo', 'Partners and compliance in one flow')}</li>
             </ul>

@@ -102,17 +102,17 @@ export function MeetingsSection({ project }: SectionProps) {
             <SectionTooltip
               title="Etholys Meet"
               content={t(
-                'Salas Jitsi ligadas a este projeto. Após a call, gere resumo e tarefas SIEP.',
-                'Salas Jitsi vinculadas a este proyecto. Tras la call, genera resumen y tareas SIEP.',
-                'Jitsi rooms linked to this project. After the call, generate summary and SIEP tasks.',
+                'Reuniões ligadas a este projeto. Após a chamada, gere resumo e tarefas.',
+                'Reuniones ligadas a este proyecto. Tras la llamada, genera resumen y tareas.',
+                'Meetings linked to this project. After the call, generate a summary and tasks.',
               )}
             />
           </h2>
           <p className="mt-1 text-sm text-gray-500">
             {t(
-              'Espelho SIEP do motor Meet — breakouts no Jitsi self-hosted.',
-              'Espejo SIEP del motor Meet — breakouts en Jitsi self-hosted.',
-              'SIEP mirror of the Meet engine — breakouts on self-hosted Jitsi.',
+              'Crie e abra reuniões deste projeto.',
+              'Cree y abra reuniones de este proyecto.',
+              'Create and open meetings for this project.',
             )}
           </p>
         </div>

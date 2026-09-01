@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            'En fase pré-comercial debe elegir al menos un sistema/función (SIEP, ATLAS, FORGE, …).',
+            'Escolha pelo menos um sistema no convite.',
         },
         { status: 400 },
       );

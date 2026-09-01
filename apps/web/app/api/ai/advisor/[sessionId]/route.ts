@@ -329,7 +329,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            'Esta sessão é do assessor workspace. Para o Copiloto NEXUS utilize /hub/nexus e inicie a conversa a partir daí.',
+            'Esta conversa é do Advisor. Para o Copiloto NEXUS, abra NEXUS no Hub.',
           code: 'SESSION_KIND_MISMATCH',
         },
         { status: 409 },
@@ -341,7 +341,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          'Esta conversa é do Copiloto NEXUS (/hub/nexus). Para o assessor Etholys (Centro ou chat com IA contexto) abra uma conversa nova.',
+          'Esta conversa é do Copiloto NEXUS. Para o Advisor, inicie uma conversa nova.',
         code: 'NEXUS_SESSION_REQUIRES_WORKSPACE_MODE',
       },
       { status: 409 },
@@ -537,7 +537,10 @@ export async function POST(
     }
   } catch (err) {
     console.error('[AI Advisor] LLM error:', err);
-    return NextResponse.json({ error: 'AI unavailable', detail: String(err) }, { status: 503 });
+    return NextResponse.json(
+      { error: 'O assistente não está disponível neste momento. Tente novamente.' },
+      { status: 503 },
+    );
   }
 
   // Save AI response

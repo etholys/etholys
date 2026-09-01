@@ -70,7 +70,7 @@ export function getLlmApiKey(): string {
     process.env.CLAUDE_API_KEY ||
     process.env.LLM_API_KEY;
   if (!key?.trim()) {
-    throw new Error('Falta chave LLM no .env (ANTHROPIC_API_KEY ou LLM_API_KEY)');
+    throw new Error('O serviço de IA não está disponível neste momento.');
   }
   return key.trim();
 }
@@ -392,7 +392,7 @@ export async function llmCompleteJsonText(
   });
   if (finishReason === 'MAX_TOKENS') {
     throw new Error(
-      'A IA cortou a resposta (limite de saída). Aumente LLM_MAX_OUTPUT_TOKENS no .env (até 64000), divida o ficheiro em partes menores, ou reduza linhas no Excel/CSV.',
+      'A IA cortou a resposta. Tente um documento mais curto, ou divida o ficheiro em partes menores.',
     );
   }
   return text;
@@ -445,7 +445,7 @@ export async function llmCompleteVision(
   });
   if (finishReason === 'MAX_TOKENS') {
     throw new Error(
-      'A IA cortou a resposta (limite de saída). Aumente LLM_MAX_OUTPUT_TOKENS no .env (até 64000) e reinicie o servidor.',
+      'A IA cortou a resposta. Tente de novo ou use um documento mais curto.',
     );
   }
   return text;
@@ -470,7 +470,7 @@ export async function llmCompleteJsonWithPdf(
   });
   if (finishReason === 'MAX_TOKENS') {
     throw new Error(
-      'A IA cortou a resposta (limite de saída). Aumente LLM_MAX_OUTPUT_TOKENS no .env (até 64000), ou use um PDF mais curto.',
+      'A IA cortou a resposta. Tente um PDF mais curto.',
     );
   }
   return text;

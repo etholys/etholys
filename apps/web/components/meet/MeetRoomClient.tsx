@@ -721,9 +721,9 @@ export function MeetRoomClient({ sessionId }: Props) {
           autoWhisper ||
           window.confirm(
             t(
-              'Gravação guardada. Queres enviar para o CHORUS gerar a transcrição diarizada (Whisper)?',
-              'Grabación guardada. ¿Quieres subirla a CHORUS para la transcripción diarizada (Whisper)?',
-              'Recording saved. Upload to CHORUS for a diarized Whisper transcript?',
+              'Gravação guardada. Enviar para gerar a transcrição?',
+              'Grabación guardada. ¿Subir para generar la transcripción?',
+              'Recording saved. Upload to generate the transcript?',
             ),
           );
         if (wantUpload) {
@@ -782,17 +782,17 @@ export function MeetRoomClient({ sessionId }: Props) {
             if (tr.ok) {
               setError(
                 t(
-                  'CHORUS: gravação enviada e transcrição diarizada em curso — vê o recap ao sair.',
-                  'CHORUS: grabación subida y transcripción diarizada en curso — mira el recap al salir.',
-                  'CHORUS: recording uploaded; diarized transcript in progress — check the recap when you leave.',
+                  'Gravação enviada. A transcrição está a ser gerada — veja o resumo ao sair.',
+                  'Grabación enviada. La transcripción se está generando — vea el recap al salir.',
+                  'Recording uploaded. The transcript is being generated — check the recap when you leave.',
                 ),
               );
             } else {
               setError(
                 t(
-                  'Gravação na nuvem OK. Abre o recap e corre «Transcrever» se a IA ainda não arrancou.',
-                  'Grabación en la nube OK. Abre el recap y pulsa «Transcribir» si la IA aún no arrancó.',
-                  'Cloud recording OK. Open the recap and run “Transcribe” if AI did not start.',
+                  'Gravação pronta. Abra o resumo e use Transcrever se ainda não houver texto.',
+                  'Grabación lista. Abra el recap y use Transcribir si aún no hay texto.',
+                  'Cloud recording is ready. Open the recap and use Transcribe if there is no text yet.',
                 ),
               );
             }
@@ -1534,14 +1534,14 @@ export function MeetRoomClient({ sessionId }: Props) {
               <p className="text-[10px] leading-relaxed text-white/35">
                 {joinPrefs.enableLiveTranscript
                   ? t(
-                      'Transcrição ao vivo (qualidade limitada). Para texto fiável, grava e usa Whisper no recap.',
-                      'Transcripción en vivo (calidad limitada). Para texto fiable, graba y usa Whisper en el recap.',
-                      'Live transcript (limited quality). For reliable text, record and use Whisper in the recap.',
+                      'Transcrição ao vivo (qualidade limitada). Para texto mais fiável, grave e use Transcrever no resumo.',
+                      'Transcripción en vivo (calidad limitada). Para texto más fiable, grabe y use Transcribir en el recap.',
+                      'Live transcript (limited quality). For more reliable text, record and use Transcribe in the recap.',
                     )
                   : t(
-                      'Grava no PC e activa Whisper na entrada para transcrição profissional após a reunião.',
-                      'Graba en el PC y activa Whisper al entrar para transcripción profesional tras la reunión.',
-                      'Record on this PC and enable Whisper when joining for professional post-meeting transcription.',
+                      'Grave nesta sessão e active a transcrição automática na entrada para um resumo após a reunião.',
+                      'Grabe en esta sesión y active la transcripción automática al entrar para un resumen tras la reunión.',
+                      'Record in this session and enable automatic transcription when joining for a post-meeting recap.',
                     )}
               </p>
             </div>

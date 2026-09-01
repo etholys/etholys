@@ -144,9 +144,9 @@ export function LicenseOverviewPanel() {
         ) : (
           <p className="text-sm text-slate-700">
             {t(
-              'Todos os sistemas (ainda sem restrição configurada para si).',
-              'Todos los sistemas (aún sin restricción configurada para usted).',
-              'All systems (no restriction configured for you yet).',
+              'Todos os sistemas desta organização.',
+              'Todos los sistemas de esta organización.',
+              'All systems in this organization.',
             )}
           </p>
         )}
@@ -156,15 +156,15 @@ export function LicenseOverviewPanel() {
         <div>
           <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <Shield className="h-3.5 w-3.5" />
-            {t('Utilizadores com grant', 'Usuarios con grant', 'Users with grants')}
+            {t('Utilizadores', 'Usuarios', 'Users')}
             <span className="font-normal normal-case text-slate-400">({grants.length})</span>
           </p>
           {grants.length === 0 ? (
             <p className="text-sm text-slate-600">
               {t(
-                'Nenhum grant explícito — todos entram por compatibilidade até configurar em Equipa.',
-                'Ningún grant explícito — todos entran por compatibilidad hasta configurar en Equipo.',
-                'No explicit grants — everyone has full access until you configure Team.',
+                'Nenhum acesso individual definido — configure em Equipa quando precisar.',
+                'Ningún acceso individual definido — configure en Equipo cuando lo necesite.',
+                'No individual access set — configure Team when you need to.',
               )}
             </p>
           ) : (

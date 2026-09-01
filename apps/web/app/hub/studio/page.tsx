@@ -704,15 +704,6 @@ function StudioHubInner() {
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
             <p className="font-semibold">{t('Studio indisponível', 'Studio no disponible', 'Studio unavailable')}</p>
             <p className="mt-1">{error}</p>
-            {(error.includes('schema') || error.includes('prisma') || error.includes('Studio schema')) && (
-              <p className="mt-2 text-xs text-amber-800">
-                {t(
-                  'Aplique manual_etholys_studio.sql e execute prisma generate.',
-                  'Aplique manual_etholys_studio.sql y ejecute prisma generate.',
-                  'Apply manual_etholys_studio.sql and run prisma generate.',
-                )}
-              </p>
-            )}
             <p className="mt-3">
               <Link href="/studio/shared" className="font-semibold text-orange-700 underline">
                 {t('Ver conteúdos partilhados comigo', 'Ver contenidos compartidos conmigo', 'View content shared with me')}

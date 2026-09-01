@@ -275,14 +275,14 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
       setMsg(
         finalize
           ? t(
-              'CHORUS: transcrição diarizada + resumo gerados.',
-              'CHORUS: transcripción diarizada + resumen listos.',
-              'CHORUS: diarized transcript + summary ready.',
+              'Transcrição e resumo prontos.',
+              'Transcripción y resumen listos.',
+              'Transcript and summary ready.',
             )
           : t(
-              'CHORUS: transcrição diarizada pronta — revê e gera o resumo.',
-              'CHORUS: transcripción diarizada lista — revisa y genera el resumen.',
-              'CHORUS: diarized transcript ready — review and generate summary.',
+              'Transcrição pronta — reveja e gere o resumo.',
+              'Transcripción lista — revise y genere el resumen.',
+              'Transcript ready — review and generate the summary.',
             ),
       );
       await loadDetail();
@@ -328,9 +328,9 @@ export function MeetPostMeetingPanel({ companyId, sessionId, locale, onClose, on
       <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 space-y-2">
         <p>
           {t(
-            'Gravação: envie um ficheiro ou grave neste PC. O CHORUS usa Whisper + diarização (falantes) para uma transcrição pós-chamada profissional.',
-            'Grabación: sube un archivo o graba en este PC. CHORUS usa Whisper + diarización (hablantes) para una transcripción post-llamada profesional.',
-            'Recording: upload a file or record on this PC. CHORUS uses Whisper + diarization (speakers) for a professional post-call transcript.',
+            'Grave ou envie um ficheiro para gerar a transcrição com os nomes de quem falou.',
+            'Grabe o suba un archivo para generar la transcripción con los nombres de quien habló.',
+            'Record or upload a file to generate the transcript with speaker names.',
           )}
         </p>
         <div className="flex flex-wrap items-center gap-2">

@@ -23,7 +23,7 @@ async function refreshMicrosoftToken(refreshToken: string): Promise<{
   const clientSecret =
     process.env.AZURE_AD_CLIENT_SECRET?.trim() || process.env.AZURE_AD_CLIENTSECRET?.trim();
   if (!clientId || !clientSecret) {
-    throw new Error('AZURE_AD_CLIENT_ID / AZURE_AD_CLIENT_SECRET em falta');
+    throw new Error('Outlook Calendar não está disponível neste momento.');
   }
   const res = await fetch(MS_TOKEN_URL, {
     method: 'POST',
@@ -92,7 +92,7 @@ export async function createOutlookCalendarEvent(
   const { accessToken, needsReconnect, connected } = await getOutlookCalendarAccessToken(userId);
   if (!connected || needsReconnect || !accessToken) {
     throw new Error(
-      'Outlook Calendar não ligado. Configure Azure AD (AZURE_AD_*) e faça login com Microsoft com Calendars.ReadWrite.',
+      'Outlook Calendar não está ligado. Ligue a conta Microsoft em Meet.',
     );
   }
 

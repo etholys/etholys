@@ -204,8 +204,7 @@ export async function POST(req: Request) {
         await setBudgetFlowSql(item.id, flow);
       } catch (sqlErr) {
         await prisma.companyBudgetItem.delete({ where: { id: item.id } }).catch(() => {});
-        const hint =
-          'Não foi possível gravar budgetFlow. Rode na pasta apps/web: npx prisma db push';
+        const hint = 'Não foi possível gravar o fluxo orçamental. Tente novamente.';
         console.error('setBudgetFlowSql createItem', sqlErr);
         return NextResponse.json({ error: hint }, { status: 500 });
       }
@@ -260,7 +259,7 @@ export async function PUT(req: Request) {
         } catch (sqlErr) {
           console.error('setBudgetFlowSql updateItem', sqlErr);
           return NextResponse.json(
-            { error: 'Não foi possível atualizar budgetFlow. Rode: npx prisma db push' },
+            { error: 'Não foi possível atualizar o fluxo orçamental. Tente novamente.' },
             { status: 500 }
           );
         }

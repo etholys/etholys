@@ -20,7 +20,7 @@ export default async function ForgeDiagnosticoPage() {
       forgeCourseCount = await db.forgeCourse.count();
       ok = true;
     } else {
-      error = 'Prisma sem delegate forgeCourse — corra prisma generate no contentor.';
+      error = 'Cursos indisponíveis neste momento.';
     }
   } catch (e) {
     error = e instanceof Error ? e.message : 'Erro desconhecido';

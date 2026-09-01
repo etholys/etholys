@@ -98,7 +98,7 @@ export default function ForgotPasswordPage() {
         {resetUrl && (
           <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900">
             <p className="font-bold mb-1">
-              {t('Modo soporte (email no configurado)', 'Modo suporte (email não configurado)', 'Support mode (email not configured)')}
+              {t('Link de recuperação', 'Enlace de recuperación', 'Recovery link')}
             </p>
             <a href={resetUrl} className="break-all underline">
               {resetUrl}

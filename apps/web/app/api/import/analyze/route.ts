@@ -364,11 +364,11 @@ ${hintParts.length ? `\nInstrucciones adicionales:\n- ${hintParts.join('\n- ')}`
       return NextResponse.json(
         {
           error:
-            'Não foi possível processar os documentos com IA. Veja o detalhe abaixo e confira a chave LLM e LLM_MODEL no .env.',
+            'Não foi possível processar os documentos com IA. Tente de novo ou use um ficheiro mais curto.',
           detail,
           llmModel,
           hint:
-            'Defina LLM_MODEL no .env e reinicie o servidor. A app tenta fallbacks se houver 429/503.',
+            'Se o problema continuar, contacte o administrador da plataforma.',
           modelsTried: getLlmModelCandidates(),
         },
         { status: 502 }
@@ -399,7 +399,7 @@ ${hintParts.length ? `\nInstrucciones adicionales:\n- ${hintParts.join('\n- ')}`
       return NextResponse.json(
         {
           error:
-            'La respuesta de la IA no era JSON válido (a veces por límite de tokens o texto extra). Pruebe con menos archivos a la vez o aumente LLM_MAX_OUTPUT_TOKENS en el servidor.',
+            'A resposta da IA não foi válida. Tente com menos ficheiros de cada vez.',
           detail: String((parseErr as Error)?.message || parseErr),
           rawPreview: rawContent.substring(0, 400),
         },

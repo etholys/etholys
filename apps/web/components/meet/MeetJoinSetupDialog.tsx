@@ -72,9 +72,9 @@ export function MeetJoinSetupDialog({
           </select>
           <p className="mt-1 text-[11px] text-slate-500">
             {t(
-              'Usado na gravação e transcrição profissional (Whisper). Evita misturar idiomas.',
-              'Usado en la grabación y transcripción profesional (Whisper). Evita mezclar idiomas.',
-              'Used for recording and professional transcription (Whisper). Avoids mixed languages.',
+              'Usado na gravação e na transcrição. Evite misturar idiomas.',
+              'Usado en la grabación y la transcripción. Evite mezclar idiomas.',
+              'Used for recording and transcription. Avoid mixing languages.',
             )}
           </p>
         </label>
@@ -124,9 +124,9 @@ export function MeetJoinSetupDialog({
                 <span className="flex items-center gap-1.5 text-sm font-medium text-teal-900">
                   <Sparkles className="h-4 w-4" />
                   {t(
-                    'Transcrição profissional (Whisper)',
-                    'Transcripción profesional (Whisper)',
-                    'Professional transcript (Whisper)',
+                    'Transcrição automática após a reunião',
+                    'Transcripción automática tras la reunión',
+                    'Automatic transcript after the meeting',
                   )}
                 </span>
                 <span className="mt-0.5 block text-xs text-teal-800/80">
@@ -157,9 +157,9 @@ export function MeetJoinSetupDialog({
                 </span>
                 <span className="mt-0.5 block text-xs text-amber-700">
                   {t(
-                    'Qualidade inferior — pode errar muito. Preferir gravação + Whisper.',
-                    'Calidad inferior — puede fallar mucho. Preferir grabación + Whisper.',
-                    'Lower quality — often inaccurate. Prefer record + Whisper.',
+                    'Qualidade inferior — pode errar. Prefira gravar e transcrever depois.',
+                    'Calidad inferior — puede fallar. Prefiera grabar y transcribir después.',
+                    'Lower quality — may be inaccurate. Prefer recording and transcribing afterwards.',
                   )}
                 </span>
               </span>

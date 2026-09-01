@@ -126,9 +126,9 @@ export function SystemLicenseGate({ system, children, isExemptPath }: Props) {
                   'This account can only use the FORGE course you were invited to. No access to the rest of Etholys.',
                 )
               : t(
-                  `A sua conta não tem acesso a ${system} nesta empresa. Peça ao administrador ou escolha outro sistema no Hub.`,
-                  `Su cuenta no tiene acceso a ${system} en esta empresa. Pida al administrador o elija otro sistema en el Hub.`,
-                  `Your account does not have access to ${system} for this company. Ask your admin or pick another system in the Hub.`,
+                  `A sua conta não tem acesso a ${system} nesta organização.`,
+                  `Su cuenta no tiene acceso a ${system} en esta organización.`,
+                  `Your account does not have access to ${system} in this organization.`,
                 )}
           </p>
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">

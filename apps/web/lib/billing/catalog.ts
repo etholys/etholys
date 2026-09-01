@@ -375,9 +375,9 @@ const ADDON_SKUS: BillingSku[] = [
     kind: 'addon',
     name: L('Studio (documentos com IA)', 'Studio (documentos con IA)', 'Studio (AI documents)'),
     blurb: L(
-      'Ferramenta transversal — gate comercial quando deixar de ser isenta.',
-      'Herramienta transversal — gate comercial cuando deje de ser exenta.',
-      'Transversal tool — commercial gate when it is no longer exempt.',
+      'Documentos com IA: pastas, modelos e canvas.',
+      'Documentos con IA: carpetas, plantillas y canvas.',
+      'AI documents: folders, templates, and canvas.',
     ),
     systems: [],
     requiresSystems: [],

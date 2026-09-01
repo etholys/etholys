@@ -35,12 +35,12 @@ export default function ForgeDashboard() {
     Promise.all([
       fetch(`/api/forge/overview${q}`).then(async (r) => {
         const d = await r.json();
-        if (!r.ok) throw new Error(d.error || `overview ${r.status}`);
+        if (!r.ok) throw new Error('overview');
         return d;
       }),
       fetch(`/api/forge/courses${q}`).then(async (r) => {
         const d = await r.json();
-        if (!r.ok) throw new Error(d.error || `courses ${r.status}`);
+        if (!r.ok) throw new Error('courses');
         return d;
       }),
     ])
@@ -48,8 +48,8 @@ export default function ForgeDashboard() {
         if (overview.stats) setStats(overview.stats);
         setCourses((coursesRes.courses ?? []).slice(0, 4));
       })
-      .catch((e) => {
-        setLoadError(e instanceof Error ? e.message : ft('forge.dashboard.loadError'));
+      .catch(() => {
+        setLoadError(ft('forge.dashboard.loadError'));
       });
   }, [activeCompanyId]);
 
@@ -68,10 +68,7 @@ export default function ForgeDashboard() {
 
       {loadError ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {loadError}.{' '}
-          <Link href="/hub/forge/diagnostico" className="font-semibold underline">
-            {ft('forge.dashboard.diagnostic')}
-          </Link>
+          {ft('forge.dashboard.loadError')}
         </div>
       ) : null}
 

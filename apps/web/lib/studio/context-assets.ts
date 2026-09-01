@@ -122,7 +122,7 @@ async function loadStudioContextBuffer(storagePath: string): Promise<Buffer> {
   if (storagePath.startsWith('uploads/studio-context/')) {
     return fs.readFile(path.join(process.cwd(), 'public', storagePath));
   }
-  if (!isS3Configured()) throw new Error('S3 não configurado');
+  if (!isS3Configured()) throw new Error('Armazenamento de ficheiros indisponível de momento.');
   const s3 = createS3Client();
   const { bucketName } = getBucketConfig();
   const resp = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: storagePath }));

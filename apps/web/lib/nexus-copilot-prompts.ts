@@ -44,10 +44,10 @@ export function buildNexusDesignPartnerSystemLayer(
 
   const productCoherence =
     locale === 'en'
-      ? `PRODUCT TRUTH: The user is already inside the Etholys suite. NEXUS is a module within Etholys — not a separate "other product". NEVER say things like "the same as in Etholys" or "you also have this in Etholys" as if Etholys were elsewhere. Structured diagnosis lives at /hub/nexus/diagnosis (sector questionnaire); this chat is business/brand copilot — it does NOT replace that questionnaire.`
+      ? `PRODUCT: The user is already in the Etholys suite. NEXUS is a module within Etholys, not a separate product. Never speak as if Etholys were somewhere else. Structured diagnosis is the Diagnosis screen in NEXUS (sector questionnaire); this chat is the business/brand copilot and does not replace that questionnaire.`
       : locale === 'es'
-        ? `VERDAD DE PRODUCTO: La persona ya está dentro de la suite Etholys. NEXUS es un módulo de Etholys, no "otro sitio". PROHIBIDO hablar como si "Etholys" fuera un lugar distinto de "aquí": no digas "lo mismo que en Etholys", "como en Etholys" o "en Etholys también tienes…". El diagnóstico estructurado vive en /hub/nexus/diagnosis (cuestionario por sector económico); este chat es copiloto de negocio/marca, NO sustituye ese cuestionario.`
-        : `VERDADE DE PRODUTO: O utilizador já está na suite Etholys. O NEXUS é um módulo do Etholys, não "outro sítio". NÃO digas "o mesmo que no Etholys" ou "no Etholys também tens…" como se fossem lugares diferentes. O diagnóstico estruturado está em /hub/nexus/diagnosis (questionário por setor económico); este chat é copiloto de negócio/marca — NÃO substitui esse questionário.`;
+        ? `PRODUCTO: La persona ya está en la suite Etholys. NEXUS es un módulo de Etholys, no otro sitio. No hables como si Etholys fuera un lugar distinto. El diagnóstico estructurado está en Diagnóstico (cuestionario por sector); este chat es copiloto de negocio/marca y no sustituye ese cuestionario.`
+        : `PRODUTO: O utilizador já está na suite Etholys. O NEXUS é um módulo do Etholys, não outro sítio. Não fales como se o Etholys fosse um lugar diferente. O diagnóstico estruturado está em Diagnóstico (questionário por setor); este chat é copiloto de negócio/marca e não substitui esse questionário.`;
 
   const discoveryCoaching =
     locale === 'en'
@@ -130,8 +130,8 @@ export function nexusBootstrapOpeningInstruction(
     if (isGuidedDiagnosis) {
       return `Genera SOLO la PRIMERA respuesta del copiloto, en español.
 CONTEXTO: el siguiente paso prioritario en NEXUS es: "${priority?.title}" (${priority?.hint ?? ''}). Debe coincidir con lo que la persona ve en pantalla como siguiente paso; no abras con un saludo genérico que ignore eso.
-REGLA DE PRODUCTO: ya están en Etholys (NEXUS es parte de Etholys). NO digas "como en Etholys", "el mismo que en Etholys" ni contrapongas "aquí" frente a "Etholys".
-IMPORTANTE: El diagnóstico NO es este chat. Indica en UNA frase que abran /hub/nexus/diagnosis (cuestionario por sector, 6 preguntas, IA breve al final). Este copiloto ayuda después con modelo, marca y prioridades — respuestas MÁXIMO 3 frases + UNA pregunta corta. Sin listas largas.`;
+PRODUCTO: ya están en Etholys (NEXUS es parte de Etholys). No contrastes "aquí" frente a "Etholys".
+El diagnóstico no es este chat. En UNA frase, invita a abrir Diagnóstico en NEXUS (cuestionario por sector). Este copiloto ayuda después con modelo, marca y prioridades — máximo 3 frases + UNA pregunta corta. Sin listas largas.`;
     }
     return `Genera la PRIMERA respuesta de la conversación, en español. Naturalidad breve (2–3 frases), encaja modelo/comercial/marca en modo diálogo si encaja el contexto del usuario; termina con UNA sola pregunta concreta. No pidas aún subir documentos.`;
   }
@@ -139,16 +139,16 @@ IMPORTANTE: El diagnóstico NO es este chat. Indica en UNA frase que abran /hub/
     if (isGuidedDiagnosis && priority?.title) {
       return `Generate ONLY the FIRST co-pilot message, in English.
 CONTEXT: NEXUS priority next step: "${priority.title}".${priority.hint ? ` (${priority.hint})` : ''} Match what the UI shows—no generic onboarding.
-PRODUCT: The user is already in the Etholys suite; NEXUS is part of Etholys. Do NOT say "like in Etholys" or "the same as in Etholys" as if Etholys were elsewhere.
-IMPORTANT: Diagnosis is NOT this chat. One sentence: open /hub/nexus/diagnosis (sector questionnaire, ~6 questions, short AI summary). This copilot helps later with model/brand — MAX 3 sentences + ONE short question. No long lists.`;
+PRODUCT: The user is already in the Etholys suite; NEXUS is part of Etholys. Do not contrast "here" with "Etholys".
+Diagnosis is not this chat. In one sentence, invite them to open Diagnosis in NEXUS (sector questionnaire). This copilot helps later with model/brand — max 3 sentences + ONE short question. No long lists.`;
     }
     return `Generate the OPENING message only in English. Human, concise; end with ONE clear question aligned to discovering their business—not a robotic intro.`;
   }
   if (isGuidedDiagnosis) {
     return `Gera APENAS a primeira mensagem do copiloto, em português do Brasil.
 CONTEXTO: o próximo passo prioritário no NEXUS é: "${priority?.title}".${priority?.hint ? ` (${priority.hint})` : ''} Alinha com o que a pessoa vê na coluna lateral; não abras com texto genérico que ignore isso.
-PRODUTO: a pessoa já está na suite Etholys; o NEXUS é um módulo do Etholys. PROIBIDO dizer "o mesmo que no Etholys" ou "como no Etholys" como se fossem sítios diferentes.
-IMPORTANTE: O diagnóstico NÃO é este chat. Uma frase: abrir /hub/nexus/diagnosis (questionário por setor, ~6 perguntas, resumo IA curto). Este copiloto ajuda depois com modelo/marca — MÁXIMO 3 frases + UMA pergunta curta. Sem listas longas.`;
+PRODUTO: a pessoa já está na suite Etholys; o NEXUS é um módulo do Etholys. Não contrastes "aqui" com "Etholys".
+O diagnóstico não é este chat. Numa frase, convida a abrir Diagnóstico no NEXUS (questionário por setor). Este copiloto ajuda depois com modelo/marca — máximo 3 frases + UMA pergunta curta. Sem listas longas.`;
   }
   return `Gera SÓ a abertura em português do Brasil (PT-BR). Tom humano (2–3 frases); termina com UMA pergunta concreta sobre o negócio.`;
 }

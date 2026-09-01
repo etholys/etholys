@@ -84,86 +84,86 @@ function copy(locale: Locale) {
     demo: es ? 'Solicitar demostración' : pt ? 'Solicitar demonstração' : 'Request a demo',
 
     headline: es
-      ? 'El trabajo que ya hacen. Convertido en algo que pueden licenciar y repetir.'
+      ? 'Sistemas de gestión y de trabajo para empresas e instituciones.'
       : pt
-        ? 'O trabalho que já fazem. Convertido em algo que podem licenciar e repetir.'
-        : 'The work you already do. Turned into something you can license and do again.',
+        ? 'Sistemas de gestão e de trabalho para empresas e instituições.'
+        : 'Management and work systems for companies and institutions.',
     support: es
-      ? 'No vendemos otra herramienta de gestión. Diseñamos, construimos y licenciamos la solución del trabajo que su institución vuelve a hacer — en pantalla, en el campo, o en las dos.'
+      ? 'Finanzas, proyectos, fondos, asistencia a MIPYMEs, formación, y las herramientas del día a día: reuniones, documentos, tareas. En español y portugués. En nuestros servidores o en los de la organización.'
       : pt
-        ? 'Não vendemos mais uma ferramenta de gestão. Desenhamos, construímos e licenciamos a solução do trabalho que a vossa instituição volta a fazer — no ecrã, no campo, ou nos dois.'
-        : 'We don’t sell another management tool. We design, build and license the solution to the work your institution keeps doing — on screen, in the field, or both.',
+        ? 'Finanças, projectos, fundos, assistência a MIPYMEs, formação, e as ferramentas do dia a dia: reuniões, documentos, tarefas. Em espanhol e português. Nos nossos servidores ou nos da organização.'
+        : 'Finance, projects, funds, MSME assistance, training, and day-to-day tools: meetings, documents, tasks. In Spanish and Portuguese. On our servers or yours.',
 
     aboutKicker: es ? 'Quiénes somos' : pt ? 'Quem somos' : 'About',
-    aboutTitle: es ? 'Fábrica de Soluciones' : pt ? 'Fábrica de Soluções' : 'Solutions Factory',
+    aboutTitle: es ? 'Qué es Etholys' : pt ? 'O que é a Etholys' : 'What Etholys is',
     aboutBody: es
-      ? 'Etholys cobra a la institución que firma. Diseña, construye y licencia lo que esa institución necesita para ejecutar — y para no volver a inventarlo: la casa, los programas, los fondos, las empresas que atiende, la formación. Cuando el problema está en el campo, la solución incluye el método y el equipo, no solo la pantalla.'
+      ? 'Etholys desarrolla y licencia sistemas para que MIPYMEs, empresas, fundaciones, agencias de cooperación y gobiernos organicen su operación y mejoren cómo trabajan. Cada sistema se contrata por separado. Si se usan varios, los datos se comparten. Cuando el problema es de campo —un proceso, un equipo, una forma de producir— diseñamos también el método y el dispositivo, no solo el software.'
       : pt
-        ? 'A Etholys cobra à instituição que assina. Desenha, constrói e licencia o que essa instituição precisa para executar — e para não voltar a inventar: a casa, os programas, os fundos, as empresas que atende, a formação. Quando o problema está no campo, a solução inclui o método e a equipa, não só o ecrã.'
-        : 'Etholys bills the institution that signs. We design, build and license what that institution needs to execute — and to stop reinventing: the home base, programs, funds, the businesses it serves, learning. When the problem is in the field, the solution includes method and team, not just the screen.',
+        ? 'A Etholys desenvolve e licencia sistemas para que MIPYMEs, empresas, fundações, agências de cooperação e governos organizem a operação e melhorem a forma de trabalhar. Cada sistema contrata-se à parte. Se se usam vários, os dados partilham-se. Quando o problema é de campo — um processo, um equipamento, uma forma de produzir — desenhamos também o método e o dispositivo, não só o software.'
+        : 'Etholys develops and licenses systems so MSMEs, companies, foundations, cooperation agencies and governments can run operations and improve how they work. Each system is licensed on its own. Use several and data is shared. When the problem is in the field — a process, a device, a way of producing — we also design the method and the equipment, not only the software.',
 
     values: es
       ? [
           {
-            title: 'La forma sigue el problema',
-            body: 'Software, equipo, método, o los tres. Un solo diseño, no tres proveedores.',
+            title: 'Eficiencia',
+            body: 'Un lugar para finanzas, proyectos, fondos, asistencia técnica y formación, en lugar de cinco herramientas que no se hablan.',
           },
           {
-            title: 'Una firma, toda la red',
-            body: 'Subproyectos, MIPYMEs y alumnos usan lo contratado. No compran Etholys.',
+            title: 'Acceso',
+            body: 'Español y portugués. Precio y complejidad pensados para estas organizaciones, no para un ERP de otro mercado.',
           },
           {
-            title: 'Pieza, no peaje',
-            body: 'Cada producto funciona solo. El segundo se gana; no se cobra como impuesto del primero.',
+            title: 'Procesos',
+            body: 'Diagnóstico, ruta, evidencias, aprobaciones y reportes sobre el trabajo real — no un informe reconstruido al final.',
           },
         ]
       : pt
         ? [
             {
-              title: 'A forma segue o problema',
-              body: 'Software, equipa, método, ou os três. Um só desenho, não três fornecedores.',
+              title: 'Eficiência',
+              body: 'Um sítio para finanças, projectos, fundos, assistência técnica e formação, em vez de cinco ferramentas que não se falam.',
             },
             {
-              title: 'Uma firma, toda a rede',
-              body: 'Subprojetos, MIPYMEs e alunos usam o contratado. Não compram Etholys.',
+              title: 'Acesso',
+              body: 'Espanhol e português. Preço e complexidade pensados para estas organizações, não para um ERP de outro mercado.',
             },
             {
-              title: 'Peça, não portagem',
-              body: 'Cada produto funciona sozinho. O segundo conquista-se; não se cobra como imposto do primeiro.',
+              title: 'Processos',
+              body: 'Diagnóstico, rota, evidências, aprovações e relatórios sobre o trabalho real — não um relatório reconstruído no fim.',
             },
           ]
         : [
             {
-              title: 'Form follows the problem',
-              body: 'Software, team, method, or all three. One design, not three vendors.',
+              title: 'Efficiency',
+              body: 'One place for finance, projects, funds, technical assistance and training, instead of five tools that do not talk.',
             },
             {
-              title: 'One contract, the whole network',
-              body: 'Sub-projects, MSMEs and learners use what you license. They don’t buy Etholys.',
+              title: 'Access',
+              body: 'Spanish and Portuguese. Price and complexity built for these organisations, not for an ERP from another market.',
             },
             {
-              title: 'A piece, not a toll',
-              body: 'Each product works on its own. The second earns its place — not as a tax on the first.',
+              title: 'Processes',
+              body: 'Diagnosis, pathway, evidence, approvals and reports on the actual work — not a report rebuilt at the end.',
             },
           ],
 
     servicesKicker: es ? 'Qué ofrecemos' : pt ? 'O que oferecemos' : 'What we offer',
     servicesTitle: es
-      ? 'Soluciones a medida y sistemas propios'
+      ? 'Sistemas propios y soluciones a medida'
       : pt
-        ? 'Soluções à medida e sistemas próprios'
-        : 'Tailored solutions and proprietary systems',
+        ? 'Sistemas próprios e soluções à medida'
+        : 'Own systems and tailored solutions',
     servicesLead: es
-      ? 'Contrata la solución del trabajo, en la forma que el trabajo exige, y vuelve a usarla.'
+      ? 'Contrate el sistema que necesita. Si usa más de uno, los datos se comparten. Si el problema es de campo, diseñamos método y equipo además del software.'
       : pt
-        ? 'Contrate a solução do trabalho, na forma que o trabalho exige, e volte a usá-la.'
-        : 'License the solution to the work, in the form the work demands, and use it again.',
+        ? 'Contrate o sistema de que precisa. Se usar mais do que um, os dados partilham-se. Se o problema é de campo, desenhamos método e equipamento além do software.'
+        : 'License the system you need. Use more than one and data is shared. If the problem is in the field, we design method and equipment as well as software.',
 
     serviceCards: es
       ? [
           {
             title: 'Sistemas propios',
-            body: 'Seis productos independientes — ATLAS, SIEP, FUNDHUB, NEXUS, FORGE y PRISM — más herramientas transversales (Advisor, Studio, Meet, Work, CARTA). Contrate solo lo que necesita hoy.',
+            body: 'Seis productos independientes — ATLAS, SIEP, FUNDHUB, NEXUS, FORGE y PRISM — más Advisor, Studio, Meet, Work y CARTA. Contrate solo lo que necesita hoy.',
             cta: 'Ver sistemas',
             href: '#sistemas',
           },
@@ -175,7 +175,7 @@ function copy(locale: Locale) {
           },
           {
             title: 'Dónde corre',
-            body: 'En nuestros servidores o en los suyos. La propiedad intelectual queda en la fábrica; la institución se lleva el derecho a usar.',
+            body: 'En nuestros servidores o en los de la organización.',
             cta: 'Solicitar demostración',
             href: 'mailto:hola@etholys.com?subject=Demostraci%C3%B3n%20Etholys',
           },
@@ -184,7 +184,7 @@ function copy(locale: Locale) {
         ? [
             {
               title: 'Sistemas próprios',
-              body: 'Seis produtos independentes — ATLAS, SIEP, FUNDHUB, NEXUS, FORGE e PRISM — mais ferramentas transversais (Advisor, Studio, Meet, Work, CARTA). Contrate apenas o que precisa hoje.',
+              body: 'Seis produtos independentes — ATLAS, SIEP, FUNDHUB, NEXUS, FORGE e PRISM — mais Advisor, Studio, Meet, Work e CARTA. Contrate apenas o que precisa hoje.',
               cta: 'Ver sistemas',
               href: '#sistemas',
             },
@@ -196,7 +196,7 @@ function copy(locale: Locale) {
             },
             {
               title: 'Onde corre',
-              body: 'Nos nossos servidores ou nos seus. A propriedade intelectual fica na fábrica; a instituição leva o direito de usar.',
+              body: 'Nos nossos servidores ou nos da organização.',
               cta: 'Solicitar demonstração',
               href: 'mailto:hola@etholys.com?subject=Demonstra%C3%A7%C3%A3o%20Etholys',
             },
@@ -204,7 +204,7 @@ function copy(locale: Locale) {
         : [
             {
               title: 'Proprietary systems',
-              body: 'Six independent products — ATLAS, SIEP, FUNDHUB, NEXUS, FORGE and PRISM — plus cross-cutting tools (Advisor, Studio, Meet, Work, CARTA). License only what you need today.',
+              body: 'Six independent products — ATLAS, SIEP, FUNDHUB, NEXUS, FORGE and PRISM — plus Advisor, Studio, Meet, Work and CARTA. License only what you need today.',
               cta: 'See systems',
               href: '#sistemas',
             },
@@ -216,7 +216,7 @@ function copy(locale: Locale) {
             },
             {
               title: 'Where it runs',
-              body: 'On our servers or yours. Intellectual property stays with the factory; the institution gets the right to use.',
+              body: 'On our servers or the organisation’s.',
               cta: 'Request a demo',
               href: 'mailto:hola@etholys.com?subject=Etholys%20demo',
             },

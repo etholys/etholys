@@ -21,7 +21,6 @@ export function CompanyRequiredPanel({
   companies,
   ready,
   error,
-  httpStatus,
   activeCompanyId,
   onSelect,
   onRetry,
@@ -58,7 +57,6 @@ export function CompanyRequiredPanel({
             <div className="mt-3 space-y-2">
               <p className="text-sm text-red-800">
                 {error}
-                {httpStatus ? ` (${httpStatus})` : ''}
               </p>
               <button
                 type="button"

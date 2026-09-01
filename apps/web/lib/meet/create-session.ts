@@ -35,7 +35,7 @@ function meetClientReady(): boolean {
 export function assertMeetPrismaReady() {
   if (!meetClientReady()) {
     throw new Error(
-      'MeetSession ausente no Prisma Client. Rode: npx prisma generate && aplique prisma/migrations/manual_etholys_meet.sql',
+    throw new Error('Meet indisponível de momento. Tente novamente.');
     );
   }
 }

@@ -251,21 +251,17 @@ function NexusHomeInner() {
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-100 bg-violet-50/80 px-3 py-2 text-xs text-violet-900">
                 <span className="font-semibold">
                   {loc === 'es'
-                    ? 'Modo: mejora de mi empresa (IA)'
+                    ? 'Mejora de mi empresa'
                     : loc === 'en'
-                      ? 'Mode: improve my company (AI)'
-                      : 'Modo: melhoria da minha empresa (IA)'}
+                      ? 'Improving my company'
+                      : 'Melhoria da minha empresa'}
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowMineWorkspace(false)}
                   className="text-violet-700 hover:underline"
                 >
-                  {loc === 'es'
-                    ? 'Volver a las dos puertas'
-                    : loc === 'en'
-                      ? 'Back to the two doors'
-                      : 'Voltar às duas portas'}
+                  {loc === 'es' ? 'Volver' : loc === 'en' ? 'Back' : 'Voltar'}
                 </button>
               </div>
               <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">

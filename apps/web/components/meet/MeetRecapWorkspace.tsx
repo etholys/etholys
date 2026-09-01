@@ -660,18 +660,18 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                     {transcriptSource === 'live' && transcriptBody && (
                       <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                         {t(
-                          'Esta transcrição veio do reconhecimento ao vivo (baixa qualidade). Para o texto correcto: apaga isto, envia a gravação .webm e clica «Transcrever com Whisper».',
-                          'Esta transcripción vino del reconocimiento en vivo (baja calidad). Para el texto correcto: bórrala, sube la grabación .webm y pulsa «Transcribir con Whisper».',
-                          'This transcript came from live recognition (low quality). For correct text: delete it, upload the .webm recording, and click «Transcribe with Whisper».',
+                          'Esta transcrição veio do reconhecimento ao vivo e pode ter erros. Para um texto mais fiável, envie a gravação e use Transcrever.',
+                          'Esta transcripción vino del reconocimiento en vivo y puede tener errores. Para un texto más fiable, suba la grabación y use Transcribir.',
+                          'This transcript came from live recognition and may contain errors. For a more reliable text, upload the recording and use Transcribe.',
                         )}
                       </div>
                     )}
                     <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                       <p className="text-xs text-slate-600">
                         {t(
-                          'Transcrição profissional = gravação de áudio/vídeo + Whisper (português). O ficheiro .crswap no PC não serve — precisa do .webm final.',
-                          'Transcripción profesional = grabación de audio/vídeo + Whisper (portugués). El archivo .crswap en el PC no sirve — necesitas el .webm final.',
-                          'Professional transcript = audio/video recording + Whisper. The .crswap file on your PC does not work — you need the final .webm.',
+                          'Para melhor qualidade, envie a gravação da reunião e use Transcrever.',
+                          'Para mejor calidad, suba la grabación de la reunión y use Transcribir.',
+                          'For better quality, upload the meeting recording and use Transcribe.',
                         )}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -698,7 +698,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                             className="inline-flex items-center gap-1.5 rounded-full bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
                           >
                             {transcribeBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                            {t('Transcrever com Whisper', 'Transcribir con Whisper', 'Transcribe with Whisper')}
+                            {t('Transcrever', 'Transcribir', 'Transcribe')}
                           </button>
                         )}
                       </div>

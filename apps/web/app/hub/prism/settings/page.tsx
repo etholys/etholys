@@ -35,23 +35,12 @@ export default function PrismSettingsPage() {
             {t('Definições PRISM', 'Ajustes PRISM', 'PRISM settings')}
           </h1>
           <p className="mt-1 text-sm text-gray-600">
-            {t(
-              'Preferências de painel executivo, fontes de dados e indicadores. Organização e licenças ficam na administração Etholys.',
-              'Preferencias de panel ejecutivo, fuentes de datos e indicadores. Organización y licencias están en administración Etholys.',
-              'Executive panel preferences, data sources, and indicators. Organization and licenses live in Etholys administration.',
-            )}
+            {t('Painel executivo e indicadores.', 'Panel ejecutivo e indicadores.', 'Executive panel and indicators.')}
           </p>
         </header>
 
         <section className="rounded-xl border border-rose-100 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-gray-900">{t('Módulo PRISM', 'Módulo PRISM', 'PRISM module')}</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            {t(
-              'Preferências avançadas deste módulo ainda não estão disponíveis. Use os atalhos abaixo para organização e acessos.',
-              'Las preferencias avanzadas de este módulo aún no están disponibles. Use los atajos de abajo para organización y accesos.',
-              'Advanced preferences for this module are not available yet. Use the shortcuts below for organization and access.',
-            )}
-          </p>
+          <h2 className="text-sm font-semibold text-gray-900">{t('Atalhos', 'Atajos', 'Shortcuts')}</h2>
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2">

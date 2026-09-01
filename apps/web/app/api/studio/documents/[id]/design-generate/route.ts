@@ -145,7 +145,7 @@ export async function POST(
   } catch (e: unknown) {
     console.error('[studio design-generate]', e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Erro interno ao gerar design.' },
+      { error: 'Não foi possível gerar o design. Tente novamente.' },
       { status: 500 },
     );
   }

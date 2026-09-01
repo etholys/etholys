@@ -36,7 +36,7 @@ function metadataBaseUrl(): URL {
 export const metadata: Metadata = {
   title: 'ETHOLYS — Fábrica de Soluciones | Laboratorio I+D+i',
   description:
-    'Ecosistema de soluciones para gestionar, financiar, ejecutar, aprender y decidir mejor. Seis sistemas independientes y herramientas transversales.',
+    'Ecosistema de soluciones para gestionar, financiar, ejecutar, aprender y decidir mejor.',
   metadataBase: metadataBaseUrl(),
   icons: { icon: '/favicon.svg' },
   openGraph: { images: ['/og-image.png'] },

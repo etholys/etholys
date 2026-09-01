@@ -171,9 +171,6 @@ export function ForgeLiveSessionsManager({ courseId, modules }: Props) {
           {ft('forge.live.calendar')}
         </h3>
         <p className="mt-1 text-sm text-slate-500">{ft('forge.live.managerHint')}</p>
-        <p className="mt-1 text-xs text-sky-800">
-          Etholys Meet: salas Jitsi com breakouts. Sem URL externa, a sala Meet é criada automaticamente.
-        </p>
       </div>
 
       {loading ? (
@@ -300,7 +297,7 @@ export function ForgeLiveSessionsManager({ courseId, modules }: Props) {
         <input
           value={form.meetingUrl}
           onChange={(e) => setForm({ ...form, meetingUrl: e.target.value })}
-          placeholder={`${ft('forge.live.meetingPlaceholder')} (opcional — Meet auto)`}
+          placeholder={ft('forge.live.meetingPlaceholder')}
           className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
         />
         <textarea

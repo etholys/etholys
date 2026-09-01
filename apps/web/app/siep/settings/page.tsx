@@ -18,23 +18,12 @@ export default function SiepSettingsPage() {
           {t('Definições SIEP', 'Ajustes SIEP', 'SIEP settings')}
         </h1>
         <p className="mt-1 text-sm text-gray-600">
-          {t(
-            'Preferências do módulo de execução e inovação de projetos. Organização, utilizadores e licenças ficam na administração Etholys.',
-            'Preferencias del módulo de ejecución e innovación de proyectos. Organización, usuarios y licencias están en la administración Etholys.',
-            'Project execution & innovation preferences. Organization, users and system licenses live in Etholys administration.',
-          )}
+          {t('Preferências de projetos.', 'Preferencias de proyectos.', 'Project preferences.')}
         </p>
       </header>
 
       <section className="rounded-xl border border-indigo-100 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-gray-900">{t('Módulo SIEP', 'Módulo SIEP', 'SIEP module')}</h2>
-        <p className="mt-2 text-sm text-gray-600">
-          {t(
-            'Preferências avançadas deste módulo ainda não estão disponíveis. Use os atalhos abaixo para organização e acessos.',
-            'Las preferencias avanzadas de este módulo aún no están disponibles. Use los atajos de abajo para organización y accesos.',
-            'Advanced preferences for this module are not available yet. Use the shortcuts below for organization and access.',
-          )}
-        </p>
+        <h2 className="text-sm font-semibold text-gray-900">{t('Atalhos', 'Atajos', 'Shortcuts')}</h2>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2">

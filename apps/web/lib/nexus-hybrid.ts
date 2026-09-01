@@ -50,21 +50,17 @@ export type NexusHybridCopy = {
 
 const COPY: Record<NexusHybridLocale, NexusHybridCopy> = {
   pt: {
-    unifiedTagline:
-      'Desenvolver o negócio e gerir o dia a dia não são sítios diferentes: a mesma lição. A trilha, os dados e o assistente ligam-se ao teu plano e aos módulos Etholys no mesmo sítio.',
-    stepsHeading: 'A tua lição de hoje (por ordem)',
-    chatHeading: 'A seguir: fala com o guia (IA) — a mesma conversa, aqui e no ecrã completo',
-    oneFlowNote:
-      'Isto segue a ideia de “um jogo, um caminho”: passos, conversa e progresso, sem partires o cérebro por “módulo A vs módulo B”.',
-    pageTitle: 'NEXUS: evolução e gestão, no mesmo processo',
-    pageSubtitle:
-      'Aqui acompanhas o teu negócio por nível. O assistente e a trilha puxam melhoras; tarefas, dados e serviços ligam-se a ATLAS, SIEP e resto do Etholys — por integração, no mesmo fluxo de trabalho.',
+    unifiedTagline: 'Acompanhe o negócio por fase, com diagnóstico, rota e copiloto.',
+    stepsHeading: 'Hoje',
+    chatHeading: 'Conversa',
+    oneFlowNote: 'Passos, conversa e progresso no mesmo sítio.',
+    pageTitle: 'NEXUS',
+    pageSubtitle: 'Diagnóstico, rota de desenvolvimento e acompanhamento.',
     devTitle: 'Desenvolver o negócio',
-    devSubtitle: 'Fase, diagnóstico, rota e conversa com o assistente (ritmo e clareza).',
+    devSubtitle: 'Fase, diagnóstico, rota e conversa.',
     opsTitle: 'Gerir a operação',
-    opsSubtitle: 'Fila de hoje, finanças, projetos, fundos e tickets — a partir dos módulos que já usas no Etholys.',
-    footnote:
-      'A oferta comercial (base e add-ons) define que funções de cada módulo estão incluídas. O NEXUS orquestra o percurso; as capacidades concretas vivem nas apps integradas.',
+    opsSubtitle: 'Tarefas, finanças, projetos e fundos.',
+    footnote: '',
     linkLabels: {
       coach: 'Assistente IA',
       journey: 'Fase e metas',
@@ -78,8 +74,7 @@ const COPY: Record<NexusHybridLocale, NexusHybridCopy> = {
       hub: 'Outros produtos no Hub',
     },
     humanRhythmTitle: 'Acompanhamento humano, no teu ritmo',
-    humanRhythmBody:
-      'Num fecho de fase ou ponto mensal, o diagnóstico e o copiloto alimentam a conversa com o assessor da vossa empresa. Isto é melhoria interna — não confundir com AT a clientes.',
+    humanRhythmBody: 'O diagnóstico ajuda a preparar o acompanhamento.',
     humanRhythmCta: 'Ajustar fase e metas',
     chatTeaserTitle: 'Conversa com o assistente (continua aqui)',
     chatTeaserOpenFull: 'Abrir ecrã completo',
@@ -88,21 +83,17 @@ const COPY: Record<NexusHybridLocale, NexusHybridCopy> = {
     conductorWhyLabel: 'Porquê',
   },
   es: {
-    unifiedTagline:
-      'Desarrollar y gestionar el día a día no son dos productos: es la misma lección. La ruta, los datos y el asistente conectan vuestro plan y Etholys en un solo flujo.',
-    stepsHeading: 'La lección de hoy (en orden)',
-    chatHeading: 'Ahora: hablad con el guía (IA) — el mismo diálogo, acá o en pantalla completa',
-    oneFlowNote:
-      'Misma idea de “un juego, un camino”: pasos, charla y progreso, sin partir la cabeza en “módulo A vs módulo B”.',
-    pageTitle: 'NEXUS: evolución y gestión, en el mismo proceso',
-    pageSubtitle:
-      'Aquí acompañás tu negocio por nivel. El asistente y la ruta empujan mejoras; tareas, datos y servicios se conectan a ATLAS, SIEP y el resto de Etholys: integrado, en el mismo flujo.',
+    unifiedTagline: 'Acompañá el negocio por fase, con diagnóstico, ruta y copiloto.',
+    stepsHeading: 'Hoy',
+    chatHeading: 'Conversación',
+    oneFlowNote: 'Pasos, conversación y progreso en el mismo lugar.',
+    pageTitle: 'NEXUS',
+    pageSubtitle: 'Diagnóstico, ruta de desarrollo y acompañamiento.',
     devTitle: 'Desarrollar el negocio',
-    devSubtitle: 'Fase, diagnóstico, ruta y diálogo con el asistente: ritmo y claridad.',
+    devSubtitle: 'Fase, diagnóstico, ruta y conversación.',
     opsTitle: 'Gestionar la operación',
-    opsSubtitle: 'Hoy, finanzas, proyectos, fondos y tickets — desde los módulos de Etholys que ya usás.',
-    footnote:
-      'La oferta (base y add-ons) define qué funciones de cada módulo están incluidas. NEXUS orquesta el recorrido; la capacidad concreta vive en las apps integradas.',
+    opsSubtitle: 'Tareas, finanzas, proyectos y fondos.',
+    footnote: '',
     linkLabels: {
       coach: 'Asistente IA',
       journey: 'Fase y metas',
@@ -116,8 +107,7 @@ const COPY: Record<NexusHybridLocale, NexusHybridCopy> = {
       hub: 'Más en el Hub',
     },
     humanRhythmTitle: 'Acompañamiento humano, a vuestro ritmo',
-    humanRhythmBody:
-      'En cierre de fase o cita mensual, el diagnóstico y el copiloto alimentan la charla con el asesor de vuestra empresa. Esto es mejora interna — no confundir con AT a clientes.',
+    humanRhythmBody: 'El diagnóstico ayuda a preparar el acompañamiento.',
     humanRhythmCta: 'Ajustar fase y metas',
     chatTeaserTitle: 'Hablá con el asistente (sigue acá)',
     chatTeaserOpenFull: 'Pantalla completa',
@@ -126,21 +116,17 @@ const COPY: Record<NexusHybridLocale, NexusHybridCopy> = {
     conductorWhyLabel: 'Por qué',
   },
   en: {
-    unifiedTagline:
-      'Growing the business and running day-to-day aren’t two different products: it’s the same lesson. The path, data, and assistant connect your plan and Etholys in one flow.',
-    stepsHeading: 'Today’s lesson (in order)',
-    chatHeading: 'Next: talk to the guide (AI) — the same thread, here or full screen',
-    oneFlowNote:
-      'One game, one path: steps, chat, and progress—no mental split into “module A vs module B.”',
-    pageTitle: 'NEXUS: growth and operations, one process',
-    pageSubtitle:
-      'Follow the business by level. The assistant and the path drive improvements; tasks, data, and services connect to ATLAS, SIEP, and the rest of Etholys—integrated, same workflow.',
+    unifiedTagline: 'Follow the business by phase, with diagnosis, roadmap, and copilot.',
+    stepsHeading: 'Today',
+    chatHeading: 'Conversation',
+    oneFlowNote: 'Steps, chat, and progress in one place.',
+    pageTitle: 'NEXUS',
+    pageSubtitle: 'Diagnosis, development roadmap, and follow-up.',
     devTitle: 'Develop the business',
-    devSubtitle: 'Phase, diagnosis, live roadmap, and the AI coach—pace and clarity.',
+    devSubtitle: 'Phase, diagnosis, roadmap, and conversation.',
     opsTitle: 'Run the operation',
-    opsSubtitle: "Today's queue, finance, projects, funds, and tickets—from the Etholys modules you already use.",
-    footnote:
-      'Plans (base and add-ons) define which features from each module are included. NEXUS orchestrates the journey; the actual capabilities live in the integrated apps.',
+    opsSubtitle: 'Tasks, finance, projects, and funds.',
+    footnote: '',
     linkLabels: {
       coach: 'AI coach',
       journey: 'Phase & goals',
@@ -154,8 +140,7 @@ const COPY: Record<NexusHybridLocale, NexusHybridCopy> = {
       hub: 'More in Hub',
     },
     humanRhythmTitle: 'Human check-ins, on your schedule',
-    humanRhythmBody:
-      'At a phase close or monthly touchpoint, diagnosis and the copilot feed a conversation with your company advisor. This is internal improvement — not client AT delivery.',
+    humanRhythmBody: 'Diagnosis helps prepare the follow-up.',
     humanRhythmCta: 'Adjust phase & goals',
     chatTeaserTitle: 'Talk with the assistant (continues here)',
     chatTeaserOpenFull: 'Open full screen',

@@ -109,17 +109,17 @@ export default function PrismHubPage() {
             </p>
             <p className="mt-1 text-rose-950/90">
               {t(
-                'O PRISM cruza dados dos sistemas contratados (ATLAS, SIEP, FUNDHUB, NEXUS…) com leitura executiva e análise preditiva. O Centro integrado continua a ser o cockpit do dia a dia; aqui o foco é visão consolidada e decisão.',
-                'PRISM cruza datos de los sistemas contratados (ATLAS, SIEP, FUNDHUB, NEXUS…) con lectura ejecutiva y análisis predictivo. El Centro integrado sigue siendo el cockpit diario; aquí el foco es visión consolidada y decisión.',
-                'PRISM cross-cuts data from licensed systems (ATLAS, SIEP, FUNDHUB, NEXUS…) for executive reads and predictive analysis. The integrated workspace remains the daily cockpit; here the focus is consolidated insight and decisions.',
+                'Dashboards cruzados, leitura executiva e indicadores de impacto a partir dos sistemas que a organização já usa.',
+                'Dashboards cruzados, lectura ejecutiva e indicadores de impacto a partir de los sistemas que la organización ya usa.',
+                'Cross-system dashboards, executive reads, and impact indicators from the systems your organization already uses.',
               )}
             </p>
           </div>
           <p className="mt-4 text-slate-600">
             {t(
-              'Dashboards, indicadores de impacto (incluindo ESG) e relatórios multinível. O M&E de projeto continua no SIEP; o PRISM agrega a lente institucional.',
-              'Dashboards, indicadores de impacto (incluido ESG) e informes multinivel. El M&E de proyecto sigue en SIEP; PRISM aporta la lente institucional.',
-              'Dashboards, impact indicators (including ESG), and multi-level reports. Project M&E stays in SIEP; PRISM adds the institutional lens.',
+              'Dashboards, indicadores de impacto (incluindo ESG) e relatórios multinível.',
+              'Dashboards, indicadores de impacto (incluido ESG) e informes multinivel.',
+              'Dashboards, impact indicators (including ESG), and multi-level reports.',
             )}
           </p>
 
@@ -150,23 +150,15 @@ export default function PrismHubPage() {
             </li>
           </ul>
 
-          <p className="mt-8 text-xs text-slate-500">
-            {t(
-              'Indicadores ME e linha de base ligados a resultados serão reforçados em evoluções futuras; os dados já fluem a partir de ATLAS e SIEP.',
-              'Los indicadores ME y línea base conectados a resultados se reforzarán en evoluciones futuras.',
-              'ME indicators and baselines tied to outcomes will be strengthened in future iterations; data already flows from ATLAS and SIEP.'
-            )}
-          </p>
-
           <div className="mt-10 border-t border-rose-100 pt-8">
             <h2 className="text-lg font-semibold text-slate-900">
-              {t('Cadeia mínima: indicador → evidência', 'Cadena mínima: indicador → evidencia', 'Minimal chain: indicator → evidence')}
+              {t('Indicador e evidência', 'Indicador y evidencia', 'Indicator and evidence')}
             </h2>
             <p className="mt-1 text-sm text-slate-600">
               {t(
-                'Ligue um indicador a um link ou documento (URL), com etiqueta de projecto/resultado se fizer sentido. Isto fica no contexto do tenant.',
-                'Vincule un indicador a una URL, con etiqueta de proyecto/resultado si aplica.',
-                'Tie an indicator to a link (URL) with an optional project/result label — stored in tenant context.'
+                'Ligue um indicador a um link ou documento, com etiqueta de projeto ou resultado se fizer sentido.',
+                'Vincule un indicador a un enlace o documento, con etiqueta de proyecto o resultado si aplica.',
+                'Tie an indicator to a link or document, with an optional project or result label.',
               )}
             </p>
 

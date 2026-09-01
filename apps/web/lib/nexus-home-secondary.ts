@@ -35,15 +35,13 @@ const COPY: Record<NexusHomeLocale, NexusHomeSecondary> = {
     loadError: 'Não foi possível carregar o NEXUS.',
     retry: 'Tentar de novo',
     welcomeTitle: 'Bem-vindo ao NEXUS',
-    welcomeBody:
-      'Ainda não há ações de rota nem tickets de serviço com a etiqueta NEXUS. O assessor acompanha melhor quando dás o primeiro passo: alinhar fase, diagnóstico ou rota viva.',
+    welcomeBody: 'Comece pela fase, pelo diagnóstico ou pela rota.',
     netCompanies: 'empresas',
     netAnchor: 'âncora',
     netSiep: 'projeto SIEP',
     profileLabel: 'Perfil em uso',
     profileRole: 'função nesta empresa',
-    profileHint:
-      'Se isto parecer genérico, ajusta as funções por empresa para personalizar melhor recomendações e linguagem.',
+    profileHint: '',
     tools: {
       diagnosis: 'Diagnóstico guiado',
       diagnosisHint: 'Forças e debilidades por pilar',
@@ -60,15 +58,13 @@ const COPY: Record<NexusHomeLocale, NexusHomeSecondary> = {
     loadError: 'No se pudo cargar NEXUS.',
     retry: 'Reintentar',
     welcomeTitle: 'Bienvenido a NEXUS',
-    welcomeBody:
-      'Aún no hay acciones de ruta ni tickets con etiqueta NEXUS. El asesor acompaña mejor si dan el primer paso: fase, diagnóstico o ruta viva.',
+    welcomeBody: 'Empiecen por la fase, el diagnóstico o la ruta.',
     netCompanies: 'empresas',
     netAnchor: 'ancla',
     netSiep: 'proyecto SIEP',
     profileLabel: 'Perfil en uso',
     profileRole: 'rol en esta empresa',
-    profileHint:
-      'Si esto se ve genérico, ajusten los roles por empresa para personalizar recomendaciones e idioma.',
+    profileHint: '',
     tools: {
       diagnosis: 'Diagnóstico guiado',
       diagnosisHint: 'Fortalezas y brechas por pilar',
@@ -85,15 +81,13 @@ const COPY: Record<NexusHomeLocale, NexusHomeSecondary> = {
     loadError: 'Could not load NEXUS.',
     retry: 'Try again',
     welcomeTitle: 'Welcome to NEXUS',
-    welcomeBody:
-      'There are no NEXUS-tagged roadmap actions or service tickets yet. The advisor can help more after a first step: align phase, diagnosis, or live roadmap.',
+    welcomeBody: 'Start with phase, diagnosis, or the roadmap.',
     netCompanies: 'companies',
     netAnchor: 'anchor',
     netSiep: 'SIEP project',
     profileLabel: 'Profile in use',
     profileRole: 'role in this company',
-    profileHint:
-      'If this feels generic, adjust roles per company to tune recommendations and language.',
+    profileHint: '',
     tools: {
       diagnosis: 'Guided diagnosis',
       diagnosisHint: 'Strengths and gaps by pillar',

@@ -133,7 +133,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'hub.comingSoon': 'Coming Soon',
     'hub.access': 'Access',
     'hub.ecosystemSystems': 'Ecosystem Systems',
-    'hub.coreDescription': 'Cross-cutting ecosystem layer: SSO, document management, notifications, permissions, i18n, internal chat and more. All systems share this common base.',
+    'hub.coreDescription': 'Sign-in, documents, notifications, and chat — shared across every system.',
     'hub.vitrina': 'Showcase',
     'hub.logout': 'Sign Out',
     // Lab

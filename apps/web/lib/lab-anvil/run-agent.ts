@@ -84,7 +84,7 @@ export async function runAnvilAgentTurn(opts: {
         sessionId: session.id,
         role: 'assistant',
         content:
-          'Chave LLM não configurada. Define ANTHROPIC_API_KEY ou LLM_API_KEY no .env para o agente gerar planos e código.',
+          'Chave LLM não configurada. Peça a um administrador de plataforma para ligar o serviço de IA.',
         metaJson: { policyWarnings: policy.warnings },
       },
     });

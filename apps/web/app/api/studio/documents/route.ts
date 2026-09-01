@@ -380,14 +380,9 @@ export async function GET(req: NextRequest) {
       canManageShares: canManageStudioShares(folderAccess),
     });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
     console.error('[GET /api/studio/documents]', e);
     return NextResponse.json(
-      {
-        error: 'Studio schema missing or DB error',
-        detail: msg,
-        hint: 'Apply apps/web/prisma/migrations/manual_etholys_studio.sql then prisma generate',
-      },
+      { error: 'Studio indisponível de momento. Tente novamente dentro de instantes.' },
       { status: 503 },
     );
   }

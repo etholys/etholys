@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { BookOpen, ClipboardCheck, FileJson, History, Route, Sparkles, Rocket } from 'lucide-react';
+import { BookOpen, ClipboardCheck, History, Route, Sparkles, Rocket } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { touchRunwayChapter } from '@/lib/nexus-runway';
 
@@ -23,10 +23,10 @@ function NexusLibraryInner() {
       locale === 'es' ? 'Biblioteca Nexus' : locale === 'pt' ? 'Biblioteca Nexus' : 'Nexus library',
     subtitle:
       locale === 'es'
-        ? 'Método, enlaces útiles y cómo extender el diagnóstico.'
+        ? 'Método, enlaces y cómo seguir el diagnóstico.'
         : locale === 'pt'
-          ? 'Método, links úteis e como estender o diagnóstico.'
-          : 'Method, useful links, and how to extend the diagnostic.',
+          ? 'Método, ligações e como seguir o diagnóstico.'
+          : 'Method, links, and how to continue the diagnostic.',
     cycle:
       locale === 'es'
         ? 'Ciclo recomendado'
@@ -35,22 +35,10 @@ function NexusLibraryInner() {
           : 'Recommended cycle',
     cycleBody:
       locale === 'es'
-        ? 'Visión general → cuestionario por sectores → acciones en la ruta viva → tickets de servicio cuando necesite apoyo interno.'
+        ? 'Visión general → cuestionario por sectores → acciones en la ruta → servicios de apoyo cuando los necesite.'
         : locale === 'pt'
-          ? 'Visão geral → questionário por setores → ações na rota viva → tickets de serviço quando precisar de apoio interno.'
-          : 'Overview → sector questionnaire → live roadmap actions → internal service tickets when you need support.',
-    extend:
-      locale === 'es'
-        ? 'Extender el cuestionario'
-        : locale === 'pt'
-          ? 'Estender o questionário'
-          : 'Extend the questionnaire',
-    extendBody:
-      locale === 'es'
-        ? 'Coloque un archivo quiz.json en apps/web/data/nexus-diagnostic/ (ver documentación del API). El sistema lo cargará automáticamente.'
-        : locale === 'pt'
-          ? 'Coloque o arquivo quiz.json em apps/web/data/nexus-diagnostic/. O app carrega automaticamente via API.'
-          : 'Place a quiz.json file under apps/web/data/nexus-diagnostic/. The app loads it automatically via the API.',
+          ? 'Visão geral → questionário por setores → ações na rota → serviços de apoio quando precisar.'
+          : 'Overview → sector questionnaire → roadmap actions → support services when you need them.',
     links: locale === 'es' ? 'Accesos rápidos' : locale === 'pt' ? 'Acessos rápidos' : 'Quick links',
   };
 
@@ -67,14 +55,6 @@ function NexusLibraryInner() {
       <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">{t.cycle}</h2>
         <p className="mt-2 text-sm text-gray-700">{t.cycleBody}</p>
-      </section>
-
-      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center gap-2 text-gray-900">
-          <FileJson className="h-5 w-5 text-violet-600" />
-          <h2 className="font-semibold">{t.extend}</h2>
-        </div>
-        <p className="mt-2 text-sm text-gray-600">{t.extendBody}</p>
       </section>
 
       <section>
@@ -107,7 +87,9 @@ function NexusLibraryInner() {
             <History className="mt-0.5 h-5 w-5 text-violet-600" />
             <div>
               <p className="font-medium text-gray-900">Histórico de diagnósticos</p>
-              <p className="text-xs text-gray-500">Snapshots locais por contexto</p>
+              <p className="text-xs text-gray-500">
+                {locale === 'es' ? 'Diagnósticos anteriores' : locale === 'en' ? 'Previous diagnostics' : 'Diagnósticos anteriores'}
+              </p>
             </div>
           </Link>
           <Link
@@ -126,8 +108,12 @@ function NexusLibraryInner() {
           >
             <Sparkles className="mt-0.5 h-5 w-5 text-violet-600" />
             <div>
-              <p className="font-medium text-gray-900">Serviços internos</p>
-              <p className="text-xs text-gray-500">Tickets Etholys</p>
+              <p className="font-medium text-gray-900">
+                {locale === 'es' ? 'Servicios de apoyo' : locale === 'en' ? 'Support services' : 'Serviços de apoio'}
+              </p>
+              <p className="text-xs text-gray-500">
+                {locale === 'es' ? 'Pedidos de asistencia' : locale === 'en' ? 'Assistance requests' : 'Pedidos de assistência'}
+              </p>
             </div>
           </Link>
         </div>

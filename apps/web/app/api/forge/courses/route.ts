@@ -65,11 +65,10 @@ export async function GET(req: NextRequest) {
       msg.includes('findMany') || msg.includes('forgeCourse') || msg.includes('Forge')
         ? 503
         : 500;
-    const hint =
-      status === 503
-        ? ' Abra /api/forge/health e execute: cd apps/web && npm run dev:clean'
-        : '';
-    return NextResponse.json({ error: msg + hint }, { status });
+    return NextResponse.json(
+      { error: 'Não foi possível carregar os cursos. Tente novamente.' },
+      { status },
+    );
   }
 }
 

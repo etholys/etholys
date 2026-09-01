@@ -85,12 +85,11 @@ export function DonorFileValidationCard({ validation: v, defaultOpen = true, onC
             <AlertTriangle className="w-3.5 h-3.5" /> Leitura do ficheiro limitada
           </p>
           <p className="mt-0.5">
-            {v.extractionCharCount ?? 0} caracteres extraídos
-            {v.extractionMethod ? ` (${v.extractionMethod})` : ''}.
+            {v.extractionCharCount ?? 0} caracteres lidos
             {v.extractionIssue ? ` ${v.extractionIssue}` : ''}
           </p>
           <p className="mt-1 text-amber-900/90">
-            «Validar estrutura» só revê o Word/PDF subido. Para <strong>construir</strong> o informe, use o passo ③ «Gerar borrador del informe».
+            «Validar estrutura» só revê o ficheiro enviado. Para construir o informe, use «Gerar rascunho do informe».
           </p>
         </div>
       )}

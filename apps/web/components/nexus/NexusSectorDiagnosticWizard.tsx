@@ -359,8 +359,8 @@ export function NexusSectorDiagnosticWizard() {
         </h1>
         <p className="mt-1 text-sm text-slate-600">
           {es
-            ? 'Flujo: programa de acompañamiento → diagnóstico por sector → mapa de potencial → capas de trabajo → rota viva + plano estratégico.'
-            : 'Fluxo: programa de acompanhamento → diagnóstico por setor → mapa de potencial → camadas de trabalho → rota viva + plano estratégico.'}
+            ? 'Programa de acompañamiento, diagnóstico por sector, mapa de potencial y plan de trabajo.'
+            : 'Programa de acompanhamento, diagnóstico por setor, mapa de potencial e plano de trabalho.'}
         </p>
         <ol className="mt-3 flex flex-wrap gap-2 text-[10px] font-medium uppercase text-slate-500">
           {[
@@ -800,8 +800,8 @@ export function NexusSectorDiagnosticWizard() {
           <p className="font-semibold text-emerald-950">{es ? 'Processo registado' : 'Processo registado'}</p>
           <p className="text-sm text-emerald-900">
             {es
-              ? 'Plano de trabalho na rota viva, camadas de desenvolvimento e histórico de incubação guardados no servidor. Casos AT críticos foram abertos se o serviço estava vinculado.'
-              : 'Plano de trabalho na rota viva, camadas de desenvolvimento e histórico guardados no servidor.'}
+              ? 'Plan de trabajo y diagnóstico guardados. Si había un servicio vinculado, se abrieron casos de asistencia.'
+              : 'Plano de trabalho e diagnóstico guardados. Se havia um serviço vinculado, foram abertos casos de assistência.'}
           </p>
           {commitResult?.atCaseIds && commitResult.atCaseIds.length > 0 && (
             <p className="text-xs text-emerald-800">

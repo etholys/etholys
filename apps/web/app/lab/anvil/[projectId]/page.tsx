@@ -746,9 +746,9 @@ export default function AnvilProjectPage() {
           </h3>
           <p className="text-sm text-slate-400">
             {t(
-              'Elige preview primero; Contabo u otro host cuando apruebes.',
-              'Escolhe preview primeiro; Contabo ou outro host quando aprovares.',
-              'Use preview first; Contabo or another host when you approve.',
+              'Elige una vista previa primero; publica en producción cuando apruebes.',
+              'Escolhe uma pré-visualização primeiro; publica em produção quando aprovares.',
+              'Use a preview first; publish to production when you approve.',
             )}
           </p>
           <div className="space-y-2">
@@ -827,9 +827,6 @@ export default function AnvilProjectPage() {
               </button>
             </div>
           )}
-          <p className="text-xs text-slate-500">
-            F2: preview estático do sandbox activo. F3: Contabo/custom ainda pendente.
-          </p>
         </div>
       )}
 

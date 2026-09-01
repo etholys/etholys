@@ -37,8 +37,7 @@ export async function POST(req: Request, ctx: Ctx) {
     if (!isMeetTranscribeConfigured()) {
       return NextResponse.json(
         {
-          error:
-            'STT não configurado. Defina OPENAI_API_KEY ou MEET_TRANSCRIBE_API_KEY (Whisper).',
+          error: 'A transcrição automática não está disponível neste momento.',
         },
         { status: 503 },
       );

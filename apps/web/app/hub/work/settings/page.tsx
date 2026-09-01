@@ -399,9 +399,9 @@ export default function HubWorkSettingsPage() {
               </h2>
               <p className="mb-4 text-xs text-slate-500">
                 {t(
-                  'Projects stay in SIEP (same Task engine). Create or edit them there; they show in the Work sidebar.',
-                  'Los proyectos viven en SIEP (mismo motor Task). Créalos allí; aparecen en la barra de Work.',
-                  'Os projetos vivem no SIEP (mesmo motor Task). Cria-os lá; aparecem na barra do Work.',
+                  'Projects stay in SIEP. Create or edit them there; they show in the Work sidebar.',
+                  'Los proyectos se gestionan en SIEP. Créalos allí; aparecen en la barra de Work.',
+                  'Os projetos gerem-se no SIEP. Cria-os lá; aparecem na barra do Work.',
                 )}
               </p>
               <ul className="mb-4 space-y-1">

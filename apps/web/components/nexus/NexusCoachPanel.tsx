@@ -185,51 +185,51 @@ export function NexusCoachPanel({
     nexusLocale === 'es'
       ? {
           h1: 'Copiloto NEXUS',
-          sub: 'Una voz que acompaña: vamos a conocer vuestro negocio en diálogo, para alinear modelo, plan y marca, con pruebas y documentos (podéis pegar textos o describirlos; los archivos reales viven luego en Etholys o los referís aquí).',
+          sub: 'Conversamos para alinear modelo, plan comercial e identidad. Pegá un texto o describí el negocio.',
         }
       : nexusLocale === 'en'
         ? {
             h1: 'NEXUS co-pilot',
-            sub: 'A voice that stays with you: we explore the business in conversation—model, go-to-market, and brand—grounded in what you can paste, describe, or point to. Real files can stay in Etholys; you reference them here.',
+            sub: 'We talk to align model, go-to-market, and brand. Paste a text or describe the business.',
           }
         : {
             h1: 'Copiloto NEXUS',
-            sub: 'Uma voz presente: vamos conhecer o negócio no diálogo, para alinhar modelo, plano comercial e identidade, com o que forem colando ou descrevendo (ficheiros podem ficar no Etholys; descrevam o que têm). O copiloto vê tarefas pendentes na NEXUS e lembra-vos de forma concreta.',
+            sub: 'Conversamos para alinhar modelo, plano comercial e identidade. Cole um texto ou descreva o negócio.',
           };
 
   const tNav =
     nexusLocale === 'es'
       ? {
-          label: 'Atajos (mismo NEXUS)',
+          label: 'Atajos',
           journey: 'Fase y metas',
           journeyHint: 'Nivel, mercados',
           road: 'Ruta viva',
           roadHint: 'Acciones abiertas',
           diag: 'Diagnóstico',
-          diagHint: 'Por sector (6 preg.)',
+          diagHint: 'Por sector',
           workspace: 'Centro hoy',
           workspaceHint: 'Etholys',
         }
       : nexusLocale === 'en'
         ? {
-            label: 'Shortcuts (same NEXUS)',
+            label: 'Shortcuts',
             journey: 'Phase & goals',
             journeyHint: 'Level, markets',
             road: 'Live roadmap',
             roadHint: 'Open actions',
           diag: 'Diagnosis',
-          diagHint: 'By sector (~6 Q)',
+          diagHint: 'By sector',
             workspace: 'Today hub',
             workspaceHint: 'Etholys',
           }
         : {
-            label: 'Atalhos (mesmo NEXUS)',
+            label: 'Atalhos',
             journey: 'Fase e metas',
             journeyHint: 'Nível, mercados',
             road: 'Rota viva',
             roadHint: 'Ações em aberto',
           diag: 'Diagnóstico',
-          diagHint: 'Por setor (~6 perg.)',
+          diagHint: 'Por setor',
             workspace: 'Centro hoje',
             workspaceHint: 'Etholys',
           };
@@ -359,7 +359,9 @@ export function NexusCoachPanel({
           <label className="block text-xs font-medium text-gray-500">Projeto SIEP (opcional)</label>
           <input
             className="mt-1 w-full rounded border border-gray-200 px-2 py-1.5 font-mono text-xs"
-            placeholder="cuid do projeto"
+            placeholder={
+              nexusLocale === 'es' ? 'ID del proyecto' : nexusLocale === 'en' ? 'Project ID' : 'ID do projeto'
+            }
             value={projectOverride ?? ''}
             onChange={(e) => setProjectOverride(e.target.value || null)}
           />

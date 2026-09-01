@@ -18,23 +18,12 @@ export default function NexusSettingsPage() {
           {t('Definições NEXUS', 'Ajustes NEXUS', 'NEXUS settings')}
         </h1>
         <p className="mt-1 text-sm text-gray-600">
-          {t(
-            'Preferências de diagnóstico MIPYME, rota de desenvolvimento e pontes com ATLAS/FUNDHUB. Organização e licenças ficam na administração Etholys.',
-            'Preferencias de diagnóstico MIPYME, ruta de desarrollo y puentes con ATLAS/FUNDHUB. Organización y licencias están en administración Etholys.',
-            'MIPYME diagnosis preferences, development roadmap, and ATLAS/FUNDHUB bridges. Organization and licenses live in Etholys administration.',
-          )}
+          {t('Diagnóstico e rota de desenvolvimento.', 'Diagnóstico y ruta de desarrollo.', 'Diagnosis and development roadmap.')}
         </p>
       </header>
 
       <section className="rounded-xl border border-violet-100 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-gray-900">{t('Módulo NEXUS', 'Módulo NEXUS', 'NEXUS module')}</h2>
-        <p className="mt-2 text-sm text-gray-600">
-          {t(
-            'Preferências avançadas deste módulo ainda não estão disponíveis. Use os atalhos abaixo para organização e acessos.',
-            'Las preferencias avanzadas de este módulo aún no están disponibles. Use los atajos de abajo para organización y accesos.',
-            'Advanced preferences for this module are not available yet. Use the shortcuts below for organization and access.',
-          )}
-        </p>
+        <h2 className="text-sm font-semibold text-gray-900">{t('Atalhos', 'Atajos', 'Shortcuts')}</h2>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2">

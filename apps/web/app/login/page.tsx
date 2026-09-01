@@ -124,18 +124,18 @@ function LoginContent() {
     ? [
         { icon: Layers, text: 'Ecosistema integrado de soluciones' },
         { icon: Shield, text: 'Acceso unificado a todos los sistemas' },
-        { icon: Sparkles, text: 'Inteligencia artificial transversal' },
+        { icon: Sparkles, text: 'Inteligencia artificial integrada' },
         { icon: Zap, text: 'Herramientas modulares y escalables' },
       ]
     : locale === 'pt' ? [
         { icon: Layers, text: 'Ecossistema integrado de solu\u00e7\u00f5es' },
         { icon: Shield, text: 'Acesso unificado a todos os sistemas' },
-        { icon: Sparkles, text: 'Intelig\u00eancia artificial transversal' },
+        { icon: Sparkles, text: 'Intelig\u00eancia artificial integrada' },
         { icon: Zap, text: 'Ferramentas modulares e escal\u00e1veis' },
       ] : [
         { icon: Layers, text: 'Integrated solutions ecosystem' },
         { icon: Shield, text: 'Unified access to all systems' },
-        { icon: Sparkles, text: 'Cross-cutting artificial intelligence' },
+        { icon: Sparkles, text: 'Integrated artificial intelligence' },
         { icon: Zap, text: 'Modular and scalable tools' },
       ];
 

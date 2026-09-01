@@ -20,9 +20,9 @@ export default function AcessoRestritoPage() {
       </h1>
       <p className="mt-3 max-w-md text-sm text-slate-600">
         {t(
-          `A sua conta${email ? ` (${email})` : ''} ainda não tem funções Etholys atribuídas. Peça a um administrador um convite para o sistema ou módulo de que precisa (SIEP, ATLAS, FORGE, etc.).`,
-          `Su cuenta${email ? ` (${email})` : ''} aún no tiene funciones Etholys asignadas. Pida a un administrador una invitación al sistema o módulo que necesite (SIEP, ATLAS, FORGE, etc.).`,
-          `Your account${email ? ` (${email})` : ''} does not have Etholys functions assigned yet. Ask an administrator for an invitation to the system or module you need (SIEP, ATLAS, FORGE, etc.).`,
+          `A sua conta${email ? ` (${email})` : ''} ainda não tem acesso atribuído. Peça a um administrador um convite.`,
+          `Su cuenta${email ? ` (${email})` : ''} aún no tiene acceso asignado. Pida a un administrador una invitación.`,
+          `Your account${email ? ` (${email})` : ''} does not have access yet. Ask an administrator for an invitation.`,
         )}
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">

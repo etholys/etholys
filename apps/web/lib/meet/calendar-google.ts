@@ -17,7 +17,7 @@ async function refreshGoogleAccessToken(refreshToken: string): Promise<{
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
   if (!clientId || !clientSecret) {
-    throw new Error('GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET em falta');
+    throw new Error('Google Calendar não está disponível neste momento.');
   }
   const res = await fetch(GOOGLE_TOKEN_URL, {
     method: 'POST',
@@ -121,7 +121,7 @@ export async function createGoogleCalendarEvent(
   const { accessToken, needsReconnect, connected } = await getGoogleCalendarAccessToken(userId);
   if (!connected || needsReconnect || !accessToken) {
     throw new Error(
-      'Google Calendar não ligado. Faça login com Google com GOOGLE_CALENDAR_ENABLED=1 (scope calendar.events).',
+      'Google Calendar não está ligado. Ligue a conta Google em Meet.',
     );
   }
 

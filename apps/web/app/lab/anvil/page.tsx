@@ -258,9 +258,9 @@ export default function AnvilLabPage() {
               <h1 className="text-2xl font-bold text-white">ANVIL</h1>
               <p className="text-sm text-slate-400">
                 {t(
-                  'Un agente por proyecto · preview → Contabo / custom',
-                  'Um agente por projeto · preview → Contabo / custom',
-                  'One agent per project · preview → Contabo / custom',
+                  'Un agente por proyecto',
+                  'Um agente por projeto',
+                  'One agent per project',
                 )}
               </p>
             </div>
