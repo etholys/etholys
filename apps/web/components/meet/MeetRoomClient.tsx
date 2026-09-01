@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import {
   ArrowLeft,
   ExternalLink,
@@ -37,10 +38,10 @@ import {
   type MeetLocalRecorder,
 } from '@/lib/meet/local-recorder';
 import {
-  closeMeetDocumentPipWindow,
-  openMeetDocumentPip,
-  supportsDocumentPictureInPicture,
-} from '@/lib/meet/document-pip';
+  MeetJoinSetupDialog,
+  type MeetJoinSetupPrefs,
+} from '@/components/meet/MeetJoinSetupDialog';
+import { resolveMeetSpeechLanguage, type MeetSpeechLanguage } from '@/lib/meet/language';
 
 type SessionRow = {
   id: string;
@@ -48,6 +49,7 @@ type SessionRow = {
   status: string;
   meetingUrl: string | null;
   projectId: string | null;
+  createdById?: string | null;
   transcriptText?: string | null;
   seriesParentId?: string | null;
 };
@@ -123,7 +125,9 @@ function layoutLabel(
 export function MeetRoomClient({ sessionId }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: authSession } = useSession();
   const { locale, activeCompanyId } = useApp();
+  const currentUserId = (authSession?.user as { id?: string } | undefined)?.id || null;
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
 
   const companyId =
@@ -146,7 +150,37 @@ export function MeetRoomClient({ sessionId }: Props) {
   const [clock, setClock] = useState(() => formatMeetClock(locale, new Date()));
   const [features, setFeatures] = useState({
     liveTranscriptionEnabled: false,
+    whisperTranscriptionEnabled: false,
   });
+  const [joinSetupDone, setJoinSetupDone] = useState(false);
+  const [joinPrefs, setJoinPrefs] = useState<MeetJoinSetupPrefs>(() => ({
+    language: 'auto',
+    enableLiveTranscript: false,
+    enableLocalRecording: true,
+    enableWhisperOnEnd: true,
+  }));
+  const joinPrefsRef = useRef(joinPrefs);
+  useEffect(() => {
+    joinPrefsRef.current = joinPrefs;
+  }, [joinPrefs]);
+
+  useEffect(() => {
+    setJoinPrefs((prev) => ({
+      ...prev,
+      language: (resolveMeetSpeechLanguage({ uiLocale: locale }) || 'pt') as MeetSpeechLanguage,
+    }));
+  }, [locale]);
+
+  const meetingSpeechLang = useMemo(
+    () =>
+      resolveMeetSpeechLanguage({
+        explicit: joinPrefs.language,
+        uiLocale: locale,
+      }),
+    [joinPrefs.language, locale],
+  );
+
+  const isHost = Boolean(currentUserId && session?.createdById === currentUserId);
   const [pipActive, setPipActive] = useState(false);
   const [pipMode, setPipMode] = useState<'none' | 'document' | 'css'>('none');
   const [conferenceReady, setConferenceReady] = useState(false);
@@ -226,6 +260,13 @@ export function MeetRoomClient({ sessionId }: Props) {
   }, [locale]);
 
   useEffect(() => {
+    if (!session || joinSetupDone || !currentUserId) return;
+    if (session.createdById !== currentUserId) {
+      setJoinSetupDone(true);
+    }
+  }, [session, currentUserId, joinSetupDone]);
+
+  useEffect(() => {
     if (!companyId) return;
     void Promise.all([
       fetch('/api/meet/status')
@@ -233,6 +274,7 @@ export function MeetRoomClient({ sessionId }: Props) {
         .then((d) =>
           setFeatures({
             liveTranscriptionEnabled: Boolean(d.liveTranscriptionEnabled),
+            whisperTranscriptionEnabled: Boolean(d.whisperTranscriptionEnabled),
           }),
         ),
       fetch(
@@ -499,7 +541,7 @@ export function MeetRoomClient({ sessionId }: Props) {
           const next = [...current];
           const updated = { ...current[index], ...row };
           next[index] = updated;
-          if (isFinal && companyId) {
+          if (isFinal && companyId && joinPrefsRef.current.enableLiveTranscript) {
             const persist = updated;
             queueMicrotask(() => {
               void fetch(`/api/meet/sessions/${sessionId}/transcript`, {
@@ -553,7 +595,7 @@ export function MeetRoomClient({ sessionId }: Props) {
           next = [...withoutInterim, row];
         }
 
-        if (companyId) {
+        if (companyId && joinPrefsRef.current.enableLiveTranscript) {
           const persist = persistRow;
           queueMicrotask(() => {
             void fetch(`/api/meet/sessions/${sessionId}/transcript`, {
@@ -576,6 +618,25 @@ export function MeetRoomClient({ sessionId }: Props) {
     },
     [companyId, sessionId, locale],
   );
+
+  function confirmJoinSetup() {
+    const prefs = joinPrefsRef.current;
+    setJoinSetupDone(true);
+    if (prefs.enableLocalRecording) {
+      window.setTimeout(() => void startLocalRecording(), 400);
+    }
+  }
+
+  function maybeStartLiveTranscription() {
+    if (!joinPrefsRef.current.enableLiveTranscript || !features.liveTranscriptionEnabled) {
+      return;
+    }
+    setPanelOpen(true);
+    transcriptionStartedAtRef.current = Date.now();
+    setTranscriptionWaiting(true);
+    setTranscriptionOn(true);
+    conferenceRef.current?.startTranscription();
+  }
 
   function toggleTranscription() {
     setError(null);
@@ -653,15 +714,18 @@ export function MeetRoomClient({ sessionId }: Props) {
         return;
       }
       setError(null);
-      // Oferece upload para Whisper + diarização (se storage estiver pronto)
+      // Upload Whisper quando o organizador optou na entrada
       if (companyId && result.blob.size > 0) {
-        const wantUpload = window.confirm(
-          t(
-            'Gravação guardada. Queres enviar para o CHORUS gerar a transcrição diarizada (Whisper)?',
-            'Grabación guardada. ¿Quieres subirla a CHORUS para la transcripción diarizada (Whisper)?',
-            'Recording saved. Upload to CHORUS for a diarized Whisper transcript?',
-          ),
-        );
+        const autoWhisper = joinPrefsRef.current.enableWhisperOnEnd && features.whisperTranscriptionEnabled;
+        const wantUpload =
+          autoWhisper ||
+          window.confirm(
+            t(
+              'Gravação guardada. Queres enviar para o CHORUS gerar a transcrição diarizada (Whisper)?',
+              'Grabación guardada. ¿Quieres subirla a CHORUS para la transcripción diarizada (Whisper)?',
+              'Recording saved. Upload to CHORUS for a diarized Whisper transcript?',
+            ),
+          );
         if (wantUpload) {
           try {
             const fileName = result.fileName || `chorus-${sessionId}.webm`;
@@ -707,7 +771,13 @@ export function MeetRoomClient({ sessionId }: Props) {
             const tr = await fetch(`/api/meet/sessions/${sessionId}/transcribe`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ companyId, locale, finalize: false, diarize: true }),
+              body: JSON.stringify({
+                companyId,
+                locale,
+                languageHint: meetingSpeechLang,
+                finalize: false,
+                diarize: true,
+              }),
             });
             if (tr.ok) {
               setError(
@@ -810,14 +880,21 @@ export function MeetRoomClient({ sessionId }: Props) {
         setRecordingOn(false);
       }
 
-      let transcript = buildTranscriptText(segmentsRef.current);
+      let transcript = joinPrefsRef.current.enableLiveTranscript
+        ? buildTranscriptText(segmentsRef.current)
+        : '';
       if (companyId) {
         try {
           const tr = await fetch(
             `/api/meet/sessions/${sessionId}/transcript?companyId=${encodeURIComponent(companyId)}`,
           );
-          const td = (await tr.json()) as { transcriptText?: string };
-          if ((td.transcriptText || '').trim().length > transcript.length) {
+          const td = (await tr.json()) as { transcriptText?: string; source?: string };
+          if (
+            joinPrefsRef.current.enableLiveTranscript &&
+            (td.transcriptText || '').trim().length > transcript.length
+          ) {
+            transcript = td.transcriptText!.trim();
+          } else if (td.source === 'whisper' && (td.transcriptText || '').trim()) {
             transcript = td.transcriptText!.trim();
           }
         } catch {
@@ -880,10 +957,10 @@ export function MeetRoomClient({ sessionId }: Props) {
   }
 
   async function leaveToMeetHome() {
-    // Sai deste browser: flush da transcrição, sem finalizar IA (os outros podem continuar).
+    // Sai deste browser: flush da transcrição live só se estava activa.
     leaveQuietRef.current = true;
     closingRef.current = true;
-    if (companyId) {
+    if (companyId && joinPrefsRef.current.enableLiveTranscript) {
       const transcript = buildTranscriptText(segmentsRef.current);
       if (transcript) {
         void fetch(`/api/meet/sessions/${sessionId}`, {
@@ -1237,22 +1314,24 @@ export function MeetRoomClient({ sessionId }: Props) {
               }
             >
             <div ref={stageRef} className="relative h-full w-full">
-              {session.meetingUrl && canEmbedJitsiInIframe(session.meetingUrl) ? (
+              {!joinSetupDone ? (
+                <div className="flex h-full min-h-[min(70vh,640px)] items-center justify-center p-6 text-center text-sm text-white/50">
+                  {t(
+                    'Configura a reunião para entrar na sala.',
+                    'Configura la reunión para entrar a la sala.',
+                    'Set up the meeting to join the room.',
+                  )}
+                </div>
+              ) : session.meetingUrl && canEmbedJitsiInIframe(session.meetingUrl) ? (
                 <MeetConferenceFrame
                   ref={conferenceRef}
                   meetingUrl={session.meetingUrl}
                   title={session.title}
                   locale={locale}
+                  transcriptionLanguage={meetingSpeechLang}
                   onReady={() => {
                     setConferenceReady(true);
-                    if (!features.liveTranscriptionEnabled) return;
-                    // STT em fundo — painel fica fechado até o utilizador abrir
-                    window.setTimeout(() => {
-                      transcriptionStartedAtRef.current = Date.now();
-                      setTranscriptionWaiting(true);
-                      setTranscriptionOn(true);
-                      conferenceRef.current?.startTranscription();
-                    }, 800);
+                    maybeStartLiveTranscription();
                   }}
                   onTranscriptionChunk={handleTranscriptionChunk}
                   onParticipantCountChange={setParticipantCount}
@@ -1453,16 +1532,35 @@ export function MeetRoomClient({ sessionId }: Props) {
               </div>
 
               <p className="text-[10px] leading-relaxed text-white/35">
-                {t(
-                  'A transcrição vem do servidor Meet (por participante). Minimiza este painel com «‹» à direita.',
-                  'La transcripción viene del servidor Meet (por participante). Minimiza este panel con «‹» a la derecha.',
-                  'Transcript comes from the Meet server (per participant). Minimize this panel with “‹” on the right.',
-                )}
+                {joinPrefs.enableLiveTranscript
+                  ? t(
+                      'Transcrição ao vivo (qualidade limitada). Para texto fiável, grava e usa Whisper no recap.',
+                      'Transcripción en vivo (calidad limitada). Para texto fiable, graba y usa Whisper en el recap.',
+                      'Live transcript (limited quality). For reliable text, record and use Whisper in the recap.',
+                    )
+                  : t(
+                      'Grava no PC e activa Whisper na entrada para transcrição profissional após a reunião.',
+                      'Graba en el PC y activa Whisper al entrar para transcripción profesional tras la reunión.',
+                      'Record on this PC and enable Whisper when joining for professional post-meeting transcription.',
+                    )}
               </p>
             </div>
           </aside>
         )}
       </div>
+
+      {!joinSetupDone && session && (
+        <MeetJoinSetupDialog
+          locale={locale}
+          meetingTitle={session.title}
+          isHost={isHost}
+          whisperAvailable={features.whisperTranscriptionEnabled}
+          liveTranscriptionAvailable={features.liveTranscriptionEnabled}
+          prefs={joinPrefs}
+          onChange={setJoinPrefs}
+          onConfirm={confirmJoinSetup}
+        />
+      )}
     </div>
   );
 }

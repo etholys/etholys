@@ -6,6 +6,7 @@ import { getMeetSessionForCompany } from '@/lib/meet/create-session';
 import { prisma } from '@/lib/prisma';
 import { isMeetTranscribeConfigured, transcribeMeetRecording } from '@/lib/meet/transcribe';
 import { diarizeWhisperSegments, formatDiarizedTranscript } from '@/lib/meet/diarize';
+import { resolveMeetSpeechLanguage } from '@/lib/meet/language';
 import { generateMeetPostMeetingAi } from '@/lib/meet/post-meeting-ai';
 import { notifyMeetActionsPending } from '@/lib/meet/notify-pending-actions';
 
@@ -55,15 +56,10 @@ export async function POST(req: Request, ctx: Ctx) {
       );
     }
 
-    const lang =
-      body.languageHint ||
-      (body.locale === 'es'
-        ? 'es'
-        : body.locale === 'en'
-          ? 'en'
-          : body.locale === 'pt'
-            ? 'pt'
-            : undefined);
+    const lang = resolveMeetSpeechLanguage({
+      explicit: body.languageHint,
+      uiLocale: body.locale,
+    });
 
     const participants = await prisma.meetParticipant.findMany({
       where: { sessionId: session.id },
@@ -79,13 +75,18 @@ export async function POST(req: Request, ctx: Ctx) {
       .map((p) => p.displayName || p.user?.name || p.email || '')
       .filter(Boolean);
 
+    const whisperPromptLang =
+      lang === 'pt' ? 'português' : lang === 'en' ? 'English' : lang === 'es' ? 'español' : '';
+
     const whisper = await transcribeMeetRecording({
       recordingUrlOrKey: session.recordingUrl,
       languageHint: lang,
       promptHint: [
-        'CHORUS meeting transcript.',
-        participantNames.length ? `Participants: ${participantNames.join(', ')}.` : '',
-        session.title ? `Meeting title: ${session.title}.` : '',
+        whisperPromptLang
+          ? `Reunião de trabalho em ${whisperPromptLang}.`
+          : 'Reunião de trabalho.',
+        participantNames.length ? `Participantes: ${participantNames.join(', ')}.` : '',
+        session.title ? `Título: ${session.title}.` : '',
       ]
         .filter(Boolean)
         .join(' '),
@@ -94,7 +95,7 @@ export async function POST(req: Request, ctx: Ctx) {
     const liveHints = await prisma.meetTranscriptSegment.findMany({
       where: {
         sessionId: session.id,
-        NOT: { messageId: { startsWith: 'chorus-whisper-' } },
+        messageId: { startsWith: 'live-jigasi-' },
       },
       orderBy: { startedAt: 'asc' },
       take: 120,
@@ -115,6 +116,7 @@ export async function POST(req: Request, ctx: Ctx) {
             text: h.text,
           })),
           locale: body.locale,
+          languageHint: lang,
         });
         if (utterances.length > 0) {
           transcriptText = formatDiarizedTranscript(utterances);

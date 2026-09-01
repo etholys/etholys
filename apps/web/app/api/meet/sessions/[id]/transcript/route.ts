@@ -36,7 +36,15 @@ export async function GET(req: Request, ctx: Ctx) {
       orderBy: [{ startedAt: 'asc' }, { createdAt: 'asc' }],
       take: 5000,
     });
-    return NextResponse.json({ segments, transcriptText: renderTranscript(segments) });
+
+    const whisperSegments = segments.filter((s) => s.messageId.startsWith('chorus-whisper-'));
+    const displaySegments = whisperSegments.length > 0 ? whisperSegments : segments;
+
+    return NextResponse.json({
+      segments: displaySegments,
+      transcriptText: renderTranscript(displaySegments),
+      source: whisperSegments.length > 0 ? 'whisper' : 'live',
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error interno';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -71,16 +79,19 @@ export async function POST(req: Request, ctx: Ctx) {
     if (!messageId || !text) {
       return NextResponse.json({ error: 'messageId e text obrigatórios' }, { status: 400 });
     }
+    const storedMessageId = messageId.startsWith('live-jigasi-')
+      ? messageId
+      : `live-jigasi-${messageId}`;
     const participantName =
       body.participantName?.trim().slice(0, 200) || 'Participante';
     const parsedDate = body.startedAt ? new Date(body.startedAt) : new Date();
     const startedAt = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
 
     const segment = await prisma.meetTranscriptSegment.upsert({
-      where: { sessionId_messageId: { sessionId: id, messageId } },
+      where: { sessionId_messageId: { sessionId: id, messageId: storedMessageId } },
       create: {
         sessionId: id,
-        messageId,
+        messageId: storedMessageId,
         participantId: body.participantId?.trim().slice(0, 200) || null,
         participantName,
         language: body.language?.trim().slice(0, 20) || null,
@@ -99,12 +110,16 @@ export async function POST(req: Request, ctx: Ctx) {
     const rows = await prisma.meetTranscriptSegment.findMany({
       where: { sessionId: id },
       orderBy: [{ startedAt: 'asc' }, { createdAt: 'asc' }],
-      select: { participantName: true, text: true, startedAt: true },
+      select: { participantName: true, text: true, startedAt: true, messageId: true },
       take: 5000,
     });
+    const whisperRows = rows.filter((r) => r.messageId.startsWith('chorus-whisper-'));
+    const syncRows = (whisperRows.length > 0 ? whisperRows : rows).map(
+      ({ participantName, text, startedAt }) => ({ participantName, text, startedAt }),
+    );
     await prisma.meetSession.update({
       where: { id },
-      data: { transcriptText: renderTranscript(rows).slice(0, 100_000) },
+      data: { transcriptText: renderTranscript(syncRows).slice(0, 100_000) },
     });
 
     return NextResponse.json({ segment });

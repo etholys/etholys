@@ -106,6 +106,8 @@ type Props = {
   meetingUrl: string;
   title: string;
   locale: string;
+  /** Idioma STT Jigasi (pt/es/en) — independente do idioma da UI */
+  transcriptionLanguage?: string;
   onReady?: () => void;
   onTranscriptionChunk?: (chunk: TranscriptionChunk) => void;
   onRecordingStatus?: (state: RecordingState) => void;
@@ -163,6 +165,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       meetingUrl,
       title,
       locale,
+      transcriptionLanguage,
       onReady,
       onTranscriptionChunk,
       onRecordingStatus,
@@ -378,7 +381,16 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
                 enabled: true,
                 autoCaptionOnTranscribe: true,
                 useAppLanguage: false,
-                preferredLanguage: locale === 'pt' ? 'pt' : locale === 'en' ? 'en' : 'es',
+                preferredLanguage:
+                  transcriptionLanguage === 'pt' ||
+                  transcriptionLanguage === 'en' ||
+                  transcriptionLanguage === 'es'
+                    ? transcriptionLanguage
+                    : locale === 'pt'
+                      ? 'pt'
+                      : locale === 'en'
+                        ? 'en'
+                        : 'es',
                 disableStartForAll: false,
               },
               disableVirtualBackground: false,
