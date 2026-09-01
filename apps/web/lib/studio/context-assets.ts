@@ -12,6 +12,8 @@ export const STUDIO_CONTEXT_MAX_TEXT = 120_000;
 export const STUDIO_COPILOT_CONTEXT_MAX_CHARS = 48_000;
 /** PDF/imagem inline no LLM — evita OOM e 502 no proxy */
 export const STUDIO_LLM_INLINE_MAX_BYTES = 3 * 1024 * 1024;
+/** Alvo após compressão de imagens (JPEG) antes de enviar ao LLM */
+export const STUDIO_LLM_IMAGE_TARGET_BYTES = 180 * 1024;
 
 const SELECT_ASSET = {
   id: true,
@@ -88,6 +90,48 @@ export async function extractStudioContextText(
     console.warn('[studio-context] extract failed', fileName, e);
   }
   return null;
+}
+
+/** Reduz imagens antes do inline base64 — evita OOM e 502 no servidor com pouca RAM. */
+async function shrinkStudioImageForLlm(
+  buffer: Buffer,
+  mimeType: string,
+): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  const mime = mimeType.toLowerCase();
+  if (!mime.startsWith('image/')) return { buffer, mimeType: mime };
+
+  if (buffer.length <= STUDIO_LLM_IMAGE_TARGET_BYTES) {
+    return { buffer, mimeType: mime };
+  }
+
+  try {
+    const sharp = (await import('sharp')).default;
+    let quality = 82;
+    let out = await sharp(buffer, { failOnError: false })
+      .rotate()
+      .resize({ width: 1568, height: 1568, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality, mozjpeg: true })
+      .toBuffer();
+
+    while (out.length > STUDIO_LLM_IMAGE_TARGET_BYTES && quality > 48) {
+      quality -= 8;
+      out = await sharp(buffer, { failOnError: false })
+        .rotate()
+        .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality, mozjpeg: true })
+        .toBuffer();
+    }
+
+    if (out.length > STUDIO_LLM_INLINE_MAX_BYTES) {
+      console.warn('[studio-context] image still too large after shrink', out.length);
+      return null;
+    }
+    return { buffer: out, mimeType: 'image/jpeg' };
+  } catch (e) {
+    console.warn('[studio-context] image shrink failed', e);
+    if (buffer.length > STUDIO_LLM_IMAGE_TARGET_BYTES) return null;
+    return { buffer, mimeType: mime };
+  }
 }
 
 async function saveStudioContextBuffer(
@@ -320,17 +364,35 @@ export async function buildStudioContextLlmParts(assetIds: string[], companyId: 
     if (!isImage && !isPdf) continue;
 
     try {
-      const buf = await loadStudioContextBuffer(a.storagePath);
+      let buf = await loadStudioContextBuffer(a.storagePath);
       if (buf.length > STUDIO_LLM_INLINE_MAX_BYTES) {
         console.warn('[studio-context] skip large inline attachment', a.id, buf.length);
         continue;
       }
-      parts.push({
-        inlineData: {
-          mimeType: isImage ? mime : 'application/pdf',
-          data: buf.toString('base64'),
-        },
-      });
+      if (isImage) {
+        const shrunk = await shrinkStudioImageForLlm(buf, mime);
+        if (!shrunk) {
+          parts.push({
+            text: `\n[Anexo imagem «${a.name || a.fileName}» demasiado grande para análise visual — descreva o conteúdo no texto ou use PDF/DOCX.]`,
+          });
+          continue;
+        }
+        buf = shrunk.buffer;
+        const inlineMime = shrunk.mimeType;
+        parts.push({
+          inlineData: {
+            mimeType: inlineMime,
+            data: buf.toString('base64'),
+          },
+        });
+      } else {
+        parts.push({
+          inlineData: {
+            mimeType: 'application/pdf',
+            data: buf.toString('base64'),
+          },
+        });
+      }
       parts.push({ text: `\n[Anexo: ${a.name || a.fileName}]` });
     } catch (e) {
       console.warn('[studio-context] load for llm', a.id, e);

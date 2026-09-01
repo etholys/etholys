@@ -10,7 +10,6 @@ import {
 } from '@/lib/studio/access';
 import { recordStudioActivity, truncatePreview } from '@/lib/studio/activity';
 import { buildStudioSystemPrompt, parseStudioCopilotJson } from '@/lib/studio/agent';
-import { buildStudioCopilotUserText } from '@/lib/studio/copilot-history';
 import {
   actionAssistantMessage,
   actionUserMessage,
@@ -372,38 +371,38 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     };
   } else {
     try {
-      const llmOpts = multimodalParts.length
-        ? {
-            systemInstruction: system,
-            userParts: [
-              {
-                text: buildStudioCopilotUserText(
-                  priorMessages.map((m) => ({ role: m.role, content: m.content })),
-                  scopedUserText,
-                  locale,
-                ),
-              },
-              ...multimodalParts,
-            ],
-            maxOutputTokens: 8000,
-            temperature: 0.1,
-            responseMimeType: 'application/json' as const,
-          }
-        : {
-            systemInstruction: system,
-            chatMessages: [
-              ...priorMessages.map((m) => ({
-                role: m.role as 'user' | 'assistant',
-                content: m.content,
-              })),
-              { role: 'user' as const, content: scopedUserText },
-            ],
-            maxOutputTokens: 8000,
-            temperature: 0.1,
-            responseMimeType: 'application/json' as const,
-          };
+      const chatMessages = [
+        ...priorMessages.map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        })),
+        { role: 'user' as const, content: scopedUserText },
+      ];
+
+      const llmOpts = {
+        systemInstruction: system,
+        chatMessages,
+        ...(multimodalParts.length ? { userParts: multimodalParts } : {}),
+        maxOutputTokens: 8000,
+        temperature: 0.1,
+        responseMimeType: 'application/json' as const,
+      };
+
+      const llmStarted = Date.now();
+      console.info('[studio/copilot] llm start', {
+        docId: params.id,
+        multimodal: multimodalParts.length,
+        mode: effectiveMode,
+      });
 
       const { text, finishReason } = await llmGenerateContent(llmOpts);
+
+      console.info('[studio/copilot] llm done', {
+        docId: params.id,
+        ms: Date.now() - llmStarted,
+        finishReason,
+        chars: text.length,
+      });
       if (finishReason === 'MAX_TOKENS') {
         return NextResponse.json(
           { error: 'LLM truncated', detail: 'Resposta cortada — tente um pedido mais curto.' },
@@ -412,9 +411,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
       raw = text;
     } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       console.error('[studio copilot] LLM', e);
+      const timedOut = /timeout|aborted|AbortError/i.test(msg);
       return NextResponse.json(
-        { error: 'O assistente não está disponível neste momento. Tente novamente.' },
+        {
+          error: timedOut
+            ? 'A IA demorou demasiado com o anexo. Tenta de novo ou sem imagem.'
+            : 'O assistente não está disponível neste momento. Tente novamente.',
+          detail: timedOut ? msg.slice(0, 200) : undefined,
+        },
         { status: 502 },
       );
     }

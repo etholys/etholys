@@ -4,6 +4,8 @@
 
 const ANTHROPIC_API_ROOT = 'https://api.anthropic.com/v1';
 const ANTHROPIC_VERSION = '2023-06-01';
+/** Evita pedidos pendurados que o proxy fecha com HTML 502. */
+const LLM_FETCH_TIMEOUT_MS = Number(process.env.LLM_FETCH_TIMEOUT_MS || 90_000);
 
 /** Modelo por defeito (2026). Sobrescrever com LLM_MODEL / ANTHROPIC_MODEL. */
 export const DEFAULT_LLM_MODEL = 'claude-sonnet-4-6';
@@ -281,12 +283,24 @@ async function llmGenerateContentWithModel(
     content: string | AnthropicContentBlock[];
   }> = [];
 
+  const attachmentBlocks = opts.userParts?.length ? partsToAnthropicContent(opts.userParts) : [];
+
   if (opts.chatMessages?.length) {
-    for (const m of opts.chatMessages.slice(-24)) {
-      anthropicMessages.push({
-        role: m.role,
-        content: m.content,
-      });
+    const history = opts.chatMessages.slice(-24);
+    for (let i = 0; i < history.length; i++) {
+      const m = history[i];
+      const isLastUser = i === history.length - 1 && m.role === 'user' && attachmentBlocks.length > 0;
+      if (isLastUser) {
+        anthropicMessages.push({
+          role: 'user',
+          content: [...partsToAnthropicContent([{ text: m.content }]), ...attachmentBlocks],
+        });
+      } else {
+        anthropicMessages.push({ role: m.role, content: m.content });
+      }
+    }
+    if (attachmentBlocks.length && history[history.length - 1]?.role !== 'user') {
+      anthropicMessages.push({ role: 'user', content: attachmentBlocks });
     }
   } else {
     anthropicMessages.push({ role: 'user', content: partsToAnthropicContent(parts) });
@@ -318,6 +332,7 @@ async function llmGenerateContentWithModel(
       'anthropic-version': ANTHROPIC_VERSION,
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(LLM_FETCH_TIMEOUT_MS),
   });
 
   const errText = await response.text();
