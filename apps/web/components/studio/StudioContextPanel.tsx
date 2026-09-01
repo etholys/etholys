@@ -229,13 +229,14 @@ export async function uploadStudioChatAttachment(opts: {
   companyId?: string | null;
   documentId: string;
   file: File;
+  signal?: AbortSignal;
 }): Promise<StudioContextAssetRow> {
   const { parseStudioApiResponse } = await import('@/lib/studio/api-response');
   const fd = new FormData();
   fd.append('file', opts.file);
   fd.append('documentId', opts.documentId);
   if (opts.companyId) fd.append('companyId', opts.companyId);
-  const r = await fetch('/api/studio/context', { method: 'POST', body: fd });
+  const r = await fetch('/api/studio/context', { method: 'POST', body: fd, signal: opts.signal });
   const d = await parseStudioApiResponse<{ error?: string; asset?: StudioContextAssetRow }>(r);
   if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
   if (!d.asset) throw new Error('Resposta de upload inválida.');

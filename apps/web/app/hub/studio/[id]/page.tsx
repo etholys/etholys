@@ -33,6 +33,7 @@ import {
   Monitor,
   Presentation,
   Download,
+  Pencil,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
@@ -199,6 +200,7 @@ export default function StudioDocumentPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [consent, setConsent] = useState<StudioConsentRequest | null>(null);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [exporting, setExporting] = useState<'pdf' | 'docx' | 'pptx' | 'xlsx' | null>(null);
@@ -251,6 +253,8 @@ export default function StudioDocumentPage() {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const chatAbortRef = useRef<AbortController | null>(null);
+  const chatBranchRef = useRef<{ fromId?: string; afterId?: string } | null>(null);
   const chatFileDragDepthRef = useRef(0);
   const moldFileRef = useRef<HTMLInputElement | null>(null);
   const dragging = useRef(false);
@@ -1295,6 +1299,38 @@ export default function StudioDocumentPage() {
     addPendingChatFiles(e.dataTransfer.files);
   }
 
+  function isPersistedChatMessageId(messageId: string): boolean {
+    return (
+      !messageId.startsWith('local-') &&
+      !messageId.startsWith('err-') &&
+      !messageId.startsWith('a-') &&
+      !messageId.startsWith('stop-')
+    );
+  }
+
+  function startEditMessage(msg: ChatMsg, index: number) {
+    if (chatBusy || !canEdit || msg.role !== 'user') return;
+    setInput(msg.content);
+    setEditingMessageId(msg.id);
+    setMessages((m) => m.slice(0, index));
+    if (isPersistedChatMessageId(msg.id)) {
+      chatBranchRef.current = { fromId: msg.id };
+    } else if (index > 0) {
+      const prev = messages[index - 1];
+      if (prev && isPersistedChatMessageId(prev.id)) {
+        chatBranchRef.current = { afterId: prev.id };
+      } else {
+        chatBranchRef.current = null;
+      }
+    } else {
+      chatBranchRef.current = null;
+    }
+  }
+
+  function stopChat() {
+    chatAbortRef.current?.abort();
+  }
+
   async function sendChat(opts?: {
     text?: string;
     approvedSources?: string[];
@@ -1317,6 +1353,11 @@ export default function StudioDocumentPage() {
     setConsent(null);
     setInput('');
     setPendingFiles([]);
+    const branch = chatBranchRef.current;
+    chatBranchRef.current = null;
+    setEditingMessageId(null);
+    const abort = new AbortController();
+    chatAbortRef.current = abort;
     const tempId = `local-${Date.now()}`;
     const scopeLabel =
       aiTargetBlockIds.length > 0
@@ -1345,6 +1386,7 @@ export default function StudioDocumentPage() {
           companyId: companyId || undefined,
           documentId: id,
           file,
+          signal: abort.signal,
         });
         attachmentIds.push(asset.id);
       }
@@ -1364,6 +1406,8 @@ export default function StudioDocumentPage() {
         approvedSources: opts?.approvedSources || [],
         attachmentIds,
         targetBlockIds: aiTargetBlockIds,
+        branchFromMessageId: branch?.fromId,
+        branchAfterMessageId: branch?.afterId,
       };
       // Canvas só quando há alterações locais — evita POST enorme e 502/OOM no proxy
       if (clientDirty) {
@@ -1373,6 +1417,7 @@ export default function StudioDocumentPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
+        signal: abort.signal,
         body: JSON.stringify(copilotBody),
       });
       const d = await parseStudioApiResponse<{
@@ -1389,6 +1434,8 @@ export default function StudioDocumentPage() {
         patchedBlockIds?: string[];
         patchCount?: number;
         consentRequest?: StudioConsentRequest;
+        userMessageId?: string;
+        assistantMessageId?: string;
       }>(r);
       if (!r.ok) {
         const detail =
@@ -1464,9 +1511,11 @@ export default function StudioDocumentPage() {
       }
 
       setMessages((m) => [
-        ...m,
+        ...m.map((msg) =>
+          msg.id === tempId && d.userMessageId ? { ...msg, id: d.userMessageId } : msg,
+        ),
         {
-          id: `a-${Date.now()}`,
+          id: d.assistantMessageId || `a-${Date.now()}`,
           role: 'assistant',
           content: assistantContent,
           createdAt: new Date().toISOString(),
@@ -1484,6 +1533,23 @@ export default function StudioDocumentPage() {
         void loadVersions();
       }
     } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        setMessages((m) => [
+          ...m,
+          {
+            id: `stop-${Date.now()}`,
+            role: 'assistant',
+            content:
+              locale === 'es'
+                ? '_(Generación detenida.)_'
+                : locale === 'en'
+                  ? '_(Generation stopped.)_'
+                  : '_(Geração interrompida.)_',
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+        return;
+      }
       setMessages((m) => [
         ...m,
         {
@@ -1493,6 +1559,7 @@ export default function StudioDocumentPage() {
         },
       ]);
     } finally {
+      chatAbortRef.current = null;
       setChatBusy(false);
     }
   }
@@ -2514,12 +2581,12 @@ export default function StudioDocumentPage() {
                 />
               </div>
             )}
-            {messages.map((m) => {
+            {messages.map((m, msgIdx) => {
               const loc = locale === 'en' || locale === 'es' ? locale : 'pt';
               return (
               <div
                 key={m.id}
-                className={`min-w-0 max-w-full overflow-hidden rounded-xl px-3 py-2 text-sm ${
+                className={`group min-w-0 max-w-full overflow-hidden rounded-xl px-3 py-2 text-sm ${
                   m.role === 'user' ? 'ml-4 bg-orange-50 text-slate-900' : 'mr-2 bg-slate-50 text-slate-800'
                 }`}
               >
@@ -2534,6 +2601,17 @@ export default function StudioDocumentPage() {
                       {new Date(m.createdAt).toLocaleString(locale === 'en' ? 'en' : locale)}
                     </span>
                   )}
+                  {m.role === 'user' && canEdit && !chatBusy ? (
+                    <button
+                      type="button"
+                      onClick={() => startEditMessage(m, msgIdx)}
+                      className="ml-auto inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-stone-500 opacity-0 transition hover:bg-orange-100/80 hover:text-orange-800 group-hover:opacity-100"
+                      title={t('Editar e reenviar', 'Editar y reenviar', 'Edit and resend')}
+                    >
+                      <Pencil className="h-3 w-3" />
+                      {t('Editar', 'Editar', 'Edit')}
+                    </button>
+                  ) : null}
                 </div>
                 {m.role === 'user' || m.role === 'assistant' ? (
                   <StudioCollapsedChatContent content={m.content} locale={loc} />
@@ -2618,6 +2696,16 @@ export default function StudioDocumentPage() {
               if (dictating) stopDictation();
               void sendChat();
             }}
+            onStop={stopChat}
+            editingHint={
+              editingMessageId
+                ? t(
+                    'A editar mensagem — altera o texto abaixo e reenvia.',
+                    'Editando mensaje — cambia el texto abajo y reenvía.',
+                    'Editing message — change the text below and resend.',
+                  )
+                : null
+            }
             onModeChange={setCopilotMode}
             onQuickPrompt={(prompt) => {
               setInput(prompt);
@@ -2634,7 +2722,13 @@ export default function StudioDocumentPage() {
             onRemovePendingFile={(i) => setPendingFiles((p) => p.filter((_, j) => j !== i))}
             statusHint={composerStatusHint}
             onEscapeCancel={
-              pendingStructureActions.includes('cancel_plan')
+              editingMessageId
+                ? () => {
+                    setEditingMessageId(null);
+                    chatBranchRef.current = null;
+                    setInput('');
+                  }
+                : pendingStructureActions.includes('cancel_plan')
                 ? () => void sendChat({ action: 'cancel_plan', mode: 'discuss' })
                 : consent
                   ? () => {

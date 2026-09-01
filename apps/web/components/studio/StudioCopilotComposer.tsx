@@ -8,13 +8,13 @@ import { StudioChatAttachmentChips } from '@/components/studio/StudioChatAttachm
 import {
   BookMarked,
   ChevronDown,
-  Loader2,
   MessageSquare,
   Mic,
   MicOff,
   Paperclip,
   PenLine,
   Send,
+  Square,
   Target,
   Wand2,
 } from 'lucide-react';
@@ -30,6 +30,8 @@ type Props = {
   input: string;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  onStop?: () => void;
+  editingHint?: string | null;
   onModeChange: (mode: StudioCopilotMode) => void;
   onQuickPrompt: (prompt: string) => void;
   onAttachClick: () => void;
@@ -63,6 +65,8 @@ export function StudioCopilotComposer({
   input,
   onInputChange,
   onSend,
+  onStop,
+  editingHint,
   onModeChange,
   onQuickPrompt,
   onAttachClick,
@@ -169,6 +173,11 @@ export function StudioCopilotComposer({
           <span className="ml-auto shrink-0 text-[9px] text-stone-400">Ctrl+↵</span>
         </div>
 
+        {editingHint ? (
+          <p className="border-b border-orange-100 bg-orange-50/80 px-2 py-1 text-[10px] leading-snug text-orange-800">
+            {editingHint}
+          </p>
+        ) : null}
         {statusHint ? (
           <p className="border-b border-stone-50 px-2 py-1 text-[10px] leading-snug text-stone-500">
             {statusHint}
@@ -246,15 +255,26 @@ export function StudioCopilotComposer({
               {dictating ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
             </button>
           ) : null}
-          <button
-            type="button"
-            disabled={!canSend}
-            onClick={onSend}
-            className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-md bg-stone-900 text-white hover:bg-stone-800 disabled:opacity-30"
-            title="Ctrl+Enter"
-          >
-            {chatBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-          </button>
+          {chatBusy && onStop ? (
+            <button
+              type="button"
+              onClick={onStop}
+              className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-md bg-red-600 text-white hover:bg-red-700"
+              title={loc === 'es' ? 'Detener' : loc === 'en' ? 'Stop' : 'Parar'}
+            >
+              <Square className="h-3 w-3 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={!canSend}
+              onClick={onSend}
+              className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-md bg-stone-900 text-white hover:bg-stone-800 disabled:opacity-30"
+              title="Ctrl+Enter"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
     </div>

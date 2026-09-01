@@ -151,6 +151,38 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const who = actorLabel(user);
 
+  const branchFromMessageId =
+    typeof body.branchFromMessageId === 'string' ? body.branchFromMessageId.trim() : '';
+  const branchAfterMessageId =
+    typeof body.branchAfterMessageId === 'string' ? body.branchAfterMessageId.trim() : '';
+
+  if (aiSessionId && (branchFromMessageId || branchAfterMessageId)) {
+    const anchor = await prisma.aiAdvisorMessage.findFirst({
+      where: {
+        sessionId: aiSessionId,
+        id: branchFromMessageId || branchAfterMessageId,
+      },
+      select: { id: true, createdAt: true },
+    });
+    if (anchor) {
+      await prisma.aiAdvisorMessage.deleteMany({
+        where: {
+          sessionId: aiSessionId,
+          createdAt: branchFromMessageId
+            ? { gte: anchor.createdAt }
+            : { gt: anchor.createdAt },
+        },
+      });
+      const mirror = await loadStudioCopilotSession(prisma, aiSessionId);
+      if (mirror) {
+        await saveStudioCopilotSession(prisma, aiSessionId, {
+          mode: mirror.mode,
+          structureState: null,
+        });
+      }
+    }
+  }
+
   const priorMessages = aiSessionId
     ? await prisma.aiAdvisorMessage.findMany({
         where: { sessionId: aiSessionId },
@@ -235,7 +267,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         ? 'develop'
         : 'apply';
 
-  await prisma.aiAdvisorMessage.create({
+  const userMessageRow = await prisma.aiAdvisorMessage.create({
     data: {
       sessionId: aiSessionId,
       role: 'user',
@@ -252,6 +284,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         copilotAction: action,
       },
     },
+    select: { id: true },
   });
 
   await recordStudioActivity({
@@ -521,7 +554,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     /* updatedById ainda não migrado */
   }
 
-  await prisma.aiAdvisorMessage.create({
+  const assistantMessageRow = await prisma.aiAdvisorMessage.create({
     data: {
       sessionId: aiSessionId,
       role: 'assistant',
@@ -541,6 +574,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         deterministicStructureApply: useDeterministicStructureApply,
       },
     },
+    select: { id: true },
   });
 
   await recordStudioActivity({
@@ -574,6 +608,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   return NextResponse.json({
     message: assistantMessage,
+    userMessageId: userMessageRow.id,
+    assistantMessageId: assistantMessageRow.id,
     canvasState: nextCanvas,
     consentRequest: payload.consentRequest ?? null,
     suggestedTitle: titleUpdate ?? null,
