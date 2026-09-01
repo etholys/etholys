@@ -269,7 +269,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       targetType: 'studio',
       studioDocumentId: doc.id,
     }),
-    buildStudioContextLlmParts(attachmentIds, effectiveCompanyId),
+    buildStudioContextLlmParts(attachmentIds, effectiveCompanyId).catch((e) => {
+      console.warn('[studio] multimodal parts failed', e);
+      return [] as Awaited<ReturnType<typeof buildStudioContextLlmParts>>;
+    }),
   ]);
 
   const mergedUserContext = [userUploadedContext, linkContext].filter(Boolean).join('\n\n');

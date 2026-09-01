@@ -1385,7 +1385,24 @@ export default function StudioDocumentPage() {
         patchCount?: number;
         consentRequest?: StudioConsentRequest;
       }>(r);
-      if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
+      if (!r.ok) {
+        const detail =
+          typeof d.detail === 'string'
+            ? d.detail
+            : typeof d.error === 'string'
+              ? d.error
+              : null;
+        throw new Error(
+          detail ||
+            (r.status === 502
+              ? locale === 'es'
+                ? 'La IA no respondió (servidor ocupado). Intenta de nuevo sin adjunto o con un archivo más pequeño.'
+                : locale === 'en'
+                  ? 'AI did not respond (server busy). Try again without attachment or with a smaller file.'
+                  : 'A IA não respondeu (servidor ocupado). Tenta de novo sem anexo ou com ficheiro mais pequeno.'
+              : `HTTP ${r.status}`),
+        );
+      }
 
       const staleResponse = !shouldApplyStudioDocumentFetch(chatDocId, id, chatEpoch, docEpochRef.current);
 

@@ -8,6 +8,8 @@ import type { LlmPart } from '@/lib/llm-client';
 
 export const STUDIO_CONTEXT_MAX_BYTES = 12 * 1024 * 1024;
 export const STUDIO_CONTEXT_MAX_TEXT = 120_000;
+/** PDF/imagem inline no LLM — evita OOM e 502 no proxy */
+export const STUDIO_LLM_INLINE_MAX_BYTES = 3 * 1024 * 1024;
 
 const SELECT_ASSET = {
   id: true,
@@ -302,21 +304,27 @@ export async function buildStudioContextLlmParts(assetIds: string[], companyId: 
   const parts: LlmPart[] = [];
   for (const a of assets) {
     const mime = (a.mimeType || '').toLowerCase();
-    // Texto já vai no system prompt; só anexar binários úteis ao modelo
-    if (a.extractedText?.trim() && !mime.startsWith('image/') && mime !== 'application/pdf') {
+    // Texto extraído já vai no system prompt (loadStudioUserContextText) — não duplicar PDF/DOCX em binário
+    if (a.extractedText?.trim()) {
       continue;
     }
+    const isImage = mime.startsWith('image/');
+    const isPdf = mime === 'application/pdf';
+    if (!isImage && !isPdf) continue;
+
     try {
       const buf = await loadStudioContextBuffer(a.storagePath);
-      if (mime.startsWith('image/') || mime === 'application/pdf') {
-        parts.push({
-          inlineData: {
-            mimeType: mime.startsWith('image/') ? mime : 'application/pdf',
-            data: buf.toString('base64'),
-          },
-        });
-        parts.push({ text: `\n[Anexo: ${a.name || a.fileName}]` });
+      if (buf.length > STUDIO_LLM_INLINE_MAX_BYTES) {
+        console.warn('[studio-context] skip large inline attachment', a.id, buf.length);
+        continue;
       }
+      parts.push({
+        inlineData: {
+          mimeType: isImage ? mime : 'application/pdf',
+          data: buf.toString('base64'),
+        },
+      });
+      parts.push({ text: `\n[Anexo: ${a.name || a.fileName}]` });
     } catch (e) {
       console.warn('[studio-context] load for llm', a.id, e);
     }
