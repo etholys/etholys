@@ -158,6 +158,15 @@ type MoldRow = {
 };
 
 const MAX_UNDO = 40;
+const STUDIO_CHAT_FILE_MAX = 6;
+
+function filterStudioChatFiles(files: Iterable<File>): File[] {
+  return Array.from(files).filter((f) => {
+    const name = f.name.toLowerCase();
+    if (/\.(pdf|txt|md|csv|json|docx)$/.test(name)) return true;
+    return /^image\/(png|jpeg|webp|gif)$/i.test(f.type);
+  });
+}
 
 export default function StudioDocumentPage() {
   const params = useParams();
@@ -188,6 +197,7 @@ export default function StudioDocumentPage() {
   const [showLinks, setShowLinks] = useState(false);
   const [showFolderContext, setShowFolderContext] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [chatFileDragOver, setChatFileDragOver] = useState(false);
   const [folderContextCount, setFolderContextCount] = useState(0);
   const [chatWidth, setChatWidth] = useState(320);
   const [undoStack, setUndoStack] = useState<StudioCanvasState[]>([]);
@@ -228,6 +238,7 @@ export default function StudioDocumentPage() {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const chatFileDragDepthRef = useRef(0);
   const moldFileRef = useRef<HTMLInputElement | null>(null);
   const dragging = useRef(false);
   const chatDragStart = useRef({ x: 0, w: 320 });
@@ -1234,6 +1245,41 @@ export default function StudioDocumentPage() {
   function blockLabel(blockId: string): string {
     if (!canvas) return blockId;
     return blockLabelWithPage(canvas, blockId);
+  }
+
+  function addPendingChatFiles(files: Iterable<File>) {
+    const accepted = filterStudioChatFiles(files);
+    if (!accepted.length) return;
+    setPendingFiles((prev) => [...prev, ...accepted].slice(0, STUDIO_CHAT_FILE_MAX));
+  }
+
+  function handleChatFileDragEnter(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    chatFileDragDepthRef.current += 1;
+    setChatFileDragOver(true);
+  }
+
+  function handleChatFileDragLeave(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    chatFileDragDepthRef.current = Math.max(0, chatFileDragDepthRef.current - 1);
+    if (chatFileDragDepthRef.current === 0) setChatFileDragOver(false);
+  }
+
+  function handleChatFileDragOver(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = canEdit && !chatBusy ? 'copy' : 'none';
+  }
+
+  function handleChatFileDrop(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    chatFileDragDepthRef.current = 0;
+    setChatFileDragOver(false);
+    if (!canEdit || chatBusy) return;
+    addPendingChatFiles(e.dataTransfer.files);
   }
 
   async function sendChat(opts?: {
@@ -2373,10 +2419,25 @@ export default function StudioDocumentPage() {
           ) : (
           <>
           <div
-            className={`flex min-h-0 flex-col overflow-visible ${
+            className={`relative flex min-h-0 flex-col overflow-visible ${
               hasChatContent ? 'flex-1' : 'shrink-0 justify-end'
             }`}
+            onDragEnter={handleChatFileDragEnter}
+            onDragLeave={handleChatFileDragLeave}
+            onDragOver={handleChatFileDragOver}
+            onDrop={handleChatFileDrop}
           >
+          {chatFileDragOver && canEdit && !chatBusy ? (
+            <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center rounded-lg border-2 border-dashed border-orange-400 bg-orange-50/95">
+              <p className="px-4 text-center text-xs font-medium text-orange-900">
+                {t(
+                  'Largar ficheiros para anexar ao chat',
+                  'Soltar archivos para adjuntar al chat',
+                  'Drop files to attach to chat',
+                )}
+              </p>
+            </div>
+          ) : null}
           <div
             ref={chatScrollRef}
             className={`min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain px-2 py-2 ${
@@ -2543,7 +2604,7 @@ export default function StudioDocumentPage() {
             onChange={(e) => {
               const list = e.target.files ? Array.from(e.target.files) : [];
               e.target.value = '';
-              if (list.length) setPendingFiles((prev) => [...prev, ...list].slice(0, 6));
+              if (list.length) addPendingChatFiles(list);
             }}
           />
           </>
