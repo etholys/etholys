@@ -30,7 +30,14 @@ function safeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180) || 'file';
 }
 
-function sniffMime(fileName: string, declared?: string | null): string {
+function sniffMime(fileName: string, declared?: string | null, buffer?: Buffer): string {
+  if (buffer && buffer.length >= 4) {
+    if (buffer.subarray(0, 4).toString('ascii') === '%PDF') return 'application/pdf';
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+      return 'image/png';
+    }
+    if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+  }
   if (declared && declared !== 'application/octet-stream') return declared;
   const lower = fileName.toLowerCase();
   if (lower.endsWith('.pdf')) return 'application/pdf';
@@ -147,7 +154,7 @@ export async function createStudioContextAsset(opts: {
   if (opts.file.buffer.length > STUDIO_CONTEXT_MAX_BYTES) {
     throw new Error(`Ficheiro excede ${Math.round(STUDIO_CONTEXT_MAX_BYTES / (1024 * 1024))} MB`);
   }
-  const mimeType = sniffMime(opts.file.fileName, opts.file.mimeType);
+  const mimeType = sniffMime(opts.file.fileName, opts.file.mimeType, opts.file.buffer);
   const extractedText = await extractStudioContextText(opts.file.buffer, mimeType, opts.file.fileName);
   const storagePath = await saveStudioContextBuffer(
     opts.companyId,

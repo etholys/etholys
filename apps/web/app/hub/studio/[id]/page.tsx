@@ -125,6 +125,7 @@ import {
   writeStudioToolsPanelOpen,
 } from '@/lib/studio/editor-panel-prefs';
 import { canDeleteStudioDocument, type StudioAccessLevel } from '@/lib/studio/access-levels';
+import { parseStudioApiResponse } from '@/lib/studio/api-response';
 
 type ChatMsg = {
   id: string;
@@ -163,8 +164,20 @@ const STUDIO_CHAT_FILE_MAX = 6;
 function filterStudioChatFiles(files: Iterable<File>): File[] {
   return Array.from(files).filter((f) => {
     const name = f.name.toLowerCase();
+    const type = (f.type || '').toLowerCase();
     if (/\.(pdf|txt|md|csv|json|docx)$/.test(name)) return true;
-    return /^image\/(png|jpeg|webp|gif)$/i.test(f.type);
+    if (/^image\/(png|jpeg|webp|gif)$/i.test(type)) return true;
+    if (
+      type === 'application/pdf' ||
+      type === 'application/json' ||
+      type === 'text/plain' ||
+      type === 'text/csv' ||
+      type === 'text/markdown' ||
+      type.includes('wordprocessingml')
+    ) {
+      return true;
+    }
+    return false;
   });
 }
 
@@ -1341,6 +1354,7 @@ export default function StudioDocumentPage() {
       const r = await fetch(`/api/studio/documents/${chatDocId}/copilot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({
           companyId: companyId || undefined,
           locale,
@@ -1356,7 +1370,21 @@ export default function StudioDocumentPage() {
           targetBlockIds: aiTargetBlockIds,
         }),
       });
-      const d = await r.json();
+      const d = await parseStudioApiResponse<{
+        detail?: string;
+        error?: string;
+        message?: string;
+        canvasState?: StudioCanvasState;
+        title?: string;
+        copilotSession?: {
+          mode?: string;
+          pendingActions?: StudioCopilotAction[];
+          structureState?: StudioStructureSessionState | null;
+        };
+        patchedBlockIds?: string[];
+        patchCount?: number;
+        consentRequest?: StudioConsentRequest;
+      }>(r);
       if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
 
       const staleResponse = !shouldApplyStudioDocumentFetch(chatDocId, id, chatEpoch, docEpochRef.current);

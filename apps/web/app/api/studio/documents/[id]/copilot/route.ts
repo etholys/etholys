@@ -64,6 +64,7 @@ function actorLabel(u: { name: string | null; email: string }) {
 
 /** POST /api/studio/documents/[id]/copilot */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -575,6 +576,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     patchedBlockIds: safePatches.map((p) => p.blockId),
     patchCount,
   });
+  } catch (e: unknown) {
+    console.error('[POST /api/studio/documents/copilot]', e);
+    const msg = e instanceof Error ? e.message : 'Erro interno no copiloto.';
+    return NextResponse.json({ error: 'Copilot failed', detail: msg }, { status: 500 });
+  }
 }
 
 /** GET messages for studio document session */

@@ -64,6 +64,7 @@ export async function GET(req: NextRequest) {
 
 /** POST /api/studio/context — multipart: file, companyId?, folderId|documentId, label? */
 export async function POST(req: NextRequest) {
+  try {
   const user = await authUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -128,6 +129,11 @@ export async function POST(req: NextRequest) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[POST /api/studio/context]', e);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Erro ao carregar anexo.';
+    console.error('[POST /api/studio/context] outer', e);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
