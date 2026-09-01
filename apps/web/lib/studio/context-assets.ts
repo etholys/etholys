@@ -8,6 +8,8 @@ import type { LlmPart } from '@/lib/llm-client';
 
 export const STUDIO_CONTEXT_MAX_BYTES = 12 * 1024 * 1024;
 export const STUDIO_CONTEXT_MAX_TEXT = 120_000;
+/** Total de texto de anexos no system prompt do copilot */
+export const STUDIO_COPILOT_CONTEXT_MAX_CHARS = 48_000;
 /** PDF/imagem inline no LLM — evita OOM e 502 no proxy */
 export const STUDIO_LLM_INLINE_MAX_BYTES = 3 * 1024 * 1024;
 
@@ -291,7 +293,12 @@ export async function loadStudioUserContextText(opts: {
       );
     }
   }
-  return parts.join('\n\n');
+  const joined = parts.join('\n\n');
+  if (joined.length <= STUDIO_COPILOT_CONTEXT_MAX_CHARS) return joined;
+  return (
+    joined.slice(0, STUDIO_COPILOT_CONTEXT_MAX_CHARS) +
+    '\n\n… [contexto de anexos truncado — documento muito grande]'
+  );
 }
 
 /** Partes multimodais (imagens/PDF) para o turno, a partir de assets seleccionados. */

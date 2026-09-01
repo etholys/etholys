@@ -8,13 +8,17 @@ export function shouldApplyStudioDocumentFetch(
   return requestedDocId === currentDocId && epochAtStart === currentEpoch;
 }
 
-/** Prefer server canvas when the client revision does not match (cross-document leak guard). */
+/**
+ * Usar canvas do cliente só quando há edições locais não guardadas.
+ * Sem dirty, o servidor usa sempre `doc.canvasState` (evita POST gigante + OOM).
+ * Com dirty + revisão desfasada, rejeita canvas do cliente (troca rápida de documento).
+ */
 export function shouldTrustClientStudioCanvas(
   clientDirty: boolean,
   clientRevision: string | null | undefined,
   serverUpdatedAt: Date | string,
 ): boolean {
-  if (clientDirty) return true;
+  if (!clientDirty) return false;
   if (!clientRevision) return true;
   const serverIso =
     serverUpdatedAt instanceof Date ? serverUpdatedAt.toISOString() : String(serverUpdatedAt);

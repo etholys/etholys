@@ -38,12 +38,16 @@ describe('shouldTrustClientStudioCanvas', () => {
     assert.equal(shouldTrustClientStudioCanvas(true, 'other', serverAt), true);
   });
 
-  it('trusts client canvas when revision matches server', () => {
-    assert.equal(shouldTrustClientStudioCanvas(false, serverAt, serverAt), true);
+  it('uses server canvas when client is clean even if revision matches', () => {
+    assert.equal(shouldTrustClientStudioCanvas(false, serverAt, serverAt), false);
   });
 
   it('rejects stale client canvas from another document session', () => {
     assert.equal(shouldTrustClientStudioCanvas(false, '2026-08-28T12:00:00.000Z', serverAt), false);
+  });
+
+  it('rejects dirty client canvas when revision is stale', () => {
+    assert.equal(shouldTrustClientStudioCanvas(true, '2026-08-28T12:00:00.000Z', serverAt), false);
   });
 });
 

@@ -1,5 +1,8 @@
 import type { StudioCanvasState, StudioConsentSource, StudioCopilotPayload } from '@/lib/studio/types';
 
+/** Limite total do resumo de canvas no system prompt (evita OOM com docs grandes). */
+export const STUDIO_CANVAS_SUMMARY_MAX_CHARS = 24_000;
+
 export const STUDIO_ECOSYSTEM_CATALOG: StudioConsentSource[] = [
   {
     id: 'company.profile',
@@ -63,13 +66,14 @@ export function buildStudioSystemPrompt(opts: {
   const targets = (opts.targetBlockIds || []).filter(Boolean);
   const targetSet = new Set(targets);
 
-  const canvasSummary = opts.canvas.pages
+  const blockLimit = targetSet.size ? 1200 : 400;
+  let canvasSummary = opts.canvas.pages
     .map((p) => {
       const blocks = p.blocks
         .filter((b) => !targetSet.size || targetSet.has(b.id))
         .map((b) => {
           const mark = targetSet.has(b.id) ? ' ★ÂMBITO' : '';
-          return `  - [${b.id}] ${b.kind}${b.title ? ` «${b.title}»` : ''}${mark}: ${truncate(b.text, targetSet.size ? 1200 : 400)}`;
+          return `  - [${b.id}] ${b.kind}${b.title ? ` «${b.title}»` : ''}${mark}: ${truncate(b.text, blockLimit)}`;
         })
         .join('\n');
       if (!blocks) return null;
@@ -77,6 +81,12 @@ export function buildStudioSystemPrompt(opts: {
     })
     .filter(Boolean)
     .join('\n');
+
+  if (canvasSummary.length > STUDIO_CANVAS_SUMMARY_MAX_CHARS) {
+    canvasSummary =
+      canvasSummary.slice(0, STUDIO_CANVAS_SUMMARY_MAX_CHARS) +
+      '\n… [resumo do canvas truncado — documento muito grande; usa blockIds do âmbito ou pede edição por secção]';
+  }
 
   const catalogLines = opts.catalog
     .map((s) => `- ${s.id}: ${s.label}${s.system ? ` (${s.system})` : ''}`)

@@ -1351,24 +1351,29 @@ export default function StudioDocumentPage() {
 
       const chatDocId = id;
       const chatEpoch = docEpochRef.current;
+      const clientDirty = dirtyRef.current;
+      const copilotBody: Record<string, unknown> = {
+        companyId: companyId || undefined,
+        locale,
+        message: text || (opts?.action ? userLine : ''),
+        mode: sendMode,
+        action: opts?.action,
+        documentId: chatDocId,
+        clientDirty,
+        clientRevision: knownUpdatedAt.current,
+        approvedSources: opts?.approvedSources || [],
+        attachmentIds,
+        targetBlockIds: aiTargetBlockIds,
+      };
+      // Canvas só quando há alterações locais — evita POST enorme e 502/OOM no proxy
+      if (clientDirty) {
+        copilotBody.canvasState = canvasRef.current || canvas;
+      }
       const r = await fetch(`/api/studio/documents/${chatDocId}/copilot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({
-          companyId: companyId || undefined,
-          locale,
-          message: text || (opts?.action ? userLine : ''),
-          mode: sendMode,
-          action: opts?.action,
-          documentId: chatDocId,
-          canvasState: canvasRef.current || canvas,
-          clientDirty: dirtyRef.current,
-          clientRevision: knownUpdatedAt.current,
-          approvedSources: opts?.approvedSources || [],
-          attachmentIds,
-          targetBlockIds: aiTargetBlockIds,
-        }),
+        body: JSON.stringify(copilotBody),
       });
       const d = await parseStudioApiResponse<{
         detail?: string;

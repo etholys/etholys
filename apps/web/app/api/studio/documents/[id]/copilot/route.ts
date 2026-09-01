@@ -71,7 +71,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const user = await prisma.user.findUnique({ where: { email: session.user.email } });
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
+  const contentLengthHeader = req.headers.get('content-length');
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const bodyJsonLen = JSON.stringify(body).length;
   const locale = typeof body.locale === 'string' ? body.locale : 'pt';
 
   const action = normalizeStudioCopilotAction(body.action);
@@ -107,17 +109,25 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       ? [body.targetBlockId]
       : [];
 
+  const clientDirty = body.clientDirty === true;
+  const clientRevision =
+    typeof body.clientRevision === 'string' ? body.clientRevision : null;
+
   let canvas = normalizeStudioCanvas(doc.canvasState) as StudioCanvasState;
-  if (body.canvasState && typeof body.canvasState === 'object') {
-    const clientDirty = body.clientDirty === true;
-    const clientRevision =
-      typeof body.clientRevision === 'string' ? body.clientRevision : null;
-    if (
-      shouldTrustClientStudioCanvas(clientDirty, clientRevision, doc.updatedAt)
-    ) {
+  if (clientDirty && body.canvasState && typeof body.canvasState === 'object') {
+    if (shouldTrustClientStudioCanvas(clientDirty, clientRevision, doc.updatedAt)) {
       canvas = body.canvasState as StudioCanvasState;
     }
   }
+
+  console.info('[studio/copilot] request', {
+    docId: params.id,
+    contentLength: contentLengthHeader,
+    bodyJsonLen,
+    clientDirty,
+    attachmentCount: Array.isArray(body.attachmentIds) ? body.attachmentIds.length : 0,
+    canvasBlocks: canvas.pages.reduce((n, p) => n + p.blocks.length, 0),
+  });
 
   let aiSessionId = doc.aiSessionId;
   if (!aiSessionId) {
@@ -145,7 +155,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     ? await prisma.aiAdvisorMessage.findMany({
         where: { sessionId: aiSessionId },
         orderBy: { createdAt: 'asc' },
-        take: 40,
+        take: 24,
         select: { role: true, content: true, context: true },
       })
     : [];
