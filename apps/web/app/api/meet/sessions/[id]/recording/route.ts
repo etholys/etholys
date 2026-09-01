@@ -14,19 +14,42 @@ import {
 
 type Ctx = { params: Promise<{ id: string }> };
 
+function readUploadBlob(form: FormData): { blob: Blob; fileName: string } | null {
+  const raw = form.get('file');
+  if (!raw || typeof raw === 'string') return null;
+  if (!(raw instanceof Blob)) return null;
+  if (raw.size <= 0) return null;
+  const fileName =
+    raw instanceof File && raw.name.trim() ? raw.name.trim() : 'recording.webm';
+  return { blob: raw, fileName };
+}
+
 async function handleDirectUpload(req: Request, sessionId: string) {
   const tenant = await getUserCompanyIds();
   if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
   const form = await req.formData();
   const companyId = String(form.get('companyId') || '').trim();
-  const file = form.get('file');
+  const upload = readUploadBlob(form);
 
   if (!companyId || !tenant.companyIds.includes(companyId)) {
     return NextResponse.json({ error: 'companyId inválido' }, { status: 400 });
   }
-  if (!(file instanceof File) || file.size <= 0) {
-    return NextResponse.json({ error: 'Ficheiro de gravação obrigatório' }, { status: 400 });
+  if (!upload) {
+    const raw = form.get('file');
+    console.warn('[meet/recording] upload reject', {
+      sessionId,
+      hasFileField: raw != null,
+      rawType: raw == null ? 'null' : typeof raw,
+      ctor: raw && typeof raw === 'object' ? (raw as object).constructor?.name : undefined,
+    });
+    return NextResponse.json(
+      {
+        error:
+          'Ficheiro de gravação obrigatório (upload interrompido ou ficheiro vazio). Para vídeos grandes, configure CORS no bucket R2 etholys-chorus e tente de novo.',
+      },
+      { status: 400 },
+    );
   }
 
   const session = await getMeetSessionForCompany(sessionId, companyId);
@@ -39,9 +62,10 @@ async function handleDirectUpload(req: Request, sessionId: string) {
     );
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const fileName = (file.name || `meet-${sessionId}.webm`).trim();
-  const contentType = (file.type || 'video/webm').trim();
+  const buffer = Buffer.from(await upload.blob.arrayBuffer());
+  const fileName = upload.fileName;
+  const contentType =
+    (upload.blob instanceof File && upload.blob.type) || 'video/webm';
   const { storageKey, recordingUrl } = await putMeetRecordingBuffer({
     sessionId,
     fileName,
