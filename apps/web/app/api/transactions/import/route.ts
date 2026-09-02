@@ -82,6 +82,8 @@ function sanitizeTx(t: Partial<AtlasImportTransaction> & Record<string, unknown>
     date: String(t.date || new Date().toISOString().slice(0, 10)).slice(0, 10),
     note: t.note ? String(t.note) : null,
     executionStatus: t.executionStatus === 'FORECAST' ? 'FORECAST' : 'EXECUTED',
+    sourceRow: Number(t.sourceRow) > 0 ? Number(t.sourceRow) : 0,
+    issues: Array.isArray(t.issues) ? (t.issues as AtlasImportTransaction['issues']) : [],
   };
 }
 

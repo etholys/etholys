@@ -80,6 +80,12 @@ export const ATLAS_TX_COLUMNS: AtlasTxColumnDef[] = [
 
 export const ATLAS_TX_CANONICAL_HEADERS = ATLAS_TX_COLUMNS.map((c) => c.header);
 
+export type AtlasImportIssue = {
+  field: 'amount' | 'date' | 'type';
+  message: string;
+  raw: string;
+};
+
 export type AtlasImportTransaction = {
   title: string;
   description: string | null;
@@ -90,6 +96,8 @@ export type AtlasImportTransaction = {
   date: string;
   note: string | null;
   executionStatus: AtlasTxStatus;
+  sourceRow: number;
+  issues: AtlasImportIssue[];
 };
 
 export type AtlasTemplateParseResult = {
@@ -198,12 +206,23 @@ export function normalizeAtlasTxStatus(raw: unknown): AtlasTxStatus {
   return STATUS_ALIASES[folded] ?? 'EXECUTED';
 }
 
+function rawPreview(raw: unknown): string {
+  if (raw == null || raw === '') return '(vacío)';
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw.toISOString().slice(0, 10);
+  const s = String(raw).replace(/\s+/g, ' ').trim();
+  return s.length > 48 ? `${s.slice(0, 45)}…` : s;
+}
+
 export function parseAtlasAmount(raw: unknown): number {
   if (typeof raw === 'number' && Number.isFinite(raw)) return Math.abs(raw);
-  const s = String(raw ?? '').trim();
-  if (!s) return NaN;
+  const s = String(raw ?? '')
+    .replace(/\u00a0|\u202f|\u2009/g, ' ')
+    .replace(/\u2212/g, '-')
+    .trim();
+  if (!s || s === '-' || s === '—' || s === '.') return NaN;
+  if (/^#(?:n\/?a|value!|ref!|div\/0!)/i.test(s)) return NaN;
   const cleaned = s.replace(/\s/g, '').replace(/[^\d,.\-]/g, '');
-  if (!cleaned) return NaN;
+  if (!cleaned || cleaned === '-' || cleaned === '.' || cleaned === ',') return NaN;
   const lastComma = cleaned.lastIndexOf(',');
   const lastDot = cleaned.lastIndexOf('.');
   let normalized = cleaned;
@@ -318,7 +337,8 @@ export function parseAtlasTransactionWorkbook(buffer: Buffer): AtlasTemplatePars
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i] ?? [];
     const line = i + 1;
-    const amount = parseAtlasAmount(row[mapping.amount!]);
+    const amountRaw = row[mapping.amount!];
+    const amount = parseAtlasAmount(amountRaw);
     const dateRaw = row[mapping.date!];
     const typeRaw = row[mapping.type!];
     const titleRaw = mapping.title !== undefined ? cellStr(row[mapping.title]) : '';
@@ -326,61 +346,117 @@ export function parseAtlasTransactionWorkbook(buffer: Buffer): AtlasTemplatePars
     const empty =
       !cellStr(dateRaw) &&
       !cellStr(typeRaw) &&
-      !(typeof row[mapping.amount!] === 'number') &&
-      !cellStr(row[mapping.amount!]) &&
+      !(typeof amountRaw === 'number') &&
+      !cellStr(amountRaw) &&
       !titleRaw;
     if (empty) continue;
 
+    const issues: AtlasImportIssue[] = [];
     if (!Number.isFinite(amount) || amount <= 0) {
-      warnings.push(`Fila ${line}: monto inválido, se omitió.`);
-      continue;
+      issues.push({
+        field: 'amount',
+        raw: rawPreview(amountRaw),
+        message: `Fila ${line}: monto inválido «${rawPreview(amountRaw)}». Corrija el valor en la tabla — no se elimina la fila.`,
+      });
     }
     const date = parseAtlasDate(dateRaw);
     if (!date) {
-      warnings.push(`Fila ${line}: fecha inválida, se omitió.`);
-      continue;
+      issues.push({
+        field: 'date',
+        raw: rawPreview(dateRaw),
+        message: `Fila ${line}: fecha inválida «${rawPreview(dateRaw)}». Use YYYY-MM-DD o DD/MM/YYYY.`,
+      });
     }
     const type = normalizeAtlasTxType(typeRaw);
     if (!type) {
-      warnings.push(`Fila ${line}: tipo inválido, se omitió. Use INCOME, EXPENSE, TRANSFER_IN o TRANSFER_OUT.`);
-      continue;
+      issues.push({
+        field: 'type',
+        raw: rawPreview(typeRaw),
+        message: `Fila ${line}: tipo inválido «${rawPreview(typeRaw)}». Use INCOME, EXPENSE, TRANSFER_IN o TRANSFER_OUT.`,
+      });
     }
     const currencyRaw = mapping.currency !== undefined ? cellStr(row[mapping.currency]).toUpperCase() : 'USD';
     const currency = (ATLAS_TX_CURRENCIES as readonly string[]).includes(currencyRaw) ? currencyRaw : currencyRaw || 'USD';
     const category = mapping.category !== undefined ? cellStr(row[mapping.category]) : '';
     const note = mapping.note !== undefined ? cellStr(row[mapping.note]) : '';
     const statusRaw = mapping.status !== undefined ? row[mapping.status] : '';
-    const title = titleRaw || descRaw || `${type} ${amount}`;
+    const resolvedType = type ?? 'EXPENSE';
+    const resolvedAmount = Number.isFinite(amount) && amount > 0 ? amount : 0;
+    const title = titleRaw || descRaw || `${resolvedType} ${resolvedAmount || rawPreview(amountRaw)}`;
+
+    for (const issue of issues) warnings.push(issue.message);
 
     transactions.push({
       title,
       description: descRaw || null,
-      type,
-      amount,
+      type: resolvedType,
+      amount: resolvedAmount,
       currency: currency || 'USD',
       category,
-      date,
+      date: date || '',
       note: note || null,
       executionStatus: normalizeAtlasTxStatus(statusRaw),
+      sourceRow: line,
+      issues,
     });
   }
 
   if (transactions.length === 0) {
     return {
       ok: false,
-      error: 'No se encontraron filas válidas. Complete fecha, tipo y monto.',
+      error: 'No se encontraron filas. Complete fecha, tipo y monto (las filas vacías se ignoran).',
       code: 'NO_ROWS',
       missing: [],
     };
   }
 
+  const errorCount = transactions.filter((t) => t.issues.length > 0).length;
+  const okCount = transactions.length - errorCount;
+  const summary =
+    errorCount > 0
+      ? `${okCount} listas, ${errorCount} con error — corrija las filas en rojo (no se omiten)`
+      : `${transactions.length} transacción(es) del formato ATLAS`;
+
   return {
     ok: true,
     transactions,
-    summary: `${transactions.length} transacción(es) del formato ATLAS`,
+    summary,
     warnings,
     mappedColumns,
   };
+}
+
+/** Revalida una fila después de editarla en la vista previa. */
+export function atlasImportLiveIssues(t: {
+  amount: number;
+  date: string;
+  type: string;
+  sourceRow?: number;
+}): AtlasImportIssue[] {
+  const line = t.sourceRow ?? '?';
+  const issues: AtlasImportIssue[] = [];
+  if (!Number.isFinite(t.amount) || t.amount <= 0) {
+    issues.push({
+      field: 'amount',
+      raw: String(t.amount ?? ''),
+      message: `Fila ${line}: monto inválido «${t.amount}». Debe ser un número mayor que 0.`,
+    });
+  }
+  if (!t.date || !parseAtlasDate(t.date)) {
+    issues.push({
+      field: 'date',
+      raw: t.date || '(vacío)',
+      message: `Fila ${line}: fecha inválida «${t.date || '(vacío)'}». Use YYYY-MM-DD o DD/MM/YYYY.`,
+    });
+  }
+  if (!normalizeAtlasTxType(t.type)) {
+    issues.push({
+      field: 'type',
+      raw: t.type || '(vacío)',
+      message: `Fila ${line}: tipo inválido «${t.type || '(vacío)'}». Use INCOME, EXPENSE, TRANSFER_IN o TRANSFER_OUT.`,
+    });
+  }
+  return issues;
 }
 
 function instructionLines(locale: 'es' | 'pt' | 'en'): string[][] {
@@ -393,6 +469,7 @@ function instructionLines(locale: 'es' | 'pt' | 'en'): string[][] {
       ['2. Uma linha = uma transação. Apague as linhas de exemplo antes de enviar, se quiser.'],
       ['3. Em ATLAS → Finanças → Importar → Formato ATLAS, envie este ficheiro.'],
       ['4. Confirme a pré-visualização e grave. Não usa IA nem créditos.'],
+      ['5. Linhas com erro NÃO são apagadas: aparecem em vermelho para corrigir antes de gravar.'],
       [],
       ['Colunas'],
       ['fecha*', 'Data YYYY-MM-DD (também DD/MM/YYYY)'],
@@ -415,6 +492,7 @@ function instructionLines(locale: 'es' | 'pt' | 'en'): string[][] {
       ['2. One row = one transaction. Delete the sample rows before upload if you prefer.'],
       ['3. In ATLAS → Finance → Import → ATLAS format, upload this file.'],
       ['4. Confirm the preview and save. No AI / no credits.'],
+      ['5. Invalid rows are NOT dropped: they appear in red so you can fix them before saving.'],
       [],
       ['Columns'],
       ['fecha*', 'Date YYYY-MM-DD (also DD/MM/YYYY)'],
@@ -435,7 +513,8 @@ function instructionLines(locale: 'es' | 'pt' | 'en'): string[][] {
     ['1. Complete la hoja Transacciones. No cambie los nombres de las columnas.'],
     ['2. Una fila = una transacción. Puede borrar las filas de ejemplo antes de subir.'],
     ['3. En ATLAS → Finanzas → Importar → Formato ATLAS, suba este archivo.'],
-    ['4. Confirme la vista previa y guarde. No usa IA ni créditos.'],
+      ['4. Confirme la vista previa y guarde. No usa IA ni créditos.'],
+      ['5. Las filas con error NO se eliminan: aparecen en rojo para corregirlas antes de guardar.'],
     [],
     ['Columnas'],
     ['fecha*', 'Fecha YYYY-MM-DD (también DD/MM/YYYY)'],

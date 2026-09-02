@@ -50,6 +50,10 @@ test('parses amounts with comma or dot', () => {
   assert.equal(parseAtlasAmount('1.234,56'), 1234.56);
   assert.equal(parseAtlasAmount(89), 89);
   assert.equal(parseAtlasAmount('-40'), 40);
+  assert.equal(parseAtlasAmount('$1,234.56'), 1234.56);
+  assert.equal(parseAtlasAmount('(120,50)'), 120.5);
+  assert.equal(parseAtlasAmount('1\u00a0234,56'), 1234.56);
+  assert.ok(Number.isNaN(parseAtlasAmount('#N/A')));
 });
 
 test('parses ISO and DMY dates', () => {
@@ -92,7 +96,7 @@ test('rejects sheets without required columns', () => {
   assert.ok(parsed.missing.includes('type'));
 });
 
-test('skips invalid rows and keeps valid ones', () => {
+test('keeps invalid rows with issues instead of omitting them', () => {
   const csv = [
     'fecha,tipo,monto,titulo',
     '2026-02-01,EXPENSE,10,Ok',
@@ -103,9 +107,15 @@ test('skips invalid rows and keeps valid ones', () => {
   const parsed = parseAtlasTransactionWorkbook(Buffer.from(csv, 'utf8'));
   assert.equal(parsed.ok, true);
   if (!parsed.ok) return;
-  assert.equal(parsed.transactions.length, 2);
+  assert.equal(parsed.transactions.length, 4);
+  assert.equal(parsed.transactions[0]?.issues.length, 0);
+  assert.equal(parsed.transactions[0]?.sourceRow, 2);
+  assert.ok(parsed.transactions[1]?.issues.some((i) => i.field === 'date'));
+  assert.equal(parsed.transactions[1]?.issues[0]?.raw, 'no-date');
+  assert.ok(parsed.transactions[2]?.issues.some((i) => i.field === 'amount'));
+  assert.equal(parsed.transactions[3]?.title, 'Keep');
+  assert.ok(parsed.summary.includes('con error'));
   assert.equal(parsed.warnings.length, 2);
-  assert.equal(parsed.transactions[1]?.title, 'Keep');
 });
 
 test('template id is stable', () => {
