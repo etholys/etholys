@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
+import { normalizeCategoryName } from '@/lib/atlas/transaction-categories';
 
 const DEFAULT_CATEGORIES = [
   'Salarios', 'Materiales', 'Equipamiento', 'Transporte',
@@ -18,18 +19,28 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const companyId = searchParams.get('companyId');
 
-    const where: any = { isActive: true };
-    if (companyId && tenant.companyIds.includes(companyId)) {
-      where.companyId = companyId;
-    } else {
-      where.companyId = { in: tenant.companyIds };
-    }
+    const companyWhere =
+      companyId && tenant.companyIds.includes(companyId)
+        ? { companyId }
+        : { companyId: { in: tenant.companyIds } };
 
     const categories = await prisma.transactionCategory.findMany({
-      where,
+      where: { isActive: true, ...companyWhere },
       orderBy: { name: 'asc' },
     });
-    return NextResponse.json({ categories, defaults: DEFAULT_CATEGORIES });
+    const ledgerRows = await prisma.transaction.findMany({
+      where: companyWhere,
+      distinct: ['category'],
+      select: { category: true },
+    });
+    const ledger = [
+      ...new Set(
+        ledgerRows
+          .map((r) => (r.category || '').trim())
+          .filter(Boolean),
+      ),
+    ].sort((a, b) => a.localeCompare(b, 'es'));
+    return NextResponse.json({ categories, defaults: DEFAULT_CATEGORIES, ledger });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -40,7 +51,8 @@ export async function POST(req: Request) {
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     const body = await req.json();
-    if (!body.companyId || !body.name) {
+    const name = normalizeCategoryName(body.name);
+    if (!body.companyId || !name) {
       return NextResponse.json({ error: 'companyId y name son requeridos' }, { status: 400 });
     }
     if (!tenant.companyIds.includes(body.companyId)) {
@@ -48,11 +60,11 @@ export async function POST(req: Request) {
     }
 
     const category = await prisma.transactionCategory.upsert({
-      where: { companyId_name: { companyId: body.companyId, name: body.name } },
+      where: { companyId_name: { companyId: body.companyId, name } },
       update: { isActive: true, color: body.color || '#6B7280' },
       create: {
         companyId: body.companyId,
-        name: body.name,
+        name,
         color: body.color || '#6B7280',
       },
     });

@@ -8,7 +8,7 @@ import {
   DollarSign, TrendingUp, TrendingDown, Plus, Trash2,
   ArrowUpRight, ArrowDownRight, RefreshCw, PieChart, BarChart3,
   Building2, FolderKanban, Tag, Download, X, Search,
-  Pencil, CheckSquare, Square, CalendarClock, Repeat, Eye, EyeOff,
+  Pencil, CheckSquare, Square, CalendarClock, Repeat, Eye,
   Clock, CheckCircle2, PlusCircle, Upload, FileText, Loader2, Wallet, FileSpreadsheet
 } from 'lucide-react';
 import { FinanceImportModal } from '@/components/finance/FinanceImportModal';
@@ -77,9 +77,8 @@ export default function FinancePage() {
 
   const [filterOrigin, setFilterOrigin] = useState('');
   const [filterCurrency, setFilterCurrency] = useState('');
-  /** When false (default), rows with scope PROJECT_ONLY stay hidden — not shown in the filter bar (SIEP-only). */
-  const [showProjectOnlyTx, setShowProjectOnlyTx] = useState(false);
   const [cfCurrency, setCfCurrency] = useState('ALL'); // multi-currency cashflow filter
+  const [loadError, setLoadError] = useState('');
 
   // Payment modal state
   const [paymentModal, setPaymentModal] = useState<{ id: string; title: string } | null>(null);
@@ -91,19 +90,16 @@ export default function FinancePage() {
   // Dynamic categories
   const [customCategories, setCustomCategories] = useState<any[]>([]);
   const [defaultCategories, setDefaultCategories] = useState<string[]>([]);
+  const [ledgerCategories, setLedgerCategories] = useState<string[]>([]);
   const [newCatName, setNewCatName] = useState('');
   const [showNewCat, setShowNewCat] = useState(false);
 
   const allCategories = useMemo(() => {
-    const custom = customCategories.map(c => c.name);
-    const merged = [...new Set([...defaultCategories, ...custom])];
-    return merged.sort();
-  }, [customCategories, defaultCategories]);
-
-  const projectOnlyHiddenCount = useMemo(
-    () => transactions.filter((tx: any) => tx.scope === 'PROJECT_ONLY').length,
-    [transactions]
-  );
+    const custom = customCategories.map((c) => c.name);
+    const fromTx = transactions.map((t: any) => String(t.category || '').trim()).filter(Boolean);
+    const merged = [...new Set([...fromTx, ...ledgerCategories, ...custom, ...defaultCategories])];
+    return merged.sort((a, b) => a.localeCompare(b, 'es'));
+  }, [customCategories, defaultCategories, ledgerCategories, transactions]);
 
   const txCurrencies = useMemo(() => {
     const codes = new Set<string>();
@@ -119,11 +115,13 @@ export default function FinancePage() {
       const data = await res.json();
       setCustomCategories(data?.categories ?? []);
       setDefaultCategories(data?.defaults ?? []);
+      setLedgerCategories(Array.isArray(data?.ledger) ? data.ledger : []);
     } catch {}
   }, [activeCompanyId]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const txParams = new URLSearchParams();
       if (activeCompanyId) txParams.set('companyId', activeCompanyId);
@@ -137,10 +135,13 @@ export default function FinancePage() {
       const txData = await txRes.json();
       const compData = await compRes.json();
       const projData = await projRes.json();
+      if (!txRes.ok) throw new Error(txData.error || 'No se pudieron cargar las transacciones');
       setTransactions(txData?.transactions ?? []);
       setCompanies(compData?.companies ?? []);
       setProjects(projData?.projects ?? []);
-    } catch { /* ignore */ }
+    } catch (err: any) {
+      setLoadError(err?.message || 'Error al cargar finanzas');
+    }
     setLoading(false);
   }, [activeCompanyId, filterBudgetItemId]);
 
@@ -179,7 +180,7 @@ export default function FinancePage() {
 
   const filtered = useMemo(() => {
     return transactions.filter(tx => {
-      if (!showProjectOnlyTx && tx.scope === 'PROJECT_ONLY') return false;
+      if (tx.scope === 'PROJECT_ONLY') return false;
       if (filterBudgetItemId && tx.companyBudgetItemId !== filterBudgetItemId) return false;
       if (filterType && tx.type !== filterType) return false;
       if (filterCategory && tx.category !== filterCategory) return false;
@@ -198,7 +199,7 @@ export default function FinancePage() {
       if (dateTo && new Date(tx.date) > new Date(dateTo + 'T23:59:59')) return false;
       return true;
     });
-  }, [transactions, showProjectOnlyTx, filterBudgetItemId, filterType, filterCategory, filterCompany, filterExecStatus, filterOrigin, filterCurrency, searchText, dateFrom, dateTo]);
+  }, [transactions, filterBudgetItemId, filterType, filterCategory, filterCompany, filterExecStatus, filterOrigin, filterCurrency, searchText, dateFrom, dateTo]);
 
   // Group totals by currency so multi-currency transactions are not mixed
   const totalsByCurrency = useMemo(() => {
@@ -562,24 +563,9 @@ export default function FinancePage() {
         </div>
       </div>
 
-      {projectOnlyHiddenCount > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-900 flex flex-wrap items-center gap-3">
-          <span>
-            {L(ml(
-              `${projectOnlyHiddenCount} transaction(s) are hidden (marked “project only” / SIEP). Totals and the list below exclude them unless you enable the option.`,
-              `${projectOnlyHiddenCount} transacción(es) ocultas (alcance “solo proyecto” / SIEP). Los totales y la lista no las incluyen salvo que actives la opción.`,
-              `${projectOnlyHiddenCount} transação(ões) ocultas (âmbito “somente projeto” / SIEP). Os totais e a lista não as incluem exceto se ativar a opção.`,
-            ))}
-          </span>
-          <label className="inline-flex items-center gap-2 cursor-pointer font-medium text-amber-950 whitespace-nowrap">
-            <input
-              type="checkbox"
-              checked={showProjectOnlyTx}
-              onChange={e => setShowProjectOnlyTx(e.target.checked)}
-              className="rounded border-amber-400 text-teal-600 focus:ring-teal-500"
-            />
-            {L(ml('Show SIEP / project-only movements', 'Mostrar movimientos solo-proyecto (SIEP)', 'Mostrar movimentos só-projeto (SIEP)'))}
-          </label>
+      {loadError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {loadError}
         </div>
       )}
 
@@ -1292,7 +1278,7 @@ export default function FinancePage() {
           activeCompanyId={activeCompanyId}
           companies={companies}
           onClose={() => setShowImport(false)}
-          onImported={fetchData}
+          onImported={() => { fetchData(); fetchCategories(); }}
         />
       )}
 

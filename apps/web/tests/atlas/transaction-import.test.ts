@@ -14,6 +14,7 @@ import {
   parseAtlasDate,
   parseAtlasTransactionWorkbook,
 } from '../../lib/atlas/transaction-import';
+import { normalizeCategoryName, uniqueCategoryPairs } from '../../lib/atlas/transaction-categories';
 
 test('canonical headers are detected as ATLAS template', () => {
   assert.equal(isAtlasTxTemplate(ATLAS_TX_CANONICAL_HEADERS), true);
@@ -148,4 +149,18 @@ test('maps Inflow/Outflow cashflow labels without marking rows as errors', () =>
 
 test('template id is stable', () => {
   assert.equal(ATLAS_TX_TEMPLATE_ID, 'ATLAS_TX_V1');
+});
+
+test('collects unique company categories without merging names', () => {
+  assert.equal(normalizeCategoryName('  Bank  Fees  '), 'Bank Fees');
+  const pairs = uniqueCategoryPairs([
+    { companyId: 'c1', category: 'Bank Fees' },
+    { companyId: 'c1', category: 'Bank Fees' },
+    { companyId: 'c1', category: 'Business Meals' },
+    { companyId: 'c1', category: '  ' },
+    { companyId: 'c2', category: 'Bank Fees' },
+  ]);
+  assert.equal(pairs.length, 3);
+  assert.equal(pairs.filter((p) => p.companyId === 'c1').length, 2);
+  assert.equal(pairs.filter((p) => p.companyId === 'c2' && p.name === 'Bank Fees').length, 1);
 });

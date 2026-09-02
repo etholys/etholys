@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
+import { ensureCompanyTransactionCategories } from '@/lib/atlas/transaction-categories';
 
 /** Accepts JSON numbers or locale strings like "655,74" */
 function parseAmount(v: unknown): number {
@@ -76,7 +77,7 @@ export async function GET(req: Request) {
       where.companyId = { in: tenant.companyIds };
     }
     const transactions = await prisma.transaction.findMany({ where, orderBy: { date: 'desc' }, include: { project: true, company: true } });
-    return NextResponse.json({ transactions });
+    return NextResponse.json({ transactions, count: transactions.length });
   } catch (error: any) {
     console.error('Transactions error:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
@@ -106,6 +107,7 @@ export async function POST(req: Request) {
           await syncProjectSpent(item.projectId);
         }
       }
+      await ensureCompanyTransactionCategories(created);
       if (created.length === 0 && body.items.length > 0) {
         return NextResponse.json({ error: 'No se pudo crear ninguna transacci\u00f3n. Verifica que la empresa est\u00e9 correcta y los datos completos.', skipped }, { status: 400 });
       }
@@ -159,6 +161,7 @@ export async function POST(req: Request) {
       if (body.projectId && (type === 'EXPENSE' || type === 'TRANSFER_OUT')) {
         await syncProjectSpent(body.projectId);
       }
+      await ensureCompanyTransactionCategories(created);
       return NextResponse.json({ transactions: created, count: created.length });
     }
 
@@ -166,6 +169,7 @@ export async function POST(req: Request) {
     if (body.projectId && (type === 'EXPENSE' || type === 'TRANSFER_OUT')) {
       await syncProjectSpent(body.projectId);
     }
+    await ensureCompanyTransactionCategories([transaction]);
     return NextResponse.json({ transaction });
   } catch (error: any) {
     console.error('Create transaction error:', error);
@@ -221,6 +225,7 @@ export async function PUT(req: Request) {
         if (existing.projectId) await syncProjectSpent(existing.projectId);
         if (tx.projectId && tx.projectId !== existing.projectId) await syncProjectSpent(tx.projectId);
       }
+      await ensureCompanyTransactionCategories(updated);
       return NextResponse.json({ transactions: updated, count: updated.length });
     }
 
@@ -262,6 +267,7 @@ export async function PUT(req: Request) {
     const transaction = await prisma.transaction.update({ where: { id: body.id }, data: updateData });
     if (existing.projectId) await syncProjectSpent(existing.projectId);
     if (transaction.projectId && transaction.projectId !== existing.projectId) await syncProjectSpent(transaction.projectId);
+    await ensureCompanyTransactionCategories([transaction]);
     return NextResponse.json({ transaction });
   } catch (error: any) {
     console.error('Update transaction error:', error);
@@ -283,6 +289,7 @@ export async function DELETE(req: Request) {
       const allowed = txs.filter(tx => tenant.companyIds.includes(tx.companyId));
       const allowedIds = allowed.map(tx => tx.id);
       await prisma.transaction.deleteMany({ where: { id: { in: allowedIds } } });
+      console.warn('[atlas] transaction.deleteMany', { userId: tenant.userId, deleted: allowedIds.length });
       const projectIds = [...new Set(allowed.filter(tx => tx.projectId).map(tx => tx.projectId!))];
       for (const pid of projectIds) await syncProjectSpent(pid);
       return NextResponse.json({ success: true, deleted: allowedIds.length });
@@ -292,6 +299,7 @@ export async function DELETE(req: Request) {
     const tx = await prisma.transaction.findUnique({ where: { id } });
     if (!tx || !tenant.companyIds.includes(tx.companyId)) return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     await prisma.transaction.delete({ where: { id } });
+    console.warn('[atlas] transaction.delete', { userId: tenant.userId, id });
     if (tx?.projectId) await syncProjectSpent(tx.projectId);
     return NextResponse.json({ success: true });
   } catch (error: any) {

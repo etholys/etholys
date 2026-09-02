@@ -95,6 +95,15 @@ export function FinanceImportModal({
     [importPreview],
   );
 
+  const uniqueCategories = useMemo(() => {
+    const names = new Set<string>();
+    for (const t of importPreview ?? []) {
+      const n = String(t.category || '').replace(/\s+/g, ' ').trim();
+      if (n) names.add(n);
+    }
+    return [...names].sort((a, b) => a.localeCompare(b, 'es'));
+  }, [importPreview]);
+
   const visibleRows = useMemo(() => {
     if (!importPreview) return [];
     return importPreview
@@ -355,6 +364,16 @@ export function FinanceImportModal({
                   {L(ml('Upload different file', 'Subir otro archivo', 'Enviar outro arquivo'))}
                 </button>
               </div>
+              {uniqueCategories.length > 0 && (
+                <p className="text-xs text-gray-600">
+                  {L(ml(
+                    `${uniqueCategories.length} categor${uniqueCategories.length === 1 ? 'y' : 'ies'} will be registered on the company (not mapped to Etholys defaults): `,
+                    `${uniqueCategories.length} categoría(s) se registrarán en la empresa (sin fusionarlas con las predeterminadas): `,
+                    `${uniqueCategories.length} categoria(s) serão registadas na empresa (sem as fundir com as predefinidas): `,
+                  ))}
+                  <span className="font-medium text-gray-800">{uniqueCategories.join(', ')}</span>
+                </p>
+              )}
               {errorCount === 0 && importWarnings.length > 0 && (
                 <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs text-teal-950 space-y-0.5">
                   {importWarnings.map((w, i) => (
