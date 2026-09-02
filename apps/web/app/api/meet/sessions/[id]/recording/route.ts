@@ -11,6 +11,12 @@ import {
   putMeetRecordingBuffer,
   resolveMeetRecordingUrl,
 } from '@/lib/meet/recording-storage';
+import { ensureMeetRecordingCors } from '@/lib/meet/recording-cors';
+import {
+  completeMeetRecordingMultipart,
+  initMeetRecordingMultipart,
+  uploadMeetRecordingPart,
+} from '@/lib/meet/recording-multipart';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -24,11 +30,46 @@ function readUploadBlob(form: FormData): { blob: Blob; fileName: string } | null
   return { blob: raw, fileName };
 }
 
-async function handleDirectUpload(req: Request, sessionId: string) {
+async function handleMultipartPartUpload(
+  form: FormData,
+  sessionId: string,
+) {
   const tenant = await getUserCompanyIds();
   if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-  const form = await req.formData();
+  const companyId = String(form.get('companyId') || '').trim();
+  const uploadId = String(form.get('uploadId') || '').trim();
+  const storageKey = String(form.get('storageKey') || '').trim();
+  const partNumber = Number(form.get('partNumber') || 0);
+  const upload = readUploadBlob(form);
+
+  if (!companyId || !tenant.companyIds.includes(companyId)) {
+    return NextResponse.json({ error: 'companyId inválido' }, { status: 400 });
+  }
+  if (!uploadId || !storageKey || !Number.isFinite(partNumber) || partNumber < 1) {
+    return NextResponse.json({ error: 'multipart-part inválido' }, { status: 400 });
+  }
+  if (!upload) {
+    return NextResponse.json({ error: 'Chunk vazio' }, { status: 400 });
+  }
+
+  const session = await getMeetSessionForCompany(sessionId, companyId);
+  if (!session) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+
+  const buffer = Buffer.from(await upload.blob.arrayBuffer());
+  const etag = await uploadMeetRecordingPart({
+    storageKey,
+    uploadId,
+    partNumber,
+    body: buffer,
+  });
+  return NextResponse.json({ ok: true, etag });
+}
+
+async function handleDirectUpload(form: FormData, sessionId: string) {
+  const tenant = await getUserCompanyIds();
+  if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+
   const companyId = String(form.get('companyId') || '').trim();
   const upload = readUploadBlob(form);
 
@@ -46,7 +87,7 @@ async function handleDirectUpload(req: Request, sessionId: string) {
     return NextResponse.json(
       {
         error:
-          'Ficheiro de gravação obrigatório (upload interrompido ou ficheiro vazio). Para vídeos grandes, configure CORS no bucket R2 etholys-chorus e tente de novo.',
+          'Ficheiro de gravação obrigatório (upload interrompido ou ficheiro vazio). Tente de novo ou use o resumo da reunião.',
       },
       { status: 400 },
     );
@@ -100,6 +141,8 @@ export async function GET(req: Request, ctx: Ctx) {
     const session = await getMeetSessionForCompany(id, companyId);
     if (!session) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
 
+    void ensureMeetRecordingCors();
+
     return NextResponse.json({
       recordingUrl: session.recordingUrl,
       storageReady: isMeetRecordingStorageReady(),
@@ -115,19 +158,27 @@ export async function POST(req: Request, ctx: Ctx) {
     const { id } = await ctx.params;
     const contentType = req.headers.get('content-type') || '';
     if (contentType.includes('multipart/form-data')) {
-      return await handleDirectUpload(req, id);
+      const form = await req.formData();
+      if (String(form.get('uploadAction') || '') === 'multipart-part') {
+        return await handleMultipartPartUpload(form, id);
+      }
+      return await handleDirectUpload(form, id);
     }
+
+    void ensureMeetRecordingCors();
 
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
     const body = (await req.json()) as {
       companyId?: string;
-      action?: 'presign' | 'confirm';
+      action?: 'presign' | 'confirm' | 'multipart-init' | 'multipart-complete';
       fileName?: string;
       contentType?: string;
       storageKey?: string;
       recordingUrl?: string;
+      uploadId?: string;
+      parts?: Array<{ PartNumber: number; ETag: string }>;
     };
 
     const companyId = body.companyId?.trim();
@@ -171,6 +222,41 @@ export async function POST(req: Request, ctx: Ctx) {
         select: { id: true, recordingUrl: true },
       });
       return NextResponse.json({ session: updated });
+    }
+
+    if (action === 'multipart-init') {
+      if (!isMeetRecordingStorageReady()) {
+        return NextResponse.json(
+          { error: 'Armazenamento de gravações indisponível de momento.' },
+          { status: 503 },
+        );
+      }
+      const fileName = (body.fileName || `meet-${id}.webm`).trim();
+      const contentType = (body.contentType || 'video/webm').trim();
+      const init = await initMeetRecordingMultipart({
+        sessionId: id,
+        fileName,
+        contentType,
+      });
+      return NextResponse.json(init);
+    }
+
+    if (action === 'multipart-complete') {
+      if (!body.uploadId?.trim() || !body.storageKey?.trim() || !Array.isArray(body.parts) || !body.parts.length) {
+        return NextResponse.json({ error: 'multipart-complete inválido' }, { status: 400 });
+      }
+      const { recordingUrl } = await completeMeetRecordingMultipart({
+        sessionId: id,
+        uploadId: body.uploadId.trim(),
+        storageKey: body.storageKey.trim(),
+        parts: body.parts,
+      });
+      const updated = await prisma.meetSession.update({
+        where: { id },
+        data: { recordingUrl: recordingUrl.slice(0, 2000) },
+        select: { id: true, recordingUrl: true },
+      });
+      return NextResponse.json({ ok: true, session: updated, storageKey: body.storageKey.trim() });
     }
 
     return NextResponse.json({ error: 'action inválida' }, { status: 400 });
