@@ -178,12 +178,44 @@ const TYPE_ALIASES: Record<string, AtlasTxType> = {
   transferenciasaida: 'TRANSFER_OUT',
 };
 
+/** Subtipo entre paréntesis: "Inflow (Revenue)" → "Revenue". */
+export function atlasTypeSubtype(raw: unknown): string {
+  const m = String(raw ?? '').match(/\(([^)]+)\)/);
+  const s = (m?.[1] ?? '').trim();
+  if (!s) return '';
+  const fold = foldHeader(s);
+  if (['expense', 'income', 'inflow', 'outflow', 'ingreso', 'gasto', 'entrada', 'salida', 'saida'].includes(fold)) {
+    return '';
+  }
+  return s;
+}
+
+function typeFromCashflowLabel(folded: string): AtlasTxType | null {
+  const inflow =
+    /^(inflow|in_flow|entrada|entradas|ingreso|ingresos|credit|credits|deposito|depositos|deposit|deposits)(_|$)/.test(
+      folded,
+    );
+  const outflow =
+    /^(outflow|out_flow|salida|salidas|saida|saidas|egreso|egresos|debit|debits|retiro|retiros|withdrawal|withdrawals)(_|$)/.test(
+      folded,
+    );
+  if (!inflow && !outflow) return null;
+  if (inflow) {
+    if (/transfer|contribuci|contribution|capital|equity|aporte/.test(folded) && !/revenue|sales?|income|venta/.test(folded)) {
+      return 'TRANSFER_IN';
+    }
+    return 'INCOME';
+  }
+  if (/transfer|distribution|dividend|owner_draw|draw|retirada/.test(folded)) return 'TRANSFER_OUT';
+  return 'EXPENSE';
+}
+
 export function normalizeAtlasTxType(raw: unknown): AtlasTxType | null {
   const folded = foldHeader(String(raw ?? ''));
   if (!folded) return null;
   const upper = String(raw ?? '').trim().toUpperCase().replace(/\s+/g, '_');
   if ((ATLAS_TX_TYPES as readonly string[]).includes(upper)) return upper as AtlasTxType;
-  return TYPE_ALIASES[folded] ?? null;
+  return TYPE_ALIASES[folded] ?? typeFromCashflowLabel(folded);
 }
 
 const STATUS_ALIASES: Record<string, AtlasTxStatus> = {
@@ -332,7 +364,7 @@ export function parseAtlasTransactionWorkbook(buffer: Buffer): AtlasTemplatePars
   }
 
   const transactions: AtlasImportTransaction[] = [];
-  const warnings: string[] = [];
+  let mappedTypeCount = 0;
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i] ?? [];
@@ -372,19 +404,23 @@ export function parseAtlasTransactionWorkbook(buffer: Buffer): AtlasTemplatePars
       issues.push({
         field: 'type',
         raw: rawPreview(typeRaw),
-        message: `Fila ${line}: tipo inválido «${rawPreview(typeRaw)}». Use INCOME, EXPENSE, TRANSFER_IN o TRANSFER_OUT.`,
+        message: `Fila ${line}: tipo inválido «${rawPreview(typeRaw)}». Use INCOME, EXPENSE, TRANSFER_IN o TRANSFER_OUT (también Inflow/Outflow, Ingreso/Gasto).`,
       });
+    } else {
+      const exact = (ATLAS_TX_TYPES as readonly string[]).includes(
+        String(typeRaw ?? '').trim().toUpperCase().replace(/\s+/g, '_'),
+      );
+      if (!exact) mappedTypeCount += 1;
     }
     const currencyRaw = mapping.currency !== undefined ? cellStr(row[mapping.currency]).toUpperCase() : 'USD';
     const currency = (ATLAS_TX_CURRENCIES as readonly string[]).includes(currencyRaw) ? currencyRaw : currencyRaw || 'USD';
-    const category = mapping.category !== undefined ? cellStr(row[mapping.category]) : '';
+    const categoryFromCol = mapping.category !== undefined ? cellStr(row[mapping.category]) : '';
+    const category = categoryFromCol || atlasTypeSubtype(typeRaw);
     const note = mapping.note !== undefined ? cellStr(row[mapping.note]) : '';
     const statusRaw = mapping.status !== undefined ? row[mapping.status] : '';
     const resolvedType = type ?? 'EXPENSE';
     const resolvedAmount = Number.isFinite(amount) && amount > 0 ? amount : 0;
     const title = titleRaw || descRaw || `${resolvedType} ${resolvedAmount || rawPreview(amountRaw)}`;
-
-    for (const issue of issues) warnings.push(issue.message);
 
     transactions.push({
       title,
@@ -416,6 +452,30 @@ export function parseAtlasTransactionWorkbook(buffer: Buffer): AtlasTemplatePars
     errorCount > 0
       ? `${okCount} listas, ${errorCount} con error — corrija las filas en rojo (no se omiten)`
       : `${transactions.length} transacción(es) del formato ATLAS`;
+
+  const typeFailCounts = new Map<string, number>();
+  const warnings: string[] = [];
+  for (const t of transactions) {
+    for (const issue of t.issues) {
+      if (issue.field === 'type') {
+        typeFailCounts.set(issue.raw, (typeFailCounts.get(issue.raw) ?? 0) + 1);
+      } else {
+        warnings.push(issue.message);
+      }
+    }
+  }
+  for (const [raw, n] of typeFailCounts) {
+    warnings.unshift(
+      n === 1
+        ? `1 fila: tipo inválido «${raw}». Use INCOME, EXPENSE, TRANSFER_IN o TRANSFER_OUT (también Inflow/Outflow).`
+        : `${n} filas: tipo inválido «${raw}». Use INCOME, EXPENSE, TRANSFER_IN o TRANSFER_OUT (también Inflow/Outflow).`,
+    );
+  }
+  if (mappedTypeCount > 0) {
+    warnings.unshift(
+      `${mappedTypeCount} tipo(s) equivalentes interpretados (Inflow → ingreso/transferencia, Outflow → gasto). Revise la columna Tipo si alguna fila no corresponde.`,
+    );
+  }
 
   return {
     ok: true,
@@ -473,7 +533,7 @@ function instructionLines(locale: 'es' | 'pt' | 'en'): string[][] {
       [],
       ['Colunas'],
       ['fecha*', 'Data YYYY-MM-DD (também DD/MM/YYYY)'],
-      ['tipo*', 'INCOME | EXPENSE | TRANSFER_IN | TRANSFER_OUT (ou Ingreso / Gasto / Receita / Despesa)'],
+      ['tipo*', 'INCOME | EXPENSE | TRANSFER_IN | TRANSFER_OUT (ou Ingreso / Gasto / Inflow / Outflow)'],
       ['monto*', 'Número positivo (120.50 ou 120,50)'],
       ['moneda', 'USD, UYU, BRL, EUR, ARS (predefinição USD)'],
       ['titulo', 'Nome curto'],
@@ -496,7 +556,7 @@ function instructionLines(locale: 'es' | 'pt' | 'en'): string[][] {
       [],
       ['Columns'],
       ['fecha*', 'Date YYYY-MM-DD (also DD/MM/YYYY)'],
-      ['tipo*', 'INCOME | EXPENSE | TRANSFER_IN | TRANSFER_OUT (or Ingreso / Gasto)'],
+      ['tipo*', 'INCOME | EXPENSE | TRANSFER_IN | TRANSFER_OUT (or Ingreso / Gasto / Inflow / Outflow)'],
       ['monto*', 'Positive number (120.50 or 120,50)'],
       ['moneda', 'USD, UYU, BRL, EUR, ARS (default USD)'],
       ['titulo', 'Short name'],
@@ -518,7 +578,7 @@ function instructionLines(locale: 'es' | 'pt' | 'en'): string[][] {
     [],
     ['Columnas'],
     ['fecha*', 'Fecha YYYY-MM-DD (también DD/MM/YYYY)'],
-    ['tipo*', 'INCOME | EXPENSE | TRANSFER_IN | TRANSFER_OUT (o Ingreso / Gasto / Receita / Despesa)'],
+    ['tipo*', 'INCOME | EXPENSE | TRANSFER_IN | TRANSFER_OUT (o Ingreso / Gasto / Inflow / Outflow)'],
     ['monto*', 'Número positivo (120.50 o 120,50)'],
     ['moneda', 'USD, UYU, BRL, EUR, ARS (por defecto USD)'],
     ['titulo', 'Nombre corto'],

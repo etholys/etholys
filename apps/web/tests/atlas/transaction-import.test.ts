@@ -36,6 +36,12 @@ test('normalizes type aliases', () => {
   assert.equal(normalizeAtlasTxType('TRANSFER_IN'), 'TRANSFER_IN');
   assert.equal(normalizeAtlasTxType('Transferencia salida'), 'TRANSFER_OUT');
   assert.equal(normalizeAtlasTxType('xyz'), null);
+  assert.equal(normalizeAtlasTxType('Inflow (Contribution)'), 'TRANSFER_IN');
+  assert.equal(normalizeAtlasTxType('Inflow (Adjustment)'), 'INCOME');
+  assert.equal(normalizeAtlasTxType('Inflow (Revenue)'), 'INCOME');
+  assert.equal(normalizeAtlasTxType('Outflow (Expense)'), 'EXPENSE');
+  assert.equal(normalizeAtlasTxType('Outflow (Transfer)'), 'TRANSFER_OUT');
+  assert.equal(normalizeAtlasTxType('Inflow (Transfer)'), 'TRANSFER_IN');
 });
 
 test('normalizes status with default EXECUTED', () => {
@@ -116,6 +122,28 @@ test('keeps invalid rows with issues instead of omitting them', () => {
   assert.equal(parsed.transactions[3]?.title, 'Keep');
   assert.ok(parsed.summary.includes('con error'));
   assert.equal(parsed.warnings.length, 2);
+});
+
+test('maps Inflow/Outflow cashflow labels without marking rows as errors', () => {
+  const csv = [
+    'fecha,tipo,monto,titulo',
+    '2026-02-01,Inflow (Contribution),100,Aporte',
+    '2026-02-02,Inflow (Adjustment),20,Ajuste',
+    '2026-02-03,Inflow (Revenue),55,Venta',
+    '2026-02-04,Outflow (Expense),10,Luz',
+  ].join('\n');
+  const parsed = parseAtlasTransactionWorkbook(Buffer.from(csv, 'utf8'));
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  assert.equal(parsed.transactions.length, 4);
+  assert.equal(parsed.transactions.every((t) => t.issues.length === 0), true);
+  assert.equal(parsed.transactions[0]?.type, 'TRANSFER_IN');
+  assert.equal(parsed.transactions[0]?.category, 'Contribution');
+  assert.equal(parsed.transactions[1]?.type, 'INCOME');
+  assert.equal(parsed.transactions[2]?.type, 'INCOME');
+  assert.equal(parsed.transactions[2]?.category, 'Revenue');
+  assert.equal(parsed.transactions[3]?.type, 'EXPENSE');
+  assert.ok(parsed.warnings.some((w) => w.includes('equivalentes')));
 });
 
 test('template id is stable', () => {
