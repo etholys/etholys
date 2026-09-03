@@ -18,7 +18,7 @@ function tryParseJson(value: unknown): unknown {
   }
 }
 
-function fromJigasiJson(json: any): NormalizedTranscriptChunk | null {
+function fromLiveTranscriptJson(json: any): NormalizedTranscriptChunk | null {
   if (!json || typeof json !== 'object') return null;
   const type = String(json.type || '');
   if (type !== 'transcription-result' && type !== 'translation-result') return null;
@@ -47,10 +47,10 @@ function fromJigasiJson(json: any): NormalizedTranscriptChunk | null {
 }
 
 /**
- * Aceita o payload do External API (campos no topo ou em `.data`),
- * mensagens endpoint do Jigasi e chat do transcriber.
+ * Aceita o payload do External API (campos no topo ou em `.data`)
+ * e mensagens do motor de transcrição ao vivo.
  */
-export function normalizeJitsiTranscriptPayload(raw: unknown): NormalizedTranscriptChunk | null {
+export function normalizeChorusLiveTranscript(raw: unknown): NormalizedTranscriptChunk | null {
   if (!raw || typeof raw !== 'object') return null;
   const root = raw as Record<string, any>;
   const inner =
@@ -71,22 +71,22 @@ export function normalizeJitsiTranscriptPayload(raw: unknown): NormalizedTranscr
     };
   }
 
-  const jigasiDirect = fromJigasiJson(inner) || fromJigasiJson(tryParseJson(inner));
-  if (jigasiDirect) return jigasiDirect;
+  const liveDirect = fromLiveTranscriptJson(inner) || fromLiveTranscriptJson(tryParseJson(inner));
+  if (liveDirect) return liveDirect;
 
   const eventData = inner.eventData && typeof inner.eventData === 'object' ? inner.eventData : null;
   if (eventData) {
     const fromEvent =
-      fromJigasiJson(eventData) ||
-      fromJigasiJson(eventData.data) ||
-      fromJigasiJson(tryParseJson(eventData.text)) ||
-      fromJigasiJson(tryParseJson(eventData.data));
+      fromLiveTranscriptJson(eventData) ||
+      fromLiveTranscriptJson(eventData.data) ||
+      fromLiveTranscriptJson(tryParseJson(eventData.text)) ||
+      fromLiveTranscriptJson(tryParseJson(eventData.data));
     if (fromEvent) return fromEvent;
   }
 
   const message = String(inner.message || inner.txt || '').trim();
   const nick = String(inner.nick || inner.displayName || inner.from || '');
-  if (message && /transcrib|jigasi|vosk|transcriber/i.test(`${nick} ${message}`)) {
+  if (message && /transcrib|vosk|transcriber/i.test(`${nick} ${message}`)) {
     return {
       messageID: inner.messageId || inner.messageID || `chat-${Date.now()}`,
       participant: { name: nick || 'Transcriber' },
@@ -95,4 +95,9 @@ export function normalizeJitsiTranscriptPayload(raw: unknown): NormalizedTranscr
   }
 
   return null;
+}
+
+/** @deprecated Prefer normalizeChorusLiveTranscript */
+export function normalizeJitsiTranscriptPayload(raw: unknown): NormalizedTranscriptChunk | null {
+  return normalizeChorusLiveTranscript(raw);
 }

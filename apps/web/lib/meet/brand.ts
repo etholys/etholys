@@ -1,6 +1,7 @@
 /**
  * Identidade de produto — CHORUS (não “Meet”, para não confundir com Google Meet).
  * Rotas técnicas mantêm `/hub/meet` e `MeetSession` por compatibilidade.
+ * O motor de vídeo por baixo é infraestrutura — o produto é sempre CHORUS.
  */
 
 export const CHORUS_PRODUCT_NAME = 'CHORUS';

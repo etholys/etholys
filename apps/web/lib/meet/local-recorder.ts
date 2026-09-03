@@ -1,5 +1,5 @@
 /**
- * Gravação local no browser (fora do iframe Jitsi).
+ * Gravação no browser (fora do iframe da sala CHORUS).
  * Grava em memória e só pede destino ao parar — evita ficheiros .webm vazios no disco.
  */
 

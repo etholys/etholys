@@ -29,7 +29,7 @@ export async function queueMeetRecordingUpload(opts: {
   });
 
   try {
-    await uploadAndTranscribeMeetRecording({
+    const result = await uploadAndTranscribeMeetRecording({
       sessionId: opts.sessionId,
       companyId: opts.companyId,
       blob: opts.blob,
@@ -38,13 +38,24 @@ export async function queueMeetRecordingUpload(opts: {
       languageHint: opts.languageHint,
       whisperEnabled: opts.whisperEnabled,
     });
+    // Gravação já na nuvem — pode limpar a fila mesmo se a transcrição falhou
     await removePendingMeetRecording(opts.sessionId);
+    if (result.warning) {
+      throw new Error(result.warning);
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Upload falhou';
-    await markPendingMeetRecordingError(opts.sessionId, msg);
-    throw new Error(
-      `${msg} A gravação ficou guardada neste browser — pode reenviar no resumo CHORUS.`,
+    // Se a mensagem é só transcrição, a fila já foi limpa
+    const stillPending = await listPendingMeetRecordings().then((rows) =>
+      rows.some((r) => r.sessionId === opts.sessionId),
     );
+    if (stillPending) {
+      await markPendingMeetRecordingError(opts.sessionId, msg);
+      throw new Error(
+        `${msg} A gravação ficou guardada neste browser — pode reenviar no resumo CHORUS.`,
+      );
+    }
+    throw err;
   }
 }
 
@@ -73,7 +84,7 @@ export async function flushAllPendingMeetRecordings(): Promise<{
 }
 
 async function flushPendingRow(row: PendingMeetRecording): Promise<void> {
-  await uploadAndTranscribeMeetRecording({
+  const result = await uploadAndTranscribeMeetRecording({
     sessionId: row.sessionId,
     companyId: row.companyId,
     blob: row.blob,
@@ -83,6 +94,7 @@ async function flushPendingRow(row: PendingMeetRecording): Promise<void> {
     whisperEnabled: row.whisperEnabled,
   });
   await removePendingMeetRecording(row.sessionId);
+  if (result.warning) throw new Error(result.warning);
 }
 
 export {

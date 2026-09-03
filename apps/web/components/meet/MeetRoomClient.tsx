@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { meetEmbedUrl } from '@/lib/meet/room';
 import { meetRecapPath } from '@/lib/meet/types';
-import { canEmbedJitsiInIframe } from '@/lib/forge/jitsi-config';
+import { canEmbedChorusRoom } from '@/lib/meet/video-engine';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
 import {
@@ -363,7 +363,7 @@ export function MeetRoomClient({ sessionId }: Props) {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [segments]);
 
-  // Aguarda texto do transcriber (Jigasi) sem alarmes ruidosos.
+  // Aguarda texto do motor de transcrição ao vivo sem alarmes ruidosos.
   useEffect(() => {
     if (!transcriptionOn) {
       setTranscriptionWaiting(false);
@@ -792,17 +792,18 @@ export function MeetRoomClient({ sessionId }: Props) {
             );
           }
         } catch (upErr) {
-          recordingFinalizeRef.current = false;
+          const msg =
+            upErr instanceof Error
+              ? upErr.message
+              : t(
+                  'Não foi possível enviar agora. A gravação ficou guardada neste browser — reenvie no resumo.',
+                  'No se pudo enviar ahora. La grabación quedó guardada en este navegador — reenvíe en el resumen.',
+                  'Could not upload now. Recording saved in this browser — retry from the recap.',
+                );
+          // Se a gravação já está na nuvem e só falhou a transcrição, não reabrir o fluxo
+          recordingFinalizeRef.current = /nuvem OK|cloud OK|Grabación en la nube OK/i.test(msg);
           if (!opts?.quiet) {
-            setError(
-              upErr instanceof Error
-                ? upErr.message
-                : t(
-                    'Não foi possível enviar agora. A gravação ficou guardada neste browser — reenvie no resumo.',
-                    'No se pudo enviar ahora. La grabación quedó guardada en este navegador — reenvíe en el resumen.',
-                    'Could not upload now. Recording saved in this browser — retry from the recap.',
-                  ),
-            );
+            setError(msg);
           }
         }
       }
@@ -1322,7 +1323,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                     'Set up the meeting to join the room.',
                   )}
                 </div>
-              ) : session.meetingUrl && canEmbedJitsiInIframe(session.meetingUrl) ? (
+              ) : session.meetingUrl && canEmbedChorusRoom(session.meetingUrl) ? (
                 <MeetConferenceFrame
                   ref={conferenceRef}
                   meetingUrl={session.meetingUrl}

@@ -141,7 +141,7 @@ function MeetHubContent() {
   const [detailSessionFull, setDetailSessionFull] = useState<MeetEventDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [calBusyId, setCalBusyId] = useState<string | null>(null);
-  const [jitsiStatus, setJitsiStatus] = useState<{ baseUrl: string; isDemo: boolean } | null>(null);
+  const [videoStatus, setVideoStatus] = useState<{ baseUrl: string; isDemo: boolean } | null>(null);
   const [connections, setConnections] = useState<{
     google: { configured: boolean; connected: boolean; ready: boolean; needsReconnect: boolean };
     outlook: { configured: boolean; connected: boolean; ready: boolean; needsReconnect: boolean };
@@ -164,7 +164,7 @@ function MeetHubContent() {
         const r = await fetch('/api/meet/status');
         const d = (await r.json()) as { baseUrl?: string; isDemo?: boolean };
         if (!cancelled && r.ok) {
-          setJitsiStatus({ baseUrl: d.baseUrl || '', isDemo: Boolean(d.isDemo) });
+          setVideoStatus({ baseUrl: d.baseUrl || '', isDemo: Boolean(d.isDemo) });
         }
       } catch {
         /* status é informativo */
@@ -766,12 +766,12 @@ function MeetHubContent() {
           />
         )}
 
-        {jitsiStatus?.isDemo && (
+        {videoStatus?.isDemo && (
           <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {t(
-              'Servidor de vídeo em modo demo: as chamadas cortam a cerca de 5 minutos.',
-              'Servidor de vídeo en modo demo: las llamadas se cortan a unos 5 minutos.',
-              'Video server in demo mode: calls cut off after about 5 minutes.',
+              'CHORUS em modo demonstração: as chamadas cortam a cerca de 5 minutos.',
+              'CHORUS en modo demostración: las llamadas se cortan a unos 5 minutos.',
+              'CHORUS is in demo mode: calls cut off after about 5 minutes.',
             )}
           </p>
         )}

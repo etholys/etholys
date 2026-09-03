@@ -48,7 +48,7 @@ export async function presignMeetRecordingUpload(opts: {
   };
 }
 
-/** Upload server-side (webhook Jibri ou fetch de URL). */
+/** Upload server-side (proxy CHORUS ou webhook de gravação). */
 export async function putMeetRecordingBuffer(opts: {
   sessionId: string;
   fileName: string;

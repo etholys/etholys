@@ -26,7 +26,7 @@ export type MeetSessionSummary = {
   forgeLiveSessionId: string | null;
 };
 
-/** Room slug estável a partir do id da sessão (Jitsi). */
+/** Room slug estável a partir do id da sessão (sala CHORUS). */
 export function meetRoomSlug(sessionId: string, prefix = 'etholys'): string {
   const safe = sessionId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24);
   return `${prefix}-${safe || 'room'}`;
@@ -36,7 +36,7 @@ export function isMeetMirror(v: unknown): v is MeetMirror {
   return typeof v === 'string' && (MEET_MIRRORS as readonly string[]).includes(v);
 }
 
-/** Entrada na sala integrada do Hub (Jitsi embed + painel IA). */
+/** Entrada na sala integrada do Hub (embed CHORUS + painel IA). */
 export function meetHubJoinPath(sessionId: string, companyId: string): string {
   return `/hub/meet/${sessionId}?companyId=${encodeURIComponent(companyId)}`;
 }
@@ -51,7 +51,7 @@ export function meetCapturePath(opts: {
   return `/hub/meet/capture?${params.toString()}`;
 }
 
-/** Sessão importada do Google Calendar (sem Jitsi Etholys por omissão). */
+/** Sessão importada do Google Calendar (sem sala CHORUS por omissão). */
 export function isGoogleImportedMeetSession(session: {
   roomSlug?: string | null;
 }): boolean {
@@ -72,7 +72,7 @@ export function meetRecapPath(sessionId: string, companyId?: string | null): str
     : `/hub/meet/recaps/${sessionId}`;
 }
 
-/** Para ocorrências de série, abrir sempre a sessão mestre (mesmo link Jitsi). */
+/** Para ocorrências de série, abrir sempre a sessão mestre (mesmo link de sala). */
 export function meetJoinTargetId(session: {
   id: string;
   seriesParentId?: string | null;

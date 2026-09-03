@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react';
 import { Loader2 } from 'lucide-react';
-import { normalizeJitsiTranscriptPayload } from '@/lib/meet/parse-transcript-event';
+import { normalizeChorusLiveTranscript } from '@/lib/meet/parse-transcript-event';
 
 type TranscriptionChunk = {
   language?: string;
@@ -106,7 +106,7 @@ type Props = {
   meetingUrl: string;
   title: string;
   locale: string;
-  /** Idioma STT Jigasi (pt/es/en) — independente do idioma da UI */
+  /** Idioma da transcrição ao vivo (pt/es/en) — independente do idioma da UI */
   transcriptionLanguage?: string;
   onReady?: () => void;
   onTranscriptionChunk?: (chunk: TranscriptionChunk) => void;
@@ -116,7 +116,7 @@ type Props = {
   onParticipantCountChange?: (count: number) => void;
   onDominantSpeakerChanged?: (name: string | null) => void;
   onConferenceLeft?: () => void;
-  /** Clique no botão Etholys da toolbar Jitsi (abrir/fechar painel de transcrição). */
+  /** Clique no botão Etholys da toolbar (abrir/fechar painel de transcrição). */
   onTranscriptToolbarClick?: () => void;
   onError?: (message: string) => void;
 };
@@ -235,7 +235,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               transcription: true,
             });
           } catch {
-            /* sem Jibri pode falhar; setSubtitles basta para STT */
+            /* STT ao vivo pode falhar se o serviço não estiver activo */
           }
         },
         stopTranscription() {
@@ -254,7 +254,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
         },
         startRecording(_destination) {
           // Gravação local fiável é feita no Etholys (MediaRecorder top-level).
-          // Mantemos o comando Jitsi apenas como fallback legado — preferir MeetRoomClient.
+          // Fallback legado da toolbar — preferir MeetRoomClient.
           apiRef.current?.executeCommand('startRecording', {
             mode: 'local',
             onlySelf: false,
@@ -366,7 +366,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               defaultLogoUrl: 'https://app.etholys.com/meet-brand/etholys-mark.svg',
               defaultRemoteDisplayName: 'Participante',
               fileRecordingsEnabled: true,
-              // Sem serviço de gravação na nuvem (Jibri) — só local no browser
+              // Gravação CHORUS: no browser → nuvem (não depende de gravador no servidor)
               recordingService: {
                 enabled: false,
                 hideStorageWarning: true,
@@ -551,7 +551,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             callbacksRef.current.onReady?.();
           });
           const emitTranscript = (raw: unknown) => {
-            const chunk = normalizeJitsiTranscriptPayload(raw);
+            const chunk = normalizeChorusLiveTranscript(raw);
             if (!chunk) return;
             const pid = chunk.participant?.id;
             const resolved = resolveParticipantName(pid);
