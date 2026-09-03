@@ -20,7 +20,7 @@ ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 
-RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates wget \
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates wget ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/package.json ./

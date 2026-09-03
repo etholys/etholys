@@ -10,8 +10,9 @@ export function ensureMeetRecordingCors(): Promise<void> {
   if (!isObjectStorageConfigured()) return Promise.resolve();
   if (!corsEnsurePromise) {
     corsEnsurePromise = applyCors().catch((err) => {
-      corsEnsurePromise = null;
-      console.warn('[meet/recording-cors] ensure failed', err);
+      // Token R2 sem permissão PutBucketCors — não voltar a tentar em loop
+      console.warn('[meet/recording-cors] ensure failed (upload via servidor não precisa de CORS)', err);
+      return undefined;
     });
   }
   return corsEnsurePromise;

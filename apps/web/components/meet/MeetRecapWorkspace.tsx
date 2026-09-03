@@ -273,6 +273,39 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
       await uploadMeetRecordingFile({ sessionId, companyId, file });
       await loadDetail();
       await loadList();
+      // Após upload, transcreve automaticamente (extrai áudio se o vídeo for grande)
+      setTranscribeBusy(true);
+      try {
+        const languageHint = resolveMeetSpeechLanguage({ uiLocale: locale });
+        const r = await fetch(`/api/meet/sessions/${sessionId}/transcribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyId,
+            locale,
+            languageHint,
+            finalize: false,
+            diarize: true,
+          }),
+        });
+        const d = (await r.json()) as { error?: string };
+        if (!r.ok) throw new Error(d.error || 'Error');
+        await loadDetail();
+        await loadList();
+        setTab('transcript');
+      } catch (trErr) {
+        setError(
+          trErr instanceof Error
+            ? `${trErr.message} ${t(
+                'A gravação ficou na nuvem — use «Transcrever» para tentar de novo.',
+                'La grabación quedó en la nube — use «Transcribir» para reintentar.',
+                'Recording is in the cloud — use «Transcribe» to retry.',
+              )}`
+            : 'Error',
+        );
+      } finally {
+        setTranscribeBusy(false);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
     } finally {
@@ -641,21 +674,35 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                     )}
                     <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                       <p className="text-xs text-slate-600">
-                        {t(
-                          'Para melhor qualidade, envie a gravação da reunião e use Transcrever.',
-                          'Para mejor calidad, suba la grabación de la reunión y use Transcribir.',
-                          'For better quality, upload the meeting recording and use Transcribe.',
-                        )}
+                        {detail.recordingUrl
+                          ? t(
+                              'Gravação na nuvem CHORUS. Se ainda não há texto, clique Transcrever.',
+                              'Grabación en la nube CHORUS. Si aún no hay texto, pulse Transcribir.',
+                              'Recording is in CHORUS cloud. If there is no text yet, click Transcribe.',
+                            )
+                          : t(
+                              'Envie a gravação — o CHORUS guarda na nuvem e gera a transcrição automaticamente.',
+                              'Suba la grabación — CHORUS la guarda en la nube y genera la transcripción automáticamente.',
+                              'Upload the recording — CHORUS stores it in the cloud and generates the transcript automatically.',
+                            )}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-100">
-                          {uploadBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Video className="h-3.5 w-3.5" />}
-                          {t('Enviar gravação', 'Subir grabación', 'Upload recording')}
+                          {uploadBusy || transcribeBusy ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Video className="h-3.5 w-3.5" />
+                          )}
+                          {uploadBusy
+                            ? t('A enviar…', 'Enviando…', 'Uploading…')
+                            : transcribeBusy
+                              ? t('A transcrever…', 'Transcribiendo…', 'Transcribing…')
+                              : t('Enviar gravação', 'Subir grabación', 'Upload recording')}
                           <input
                             type="file"
                             accept="audio/*,video/*,.webm,.mp4,.mp3,.wav,.m4a"
                             className="hidden"
-                            disabled={uploadBusy}
+                            disabled={uploadBusy || transcribeBusy}
                             onChange={(e) => {
                               const f = e.target.files?.[0];
                               if (f) void uploadRecording(f);
@@ -666,7 +713,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                         {detail.recordingUrl && (
                           <button
                             type="button"
-                            disabled={transcribeBusy}
+                            disabled={transcribeBusy || uploadBusy}
                             onClick={() => void runTranscribe()}
                             className="inline-flex items-center gap-1.5 rounded-full bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
                           >

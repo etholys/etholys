@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { downloadMeetRecordingBuffer } from '@/lib/meet/recording-storage';
+import { extractMeetAudioForTranscription } from '@/lib/meet/extract-audio';
 
 export type WhisperTimedSegment = {
   id: number;
@@ -10,8 +11,8 @@ export type WhisperTimedSegment = {
 };
 
 /**
- * Transcrição automática (Whisper via API OpenAI-compatible).
- * Requer OPENAI_API_KEY (ou MEET_TRANSCRIBE_API_KEY).
+ * Transcrição automática (Whisper via API OpenAI-compatible, ou Gemini).
+ * Requer OPENAI_API_KEY / MEET_TRANSCRIBE_API_KEY ou GEMINI_API_KEY.
  */
 export function isMeetTranscribeConfigured(): boolean {
   const openAiKey = (
@@ -57,6 +58,49 @@ function pickAudioExtension(contentType: string, urlHint: string): string {
   return 'mp4';
 }
 
+function maxTranscribeBytes(): number {
+  return Number(process.env.MEET_TRANSCRIBE_MAX_BYTES || 24 * 1024 * 1024);
+}
+
+/** Se o ficheiro for grande (vídeo), extrai áudio compacto para STT. */
+async function prepareBufferForStt(opts: {
+  buffer: Buffer;
+  contentType: string;
+  urlHint: string;
+}): Promise<{ buffer: Buffer; contentType: string; ext: string }> {
+  const maxBytes = maxTranscribeBytes();
+  let { buffer, contentType } = opts;
+  let ext = pickAudioExtension(contentType, opts.urlHint);
+
+  if (buffer.byteLength > maxBytes) {
+    const extracted = await extractMeetAudioForTranscription({
+      buffer,
+      contentType,
+      urlHint: opts.urlHint,
+    });
+    if (!extracted) {
+      const mb = Math.round(buffer.byteLength / 1024 / 1024);
+      const lim = Math.round(maxBytes / 1024 / 1024);
+      throw new Error(
+        `A gravação é demasiado grande (${mb} MB; limite ~${lim} MB após extrair áudio). Tente um ficheiro mais curto.`,
+      );
+    }
+    buffer = extracted.buffer;
+    contentType = extracted.contentType;
+    ext = extracted.ext;
+  }
+
+  if (buffer.byteLength > maxBytes) {
+    const mb = Math.round(buffer.byteLength / 1024 / 1024);
+    const lim = Math.round(maxBytes / 1024 / 1024);
+    throw new Error(
+      `O áudio extraído ainda é grande (${mb} MB; limite ~${lim} MB). Divida a reunião ou envie só o áudio.`,
+    );
+  }
+
+  return { buffer, contentType, ext };
+}
+
 export type MeetWhisperResult = {
   text: string;
   model: string;
@@ -64,7 +108,7 @@ export type MeetWhisperResult = {
 };
 
 /**
- * Whisper com timestamps (verbose_json) — base para diarização CHORUS pós-chamada.
+ * Whisper/Gemini com timestamps — base para diarização CHORUS pós-chamada.
  */
 export async function transcribeMeetRecording(opts: {
   recordingUrlOrKey: string;
@@ -82,23 +126,20 @@ export async function transcribeMeetRecording(opts: {
   }
 
   const { apiKey, baseUrl, model } = getTranscribeConfig();
-  const { buffer, contentType } = await downloadMeetRecordingBuffer(opts.recordingUrlOrKey);
+  const downloaded = await downloadMeetRecordingBuffer(opts.recordingUrlOrKey);
+  const prepared = await prepareBufferForStt({
+    buffer: downloaded.buffer,
+    contentType: downloaded.contentType,
+    urlHint: opts.recordingUrlOrKey,
+  });
 
-  const maxBytes = Number(process.env.MEET_TRANSCRIBE_MAX_BYTES || 24 * 1024 * 1024);
-  if (buffer.byteLength > maxBytes) {
-    const mb = Math.round(buffer.byteLength / 1024 / 1024);
-    const lim = Math.round(maxBytes / 1024 / 1024);
-    throw new Error(
-      `A gravação é demasiado grande (${mb} MB; limite ~${lim} MB). Envie só o áudio ou um ficheiro mais curto.`,
-    );
-  }
-
-  const ext = pickAudioExtension(contentType, opts.recordingUrlOrKey);
   const form = new FormData();
   form.append(
     'file',
-    new Blob([new Uint8Array(buffer)], { type: contentType || 'application/octet-stream' }),
-    `recording.${ext}`,
+    new Blob([new Uint8Array(prepared.buffer)], {
+      type: prepared.contentType || 'application/octet-stream',
+    }),
+    `recording.${prepared.ext}`,
   );
   form.append('model', model);
   form.append('response_format', 'verbose_json');
@@ -121,9 +162,9 @@ export async function transcribeMeetRecording(opts: {
         apiKey,
         baseUrl,
         model,
-        buffer,
-        contentType,
-        ext,
+        buffer: prepared.buffer,
+        contentType: prepared.contentType,
+        ext: prepared.ext,
         languageHint: opts.languageHint,
       });
     }
@@ -168,16 +209,12 @@ async function transcribeWithGemini(opts: {
   )
     .trim()
     .replace(/^models\//, '');
-  const { buffer, contentType } = await downloadMeetRecordingBuffer(opts.recordingUrlOrKey);
-
-  const maxBytes = Number(process.env.MEET_TRANSCRIBE_MAX_BYTES || 24 * 1024 * 1024);
-  if (buffer.byteLength > maxBytes) {
-    const mb = Math.round(buffer.byteLength / 1024 / 1024);
-    const lim = Math.round(maxBytes / 1024 / 1024);
-    throw new Error(
-      `A gravação é demasiado grande (${mb} MB; limite ~${lim} MB). Envie só o áudio ou um ficheiro mais curto.`,
-    );
-  }
+  const downloaded = await downloadMeetRecordingBuffer(opts.recordingUrlOrKey);
+  const prepared = await prepareBufferForStt({
+    buffer: downloaded.buffer,
+    contentType: downloaded.contentType,
+    urlHint: opts.recordingUrlOrKey,
+  });
 
   const lang = (opts.languageHint || 'pt').slice(0, 8);
   const prompt = [
@@ -199,8 +236,8 @@ async function transcribeWithGemini(opts: {
             parts: [
               {
                 inline_data: {
-                  mime_type: contentType || 'audio/webm',
-                  data: buffer.toString('base64'),
+                  mime_type: prepared.contentType || 'audio/mpeg',
+                  data: prepared.buffer.toString('base64'),
                 },
               },
               { text: prompt },
