@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Cloud, Loader2, MonitorUp, Square } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { CHORUS_PRODUCT_NAME } from '@/lib/meet/brand';
-import { uploadAndTranscribeMeetRecording } from '@/lib/meet/finalize-cloud-recording';
+import { queueMeetRecordingUpload } from '@/lib/meet/flush-pending-recording';
 import {
   meetSpeechLanguageLabel,
   resolveMeetSpeechLanguage,
@@ -146,7 +146,7 @@ export function MeetExternalCapture({ companyId, sessionId: initialSessionId }: 
         setSessionId(activeSessionId);
       }
 
-      await uploadAndTranscribeMeetRecording({
+      await queueMeetRecordingUpload({
         sessionId: activeSessionId,
         companyId,
         blob: result.blob,

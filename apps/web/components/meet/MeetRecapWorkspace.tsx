@@ -23,6 +23,8 @@ import { CompanyRequiredPanel } from '@/components/hub/CompanyRequiredPanel';
 import { meetRecapPath, meetRecapsPath, meetHubJoinPath } from '@/lib/meet/types';
 import { resolveMeetSpeechLanguage } from '@/lib/meet/language';
 import { uploadMeetRecordingFile } from '@/lib/meet/upload-recording-client';
+import { PendingMeetRecordingBanner } from '@/components/meet/PendingMeetRecordingBanner';
+import { flushAllPendingMeetRecordings } from '@/lib/meet/flush-pending-recording';
 
 type RecapListRow = {
   id: string;
@@ -169,6 +171,11 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
   useEffect(() => {
     void loadDetail();
   }, [loadDetail]);
+
+  useEffect(() => {
+    if (!companyId || !sessionId) return;
+    void flushAllPendingMeetRecordings().then(() => loadDetail());
+  }, [companyId, sessionId, loadDetail]);
 
   function rowDateKey(row: RecapListRow): string | null {
     const raw = row.endedAt || row.scheduledAt || row.endsAt;
@@ -554,6 +561,10 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                     </Link>
                   </div>
                 </div>
+
+                {sessionId && companyId && (
+                  <PendingMeetRecordingBanner sessionId={sessionId} companyId={companyId} />
+                )}
 
                 <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
                   {(

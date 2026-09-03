@@ -41,8 +41,9 @@ import {
   MeetJoinSetupDialog,
   type MeetJoinSetupPrefs,
 } from '@/components/meet/MeetJoinSetupDialog';
+import { PendingMeetRecordingBanner } from '@/components/meet/PendingMeetRecordingBanner';
 import { resolveMeetSpeechLanguage, type MeetSpeechLanguage } from '@/lib/meet/language';
-import { uploadAndTranscribeMeetRecording } from '@/lib/meet/finalize-cloud-recording';
+import { queueMeetRecordingUpload } from '@/lib/meet/flush-pending-recording';
 import {
   openMeetDocumentPip,
   supportsDocumentPictureInPicture,
@@ -666,8 +667,7 @@ export function MeetRoomClient({ sessionId }: Props) {
   function confirmJoinSetup() {
     const prefs = joinPrefsRef.current;
     setJoinSetupDone(true);
-    const cloudReady =
-      features.cloudStorageReady && features.whisperTranscriptionEnabled;
+    const cloudReady = features.cloudStorageReady;
     if (prefs.enableCloudRecording && cloudReady) {
       window.setTimeout(() => void startCloudRecording(), 400);
     }
@@ -746,9 +746,7 @@ export function MeetRoomClient({ sessionId }: Props) {
       return;
     }
     const cloudMode =
-      joinPrefsRef.current.enableCloudRecording &&
-      features.cloudStorageReady &&
-      features.whisperTranscriptionEnabled;
+      joinPrefsRef.current.enableCloudRecording && features.cloudStorageReady;
     const autoCloud = opts?.cloudAuto ?? cloudMode;
 
     setRecordingBusy(true);
@@ -775,7 +773,7 @@ export function MeetRoomClient({ sessionId }: Props) {
         recordingFinalizeRef.current = true;
         try {
           const fileName = result.fileName || `chorus-${sessionId}.webm`;
-          await uploadAndTranscribeMeetRecording({
+          await queueMeetRecordingUpload({
             sessionId,
             companyId,
             blob: result.blob,
@@ -800,9 +798,9 @@ export function MeetRoomClient({ sessionId }: Props) {
               upErr instanceof Error
                 ? upErr.message
                 : t(
-                    'Não foi possível enviar a gravação. Tente novamente no resumo.',
-                    'No se pudo subir la grabación. Inténtelo de nuevo en el recap.',
-                    'Could not upload the recording. Try again from the recap.',
+                    'Não foi possível enviar agora. A gravação ficou guardada neste browser — reenvie no resumo.',
+                    'No se pudo enviar ahora. La grabación quedó guardada en este navegador — reenvíe en el resumen.',
+                    'Could not upload now. Recording saved in this browser — retry from the recap.',
                   ),
             );
           }
@@ -1556,6 +1554,18 @@ export function MeetRoomClient({ sessionId }: Props) {
           </aside>
         )}
       </div>
+
+      {companyId && (
+        <div className="pointer-events-none absolute bottom-4 left-4 right-4 z-40 mx-auto max-w-lg">
+          <div className="pointer-events-auto">
+            <PendingMeetRecordingBanner
+              sessionId={sessionId}
+              companyId={companyId}
+              compact
+            />
+          </div>
+        </div>
+      )}
 
       {!joinSetupDone && session && (
         <MeetJoinSetupDialog
