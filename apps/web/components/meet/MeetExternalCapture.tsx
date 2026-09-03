@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Cloud, Loader2, MonitorUp, Square } from 'lucide-react';
+import { ArrowLeft, Cloud, Download, Loader2, MonitorUp, RefreshCw, Square } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { CHORUS_PRODUCT_NAME } from '@/lib/meet/brand';
-import { queueMeetRecordingUpload } from '@/lib/meet/flush-pending-recording';
+import {
+  getPendingMeetRecording,
+  queueMeetRecordingUpload,
+} from '@/lib/meet/flush-pending-recording';
 import {
   meetSpeechLanguageLabel,
   resolveMeetSpeechLanguage,
@@ -20,7 +23,7 @@ type Props = {
   sessionId?: string;
 };
 
-type Phase = 'setup' | 'recording' | 'processing';
+type Phase = 'setup' | 'recording' | 'processing' | 'pending';
 
 /**
  * Reuniões externas (Zoom / Teams / Google Meet): mesmo pipeline CHORUS que a sala interna —
@@ -49,6 +52,7 @@ export function MeetExternalCapture({ companyId, sessionId: initialSessionId }: 
   const timerRef = useRef<number | null>(null);
   const startedAtRef = useRef(0);
   const finalizeRef = useRef(false);
+  const pendingBlobRef = useRef<{ blob: Blob; fileName: string } | null>(null);
 
   const speechLang = useMemo(
     () => resolveMeetSpeechLanguage({ explicit: language, uiLocale: locale }),
@@ -97,6 +101,71 @@ export function MeetExternalCapture({ companyId, sessionId: initialSessionId }: 
     }
   }, []);
 
+  useEffect(() => {
+    const sid = sessionId || initialSessionId;
+    if (!sid) return;
+    void getPendingMeetRecording(sid).then((row) => {
+      if (row) setPhase('pending');
+    });
+  }, [sessionId, initialSessionId]);
+
+  async function retryPendingUpload() {
+    if (!companyId) return;
+    const sid = sessionId || initialSessionId;
+    if (!sid) return;
+
+    setPhase('processing');
+    setError(null);
+    try {
+      const row = await getPendingMeetRecording(sid);
+      const blob = row?.blob ?? pendingBlobRef.current?.blob;
+      const fileName = row?.fileName ?? pendingBlobRef.current?.fileName;
+      if (!blob || !fileName) {
+        throw new Error(
+          t(
+            'Gravação não encontrada neste browser.',
+            'Grabación no encontrada en este navegador.',
+            'Recording not found in this browser.',
+          ),
+        );
+      }
+      await queueMeetRecordingUpload({
+        sessionId: sid,
+        companyId,
+        blob,
+        fileName,
+        locale,
+        languageHint: speechLang,
+        whisperEnabled: features.whisperTranscriptionEnabled,
+      });
+      await fetch(`/api/meet/sessions/${sid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId, status: 'ended' }),
+      }).catch(() => undefined);
+      pendingBlobRef.current = null;
+      router.push(meetRecapPath(sid, companyId));
+    } catch (err) {
+      setPhase('pending');
+      setError(err instanceof Error ? err.message : t('Erro ao reenviar.', 'Error al reenviar.', 'Retry failed.'));
+    }
+  }
+
+  function downloadPendingLocally() {
+    const row = pendingBlobRef.current;
+    void getPendingMeetRecording(sessionId || initialSessionId || '').then((stored) => {
+      const blob = stored?.blob ?? row?.blob;
+      const fileName = stored?.fileName ?? row?.fileName ?? 'chorus-gravacao.webm';
+      if (!blob?.size) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    });
+  }
+
   const finalizeRecording = useCallback(async () => {
     if (finalizeRef.current) return;
     const recorder = recorderRef.current;
@@ -125,6 +194,8 @@ export function MeetExternalCapture({ companyId, sessionId: initialSessionId }: 
           ),
         );
       }
+
+      pendingBlobRef.current = { blob: result.blob, fileName: result.fileName };
 
       let activeSessionId = sessionId;
       if (!activeSessionId) {
@@ -165,8 +236,12 @@ export function MeetExternalCapture({ companyId, sessionId: initialSessionId }: 
       router.push(meetRecapPath(activeSessionId, companyId));
     } catch (err) {
       finalizeRef.current = false;
-      setPhase('setup');
-      setError(err instanceof Error ? err.message : t('Erro ao finalizar.', 'Error al finalizar.', 'Could not finish.'));
+      setPhase('pending');
+      setError(
+        err instanceof Error
+          ? err.message
+          : t('Erro ao finalizar.', 'Error al finalizar.', 'Could not finish.'),
+      );
     }
   }, [
     companyId,
@@ -399,6 +474,39 @@ export function MeetExternalCapture({ companyId, sessionId: initialSessionId }: 
                 'Uploading recording and generating speaker-attributed transcript…',
               )}
             </p>
+          </div>
+        )}
+
+        {phase === 'pending' && (
+          <div className="rounded-3xl border border-amber-500/40 bg-slate-900/80 p-8 text-center shadow-xl">
+            <h2 className="text-lg font-semibold text-amber-100">
+              {t('Gravação guardada neste browser', 'Grabación guardada en este navegador', 'Recording saved in this browser')}
+            </h2>
+            <p className="mt-2 text-sm text-white/60">
+              {t(
+                'O envio falhou mas a gravação não se perdeu. Reenvie quando a ligação estiver estável.',
+                'El envío falló pero la grabación no se perdió. Reenvíe cuando la conexión sea estable.',
+                'Upload failed but the recording was not lost. Retry when your connection is stable.',
+              )}
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => void retryPendingUpload()}
+                className="inline-flex items-center gap-2 rounded-full bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-600"
+              >
+                <RefreshCw className="h-4 w-4" />
+                {t('Reenviar agora', 'Reenviar ahora', 'Retry upload')}
+              </button>
+              <button
+                type="button"
+                onClick={downloadPendingLocally}
+                className="inline-flex items-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-sm font-medium text-white hover:bg-white/15"
+              >
+                <Download className="h-4 w-4" />
+                {t('Descarregar cópia', 'Descargar copia', 'Download backup')}
+              </button>
+            </div>
           </div>
         )}
       </main>
