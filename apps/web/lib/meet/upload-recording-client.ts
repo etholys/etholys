@@ -1,7 +1,7 @@
-import { MEET_RECORDING_PART_BYTES } from '@/lib/meet/recording-multipart';
-
 /** Upload directo pelo servidor — até ~96 MB num único POST. */
 const SERVER_DIRECT_MAX_BYTES = 96 * 1024 * 1024;
+/** Deve coincidir com MEET_RECORDING_PART_BYTES no servidor. */
+const CLIENT_PART_BYTES = 8 * 1024 * 1024;
 
 function validateRecordingFile(file: File): void {
   const name = (file.name || '').toLowerCase();
@@ -89,7 +89,7 @@ async function uploadViaMultipart(opts: {
     throw new Error(initData.error || 'Multipart init failed');
   }
 
-  const partSize = initData.partSize || MEET_RECORDING_PART_BYTES;
+  const partSize = initData.partSize || CLIENT_PART_BYTES;
   const parts: Array<{ PartNumber: number; ETag: string }> = [];
   let partNumber = 1;
 
