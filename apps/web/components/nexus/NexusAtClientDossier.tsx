@@ -6,6 +6,7 @@ import { sectorProgramSummary } from '@/lib/nexus-at-sector-playbook';
 import { loadDiagnosisHistory, type NexusDiagnosisSnapshot } from '@/lib/nexus-diagnosis-history';
 import { sectorBadgeLabel } from '@/components/nexus/NexusAtSectorPlaybook';
 import { NexusIncubationProcessPanel } from '@/components/nexus/NexusIncubationProcessPanel';
+import { hasDeepSectorMatrix } from '@/lib/nexus-sector-matrices';
 
 type Locale = 'es' | 'pt' | 'en';
 
@@ -31,6 +32,7 @@ export function NexusAtClientDossier({
   const program = sectorProgramSummary(sectorId, locale);
   const sectorLabel = sectorBadgeLabel(sectorId, locale);
   const [lastDx, setLastDx] = useState<NexusDiagnosisSnapshot | null>(null);
+  const deepMatrix = hasDeepSectorMatrix(sectorId);
 
   useEffect(() => {
     const hist = loadDiagnosisHistory({ companyId, networkId: networkId || null });
@@ -81,11 +83,28 @@ export function NexusAtClientDossier({
         <div className="mt-3 flex flex-wrap gap-2">
           <Link
             href={diagnosisHref}
-            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-md bg-teal-800 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-teal-900"
           >
-            {lastDx ? (es ? 'Repetir diagnóstico' : 'Repetir diagnóstico') : es ? 'Correr diagnóstico' : 'Correr diagnóstico'}
+            {lastDx
+              ? es
+                ? 'Repetir diagnóstico CMM'
+                : 'Repetir diagnóstico CMM'
+              : deepMatrix
+                ? es
+                  ? 'Diagnóstico matriz sectorial (1–5)'
+                  : 'Diagnóstico matriz setorial (1–5)'
+                : es
+                  ? 'Correr diagnóstico'
+                  : 'Correr diagnóstico'}
           </Link>
         </div>
+        {deepMatrix && (
+          <p className="mt-2 text-[11px] text-slate-500">
+            {es
+              ? 'Este sector usa matriz profunda CMM (gobernanza, operaciones, finanzas…) — no el quiz genérico.'
+              : 'Este setor usa matriz profunda CMM (governança, operações, finanças…) — não o quiz genérico.'}
+          </p>
+        )}
       </div>
 
       <NexusIncubationProcessPanel

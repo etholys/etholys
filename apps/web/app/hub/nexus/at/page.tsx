@@ -51,6 +51,26 @@ type InboxTab = 'all' | 'overdue' | 'today' | 'week';
 
 type PickedClient = { key: string; id?: string; name: string; shortName?: string };
 
+async function readJsonSafe<T = Record<string, unknown>>(res: Response): Promise<T> {
+  const text = await res.text();
+  if (!text.trim()) {
+    throw new Error(
+      res.ok
+        ? 'Respuesta vacía del servidor'
+        : `Error HTTP ${res.status} (sin cuerpo JSON)`
+    );
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      res.ok
+        ? 'Respuesta inválida del servidor'
+        : `Error HTTP ${res.status}: ${text.slice(0, 120)}`
+    );
+  }
+}
+
 export default function NexusAtPage() {
   const router = useRouter();
   const { locale, activeCompanyId } = useApp();
@@ -101,10 +121,20 @@ export default function NexusAtPage() {
         fetch('/api/companies'),
         fetch('/api/nexus/at/sectors'),
       ]);
-      const inboxJson = await inboxRes.json();
-      const cJson = await cRes.json();
-      const secJson = secRes.ok ? await secRes.json() : { sectors: [], groups: [] };
+      const inboxJson = await readJsonSafe<{
+        error?: string;
+        services?: Service[];
+        inbox?: AtCaseCardModel[];
+        agenda?: Agenda;
+        summary?: typeof summary;
+        sectorPortfolio?: SectorPortfolioRow[];
+      }>(inboxRes);
+      const cJson = await readJsonSafe<{ companies?: Company[]; error?: string }>(cRes);
+      const secJson = secRes.ok
+        ? await readJsonSafe<{ sectors?: SectorCatalogRow[]; groups?: typeof sectorGroups }>(secRes)
+        : { sectors: [], groups: [] };
       if (!inboxRes.ok) throw new Error(inboxJson.error || 'Error');
+      if (!cRes.ok) throw new Error(cJson.error || (es ? 'No se pudieron cargar empresas' : 'Falha ao carregar empresas'));
       setSectorCatalog(secJson.sectors || []);
       setSectorGroups(secJson.groups || []);
       setSectorPortfolio(inboxJson.sectorPortfolio || []);
@@ -689,8 +719,8 @@ export default function NexusAtPage() {
               <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
                 <p className="text-sm text-slate-500">
                   {es
-                    ? 'Aún no hay contratos. Crea uno e incluye las empresas que atendéis.'
-                    : 'Ainda não há contratos. Cria um e inclui as empresas que atendem.'}
+                    ? 'Aún no hay contratos. Crea el marco legal; después importas las MIPYMEs y corres el diagnóstico por empresa.'
+                    : 'Ainda não há contratos. Cria o marco legal; depois importas as MIPYMEs e corres o diagnóstico por empresa.'}
                 </p>
                 <button
                   type="button"

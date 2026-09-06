@@ -9,6 +9,8 @@ import { NexusAtCaseCard, type AtCaseCardModel } from '@/components/nexus/NexusA
 import { NexusAtSectorPlaybook, sectorBadgeLabel } from '@/components/nexus/NexusAtSectorPlaybook';
 import { NexusAtClientDossier } from '@/components/nexus/NexusAtClientDossier';
 import { NexusAtBulkImport } from '@/components/nexus/NexusAtBulkImport';
+import { NexusAtProcessRail } from '@/components/nexus/NexusAtProcessRail';
+import { loadDiagnosisHistory } from '@/lib/nexus-diagnosis-history';
 import { AT_CASE_KIND_LABELS, type AtCaseKind } from '@/lib/nexus-at-shared';
 import {
   buildAtBriefTemplate,
@@ -171,6 +173,16 @@ export default function NexusAtServicePage() {
     () => (service?.members || []).filter((m) => m.memberRole === 'client'),
     [service]
   );
+
+  const [hasLocalDx, setHasLocalDx] = useState(false);
+  useEffect(() => {
+    if (!selectedCompanyId) {
+      setHasLocalDx(false);
+      return;
+    }
+    const hist = loadDiagnosisHistory({ companyId: selectedCompanyId });
+    setHasLocalDx(hist.length > 0);
+  }, [selectedCompanyId, cases.length]);
 
   useEffect(() => {
     if (!loading && isOperator && clients.length === 0) setShowBulkImport(true);
@@ -465,6 +477,18 @@ export default function NexusAtServicePage() {
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <NexusAtProcessRail
+        engagementId={id}
+        clientCount={clients.length}
+        selectedCompanyId={selectedCompanyId}
+        sectorId={
+          clients.find((m) => m.companyId === selectedCompanyId)?.sectorId || service.primarySectorId
+        }
+        hasOpenCases={cases.some((c) => c.isOpen !== false && !['DONE', 'CANCELLED'].includes(c.status))}
+        hasDiagnosisHint={hasLocalDx}
+        es={es}
+      />
 
       <div className="grid gap-5 lg:grid-cols-[200px_minmax(0,1fr)_260px]">
         <aside className="space-y-1">

@@ -140,6 +140,17 @@ export function NexusSectorDiagnosticWizard() {
   }, [targetCompanyId, sectorId]);
 
   useEffect(() => {
+    if (!engagementParam || sectorId) return;
+    fetch(`/api/nexus/at/engagements/${encodeURIComponent(engagementParam)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const sid = d.engagement?.primarySectorId || d.engagement?.sectorIds?.[0];
+        if (typeof sid === 'string' && sid) setSectorId(sid);
+      })
+      .catch(() => {});
+  }, [engagementParam, sectorId]);
+
+  useEffect(() => {
     fetch('/api/nexus/at/engagements')
       .then((r) => r.json())
       .then((d) => {
@@ -618,6 +629,16 @@ export function NexusSectorDiagnosticWizard() {
             {baseIdx + 1}/{allSteps.length} · {sectionLabel(current.section, loc)}
           </p>
           <h2 className="mt-2 text-lg font-semibold">{questionLabel(current, loc)}</h2>
+          {current.help && (
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">
+              {current.help[loc] || current.help.es}
+            </p>
+          )}
+          {current.areaName && (
+            <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-teal-800">
+              {current.areaName}
+            </p>
+          )}
           {current.section === 'custom' ? (
             <textarea
               value={customAnswers[current.id] || ''}

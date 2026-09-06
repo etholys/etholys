@@ -13,6 +13,7 @@ import {
   type DiagnosticDepth,
   type IncubationProgram,
 } from './nexus-incubation-program';
+import { hasDeepSectorMatrix, matrixItemsToDxQuestions } from './nexus-sector-matrices';
 
 export type DxLocale = 'es' | 'pt' | 'en';
 
@@ -80,7 +81,8 @@ const PILLAR_SLUGS = ['strategy', 'finance', 'operations', 'commercial', 'people
 
 /** Prioridade de pilares por setor económico (peso relativo) */
 const SECTOR_PILLAR_WEIGHTS: Record<string, Partial<Record<(typeof PILLAR_SLUGS)[number], number>>> = {
-  agriculture: { operations: 1.4, commercial: 1.2, finance: 1.1, risk: 1.1 },
+  agriculture: { operations: 1.4, commercial: 1.2, finance: 1.3, risk: 1.2 },
+  agroindustry: { operations: 1.4, finance: 1.3, risk: 1.35, commercial: 1.2, people: 1.1 },
   livestock: { operations: 1.4, finance: 1.2, commercial: 1.1, risk: 1.2 },
   food_hospitality: { operations: 1.3, finance: 1.3, commercial: 1.2, people: 1.1 },
   retail_supermarket: { commercial: 1.3, finance: 1.2, operations: 1.2, digital: 1.0 },
@@ -230,6 +232,15 @@ export function listDiagnosticQuestions(
 ): DxQuestion[] {
   const norm = normalizeEconomicSectorId(sectorId) || 'other';
   const depth = program ? depthFromProgram(program) : 'standard';
+
+  /** Playbooks profundos (agricultura / agroindústria): matriz CMM 1–5 no lugar do quiz genérico. */
+  if (hasDeepSectorMatrix(norm)) {
+    const matrixQs = matrixItemsToDxQuestions(norm, depth) as DxQuestion[];
+    if (depth === 'screening') return matrixQs;
+    const universal: DxQuestion[] = UNIVERSAL.map((q) => ({ ...q, sectorId: 'universal' as const }));
+    return [...universal.slice(0, depth === 'standard' ? 3 : UNIVERSAL.length), ...matrixQs];
+  }
+
   const sector = getEconomicSector(norm);
 
   const universal: DxQuestion[] = UNIVERSAL.map((q) => ({ ...q, sectorId: 'universal' as const }));
