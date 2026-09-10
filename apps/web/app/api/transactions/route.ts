@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { ensureCompanyTransactionCategories } from '@/lib/atlas/transaction-categories';
+import { parseDateOnlyToUtc } from '@/lib/atlas/date-only';
 
 /** Accepts JSON numbers or locale strings like "655,74" */
 function parseAmount(v: unknown): number {
@@ -21,11 +22,19 @@ async function syncProjectSpent(projectId: string) {
   await prisma.project.update({ where: { id: projectId }, data: { spent: totals._sum.amount || 0 } });
 }
 
+function calendarDate(raw: unknown, fallback: Date | null = null): Date | null {
+  return parseDateOnlyToUtc(raw) ?? (fallback ? parseDateOnlyToUtc(fallback) : null);
+}
+
 function buildTxData(body: any) {
   const asExecuted =
     body.executionStatus === 'EXECUTED' ||
     body.registerAsExecuted === true ||
     body.markExecuted === true;
+  const date = calendarDate(body.date, new Date()) as Date;
+  const executedDate = asExecuted
+    ? calendarDate(body.executedDate, date)
+    : null;
   return {
     companyId: body.companyId,
     projectId: body.projectId || null,
@@ -35,12 +44,12 @@ function buildTxData(body: any) {
     title: body.title || '',
     description: body.description || '',
     category: body.category || '',
-    date: body.date ? new Date(body.date) : new Date(),
-    accrualDate: body.accrualDate ? new Date(body.accrualDate) : null,
+    date,
+    accrualDate: body.accrualDate ? calendarDate(body.accrualDate) : null,
     isRecurring: body.isRecurring || false,
     recurrenceMonths: body.recurrenceMonths ? parseInt(body.recurrenceMonths) : null,
     executionStatus: asExecuted ? 'EXECUTED' : 'FORECAST',
-    executedDate: asExecuted ? (body.executedDate ? new Date(body.executedDate) : new Date()) : null,
+    executedDate,
     note: body.note || null,
     origin: body.origin || null,
     budgetLineId: body.budgetLineId || null,
@@ -139,8 +148,8 @@ export async function POST(req: Request) {
 
     if (recurrenceCount > 1) {
       const created = [];
-      const baseDate = body.date ? new Date(body.date) : new Date();
-      const baseAccrualDate = body.accrualDate ? new Date(body.accrualDate) : null;
+      const baseDate = parseDateOnlyToUtc(body.date) ?? parseDateOnlyToUtc(new Date())!;
+      const baseAccrualDate = body.accrualDate ? parseDateOnlyToUtc(body.accrualDate) : null;
       const baseTitle = body.title || '';
       for (let i = 0; i < recurrenceCount; i++) {
         const txDate = addMonthsSafe(baseDate, i * recurrenceMonths);
@@ -198,11 +207,11 @@ export async function PUT(req: Request) {
         if (item.title !== undefined) updateData.title = item.title;
         if (item.description !== undefined) updateData.description = item.description;
         if (item.category !== undefined) updateData.category = item.category;
-        if (item.date !== undefined) updateData.date = new Date(item.date);
-        if (item.accrualDate !== undefined) updateData.accrualDate = item.accrualDate ? new Date(item.accrualDate) : null;
+        if (item.date !== undefined) updateData.date = calendarDate(item.date) ?? existing.date;
+        if (item.accrualDate !== undefined) updateData.accrualDate = item.accrualDate ? calendarDate(item.accrualDate) : null;
         if (item.projectId !== undefined) updateData.projectId = item.projectId || null;
         if (item.executionStatus !== undefined) updateData.executionStatus = item.executionStatus;
-        if (item.executedDate !== undefined) updateData.executedDate = item.executedDate ? new Date(item.executedDate) : null;
+        if (item.executedDate !== undefined) updateData.executedDate = item.executedDate ? calendarDate(item.executedDate) : null;
         if (item.isRecurring !== undefined) updateData.isRecurring = item.isRecurring;
         if (item.recurrenceMonths !== undefined) updateData.recurrenceMonths = item.recurrenceMonths ? parseInt(item.recurrenceMonths) : null;
         if (item.note !== undefined) updateData.note = item.note || null;
@@ -213,8 +222,8 @@ export async function PUT(req: Request) {
         if (item.companyBudgetItemId !== undefined) updateData.companyBudgetItemId = item.companyBudgetItemId || null;
         if (item.receiptUrl !== undefined) updateData.receiptUrl = item.receiptUrl || null;
         // When marking as EXECUTED, ensure executedDate is set
-        if (item.executionStatus === 'EXECUTED' && !updateData.executedDate) {
-          updateData.executedDate = new Date();
+        if (item.executionStatus === 'EXECUTED' && updateData.executedDate == null && !existing.executedDate) {
+          updateData.executedDate = calendarDate(updateData.date, existing.date);
         }
         // When reverting to FORECAST, clear executedDate
         if (item.executionStatus === 'FORECAST') {
@@ -242,11 +251,11 @@ export async function PUT(req: Request) {
     if (body.title !== undefined) updateData.title = body.title;
     if (body.description !== undefined) updateData.description = body.description;
     if (body.category !== undefined) updateData.category = body.category;
-    if (body.date !== undefined) updateData.date = new Date(body.date);
-    if (body.accrualDate !== undefined) updateData.accrualDate = body.accrualDate ? new Date(body.accrualDate) : null;
+    if (body.date !== undefined) updateData.date = calendarDate(body.date) ?? existing.date;
+    if (body.accrualDate !== undefined) updateData.accrualDate = body.accrualDate ? calendarDate(body.accrualDate) : null;
     if (body.projectId !== undefined) updateData.projectId = body.projectId || null;
     if (body.executionStatus !== undefined) updateData.executionStatus = body.executionStatus;
-    if (body.executedDate !== undefined) updateData.executedDate = body.executedDate ? new Date(body.executedDate) : null;
+    if (body.executedDate !== undefined) updateData.executedDate = body.executedDate ? calendarDate(body.executedDate) : null;
     if (body.isRecurring !== undefined) updateData.isRecurring = body.isRecurring;
     if (body.recurrenceMonths !== undefined) updateData.recurrenceMonths = body.recurrenceMonths ? parseInt(body.recurrenceMonths) : null;
     if (body.note !== undefined) updateData.note = body.note || null;
@@ -256,8 +265,8 @@ export async function PUT(req: Request) {
     if (body.companyBudgetItemId !== undefined) updateData.companyBudgetItemId = body.companyBudgetItemId || null;
     if (body.receiptUrl !== undefined) updateData.receiptUrl = body.receiptUrl || null;
     // When marking as EXECUTED, ensure executedDate is set
-    if (body.executionStatus === 'EXECUTED' && !updateData.executedDate) {
-      updateData.executedDate = new Date();
+    if (body.executionStatus === 'EXECUTED' && updateData.executedDate == null && !existing.executedDate) {
+      updateData.executedDate = calendarDate(updateData.date, existing.date);
     }
     // When reverting to FORECAST, clear executedDate
     if (body.executionStatus === 'FORECAST') {

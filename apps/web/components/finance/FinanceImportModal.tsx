@@ -167,10 +167,11 @@ export function FinanceImportModal({
         title: t.title,
         description: t.description,
         category: t.category,
-        date: t.date ? new Date(t.date).toISOString() : new Date().toISOString(),
+        date: t.date,
         note: t.note || null,
         registerAsExecuted: t.executionStatus !== 'FORECAST',
         executionStatus: t.executionStatus === 'FORECAST' ? 'FORECAST' : 'EXECUTED',
+        executedDate: t.executionStatus === 'FORECAST' ? null : t.date,
       }));
       const res = await fetch('/api/transactions', {
         method: 'POST',

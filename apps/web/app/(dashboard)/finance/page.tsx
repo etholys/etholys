@@ -12,6 +12,7 @@ import {
   Clock, CheckCircle2, PlusCircle, Upload, FileText, Loader2, Wallet, FileSpreadsheet
 } from 'lucide-react';
 import { FinanceImportModal } from '@/components/finance/FinanceImportModal';
+import { dateOnlyIso, formatDateOnly } from '@/lib/atlas/date-only';
 
 const BudgetPlanning = dynamic(() => import('@/components/finance/BudgetPlanning'), { ssr: false, loading: () => <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div> });
 
@@ -195,8 +196,8 @@ export default function FinancePage() {
         const matchDesc = tx.description?.toLowerCase().includes(q);
         if (!matchTitle && !matchDesc) return false;
       }
-      if (dateFrom && new Date(tx.date) < new Date(dateFrom)) return false;
-      if (dateTo && new Date(tx.date) > new Date(dateTo + 'T23:59:59')) return false;
+      if (dateFrom && dateOnlyIso(tx.date) < dateFrom) return false;
+      if (dateTo && dateOnlyIso(tx.date) > dateTo) return false;
       return true;
     });
   }, [transactions, filterBudgetItemId, filterType, filterCategory, filterCompany, filterExecStatus, filterOrigin, filterCurrency, searchText, dateFrom, dateTo]);
@@ -250,7 +251,7 @@ export default function FinancePage() {
   const monthlyData = useMemo(() => {
     const map: Record<string, { income: number; expense: number }> = {};
     filtered.forEach(t => {
-      const month = new Date(t.date).toISOString().slice(0, 7);
+      const month = dateOnlyIso(t.date).slice(0, 7);
       if (!map[month]) map[month] = { income: 0, expense: 0 };
       if (t.type === 'INCOME' || t.type === 'TRANSFER_IN') map[month].income += t.amount;
       else map[month].expense += t.amount;
@@ -277,8 +278,8 @@ export default function FinancePage() {
       title: tx.title || '',
       description: tx.description || '',
       category: tx.category || '',
-      date: tx.date ? new Date(tx.date).toISOString().slice(0, 10) : '',
-      accrualDate: tx.accrualDate ? new Date(tx.accrualDate).toISOString().slice(0, 10) : '',
+      date: dateOnlyIso(tx.date),
+      accrualDate: dateOnlyIso(tx.accrualDate),
       isRecurring: tx.isRecurring || false,
       recurrenceMonths: tx.recurrenceMonths ? String(tx.recurrenceMonths) : '1',
       recurrenceCount: '1',
@@ -311,7 +312,7 @@ export default function FinancePage() {
       title: form.title || null,
       description: form.description || null,
       category: form.category || null,
-      date: form.date || new Date().toISOString(),
+      date: form.date || dateOnlyIso(new Date()),
       accrualDate: form.accrualDate || null,
       note: form.note || null,
       receiptUrl: form.receiptUrl || null,
@@ -326,9 +327,11 @@ export default function FinancePage() {
       const opened = editOpenedForecastOnly.current;
       if (opened !== null && form.forecastOnly !== opened) {
         payload.executionStatus = form.forecastOnly ? 'FORECAST' : 'EXECUTED';
+        if (!form.forecastOnly) payload.executedDate = form.date || dateOnlyIso(new Date());
       }
     } else {
       payload.registerAsExecuted = !form.forecastOnly;
+      if (!form.forecastOnly) payload.executedDate = form.date || dateOnlyIso(new Date());
     }
     const res = await fetch('/api/transactions', {
       method: editingId ? 'PUT' : 'POST',
@@ -446,7 +449,7 @@ export default function FinancePage() {
   const exportCSV = () => {
     const header = 'Fecha Prevista,Fecha Pago,Competencia,Tipo,Estado,Título,Categoría,Descripción,Monto,Moneda,Empresa,Proyecto,Recurrente\n';
     const rows = filtered.map(t =>
-      `${new Date(t.date).toLocaleDateString('es-UY')},${t.executedDate ? new Date(t.executedDate).toLocaleDateString('es-UY') : ''},${t.accrualDate ? new Date(t.accrualDate).toLocaleDateString('es-UY') : ''},${TYPE_CONFIG[t.type]?.labels || t.type},${L(EXEC_STATUS[t.executionStatus]?.labels || ml('','','')) || t.executionStatus},"${t.title || ''}",${t.category || ''},"${t.description || ''}",${t.amount},${t.currency},"${t.company?.shortName || ''}","${t.project?.name || ''}",${t.isRecurring ? 'Sí' : 'No'}`
+      `${formatDateOnly(t.date)},${t.executedDate ? formatDateOnly(t.executedDate) : ''},${t.accrualDate ? formatDateOnly(t.accrualDate) : ''},${TYPE_CONFIG[t.type]?.labels || t.type},${L(EXEC_STATUS[t.executionStatus]?.labels || ml('','','')) || t.executionStatus},"${t.title || ''}",${t.category || ''},"${t.description || ''}",${t.amount},${t.currency},"${t.company?.shortName || ''}","${t.project?.name || ''}",${t.isRecurring ? 'Sí' : 'No'}`
     ).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -769,7 +772,7 @@ export default function FinancePage() {
                       {/* Category */}
                       <span className="text-xs text-gray-500 truncate">{tx.category || '—'}</span>
                       {/* Date */}
-                      <span className="text-xs text-gray-500 tabular-nums">{new Date(tx.date).toLocaleDateString('es-UY')}</span>
+                      <span className="text-xs text-gray-500 tabular-nums">{formatDateOnly(tx.date)}</span>
                       {/* Status */}
                       <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium w-fit ${execCfg.bg} ${execCfg.color}`}>
                         {L(execCfg.labels)}
@@ -962,7 +965,7 @@ export default function FinancePage() {
         const cfMonths: { month: string; inflows: number; outflows: number; net: number; balance: number }[] = [];
         const monthMap: Record<string, { inflows: number; outflows: number }> = {};
         cfSource.forEach(t => {
-          const m = new Date(t.date).toISOString().slice(0, 7);
+          const m = dateOnlyIso(t.date).slice(0, 7);
           if (!monthMap[m]) monthMap[m] = { inflows: 0, outflows: 0 };
           if (t.type === 'INCOME' || t.type === 'TRANSFER_IN') monthMap[m].inflows += t.amount;
           else monthMap[m].outflows += t.amount;
@@ -1215,10 +1218,11 @@ export default function FinancePage() {
                   {!editingId && parseInt(form.recurrenceCount) > 1 && form.date && (() => {
                     const count = parseInt(form.recurrenceCount) || 1;
                     const months = parseInt(form.recurrenceMonths) || 1;
-                    const base = new Date(form.date);
+                    const baseIso = dateOnlyIso(form.date);
+                    const [y, mo, d] = baseIso.split('-').map(Number);
                     const dates = Array.from({ length: Math.min(count, 12) }, (_, i) => {
-                      const d = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + (i * months), base.getUTCDate()));
-                      return d.toLocaleDateString('es-UY');
+                      const dt = new Date(Date.UTC(y, mo - 1 + i * months, d, 12, 0, 0));
+                      return formatDateOnly(dt);
                     });
                     return (
                       <div className="col-span-2 bg-purple-50 border border-purple-200 rounded-lg p-2 text-xs text-purple-700">
