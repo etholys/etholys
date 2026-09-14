@@ -15,16 +15,21 @@ function parseAmount(v: unknown): number {
 
 async function syncProjectSpent(projectId: string) {
   // SIEP spent = informe (SHARED + PROJECT_ONLY). COMPANY_ONLY is internal ATLAS cost only.
-  const totals = await prisma.transaction.aggregate({
-    where: {
-      projectId,
-      type: { in: ['EXPENSE', 'TRANSFER_OUT'] },
-      executionStatus: 'EXECUTED',
-      OR: [{ scope: null }, { scope: { not: 'COMPANY_ONLY' } }],
-    },
-    _sum: { amount: true },
-  });
-  await prisma.project.update({ where: { id: projectId }, data: { spent: totals._sum.amount || 0 } });
+  // `scope` is required String — do not filter with `{ scope: null }` (Prisma validation error).
+  try {
+    const totals = await prisma.transaction.aggregate({
+      where: {
+        projectId,
+        type: { in: ['EXPENSE', 'TRANSFER_OUT'] },
+        executionStatus: 'EXECUTED',
+        NOT: { scope: 'COMPANY_ONLY' },
+      },
+      _sum: { amount: true },
+    });
+    await prisma.project.update({ where: { id: projectId }, data: { spent: totals._sum.amount || 0 } });
+  } catch (err) {
+    console.error('syncProjectSpent failed (transaction was still saved):', projectId, err);
+  }
 }
 
 function calendarDate(raw: unknown, fallback: Date | null = null): Date | null {
