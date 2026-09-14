@@ -1206,8 +1206,8 @@ export default function FinancePage() {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3 text-[11px] text-gray-600">
-                      <p>{L(ml('On report and cash','En informe y caja','No informe e no caixa')}: {formatMoney(row.sharedOut, row.currency)}</p>
-                      <p>{L(ml('Internal, not reimbursed','Interno, no reembolsado','Interno, não reembolsado')}: {formatMoney(row.internalOut, row.currency)}</p>
+                      <p>{L(ml('On report and cash','En informe y caja','No informe e no caixa'))}: {formatMoney(row.sharedOut, row.currency)}</p>
+                      <p>{L(ml('Internal, not reimbursed','Interno, no reembolsado','Interno, não reembolsado'))}: {formatMoney(row.internalOut, row.currency)}</p>
                     </div>
                   </div>
                 );
