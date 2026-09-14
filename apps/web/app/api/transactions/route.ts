@@ -14,9 +14,14 @@ function parseAmount(v: unknown): number {
 }
 
 async function syncProjectSpent(projectId: string) {
-  // Only EXECUTED transactions count toward project spent (FORECAST should not contaminate SIEP)
+  // SIEP spent = informe (SHARED + PROJECT_ONLY). COMPANY_ONLY is internal ATLAS cost only.
   const totals = await prisma.transaction.aggregate({
-    where: { projectId, type: { in: ['EXPENSE', 'TRANSFER_OUT'] }, executionStatus: 'EXECUTED' },
+    where: {
+      projectId,
+      type: { in: ['EXPENSE', 'TRANSFER_OUT'] },
+      executionStatus: 'EXECUTED',
+      OR: [{ scope: null }, { scope: { not: 'COMPANY_ONLY' } }],
+    },
     _sum: { amount: true },
   });
   await prisma.project.update({ where: { id: projectId }, data: { spent: totals._sum.amount || 0 } });

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { FinanceImportModal } from '@/components/finance/FinanceImportModal';
 import { dateOnlyIso, formatDateOnly } from '@/lib/atlas/date-only';
+import { buildProjectBooks, companyResultStatus } from '@/lib/atlas/project-books';
 
 const BudgetPlanning = dynamic(() => import('@/components/finance/BudgetPlanning'), { ssr: false, loading: () => <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div> });
 
@@ -25,6 +26,23 @@ const TYPE_CONFIG: Record<string, { labels: ML; icon: any; color: string; bg: st
   TRANSFER_IN: { labels: ml('Transfer in', 'Transferencia entrada', 'Transferência entrada'), icon: RefreshCw, color: 'text-blue-500', bg: 'bg-blue-50' },
   TRANSFER_OUT: { labels: ml('Transfer out', 'Transferencia salida', 'Transferência saída'), icon: RefreshCw, color: 'text-amber-600', bg: 'bg-amber-50' },
 };
+
+const REIMBURSEMENT_CFG = {
+  labels: ml('Reimbursement', 'Reembolso', 'Reembolso'),
+  icon: RefreshCw,
+  color: 'text-teal-700',
+  bg: 'bg-teal-50',
+};
+
+function isReimbursementRow(tx: { origin?: string | null }) {
+  return String(tx.origin || '').toUpperCase() === 'REIMBURSEMENT';
+}
+
+function parseFormAmount(v: unknown): number {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const s = String(v ?? '').trim().replace(/\s/g, '').replace(',', '.');
+  return parseFloat(s);
+}
 
 const EXEC_STATUS: Record<string, { labels: ML; icon: any; color: string; bg: string }> = {
   FORECAST: { labels: ml('Forecast', 'Previsto', 'Previsto'), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
@@ -40,6 +58,8 @@ const EMPTY_FORM = {
   amount: '', currency: 'USD', title: '', description: '', category: '',
   date: '', accrualDate: '', isRecurring: false, recurrenceMonths: '1', recurrenceCount: '1',
   note: '', receiptUrl: '', allocationPct: '100',
+  /** COMPANY_ONLY = caja interna del proyecto (default ATLAS); SHARED/PROJECT_ONLY tocan SIEP */
+  scope: 'COMPANY_ONLY',
   /** false = EXECUTED (default on Execution tab); true = FORECAST only */
   forecastOnly: false,
 };
@@ -72,7 +92,7 @@ export default function FinancePage() {
   const [searchText, setSearchText] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [view, setView] = useState<'list' | 'summary' | 'dre' | 'cashflow'>('list');
+  const [view, setView] = useState<'list' | 'summary' | 'dre' | 'cashflow' | 'projects'>('list');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [batchCat, setBatchCat] = useState('');
 
@@ -183,7 +203,11 @@ export default function FinancePage() {
     return transactions.filter(tx => {
       if (tx.scope === 'PROJECT_ONLY') return false;
       if (filterBudgetItemId && tx.companyBudgetItemId !== filterBudgetItemId) return false;
-      if (filterType && tx.type !== filterType) return false;
+      if (filterType === 'REIMBURSEMENT') {
+        if (!isReimbursementRow(tx)) return false;
+      } else if (filterType && (isReimbursementRow(tx) ? 'REIMBURSEMENT' : tx.type) !== filterType) {
+        return false;
+      }
       if (filterCategory && tx.category !== filterCategory) return false;
       if (filterCompany && tx.companyId !== filterCompany) return false;
       if (filterExecStatus && tx.executionStatus !== filterExecStatus) return false;
@@ -259,6 +283,23 @@ export default function FinancePage() {
     return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0])).slice(-12);
   }, [filtered]);
 
+  const projectBookSource = useMemo(() => {
+    return transactions.filter((tx) => {
+      if (!tx.projectId) return false;
+      if (filterCompany && tx.companyId !== filterCompany) return false;
+      if (filterCurrency && (tx.currency || 'USD') !== filterCurrency) return false;
+      if (filterExecStatus && tx.executionStatus !== filterExecStatus) return false;
+      if (dateFrom && dateOnlyIso(tx.date) < dateFrom) return false;
+      if (dateTo && dateOnlyIso(tx.date) > dateTo) return false;
+      return true;
+    });
+  }, [transactions, filterCompany, filterCurrency, filterExecStatus, dateFrom, dateTo]);
+
+  const projectBooks = useMemo(
+    () => buildProjectBooks(projectBookSource, projects),
+    [projectBookSource, projects],
+  );
+
   const openNew = () => {
     setEditingId(null);
     editOpenedForecastOnly.current = null;
@@ -272,7 +313,7 @@ export default function FinancePage() {
     setForm({
       companyId: tx.companyId || '',
       projectId: tx.projectId || '',
-      type: tx.type,
+      type: tx.origin && isReimbursementRow(tx) ? 'REIMBURSEMENT' : tx.type,
       amount: String(tx.amount),
       currency: tx.currency || 'USD',
       title: tx.title || '',
@@ -286,6 +327,7 @@ export default function FinancePage() {
       note: tx.note || '',
       receiptUrl: tx.receiptUrl || '',
       allocationPct: tx.allocationPct != null ? String(tx.allocationPct) : '100',
+      scope: tx.scope || (tx.projectId ? 'COMPANY_ONLY' : 'SHARED'),
       forecastOnly: tx.executionStatus === 'FORECAST',
     });
     setShowForm(true);
@@ -294,7 +336,7 @@ export default function FinancePage() {
   const handleSubmit = async (e: React.FormEvent, keepOpen = false) => {
     e.preventDefault();
     const compId = form.companyId || companies[0]?.id;
-    const amt = parseFloat(String(form.amount));
+    const amt = parseFormAmount(form.amount);
     if (!compId) {
       alert(L(ml('Select a company.', 'Selecciona una empresa.', 'Selecione uma empresa.')));
       return;
@@ -303,10 +345,19 @@ export default function FinancePage() {
       alert(L(ml('Enter a valid amount.', 'Introduce un monto válido.', 'Informe um valor válido.')));
       return;
     }
+    const isReimb = form.type === 'REIMBURSEMENT';
+    if (isReimb && !form.projectId) {
+      alert(L(ml(
+        'Pick the project whose internal cash this reimbursement belongs to. It will not appear in SIEP.',
+        'Elige el proyecto de esta caja interna. El reembolso no aparece en SIEP.',
+        'Escolha o projeto desta caixa interna. O reembolso não aparece no SIEP.',
+      )));
+      return;
+    }
     const payload: any = {
       companyId: compId,
       projectId: form.projectId || null,
-      type: form.type,
+      type: isReimb ? 'TRANSFER_IN' : form.type,
       amount: amt,
       currency: form.currency,
       title: form.title || null,
@@ -316,8 +367,8 @@ export default function FinancePage() {
       accrualDate: form.accrualDate || null,
       note: form.note || null,
       receiptUrl: form.receiptUrl || null,
-      origin: form.projectId ? 'PROJECT' : 'INTERNAL',
-      allocationPct: form.projectId ? (parseInt(form.allocationPct) || 100) : 100,
+      origin: isReimb ? 'REIMBURSEMENT' : (form.projectId ? 'PROJECT' : 'INTERNAL'),
+      scope: isReimb ? 'COMPANY_ONLY' : (form.projectId ? (form.scope || 'COMPANY_ONLY') : 'SHARED'),
       isRecurring: form.isRecurring,
       recurrenceMonths: form.isRecurring ? parseInt(form.recurrenceMonths) || 1 : null,
       recurrenceCount: form.isRecurring ? parseInt(form.recurrenceCount) || 1 : null,
@@ -351,8 +402,10 @@ export default function FinancePage() {
         currency: form.currency,
         category: form.category,
         date: form.date,
+        type: form.type,
         projectId: form.projectId,
         allocationPct: form.allocationPct,
+        scope: form.scope,
         forecastOnly: form.forecastOnly,
       });
     } else {
@@ -575,7 +628,7 @@ export default function FinancePage() {
       {/* View tabs + inline filters */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
-          {([['list', L(ml('Transactions','Transacciones','Transações')), BarChart3], ['summary', L(ml('Summary','Resumen','Resumo')), PieChart], ['dre', L(ml('P&L','PyG','DRE')), TrendingUp], ['cashflow', L(ml('Cash Flow','Flujo Caja','Fluxo Caixa')), DollarSign]] as const).map(([key, label, Icon]) => (
+          {([['list', L(ml('Transactions','Transacciones','Transações')), BarChart3], ['summary', L(ml('Summary','Resumen','Resumo')), PieChart], ['dre', L(ml('P&L','PyG','DRE')), TrendingUp], ['cashflow', L(ml('Cash Flow','Flujo Caja','Fluxo Caixa')), DollarSign], ['projects', L(ml('Projects','Proyectos','Projetos')), FolderKanban]] as const).map(([key, label, Icon]) => (
             <button key={key} onClick={() => setView(key as any)} className={`px-3 py-1.5 text-xs rounded-md font-medium transition flex items-center gap-1.5 ${view === key ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
               <Icon className="w-3 h-3" />{label}
             </button>
@@ -589,6 +642,7 @@ export default function FinancePage() {
           <select value={filterType} onChange={e => setFilterType(e.target.value)} className="px-2 py-1.5 rounded-lg border text-xs">
             <option value="">{L(ml('All types','Todos','Todos'))}</option>
             {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{L(v.labels)}</option>)}
+            <option value="REIMBURSEMENT">{L(REIMBURSEMENT_CFG.labels)}</option>
           </select>
           <select value={filterExecStatus} onChange={e => setFilterExecStatus(e.target.value)} className="px-2 py-1.5 rounded-lg border text-xs">
             <option value="">{L(ml('All status','Todo estado','Todo status'))}</option>
@@ -736,7 +790,8 @@ export default function FinancePage() {
               </div>
               <div className="divide-y">
                 {filtered.map(tx => {
-                  const cfg = TYPE_CONFIG[tx.type] || TYPE_CONFIG.EXPENSE;
+                  const isReimb = isReimbursementRow(tx);
+                  const cfg = isReimb ? REIMBURSEMENT_CFG : (TYPE_CONFIG[tx.type] || TYPE_CONFIG.EXPENSE);
                   const Icon = cfg.icon;
                   const execCfg = EXEC_STATUS[tx.executionStatus] || EXEC_STATUS.EXECUTED;
                   const isSelected = selected.has(tx.id);
@@ -764,6 +819,15 @@ export default function FinancePage() {
                             ) : (
                               <><span>·</span><span className="text-[10px] text-gray-300">{L(ml('Internal','Interno','Interno'))}</span></>
                             )}
+                            {isReimb && (
+                              <span className="inline-block px-1 py-0 rounded bg-teal-50 text-teal-800 text-[10px]">{L(REIMBURSEMENT_CFG.labels)}</span>
+                            )}
+                            {tx.projectId && tx.scope === 'COMPANY_ONLY' && !isReimb && (
+                              <span className="inline-block px-1 py-0 rounded bg-amber-50 text-amber-700 text-[10px]">{L(ml('Project pocket','Caja proyecto','Caixa projeto'))}</span>
+                            )}
+                            {tx.projectId && tx.scope === 'PROJECT_ONLY' && (
+                              <span className="inline-block px-1 py-0 rounded bg-slate-100 text-slate-600 text-[10px]">{L(ml('Report only','Sólo informe','Só informe'))}</span>
+                            )}
                             {tx.note && <><span>·</span><span className="truncate max-w-[120px] italic">{tx.note}</span></>}
                             {tx.receiptUrl && <a href={tx.receiptUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-teal-600 hover:text-teal-700" title={L(ml('View receipt','Ver comprobante','Ver comprovante'))} onClick={e => e.stopPropagation()}><FileText className="w-3 h-3" /></a>}
                           </div>
@@ -778,8 +842,8 @@ export default function FinancePage() {
                         {L(execCfg.labels)}
                       </span>
                       {/* Amount - right-aligned */}
-                      <p className={`text-sm font-semibold text-right tabular-nums font-mono ${tx.type === 'INCOME' || tx.type === 'TRANSFER_IN' ? 'text-emerald-600' : 'text-red-500'} ${isForecast ? 'italic' : ''}`}>
-                        {tx.type === 'INCOME' || tx.type === 'TRANSFER_IN' ? '+' : '-'}{formatMoney(tx.amount, tx.currency)}
+                      <p className={`text-sm font-semibold text-right tabular-nums font-mono ${tx.type === 'INCOME' || tx.type === 'TRANSFER_IN' || isReimb ? 'text-emerald-600' : 'text-red-500'} ${isForecast ? 'italic' : ''}`}>
+                        {tx.type === 'INCOME' || tx.type === 'TRANSFER_IN' || isReimb ? '+' : '-'}{formatMoney(tx.amount, tx.currency)}
                       </p>
                       {/* Actions */}
                       <div className="flex gap-0.5 md:opacity-0 md:group-hover:opacity-100 transition justify-end">
@@ -1077,6 +1141,82 @@ export default function FinancePage() {
         );
       })()}
 
+      {view === 'projects' && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            {L(ml(
+              'Internal project pocket of the company: you spend first (red), then reimbursements cover those costs. SIEP is not updated — the donor budget already lives there.',
+              'Caja interna de la empresa por proyecto: primero gastas (rojo), el reembolso cubre esos gastos. SIEP no se toca: el presupuesto del donante ya está ahí.',
+              'Caixa interna da empresa por projeto: primeiro gastas (vermelho), o reembolso cobre esses gastos. O SIEP não é alterado: o orçamento do doador já está lá.',
+            ))}
+          </div>
+          {loading ? (
+            <div className="p-8 text-center text-gray-400">{L(ml('Loading…','Cargando…','Carregando…'))}</div>
+          ) : projectBooks.length === 0 ? (
+            <div className="bg-white rounded-xl p-8 text-center text-gray-400 shadow-sm">
+              <FolderKanban className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p className="font-medium">{L(ml('No project movements','Sin movimientos de proyecto','Sem movimentos de projeto'))}</p>
+              <p className="text-sm mt-1">{L(ml('Link a transaction to a project and choose whether it is report, cash, or both.','Vincula un movimiento a un proyecto y elige si va al informe, a la caja, o a ambos.','Vincule um movimento a um projeto e escolha se vai ao informe, ao caixa, ou aos dois.'))}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {projectBooks.map((row) => {
+                const st = companyResultStatus(row.companyResult);
+                const stLabel =
+                  st === 'margin'
+                    ? L(ml('Margin','Margen','Margem'))
+                    : st === 'loss'
+                      ? L(ml('Loss','Pérdida','Prejuízo'))
+                      : L(ml('Even','En cero','Zerado'));
+                const stClass =
+                  st === 'margin' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : st === 'loss' ? 'bg-red-50 text-red-800 border-red-200' : 'bg-slate-50 text-slate-700 border-slate-200';
+                return (
+                  <div key={`${row.projectId}-${row.currency}`} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold text-gray-900 text-sm leading-snug">{row.projectName}</h3>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{row.currency}</p>
+                      </div>
+                      <span className={`shrink-0 px-2 py-1 rounded-lg text-[11px] font-semibold border ${stClass}`}>{stLabel}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="rounded-lg bg-slate-50 p-3">
+                        <p className="text-[10px] uppercase tracking-wide text-slate-500 font-medium">{L(ml('Donor report (SIEP)','Informe donante (SIEP)','Informe doador (SIEP)'))}</p>
+                        <p className="mt-1 text-emerald-700 font-mono text-xs">+{formatMoney(row.reportedIn, row.currency)}</p>
+                        <p className="text-red-600 font-mono text-xs">-{formatMoney(row.reportedOut, row.currency)}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">{L(ml('Imputed only','Sólo imputado','Só imputado'))}: {formatMoney(row.imputedOut, row.currency)}</p>
+                      </div>
+                      <div className="rounded-lg bg-teal-50/70 p-3">
+                        <p className="text-[10px] uppercase tracking-wide text-teal-800 font-medium">{L(ml('Company project pocket','Caja interna del proyecto','Caixa interna do projeto'))}</p>
+                        <p className="mt-1 text-emerald-700 font-mono text-xs">+{formatMoney(row.companyIn, row.currency)}</p>
+                        {row.reimbursedIn > 0 && (
+                          <p className="text-[10px] text-teal-700">{L(ml('of which reimbursement','de ello reembolso','disso reembolso'))}: {formatMoney(row.reimbursedIn, row.currency)}</p>
+                        )}
+                        <p className="text-red-600 font-mono text-xs">-{formatMoney(row.companyOut, row.currency)}</p>
+                        <p className={`mt-2 text-sm font-semibold font-mono ${row.companyResult >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                          {row.companyResult >= 0 ? '+' : ''}{formatMoney(row.companyResult, row.currency)}
+                        </p>
+                        <p className="text-[10px] text-teal-700 mt-1">
+                          {st === 'loss'
+                            ? L(ml('Uncovered — waiting for reimbursement','Sin cubrir — a la espera del reembolso','Por cobrir — à espera do reembolso'))
+                            : st === 'even'
+                              ? L(ml('Reimbursement covered the costs','El reembolso cubrió los gastos','O reembolso cobriu os gastos'))
+                              : L(ml('Covered, leftover margin','Cubierto, sobró margen','Coberto, sobrou margem'))}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-[11px] text-gray-600">
+                      <p>{L(ml('On report and cash','En informe y caja','No informe e no caixa')}: {formatMoney(row.sharedOut, row.currency)}</p>
+                      <p>{L(ml('Internal, not reimbursed','Interno, no reembolsado','Interno, não reembolsado')}: {formatMoney(row.internalOut, row.currency)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* CREATE / EDIT FORM MODAL - NO click-outside-close */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -1087,12 +1227,20 @@ export default function FinancePage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><label className="block text-xs text-gray-500 mb-1">Tipo *</label>
-                <select required value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm">
+                <select required value={form.type} onChange={e => {
+                  const type = e.target.value;
+                  setForm({
+                    ...form,
+                    type,
+                    scope: type === 'REIMBURSEMENT' ? 'COMPANY_ONLY' : form.scope,
+                  });
+                }} className="w-full px-3 py-2 rounded-lg border text-sm">
                   {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{L(v.labels)}</option>)}
+                  <option value="REIMBURSEMENT">{L(REIMBURSEMENT_CFG.labels)}</option>
                 </select>
               </div>
               <div><label className="block text-xs text-gray-500 mb-1">{L(ml('Amount *','Monto *','Valor *'))}</label>
-                <input required type="number" step="0.01" min="0" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm" placeholder="0.00" />
+                <input required inputMode="decimal" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm" placeholder="0.00" />
               </div>
             </div>
             <div><label className="block text-xs text-gray-500 mb-1">Título</label>
@@ -1106,29 +1254,55 @@ export default function FinancePage() {
                 </select>
               </div>
               <div><label className="block text-xs text-gray-500 mb-1">{L(ml('Project (optional)','Proyecto (opcional)','Projeto (opcional)'))}</label>
-                <select value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value, allocationPct: e.target.value ? form.allocationPct : '100' })} className="w-full px-3 py-2 rounded-lg border text-sm">
+                <select value={form.projectId} onChange={e => {
+                  const projectId = e.target.value;
+                  setForm({
+                    ...form,
+                    projectId,
+                    scope: projectId ? (form.type === 'REIMBURSEMENT' ? 'COMPANY_ONLY' : (form.projectId ? form.scope : 'COMPANY_ONLY')) : 'SHARED',
+                  });
+                }} className="w-full px-3 py-2 rounded-lg border text-sm">
                   <option value="">{L(ml('No project','Sin proyecto','Sem projeto'))}</option>
                   {projects.filter((p: any) => !form.companyId || p.companyId === form.companyId).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
             </div>
-            {/* Allocation % — only when project is selected */}
             {form.projectId && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <label className="block text-xs font-medium text-blue-700 mb-1.5">{L(ml('Project allocation %','% Asignación al proyecto','% Alocação ao projeto'))}</label>
-                <div className="flex items-center gap-3">
-                  <input type="range" min="0" max="100" step="5" value={form.allocationPct} onChange={e => setForm({ ...form, allocationPct: e.target.value })} className="flex-1 accent-blue-600" />
-                  <div className="flex items-center gap-1">
-                    <input type="number" min="0" max="100" value={form.allocationPct} onChange={e => setForm({ ...form, allocationPct: e.target.value })} className="w-16 px-2 py-1 rounded border text-sm text-center font-mono" />
-                    <span className="text-xs text-blue-600">%</span>
-                  </div>
-                </div>
-                <p className="text-[10px] text-blue-500 mt-1">
-                  {parseInt(form.allocationPct) === 100
-                    ? L(ml('100% allocated to the project','100% asignado al proyecto','100% alocado ao projeto'))
-                    : `${form.allocationPct}% ${L(ml('project','proyecto','projeto'))} — ${100 - (parseInt(form.allocationPct) || 0)}% ${L(ml('internal/overhead','interno/overhead','interno/overhead'))}`
-                  }
-                </p>
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 space-y-2">
+                {form.type === 'REIMBURSEMENT' ? (
+                  <>
+                    <p className="text-xs font-medium text-teal-800">
+                      {L(ml(
+                        'Internal project cash (ATLAS). Does not change the SIEP budget.',
+                        'Caja interna del proyecto (ATLAS). No entra en el presupuesto SIEP.',
+                        'Caixa interna do projeto (ATLAS). Não entra no orçamento SIEP.',
+                      ))}
+                    </p>
+                    <p className="text-[11px] text-teal-700">
+                      {L(ml(
+                        'You spend first (the pocket goes negative). When the reimbursement lands, it covers those costs and any leftover is margin.',
+                        'Primero gastas (la caja queda en rojo). Cuando entra el reembolso, cubre esos gastos y lo que sobre es margen.',
+                        'Primeiro gastas (a caixa fica no vermelho). Quando entra o reembolso, cobre esses gastos e o que sobrar é margem.',
+                      ))}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <label className="block text-xs font-medium text-teal-800">{L(ml('Company project pocket','Caja interna del proyecto','Caixa interna do projeto'))}</label>
+                    <select value={form.scope} onChange={e => setForm({ ...form, scope: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm bg-white">
+                      <option value="COMPANY_ONLY">{L(ml('ATLAS only — mark as this project, hide from SIEP','Sólo ATLAS — marcar el proyecto, no ver en SIEP','Só ATLAS — marcar o projeto, não ver no SIEP'))}</option>
+                      <option value="SHARED">{L(ml('Also post to the SIEP report (donor)','También imputar al informe SIEP (donante)','Também imputar ao informe SIEP (doador)'))}</option>
+                      <option value="PROJECT_ONLY">{L(ml('SIEP report only (not company cash)','Sólo informe SIEP (no sale de caja)','Só informe SIEP (não sai do caixa)'))}</option>
+                    </select>
+                    <p className="text-[10px] text-teal-700">
+                      {form.scope === 'COMPANY_ONLY'
+                        ? L(ml('Fuel, chairs, staff pay, reimbursements: company pocket of this project.','Combustible, sillas, pagos, reembolsos: caja de la empresa de este proyecto.','Combustível, cadeiras, pagamentos, reembolsos: caixa da empresa deste projeto.'))
+                        : form.scope === 'PROJECT_ONLY'
+                          ? L(ml('Billed to the donor report only, e.g. 560 vs 480 paid.','Sólo en el informe, ej. 560 facturados vs 480 pagados.','Só no informe, ex. 560 faturados vs 480 pagos.'))
+                          : L(ml('Same amount in the donor report and in company cash.','El mismo monto en el informe y en la caja.','O mesmo valor no informe e no caixa.'))}
+                    </p>
+                  </>
+                )}
               </div>
             )}
             <div className="grid grid-cols-2 gap-3">
