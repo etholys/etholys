@@ -277,7 +277,7 @@ export default function HubPage() {
 
   if (status === 'loading' || status === 'unauthenticated') {
     return (
-      <div className="etholys-hub-bg min-h-screen px-4">
+      <div className="flex min-h-screen items-center justify-center bg-[#07111A] px-4">
         <StateLoading className="h-full" />
       </div>
     );
@@ -287,16 +287,7 @@ export default function HubPage() {
   const toolCards = systems.filter(isEtholysTool);
   const systemCards = systems.filter((sys) => !isEtholysTool(sys));
 
-  const tileOpen =
-    'group relative flex min-h-[4.25rem] items-center gap-4 rounded-2xl bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.05),0_10px_28px_-12px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/[0.05] transition duration-200 hover:-translate-y-0.5 hover:ring-teal-500/25 hover:shadow-[0_4px_16px_-4px_rgba(13,148,136,0.15),0_16px_40px_-16px_rgba(15,23,42,0.15)]';
-  const tileMuted =
-    'group flex min-h-[4.25rem] items-center gap-4 rounded-2xl bg-white/70 px-4 py-3.5 ring-1 ring-slate-900/[0.04]';
-  const iconShell =
-    'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0B1C24] text-teal-300/90 shadow-inner transition duration-200 group-hover:bg-[#0B1C24] group-hover:text-teal-200';
-  const iconShellMuted =
-    'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-400';
-
-  const renderTile = (sys: HubEntry) => {
+  const renderRow = (sys: HubEntry, index: number) => {
     const Icon = sys.icon;
     const cardAccess = resolveHubCardAccess(sys.id, sys.active, licensedSystems, {
       canManage,
@@ -304,22 +295,31 @@ export default function HubPage() {
       companyLicensedSystems,
     });
 
+    const rowShell =
+      'group flex items-center gap-4 px-4 py-4 transition sm:px-5 sm:py-[1.125rem]';
+
     if (cardAccess === 'locked') {
       return (
-        <div key={sys.id} className={`${tileMuted} opacity-80`}>
-          <div className={iconShellMuted}>
-            <Icon className="h-4 w-4" />
+        <div
+          key={sys.id}
+          className={`${rowShell} opacity-70`}
+          style={{ animationDelay: `${index * 45}ms` }}
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/40">
+            <Icon className="h-4 w-4" strokeWidth={1.75} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <p className="truncate text-sm font-semibold text-slate-700">{sys.name}</p>
-              <Lock className="h-3 w-3 shrink-0 text-amber-600/90" />
+              <p className="truncate font-[family-name:var(--font-etholys-display)] text-sm font-semibold tracking-wide text-white/70">
+                {sys.name}
+              </p>
+              <Lock className="h-3 w-3 shrink-0 text-amber-400/80" />
             </div>
-            <p className="truncate text-xs text-slate-500">{pickLocalized(sys.tagline, locale)}</p>
+            <p className="truncate text-xs text-white/35">{pickLocalized(sys.tagline, locale)}</p>
           </div>
           <Link
             href={canManage ? `/hub/billing?sku=sys.${(sys.id || '').toUpperCase()}` : '/hub/admin'}
-            className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium text-teal-800 ring-1 ring-teal-600/20 transition hover:bg-teal-50"
+            className="shrink-0 rounded-md border border-teal-400/30 bg-teal-500/10 px-2.5 py-1 text-xs font-medium text-teal-200 transition hover:bg-teal-500/20"
           >
             {canManage
               ? t(locale, 'Licencia', 'Licença', 'License')
@@ -331,34 +331,43 @@ export default function HubPage() {
 
     if (cardAccess === 'open') {
       return (
-        <Link key={sys.id} href={sys.href} className={tileOpen}>
-          <div className={iconShell}>
+        <Link
+          key={sys.id}
+          href={sys.href}
+          className={`${rowShell} hover:bg-white/[0.04]`}
+          style={{ animationDelay: `${index * 45}ms` }}
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-teal-400/20 bg-teal-500/10 text-teal-300 transition group-hover:border-teal-400/40 group-hover:bg-teal-500/15 group-hover:text-teal-200">
             <Icon className="h-[1.125rem] w-[1.125rem]" strokeWidth={1.75} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-[family-name:var(--font-etholys-display)] text-[0.9375rem] font-semibold tracking-tight text-[#0B1C24]">
+            <p className="truncate font-[family-name:var(--font-etholys-display)] text-[0.95rem] font-semibold tracking-wide text-white">
               {sys.name}
             </p>
-            <p className="truncate text-xs leading-relaxed text-slate-500">{pickLocalized(sys.tagline, locale)}</p>
+            <p className="truncate text-xs text-white/45 transition group-hover:text-white/60">
+              {pickLocalized(sys.tagline, locale)}
+            </p>
           </div>
-          <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-teal-600" />
+          <ArrowRight className="h-4 w-4 shrink-0 text-white/25 transition group-hover:translate-x-0.5 group-hover:text-teal-300" />
         </Link>
       );
     }
 
     return (
-      <div key={sys.id} className={`${tileMuted} opacity-55`}>
-        <div className={iconShellMuted}>
-          <Icon className="h-4 w-4" />
+      <div key={sys.id} className={`${rowShell} opacity-45`}>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-white/30">
+          <Icon className="h-4 w-4" strokeWidth={1.75} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-semibold text-slate-600">{sys.name}</p>
-            <Lock className="h-3 w-3 shrink-0 text-slate-400" />
+            <p className="truncate font-[family-name:var(--font-etholys-display)] text-sm font-semibold text-white/55">
+              {sys.name}
+            </p>
+            <Lock className="h-3 w-3 shrink-0 text-white/30" />
           </div>
-          <p className="truncate text-xs text-slate-400">{pickLocalized(sys.tagline, locale)}</p>
+          <p className="truncate text-xs text-white/30">{pickLocalized(sys.tagline, locale)}</p>
         </div>
-        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-white/30">
           {t(locale, 'Pronto', 'Em breve', 'Soon')}
         </span>
       </div>
@@ -366,34 +375,47 @@ export default function HubPage() {
   };
 
   return (
-    <div className="etholys-hub-bg min-h-screen text-slate-900">
-      <header className="sticky top-0 z-30 border-b border-slate-900/[0.06] bg-white/75 pt-[env(safe-area-inset-top)] shadow-[0_1px_0_rgba(255,255,255,0.8)_inset] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3.5 sm:px-6">
+    <div className="etholys-hub relative isolate min-h-screen overflow-hidden bg-[#07111A] text-[#E8EEF2]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_70%_10%,rgba(13,148,136,0.26),transparent_55%),radial-gradient(90%_70%_at_10%_90%,rgba(15,23,42,0.85),transparent_50%),linear-gradient(165deg,#041018_0%,#0B1C24_42%,#07111A_100%)]"
+      />
+      <div aria-hidden className="etholys-site-grid pointer-events-none absolute inset-0 opacity-[0.14]" />
+      <div
+        aria-hidden
+        className="etholys-site-orbit pointer-events-none absolute -right-[22%] top-[-8%] h-[75vmin] w-[75vmin] rounded-full border border-teal-400/15"
+      />
+      <div
+        aria-hidden
+        className="etholys-site-orbit-slow pointer-events-none absolute -right-[10%] top-[12%] h-[48vmin] w-[48vmin] rounded-full border border-teal-300/10"
+      />
+
+      <header className="relative z-20 border-b border-white/10 bg-[#07111A]/55 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0B1C24] shadow-sm">
-              <Layers className="h-4 w-4 text-teal-400" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-teal-400/25 bg-teal-500/10">
+              <Layers className="h-4 w-4 text-teal-300" />
             </div>
-            <div className="min-w-0">
-              <p className="font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-[0.14em] text-[#0B1C24]">
-                ETHOLYS
-              </p>
+            <p className="font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-[0.16em] text-white">
+              ETHOLYS
+            </p>
+            <div className="hub-company-picker-dark ml-1 max-w-[9.5rem] sm:ml-2 sm:max-w-none">
+              <CompanyPicker
+                companies={companies}
+                activeCompanyId={companyId}
+                onSelect={setActiveCompanyId}
+                ready={companiesReady}
+                error={companiesLoadError}
+                onRetry={() => void reloadCompanies()}
+                locale={locale}
+              />
             </div>
-            <CompanyPicker
-              companies={companies}
-              activeCompanyId={companyId}
-              onSelect={setActiveCompanyId}
-              ready={companiesReady}
-              error={companiesLoadError}
-              onRetry={() => void reloadCompanies()}
-              locale={locale}
-              className="ml-1 max-w-[9.5rem] sm:ml-2 sm:max-w-none"
-            />
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
             <button
               type="button"
               onClick={() => setLocale(locale === 'es' ? 'pt' : locale === 'pt' ? 'en' : 'es')}
-              className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs uppercase tracking-wider text-white/50 transition hover:bg-white/5 hover:text-white"
             >
               <Globe className="h-3.5 w-3.5" />
               {locale?.toUpperCase()}
@@ -401,7 +423,7 @@ export default function HubPage() {
             {canManage && (
               <Link
                 href="/hub/setup"
-                className="hidden rounded-md px-2 py-1.5 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 sm:inline-flex"
+                className="hidden rounded-md px-2 py-1.5 text-xs text-white/50 transition hover:bg-white/5 hover:text-white sm:inline-flex"
               >
                 {t(locale, 'Organización', 'Organização', 'Organization')}
               </Link>
@@ -409,32 +431,32 @@ export default function HubPage() {
             {canManage && (
               <Link
                 href="/hub/billing"
-                className="hidden rounded-md px-2 py-1.5 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 sm:inline-flex"
+                className="hidden rounded-md px-2 py-1.5 text-xs text-white/50 transition hover:bg-white/5 hover:text-white sm:inline-flex"
               >
                 {t(locale, 'Licencias', 'Licenças', 'Billing')}
               </Link>
             )}
             <Link
               href="/hub/admin"
-              className="hidden rounded-md px-2 py-1.5 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 sm:inline-flex"
+              className="hidden rounded-md px-2 py-1.5 text-xs text-white/50 transition hover:bg-white/5 hover:text-white sm:inline-flex"
             >
-              {t(locale, 'Admin', 'Admin', 'Admin')}
+              Admin
             </Link>
             <Link
               href="https://etholys.com"
-              className="hidden items-center gap-1 rounded-md px-2 py-1.5 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 sm:inline-flex"
+              className="hidden items-center gap-1 rounded-md px-2 py-1.5 text-xs text-white/50 transition hover:bg-white/5 hover:text-white sm:inline-flex"
             >
               <ExternalLink className="h-3 w-3" />
               {t(locale, 'Sitio', 'Site', 'Site')}
             </Link>
-            <div className="ml-1 flex items-center gap-2 border-l border-slate-200 pl-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">
+            <div className="ml-1 flex items-center gap-2 border-l border-white/10 pl-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-teal-500/20 text-xs font-bold text-teal-200">
                 {firstName?.charAt(0)?.toUpperCase() || '?'}
               </div>
               <button
                 type="button"
                 onClick={() => signOut({ callbackUrl: '/login' })}
-                className="text-slate-400 transition hover:text-red-500"
+                className="text-white/40 transition hover:text-red-300"
                 title={t(locale, 'Cerrar sesión', 'Sair', 'Sign out')}
               >
                 <LogOut className="h-4 w-4" />
@@ -444,21 +466,27 @@ export default function HubPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
-        <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="font-[family-name:var(--font-etholys-display)] text-2xl font-semibold tracking-tight text-[#0B1C24] sm:text-[1.75rem]">
-              {t(locale, `Hola, ${firstName}`, `Olá, ${firstName}`, `Hello, ${firstName}`)}
-            </h1>
-            <p className="mt-1.5 max-w-md text-sm leading-relaxed text-slate-600">
-              {t(locale, 'Abra un sistema o una herramienta.', 'Abra um sistema ou uma ferramenta.', 'Open a system or a tool.')}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+      <main className="relative z-10 mx-auto max-w-5xl px-4 pb-16 pt-10 sm:px-6 sm:pt-14">
+        <div className="etholys-site-rise mb-10 max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-400/90">
+            {t(locale, 'Hub', 'Hub', 'Hub')}
+          </p>
+          <h1 className="mt-3 font-[family-name:var(--font-etholys-display)] text-3xl font-semibold leading-tight tracking-tight text-white sm:text-4xl">
+            {t(locale, `Hola, ${firstName}`, `Olá, ${firstName}`, `Hello, ${firstName}`)}
+          </h1>
+          <p className="mt-3 max-w-lg text-base leading-relaxed text-white/55">
+            {t(
+              locale,
+              'Elija por dónde empezar. Un ecosistema, un acceso.',
+              'Escolha por onde começar. Um ecossistema, um acesso.',
+              'Choose where to start. One ecosystem, one access.',
+            )}
+          </p>
+          <div className="mt-6 flex flex-wrap items-center gap-2">
             {canManage && setupNudge && (
               <Link
                 href="/hub/setup"
-                className="rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-teal-800 ring-1 ring-teal-600/15 transition hover:bg-white"
+                className="rounded-md bg-teal-500 px-3.5 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-teal-400"
               >
                 {setupNudge === 'currency-mismatch'
                   ? t(locale, 'Actualizar perfil', 'Atualizar perfil', 'Update profile')
@@ -468,7 +496,7 @@ export default function HubPage() {
             {showIntegratedWorkspace && (
               <Link
                 href="/hub/workspace"
-                className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-slate-900/8 transition hover:bg-white hover:text-[#0B1C24]"
+                className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-white/80 transition hover:border-white/30 hover:bg-white/10 hover:text-white"
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
                 {t(locale, 'Centro integrado', 'Centro integrado', 'Integrated workspace')}
@@ -477,7 +505,7 @@ export default function HubPage() {
             {showLabShortcut && (
               <Link
                 href="/lab"
-                className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-900/8 transition hover:bg-white"
+                className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-3.5 py-1.5 text-xs font-medium text-white/55 transition hover:border-white/25 hover:text-white"
               >
                 <FlaskConical className="h-3.5 w-3.5" />
                 Lab
@@ -486,27 +514,39 @@ export default function HubPage() {
           </div>
         </div>
 
-        {systemCards.length > 0 && (
-          <section className="mb-10">
-            <h2 className="mb-4 font-[family-name:var(--font-etholys-display)] text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              {t(locale, 'Sistemas', 'Sistemas', 'Systems')}
-            </h2>
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              {systemCards.map(renderTile)}
-            </div>
-          </section>
-        )}
+        <div className="etholys-site-rise grid gap-6 lg:grid-cols-[1.35fr_1fr]" style={{ animationDelay: '120ms' }}>
+          {systemCards.length > 0 && (
+            <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#0C1822]/80 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.8)] backdrop-blur-sm">
+              <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+                <h2 className="font-[family-name:var(--font-etholys-display)] text-xs font-semibold uppercase tracking-[0.2em] text-teal-400/90">
+                  {t(locale, 'Sistemas', 'Sistemas', 'Systems')}
+                </h2>
+                <span className="text-[11px] text-white/35">
+                  {systemCards.length} {t(locale, 'productos', 'produtos', 'products')}
+                </span>
+              </div>
+              <div className="divide-y divide-white/[0.07]">
+                {systemCards.map((sys, i) => renderRow(sys, i))}
+              </div>
+            </section>
+          )}
 
-        {toolCards.length > 0 && (
-          <section>
-            <h2 className="mb-4 font-[family-name:var(--font-etholys-display)] text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Etholys Tools
-            </h2>
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              {toolCards.map(renderTile)}
-            </div>
-          </section>
-        )}
+          {toolCards.length > 0 && (
+            <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#0C1822]/55 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.7)] backdrop-blur-sm">
+              <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+                <h2 className="font-[family-name:var(--font-etholys-display)] text-xs font-semibold uppercase tracking-[0.2em] text-white/50">
+                  Etholys Tools
+                </h2>
+                <span className="text-[11px] text-white/30">
+                  {toolCards.length}
+                </span>
+              </div>
+              <div className="divide-y divide-white/[0.07]">
+                {toolCards.map((sys, i) => renderRow(sys, i + systemCards.length))}
+              </div>
+            </section>
+          )}
+        </div>
       </main>
     </div>
   );

@@ -93,12 +93,20 @@
   }
 }
 
-/* Hub — fundo premium, paleta unificada (sem cor por produto) */
-.etholys-hub-bg {
-  background-color: #e9eef3;
-  background-image:
-    radial-gradient(120% 80% at 50% -20%, rgba(13, 148, 136, 0.09), transparent 50%),
-    linear-gradient(180deg, #f3f6f9 0%, #e9eef3 100%);
+/* Hub — atmosfera alinhada ao site institucional (fundo escuro) */
+.etholys-hub {
+  color-scheme: dark;
+}
+
+/* CompanyPicker no Hub escuro: tons claros sobre painéis escuros */
+.hub-company-picker-dark button {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: rgba(232, 238, 242, 0.9) !important;
+}
+.hub-company-picker-dark button:hover {
+  border-color: rgba(45, 212, 191, 0.35) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 /*
