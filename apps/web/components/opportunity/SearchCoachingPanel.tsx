@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
+import { ScanProgressRing } from '@/components/opportunity/ScanProgressRing';
 import {
-  Loader2,
   Pencil,
   Plus,
   Radar,
@@ -43,11 +43,17 @@ const CLASS_OPTS: { id: OpportunityClassification; pt: string; es: string; en: s
 export function SearchCoachingPanel({
   briefing,
   scanning,
+  scanPercent = 0,
+  scanUi = 'idle',
+  onRetryScan,
   onSaved,
   onRunShortcut,
 }: {
   briefing: Briefing;
   scanning?: boolean;
+  scanPercent?: number;
+  scanUi?: 'idle' | 'running' | 'error' | 'done';
+  onRetryScan?: () => void;
   onSaved?: (next: Briefing) => void;
   /** Activa o atalho e dispara a varredura. */
   onRunShortcut?: (briefing: Briefing, focus: ScanFocus) => void;
@@ -277,8 +283,13 @@ export function SearchCoachingPanel({
                   onClick={() => void runShortcut(p, 'open_now')}
                   className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-amber-600 px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
                 >
-                  {busy || scanning ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {scanning ? (
+                    <ScanProgressRing
+                      percent={scanPercent}
+                      state={scanUi === 'done' ? 'done' : 'running'}
+                      size={18}
+                      tone="onDark"
+                    />
                   ) : (
                     <Radar className="h-3.5 w-3.5" />
                   )}
@@ -380,7 +391,7 @@ export function SearchCoachingPanel({
               className="flex-1 rounded-lg bg-violet-700 py-2 text-xs font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
             >
               {busy ? (
-                <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                <ScanProgressRing percent={40} state="running" size={16} tone="onDark" />
               ) : editingId ? (
                 t('Guardar alterações', 'Guardar cambios', 'Save changes')
               ) : (

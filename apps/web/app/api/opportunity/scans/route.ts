@@ -9,6 +9,22 @@ import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import { runOpportunityScan } from '@/lib/opportunity/run-scan';
 import type { OpportunityBriefing, ScanFocus } from '@/lib/opportunity/scan-types';
 
+function progressFromErrorsJson(errorsJson: string | null | undefined): {
+  progressPct: number | null;
+  phase: string | null;
+} {
+  if (!errorsJson) return { progressPct: null, phase: null };
+  try {
+    const o = JSON.parse(errorsJson) as { progressPct?: number; phase?: string };
+    return {
+      progressPct: typeof o.progressPct === 'number' ? o.progressPct : null,
+      phase: typeof o.phase === 'string' ? o.phase : null,
+    };
+  } catch {
+    return { progressPct: null, phase: null };
+  }
+}
+
 export async function GET(req: NextRequest) {
   const ctx = await resolveOpportunityCompanyId(req.nextUrl.searchParams.get('companyId'));
   if (!ctx) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
@@ -21,6 +37,7 @@ export async function GET(req: NextRequest) {
     });
     if (!run) return NextResponse.json({ error: 'Varredura não encontrada' }, { status: 404 });
     const results = await readScanResults(ctx.companyId, run.id);
+    const progress = progressFromErrorsJson(run.errorsJson);
     return NextResponse.json({
       companyId: ctx.companyId,
       run: {
@@ -32,6 +49,8 @@ export async function GET(req: NextRequest) {
         created: run.created,
         errorCount: run.errorCount,
         errorsJson: run.errorsJson,
+        progressPct: run.status === 'completed' ? 100 : progress.progressPct,
+        phase: progress.phase,
         discoveryMode: results.discoveryMode ?? null,
         searchQueries: results.searchQueries ?? [],
         scanFocus: results.scanFocus ?? null,
@@ -156,6 +175,7 @@ export async function POST(req: NextRequest) {
       initiatedByUserId: ctx.userId,
       source: scanFocus === 'open_now' ? 'opportunity_open_now' : 'opportunity_reference',
       status: 'running',
+      errorsJson: JSON.stringify({ progressPct: 5, phase: 'queued' }),
     },
   });
 

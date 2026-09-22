@@ -151,19 +151,31 @@ export async function discoverOpportunitiesOnline(opts: {
   existingFunds: Array<{ name: string; institution: string }>;
   optionalExtraContext?: string;
   scanFocus?: ScanFocus;
+  /** 0–100 phase updates during long web search. */
+  onProgress?: (pct: number, phase: string) => void | Promise<void>;
 }): Promise<WebDiscoveryResult> {
   const scanFocus = opts.scanFocus ?? 'open_now';
+  const report = async (pct: number, phase: string) => {
+    try {
+      await opts.onProgress?.(pct, phase);
+    } catch {
+      /* ignore progress write failures */
+    }
+  };
   const existingBlock =
     opts.existingFunds.map((f) => `${f.name} (${f.institution})`).join('\n') || '(none)';
 
   if (!isWebSearchEnabled()) {
-    return knowledgeOnlyDiscovery(
+    await report(40, 'knowledge');
+    const result = await knowledgeOnlyDiscovery(
       opts.briefing,
       opts.learningContext,
       existingBlock,
       scanFocus,
       opts.optionalExtraContext,
     );
+    await report(90, 'structuring');
+    return result;
   }
 
   const { research: RESEARCH_SYSTEM, structure: STRUCTURE_SYSTEM } = promptsForFocus(scanFocus);
@@ -186,12 +198,14 @@ export async function discoverOpportunitiesOnline(opts: {
       `\nSearch the web broadly (generic queries OK). Prefer official domains for linkOficial; never put aggregator URLs in linkOficial.`,
     ].join('');
 
+    await report(25, 'web_research');
     const { text: research, searchQueries } = await llmCompleteWithWebSearch(
       RESEARCH_SYSTEM,
       userResearch,
       { maxOutputTokens: 16384, temperature: scanFocus === 'open_now' ? 0.15 : 0.25 },
     );
 
+    await report(65, 'structuring');
     const structureUser = [
       `RESEARCH REPORT:\n${research}`,
       `\nEXISTING (skip duplicates):\n${existingBlock}`,
@@ -215,6 +229,7 @@ export async function discoverOpportunitiesOnline(opts: {
       );
     }
 
+    await report(88, 'filtering');
     if (candidates.length > 0) {
       return { candidates, discoveryMode: 'web', searchQueries };
     }
@@ -222,13 +237,16 @@ export async function discoverOpportunitiesOnline(opts: {
     console.warn('[opportunity/web-discovery] web search failed, fallback:', e);
   }
 
-  return knowledgeOnlyDiscovery(
+  await report(50, 'knowledge_fallback');
+  const fallback = await knowledgeOnlyDiscovery(
     opts.briefing,
     opts.learningContext,
     existingBlock,
     scanFocus,
     opts.optionalExtraContext,
   );
+  await report(90, 'structuring');
+  return fallback;
 }
 
 async function knowledgeOnlyDiscovery(

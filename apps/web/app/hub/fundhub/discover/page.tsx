@@ -8,6 +8,10 @@ import { StateEmpty, StateLoading } from '@/components/ui/StateBlocks';
 import { CandidateDetailSheet } from '@/components/opportunity/CandidateDetailSheet';
 import { DeadlineAlertsPanel } from '@/components/opportunity/DeadlineAlertsPanel';
 import { KnownFundsPanel } from '@/components/opportunity/KnownFundsPanel';
+import {
+  estimateScanPercent,
+  ScanProgressRing,
+} from '@/components/opportunity/ScanProgressRing';
 import { SearchCoachingPanel } from '@/components/opportunity/SearchCoachingPanel';
 import {
   availabilityBadgeClass,
@@ -22,7 +26,6 @@ import {
   Database,
   ExternalLink,
   History,
-  Loader2,
   MapPin,
   MessageSquare,
   Radar,
@@ -136,6 +139,12 @@ export default function OpportunityDiscoverPage() {
 
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [scanPercent, setScanPercent] = useState(0);
+  const [scanUi, setScanUi] = useState<'idle' | 'running' | 'error' | 'done'>('idle');
+  const [lastScanArgs, setLastScanArgs] = useState<{
+    focus: ScanFocus;
+    briefing?: Briefing;
+  } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [detail, setDetail] = useState<ScanCandidate | null>(null);
@@ -227,9 +236,13 @@ export default function OpportunityDiscoverPage() {
     briefingOverride?: Briefing,
   ) => {
     setScanning(true);
+    setScanUi('running');
+    setScanPercent(3);
     setMsg(null);
     setDiscoveryFocus(focus);
     const briefingToUse = briefingOverride ?? briefing;
+    setLastScanArgs({ focus, briefing: briefingOverride });
+    const startedAt = Date.now();
     try {
       const r = await fetch(q('/api/opportunity/scans'), {
         method: 'POST',
@@ -277,6 +290,7 @@ export default function OpportunityDiscoverPage() {
         errorCount: 0,
         scanFocus: focus,
       });
+      setScanPercent(8);
 
       // Poll até completed / failed
       let attempts = 0;
@@ -288,17 +302,33 @@ export default function OpportunityDiscoverPage() {
         });
         const pRaw = await pr.text();
         let pd: {
-          run?: { status: string; created: number; discoveryMode?: string | null; errorCount?: number };
+          run?: {
+            status: string;
+            created: number;
+            discoveryMode?: string | null;
+            errorCount?: number;
+            progressPct?: number | null;
+            phase?: string | null;
+          };
           error?: string;
         } = {};
         try {
           pd = JSON.parse(pRaw) as typeof pd;
         } catch {
+          setScanPercent(estimateScanPercent(Date.now() - startedAt));
           continue;
         }
-        if (!pr.ok) continue;
+        if (!pr.ok) {
+          setScanPercent(estimateScanPercent(Date.now() - startedAt));
+          continue;
+        }
         const st = pd.run?.status;
+        setScanPercent(
+          estimateScanPercent(Date.now() - startedAt, pd.run?.progressPct ?? null),
+        );
         if (st === 'completed') {
+          setScanPercent(100);
+          setScanUi('done');
           const focusLabel =
             focus === 'open_now'
               ? t('Abertos agora', 'Abiertos ahora', 'Open now')
@@ -324,9 +354,9 @@ export default function OpportunityDiscoverPage() {
         if (attempts % 5 === 0) {
           setMsg(
             t(
-              `A pesquisar… (${attempts * 2}s)`,
-              `Buscando… (${attempts * 2}s)`,
-              `Searching… (${attempts * 2}s)`,
+              `A pesquisar… ${estimateScanPercent(Date.now() - startedAt, pd.run?.progressPct ?? null)}%`,
+              `Buscando… ${estimateScanPercent(Date.now() - startedAt, pd.run?.progressPct ?? null)}%`,
+              `Searching… ${estimateScanPercent(Date.now() - startedAt, pd.run?.progressPct ?? null)}%`,
             ),
           );
         }
@@ -334,11 +364,24 @@ export default function OpportunityDiscoverPage() {
 
       await Promise.all([loadScan(), loadCatalog()]);
       setTab('new');
+      setTimeout(() => {
+        setScanUi((s) => (s === 'done' ? 'idle' : s));
+        setScanPercent(0);
+      }, 1200);
     } catch (e) {
+      setScanUi('error');
       setMsg(e instanceof Error ? e.message : 'Erro');
     } finally {
       setScanning(false);
     }
+  };
+
+  const retryLastScan = () => {
+    if (!lastScanArgs) {
+      void startScan(discoveryFocus);
+      return;
+    }
+    void startScan(lastScanArgs.focus, lastScanArgs.briefing);
   };
 
   const validate = async (
@@ -477,8 +520,14 @@ export default function OpportunityDiscoverPage() {
             onClick={() => void startScan('open_now')}
             className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
           >
-            {scanning && discoveryFocus === 'open_now' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+            {(scanning || scanUi === 'error') && discoveryFocus === 'open_now' ? (
+              <ScanProgressRing
+                percent={scanPercent}
+                state={scanUi === 'error' ? 'error' : scanUi === 'done' ? 'done' : 'running'}
+                size={20}
+                tone="onDark"
+                onRetry={scanUi === 'error' ? retryLastScan : undefined}
+              />
             ) : (
               <Radar className="h-4 w-4" />
             )}
@@ -490,8 +539,13 @@ export default function OpportunityDiscoverPage() {
             onClick={() => void startScan('reference')}
             className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-900 hover:bg-violet-100 disabled:opacity-60"
           >
-            {scanning && discoveryFocus === 'reference' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+            {(scanning || scanUi === 'error') && discoveryFocus === 'reference' ? (
+              <ScanProgressRing
+                percent={scanPercent}
+                state={scanUi === 'error' ? 'error' : scanUi === 'done' ? 'done' : 'running'}
+                size={20}
+                onRetry={scanUi === 'error' ? retryLastScan : undefined}
+              />
             ) : (
               <Database className="h-4 w-4" />
             )}
@@ -501,7 +555,23 @@ export default function OpportunityDiscoverPage() {
       </div>
 
       {msg && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">{msg}</p>
+        <div
+          className={`flex flex-wrap items-center gap-3 rounded-lg border px-4 py-2 text-sm ${
+            scanUi === 'error'
+              ? 'border-red-200 bg-red-50 text-red-900'
+              : 'border-amber-200 bg-amber-50 text-amber-900'
+          }`}
+        >
+          {(scanning || scanUi === 'error' || scanUi === 'done') && (
+            <ScanProgressRing
+              percent={scanPercent}
+              state={scanUi === 'error' ? 'error' : scanUi === 'done' ? 'done' : 'running'}
+              size={28}
+              onRetry={scanUi === 'error' ? retryLastScan : undefined}
+            />
+          )}
+          <p className="min-w-0 flex-1">{msg}</p>
+        </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
@@ -622,10 +692,22 @@ export default function OpportunityDiscoverPage() {
               <button
                 type="button"
                 disabled={scanning}
-                onClick={() => void startScan(discoveryFocus)}
+                onClick={() => (scanUi === 'error' ? retryLastScan() : void startScan(discoveryFocus))}
                 className="mt-6 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
               >
-                {discoveryFocus === 'open_now' ? <Radar className="h-4 w-4" /> : <Database className="h-4 w-4" />}
+                {scanning || scanUi === 'error' ? (
+                  <ScanProgressRing
+                    percent={scanPercent}
+                    state={scanUi === 'error' ? 'error' : scanUi === 'done' ? 'done' : 'running'}
+                    size={22}
+                    tone="onDark"
+                    onRetry={scanUi === 'error' ? retryLastScan : undefined}
+                  />
+                ) : discoveryFocus === 'open_now' ? (
+                  <Radar className="h-4 w-4" />
+                ) : (
+                  <Database className="h-4 w-4" />
+                )}
                 {discoveryFocus === 'open_now'
                   ? t('Buscar abertos agora', 'Buscar abiertos', 'Find open calls')
                   : t('Mapear base de fundos', 'Mapear base', 'Map fund base')}
@@ -723,6 +805,9 @@ export default function OpportunityDiscoverPage() {
           <SearchCoachingPanel
             briefing={briefing}
             scanning={scanning}
+            scanPercent={scanPercent}
+            scanUi={scanUi}
+            onRetryScan={retryLastScan}
             onSaved={(next) =>
               setBriefing({
                 themes: next.themes ?? [],

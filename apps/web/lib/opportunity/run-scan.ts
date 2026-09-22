@@ -9,6 +9,19 @@ import { listUserMonitoredUrls } from '@/lib/opportunity/source-catalog';
 import { discoverOpportunitiesOnline } from '@/lib/opportunity/web-discovery';
 import type { OpportunityBriefing, ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
 
+async function setScanProgress(runId: string, progressPct: number, phase: string) {
+  const pct = Math.max(0, Math.min(99, Math.round(progressPct)));
+  await prisma.fundhubDiscoveryRun
+    .update({
+      where: { id: runId },
+      data: {
+        scanned: Math.max(1, Math.floor(pct / 10)),
+        errorsJson: JSON.stringify({ progressPct: pct, phase }),
+      },
+    })
+    .catch(() => {});
+}
+
 export async function runOpportunityScan(opts: {
   companyId: string;
   userId: string;
@@ -58,6 +71,7 @@ export async function runOpportunityScan(opts: {
   let optionalExtraContext = '';
   if (optionalUrls.length > 0) {
     try {
+      await setScanProgress(run.id, 12, 'fetching_portals');
       const { snippets } = await fetchSourceSnippets(optionalUrls);
       optionalExtraContext = snippetsToPromptBlock(snippets);
     } catch {
@@ -65,12 +79,15 @@ export async function runOpportunityScan(opts: {
     }
   }
 
+  await setScanProgress(run.id, 18, 'starting_discovery');
+
   const discovery = await discoverOpportunitiesOnline({
     briefing,
     learningContext,
     existingFunds,
     optionalExtraContext: optionalExtraContext || undefined,
     scanFocus,
+    onProgress: (pct, phase) => setScanProgress(run.id, pct, phase),
   });
 
   let candidates = discovery.candidates.filter(
