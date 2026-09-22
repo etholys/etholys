@@ -24,7 +24,6 @@ type HubEntry = {
   name: string;
   tagline: Record<Locale, string>;
   icon: ComponentType<{ className?: string }>;
-  accent: string;
   href: string;
   active: boolean;
   productTier?: 'advisor' | 'tool' | 'default';
@@ -40,7 +39,6 @@ const systems: HubEntry[] = [
       en: 'Alerts & priorities',
     },
     icon: BrainCircuit,
-    accent: '#7C3AED',
     href: '/hub/advisor',
     active: true,
     productTier: 'advisor',
@@ -54,7 +52,6 @@ const systems: HubEntry[] = [
       en: 'AI documents',
     },
     icon: PenLine,
-    accent: '#EA580C',
     href: '/hub/studio',
     active: true,
     productTier: 'tool',
@@ -68,7 +65,6 @@ const systems: HubEntry[] = [
       en: 'Team tasks',
     },
     icon: CheckSquare,
-    accent: '#0D9488',
     href: '/hub/work',
     active: true,
     productTier: 'tool',
@@ -82,7 +78,6 @@ const systems: HubEntry[] = [
       en: 'Meetings & video calls',
     },
     icon: Video,
-    accent: '#0284C7',
     href: '/hub/meet',
     active: true,
     productTier: 'tool',
@@ -96,7 +91,6 @@ const systems: HubEntry[] = [
       en: 'Governance & approvals',
     },
     icon: Scale,
-    accent: '#475569',
     href: '/hub/carta',
     active: true,
     productTier: 'tool',
@@ -110,7 +104,6 @@ const systems: HubEntry[] = [
       en: 'Home base — finance, people, operations',
     },
     icon: BarChart3,
-    accent: '#0D9488',
     href: '/dashboard',
     active: true,
   },
@@ -123,7 +116,6 @@ const systems: HubEntry[] = [
       en: 'Programs and project execution',
     },
     icon: Sprout,
-    accent: '#4F46E5',
     href: '/siep',
     active: true,
   },
@@ -136,7 +128,6 @@ const systems: HubEntry[] = [
       en: 'Funds, calls and proposals',
     },
     icon: HandCoins,
-    accent: '#D97706',
     href: '/hub/fundhub',
     active: true,
   },
@@ -149,7 +140,6 @@ const systems: HubEntry[] = [
       en: 'MSME development with AI',
     },
     icon: GraduationCap,
-    accent: '#2563EB',
     href: '/hub/nexus',
     active: true,
   },
@@ -162,7 +152,6 @@ const systems: HubEntry[] = [
       en: 'Learning, courses and games',
     },
     icon: Cpu,
-    accent: '#7C3AED',
     href: '/hub/forge',
     active: true,
   },
@@ -175,7 +164,6 @@ const systems: HubEntry[] = [
       en: 'Executive intelligence',
     },
     icon: Target,
-    accent: '#E11D48',
     href: '/hub/prism',
     active: true,
   },
@@ -289,7 +277,7 @@ export default function HubPage() {
 
   if (status === 'loading' || status === 'unauthenticated') {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] px-4">
+      <div className="etholys-hub-bg min-h-screen px-4">
         <StateLoading className="h-full" />
       </div>
     );
@@ -299,6 +287,15 @@ export default function HubPage() {
   const toolCards = systems.filter(isEtholysTool);
   const systemCards = systems.filter((sys) => !isEtholysTool(sys));
 
+  const tileOpen =
+    'group relative flex min-h-[4.25rem] items-center gap-4 rounded-2xl bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.05),0_10px_28px_-12px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/[0.05] transition duration-200 hover:-translate-y-0.5 hover:ring-teal-500/25 hover:shadow-[0_4px_16px_-4px_rgba(13,148,136,0.15),0_16px_40px_-16px_rgba(15,23,42,0.15)]';
+  const tileMuted =
+    'group flex min-h-[4.25rem] items-center gap-4 rounded-2xl bg-white/70 px-4 py-3.5 ring-1 ring-slate-900/[0.04]';
+  const iconShell =
+    'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0B1C24] text-teal-300/90 shadow-inner transition duration-200 group-hover:bg-[#0B1C24] group-hover:text-teal-200';
+  const iconShellMuted =
+    'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-400';
+
   const renderTile = (sys: HubEntry) => {
     const Icon = sys.icon;
     const cardAccess = resolveHubCardAccess(sys.id, sys.active, licensedSystems, {
@@ -307,29 +304,22 @@ export default function HubPage() {
       companyLicensedSystems,
     });
 
-    const baseClass =
-      'group flex h-full min-h-[4.5rem] items-center gap-3 border border-[#E2E8F0] bg-white px-4 py-3 transition';
-
     if (cardAccess === 'locked') {
       return (
-        <div key={sys.id} className={`${baseClass} opacity-70`}>
-          <span className="h-9 w-1 shrink-0 rounded-full" style={{ background: sys.accent, opacity: 0.35 }} />
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
-            style={{ background: `${sys.accent}14`, color: sys.accent, opacity: 0.55 }}
-          >
+        <div key={sys.id} className={`${tileMuted} opacity-80`}>
+          <div className={iconShellMuted}>
             <Icon className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <p className="truncate text-sm font-semibold text-slate-700">{sys.name}</p>
-              <Lock className="h-3 w-3 shrink-0 text-amber-600" />
+              <Lock className="h-3 w-3 shrink-0 text-amber-600/90" />
             </div>
-            <p className="truncate text-xs text-slate-400">{pickLocalized(sys.tagline, locale)}</p>
+            <p className="truncate text-xs text-slate-500">{pickLocalized(sys.tagline, locale)}</p>
           </div>
           <Link
             href={canManage ? `/hub/billing?sku=sys.${(sys.id || '').toUpperCase()}` : '/hub/admin'}
-            className="shrink-0 text-xs font-medium text-teal-700 hover:underline"
+            className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium text-teal-800 ring-1 ring-teal-600/20 transition hover:bg-teal-50"
           >
             {canManage
               ? t(locale, 'Licencia', 'Licença', 'License')
@@ -341,34 +331,24 @@ export default function HubPage() {
 
     if (cardAccess === 'open') {
       return (
-        <Link
-          key={sys.id}
-          href={sys.href}
-          className={`${baseClass} hover:border-slate-300 hover:bg-[#FAFBFC]`}
-        >
-          <span className="h-9 w-1 shrink-0 rounded-full" style={{ background: sys.accent }} />
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
-            style={{ background: `${sys.accent}18`, color: sys.accent }}
-          >
-            <Icon className="h-4 w-4" />
+        <Link key={sys.id} href={sys.href} className={tileOpen}>
+          <div className={iconShell}>
+            <Icon className="h-[1.125rem] w-[1.125rem]" strokeWidth={1.75} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-slate-900">{sys.name}</p>
-            <p className="truncate text-xs text-slate-500">{pickLocalized(sys.tagline, locale)}</p>
+            <p className="truncate font-[family-name:var(--font-etholys-display)] text-[0.9375rem] font-semibold tracking-tight text-[#0B1C24]">
+              {sys.name}
+            </p>
+            <p className="truncate text-xs leading-relaxed text-slate-500">{pickLocalized(sys.tagline, locale)}</p>
           </div>
-          <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500" />
+          <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-teal-600" />
         </Link>
       );
     }
 
     return (
-      <div key={sys.id} className={`${baseClass} opacity-50`}>
-        <span className="h-9 w-1 shrink-0 rounded-full" style={{ background: sys.accent, opacity: 0.3 }} />
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
-          style={{ background: `${sys.accent}12`, color: sys.accent, opacity: 0.5 }}
-        >
+      <div key={sys.id} className={`${tileMuted} opacity-55`}>
+        <div className={iconShellMuted}>
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
@@ -378,7 +358,7 @@ export default function HubPage() {
           </div>
           <p className="truncate text-xs text-slate-400">{pickLocalized(sys.tagline, locale)}</p>
         </div>
-        <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-400">
+        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-slate-400">
           {t(locale, 'Pronto', 'Em breve', 'Soon')}
         </span>
       </div>
@@ -386,15 +366,17 @@ export default function HubPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] text-slate-900">
-      <header className="sticky top-0 z-30 border-b border-[#E2E8F0] bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+    <div className="etholys-hub-bg min-h-screen text-slate-900">
+      <header className="sticky top-0 z-30 border-b border-slate-900/[0.06] bg-white/75 pt-[env(safe-area-inset-top)] shadow-[0_1px_0_rgba(255,255,255,0.8)_inset] backdrop-blur-xl">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3.5 sm:px-6">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#0B1C24]">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0B1C24] shadow-sm">
               <Layers className="h-4 w-4 text-teal-400" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-bold tracking-[0.12em] text-slate-900">ETHOLYS</p>
+              <p className="font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-[0.14em] text-[#0B1C24]">
+                ETHOLYS
+              </p>
             </div>
             <CompanyPicker
               companies={companies}
@@ -462,19 +444,22 @@ export default function HubPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
+        <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+            <h1 className="font-[family-name:var(--font-etholys-display)] text-2xl font-semibold tracking-tight text-[#0B1C24] sm:text-[1.75rem]">
               {t(locale, `Hola, ${firstName}`, `Olá, ${firstName}`, `Hello, ${firstName}`)}
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1.5 max-w-md text-sm leading-relaxed text-slate-600">
               {t(locale, 'Abra un sistema o una herramienta.', 'Abra um sistema ou uma ferramenta.', 'Open a system or a tool.')}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
             {canManage && setupNudge && (
-              <Link href="/hub/setup" className="font-medium text-teal-700 hover:underline">
+              <Link
+                href="/hub/setup"
+                className="rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-teal-800 ring-1 ring-teal-600/15 transition hover:bg-white"
+              >
                 {setupNudge === 'currency-mismatch'
                   ? t(locale, 'Actualizar perfil', 'Atualizar perfil', 'Update profile')
                   : t(locale, 'Completar perfil', 'Completar perfil', 'Complete profile')}
@@ -483,7 +468,7 @@ export default function HubPage() {
             {showIntegratedWorkspace && (
               <Link
                 href="/hub/workspace"
-                className="inline-flex items-center gap-1.5 font-medium text-slate-700 transition hover:text-teal-700"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-slate-900/8 transition hover:bg-white hover:text-[#0B1C24]"
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
                 {t(locale, 'Centro integrado', 'Centro integrado', 'Integrated workspace')}
@@ -492,7 +477,7 @@ export default function HubPage() {
             {showLabShortcut && (
               <Link
                 href="/lab"
-                className="inline-flex items-center gap-1.5 font-medium text-slate-500 transition hover:text-violet-700"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-900/8 transition hover:bg-white"
               >
                 <FlaskConical className="h-3.5 w-3.5" />
                 Lab
@@ -502,16 +487,11 @@ export default function HubPage() {
         </div>
 
         {systemCards.length > 0 && (
-          <section className="mb-8">
-            <div className="mb-3 flex items-baseline justify-between gap-3">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                {t(locale, 'Sistemas', 'Sistemas', 'Systems')}
-              </h2>
-              <p className="text-xs text-slate-400">
-                {t(locale, 'Productos licenciables', 'Produtos licenciáveis', 'Licensable products')}
-              </p>
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <section className="mb-10">
+            <h2 className="mb-4 font-[family-name:var(--font-etholys-display)] text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              {t(locale, 'Sistemas', 'Sistemas', 'Systems')}
+            </h2>
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {systemCards.map(renderTile)}
             </div>
           </section>
@@ -519,15 +499,10 @@ export default function HubPage() {
 
         {toolCards.length > 0 && (
           <section>
-            <div className="mb-3 flex items-baseline justify-between gap-3">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                Etholys Tools
-              </h2>
-              <p className="text-xs text-slate-400">
-                {t(locale, 'Herramientas transversales', 'Ferramentas transversais', 'Cross-cutting tools')}
-              </p>
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <h2 className="mb-4 font-[family-name:var(--font-etholys-display)] text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              Etholys Tools
+            </h2>
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {toolCards.map(renderTile)}
             </div>
           </section>
