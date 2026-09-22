@@ -52,6 +52,7 @@ export function markdownLiteToHtml(text: string): string {
   const lines = (text || '').split(/\r?\n/);
   const out: string[] = [];
   let listBuf: string[] = [];
+  let olBuf: string[] = [];
 
   const flushList = () => {
     if (!listBuf.length) return;
@@ -59,16 +60,32 @@ export function markdownLiteToHtml(text: string): string {
     listBuf = [];
   };
 
+  const flushOl = () => {
+    if (!olBuf.length) return;
+    out.push(`<ol>${olBuf.map((i) => `<li>${inline(i)}</li>`).join('')}</ol>`);
+    olBuf = [];
+  };
+
+  const flushAllLists = () => {
+    flushList();
+    flushOl();
+  };
+
   for (const raw of lines) {
     const line = raw.trimEnd();
     const t = line.trim();
     if (!t) {
-      flushList();
+      flushAllLists();
       out.push('<p>&nbsp;</p>');
       continue;
     }
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(t)) {
+      flushAllLists();
+      out.push('<hr/>');
+      continue;
+    }
     if (/^#{1,3}\s+/.test(t)) {
-      flushList();
+      flushAllLists();
       const level = (t.match(/^#+/)?.[0].length || 1) as 1 | 2 | 3;
       const body = t.replace(/^#{1,3}\s+/, '');
       const tag = level === 1 ? 'h2' : level === 2 ? 'h3' : 'h4';
@@ -76,13 +93,19 @@ export function markdownLiteToHtml(text: string): string {
       continue;
     }
     if (/^[-*•]\s+/.test(t)) {
+      flushOl();
       listBuf.push(t.replace(/^[-*•]\s+/, ''));
       continue;
     }
-    flushList();
+    if (/^\d+\.\s+/.test(t)) {
+      flushList();
+      olBuf.push(t.replace(/^\d+\.\s+/, ''));
+      continue;
+    }
+    flushAllLists();
     out.push(`<p>${inline(t)}</p>`);
   }
-  flushList();
+  flushAllLists();
   return out.join('\n') || '<p>&nbsp;</p>';
 }
 
@@ -152,6 +175,7 @@ export function StudioMarkdown({
   const lines = raw.split(/\r?\n/);
   const nodes: ReactNode[] = [];
   let listItems: string[] = [];
+  let olItems: string[] = [];
 
   const flushList = (keyBase: number) => {
     if (!listItems.length) return;
@@ -165,15 +189,37 @@ export function StudioMarkdown({
     listItems = [];
   };
 
+  const flushOl = (keyBase: number) => {
+    if (!olItems.length) return;
+    nodes.push(
+      <ol key={`ol-${keyBase}`} className="my-2 list-decimal space-y-1 pl-5">
+        {olItems.map((item, j) => (
+          <li key={j}>{renderInlineMarkdown(item)}</li>
+        ))}
+      </ol>,
+    );
+    olItems = [];
+  };
+
+  const flushAllLists = (keyBase: number) => {
+    flushList(keyBase);
+    flushOl(keyBase);
+  };
+
   lines.forEach((line, i) => {
     const t = line.trim();
     if (!t) {
-      flushList(i);
+      flushAllLists(i);
       nodes.push(<div key={`sp-${i}`} className="h-2" />);
       return;
     }
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(t)) {
+      flushAllLists(i);
+      nodes.push(<hr key={i} className="my-3 border-gray-200" />);
+      return;
+    }
     if (/^###\s+/.test(t)) {
-      flushList(i);
+      flushAllLists(i);
       nodes.push(
         <h4 key={i} className="mt-3 text-base font-bold text-slate-800">
           {renderInlineMarkdown(t.slice(4))}
@@ -182,7 +228,7 @@ export function StudioMarkdown({
       return;
     }
     if (/^##\s+/.test(t)) {
-      flushList(i);
+      flushAllLists(i);
       nodes.push(
         <h3 key={i} className="mt-4 text-lg font-bold text-slate-900">
           {renderInlineMarkdown(t.slice(3))}
@@ -191,7 +237,7 @@ export function StudioMarkdown({
       return;
     }
     if (/^#\s+/.test(t)) {
-      flushList(i);
+      flushAllLists(i);
       nodes.push(
         <h2 key={i} className="mt-4 text-xl font-bold text-slate-900">
           {renderInlineMarkdown(t.slice(2))}
@@ -200,17 +246,23 @@ export function StudioMarkdown({
       return;
     }
     if (/^[-*•]\s+/.test(t)) {
+      flushOl(i);
       listItems.push(t.replace(/^[-*•]\s+/, ''));
       return;
     }
-    flushList(i);
+    if (/^\d+\.\s+/.test(t)) {
+      flushList(i);
+      olItems.push(t.replace(/^\d+\.\s+/, ''));
+      return;
+    }
+    flushAllLists(i);
     nodes.push(
       <p key={i} className="text-[15px] leading-[1.7] text-slate-800">
         {renderInlineMarkdown(t)}
       </p>,
     );
   });
-  flushList(lines.length);
+  flushAllLists(lines.length);
 
   return <div className={`space-y-0.5 ${className || ''}`}>{nodes}</div>;
 }

@@ -1,3 +1,5 @@
+import { markdownLiteToHtml } from '@/lib/studio/markdown-lite';
+
 /** Gera um .doc compatível com Word a partir de HTML (sem dependência extra). */
 export function buildCandidateWordHtml(opts: {
   title: string;
@@ -13,9 +15,7 @@ export function buildCandidateWordHtml(opts: {
     .map(([k, v]) => `<tr><td><b>${escape(k)}</b></td><td>${escape(v!)}</td></tr>`)
     .join('');
 
-  const bodyHtml = escape(opts.bodyMarkdownish)
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br/>');
+  const bodyHtml = markdownLiteToHtml(opts.bodyMarkdownish);
 
   const html = `<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office"
@@ -36,7 +36,7 @@ td{border:1px solid #ccc;padding:6px 10px;vertical-align:top}
 <p class="muted">${escape(opts.institution)} — resumo OPPORTUNITY / Etholys</p>
 <table>${metaRows}</table>
 <h2>Análise</h2>
-<p>${bodyHtml}</p>
+<div>${bodyHtml}</div>
 </body></html>`;
 
   return new Blob(['\ufeff', html], {

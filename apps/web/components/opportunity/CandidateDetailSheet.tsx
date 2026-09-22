@@ -10,6 +10,7 @@ import {
   formatDateShort,
 } from '@/lib/opportunity/availability';
 import { buildCandidateWordHtml, downloadBlob } from '@/lib/opportunity/candidate-export';
+import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import type { ScanCandidate } from '@/lib/opportunity/scan-types';
 import {
   Bookmark,
@@ -297,7 +298,9 @@ export function CandidateDetailSheet({
                   <p className="text-[10px] font-semibold uppercase text-amber-900">
                     {t('Resumo executivo (IA)', 'Resumen ejecutivo (IA)', 'Executive brief (AI)')}
                   </p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-gray-800">{brief}</p>
+                  <div className="mt-2 text-sm text-gray-800 [&_h2]:text-base [&_h3]:text-sm [&_h4]:text-sm [&_p]:text-sm">
+                    <StudioMarkdown text={brief} />
+                  </div>
                 </div>
               )}
             </div>
@@ -351,7 +354,13 @@ export function CandidateDetailSheet({
                       m.role === 'user' ? 'ml-8 bg-white text-gray-900' : 'mr-4 bg-amber-50 text-gray-800'
                     }`}
                   >
-                    <p className="whitespace-pre-wrap">{m.content}</p>
+                    {m.role === 'assistant' ? (
+                      <div className="[&_h2]:text-base [&_h3]:text-sm [&_h4]:text-sm [&_p]:text-sm">
+                        <StudioMarkdown text={m.content} />
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{m.content}</p>
+                    )}
                   </div>
                 ))}
                 {asking && (
