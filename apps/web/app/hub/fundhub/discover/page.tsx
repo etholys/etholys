@@ -54,6 +54,11 @@ type ScanCandidate = {
   type: string;
   category?: string;
   description?: string;
+  whoCanApply?: string;
+  eligibility?: string;
+  requirements?: string;
+  howToApply?: string;
+  risksCaveats?: string;
   linkOficial?: string;
   amount?: number;
   currency?: string;

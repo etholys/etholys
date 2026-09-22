@@ -157,6 +157,11 @@ export function CandidateDetailSheet({
           c.amount != null ? `${c.amount.toLocaleString()} ${c.currency ?? 'USD'}` : undefined,
         Janela: [opensLabel, closesLabel].filter(Boolean).join(' → ') || c.applicationWindow,
         Países: countries,
+        'Quem pode candidatar': c.whoCanApply,
+        Elegibilidade: c.eligibility,
+        Requisitos: c.requirements,
+        'Como candidatar': c.howToApply,
+        Avisos: c.risksCaveats,
         Link: c.linkOficial,
         Match: c.matchScore != null ? `${Math.round(c.matchScore)}%` : undefined,
       },
@@ -271,9 +276,68 @@ export function CandidateDetailSheet({
                   <p className="text-[10px] font-semibold uppercase text-gray-500">
                     {t('Descrição', 'Descripción', 'Description')}
                   </p>
-                  <p className="mt-1 whitespace-pre-wrap text-gray-800">{c.description}</p>
+                  <p className="mt-1 whitespace-pre-wrap leading-relaxed text-gray-800">
+                    {c.description}
+                  </p>
                 </div>
               )}
+
+              {(c.whoCanApply || c.eligibility || c.requirements) && (
+                <div className="rounded-lg border border-gray-100 bg-slate-50/80 px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                    {t(
+                      'Resumo de requisitos / elegibilidade',
+                      'Resumen de requisitos / elegibilidad',
+                      'Requirements / eligibility summary',
+                    )}
+                  </p>
+                  <div className="mt-2 space-y-3">
+                    {c.whoCanApply && (
+                      <div>
+                        <p className="text-[11px] font-semibold text-slate-700">
+                          {t('Quem pode candidatar', 'Quién puede postular', 'Who can apply')}
+                        </p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-gray-800">{c.whoCanApply}</p>
+                      </div>
+                    )}
+                    {c.eligibility && (
+                      <div>
+                        <p className="text-[11px] font-semibold text-slate-700">
+                          {t('Elegibilidade', 'Elegibilidad', 'Eligibility')}
+                        </p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-gray-800">{c.eligibility}</p>
+                      </div>
+                    )}
+                    {c.requirements && (
+                      <div>
+                        <p className="text-[11px] font-semibold text-slate-700">
+                          {t('Requisitos-chave', 'Requisitos clave', 'Key requirements')}
+                        </p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-gray-800">{c.requirements}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {c.howToApply && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase text-gray-500">
+                    {t('Como candidatar', 'Cómo postular', 'How to apply')}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-gray-800">{c.howToApply}</p>
+                </div>
+              )}
+
+              {c.risksCaveats && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase text-amber-800/80">
+                    {t('Riscos / avisos', 'Riesgos / avisos', 'Risks / caveats')}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-gray-700">{c.risksCaveats}</p>
+                </div>
+              )}
+
               {c.matchJustification && (
                 <div>
                   <p className="text-[10px] font-semibold uppercase text-gray-500">

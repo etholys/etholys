@@ -44,7 +44,18 @@ export type ScanCandidate = {
   institution: string;
   type: string;
   category?: string;
+  /** Resumo substantivo (2–4 parágrafos) — o que financia e contexto operacional. */
   description?: string;
+  /** Quem pode candidatar (tipo de org, privado/público, consórcios…). */
+  whoCanApply?: string;
+  /** Critérios de elegibilidade-chave (geografia, porte, cofinanciamento…). */
+  eligibility?: string;
+  /** Requisitos operacionais (documentos, match %, idioma, regras). */
+  requirements?: string;
+  /** Como candidatar / próximos passos se conhecidos. */
+  howToApply?: string;
+  /** Riscos, contrapartidas ou incertezas — sem inventar. */
+  risksCaveats?: string;
   linkOficial?: string;
   amount?: number;
   currency?: string;

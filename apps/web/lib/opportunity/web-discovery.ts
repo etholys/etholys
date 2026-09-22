@@ -54,6 +54,19 @@ function isWebSearchEnabled(): boolean {
   );
 }
 
+/** Regras partilhadas: descrições úteis para decisão, não marketing. */
+const CANDIDATE_CONTENT_RULES = `CANDIDATE CONTENT (critical — decision support, not marketing):
+Extract from OFFICIAL funder pages when possible. If uncertain, write clearly e.g. "Não confirmado na fonte oficial — verificar no link" — NEVER invent eligibility, amounts, or deadlines.
+
+Each candidate MUST fill these fields (Portuguese preferred unless briefing is in another language):
+- description: 2–4 SUBSTANTIVE paragraphs. Explain what the call/program funds, thematic/sector focus, geographic scope, and operational context. Dates/amounts/topic codes belong as supporting detail inside the narrative — never as a one-line blurb alone. Thin marketing slogans are forbidden.
+- whoCanApply: who may apply (org types: private company, NGO, university, public body, consortium; nationality / establishment rules).
+- eligibility: key eligibility criteria (size, co-funding %, prior experience, geography, sector exclusions).
+- requirements: mandatory docs, consortium rules, language, match funding, reporting burdens if known.
+- howToApply: portal/steps/next actions if known from the source; otherwise say to verify on the official page.
+- risksCaveats: co-financing burden, short windows, restricted beneficiaries, or unknowns.
+- Also: closesAt, opensAt, amount, currency, eligibleCountries, applicationWindow when known.`;
+
 function promptsForFocus(scanFocus: ScanFocus) {
   const today = todayIso();
 
@@ -67,19 +80,25 @@ CRITICAL RULES:
 - Prefer official funder pages for linkOficial; if found only on aggregators, still INCLUDE the opportunity but leave linkOficial empty (never put aggregator URL in linkOficial).
 - Generic web search is valuable — use it; then try to resolve the official call URL.
 - EXCLUDE: expired calls, closed windows, generic program homepages WITHOUT an active open call.
-- For each item: closesAt, opensAt, eligibleCountries, classification (direct|client_bridge|joint), classificationNote.
+- For each item gather: closesAt, opensAt, eligibleCountries, classification (direct|client_bridge|joint), classificationNote, PLUS full operational content (what it funds, who can apply, eligibility, requirements, how to apply, risks).
 - Search broadly AND with site: filters for official portals.
 - Minimum 6 opportunities when possible; fewer is OK if strict quality.
+
+${CANDIDATE_CONTENT_RULES}
 
 ${OFFICIAL_LINK_PROMPT_RULES}`,
       structure: `Convert the research into JSON only. Return { "candidates": [ ... ] }
 Each item MUST include:
-name, institution, type (Grant|Crédito|Aliança|Técnico local), category, description,
+name, institution, type (Grant|Crédito|Aliança|Técnico local), category,
+description (2–4 substantive paragraphs — see content rules),
+whoCanApply, eligibility, requirements, howToApply, risksCaveats,
 linkOficial (OFFICIAL funder URL only — never aggregators; omit if unknown), amount, currency,
 opensAt, closesAt, applicationWindow, eligibleCountries,
 availabilityStatus ("open_now" or "rolling"),
 availabilityNote, classification (direct|client_bridge|joint), classificationNote,
 matchScore (0-100), matchJustification, sourceUrl (official only if present).
+
+${CANDIDATE_CONTENT_RULES}
 ${OFFICIAL_LINK_PROMPT_RULES}
 Respect ORIENTAÇÃO COMPLETA (amount caps, grant-only, private eligibility, countries).
 Skip EXISTING duplicates.`,
@@ -97,17 +116,24 @@ Include:
 - Major multilateral/bilateral frameworks the organization should track
 - Programs that existed and may reopen
 
-For each: name, institution, type, eligible countries, typical application windows, last known status, official URL, availabilityStatus (seasonal|rolling|closed|reference), when it typically opens.
+For each: name, institution, type, eligible countries, typical application windows, last known status, official URL, availabilityStatus (seasonal|rolling|closed|reference), when it typically opens — PLUS what it funds, who can apply, eligibility, requirements, how to apply, risks.
 
 This feeds an intelligence base — accuracy over quantity. Minimum 8 programs.
 
+${CANDIDATE_CONTENT_RULES}
+
 ${OFFICIAL_LINK_PROMPT_RULES}`,
     structure: `Convert the research into JSON only. Return { "candidates": [ ... ] }
-Each item: name, institution, type, category, description, linkOficial (official program page on funder domain),
+Each item: name, institution, type, category,
+description (2–4 substantive paragraphs),
+whoCanApply, eligibility, requirements, howToApply, risksCaveats,
+linkOficial (official program page on funder domain),
 amount, currency, opensAt, closesAt, applicationWindow, eligibleCountries,
 availabilityStatus (seasonal|rolling|closed|reference — NOT open_now unless verified open),
 availabilityNote (typical windows, last call date, reopening hints),
 matchScore, matchJustification, sourceUrl (official only).
+
+${CANDIDATE_CONTENT_RULES}
 ${OFFICIAL_LINK_PROMPT_RULES}
 Do not invent URLs. Skip EXISTING duplicates. Omit linkOficial if only aggregator URL found.`,
   };

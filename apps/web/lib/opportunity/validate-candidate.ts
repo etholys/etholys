@@ -132,8 +132,14 @@ async function upsertFundFromCandidate(
   const closesAt = c.closesAt ?? c.deadline;
   const countries = c.eligibleCountries ?? c.countries ?? null;
   const links = sanitizeFundingLinks(c.linkOficial, c.sourceUrl);
+  const eligibilityCriteria =
+    [c.whoCanApply, c.eligibility, c.requirements].filter(Boolean).join('\n\n') ||
+    c.applicationWindow ||
+    null;
   const noteParts = [
     c.applicationWindow ? `Janela: ${c.applicationWindow}` : '',
+    c.howToApply ? `Candidatura: ${c.howToApply}` : '',
+    c.risksCaveats ? `Avisos: ${c.risksCaveats}` : '',
     c.availabilityNote ? c.availabilityNote : '',
     c.opensAt ? `Abre: ${c.opensAt}` : '',
   ].filter(Boolean);
@@ -154,7 +160,7 @@ async function upsertFundFromCandidate(
     matchScore: c.matchScore ?? null,
     matchJustification: c.matchJustification ?? null,
     sourceOfInformation: links.sourceUrl ?? links.linkOficial ?? null,
-    eligibilityCriteria: c.applicationWindow ?? null,
+    eligibilityCriteria,
     notes: noteParts.length ? noteParts.join(' · ') : null,
     lastReviewedAt: new Date(),
   };

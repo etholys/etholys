@@ -110,6 +110,9 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
       availabilityNote = availabilityNote ? `${rejectNote} ${availabilityNote}` : rejectNote;
     }
 
+    const clip = (v: unknown, max: number): string | undefined =>
+      typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined;
+
     // Nunca mostrar link de agregador; candidata sem link oficial mantém-se (pesquisa genérica).
     // open_now já não descarta — cobrir tudo; o utilizador valida.
     out.push({
@@ -118,7 +121,12 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
       institution: institution.slice(0, 200),
       type: typeof o.type === 'string' ? o.type.slice(0, 80) : 'Grant',
       category: typeof o.category === 'string' ? o.category.slice(0, 120) : undefined,
-      description: typeof o.description === 'string' ? o.description.slice(0, 2000) : undefined,
+      description: clip(o.description, 4500),
+      whoCanApply: clip(o.whoCanApply, 1200),
+      eligibility: clip(o.eligibility, 1500),
+      requirements: clip(o.requirements, 1500),
+      howToApply: clip(o.howToApply, 1200),
+      risksCaveats: clip(o.risksCaveats, 1200),
       linkOficial: links.linkOficial,
       amount: typeof o.amount === 'number' ? o.amount : undefined,
       currency: typeof o.currency === 'string' ? o.currency.slice(0, 8) : 'USD',

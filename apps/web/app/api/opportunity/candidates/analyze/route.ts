@@ -15,6 +15,11 @@ function candidateBrief(c: ScanCandidate): string {
     `Tipo: ${c.type}`,
     c.category ? `Categoria: ${c.category}` : '',
     c.description ? `Descrição: ${c.description}` : '',
+    c.whoCanApply ? `Quem pode candidatar: ${c.whoCanApply}` : '',
+    c.eligibility ? `Elegibilidade: ${c.eligibility}` : '',
+    c.requirements ? `Requisitos: ${c.requirements}` : '',
+    c.howToApply ? `Como candidatar: ${c.howToApply}` : '',
+    c.risksCaveats ? `Riscos / avisos: ${c.risksCaveats}` : '',
     c.amount != null ? `Montante: ${c.amount} ${c.currency ?? 'USD'}` : '',
     c.opensAt || c.closesAt || c.deadline
       ? `Janela: ${c.opensAt ?? '?'} → ${c.closesAt ?? c.deadline ?? '?'}`
