@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
 import { StateEmpty, StateLoading } from '@/components/ui/StateBlocks';
+import { CandidateDetailSheet } from '@/components/opportunity/CandidateDetailSheet';
 import { DeadlineAlertsPanel } from '@/components/opportunity/DeadlineAlertsPanel';
 import { KnownFundsPanel } from '@/components/opportunity/KnownFundsPanel';
 import { SearchCoachingPanel } from '@/components/opportunity/SearchCoachingPanel';
@@ -15,20 +16,18 @@ import {
 } from '@/lib/opportunity/availability';
 import type { AvailabilityStatus, ScanFocus } from '@/lib/opportunity/scan-types';
 import {
-  AlertCircle,
   ArrowLeft,
-  Bookmark,
   CalendarDays,
-  Check,
-  Clock,
+  ChevronRight,
   Database,
+  ExternalLink,
   History,
   Loader2,
   MapPin,
+  MessageSquare,
   Radar,
   Search,
   Settings2,
-  ThumbsDown,
   X,
 } from 'lucide-react';
 
@@ -134,6 +133,13 @@ export default function OpportunityDiscoverPage() {
   const [scanning, setScanning] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [detail, setDetail] = useState<ScanCandidate | null>(null);
+  const [detailTab, setDetailTab] = useState<'overview' | 'analyze'>('overview');
+
+  const openDetail = (c: ScanCandidate, tab: 'overview' | 'analyze' = 'overview') => {
+    setDetailTab(tab);
+    setDetail(c);
+  };
 
   const q = (path: string) =>
     `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
@@ -627,9 +633,8 @@ export default function OpportunityDiscoverPage() {
               <CandidateCard
                 key={c.tempId}
                 candidate={c}
-                busy={busyId === c.tempId}
                 locale={locale}
-                onFeedback={(action, opts) => void validate(c.tempId, action, opts)}
+                onOpen={(openTab) => openDetail(c, openTab)}
                 t={t}
               />
             ))}
@@ -642,9 +647,8 @@ export default function OpportunityDiscoverPage() {
                 <CandidateCard
                   key={c.tempId}
                   candidate={c}
-                  busy={busyId === c.tempId}
                   locale={locale}
-                  onFeedback={(action, opts) => void validate(c.tempId, action, opts)}
+                  onOpen={(openTab) => openDetail(c, openTab)}
                   t={t}
                 />
               ))
@@ -749,6 +753,20 @@ export default function OpportunityDiscoverPage() {
         </aside>
       </div>
 
+      {detail && (
+        <CandidateDetailSheet
+          candidate={detail}
+          runId={latest?.id}
+          open
+          initialTab={detailTab}
+          busy={busyId === detail.tempId}
+          onClose={() => setDetail(null)}
+          onFeedback={(action, opts) => {
+            void validate(detail.tempId, action, opts).then(() => setDetail(null));
+          }}
+        />
+      )}
+
       {briefingOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
@@ -852,264 +870,128 @@ export default function OpportunityDiscoverPage() {
 
 function CandidateCard({
   candidate: c,
-  busy,
   locale,
-  onFeedback,
+  onOpen,
   t,
 }: {
   candidate: ScanCandidate;
-  busy: boolean;
   locale: string;
-  onFeedback: (
-    action: 'save' | 'not_now' | 'reject_type',
-    opts?: { reasons?: string[]; note?: string },
-  ) => void;
+  onOpen: (tab?: 'overview' | 'analyze') => void;
   t: (pt: string, es: string, en: string) => string;
 }) {
-  const [panel, setPanel] = useState<'save' | 'reject' | null>(null);
-  const [reasons, setReasons] = useState<string[]>([]);
-  const [note, setNote] = useState('');
-
   const countries = c.eligibleCountries ?? c.countries;
   const closes = c.closesAt ?? c.deadline;
   const opensLabel = formatDateShort(c.opensAt, locale);
   const closesLabel = formatDateShort(closes, locale);
   const status = c.availabilityStatus;
-  const showClosedWarning =
-    status === 'closed' || status === 'reference' || status === 'seasonal';
+  const host = (() => {
+    if (!c.linkOficial) return null;
+    try {
+      return new URL(c.linkOficial).hostname.replace(/^www\./, '');
+    } catch {
+      return null;
+    }
+  })();
 
-  const likeOpts = [
-    { id: 'more_like_this', pt: 'Mais assim', es: 'Más así', en: 'More like this' },
-    { id: 'theme_fit', pt: 'Tema certo', es: 'Tema correcto', en: 'Right theme' },
-    { id: 'size_fit', pt: 'Montante certo', es: 'Monto correcto', en: 'Right size' },
-    { id: 'geography_fit', pt: 'Geografia certa', es: 'Geografía correcta', en: 'Right geography' },
-    { id: 'instrument_fit', pt: 'Grant / instrumento', es: 'Grant / instrumento', en: 'Grant / instrument' },
-  ];
-  const rejectOpts = [
-    { id: 'loan_not_grant', pt: 'É empréstimo', es: 'Es préstamo', en: 'It is a loan' },
-    { id: 'amount_wrong', pt: 'Montante errado', es: 'Monto incorrecto', en: 'Wrong amount' },
-    { id: 'geography', pt: 'Geografia', es: 'Geografía', en: 'Geography' },
-    { id: 'theme', pt: 'Tema / sector', es: 'Tema / sector', en: 'Theme / sector' },
-    { id: 'eligibility', pt: 'Não elegíveis', es: 'No elegibles', en: 'Not eligible' },
-    { id: 'closed_or_stale', pt: 'Fechado / desactualizado', es: 'Cerrado / obsoleto', en: 'Closed / stale' },
-    { id: 'low_quality', pt: 'Má qualidade', es: 'Mala calidad', en: 'Low quality' },
-    { id: 'other', pt: 'Outro', es: 'Otro', en: 'Other' },
-  ];
+  const dateLine =
+    opensLabel && closesLabel
+      ? `${opensLabel} → ${closesLabel}`
+      : closesLabel || opensLabel || c.applicationWindow || null;
 
-  const toggleReason = (id: string) =>
-    setReasons((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-
-  const submitPanel = () => {
-    if (!panel) return;
-    onFeedback(panel === 'save' ? 'save' : 'reject_type', {
-      reasons: reasons.length ? reasons : panel === 'save' ? ['more_like_this'] : ['other'],
-      note: note.trim() || undefined,
-    });
-    setPanel(null);
-    setReasons([]);
-    setNote('');
-  };
+  const countryShort =
+    countries && countries.length > 48 ? `${countries.slice(0, 48).trim()}…` : countries;
 
   return (
-    <article className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <article className="group rounded-xl border border-gray-200 bg-white shadow-sm transition hover:border-amber-300 hover:shadow-md">
+      <button
+        type="button"
+        onClick={() => onOpen('overview')}
+        className="flex w-full items-start gap-3 px-4 py-3 text-left"
+      >
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {status && (
               <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${availabilityBadgeClass(status)}`}
+                className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${availabilityBadgeClass(status)}`}
               >
                 {availabilityLabel(status, locale)}
               </span>
             )}
-            {c.classification && (
-              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-900">
-                {c.classification === 'direct'
-                  ? t('Directo', 'Directo', 'Direct')
-                  : c.classification === 'client_bridge'
-                    ? t('Ponte cliente', 'Puente cliente', 'Client bridge')
-                    : t('Conjunto', 'Conjunto', 'Joint')}
-              </span>
-            )}
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+            <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-700">
               {c.type}
             </span>
             {c.category && (
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-900">{c.category}</span>
-            )}
-          </div>
-          <h3 className="mt-2 font-semibold text-gray-900">{c.name}</h3>
-          <p className="text-sm text-gray-600">{c.institution}</p>
-
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
-            {(opensLabel || closesLabel || c.applicationWindow) && (
-              <span className="inline-flex items-center gap-1">
-                <CalendarDays className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                {opensLabel && closesLabel
-                  ? `${opensLabel} → ${closesLabel}`
-                  : closesLabel
-                    ? `${t('Fecha', 'Cierra', 'Closes')}: ${closesLabel}`
-                    : opensLabel
-                      ? `${t('Abre', 'Abre', 'Opens')}: ${opensLabel}`
-                      : c.applicationWindow}
+              <span className="max-w-[14rem] truncate rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-900">
+                {c.category}
               </span>
             )}
-            {countries && (
-              <span className="inline-flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                {countries}
+            {c.classification && (
+              <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-900">
+                {c.classification === 'direct'
+                  ? t('Directo', 'Directo', 'Direct')
+                  : c.classification === 'client_bridge'
+                    ? t('Ponte', 'Puente', 'Bridge')
+                    : t('Conjunto', 'Conjunto', 'Joint')}
               </span>
             )}
           </div>
-
-          {c.description && <p className="mt-2 text-sm text-gray-700 line-clamp-2">{c.description}</p>}
-          {c.matchJustification && (
-            <p className="mt-2 text-xs text-gray-500">{c.matchJustification}</p>
-          )}
-          {showClosedWarning && c.scanFocus === 'open_now' && (
-            <p className="mt-2 flex items-start gap-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              {t(
-                'Verifique o link — pode não haver convocatória activa neste momento.',
-                'Verifique el enlace — puede no haber convocatoria activa.',
-                'Check the link — there may be no active call right now.',
-              )}
-            </p>
-          )}
+          <h3 className="mt-1.5 line-clamp-1 text-sm font-semibold text-gray-900 group-hover:text-amber-900">
+            {c.name}
+          </h3>
+          <p className="line-clamp-1 text-xs text-gray-600">{c.institution}</p>
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
+            {dateLine && (
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays className="h-3 w-3 shrink-0" />
+                {dateLine}
+              </span>
+            )}
+            {countryShort && (
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="h-3 w-3 shrink-0" />
+                {countryShort}
+              </span>
+            )}
+            {host && (
+              <span className="inline-flex items-center gap-1 text-gray-400">
+                <ExternalLink className="h-3 w-3 shrink-0" />
+                {host}
+              </span>
+            )}
+          </div>
         </div>
-        {c.matchScore != null && (
-          <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-bold text-emerald-800">
-            {Math.round(c.matchScore)}%
-          </span>
-        )}
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          {c.matchScore != null && (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
+              {Math.round(c.matchScore)}%
+            </span>
+          )}
+          <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-amber-600" />
+        </div>
+      </button>
+      <div className="flex flex-wrap gap-1.5 border-t border-gray-100 px-3 py-2">
         <button
           type="button"
-          disabled={busy}
-          onClick={() => {
-            setPanel('save');
-            setReasons(['more_like_this']);
-            setNote('');
-          }}
-          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+          onClick={() => onOpen('analyze')}
+          className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-900 hover:bg-amber-100"
         >
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-          {t('Guardar + aprender', 'Guardar + aprender', 'Save + learn')}
+          <MessageSquare className="h-3 w-3" />
+          {t('Analisar', 'Analizar', 'Analyze')}
         </button>
         <button
           type="button"
-          disabled={busy}
-          onClick={() => onFeedback('not_now')}
-          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          onClick={() => onOpen('overview')}
+          className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
         >
-          <Clock className="h-3.5 w-3.5" />
-          {t('Não agora', 'No ahora', 'Not now')}
+          {t('Ver detalhes', 'Ver detalles', 'View details')}
+          <ChevronRight className="h-3 w-3" />
         </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => {
-            setPanel('reject');
-            setReasons([]);
-            setNote('');
-          }}
-          className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100 disabled:opacity-50"
-        >
-          <ThumbsDown className="h-3.5 w-3.5" />
-          {t('Evitar este tipo', 'Evitar este tipo', 'Avoid this type')}
-        </button>
-        {c.linkOficial ? (
-          <a
-            href={c.linkOficial}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-          >
-            <Bookmark className="h-3.5 w-3.5" />
-            {(() => {
-              try {
-                return new URL(c.linkOficial).hostname.replace(/^www\./, '');
-              } catch {
-                return t('Link oficial', 'Enlace oficial', 'Official link');
-              }
-            })()}
-          </a>
-        ) : (
-          <span className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800">
-            <AlertCircle className="h-3.5 w-3.5" />
+        {!c.linkOficial && (
+          <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-[11px] text-red-800">
             {t('Sem link oficial', 'Sin enlace oficial', 'No official link')}
           </span>
         )}
       </div>
-
-      {panel && (
-        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <p className="text-xs font-semibold text-gray-800">
-            {panel === 'save'
-              ? t(
-                  'Porquê guardar? (ensina a IA a buscar mais assim)',
-                  '¿Por qué guardar? (enseña a la IA)',
-                  'Why save? (teaches AI to find more like this)',
-                )
-              : t(
-                  'Porquê evitar este tipo? (não é só “nesta ocasião”)',
-                  '¿Por qué evitar este tipo? (no es solo “esta ocasión”)',
-                  'Why avoid this type? (not just this occasion)',
-                )}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {(panel === 'save' ? likeOpts : rejectOpts).map((o) => {
-              const on = reasons.includes(o.id);
-              return (
-                <button
-                  key={o.id}
-                  type="button"
-                  onClick={() => toggleReason(o.id)}
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${
-                    on
-                      ? panel === 'save'
-                        ? 'bg-emerald-700 text-white'
-                        : 'bg-red-700 text-white'
-                      : 'border border-gray-200 bg-white text-gray-700'
-                  }`}
-                >
-                  {locale === 'pt' ? o.pt : locale === 'es' ? o.es : o.en}
-                </button>
-              );
-            })}
-          </div>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={2}
-            placeholder={t('Nota opcional…', 'Nota opcional…', 'Optional note…')}
-            className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs"
-          />
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={submitPanel}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold text-white ${
-                panel === 'save' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-700 hover:bg-red-800'
-              }`}
-            >
-              {panel === 'save'
-                ? t('Confirmar e aprender', 'Confirmar y aprender', 'Confirm & learn')
-                : t('Confirmar rejeição de tipo', 'Confirmar rechazo de tipo', 'Confirm type reject')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setPanel(null)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600"
-            >
-              {t('Cancelar', 'Cancelar', 'Cancel')}
-            </button>
-          </div>
-        </div>
-      )}
     </article>
   );
 }
