@@ -8,7 +8,7 @@ import { useApp } from '@/app/providers';
 import type { Locale } from '@/lib/i18n';
 import Link from 'next/link';
 import {
-  Layers, BarChart3, Sprout, HandCoins, GraduationCap, Cpu, Target, LayoutGrid, Scale,
+  Layers, BarChart3, Sprout, HandCoins, GraduationCap, Cpu, Target, LayoutGrid,
   LogOut, Globe, ArrowRight, Lock, ExternalLink, BrainCircuit, Video, PenLine, CheckSquare,
   FlaskConical,
 } from 'lucide-react';
@@ -34,9 +34,9 @@ const systems: HubEntry[] = [
     id: 'advisor',
     name: 'Advisor',
     tagline: {
-      es: 'Alertas y prioridades',
-      pt: 'Alertas e prioridades',
-      en: 'Alerts & priorities',
+      es: 'Central de inteligencia y consejos institucionales',
+      pt: 'Central de inteligência e conselhos institucionais',
+      en: 'Institutional intelligence and advisory hub',
     },
     icon: BrainCircuit,
     href: '/hub/advisor',
@@ -47,9 +47,9 @@ const systems: HubEntry[] = [
     id: 'studio',
     name: 'Studio',
     tagline: {
-      es: 'Documentos con IA',
-      pt: 'Documentos com IA',
-      en: 'AI documents',
+      es: 'Redacción y diagramación de documentos, vídeos y diseños',
+      pt: 'Redação e diagramação de documentos, vídeos e desenhos',
+      en: 'Writing and layout for documents, video and design',
     },
     icon: PenLine,
     href: '/hub/studio',
@@ -60,9 +60,9 @@ const systems: HubEntry[] = [
     id: 'work',
     name: 'Work',
     tagline: {
-      es: 'Tareas del equipo',
-      pt: 'Tarefas da equipa',
-      en: 'Team tasks',
+      es: 'Gestor de tareas del equipo',
+      pt: 'Gestor de tarefas da equipa',
+      en: 'Team task manager',
     },
     icon: CheckSquare,
     href: '/hub/work',
@@ -71,11 +71,11 @@ const systems: HubEntry[] = [
   },
   {
     id: 'meet',
-    name: 'Meet',
+    name: 'Chorus',
     tagline: {
-      es: 'Reuniones y videollamadas',
-      pt: 'Reuniões e videochamadas',
-      en: 'Meetings & video calls',
+      es: 'Reuniones y videollamadas, con transcripción y grabación',
+      pt: 'Reuniões e videochamadas, com transcrição e gravação',
+      en: 'Meetings and video calls, with transcription and recording',
     },
     icon: Video,
     href: '/hub/meet',
@@ -83,15 +83,15 @@ const systems: HubEntry[] = [
     productTier: 'tool',
   },
   {
-    id: 'carta',
-    name: 'CARTA',
+    id: 'prism',
+    name: 'PRISM',
     tagline: {
-      es: 'Gobernanza y aprobaciones',
-      pt: 'Governança e aprovações',
-      en: 'Governance & approvals',
+      es: 'Datos, progreso ESG y monitoreo de impacto',
+      pt: 'Dados, progresso ESG e monitorização de impacto',
+      en: 'Data, ESG progress and impact monitoring',
     },
-    icon: Scale,
-    href: '/hub/carta',
+    icon: Target,
+    href: '/hub/prism',
     active: true,
     productTier: 'tool',
   },
@@ -99,9 +99,9 @@ const systems: HubEntry[] = [
     id: 'atlas',
     name: 'ATLAS',
     tagline: {
-      es: 'La casa — finanzas, personas, operación',
-      pt: 'A casa — finanças, pessoas, operação',
-      en: 'Home base — finance, people, operations',
+      es: 'Gestión empresarial: planificación, finanzas, contabilidad, RRHH, proveedores, clientes e inventario',
+      pt: 'Gestão empresarial: planeamento, finanças, contabilidade, RH, fornecedores, clientes e inventário',
+      en: 'Business management: planning, finance, accounting, HR, suppliers, clients and inventory',
     },
     icon: BarChart3,
     href: '/dashboard',
@@ -111,9 +111,9 @@ const systems: HubEntry[] = [
     id: 'siep',
     name: 'SIEP',
     tagline: {
-      es: 'Programas y ejecución de proyectos',
-      pt: 'Programas e execução de projetos',
-      en: 'Programs and project execution',
+      es: 'Gestión de proyectos: portafolio, ejecución, evidencias y seguimiento',
+      pt: 'Gestão de projetos: portefólio, execução, evidências e acompanhamento',
+      en: 'Project management: portfolio, execution, evidence and tracking',
     },
     icon: Sprout,
     href: '/siep',
@@ -123,9 +123,9 @@ const systems: HubEntry[] = [
     id: 'fundhub',
     name: 'FUNDHUB',
     tagline: {
-      es: 'Fondos, convocatorias y propuestas',
-      pt: 'Fundos, concursos e propostas',
-      en: 'Funds, calls and proposals',
+      es: 'Captación de fondos, convocatorias y redacción de propuestas',
+      pt: 'Captação de fundos, concursos e redação de propostas',
+      en: 'Fundraising, calls for proposals and proposal writing',
     },
     icon: HandCoins,
     href: '/hub/fundhub',
@@ -135,9 +135,9 @@ const systems: HubEntry[] = [
     id: 'nexus',
     name: 'NEXUS',
     tagline: {
-      es: 'Desarrollo MIPYME con IA',
-      pt: 'Desenvolvimento MIPYME com IA',
-      en: 'MSME development with AI',
+      es: 'Asistencia técnica para el desarrollo de negocios en distintas etapas de madurez',
+      pt: 'Assistência técnica para desenvolvimento de negócios em distintas etapas de maturidade',
+      en: 'Technical assistance for business development across maturity stages',
     },
     icon: GraduationCap,
     href: '/hub/nexus',
@@ -147,29 +147,18 @@ const systems: HubEntry[] = [
     id: 'forge',
     name: 'FORGE',
     tagline: {
-      es: 'Formación, cursos y juegos',
-      pt: 'Formação, cursos e jogos',
-      en: 'Learning, courses and games',
+      es: 'Creación y hospedaje de cursos virtuales — metodologías tradicionales o lúdicas (juegos)',
+      pt: 'Criação e hospedagem de cursos virtuais — metodologias tradicionais ou lúdicas (jogos)',
+      en: 'Create and host virtual courses — traditional or playful methods (games)',
     },
     icon: Cpu,
     href: '/hub/forge',
     active: true,
   },
-  {
-    id: 'prism',
-    name: 'PRISM',
-    tagline: {
-      es: 'Inteligencia ejecutiva',
-      pt: 'Inteligência executiva',
-      en: 'Executive intelligence',
-    },
-    icon: Target,
-    href: '/hub/prism',
-    active: true,
-  },
 ];
 
-const TOOLS_IDS = new Set(['advisor', 'studio', 'meet', 'carta', 'work']);
+/** Ferramentas transversais (PRISM deixou de ser sistema peer). */
+const TOOLS_IDS = new Set(['advisor', 'studio', 'meet', 'work', 'prism']);
 
 function isEtholysTool(sys: HubEntry): boolean {
   return TOOLS_IDS.has(sys.id) || sys.productTier === 'advisor' || sys.productTier === 'tool';

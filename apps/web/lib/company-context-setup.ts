@@ -14,7 +14,10 @@ export const COMPANY_SECTORS = [
 
 export type CompanyContextSetup = {
   v: 1;
+  /** Temática principal (primeiro de sectorIds — compat) */
   sectorId?: string;
+  /** Uma empresa pode operar em várias temáticas (ex. horta + aves) */
+  sectorIds?: string[];
   entityKind?: 'company' | 'cooperative' | 'ngo' | 'association' | 'public' | 'other';
   countryPrimary?: string;
   /** Moeda operacional (pode alinhar com Company.currency) */
@@ -29,14 +32,14 @@ export type CompanyContextSetup = {
 };
 
 /** Códigos de módulo para sugestões pós-wizard (UI / Advisor). */
-export type ModuleHintCode = 'ATLAS' | 'SIEP' | 'FUNDHUB' | 'NEXUS' | 'PRISM' | 'CARTA';
+export type ModuleHintCode = 'ATLAS' | 'SIEP' | 'FUNDHUB' | 'NEXUS' | 'PRISM' | 'FORGE';
 
 const GOAL_TO_MODULES: Record<string, ModuleHintCode[]> = {
   operations: ['ATLAS', 'SIEP'],
   fundraising: ['FUNDHUB', 'NEXUS', 'PRISM'],
   export: ['ATLAS', 'FUNDHUB'],
   impact_reporting: ['PRISM', 'SIEP'],
-  governance: ['CARTA', 'NEXUS'],
+  governance: ['NEXUS', 'ATLAS'],
 };
 
 /**
@@ -60,8 +63,8 @@ export const MODULE_HINT_LABEL: Record<
   SIEP: { pt: 'SIEP (execução e inovação de projetos)', es: 'SIEP (ejecución e innovación de proyectos)', en: 'SIEP (project execution & innovation)' },
   FUNDHUB: { pt: 'FUNDHUB (captação e propostas)', es: 'FUNDHUB (captación y propuestas)', en: 'FUNDHUB (funding & proposals)' },
   NEXUS: { pt: 'NEXUS (diagnóstico MIPYME, rota)', es: 'NEXUS (diagnóstico MIPYME, ruta)', en: 'NEXUS (MIPYME diagnosis, roadmap)' },
-  PRISM: { pt: 'PRISM (BI 360°, dashboards)', es: 'PRISM (BI 360°, dashboards)', en: 'PRISM (BI 360°, dashboards)' },
-  CARTA: { pt: 'CARTA (governação e aprovações)', es: 'CARTA (gobernanza y aprobaciones)', en: 'CARTA (governance & approvals)' },
+  PRISM: { pt: 'PRISM (dados, ESG e impacto)', es: 'PRISM (datos, ESG e impacto)', en: 'PRISM (data, ESG & impact)' },
+  FORGE: { pt: 'FORGE (cursos e formação)', es: 'FORGE (cursos y formación)', en: 'FORGE (courses & learning)' },
 };
 
 export function emptyContextSetup(): CompanyContextSetup {
@@ -72,6 +75,7 @@ export function isContextSetupMeaningful(ctx: CompanyContextSetup | null | undef
   if (!ctx || ctx.v !== 1) return false;
   return Boolean(
     ctx.sectorId ||
+      (ctx.sectorIds && ctx.sectorIds.length > 0) ||
       ctx.entityKind ||
       ctx.countryPrimary ||
       ctx.tradesInternationally != null ||

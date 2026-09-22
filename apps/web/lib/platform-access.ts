@@ -128,9 +128,9 @@ export function isHubShellPath(pathname: string): boolean {
   if (pathname === '/hub' || pathname === '/hub/') return true;
   if (pathname === '/hub/workspace' || pathname.startsWith('/hub/workspace/')) return true;
   if (pathname === '/hub/admin' || pathname.startsWith('/hub/admin/')) return true;
+  if (pathname === '/hub/billing' || pathname.startsWith('/hub/billing/')) return true;
   if (pathname === '/hub/setup' || pathname.startsWith('/hub/setup/')) return true;
   if (pathname === '/hub/meet' || pathname.startsWith('/hub/meet/')) return true;
-  if (pathname === '/hub/carta' || pathname.startsWith('/hub/carta/')) return true;
   if (pathname === '/hub/advisor' || pathname.startsWith('/hub/advisor/')) return true;
   if (pathname === '/hub/work' || pathname.startsWith('/hub/work/')) return true;
   return false;

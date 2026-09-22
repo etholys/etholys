@@ -7,7 +7,7 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 | Área | Documento | Quando ler |
 |------|-----------|------------|
 | **Ecossistema de produtos (visão geral)** | [ETHOLYS_Arquitectura_v2.md](./ETHOLYS_Arquitectura_v2.md) | Módulos, princípios, integrações entre sistemas |
-| **Etholys Tools — faixa de ferramentas** | [docs/architecture/etholys-tools.md](./docs/architecture/etholys-tools.md) | Advisor, Studio, Meet, CARTA, Work — não confundir com Core nem com Studio como guarda-chuva |
+| **Etholys Tools — faixa de ferramentas** | [docs/architecture/etholys-tools.md](./docs/architecture/etholys-tools.md) | Advisor, Studio, Work, Chorus (Meet), Prism — não confundir com Core nem com Studio como guarda-chuva |
 | **Etholys Work — motor de tarefas** | [docs/architecture/etholys-work.md](./docs/architecture/etholys-work.md) | `Task` único, espelhos ATLAS/SIEP/Meet; vistas Board/List/Kanban/Calendar/Workload; pastas ACL tipo Drive; Integrated Workspace (F11) |
 | **FORGE — EAD unificado + jogos + gamificação** | [docs/architecture/forge-ead.md](./docs/architecture/forge-ead.md) | Qualquer trabalho em `/hub/forge`, APIs `forge`, LMS, jogos, IA geradora de jogos |
 | **Etholys Meet → CHORUS** | [docs/architecture/etholys-meet.md](./docs/architecture/etholys-meet.md) | Produto **CHORUS** (`/hub/meet`); Jitsi, breakouts, convites, gravação, Whisper+diarização pós-chamada |
@@ -15,6 +15,7 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 | **Lab MUSE — inovação / I+D+i interno** | [docs/architecture/lab-muse.md](./docs/architecture/lab-muse.md) | `/lab/muse` — sugestões estratégicas, observatório; pipeline → ANVIL (não fundir) |
 | **Lab ANVIL — agente de engenharia interno** | [docs/architecture/lab-anvil.md](./docs/architecture/lab-anvil.md) | `/lab/anvil` — 1 agente/projeto, OSS vs Etholys, deploy targets, owners+convites |
 | **System admin vs empresa** | [docs/architecture/system-admin.md](./docs/architecture/system-admin.md) | Master Etholys (`ETHOLYS_PLATFORM_ADMIN_EMAILS`) ≠ admin de cliente |
+| **Licenças e pagamentos** | [docs/architecture/etholys-billing.md](./docs/architecture/etholys-billing.md) | Assinaturas, licenciamento, add-ons, comissões, faturas Etholys |
 | **Jitsi no Contabo (ops)** | [docs/MEET-JITSI-CONTABO.md](./docs/MEET-JITSI-CONTABO.md) | Subir `meet.etholys.com` — sem isto a app usa meet.jit.si |
 | **Meet VPS + Jibri (ops)** | [docs/MEET-VPS-JIBRI.md](./docs/MEET-VPS-JIBRI.md) | VPS dedicado, gravação → R2, webhook |
 | **Índice de toda a documentação** | [docs/README.md](./docs/README.md) | Encontrar outros guias em `docs/` |

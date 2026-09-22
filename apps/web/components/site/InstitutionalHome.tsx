@@ -16,9 +16,9 @@ const SYSTEMS: Array<{
     name: 'ATLAS',
     accent: '#0D9488',
     tagline: {
-      es: 'La casa: finanzas, personas, compras, stock y operación diaria.',
-      pt: 'A casa: finanças, pessoas, compras, stock e operação do dia a dia.',
-      en: 'The home base: finance, people, purchasing, stock and daily operations.',
+      es: 'Gestión empresarial: planificación, finanzas, contabilidad, RR. HH., proveedores, clientes e inventario.',
+      pt: 'Gestão empresarial: planeamento, finanças, contabilidade, RH, fornecedores, clientes e inventário.',
+      en: 'Business management: planning, finance, accounting, HR, suppliers, clients and inventory.',
     },
   },
   {
@@ -26,9 +26,9 @@ const SYSTEMS: Array<{
     name: 'SIEP',
     accent: '#4F46E5',
     tagline: {
-      es: 'Los programas: portafolio, ejecución, evidencias y relación con quien financia.',
-      pt: 'Os programas: portefólio, execução, evidências e relação com quem financia.',
-      en: 'Programs: portfolio, execution, evidence and funder relations.',
+      es: 'Gestión de proyectos: portafolio, ejecución, evidencias e informes.',
+      pt: 'Gestão de projetos: portefólio, execução, evidências e relatórios.',
+      en: 'Project management: portfolio, execution, evidence and reporting.',
     },
   },
   {
@@ -36,9 +36,9 @@ const SYSTEMS: Array<{
     name: 'FUNDHUB',
     accent: '#D97706',
     tagline: {
-      es: 'Los fondos: encontrar convocatorias, redactar, postular y gestionar lo que ya se administra.',
-      pt: 'Os fundos: encontrar concursos, redigir, candidatar e gerir o que já se administra.',
-      en: 'Funds: find calls, draft, apply and manage what you already administer.',
+      es: 'Captación de fondos: convocatorias, redacción de propuestas y seguimiento.',
+      pt: 'Captação de fundos: editais, redação de propostas e acompanhamento.',
+      en: 'Fundraising: calls, proposal writing and follow-up.',
     },
   },
   {
@@ -46,9 +46,9 @@ const SYSTEMS: Array<{
     name: 'NEXUS',
     accent: '#2563EB',
     tagline: {
-      es: 'Las empresas que atiende: diagnóstico, ruta y asistencia técnica a escala.',
-      pt: 'As empresas que atende: diagnóstico, rota e assistência técnica à escala.',
-      en: 'The businesses you serve: diagnosis, pathway and technical assistance at scale.',
+      es: 'Asistencia técnica para el desarrollo de negocios en distintas etapas de madurez.',
+      pt: 'Assistência técnica para o desenvolvimento de negócios em distintas etapas de maturidade.',
+      en: 'Technical assistance for business development across maturity stages.',
     },
   },
   {
@@ -56,19 +56,9 @@ const SYSTEMS: Array<{
     name: 'FORGE',
     accent: '#7C3AED',
     tagline: {
-      es: 'La formación: cursos, actividades, juegos y el rastro de quien aprende.',
-      pt: 'A formação: cursos, actividades, jogos e o rasto de quem aprende.',
-      en: 'Learning: courses, activities, games and the trail of who learns.',
-    },
-  },
-  {
-    id: 'prism',
-    name: 'PRISM',
-    accent: '#E11D48',
-    tagline: {
-      es: 'La mirada de quien decide, cuando hay datos que mirar.',
-      pt: 'O olhar de quem decide, quando há dados para olhar.',
-      en: 'The decision-maker’s view, when there is data worth seeing.',
+      es: 'Cursos virtuales con metodologías tradicionales o lúdicas — creación y alojamiento.',
+      pt: 'Cursos virtuais com metodologias tradicionais ou lúdicas — criação e alojamento.',
+      en: 'Virtual courses with traditional or game-based methods — create and host.',
     },
   },
 ];
@@ -84,23 +74,23 @@ function copy(locale: Locale) {
     demo: es ? 'Solicitar demostración' : pt ? 'Solicitar demonstração' : 'Request a demo',
 
     headline: es
-      ? 'Sistemas de gestión y de trabajo para empresas e instituciones.'
+      ? 'Usted atiende empresas o ejecuta proyectos. Etholys es el sistema para ese trabajo.'
       : pt
-        ? 'Sistemas de gestão e de trabalho para empresas e instituições.'
-        : 'Management and work systems for companies and institutions.',
+        ? 'Você atende empresas ou executa projectos. A Etholys é o sistema para esse trabalho.'
+        : 'You support businesses or run projects. Etholys is the system for that work.',
     support: es
-      ? 'Finanzas, proyectos, fondos, asistencia a MIPYMEs, formación, y las herramientas del día a día: reuniones, documentos, tareas. En español y portugués. En nuestros servidores o en los de la organización.'
+      ? 'Seguimiento a cada empresa, ejecución y reportes, búsqueda de fondos, formación. Lo usan MIPYMEs, fundaciones, agencias, gobiernos y empresas. En español y portugués.'
       : pt
-        ? 'Finanças, projectos, fundos, assistência a MIPYMEs, formação, e as ferramentas do dia a dia: reuniões, documentos, tarefas. Em espanhol e português. Nos nossos servidores ou nos da organização.'
-        : 'Finance, projects, funds, MSME assistance, training, and day-to-day tools: meetings, documents, tasks. In Spanish and Portuguese. On our servers or yours.',
+        ? 'Acompanhamento de cada empresa, execução e relatórios, procura de fundos, formação. Usam MIPYMEs, fundações, agências, governos e empresas. Em espanhol e português.'
+        : 'Follow each business, deliver and report, find funding, train people. Used by MSMEs, foundations, agencies, governments and companies. In Spanish and Portuguese.',
 
     aboutKicker: es ? 'Quiénes somos' : pt ? 'Quem somos' : 'About',
     aboutTitle: es ? 'Qué es Etholys' : pt ? 'O que é a Etholys' : 'What Etholys is',
     aboutBody: es
-      ? 'Etholys desarrolla y licencia sistemas para que MIPYMEs, empresas, fundaciones, agencias de cooperación y gobiernos organicen su operación y mejoren cómo trabajan. Cada sistema se contrata por separado. Si se usan varios, los datos se comparten. Cuando el problema es de campo —un proceso, un equipo, una forma de producir— diseñamos también el método y el dispositivo, no solo el software.'
+      ? 'Si su organización trabaja con MIPYMEs, con proyectos financiados, o con las dos cosas, aquí hace ese trabajo: diagnóstico y visitas, el proyecto y el informe al donante, las convocatorias, los cursos. Cada módulo se contrata por separado. En español y portugués. En nuestros servidores o en los de ustedes.'
       : pt
-        ? 'A Etholys desenvolve e licencia sistemas para que MIPYMEs, empresas, fundações, agências de cooperação e governos organizem a operação e melhorem a forma de trabalhar. Cada sistema contrata-se à parte. Se se usam vários, os dados partilham-se. Quando o problema é de campo — um processo, um equipamento, uma forma de produzir — desenhamos também o método e o dispositivo, não só o software.'
-        : 'Etholys develops and licenses systems so MSMEs, companies, foundations, cooperation agencies and governments can run operations and improve how they work. Each system is licensed on its own. Use several and data is shared. When the problem is in the field — a process, a device, a way of producing — we also design the method and the equipment, not only the software.',
+        ? 'Se a sua organização trabalha com MIPYMEs, com projectos financiados, ou com as duas coisas, aqui faz esse trabalho: diagnóstico e visitas, o projecto e o relatório ao financiador, os concursos, os cursos. Cada módulo contrata-se à parte. Em espanhol e português. Nos nossos servidores ou nos vossos.'
+        : 'If your organisation works with MSMEs, funded projects, or both, this is where that work happens: diagnosis and visits, the project and the donor report, calls for funding, courses. Each module is licensed on its own. In Spanish and Portuguese. On our servers or yours.',
 
     values: es
       ? [
@@ -163,7 +153,7 @@ function copy(locale: Locale) {
       ? [
           {
             title: 'Sistemas propios',
-            body: 'Seis productos independientes — ATLAS, SIEP, FUNDHUB, NEXUS, FORGE y PRISM — más Advisor, Studio, Meet, Work y CARTA. Contrate solo lo que necesita hoy.',
+            body: 'Cinco sistemas — ATLAS, SIEP, FUNDHUB, NEXUS y FORGE — más herramientas: Advisor, Studio, Work, Chorus y Prism. Contrate solo lo que necesita hoy.',
             cta: 'Ver sistemas',
             href: '#sistemas',
           },
@@ -184,7 +174,7 @@ function copy(locale: Locale) {
         ? [
             {
               title: 'Sistemas próprios',
-              body: 'Seis produtos independentes — ATLAS, SIEP, FUNDHUB, NEXUS, FORGE e PRISM — mais Advisor, Studio, Meet, Work e CARTA. Contrate apenas o que precisa hoje.',
+              body: 'Cinco sistemas — ATLAS, SIEP, FUNDHUB, NEXUS e FORGE — mais ferramentas: Advisor, Studio, Work, Chorus e Prism. Contrate apenas o que precisa hoje.',
               cta: 'Ver sistemas',
               href: '#sistemas',
             },
@@ -204,7 +194,7 @@ function copy(locale: Locale) {
         : [
             {
               title: 'Proprietary systems',
-              body: 'Six independent products — ATLAS, SIEP, FUNDHUB, NEXUS, FORGE and PRISM — plus Advisor, Studio, Meet, Work and CARTA. License only what you need today.',
+              body: 'Five systems — ATLAS, SIEP, FUNDHUB, NEXUS and FORGE — plus tools: Advisor, Studio, Work, Chorus and Prism. License only what you need today.',
               cta: 'See systems',
               href: '#sistemas',
             },

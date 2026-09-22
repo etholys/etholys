@@ -110,7 +110,7 @@ export async function POST(req: Request) {
       type: 'task_approval_request',
       title: 'Aprobación de entrega solicitada',
       message: `${approval.requester.name} solicita aprobación de: ${approval.task.title}`,
-      link: '/hub/carta',
+      link: '/hub/work',
     });
 
     return NextResponse.json({ approval });

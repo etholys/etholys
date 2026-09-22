@@ -1,27 +1,29 @@
 # Etholys Tools — faixa de ferramentas transversais
 
-**Versão:** 0.1  
-**Data:** 2026-08-04  
+**Versão:** 0.2  
+**Data:** 2026-09-22  
 **Status:** Nome + agrupamento no Hub  
 **Público:** product, desenvolvedores, agentes de IA  
 
-**Fonte de verdade** para o conjunto de ferramentas avulsas do Hub (não são os 6 sistemas licenciáveis).  
+**Fonte de verdade** para o conjunto de ferramentas avulsas do Hub (não são os 5 sistemas licenciáveis principais).  
 **Entrada para agentes:** [AGENTS.md](../../AGENTS.md) → este ficheiro.
 
 ---
 
 ## 1. Princípio
 
-> **Etholys Tools** = prateleira nomeada de ferramentas transversais. Cada ferramenta é um produto próprio (rota, motor, espelhos). **Não** é o Etholys Core nem um 7.º sistema peer de ATLAS/SIEP.
+> **Etholys Tools** = prateleira nomeada de ferramentas transversais. Cada ferramenta é um produto próprio (rota, motor, espelhos). **Não** é o Etholys Core nem um 6.º sistema peer de ATLAS/SIEP.
 
 | Camada | Papel |
 |--------|--------|
-| **Sistemas** | ATLAS, SIEP, FUNDHUB, NEXUS, FORGE, PRISM — produtos licenciáveis |
-| **Etholys Tools** | Advisor, Studio, Meet, CARTA — ferramentas avulsas no Hub; atalhos / espelhos nos sistemas |
+| **Sistemas** | ATLAS, SIEP, FUNDHUB, NEXUS, FORGE — produtos licenciáveis principais |
+| **Etholys Tools** | Advisor, Studio, Work, Chorus (Meet), Prism — ferramentas no Hub; atalhos / espelhos nos sistemas |
 | **Etholys Core** | SSO, chat, Docs S3, i18n, permissões, notif. — infraestrutura incluída |
 | **Etholys Lab** | Ferramentas internas da fábrica — [MUSE](./lab-muse.md) (o quê) + [ANVIL](./lab-anvil.md) (como); separados, com pipeline; não públicas |
 
 **Studio não é o guarda-chuva.** Studio é uma ferramenta *dentro* de Etholys Tools (documentos com IA).
+
+**CARTA** foi descontinuado (sem superfície de produto). Aprovações e governança vivem em Work / NEXUS / ATLAS conforme o fluxo.
 
 ---
 
@@ -29,11 +31,11 @@
 
 | Ferramenta | Entrada Hub | Spec |
 |------------|-------------|------|
-| **AI Advisor** | `/hub/advisor` → workspace | Assessor transversal / alertas |
-| **Studio** | `/hub/studio` | [etholys-studio.md](./etholys-studio.md) |
-| **Meet** | `/hub/meet` | [etholys-meet.md](./etholys-meet.md) |
-| **CARTA** | `/hub/carta` | Governança / aprovações |
-| **Work** (tarefas) | `/hub/work` (+ atalho cyan; ATLAS `/tasks`) | [etholys-work.md](./etholys-work.md) — motor único `Task`; vistas Board/List/Kanban/Calendar/Timeline/Workload; pastas com ACL tipo Drive; modo Integrated Workspace com SIEP (F11) |
+| **Advisor** | `/hub/advisor` | Central de inteligência e conselhos institucionais |
+| **Studio** | `/hub/studio` | [etholys-studio.md](./etholys-studio.md) — redação e diagramação (docs, vídeo, gráfico) |
+| **Work** | `/hub/work` (+ atalho; ATLAS `/tasks`) | [etholys-work.md](./etholys-work.md) — gestor de tarefas |
+| **Chorus** (produto; rota Meet) | `/hub/meet` | [etholys-meet.md](./etholys-meet.md) — reuniões, vídeo, transcrição e gravação |
+| **Prism** | `/hub/prism` | Dados, progresso ESG e monitorização de impacto |
 
 Candidato futuro (Tools, fora de Work): **Board** — mural da empresa (links, docs, senhas).
 
@@ -41,12 +43,12 @@ Candidato futuro (Tools, fora de Work): **Board** — mural da empresa (links, d
 
 ## 3. UI
 
-- Secção **Etholys Tools** no Hub (`apps/web/app/hub/page.tsx`), acima ou abaixo dos sistemas conforme layout vigente.
+- Secção **Ferramentas** no Hub (`apps/web/app/hub/page.tsx`).
 - Badge `productTier: 'tool' | 'advisor'` nos cartões.
-- Cada ferramenta mantém rota própria sob `/hub/…`.
+- Cada ferramenta mantém rota própria sob `/hub/…` (`/hub/carta` redireciona para `/hub/work`).
 
 ---
 
 ## 4. Relação com Core
 
-Core = base comum. Tools = capacidades de produto transversais que o utilizador *abre* (reunião, documento, aprovação). Não misturar as duas camadas no posicionamento comercial.
+Tools usam Core (auth, tenant, storage). Não substituem os sistemas licenciáveis.

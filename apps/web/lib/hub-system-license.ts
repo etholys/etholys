@@ -23,10 +23,10 @@ export function hubSystemIdToLicenseKey(systemId: string): WorkspaceSystemKey | 
   return HUB_SYSTEM_ID_TO_LICENSE_KEY[systemId.toUpperCase()] ?? null;
 }
 
-/** Advisor, Studio, Meet, Work — não passam por grant por sistema. */
+/** Advisor, Studio, Meet/Chorus, Work — não passam por grant por sistema. PRISM continua licenciado. */
 export function isHubLicenseExempt(systemId: string): boolean {
   const id = systemId.toUpperCase();
-  return id === 'ADVISOR' || id === 'STUDIO' || id === 'MEET' || id === 'WORK';
+  return id === 'ADVISOR' || id === 'STUDIO' || id === 'MEET' || id === 'WORK' || id === 'CHORUS';
 }
 
 export type HubCardAccess = 'open' | 'locked' | 'coming_soon';

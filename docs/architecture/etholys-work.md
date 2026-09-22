@@ -66,7 +66,7 @@ Relatórios de campo / quilometragem / informes doador → **SIEP-only** (não W
 
 | Peça | Onde |
 |------|------|
-| Aprovação formal de entrega | **CARTA** (Tools) — Work só dispara / liga |
+| Aprovação formal de entrega | Fluxo em Work / sistema de origem — Work dispara / liga |
 | Mural da empresa (links, senhas, docs) | Ferramenta futura **Board** (Tools) — fora deste motor |
 | Relatório de campo / quilometragem | SIEP (`TaskActivityReport`, …) |
 
@@ -80,7 +80,7 @@ Relatórios de campo / quilometragem / informes doador → **SIEP-only** (não W
 | **F1** | Grupos/secções tipo Monday (`TaskGroup` + ordem); filtro por grupo | ✅ Base (ago/2026) |
 | **F2** | Entrada Hub `/hub/work` + cartão Etholys Tools + hot button; deep-links ATLAS | ✅ (ago/2026) |
 | **F3** | @menções em comentários → notificação | ✅ (ago/2026) |
-| **F4** | Solicitar aprovação → CARTA inbox + notificação ao aprovador | ✅ (ago/2026) |
+| **F4** | Solicitar aprovação → notificação ao aprovador (Work) | ✅ (ago/2026) |
 | **F5** | Templates de projeto (além de packs de tarefas) | Pendente |
 | **F6** | Organizador: sidebar Setor/Projeto, dashboard de carga, vista Timeline/Gantt | ✅ Base (ago/2026) |
 | **F7** | Espelho admin no Work (`/hub/work/settings`): setores, secções, atalhos SIEP/admin | ✅ Base (ago/2026) |
@@ -125,7 +125,7 @@ Lib: `apps/web/lib/work/folder-access.ts` (espelho leve de Studio share, sem mag
 | APIs | `apps/web/app/api/tasks/`, `task-groups/`, `work-folders/`, `task-approvals/`, … |
 | ACL | `apps/web/lib/work/folder-access.ts` |
 | SQL | `manual_etholys_work_groups.sql`, `manual_etholys_work_approvals.sql`, `manual_etholys_work_folders.sql` |
-| CARTA inbox | `apps/web/app/hub/carta/page.tsx` |
+| Aprovações (legado CARTA) | `apps/web/app/hub/carta/page.tsx` → redirect `/hub/work` |
 | Mentions | `apps/web/lib/work/mentions.ts` |
 
 **URL Work:** `/hub/work?nav=all|mine|company|folder|project|department|dashboard&id=…&view=table|list|kanban|calendar|gantt|workload`
