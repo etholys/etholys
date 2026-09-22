@@ -64,7 +64,87 @@ function isAuthLlmError(status: number, body: string): boolean {
 }
 
 function isBillingLlmError(body: string): boolean {
-  return /credit balance|insufficient.?quota|billing|purchase credits|payment required/i.test(body);
+  return /credit balance|insufficient.?quota|billing|purchase credits|payment required|LLM_BILLING/i.test(
+    body,
+  );
+}
+
+/** Mensagem pública — nunca expor provider, créditos ou consolas internas ao cliente. */
+export const PUBLIC_LLM_UNAVAILABLE =
+  'O serviço de IA está temporariamente indisponível. Tente novamente mais tarde.';
+
+export type LlmErrorCode = 'billing' | 'auth' | 'unavailable' | 'provider';
+
+/**
+ * Erro tipado do cliente LLM. `message` é sempre seguro para UI/API;
+ * `providerDetail` fica só para logs de servidor.
+ */
+export class LlmProviderError extends Error {
+  readonly code: LlmErrorCode;
+  readonly providerDetail?: string;
+  readonly httpStatus?: number;
+
+  constructor(
+    code: LlmErrorCode,
+    opts?: { providerDetail?: string; httpStatus?: number; message?: string },
+  ) {
+    super(opts?.message ?? PUBLIC_LLM_UNAVAILABLE);
+    this.name = 'LlmProviderError';
+    this.code = code;
+    this.providerDetail = opts?.providerDetail;
+    this.httpStatus = opts?.httpStatus;
+  }
+}
+
+export function isLlmBillingError(err: unknown): boolean {
+  if (err instanceof LlmProviderError) return err.code === 'billing';
+  const msg = err instanceof Error ? err.message : String(err);
+  return isBillingLlmError(msg);
+}
+
+/** Converte qualquer falha LLM numa mensagem segura para o cliente. */
+export function publicLlmErrorMessage(err: unknown): string {
+  if (err instanceof LlmProviderError) return err.message;
+  const msg = err instanceof Error ? err.message : String(err);
+
+  // Mensagens de produto já redigidas (truncamento, etc.)
+  if (
+    /cortou a resposta|documento mais curto|PDF mais curto|demorou demasiado|não está disponível neste momento/i.test(
+      msg,
+    )
+  ) {
+    return msg;
+  }
+
+  if (
+    isBillingLlmError(msg) ||
+    /Anthropic|console\.anthropic|OpenAI|API key|authentication_error|invalid.?api.?key|Modelos tentados|^LLM\s*\(/i.test(
+      msg,
+    )
+  ) {
+    return PUBLIC_LLM_UNAVAILABLE;
+  }
+
+  // Qualquer outro erro de infraestrutura LLM → genérico
+  if (/^LLM[:\s]/i.test(msg) || /serviço de IA/i.test(msg)) {
+    return msg.includes('indisponível') ? msg : PUBLIC_LLM_UNAVAILABLE;
+  }
+
+  return PUBLIC_LLM_UNAVAILABLE;
+}
+
+function logLlmProviderFailure(
+  kind: LlmErrorCode,
+  model: string,
+  status: number,
+  body: string,
+): void {
+  console.error('[llm] provider failure', {
+    kind,
+    model,
+    status,
+    detail: body.slice(0, 600),
+  });
 }
 
 /** Limite alto para JSON grande (importação SIEP, extratos). */
@@ -76,7 +156,10 @@ export function getLlmApiKey(): string {
     process.env.CLAUDE_API_KEY ||
     process.env.LLM_API_KEY;
   if (!key?.trim()) {
-    throw new Error('O serviço de IA não está disponível neste momento.');
+    throw new LlmProviderError('auth', {
+      message: PUBLIC_LLM_UNAVAILABLE,
+      providerDetail: 'missing API key',
+    });
   }
   return key.trim();
 }
@@ -236,12 +319,20 @@ export async function llmGenerateContent(opts: LlmGenerateOptions): Promise<LlmG
       } catch (e: unknown) {
         const err = e instanceof Error ? e : new Error(String(e));
         lastError = err;
+        // Billing / auth: não há fallback útil — propaga (mensagem já pública).
+        if (err instanceof LlmProviderError && (err.code === 'billing' || err.code === 'auth')) {
+          throw err;
+        }
+        if (isLlmBillingError(err)) throw err;
         if (/API key|authentication_error|invalid.?api.?key/i.test(err.message)) throw err;
-        if (/LLM_BILLING:/i.test(err.message) || isBillingLlmError(err.message)) throw err;
 
-        failures.push(err.message.slice(0, 200));
+        const detail =
+          err instanceof LlmProviderError
+            ? err.providerDetail?.slice(0, 200) ?? err.code
+            : err.message.slice(0, 200);
+        failures.push(`${model}: ${detail}`);
 
-        if (isModelNotFoundError(err.message)) break;
+        if (isModelNotFoundError(err.message) || isModelNotFoundError(detail)) break;
 
         if (shouldRetrySameModel(0, err.message) && attempt < 2) {
           await sleep(1500 * (attempt + 1));
@@ -252,15 +343,16 @@ export async function llmGenerateContent(opts: LlmGenerateOptions): Promise<LlmG
     }
   }
 
-  const summary = failures.length
-    ? `Modelos tentados: ${models.join(', ')}\n${failures.map((f, i) => `${i + 1}. ${f}`).join('\n')}`
-    : `Modelos tentados: ${models.join(', ')}`;
+  console.error('[llm] all models failed', {
+    models,
+    failures: failures.slice(0, 8),
+    last: lastError instanceof LlmProviderError ? lastError.code : lastError?.message?.slice(0, 200),
+  });
 
-  throw new Error(
-    lastError
-      ? `LLM: todos os modelos falharam.\n${summary}\nÚltimo erro: ${lastError.message.slice(0, 400)}`
-      : `LLM: falha após tentativas com todos os modelos.\n${summary}`,
-  );
+  if (lastError instanceof LlmProviderError) throw lastError;
+  throw new LlmProviderError('unavailable', {
+    providerDetail: failures.join(' | ').slice(0, 800),
+  });
 }
 
 async function llmGenerateContentWithModel(
@@ -343,17 +435,27 @@ async function llmGenerateContentWithModel(
   const errText = await response.text();
   if (!response.ok) {
     if (isBillingLlmError(errText)) {
-      throw new Error(
-        'LLM_BILLING: A conta da API Anthropic está sem créditos. Adicione créditos em console.anthropic.com.',
-      );
+      logLlmProviderFailure('billing', model, response.status, errText);
+      throw new LlmProviderError('billing', {
+        httpStatus: response.status,
+        providerDetail: errText.slice(0, 800),
+      });
     }
     if (isAuthLlmError(response.status, errText)) {
-      throw new Error(`LLM (${model}): ${errText.slice(0, 800)}`);
+      logLlmProviderFailure('auth', model, response.status, errText);
+      throw new LlmProviderError('auth', {
+        httpStatus: response.status,
+        providerDetail: errText.slice(0, 800),
+      });
     }
-    if (shouldTryNextModel(response.status, errText)) {
-      throw new Error(`LLM (${model}): ${errText.slice(0, 800)}`);
-    }
-    throw new Error(`LLM (${model}): ${errText.slice(0, 800)}`);
+    const kind: LlmErrorCode = shouldTryNextModel(response.status, errText)
+      ? 'provider'
+      : 'unavailable';
+    logLlmProviderFailure(kind, model, response.status, errText);
+    throw new LlmProviderError(kind, {
+      httpStatus: response.status,
+      providerDetail: errText.slice(0, 800),
+    });
   }
 
   let data: {
@@ -364,17 +466,28 @@ async function llmGenerateContentWithModel(
   try {
     data = JSON.parse(errText) as typeof data;
   } catch {
-    throw new Error(`LLM (${model}): resposta inválida`);
+    logLlmProviderFailure('provider', model, response.status, errText);
+    throw new LlmProviderError('provider', {
+      providerDetail: `invalid JSON response from ${model}`,
+    });
   }
 
   if (data.error?.message) {
-    throw new Error(`LLM (${model}): ${data.error.message}`);
+    const detail = data.error.message;
+    if (isBillingLlmError(detail)) {
+      logLlmProviderFailure('billing', model, response.status, detail);
+      throw new LlmProviderError('billing', { providerDetail: detail.slice(0, 800) });
+    }
+    logLlmProviderFailure('provider', model, response.status, detail);
+    throw new LlmProviderError('provider', { providerDetail: detail.slice(0, 800) });
   }
 
   const { text: rawText, searchQueries } = extractTextAndQueries(data);
   if (!rawText.trim() && !opts.webSearch) {
     const reason = data.stop_reason || 'sem content';
-    throw new Error(`LLM (${model}): resposta vazia (${reason})`);
+    throw new LlmProviderError('provider', {
+      providerDetail: `empty response (${model}, ${reason})`,
+    });
   }
 
   let text = rawText;
@@ -447,11 +560,17 @@ export async function llmCompleteWithWebSearch(
       return { text, searchQueries: searchQueries ?? [] };
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
+      if (lastError instanceof LlmProviderError && (lastError.code === 'billing' || lastError.code === 'auth')) {
+        throw lastError;
+      }
       if (/API key|authentication_error|invalid.?api.?key/i.test(lastError.message)) throw lastError;
     }
   }
 
-  throw lastError ?? new Error('LLM web search: todos os modelos falharam');
+  if (lastError instanceof LlmProviderError) throw lastError;
+  throw new LlmProviderError('unavailable', {
+    providerDetail: lastError?.message?.slice(0, 400) ?? 'web search all models failed',
+  });
 }
 
 export async function llmCompleteVision(
@@ -534,10 +653,11 @@ export function llmStreamAsOpenAICompatibleSSE(
         }
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
+        console.error('[llm] stream failure', e);
+        const msg = publicLlmErrorMessage(e);
         controller.enqueue(
           encoder.encode(
-            `data: ${JSON.stringify({ choices: [{ delta: { content: `Erro IA: ${msg.slice(0, 400)}` } }] })}\n\n`,
+            `data: ${JSON.stringify({ choices: [{ delta: { content: `Erro IA: ${msg}` } }] })}\n\n`,
           ),
         );
       } finally {

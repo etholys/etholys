@@ -35,6 +35,8 @@ export function parseScanResults(raw: string | null | undefined, runId: string):
     discoveryMode: d.discoveryMode === 'web' || d.discoveryMode === 'knowledge' ? d.discoveryMode : undefined,
     searchQueries: Array.isArray(d.searchQueries) ? d.searchQueries : undefined,
     scanFocus: d.scanFocus === 'open_now' || d.scanFocus === 'reference' ? d.scanFocus : undefined,
+    scanProfileId: typeof d.scanProfileId === 'string' ? d.scanProfileId : undefined,
+    scanProfileName: typeof d.scanProfileName === 'string' ? d.scanProfileName : undefined,
   };
   } catch {
     return emptyPayload(runId);
@@ -108,9 +110,8 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
       availabilityNote = availabilityNote ? `${rejectNote} ${availabilityNote}` : rejectNote;
     }
 
-    // open_now: sem link oficial válido → omitir candidato
-    if (scanFocus === 'open_now' && !links.linkOficial) continue;
-
+    // Nunca mostrar link de agregador; candidata sem link oficial mantém-se (pesquisa genérica).
+    // open_now já não descarta — cobrir tudo; o utilizador valida.
     out.push({
       tempId: typeof o.tempId === 'string' ? o.tempId : randomUUID(),
       name: name.slice(0, 300),
@@ -136,9 +137,17 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
       eligibleCountries,
       availabilityNote,
       scanFocus,
+      classification:
+        o.classification === 'direct' ||
+        o.classification === 'client_bridge' ||
+        o.classification === 'joint'
+          ? o.classification
+          : undefined,
+      classificationNote:
+        typeof o.classificationNote === 'string' ? o.classificationNote.slice(0, 300) : undefined,
     });
   }
-  return out.slice(0, 15);
+  return out.slice(0, 20);
 }
 
 export function pendingCandidates(payload: ScanResultsPayload, focus?: ScanFocus): ScanCandidate[] {

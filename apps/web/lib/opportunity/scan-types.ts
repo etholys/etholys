@@ -7,6 +7,10 @@ export type ScanFocus = (typeof SCAN_FOCUS_VALUES)[number];
 export const AVAILABILITY_STATUSES = ['open_now', 'rolling', 'seasonal', 'closed', 'reference'] as const;
 export type AvailabilityStatus = (typeof AVAILABILITY_STATUSES)[number];
 
+/** Como a organização usa a oportunidade. */
+export const OPPORTUNITY_CLASSIFICATIONS = ['direct', 'client_bridge', 'joint'] as const;
+export type OpportunityClassification = (typeof OPPORTUNITY_CLASSIFICATIONS)[number];
+
 export type OpportunityBriefing = {
   themes: string[];
   countries: string[];
@@ -14,8 +18,24 @@ export type OpportunityBriefing = {
   amountMin?: number;
   amountMax?: number;
   notes?: string;
-  /** Instruções persistentes para afinar varreduras futuras. */
+  /** Instruções persistentes / orientação profunda para a IA. */
   searchFeedback?: string;
+  /** Nome da varredura / perfil activo. */
+  scanName?: string;
+  /** Classificações a procurar nesta varredura. */
+  classifications?: OpportunityClassification[];
+  /** Empresas privadas elegíveis. */
+  privateEligible?: boolean;
+  /** Preferir não reembolsável (grant). */
+  reimbursable?: boolean;
+};
+
+export type ScanProfile = {
+  id: string;
+  name: string;
+  briefing: OpportunityBriefing;
+  classifications: OpportunityClassification[];
+  updatedAt: string;
 };
 
 export type ScanCandidate = {
@@ -34,15 +54,16 @@ export type ScanCandidate = {
   matchScore?: number;
   matchJustification?: string;
   sourceUrl?: string;
-  /** open_now | rolling | seasonal | closed | reference */
   availabilityStatus?: AvailabilityStatus;
   opensAt?: string | null;
   closesAt?: string | null;
-  /** Ex.: "Mar–Mai anualmente", "Rolling — candidaturas contínuas" */
   applicationWindow?: string;
   eligibleCountries?: string;
   availabilityNote?: string;
   scanFocus?: ScanFocus;
+  /** Classificação sugerida pela IA. */
+  classification?: OpportunityClassification;
+  classificationNote?: string;
 };
 
 export type ScanResultsPayload = {
@@ -54,6 +75,8 @@ export type ScanResultsPayload = {
   discoveryMode?: 'web' | 'knowledge';
   searchQueries?: string[];
   scanFocus?: ScanFocus;
+  scanProfileId?: string;
+  scanProfileName?: string;
 };
 
 export type FundingSourceRef = {

@@ -19,12 +19,26 @@ function todayIso(): string {
 
 function briefingLines(b: OpportunityBriefing): string {
   const kinds = b.kinds.map((k) => TYPE_MAP[k] ?? k).join(', ');
+  const classLabels: Record<string, string> = {
+    direct: 'candidatura directa pela nossa organização',
+    client_bridge: 'fundos para possíveis clientes (nós somos a ponte)',
+    joint: 'apresentação em conjunto / consórcio',
+  };
+  const classes = (b.classifications ?? ['direct'])
+    .map((c) => classLabels[c] ?? c)
+    .join('; ');
   return [
+    b.scanName ? `Nome da varredura: ${b.scanName}` : '',
     `Temas: ${b.themes.join(', ') || 'inferir'}`,
     `Países elegíveis desejados: ${b.countries.join(', ') || 'inferir'}`,
     `Tipos: ${kinds}`,
+    b.amountMax != null ? `Montante máximo preferido: ${b.amountMax} USD` : '',
+    b.amountMin != null ? `Montante mínimo: ${b.amountMin} USD` : '',
+    b.privateEligible ? 'Elegibilidade: empresas privadas OK' : '',
+    b.reimbursable === false ? 'Só financiamento NÃO reembolsável (grants). Sem empréstimos.' : '',
+    `Classificações a etiquetar: ${classes}`,
     b.notes ? `Notas: ${b.notes}` : '',
-    b.searchFeedback ? `Instruções do utilizador: ${b.searchFeedback}` : '',
+    b.searchFeedback ? `ORIENTAÇÃO COMPLETA DO UTILIZADOR:\n${b.searchFeedback}` : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -50,26 +64,25 @@ function promptsForFocus(scanFocus: ScanFocus) {
 TODAY'S DATE: ${today}
 
 CRITICAL RULES:
-- ONLY include calls where submission is open TODAY or rolling (continuous intake).
-- VERIFY on the official page: active deadline in the future, or explicit "open call / convocatoria abierta / now accepting".
-- EXCLUDE: expired calls, closed windows, generic program homepages (e.g. Horizon Europe cluster page) WITHOUT an active open call link.
-- EXCLUDE: programs that only open seasonally unless you find the CURRENT open window with dates.
-- For each item: exact closing date (closesAt), opening date if known (opensAt), eligible countries/regions, direct link to the ACTIVE call page (not parent program).
-- Search queries like: "open call 2026 deadline", "convocatoria abierta", "currently accepting applications".
-- Minimum 6 verified open opportunities.
+- Prefer official funder pages for linkOficial; if found only on aggregators, still INCLUDE the opportunity but leave linkOficial empty (never put aggregator URL in linkOficial).
+- Generic web search is valuable — use it; then try to resolve the official call URL.
+- EXCLUDE: expired calls, closed windows, generic program homepages WITHOUT an active open call.
+- For each item: closesAt, opensAt, eligibleCountries, classification (direct|client_bridge|joint), classificationNote.
+- Search broadly AND with site: filters for official portals.
+- Minimum 6 opportunities when possible; fewer is OK if strict quality.
 
 ${OFFICIAL_LINK_PROMPT_RULES}`,
       structure: `Convert the research into JSON only. Return { "candidates": [ ... ] }
 Each item MUST include:
 name, institution, type (Grant|Crédito|Aliança|Técnico local), category, description,
-linkOficial (OFFICIAL funder/call URL ONLY — see link rules), amount, currency,
-opensAt (ISO date|null), closesAt (ISO date|null), applicationWindow (human text),
-eligibleCountries (comma-separated countries/regions where applicant can apply),
-availabilityStatus ("open_now" or "rolling" ONLY — never seasonal/closed/reference here),
-availabilityNote (how you verified it's open today AND that linkOficial is on the funder's domain),
-matchScore (0-100), matchJustification, sourceUrl (official only).
+linkOficial (OFFICIAL funder URL only — never aggregators; omit if unknown), amount, currency,
+opensAt, closesAt, applicationWindow, eligibleCountries,
+availabilityStatus ("open_now" or "rolling"),
+availabilityNote, classification (direct|client_bridge|joint), classificationNote,
+matchScore (0-100), matchJustification, sourceUrl (official only if present).
 ${OFFICIAL_LINK_PROMPT_RULES}
-Do not invent URLs or dates. Skip duplicates in EXISTING. Omit candidates without an official link.`,
+Respect ORIENTAÇÃO COMPLETA (amount caps, grant-only, private eligibility, countries).
+Skip EXISTING duplicates.`,
     };
   }
 
@@ -144,7 +157,7 @@ export async function discoverOpportunitiesOnline(opts: {
         : '',
       focusHint,
       `\n${OFFICIAL_LINK_PROMPT_RULES}`,
-      `\nSearch the web now. Prefer site:ec.europa.eu site:worldbank.org site:funding-tenders.europa.eu for official pages.`,
+      `\nSearch the web broadly (generic queries OK). Prefer official domains for linkOficial; never put aggregator URLs in linkOficial.`,
     ].join('');
 
     const { text: research, searchQueries } = await llmCompleteWithWebSearch(

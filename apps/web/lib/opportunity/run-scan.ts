@@ -14,6 +14,8 @@ export async function runOpportunityScan(opts: {
   userId: string;
   briefing?: OpportunityBriefing;
   scanFocus?: ScanFocus;
+  /** Se já criado pelo POST async. */
+  existingRunId?: string;
 }): Promise<{
   runId: string;
   candidates: ScanCandidate[];
@@ -41,14 +43,17 @@ export async function runOpportunityScan(opts: {
     existingFunds.map((f) => `${f.name.toLowerCase()}|${f.institution.toLowerCase()}`),
   );
 
-  const run = await prisma.fundhubDiscoveryRun.create({
-    data: {
-      companyId: opts.companyId,
-      initiatedByUserId: opts.userId,
-      source: scanFocus === 'open_now' ? 'opportunity_open_now' : 'opportunity_reference',
-      status: 'running',
-    },
-  });
+  const run =
+    opts.existingRunId
+      ? await prisma.fundhubDiscoveryRun.findUniqueOrThrow({ where: { id: opts.existingRunId } })
+      : await prisma.fundhubDiscoveryRun.create({
+          data: {
+            companyId: opts.companyId,
+            initiatedByUserId: opts.userId,
+            source: scanFocus === 'open_now' ? 'opportunity_open_now' : 'opportunity_reference',
+            status: 'running',
+          },
+        });
 
   let optionalExtraContext = '';
   if (optionalUrls.length > 0) {
@@ -87,6 +92,7 @@ export async function runOpportunityScan(opts: {
       discoveryMode: discovery.discoveryMode,
       searchQueries: discovery.searchQueries,
       scanFocus,
+      scanProfileName: briefing.scanName,
     },
     `discovery:${opts.userId}`,
   );
@@ -106,6 +112,7 @@ export async function runOpportunityScan(opts: {
         searchQueries: discovery.searchQueries,
         mode: discovery.discoveryMode,
         scanFocus,
+        scanName: briefing.scanName ?? null,
       }),
       finishedAt: new Date(),
       durationMs,

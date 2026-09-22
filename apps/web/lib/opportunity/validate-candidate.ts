@@ -10,6 +10,12 @@ import {
 import type { ScanCandidate } from '@/lib/opportunity/scan-types';
 import { fundStatusFromAvailability } from '@/lib/opportunity/availability';
 import { sanitizeFundingLinks } from '@/lib/opportunity/official-url';
+import {
+  recordOpportunityFeedback,
+  type LearningAction,
+  type LikeReason,
+  type RejectReason,
+} from '@/lib/opportunity/learning-feedback';
 
 function parseDeadline(raw: string | null | undefined): Date | null {
   if (!raw) return null;
@@ -17,44 +23,86 @@ function parseDeadline(raw: string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+export type ValidateAction = 'save' | 'not_now' | 'reject_type' | 'discard' | 'later';
+
 export async function validateScanCandidate(opts: {
   companyId: string;
   userId: string;
   runId: string;
   tempId: string;
-  action: 'save' | 'discard' | 'later';
-}): Promise<{ ok: true; fundId?: string; pending: number }> {
+  action: ValidateAction;
+  reasons?: string[];
+  note?: string;
+}): Promise<{ ok: true; fundId?: string; pending: number; learning?: LearningAction }> {
   const payload = await readScanResults(opts.companyId, opts.runId);
   const candidate = payload.candidates.find((c) => c.tempId === opts.tempId);
   if (!candidate) {
     throw new Error('Candidato não encontrado nesta varredura');
   }
 
-  let fundId: string | undefined;
+  // Normalizar acções legadas
+  const action: ValidateAction =
+    opts.action === 'discard' ? 'not_now' : opts.action === 'later' ? 'not_now' : opts.action;
 
-  if (opts.action === 'save') {
+  let fundId: string | undefined;
+  let learning: LearningAction | undefined;
+
+  if (action === 'save') {
     fundId = await upsertFundFromCandidate(opts.companyId, candidate, opts.runId);
     await prisma.userFundStatus.upsert({
       where: { fundId_userId: { fundId, userId: opts.userId } },
-      update: { status: 'saved', notes: 'Validado na varredura' },
-      create: { fundId, userId: opts.userId, status: 'saved', notes: 'Validado na varredura' },
+      update: { status: 'saved', notes: opts.note || 'Validado na varredura' },
+      create: {
+        fundId,
+        userId: opts.userId,
+        status: 'saved',
+        notes: opts.note || 'Validado na varredura',
+      },
     });
     if (!payload.savedTempIds.includes(opts.tempId)) {
       payload.savedTempIds.push(opts.tempId);
     }
-  } else if (opts.action === 'discard') {
+    learning = 'like';
+    await recordOpportunityFeedback({
+      companyId: opts.companyId,
+      userId: opts.userId,
+      candidate,
+      action: 'like',
+      reasons: (opts.reasons as LikeReason[] | undefined) ?? ['more_like_this'],
+      note: opts.note,
+    });
+  } else if (action === 'reject_type') {
     if (!payload.discardedTempIds.includes(opts.tempId)) {
       payload.discardedTempIds.push(opts.tempId);
     }
+    learning = 'reject_type';
+    await recordOpportunityFeedback({
+      companyId: opts.companyId,
+      userId: opts.userId,
+      candidate,
+      action: 'reject_type',
+      reasons: (opts.reasons as RejectReason[] | undefined) ?? ['other'],
+      note: opts.note,
+    });
   } else {
+    // not_now — some nesta ocasião; não ensina a odiar o tipo
     if (!payload.laterTempIds.includes(opts.tempId)) {
       payload.laterTempIds.push(opts.tempId);
     }
+    learning = 'not_now';
+    await recordOpportunityFeedback({
+      companyId: opts.companyId,
+      userId: opts.userId,
+      candidate,
+      action: 'not_now',
+      reasons: opts.reasons,
+      note: opts.note,
+    });
   }
 
   await writeScanResults(opts.companyId, payload, `validate:${opts.userId}`);
 
-  if (opts.action === 'save' && candidate.deadline) {
+  if (action === 'save' && candidate.deadline) {
     void syncDeadlineNotifications(opts.companyId, opts.userId);
   }
 
@@ -62,6 +110,7 @@ export async function validateScanCandidate(opts: {
     ok: true,
     fundId,
     pending: pendingCandidates(payload).length,
+    learning,
   };
 }
 

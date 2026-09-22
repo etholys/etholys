@@ -42,6 +42,10 @@ type Briefing = {
   amountMax?: number;
   notes?: string;
   searchFeedback?: string;
+  scanName?: string;
+  classifications?: Array<'direct' | 'client_bridge' | 'joint'>;
+  privateEligible?: boolean;
+  reimbursable?: boolean;
 };
 
 type ScanCandidate = {
@@ -65,6 +69,8 @@ type ScanCandidate = {
   eligibleCountries?: string;
   availabilityNote?: string;
   scanFocus?: ScanFocus;
+  classification?: 'direct' | 'client_bridge' | 'joint';
+  classificationNote?: string;
 };
 
 type CatalogFund = ScanCandidate & {
@@ -205,50 +211,116 @@ export default function OpportunityDiscoverPage() {
     }
   };
 
-  const startScan = async (focus: ScanFocus = discoveryFocus) => {
+  const startScan = async (
+    focus: ScanFocus = discoveryFocus,
+    briefingOverride?: Briefing,
+  ) => {
     setScanning(true);
     setMsg(null);
     setDiscoveryFocus(focus);
+    const briefingToUse = briefingOverride ?? briefing;
     try {
       const r = await fetch(q('/api/opportunity/scans'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ briefing, scanFocus: focus }),
+        body: JSON.stringify({ briefing: briefingToUse, scanFocus: focus }),
       });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Erro');
-      const focusLabel =
-        focus === 'open_now'
-          ? t('Abertos agora', 'Abiertos ahora', 'Open now')
-          : t('Base de referência', 'Base de referencia', 'Reference base');
+      const raw = await r.text();
+      let d: {
+        error?: string;
+        runId?: string;
+        status?: string;
+        created?: number;
+        discoveryMode?: string;
+        searchQueries?: string[];
+        scanned?: number;
+      } = {};
+      try {
+        d = JSON.parse(raw) as typeof d;
+      } catch {
+        throw new Error(
+          t(
+            'O servidor interrompeu a varredura (timeout). Tente de novo — agora a pesquisa corre em segundo plano.',
+            'El servidor interrumpió el barrido (timeout). Intente de nuevo.',
+            'Server interrupted the scan (timeout). Please try again.',
+          ),
+        );
+      }
+      if (!r.ok && r.status !== 409) throw new Error(d.error || 'Erro');
+      const runId = d.runId;
+      if (!runId) throw new Error(d.error || 'Sem runId');
+
       setMsg(
         t(
-          `${focusLabel}: ${d.created ?? 0} candidatos para validar${d.discoveryMode === 'web' ? ' (pesquisa web)' : ''}.`,
-          `${focusLabel}: ${d.created ?? 0} candidatos${d.discoveryMode === 'web' ? ' (búsqueda web)' : ''}.`,
-          `${focusLabel}: ${d.created ?? 0} candidates${d.discoveryMode === 'web' ? ' (web search)' : ''}.`,
+          'Varredura em curso… pode demorar 1–3 minutos.',
+          'Barrido en curso… puede tardar 1–3 minutos.',
+          'Scan in progress… may take 1–3 minutes.',
         ),
       );
-      setLatest((prev) =>
-        prev
-          ? {
-              ...prev,
-              discoveryMode: d.discoveryMode ?? prev.discoveryMode,
-              searchQueries: d.searchQueries ?? [],
-              scanFocus: focus,
-              created: d.created ?? prev.created,
-            }
-          : {
-              id: d.runId,
-              status: 'completed',
-              startedAt: new Date().toISOString(),
-              scanned: d.scanned ?? 0,
-              created: d.created ?? 0,
-              errorCount: 0,
-              discoveryMode: d.discoveryMode,
-              searchQueries: d.searchQueries ?? [],
-              scanFocus: focus,
-            },
-      );
+      setLatest({
+        id: runId,
+        status: 'running',
+        startedAt: new Date().toISOString(),
+        scanned: 0,
+        created: 0,
+        errorCount: 0,
+        scanFocus: focus,
+      });
+
+      // Poll até completed / failed
+      let attempts = 0;
+      while (attempts < 90) {
+        await new Promise((res) => setTimeout(res, 2000));
+        attempts += 1;
+        const pr = await fetch(q(`/api/opportunity/scans?runId=${encodeURIComponent(runId)}`), {
+          cache: 'no-store',
+        });
+        const pRaw = await pr.text();
+        let pd: {
+          run?: { status: string; created: number; discoveryMode?: string | null; errorCount?: number };
+          error?: string;
+        } = {};
+        try {
+          pd = JSON.parse(pRaw) as typeof pd;
+        } catch {
+          continue;
+        }
+        if (!pr.ok) continue;
+        const st = pd.run?.status;
+        if (st === 'completed') {
+          const focusLabel =
+            focus === 'open_now'
+              ? t('Abertos agora', 'Abiertos ahora', 'Open now')
+              : t('Base de referência', 'Base de referencia', 'Reference base');
+          setMsg(
+            t(
+              `${focusLabel}: ${pd.run?.created ?? 0} candidatos${pd.run?.discoveryMode === 'web' ? ' (pesquisa web)' : ''}.`,
+              `${focusLabel}: ${pd.run?.created ?? 0} candidatos${pd.run?.discoveryMode === 'web' ? ' (búsqueda web)' : ''}.`,
+              `${focusLabel}: ${pd.run?.created ?? 0} candidates${pd.run?.discoveryMode === 'web' ? ' (web search)' : ''}.`,
+            ),
+          );
+          break;
+        }
+        if (st === 'failed') {
+          throw new Error(
+            t(
+              'A varredura falhou. Verifique a chave LLM e tente de novo.',
+              'El barrido falló. Verifique la clave LLM.',
+              'Scan failed. Check LLM key and retry.',
+            ),
+          );
+        }
+        if (attempts % 5 === 0) {
+          setMsg(
+            t(
+              `A pesquisar… (${attempts * 2}s)`,
+              `Buscando… (${attempts * 2}s)`,
+              `Searching… (${attempts * 2}s)`,
+            ),
+          );
+        }
+      }
+
       await Promise.all([loadScan(), loadCatalog()]);
       setTab('new');
     } catch (e) {
@@ -258,20 +330,52 @@ export default function OpportunityDiscoverPage() {
     }
   };
 
-  const validate = async (tempId: string, action: 'save' | 'discard' | 'later') => {
+  const validate = async (
+    tempId: string,
+    action: 'save' | 'not_now' | 'reject_type',
+    opts?: { reasons?: string[]; note?: string },
+  ) => {
     if (!latest?.id) return;
     setBusyId(tempId);
     try {
       const r = await fetch(q('/api/opportunity/candidates/validate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ runId: latest.id, tempId, action }),
+        body: JSON.stringify({
+          runId: latest.id,
+          tempId,
+          action,
+          reasons: opts?.reasons,
+          note: opts?.note,
+        }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Erro');
       await Promise.all([loadScan(), loadCatalog()]);
       if (action === 'save') {
-        setMsg(t('Oportunidade guardada no catálogo.', 'Oportunidad guardada.', 'Opportunity saved.'));
+        setMsg(
+          t(
+            'Guardado — a IA vai procurar mais fundos semelhantes.',
+            'Guardado — la IA buscará fondos similares.',
+            'Saved — AI will look for similar funds.',
+          ),
+        );
+      } else if (action === 'reject_type') {
+        setMsg(
+          t(
+            'Tipo registado para evitar — próximas varreduras aprendem isto.',
+            'Tipo registrado para evitar — próximos barridos lo aprenden.',
+            'Type flagged to avoid — future scans learn this.',
+          ),
+        );
+      } else {
+        setMsg(
+          t(
+            'Arquivado só para esta ocasião — não penaliza o tipo de fundo.',
+            'Archivado solo para esta ocasión — no penaliza el tipo.',
+            'Skipped for this occasion — does not penalize the fund type.',
+          ),
+        );
       }
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'Erro');
@@ -315,6 +419,12 @@ export default function OpportunityDiscoverPage() {
           <h1 className="mt-2 text-2xl font-bold text-gray-900 md:text-3xl">
             {t('Descobrir oportunidades', 'Descubrir oportunidades', 'Discover opportunities')}
           </h1>
+          {briefing.scanName && (
+            <p className="mt-1 text-sm font-medium text-violet-800">
+              {t('Perfil activo:', 'Perfil activo:', 'Active profile:')} {briefing.scanName}
+              {briefing.amountMax != null ? ` · ≤ ${briefing.amountMax.toLocaleString()} USD` : ''}
+            </p>
+          )}
           {lastScanLabel && (
             <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
               <span>
@@ -519,9 +629,7 @@ export default function OpportunityDiscoverPage() {
                 candidate={c}
                 busy={busyId === c.tempId}
                 locale={locale}
-                onSave={() => void validate(c.tempId, 'save')}
-                onDiscard={() => void validate(c.tempId, 'discard')}
-                onLater={() => void validate(c.tempId, 'later')}
+                onFeedback={(action, opts) => void validate(c.tempId, action, opts)}
                 t={t}
               />
             ))}
@@ -530,18 +638,16 @@ export default function OpportunityDiscoverPage() {
             (later.length === 0 ? (
               <p className="text-sm text-gray-500">{t('Nada para rever.', 'Nada para revisar.', 'Nothing to review.')}</p>
             ) : (
-            later.map((c) => (
-              <CandidateCard
-                key={c.tempId}
-                candidate={c}
-                busy={busyId === c.tempId}
-                locale={locale}
-                onSave={() => void validate(c.tempId, 'save')}
-                onDiscard={() => void validate(c.tempId, 'discard')}
-                onLater={undefined}
-                t={t}
-              />
-            ))
+              later.map((c) => (
+                <CandidateCard
+                  key={c.tempId}
+                  candidate={c}
+                  busy={busyId === c.tempId}
+                  locale={locale}
+                  onFeedback={(action, opts) => void validate(c.tempId, action, opts)}
+                  t={t}
+                />
+              ))
             ))}
 
           {tab === 'catalog' &&
@@ -607,7 +713,37 @@ export default function OpportunityDiscoverPage() {
         <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
           <SearchCoachingPanel
             briefing={briefing}
-            onSaved={(feedback) => setBriefing((b) => ({ ...b, searchFeedback: feedback || undefined }))}
+            scanning={scanning}
+            onSaved={(next) =>
+              setBriefing({
+                themes: next.themes ?? [],
+                countries: next.countries ?? [],
+                kinds: (next.kinds as OpportunityKind[]) ?? ['grant'],
+                notes: next.notes,
+                searchFeedback: next.searchFeedback,
+                scanName: next.scanName,
+                classifications: next.classifications,
+                amountMax: next.amountMax,
+                privateEligible: next.privateEligible,
+                reimbursable: next.reimbursable,
+              })
+            }
+            onRunShortcut={(next, focus) => {
+              const mapped: Briefing = {
+                themes: next.themes ?? [],
+                countries: next.countries ?? [],
+                kinds: (next.kinds as OpportunityKind[]) ?? ['grant'],
+                notes: next.notes,
+                searchFeedback: next.searchFeedback,
+                scanName: next.scanName,
+                classifications: next.classifications,
+                amountMax: next.amountMax,
+                privateEligible: next.privateEligible,
+                reimbursable: next.reimbursable,
+              };
+              setBriefing(mapped);
+              void startScan(focus, mapped);
+            }}
           />
           <KnownFundsPanel onAdded={() => void loadCatalog()} />
         </aside>
@@ -718,19 +854,22 @@ function CandidateCard({
   candidate: c,
   busy,
   locale,
-  onSave,
-  onDiscard,
-  onLater,
+  onFeedback,
   t,
 }: {
   candidate: ScanCandidate;
   busy: boolean;
   locale: string;
-  onSave: () => void;
-  onDiscard: () => void;
-  onLater?: () => void;
+  onFeedback: (
+    action: 'save' | 'not_now' | 'reject_type',
+    opts?: { reasons?: string[]; note?: string },
+  ) => void;
   t: (pt: string, es: string, en: string) => string;
 }) {
+  const [panel, setPanel] = useState<'save' | 'reject' | null>(null);
+  const [reasons, setReasons] = useState<string[]>([]);
+  const [note, setNote] = useState('');
+
   const countries = c.eligibleCountries ?? c.countries;
   const closes = c.closesAt ?? c.deadline;
   const opensLabel = formatDateShort(c.opensAt, locale);
@@ -738,6 +877,38 @@ function CandidateCard({
   const status = c.availabilityStatus;
   const showClosedWarning =
     status === 'closed' || status === 'reference' || status === 'seasonal';
+
+  const likeOpts = [
+    { id: 'more_like_this', pt: 'Mais assim', es: 'Más así', en: 'More like this' },
+    { id: 'theme_fit', pt: 'Tema certo', es: 'Tema correcto', en: 'Right theme' },
+    { id: 'size_fit', pt: 'Montante certo', es: 'Monto correcto', en: 'Right size' },
+    { id: 'geography_fit', pt: 'Geografia certa', es: 'Geografía correcta', en: 'Right geography' },
+    { id: 'instrument_fit', pt: 'Grant / instrumento', es: 'Grant / instrumento', en: 'Grant / instrument' },
+  ];
+  const rejectOpts = [
+    { id: 'loan_not_grant', pt: 'É empréstimo', es: 'Es préstamo', en: 'It is a loan' },
+    { id: 'amount_wrong', pt: 'Montante errado', es: 'Monto incorrecto', en: 'Wrong amount' },
+    { id: 'geography', pt: 'Geografia', es: 'Geografía', en: 'Geography' },
+    { id: 'theme', pt: 'Tema / sector', es: 'Tema / sector', en: 'Theme / sector' },
+    { id: 'eligibility', pt: 'Não elegíveis', es: 'No elegibles', en: 'Not eligible' },
+    { id: 'closed_or_stale', pt: 'Fechado / desactualizado', es: 'Cerrado / obsoleto', en: 'Closed / stale' },
+    { id: 'low_quality', pt: 'Má qualidade', es: 'Mala calidad', en: 'Low quality' },
+    { id: 'other', pt: 'Outro', es: 'Otro', en: 'Other' },
+  ];
+
+  const toggleReason = (id: string) =>
+    setReasons((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const submitPanel = () => {
+    if (!panel) return;
+    onFeedback(panel === 'save' ? 'save' : 'reject_type', {
+      reasons: reasons.length ? reasons : panel === 'save' ? ['more_like_this'] : ['other'],
+      note: note.trim() || undefined,
+    });
+    setPanel(null);
+    setReasons([]);
+    setNote('');
+  };
 
   return (
     <article className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -749,6 +920,15 @@ function CandidateCard({
                 className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${availabilityBadgeClass(status)}`}
               >
                 {availabilityLabel(status, locale)}
+              </span>
+            )}
+            {c.classification && (
+              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-900">
+                {c.classification === 'direct'
+                  ? t('Directo', 'Directo', 'Direct')
+                  : c.classification === 'client_bridge'
+                    ? t('Ponte cliente', 'Puente cliente', 'Client bridge')
+                    : t('Conjunto', 'Conjunto', 'Joint')}
               </span>
             )}
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
@@ -774,9 +954,6 @@ function CandidateCard({
                       : c.applicationWindow}
               </span>
             )}
-            {c.applicationWindow && (opensLabel || closesLabel) && (
-              <span className="text-gray-500">({c.applicationWindow})</span>
-            )}
             {countries && (
               <span className="inline-flex items-center gap-1">
                 <MapPin className="h-3.5 w-3.5 shrink-0 text-gray-400" />
@@ -788,9 +965,6 @@ function CandidateCard({
           {c.description && <p className="mt-2 text-sm text-gray-700 line-clamp-2">{c.description}</p>}
           {c.matchJustification && (
             <p className="mt-2 text-xs text-gray-500">{c.matchJustification}</p>
-          )}
-          {c.availabilityNote && (
-            <p className="mt-1 text-xs italic text-gray-500">{c.availabilityNote}</p>
           )}
           {showClosedWarning && c.scanFocus === 'open_now' && (
             <p className="mt-2 flex items-start gap-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
@@ -814,33 +988,37 @@ function CandidateCard({
         <button
           type="button"
           disabled={busy}
-          onClick={onSave}
+          onClick={() => {
+            setPanel('save');
+            setReasons(['more_like_this']);
+            setNote('');
+          }}
           className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-          {c.scanFocus === 'reference'
-            ? t('Guardar na base', 'Guardar en base', 'Save to base')
-            : t('Guardar', 'Guardar', 'Save')}
+          {t('Guardar + aprender', 'Guardar + aprender', 'Save + learn')}
         </button>
-        {onLater && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onLater}
-            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            <Clock className="h-3.5 w-3.5" />
-            {t('Rever depois', 'Revisar después', 'Review later')}
-          </button>
-        )}
         <button
           type="button"
           disabled={busy}
-          onClick={onDiscard}
+          onClick={() => onFeedback('not_now')}
+          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          <Clock className="h-3.5 w-3.5" />
+          {t('Não agora', 'No ahora', 'Not now')}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            setPanel('reject');
+            setReasons([]);
+            setNote('');
+          }}
           className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100 disabled:opacity-50"
         >
           <ThumbsDown className="h-3.5 w-3.5" />
-          {t('Descartar', 'Descartar', 'Discard')}
+          {t('Evitar este tipo', 'Evitar este tipo', 'Avoid this type')}
         </button>
         {c.linkOficial ? (
           <a
@@ -848,7 +1026,6 @@ function CandidateCard({
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-            title={c.linkOficial}
           >
             <Bookmark className="h-3.5 w-3.5" />
             {(() => {
@@ -866,6 +1043,73 @@ function CandidateCard({
           </span>
         )}
       </div>
+
+      {panel && (
+        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <p className="text-xs font-semibold text-gray-800">
+            {panel === 'save'
+              ? t(
+                  'Porquê guardar? (ensina a IA a buscar mais assim)',
+                  '¿Por qué guardar? (enseña a la IA)',
+                  'Why save? (teaches AI to find more like this)',
+                )
+              : t(
+                  'Porquê evitar este tipo? (não é só “nesta ocasião”)',
+                  '¿Por qué evitar este tipo? (no es solo “esta ocasión”)',
+                  'Why avoid this type? (not just this occasion)',
+                )}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {(panel === 'save' ? likeOpts : rejectOpts).map((o) => {
+              const on = reasons.includes(o.id);
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => toggleReason(o.id)}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${
+                    on
+                      ? panel === 'save'
+                        ? 'bg-emerald-700 text-white'
+                        : 'bg-red-700 text-white'
+                      : 'border border-gray-200 bg-white text-gray-700'
+                  }`}
+                >
+                  {locale === 'pt' ? o.pt : locale === 'es' ? o.es : o.en}
+                </button>
+              );
+            })}
+          </div>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            placeholder={t('Nota opcional…', 'Nota opcional…', 'Optional note…')}
+            className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs"
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={submitPanel}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold text-white ${
+                panel === 'save' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-700 hover:bg-red-800'
+              }`}
+            >
+              {panel === 'save'
+                ? t('Confirmar e aprender', 'Confirmar y aprender', 'Confirm & learn')
+                : t('Confirmar rejeição de tipo', 'Confirmar rechazo de tipo', 'Confirm type reject')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPanel(null)}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600"
+            >
+              {t('Cancelar', 'Cancelar', 'Cancel')}
+            </button>
+          </div>
+        </div>
+      )}
     </article>
   );
 }

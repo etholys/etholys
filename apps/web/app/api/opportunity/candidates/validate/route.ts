@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
-import { validateScanCandidate } from '@/lib/opportunity/validate-candidate';
+import { validateScanCandidate, type ValidateAction } from '@/lib/opportunity/validate-candidate';
 
 export async function POST(req: NextRequest) {
   const ctx = await resolveOpportunityCompanyId(req.nextUrl.searchParams.get('companyId'));
@@ -11,7 +11,9 @@ export async function POST(req: NextRequest) {
   const body = (await req.json()) as {
     runId?: string;
     tempId?: string;
-    action?: 'save' | 'discard' | 'later';
+    action?: ValidateAction;
+    reasons?: string[];
+    note?: string;
   };
 
   if (!body.runId || !body.tempId || !body.action) {
@@ -25,6 +27,8 @@ export async function POST(req: NextRequest) {
       runId: body.runId,
       tempId: body.tempId,
       action: body.action,
+      reasons: body.reasons,
+      note: body.note,
     });
     return NextResponse.json(result);
   } catch (e) {

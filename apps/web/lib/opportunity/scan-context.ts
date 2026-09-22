@@ -1,46 +1,54 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
+import { buildFeedbackLearningBlock } from '@/lib/opportunity/learning-feedback';
 import { SCAN_MEMORY_CATEGORY, parseScanResults } from '@/lib/opportunity/candidate-store';
-import { listUserMonitoredUrls } from '@/lib/opportunity/source-catalog';
 
 /** Contexto de aprendizagem — o que a organização já validou ou rejeitou (não substitui a descoberta). */
 export async function buildLearningContext(companyId: string): Promise<string> {
-  const [validated, scanMemories] = await Promise.all([
+  const [validated, feedbackBlock] = await Promise.all([
     prisma.fund.findMany({
       where: { companyId, isActive: true },
-      select: { institution: true, sectors: true, type: true, countries: true },
+      select: { name: true, institution: true, sectors: true, type: true, countries: true, amount: true },
       take: 30,
       orderBy: { updatedAt: 'desc' },
     }),
-    prisma.aiCompanyMemory.findMany({
-      where: { companyId, category: SCAN_MEMORY_CATEGORY },
-      orderBy: { updatedAt: 'desc' },
-      take: 5,
-      select: { value: true, key: true },
-    }),
+    buildFeedbackLearningBlock(companyId),
   ]);
 
   const lines: string[] = [];
 
   if (validated.length > 0) {
-    const inst = [...new Set(validated.map((f) => f.institution))].slice(0, 12);
-    lines.push(`Instituições já validadas pela organização: ${inst.join(', ')}`);
-    const sectors = [...new Set(validated.map((f) => f.sectors).filter(Boolean))].slice(0, 8);
-    if (sectors.length) lines.push(`Sectores/temas preferidos: ${sectors.join('; ')}`);
+    lines.push('Catálogo guardado (sinais positivos implícitos):');
+    for (const f of validated.slice(0, 15)) {
+      lines.push(
+        `- ${f.name} (${f.institution}) · ${f.type}${f.sectors ? ` · ${f.sectors}` : ''}${f.countries ? ` · ${f.countries}` : ''}`,
+      );
+    }
   }
 
-  const discarded: string[] = [];
+  if (feedbackBlock) lines.push(feedbackBlock);
+
+  // Soft: nomes descartados nesta ocasião (só evita repetir o mesmo fundo na próxima run)
+  const scanMemories = await prisma.aiCompanyMemory.findMany({
+    where: { companyId, category: SCAN_MEMORY_CATEGORY },
+    orderBy: { updatedAt: 'desc' },
+    take: 3,
+    select: { value: true, key: true },
+  });
+  const softSkip: string[] = [];
   for (const row of scanMemories) {
     const runId = row.key.replace('run_', '');
     const payload = parseScanResults(row.value, runId);
-    for (const id of payload.discardedTempIds) {
+    for (const id of [...payload.discardedTempIds, ...payload.laterTempIds]) {
       const c = payload.candidates.find((x) => x.tempId === id);
-      if (c) discarded.push(`${c.name} (${c.institution})`);
+      if (c) softSkip.push(`${c.name} (${c.institution})`);
     }
   }
-  if (discarded.length > 0) {
-    lines.push(`Evitar repetir ou priorizar baixo: ${[...new Set(discarded)].slice(0, 15).join('; ')}`);
+  if (softSkip.length) {
+    lines.push(
+      `Não repetir estes nomes já vistos (timing/ocasião — NÃO generalizar o tipo): ${[...new Set(softSkip)].slice(0, 12).join('; ')}`,
+    );
   }
 
   const profile = await prisma.fundingCaptureProfile.findUnique({
@@ -51,7 +59,7 @@ export async function buildLearningContext(companyId: string): Promise<string> {
     try {
       const prefs = JSON.parse(profile.preferencesJson) as { searchFeedback?: string };
       if (prefs.searchFeedback?.trim()) {
-        lines.push(`Instruções do utilizador para afinar buscas: ${prefs.searchFeedback.trim()}`);
+        lines.push(`Orientação do atalho activo:\n${prefs.searchFeedback.trim()}`);
       }
     } catch {
       // ignore

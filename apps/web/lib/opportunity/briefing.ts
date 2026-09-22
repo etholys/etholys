@@ -10,6 +10,10 @@ type PreferencesJson = {
   amountMax?: number;
   opportunityKinds?: string[];
   searchFeedback?: string;
+  scanName?: string;
+  classifications?: string[];
+  privateEligible?: boolean;
+  reimbursable?: boolean;
 };
 
 function parseKinds(raw: string[] | undefined): OpportunityKind[] {
@@ -58,6 +62,12 @@ export async function readOpportunityBriefing(companyId: string): Promise<Opport
     amountMax: prefs.amountMax,
     notes: prefs.briefingNotes || company?.description?.slice(0, 500) || undefined,
     searchFeedback: prefs.searchFeedback?.trim() || undefined,
+    scanName: prefs.scanName?.trim() || undefined,
+    classifications: Array.isArray(prefs.classifications)
+      ? (prefs.classifications as OpportunityBriefing['classifications'])
+      : undefined,
+    privateEligible: prefs.privateEligible,
+    reimbursable: prefs.reimbursable,
   };
 }
 
@@ -72,6 +82,10 @@ export async function writeOpportunityBriefing(
     amountMax: briefing.amountMax,
     opportunityKinds: briefing.kinds,
     searchFeedback: briefing.searchFeedback?.trim() || undefined,
+    scanName: briefing.scanName?.trim() || undefined,
+    classifications: briefing.classifications,
+    privateEligible: briefing.privateEligible,
+    reimbursable: briefing.reimbursable,
   };
 
   const data = {
