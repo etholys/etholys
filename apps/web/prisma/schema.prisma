@@ -558,6 +558,7 @@ model Project {
   transactions               Transaction[]
   activityReports            TaskActivityReport[]
   reportGuides               ProjectReportGuide[]
+  reportingTools             ProjectReportingTool[]
   meetSessions               MeetSession[]
   invitations                Invitation[]
 }
@@ -2052,6 +2053,78 @@ model IndicatorMeasurement {
   @@index([projectId])
   @@index([objectiveId])
   @@index([projectId, period])
+}
+
+/// Camada oficial de reporte (ex.: Rural Commerce Reporting Tool) — paralela ao logframe/PMP.
+model ProjectReportingTool {
+  id             String                     @id @default(cuid())
+  projectId      String
+  title          String
+  version        String?
+  sourceFileName String?
+  notes          String?
+  isActive       Boolean                    @default(true)
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  project        Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  lines          ProjectReportingToolLine[]
+
+  @@index([projectId])
+}
+
+model ProjectReportingToolLine {
+  id                 String               @id @default(cuid())
+  toolId             String
+  projectId          String
+  order              Int                  @default(0)
+  /// project_results | cross_cutting
+  block              String               @default("project_results")
+  resultContext      String?
+  indicatorText      String
+  isDos              Boolean              @default(false)
+  /// same_essence | official_dos | to_be_designed | project_only_internal
+  tag                String
+  baseline           String?
+  target             String?
+  /// Objetivo/indicador do logframe que alimenta esta linha (opcional)
+  linkedObjectiveId  String?
+  notes              String?
+  siepHint           String?
+  isActive           Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  tool               ProjectReportingTool @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  progressEntries    ProjectReportingToolProgress[]
+
+  @@index([toolId])
+  @@index([projectId])
+  @@index([linkedObjectiveId])
+  @@index([projectId, tag])
+}
+
+/// Avances periódicos por línea de Reporting Tool (capa oficial de reporte).
+model ProjectReportingToolProgress {
+  id                 String                    @id @default(cuid())
+  lineId             String
+  projectId          String
+  /// Ej. 2026-Q2 o 2026-04-01 / 2026-06-30
+  periodLabel        String
+  periodStart        DateTime?
+  periodEnd          DateTime?
+  cumulativeBefore   String?
+  progressDuring     String?
+  totalCumulative    String?
+  /// Not started | On track | Slightly off track | Severely off track
+  status             String                    @default("Not started")
+  comments           String?
+  createdById        String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  line               ProjectReportingToolLine  @relation(fields: [lineId], references: [id], onDelete: Cascade)
+
+  @@index([lineId])
+  @@index([projectId])
+  @@index([lineId, createdAt])
 }
 
 model MEReport {

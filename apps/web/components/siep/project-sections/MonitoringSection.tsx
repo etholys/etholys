@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { SectionProps } from './types';
 import { SectionTooltip } from './SectionTooltip';
+import { ReportingToolPanel } from './ReportingToolPanel';
 import { formatDate } from '@/lib/utils';
 import { buildMonitoringMaps } from '@/lib/siep/objective-hierarchy';
 import { metricsMissing, resolveIndicatorMetrics } from '@/lib/siep/indicator-fields';
@@ -121,6 +122,7 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
   const [repairInfo, setRepairInfo] = useState<string | null>(null);
   const [metaRepairState, setMetaRepairState] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [metaRepairInfo, setMetaRepairInfo] = useState<string | null>(null);
+  const [meView, setMeView] = useState<'indicators' | 'reporting'>('indicators');
 
   const { indicatorObjs, hierarchyMap, byType } = useMemo(
     () => buildMonitoringMaps(project?.objectives),
@@ -378,6 +380,31 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center bg-gray-100 rounded-lg p-0.5 w-fit">
+        <button
+          type="button"
+          onClick={() => setMeView('indicators')}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
+            meView === 'indicators' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Indicadores (PMP)
+        </button>
+        <button
+          type="button"
+          onClick={() => setMeView('reporting')}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
+            meView === 'reporting' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Reporting Tool
+        </button>
+      </div>
+
+      {meView === 'reporting' ? (
+        <ReportingToolPanel project={project} onRefresh={onRefresh} tr={tr} />
+      ) : (
+      <>
       {/* Summary Dashboard */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
@@ -873,6 +900,8 @@ export function MonitoringSection({ project, onRefresh, tr }: SectionProps) {
         </div>
       )}
 
+      </>
+      )}
     </div>
   );
 }
