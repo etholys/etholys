@@ -1,0 +1,13 @@
+---
+description: After finishing product updates, commit scoped changes and deploy Contabo web
+alwaysApply: true
+---
+
+# Commit + deploy after updates
+
+When a feature/fix update for Etholys is finished (not mid-exploration):
+
+1. **Commit** only the files for that update (never `.env` secrets, never unrelated dirty tree). Push to `origin/main` when deploy needs production.
+2. **Deploy** web changes with Contabo web-only rebuild: SSH `root@84.247.187.155`, `git fetch` + `reset --hard origin/main`, then `bash /opt/etholys/scripts/deploy-forge-web.sh` (log under `/tmp/…`). Do **not** rebuild Postgres/Caddy/Jitsi unless required.
+3. **Monitor** until `OK health` or clear failure; report HEAD + result to the user.
+4. Scope: Hub/Meet/Studio/FundHub UI or API in `apps/web` → etholys-web only. Backend-only → `docs/backend-release-hygiene.md`. Jitsi branding-only → `scripts/apply-jitsi-branding.sh`.
