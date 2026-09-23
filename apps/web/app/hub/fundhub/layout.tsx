@@ -234,7 +234,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
               </div>
               {!collapsed && (
                 <span className="truncate font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-[0.14em] text-white">
-                  FUNDHUB
+                  OPPORTUNITY
                 </span>
               )}
             </Link>
@@ -574,7 +574,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
             <Menu className="h-5 w-5" />
           </button>
           <span className="font-[family-name:var(--font-etholys-display)] text-xs font-bold tracking-[0.16em] text-white">
-            FUNDHUB
+            OPPORTUNITY
           </span>
           {activeCompany && (
             <div className="ml-auto flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/70">

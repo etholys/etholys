@@ -276,9 +276,9 @@ export default function OpportunityDiscoverPage() {
 
       setMsg(
         t(
-          'Varredura em curso… pode demorar 1–3 minutos.',
-          'Barrido en curso… puede tardar 1–3 minutos.',
-          'Scan in progress… may take 1–3 minutes.',
+          'A pesquisar… pode demorar 1–3 minutos.',
+          'Buscando… puede tardar 1–3 minutos.',
+          'Searching… may take 1–3 minutes.',
         ),
       );
       setLatest({
@@ -476,7 +476,7 @@ export default function OpportunityDiscoverPage() {
               className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-800"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              FUNDHUB
+              OPPORTUNITY
             </Link>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-gray-900 md:text-[1.75rem]">
               {t('Descobrir oportunidades', 'Descubrir oportunidades', 'Discover opportunities')}
@@ -599,7 +599,7 @@ export default function OpportunityDiscoverPage() {
           {historyOpen && recentRuns.length > 0 && (
             <div className="rounded-xl border border-gray-200 bg-white p-4">
               <h3 className="text-sm font-semibold text-gray-900">
-                {t('Varreduras recentes', 'Barridos recientes', 'Recent scans')}
+                {t('Buscas recentes', 'Búsquedas recientes', 'Recent searches')}
               </h3>
               <ul className="mt-2 space-y-1.5">
                 {recentRuns.map((run) => (
@@ -784,13 +784,16 @@ export default function OpportunityDiscoverPage() {
 
           {tab === 'catalog' &&
             (catalog.length === 0 ? (
-              <div className="rounded-xl border border-gray-200 bg-white p-8 text-center">
-                <Search className="mx-auto h-10 w-10 text-gray-300" />
-                <p className="mt-3 text-sm text-gray-600">
+              <div className="rounded-2xl border border-gray-200 bg-white px-8 py-10 text-center shadow-sm">
+                <Search className="mx-auto h-8 w-8 text-gray-400" />
+                <p className="mt-3 text-sm font-medium text-gray-900">
+                  {t('Ainda sem oportunidades guardadas', 'Aún sin oportunidades guardadas', 'No saved opportunities yet')}
+                </p>
+                <p className="mx-auto mt-1 max-w-sm text-sm text-gray-600">
                   {t(
-                    'Catálogo vazio — valide candidatos ou registe fundos que já conhece.',
-                    'Catálogo vacío — valide candidatos o registre fondos conocidos.',
-                    'Empty catalog — validate candidates or register known funds.',
+                    'Valide uma descoberta ou registe um fundo que já conhece.',
+                    'Valide un hallazgo o registre un fondo que ya conoce.',
+                    'Validate a discovery or register a fund you already know.',
                   )}
                 </p>
               </div>
@@ -799,7 +802,7 @@ export default function OpportunityDiscoverPage() {
                 {catalog.map((f) => (
                   <div
                     key={f.id}
-                    className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-200"
+                    className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-gray-300"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
@@ -811,7 +814,7 @@ export default function OpportunityDiscoverPage() {
                         </p>
                       </div>
                       {f.matchScore != null && (
-                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
                           {Math.round(f.matchScore)}%
                         </span>
                       )}

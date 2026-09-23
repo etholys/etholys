@@ -156,7 +156,7 @@ export default function FundHubPage() {
         <div className="grid items-start gap-8 xl:grid-cols-[1.4fr_0.8fr]">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-400/90">
-              FUNDHUB
+              OPPORTUNITY
             </p>
             <h1 className="mt-3 font-[family-name:var(--font-etholys-display)] text-3xl font-semibold leading-tight tracking-tight text-white md:text-4xl">
               {t('Captação de fundos, de ponta a ponta', 'Captación de fondos, de punta a punta', 'Fundraising, end to end')}

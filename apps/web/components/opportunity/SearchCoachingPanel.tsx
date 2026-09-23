@@ -201,10 +201,10 @@ export function SearchCoachingPanel({
   if (!companyId) return null;
 
   return (
-    <section className="rounded-xl border border-violet-200 bg-violet-50/40 p-4">
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-violet-600" />
+          <Sparkles className="h-4 w-4 text-amber-600" />
           <h3 className="text-sm font-semibold text-gray-900">
             {t('Atalhos de busca', 'Atajos de búsqueda', 'Search shortcuts')}
           </h3>
@@ -212,7 +212,7 @@ export function SearchCoachingPanel({
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex items-center gap-1 rounded-lg bg-violet-700 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-violet-800"
+          className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-gray-800"
         >
           <Plus className="h-3.5 w-3.5" />
           {t('Novo', 'Nuevo', 'New')}
@@ -226,13 +226,13 @@ export function SearchCoachingPanel({
         )}
       </p>
 
-      {msg && <p className="mt-2 text-xs text-violet-900">{msg}</p>}
+      {msg && <p className="mt-2 text-xs text-gray-700">{msg}</p>}
 
       {profiles.length === 0 && !editorOpen && (
         <button
           type="button"
           onClick={openCreate}
-          className="mt-3 w-full rounded-lg border border-dashed border-violet-300 bg-white/80 px-3 py-4 text-center text-xs text-violet-800 hover:bg-white"
+          className="mt-3 w-full rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-4 text-center text-xs text-gray-700 hover:bg-white"
         >
           {t(
             'Criar o primeiro atalho — ex. «Rura Commerce interno FP»',
@@ -248,8 +248,8 @@ export function SearchCoachingPanel({
           return (
             <li
               key={p.id}
-              className={`rounded-lg border bg-white p-3 ${
-                isActive ? 'border-violet-400 ring-1 ring-violet-200' : 'border-violet-100'
+              className={`rounded-xl border bg-white p-3 ${
+                isActive ? 'border-gray-900 ring-1 ring-gray-200' : 'border-gray-200'
               }`}
             >
               <p className="text-sm font-semibold text-gray-900">{p.name}</p>
@@ -264,7 +264,7 @@ export function SearchCoachingPanel({
                   return (
                     <span
                       key={c}
-                      className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-medium text-violet-800"
+                      className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-700"
                     >
                       {opt ? (locale === 'pt' ? opt.pt : locale === 'es' ? opt.es : opt.en) : c}
                     </span>
@@ -281,7 +281,7 @@ export function SearchCoachingPanel({
                   type="button"
                   disabled={busy || scanning}
                   onClick={() => void runShortcut(p, 'open_now')}
-                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-amber-600 px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-gray-900 px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
                 >
                   {scanning ? (
                     <ScanProgressRing
@@ -321,9 +321,9 @@ export function SearchCoachingPanel({
       </ul>
 
       {editorOpen && (
-        <div className="mt-3 rounded-lg border border-violet-300 bg-white p-3 shadow-sm">
+        <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-violet-900">
+            <p className="text-xs font-semibold text-gray-900">
               {editingId
                 ? t('Editar atalho', 'Editar atajo', 'Edit shortcut')
                 : t('Novo atalho', 'Nuevo atajo', 'New shortcut')}
@@ -333,17 +333,17 @@ export function SearchCoachingPanel({
             </button>
           </div>
 
-          <label className="mt-2 block text-[10px] font-semibold uppercase text-violet-800">
+          <label className="mt-2 block text-[10px] font-semibold uppercase text-gray-500">
             {t('Nome do atalho', 'Nombre del atajo', 'Shortcut name')}
           </label>
           <input
             value={scanName}
             onChange={(e) => setScanName(e.target.value)}
             placeholder="Rura Commerce interno FP"
-            className="mt-1 w-full rounded-lg border border-violet-200 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
           />
 
-          <p className="mt-2 text-[10px] font-semibold uppercase text-violet-800">
+          <p className="mt-2 text-[10px] font-semibold uppercase text-gray-500">
             {t('Classificações', 'Clasificaciones', 'Classifications')}
           </p>
           <div className="mt-1 flex flex-wrap gap-1.5">
@@ -359,7 +359,7 @@ export function SearchCoachingPanel({
                     )
                   }
                   className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                    on ? 'bg-violet-700 text-white' : 'border border-violet-200 text-violet-800'
+                    on ? 'bg-gray-900 text-white' : 'border border-gray-200 text-gray-700'
                   }`}
                 >
                   {locale === 'pt' ? c.pt : locale === 'es' ? c.es : c.en}
@@ -368,14 +368,14 @@ export function SearchCoachingPanel({
             })}
           </div>
 
-          <label className="mt-2 block text-[10px] font-semibold uppercase text-violet-800">
+          <label className="mt-2 block text-[10px] font-semibold uppercase text-gray-500">
             {t('Orientação / comando', 'Orientación / comando', 'Guidance / command')}
           </label>
           <textarea
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             rows={7}
-            className="mt-1 w-full rounded-lg border border-violet-200 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
             placeholder={t(
               'Cole aqui a orientação completa da varredura…',
               'Pegue aquí la orientación completa…',
@@ -388,7 +388,7 @@ export function SearchCoachingPanel({
               type="button"
               disabled={busy || !feedback.trim()}
               onClick={() => void save()}
-              className="flex-1 rounded-lg bg-violet-700 py-2 text-xs font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-gray-900 py-2 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
             >
               {busy ? (
                 <ScanProgressRing percent={40} state="running" size={16} tone="onDark" />
