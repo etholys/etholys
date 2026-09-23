@@ -31,14 +31,16 @@ import { showsLiveFeatures } from '@/lib/forge/delivery';
 import { useForgeT } from '@/lib/forge/use-forge-t';
 import { ForgeLocaleSwitcher } from '@/components/forge/ForgeLocaleSwitcher';
 import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
+import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
+import { sysTheme } from '@/lib/system-shell';
 
 const fg = {
-  grad: 'from-slate-900 via-blue-950 to-indigo-900',
-  activeBg: 'bg-blue-50',
-  activeText: 'text-blue-900',
-  hoverHub: 'hover:text-blue-700 hover:bg-blue-50',
-  avatar: 'bg-blue-100 text-blue-900',
-  spin: 'border-blue-600/30 border-t-blue-600',
+  grad: 'from-slate-900 via-violet-950 to-indigo-900',
+  activeBg: 'bg-violet-500/15',
+  activeText: 'text-violet-100',
+  hoverHub: 'hover:text-violet-200 hover:bg-white/5',
+  avatar: 'bg-violet-500/20 text-violet-100',
+  spin: 'border-violet-400/25 border-t-violet-400',
 };
 
 export default function ForgeLayout({ children }: { children: React.ReactNode }) {
@@ -132,13 +134,13 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
   if (isPublicForge) {
     if (status === 'loading') {
       return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="flex min-h-screen items-center justify-center bg-[#07111A]">
           <div className={cn('h-8 w-8 animate-spin rounded-full border-2', fg.spin)} />
         </div>
       );
     }
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[#07111A] text-[#E8EEF2]">
         <div className="flex justify-end p-3">
           <ForgeLocaleSwitcher />
         </div>
@@ -149,7 +151,7 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
 
   if (status === 'loading' || status === 'unauthenticated' || accessLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-[#07111A]">
         <div className={cn('h-8 w-8 animate-spin rounded-full border-2', fg.spin)} />
       </div>
     );
@@ -192,38 +194,32 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
   const q = activeCompanyId ? `?companyId=${encodeURIComponent(activeCompanyId)}` : '';
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className={sysTheme.root} data-accent="violet">
+      <SystemAtmosphere accent="violet" />
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-gray-200 bg-white transition-transform',
+          'fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-white/10 bg-[#07111A]/88 backdrop-blur-md transition-transform',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
-        <div className="border-b border-gray-100 p-4">
+        <div className="border-b border-white/10 p-4">
           <Link
             href={isCourseOnly ? defaultRedirectForCourseOnly(accessCtx!) : '/hub/forge'}
             className="flex items-center gap-2"
           >
-            <div
-              className={cn(
-                'flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br text-sm font-bold text-white',
-                fg.grad
-              )}
-            >
-              F
+            <div className={cn('flex h-8 w-8 items-center justify-center rounded-lg border', sysTheme.icon.violet)}>
+              <GraduationCap className="h-4 w-4" strokeWidth={1.75} />
             </div>
-            <span className="font-bold text-gray-900">
-              FOR<span className="text-blue-700">GE</span>
-            </span>
+            <span className={sysTheme.brand}>FORGE</span>
           </Link>
           {isCourseOnly ? (
-            <p className="mt-2 text-[10px] font-medium text-blue-800 bg-blue-50 rounded px-2 py-1">
+            <p className="mt-2 rounded bg-violet-500/15 px-2 py-1 text-[10px] font-medium text-violet-200">
               {ft('forge.layout.courseOnly')}
             </p>
           ) : (
             <Link
               href="/hub"
-              className={cn('mt-2 block text-xs text-gray-500', fg.hoverHub, 'rounded px-2 py-1')}
+              className={cn('mt-2 block rounded px-2 py-1 text-xs text-white/40', fg.hoverHub)}
             >
               {ft('forge.layout.backHub')}
             </Link>
@@ -231,19 +227,19 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
         </div>
 
         {!isCourseOnly && companies.length > 0 && (
-          <div className="border-b border-gray-100 p-3">
+          <div className="border-b border-white/10 p-3">
             <button
               type="button"
               onClick={() => setCompanyMenuOpen(!companyMenuOpen)}
-              className="flex w-full items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm"
+              className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/80"
             >
               <span className="flex items-center gap-2 truncate">
-                <Building2 className="h-4 w-4 text-gray-500" />
+                <Building2 className="h-4 w-4 text-white/40" />
                 {activeCompany?.shortName ?? 'Empresa'}
               </span>
             </button>
             {companyMenuOpen && (
-              <div className="mt-1 rounded-lg border bg-white py-1 shadow-lg">
+              <div className="mt-1 rounded-lg border border-white/10 bg-[#0C1822] py-1 shadow-lg">
                 {companies.map((c) => (
                   <button
                     key={c.id}
@@ -252,7 +248,7 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
                       setActiveCompanyId(c.id);
                       setCompanyMenuOpen(false);
                     }}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                    className="block w-full px-3 py-2 text-left text-sm text-white/70 hover:bg-white/5"
                   >
                     {c.shortName}
                   </button>
@@ -273,7 +269,7 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition',
-                  active ? cn(fg.activeBg, fg.activeText) : 'text-gray-600 hover:bg-gray-50'
+                  active ? cn(fg.activeBg, fg.activeText) : sysTheme.navIdle
                 )}
               >
                 <item.icon className="h-5 w-5" />
@@ -283,7 +279,7 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        <div className="border-t border-gray-100 p-3">
+        <div className="border-t border-white/10 p-3">
           <div className="flex items-center gap-2 px-2 py-2">
             <div
               className={cn(
@@ -294,13 +290,13 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
               {getInitials(session?.user?.name)}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{session?.user?.name}</p>
-              <p className="truncate text-[10px] text-slate-500">{session?.user?.email}</p>
+              <p className="truncate text-sm font-medium text-white">{session?.user?.name}</p>
+              <p className="truncate text-[10px] text-white/40">{session?.user?.email}</p>
             </div>
             <button
               type="button"
               onClick={() => signOut({ callbackUrl: '/login' })}
-              className="text-gray-400 hover:text-red-500"
+              className="text-white/35 hover:text-red-300"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -309,27 +305,27 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black/20 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
-        <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-gray-100 bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col lg:ml-64">
+        <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/10 bg-[#07111A]/70 px-4 py-3 backdrop-blur lg:hidden">
           <div className="flex items-center gap-3">
-            <button type="button" onClick={() => setSidebarOpen(true)}>
+            <button type="button" onClick={() => setSidebarOpen(true)} className="text-white/70">
               <Menu className="h-5 w-5" />
             </button>
-            <span className="font-bold text-blue-800">FORGE</span>
+            <span className={sysTheme.brand}>FORGE</span>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <ForgeLocaleSwitcher />
             <ForgeNotificationsBell />
           </div>
         </div>
-        <div className="hidden shrink-0 items-center justify-end gap-3 border-b border-gray-100 bg-white/90 px-6 py-3 backdrop-blur lg:flex">
+        <div className="hidden shrink-0 items-center justify-end gap-3 border-b border-white/10 bg-[#07111A]/55 px-6 py-3 backdrop-blur lg:flex">
           <ForgeLocaleSwitcher />
           <ForgeNotificationsBell />
         </div>
-        <main className="flex-1 p-4 md:p-6">
+        <main className="sys-canvas flex-1 p-4 md:p-6">
           <div className="mx-auto max-w-7xl" data-forge-company-query={q}>
             <SystemLicenseGate system="FORGE" isExemptPath={isPublicForgePath}>
               {children}

@@ -29,15 +29,17 @@ import {
   History,
   Rocket,
   Sparkles,
+  GraduationCap,
   LayoutGrid,
   Factory,
   Kanban,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { NexusRunwayProvider } from '@/components/nexus/NexusRunwayContext';
-import { NexusRunwayBar, NexusRunwayContinueLink } from '@/components/nexus/NexusRunwayBar';
-import { NexusCopilotStrip } from '@/components/nexus/NexusCopilotStrip';
+import { NexusCopilotRail } from '@/components/nexus/NexusCopilotRail';
 import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
+import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
+import { sysTheme } from '@/lib/system-shell';
 
 type NavGroup = {
   key: string;
@@ -62,20 +64,20 @@ const NEXUS_GROUP_ROUTES: Record<string, string[]> = {
   resources: ['/hub/nexus/library', '/hub/nexus/history'],
 };
 
-/** Tema Nexus (violeta) — ATLAS=teal, FundHub=âmbar */
+/** Tema NEXUS — ink + teal (autodesarrollo); AT usa acento próprio nas secções */
 
 const nx = {
-  grad: 'from-violet-600 to-indigo-700',
-  activeBg: 'bg-violet-50',
-  activeText: 'text-violet-800',
-  mutedActive: 'text-violet-700',
-  hoverHub: 'hover:text-violet-600 hover:bg-violet-50',
-  companyFallback: '#5b21b6',
-  avatar: 'bg-violet-100 text-violet-800',
-  notifUnread: 'bg-violet-50/50',
-  notifLink: 'text-violet-600',
-  spin: 'border-violet-600/30 border-t-violet-600',
-  chip: 'border-violet-200 bg-violet-50 text-violet-900',
+  grad: 'from-slate-900 to-teal-900',
+  activeBg: 'bg-teal-500/15',
+  activeText: 'text-teal-100',
+  mutedActive: 'text-teal-200',
+  hoverHub: 'hover:text-teal-200 hover:bg-white/5',
+  companyFallback: '#0f766e',
+  avatar: 'bg-teal-500/20 text-teal-100',
+  notifUnread: 'bg-teal-500/10',
+  notifLink: 'text-teal-200',
+  spin: 'border-teal-400/25 border-t-teal-400',
+  chip: 'border-teal-400/25 bg-teal-500/10 text-teal-100',
 };
 
 function NexusLayoutShell({ children }: { children: React.ReactNode }) {
@@ -84,6 +86,8 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const networkId = searchParams.get('network');
+  const atSubjectCompanyId = searchParams.get('company');
+  const atEngagementId = searchParams.get('engagement');
   const { tr, locale, setLocale, activeCompanyId, setActiveCompanyId } = useApp();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -95,6 +99,50 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [chatUnread, setChatUnread] = useState(0);
+  const [atSubjectLabel, setAtSubjectLabel] = useState<string | null>(null);
+
+  /** Diagnóstico AT de uma MIPYME cliente — ≠ percurso da empresa operadora no seletor */
+  const isAtClientDiagnosis =
+    Boolean(pathname?.startsWith('/hub/nexus/diagnosis')) &&
+    Boolean(atSubjectCompanyId) &&
+    atSubjectCompanyId !== activeCompanyId;
+
+  useEffect(() => {
+    if (!isAtClientDiagnosis || !atSubjectCompanyId) {
+      setAtSubjectLabel(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        if (atEngagementId) {
+          const r = await fetch(`/api/nexus/at/engagements/${encodeURIComponent(atEngagementId)}`);
+          const d = await r.json();
+          const m = (d.engagement?.members || []).find(
+            (x: { companyId: string }) => x.companyId === atSubjectCompanyId
+          );
+          const name = m?.company?.name || m?.company?.shortName;
+          if (!cancelled && name) {
+            setAtSubjectLabel(name);
+            return;
+          }
+        }
+        const r = await fetch(
+          `/api/nexus/at/client-companies?q=${encodeURIComponent(atSubjectCompanyId)}&take=20`
+        );
+        const d = await r.json();
+        const hit = (d.companies || []).find((c: { id: string }) => c.id === atSubjectCompanyId);
+        if (!cancelled) {
+          setAtSubjectLabel(hit?.name || hit?.shortName || atSubjectCompanyId.slice(0, 8));
+        }
+      } catch {
+        if (!cancelled) setAtSubjectLabel(atSubjectCompanyId.slice(0, 8));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAtClientDiagnosis, atSubjectCompanyId, atEngagementId]);
 
   const withNet = (href: string) => {
     const path = href.split('?')[0];
@@ -152,7 +200,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
 
   if (status === 'loading' || status === 'unauthenticated') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-[#07111A]">
         <div className={cn('h-8 w-8 animate-spin rounded-full border-2', nx.spin)} />
       </div>
     );
@@ -168,8 +216,82 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
 
   const navGroups: NavGroup[] = [
     {
+      key: 'mine',
+      label:
+        locale === 'es'
+          ? 'Autodesarrollo'
+          : locale === 'pt'
+            ? 'Autodesenvolvimento'
+            : 'Self-development',
+      icon: Sparkles,
+      items: [
+        {
+          href: withNet('/hub/nexus/journey'),
+          icon: Rocket,
+          label: locale === 'es' ? 'Fase y metas' : locale === 'pt' ? 'Fase e metas' : 'Phase & goals',
+        },
+        {
+          href: withNet('/hub/nexus/coach'),
+          icon: Sparkles,
+          label: locale === 'es' ? 'Copiloto IA' : locale === 'pt' ? 'Copiloto IA' : 'AI copilot',
+        },
+        {
+          href: withNet('/hub/nexus/diagnosis'),
+          icon: ClipboardCheck,
+          label:
+            locale === 'es'
+              ? 'Autodiagnóstico'
+              : locale === 'pt'
+                ? 'Autodiagnóstico'
+                : 'Self-diagnosis',
+        },
+        {
+          href: withNet('/hub/nexus/roadmap'),
+          icon: Route,
+          label: locale === 'es' ? 'Ruta viva' : locale === 'pt' ? 'Rota viva' : 'Live roadmap',
+        },
+      ],
+    },
+    {
+      key: 'deliver',
+      label:
+        locale === 'es'
+          ? 'Asistencia técnica'
+          : locale === 'pt'
+            ? 'Assistência técnica'
+            : 'Technical assistance',
+      icon: Headphones,
+      items: [
+        {
+          href: withNet('/hub/nexus/at'),
+          icon: ClipboardCheck,
+          label:
+            locale === 'es'
+              ? 'Contratos y MIPYMEs'
+              : locale === 'pt'
+                ? 'Contratos e MIPYMEs'
+                : 'Contracts & MSMEs',
+        },
+        {
+          href: withNet('/hub/nexus/networks'),
+          icon: Share2,
+          label: locale === 'es' ? 'Redes de clientes' : locale === 'pt' ? 'Redes de clientes' : 'Client networks',
+        },
+        {
+          href: withNet('/hub/nexus/services'),
+          icon: Wrench,
+          label:
+            locale === 'es'
+              ? 'Pedidos internos'
+              : locale === 'pt'
+                ? 'Pedidos internos'
+                : 'Internal requests',
+        },
+      ],
+    },
+    {
       key: 'integrated',
-      label: locale === 'es' ? 'Gestión (Etholys)' : locale === 'pt' ? 'Gestão (Etholys)' : 'Ops (Etholys)',
+      label: locale === 'es' ? 'Gestión Etholys' : locale === 'pt' ? 'Gestão Etholys' : 'Etholys ops',
       icon: Factory,
       items: [
         {
@@ -186,75 +308,6 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
           href: '/siep',
           icon: Kanban,
           label: 'SIEP',
-        },
-      ],
-    },
-    {
-      key: 'mine',
-      label:
-        locale === 'es'
-          ? 'Mi empresa (con IA)'
-          : locale === 'pt'
-            ? 'A minha empresa (com IA)'
-            : 'My company (with AI)',
-      icon: Sparkles,
-      items: [
-        {
-          href: withNet('/hub/nexus/journey'),
-          icon: Rocket,
-          label: locale === 'es' ? 'Fase y metas' : locale === 'pt' ? 'Fase e metas' : 'Phase & goals',
-        },
-        {
-          href: withNet('/hub/nexus/coach'),
-          icon: Sparkles,
-          label: locale === 'es' ? 'Copiloto IA' : locale === 'pt' ? 'Copiloto IA' : 'AI copilot',
-        },
-        {
-          href: withNet('/hub/nexus/diagnosis'),
-          icon: ClipboardCheck,
-          label: locale === 'es' ? 'Diagnóstico' : locale === 'pt' ? 'Diagnóstico' : 'Diagnostics',
-        },
-        {
-          href: withNet('/hub/nexus/roadmap'),
-          icon: Route,
-          label: locale === 'es' ? 'Ruta viva' : locale === 'pt' ? 'Rota viva' : 'Live roadmap',
-        },
-      ],
-    },
-    {
-      key: 'deliver',
-      label:
-        locale === 'es'
-          ? 'AT a clientes'
-          : locale === 'pt'
-            ? 'AT a clientes'
-            : 'Client AT delivery',
-      icon: Headphones,
-      items: [
-        {
-          href: withNet('/hub/nexus/at'),
-          icon: Headphones,
-          label:
-            locale === 'es'
-              ? 'Servicios y casos'
-              : locale === 'pt'
-                ? 'Serviços e casos'
-                : 'Services & cases',
-        },
-        {
-          href: withNet('/hub/nexus/networks'),
-          icon: Share2,
-          label: locale === 'es' ? 'Redes de clientes' : locale === 'pt' ? 'Redes de clientes' : 'Client networks',
-        },
-        {
-          href: withNet('/hub/nexus/services'),
-          icon: Wrench,
-          label:
-            locale === 'es'
-              ? 'Pedidos internos Etholys'
-              : locale === 'pt'
-                ? 'Pedidos internos Etholys'
-                : 'Internal Etholys requests',
         },
       ],
     },
@@ -298,6 +351,11 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
 
   const pathMatches = (href: string) => {
     const path = href.split('?')[0];
+    // Diagnóstico AT de cliente não é o "Diagnóstico" da empresa operadora
+    if (isAtClientDiagnosis) {
+      if (path === '/hub/nexus/diagnosis') return false;
+      if (path === '/hub/nexus/at') return true;
+    }
     if (path === '/hub/nexus' || path === '/hub/nexus/') {
       return pathname === '/hub/nexus' || pathname === '/hub/nexus/';
     }
@@ -306,36 +364,30 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
 
   return (
     <NexusRunwayProvider>
-    <div className="flex min-h-screen bg-gray-50">
+    <div className={sysTheme.root} data-accent="teal">
+      <SystemAtmosphere accent="teal" />
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex transform flex-col border-r border-gray-200 bg-white transition-all',
+          sysTheme.aside,
           collapsed ? 'w-16' : 'w-64',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
-        <div className={cn('flex-shrink-0 border-b border-gray-100', collapsed ? 'p-2' : 'p-4')}>
+        <div className={cn('flex-shrink-0 border-b border-white/10', collapsed ? 'p-2' : 'p-4')}>
           <div className="flex items-center justify-between">
             <Link href={withNet('/hub/nexus')} className="flex min-w-0 items-center gap-2">
-              <div
-                className={cn(
-                  'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-sm font-bold text-white',
-                  nx.grad
-                )}
-              >
-                N
+              <div className={cn('flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border', sysTheme.icon.teal)}>
+                <GraduationCap className="h-4 w-4" strokeWidth={1.75} />
               </div>
               {!collapsed && (
-                <span className="truncate font-bold text-gray-900">
-                  NEX<span className={nx.activeText}>US</span>
-                </span>
+                <span className={cn('truncate', sysTheme.brand)}>NEXUS</span>
               )}
             </Link>
             <div className="flex flex-shrink-0 items-center gap-1">
               <button
                 type="button"
                 onClick={() => setCollapsed(!collapsed)}
-                className="hidden items-center justify-center rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-50 hover:text-gray-600 lg:flex"
+                className="hidden items-center justify-center rounded-lg p-1.5 text-white/35 transition hover:bg-white/5 hover:text-white lg:flex"
                 title={collapsed ? 'Expandir' : 'Minimizar'}
               >
                 {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
@@ -343,7 +395,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => setSidebarOpen(false)}
-                className="text-gray-400 hover:text-gray-600 lg:hidden"
+                className="text-white/40 hover:text-white lg:hidden"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -361,23 +413,23 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {!collapsed && companies.length > 0 && (
-          <div className="flex-shrink-0 border-b border-gray-100 p-3">
+          <div className="flex-shrink-0 border-b border-white/10 p-3">
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setCompanyMenuOpen(!companyMenuOpen)}
-                className="flex w-full items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm transition hover:bg-gray-100"
+                className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/80 transition hover:bg-white/[0.07]"
               >
                 <div className="flex min-w-0 items-center gap-2">
-                  <Building2 className="h-4 w-4 flex-shrink-0 text-gray-500" />
-                  <span className="truncate font-medium text-gray-700">
+                  <Building2 className="h-4 w-4 flex-shrink-0 text-white/40" />
+                  <span className="truncate font-medium">
                     {activeCompany ? activeCompany?.shortName : tr('company.allCompanies')}
                   </span>
                 </div>
-                <ChevronDown className={cn('h-4 w-4 flex-shrink-0 text-gray-400 transition', companyMenuOpen && 'rotate-180')} />
+                <ChevronDown className={cn('h-4 w-4 flex-shrink-0 text-white/35 transition', companyMenuOpen && 'rotate-180')} />
               </button>
               {companyMenuOpen && (
-                <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border bg-white py-1 shadow-lg">
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-white/10 bg-[#0C1822] py-1 shadow-lg">
                   <button
                     type="button"
                     onClick={() => {
@@ -415,15 +467,26 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
                 </div>
               )}
             </div>
+            {isAtClientDiagnosis && (
+              <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2">
+                <p className="mt-0.5 truncate text-xs font-medium text-teal-950">
+                  {atSubjectLabel || '…'}
+                </p>
+                {atEngagementId && (
+                  <Link
+                    href={`/hub/nexus/at/${encodeURIComponent(atEngagementId)}`}
+                    className="mt-1 inline-block text-[11px] font-medium text-teal-800 underline"
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    {locale === 'es' ? 'Volver al contrato' : locale === 'pt' ? 'Voltar ao contrato' : 'Back to contract'}
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         <nav className={cn('flex-1 space-y-0.5 overflow-y-auto', collapsed ? 'p-1.5' : 'p-3')}>
-          <NexusRunwayContinueLink
-            collapsed={collapsed}
-            networkId={networkId}
-            onNavigate={() => setSidebarOpen(false)}
-          />
           {topItems.map((item) => {
             const isActive = pathMatches(item.href);
             return (
@@ -435,7 +498,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
                 className={cn(
                   'flex items-center rounded-lg text-sm font-medium transition',
                   collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
-                  isActive ? cn(nx.activeBg, nx.activeText) : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  isActive ? cn(nx.activeBg, nx.activeText) : sysTheme.navIdle
                 )}
               >
                 <item.icon className="h-5 w-5 flex-shrink-0" />
@@ -445,12 +508,14 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
           })}
 
           <div className="py-1 pb-2">
-            <div className="h-px bg-gray-100" />
+            <div className="h-px bg-white/10" />
           </div>
 
           {navGroups.map((group) => {
-            const isOpen = openGroups[group.key] ?? false;
+            const isOpen = openGroups[group.key] ?? (group.key === 'mine' || group.key === 'deliver');
             const hasActiveChild = group.items.some((i) => pathMatches(i.href));
+            const isDeliver = group.key === 'deliver';
+            const isMine = group.key === 'mine';
             if (collapsed) {
               return group.items.map((item) => {
                 const isActive = pathMatches(item.href);
@@ -462,7 +527,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
                     title={item.label}
                     className={cn(
                       'flex items-center justify-center rounded-lg px-2 py-2.5 text-sm transition',
-                      isActive ? cn(nx.activeBg, nx.activeText, 'font-medium') : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      isActive ? cn(nx.activeBg, nx.activeText, 'font-medium') : sysTheme.navIdle
                     )}
                   >
                     <item.icon className="h-5 w-5 flex-shrink-0" />
@@ -471,23 +536,37 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
               });
             }
             return (
-              <div key={group.key}>
+              <div
+                key={group.key}
+                className={cn(
+                  'mb-3 border-l-2 pl-1',
+                  isMine && 'border-teal-500',
+                  isDeliver && 'border-orange-400',
+                  !isMine && !isDeliver && 'border-transparent'
+                )}
+              >
                 <button
                   type="button"
                   onClick={() => toggleGroup(group.key)}
                   className={cn(
-                    'flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition',
-                    hasActiveChild ? nx.mutedActive : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                    'flex w-full items-center justify-between px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide transition',
+                    hasActiveChild
+                      ? isDeliver
+                        ? 'text-orange-900'
+                        : isMine
+                          ? 'text-teal-900'
+                          : nx.mutedActive
+                      : 'text-white/35 hover:text-white/70'
                   )}
                 >
-                  <div className="flex items-center gap-3">
-                    <group.icon className="h-4 w-4" />
+                  <span className="flex items-center gap-2">
+                    <group.icon className="h-3.5 w-3.5" />
                     {group.label}
-                  </div>
+                  </span>
                   <ChevronRight className={cn('h-3.5 w-3.5 transition-transform duration-200', isOpen && 'rotate-90')} />
                 </button>
                 {isOpen && (
-                  <div className="mb-1 ml-3 mt-0.5 space-y-0.5 border-l border-gray-100 pl-3">
+                  <div className="space-y-0.5 pb-1">
                     {group.items.map((item) => {
                       const isActive = pathMatches(item.href);
                       return (
@@ -496,14 +575,15 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
                           href={item.href}
                           onClick={() => setSidebarOpen(false)}
                           className={cn(
-                            'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition',
+                            'flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition',
                             isActive
-                              ? cn(nx.activeBg, nx.activeText, 'font-medium')
-                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                              ? isDeliver
+                                ? 'bg-orange-50 font-medium text-orange-950'
+                                : cn(nx.activeBg, nx.activeText, 'font-medium')
+                              : sysTheme.navIdle
                           )}
                         >
-                          <item.icon className="h-4 w-4" />
-                          {item.label}
+                          <span className="min-w-0 flex-1 truncate">{item.label}</span>
                         </Link>
                       );
                     })}
@@ -514,7 +594,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
           })}
 
           <div className="py-1 pb-2">
-            <div className="h-px bg-gray-100" />
+            <div className="h-px bg-white/10" />
           </div>
 
           {bottomItems.map((item) => {
@@ -528,7 +608,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
                 className={cn(
                   'flex items-center rounded-lg text-sm font-medium transition',
                   collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
-                  isActive ? cn(nx.activeBg, nx.activeText) : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  isActive ? cn(nx.activeBg, nx.activeText) : sysTheme.navIdle
                 )}
               >
                 <div className="relative">
@@ -642,8 +722,8 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
                 {getInitials(session?.user?.name)}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-gray-900">{session?.user?.name ?? ''}</p>
-                <p className="truncate text-xs text-gray-500">{session?.user?.email ?? ''}</p>
+                <p className="truncate text-sm font-medium text-white">{session?.user?.name ?? ''}</p>
+                <p className="truncate text-xs text-white/40">{session?.user?.email ?? ''}</p>
               </div>
               <button
                 type="button"
@@ -672,9 +752,9 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 z-40 bg-black/20 lg:hidden" onClick={() => setSidebarOpen(false)} aria-hidden />
       )}
 
-      <div className={cn('flex min-h-screen min-w-0 flex-1 flex-col transition-all', collapsed ? 'lg:ml-16' : 'lg:ml-64')}>
-        <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-gray-200 bg-white/80 px-4 py-3 backdrop-blur-md lg:hidden">
-          <button type="button" onClick={() => setSidebarOpen(true)} className="text-gray-600 hover:text-gray-900">
+      <div className={cn('relative z-10 flex min-h-screen min-w-0 flex-1 flex-col transition-all', collapsed ? 'lg:ml-16' : 'lg:ml-64')}>
+        <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 bg-[#07111A]/70 px-4 py-3 backdrop-blur-md lg:hidden">
+          <button type="button" onClick={() => setSidebarOpen(true)} className="text-white/70 hover:text-white">
             <Menu className="h-5 w-5" />
           </button>
           {activeCompany && (
@@ -708,13 +788,14 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <main className="flex-1 overflow-auto p-4 md:p-6">
-          <div className="mx-auto max-w-6xl">
-            <NexusRunwayBar />
-            <NexusCopilotStrip />
-            <SystemLicenseGate system="NEXUS">{children}</SystemLicenseGate>
-          </div>
-        </main>
+        <div className="flex min-h-0 flex-1">
+          <main className="sys-canvas min-w-0 flex-1 overflow-auto p-4 md:p-6">
+            <div className="mx-auto max-w-6xl">
+              <SystemLicenseGate system="NEXUS">{children}</SystemLicenseGate>
+            </div>
+          </main>
+          <NexusCopilotRail />
+        </div>
       </div>
     </div>
     </NexusRunwayProvider>
@@ -725,8 +806,8 @@ export default function NexusLayout({ children }: { children: React.ReactNode })
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-600" />
+        <div className="flex min-h-screen items-center justify-center bg-[#07111A]">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-400/25 border-t-teal-400" />
         </div>
       }
     >

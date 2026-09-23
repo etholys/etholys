@@ -13,6 +13,10 @@ import {
 import { cn, getInitials } from '@/lib/utils';
 import { useSiepT } from '@/lib/siep/use-siep-t';
 import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
+import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
+import { sysTheme } from '@/lib/system-shell';
+
+const ACCENT = 'indigo' as const;
 
 type NavGroup = {
   key: string;
@@ -81,7 +85,11 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
   const toggleGroup = (key: string) => setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }));
 
   if (status === 'loading') {
-    return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-3 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin" /></div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#07111A]">
+        <div className={cn('h-8 w-8 animate-spin rounded-full border-2', sysTheme.spin[ACCENT])} />
+      </div>
+    );
   }
 
   const isProjectGuest = (session?.user as { siepAccessMode?: string } | undefined)?.siepAccessMode === 'project_guest';
@@ -136,35 +144,36 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar — fixed position with internal scroll */}
+    <div className={sysTheme.root} data-accent={ACCENT}>
+      <SystemAtmosphere accent={ACCENT} />
       <aside className={cn(
-        'fixed inset-y-0 left-0 z-50 bg-white border-r border-gray-200 transform transition-all lg:translate-x-0 flex flex-col',
+        sysTheme.aside,
         collapsed ? 'w-16' : 'w-64',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       )}>
-        {/* Brand header */}
-        <div className={cn('border-b border-gray-100 flex-shrink-0', collapsed ? 'p-2' : 'p-4')}>
+        <div className={cn('border-b border-white/10 flex-shrink-0', collapsed ? 'p-2' : 'p-4')}>
           <div className="flex items-center justify-between">
             <Link href="/siep" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">S</div>
-              {!collapsed && <span className="font-bold text-gray-900">SIEP <span className="text-indigo-600">PM</span></span>}
+              <div className={cn('flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border', sysTheme.icon[ACCENT])}>
+                <Sprout className="h-4 w-4" strokeWidth={1.75} />
+              </div>
+              {!collapsed && <span className={sysTheme.brand}>SIEP</span>}
             </Link>
             <div className="flex items-center gap-1">
-              <button onClick={() => setCollapsed(!collapsed)} className="hidden lg:flex items-center justify-center p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition" title={collapsed ? 'Expandir' : 'Minimizar'}>
+              <button onClick={() => setCollapsed(!collapsed)} className="hidden lg:flex items-center justify-center p-1.5 rounded-lg text-white/35 hover:text-white hover:bg-white/5 transition" title={collapsed ? 'Expandir' : 'Minimizar'}>
                 {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
               </button>
-              <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-white/40 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
           </div>
           {!collapsed && !isProjectGuest && (
-            <Link href="/hub" className="mt-2 flex items-center gap-1.5 px-2 py-1 text-xs text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition">
+            <Link href="/hub" className="mt-2 flex items-center gap-1.5 px-2 py-1 text-xs text-white/40 hover:text-indigo-200 hover:bg-white/5 rounded-md transition">
               <ChevronDown className="w-3 h-3 rotate-90" />
               {locale === 'es' ? 'Volver al Hub' : locale === 'pt' ? 'Voltar ao Hub' : 'Back to Hub'}
             </Link>
           )}
           {!collapsed && isProjectGuest && (
-            <p className="mt-2 px-2 text-[11px] text-slate-500">
+            <p className="mt-2 px-2 text-[11px] text-white/40">
               {locale === 'es'
                 ? 'Acceso limitado al proyecto invitado'
                 : locale === 'pt'
@@ -175,24 +184,24 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         {/* Company selector — oculto para convidados de projeto */}
-        {!collapsed && !isProjectGuest && companies.length > 0 && (<div className="p-3 border-b border-gray-100 flex-shrink-0">
+        {!collapsed && !isProjectGuest && companies.length > 0 && (<div className="p-3 border-b border-white/10 flex-shrink-0">
           <div className="relative">
-            <button onClick={() => setCompanyMenuOpen(!companyMenuOpen)} className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition text-sm">
+            <button onClick={() => setCompanyMenuOpen(!companyMenuOpen)} className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.07] transition text-sm text-white/80">
               <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-gray-500" />
-                <span className="font-medium text-gray-700 truncate">
+                <Building2 className="w-4 h-4 text-white/40" />
+                <span className="font-medium truncate">
                   {activeCompany ? activeCompany?.shortName : tr('company.allCompanies')}
                 </span>
               </div>
-              <ChevronDown className={cn('w-4 h-4 text-gray-400 transition', companyMenuOpen && 'rotate-180')} />
+              <ChevronDown className={cn('w-4 h-4 text-white/35 transition', companyMenuOpen && 'rotate-180')} />
             </button>
             {companyMenuOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border z-50 py-1">
-                <button onClick={() => { setActiveCompanyId(null); setCompanyMenuOpen(false); }} className={cn('w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2', !activeCompanyId && 'text-indigo-600 font-medium')}>
-                  <div className="w-3 h-3 rounded-full bg-gray-400" />{tr('company.allCompanies')}
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#0C1822] rounded-lg shadow-lg border border-white/10 z-50 py-1">
+                <button onClick={() => { setActiveCompanyId(null); setCompanyMenuOpen(false); }} className={cn('w-full text-left px-3 py-2 text-sm hover:bg-white/5 flex items-center gap-2', !activeCompanyId ? 'text-indigo-200 font-medium' : 'text-white/70')}>
+                  <div className="w-3 h-3 rounded-full bg-white/30" />{tr('company.allCompanies')}
                 </button>
                 {(companies ?? []).map((c: any) => (
-                  <button key={c?.id} onClick={() => { setActiveCompanyId(c?.id); setCompanyMenuOpen(false); }} className={cn('w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2', activeCompanyId === c?.id && 'text-indigo-600 font-medium')}>
+                  <button key={c?.id} onClick={() => { setActiveCompanyId(c?.id); setCompanyMenuOpen(false); }} className={cn('w-full text-left px-3 py-2 text-sm hover:bg-white/5 flex items-center gap-2', activeCompanyId === c?.id ? 'text-indigo-200 font-medium' : 'text-white/70')}>
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c?.color ?? '#4F46E5' }} />{c?.shortName ?? ''}
                   </button>
                 ))}
@@ -209,7 +218,7 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
               <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)} title={collapsed ? item.label : undefined} className={cn(
                 'flex items-center rounded-lg text-sm font-medium transition',
                 collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
-                isActive ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                isActive ? sysTheme.active[ACCENT] : sysTheme.navIdle
               )}>
                 <item.icon className="w-5 h-5 flex-shrink-0" />
                 {!collapsed && item.label}
@@ -217,7 +226,7 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
             );
           })}
 
-          <div className="pt-2 pb-1"><div className="h-px bg-gray-100" /></div>
+          <div className="pt-2 pb-1"><div className="h-px bg-white/10" /></div>
 
           {navGroups.map(group => {
             const isOpen = openGroups[group.key] ?? false;
@@ -228,7 +237,7 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
                 return (
                   <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)} title={item.label} className={cn(
                     'flex items-center justify-center px-2 py-2.5 rounded-lg text-sm transition',
-                    isActive ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    isActive ? cn(sysTheme.active[ACCENT], 'font-medium') : sysTheme.navIdle
                   )}>
                     <item.icon className="w-5 h-5 flex-shrink-0" />
                   </Link>
@@ -239,7 +248,7 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
               <div key={group.key}>
                 <button onClick={() => toggleGroup(group.key)} className={cn(
                   'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition',
-                  hasActiveChild ? 'text-indigo-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                  hasActiveChild ? sysTheme.muted[ACCENT] : 'text-white/35 hover:bg-white/[0.04] hover:text-white/70'
                 )}>
                   <div className="flex items-center gap-3">
                     <group.icon className="w-4.5 h-4.5" />
@@ -248,13 +257,13 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
                   <ChevronRight className={cn('w-3.5 h-3.5 transition-transform duration-200', isOpen && 'rotate-90')} />
                 </button>
                 {isOpen && (
-                  <div className="ml-3 pl-3 border-l border-gray-100 space-y-0.5 mt-0.5 mb-1">
+                  <div className="ml-3 pl-3 border-l border-white/10 space-y-0.5 mt-0.5 mb-1">
                     {group.items.map(item => {
                       const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
                       return (
                         <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)} className={cn(
                           'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition',
-                          isActive ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          isActive ? cn(sysTheme.active[ACCENT], 'font-medium') : sysTheme.navIdle
                         )}>
                           <item.icon className="w-4 h-4" />
                           {item.label}
@@ -267,7 +276,7 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
             );
           })}
 
-          <div className="pt-2 pb-1"><div className="h-px bg-gray-100" /></div>
+          <div className="pt-2 pb-1"><div className="h-px bg-white/10" /></div>
 
           {bottomItems.map(item => {
             const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
@@ -275,7 +284,7 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
               <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)} title={collapsed ? item.label : undefined} className={cn(
                 'flex items-center rounded-lg text-sm font-medium transition',
                 collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
-                isActive ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                isActive ? sysTheme.active[ACCENT] : sysTheme.navIdle
               )}>
                 <div className="relative">
                   <item.icon className="w-5 h-5" />
@@ -292,39 +301,38 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
         </nav>
 
         {/* Bottom section: Language, Notifications, Collapse, User */}
-        <div className={cn('border-t border-gray-100 flex-shrink-0', collapsed ? 'p-1.5' : 'p-3')}>
-          {/* Language + Notifications row */}
+        <div className={cn('border-t border-white/10 flex-shrink-0', collapsed ? 'p-1.5' : 'p-3')}>
           <div className={cn('flex items-center mb-2', collapsed ? 'flex-col gap-1' : 'gap-1')}>
             <button onClick={() => setLocale(locale === 'es' ? 'pt' : locale === 'pt' ? 'en' : 'es')} className={cn(
-              'flex items-center gap-1.5 text-xs rounded-lg hover:bg-gray-100 transition text-gray-600',
+              'flex items-center gap-1.5 text-xs rounded-lg hover:bg-white/5 transition text-white/45',
               collapsed ? 'p-2 justify-center' : 'px-2.5 py-1.5 flex-1'
             )} title={collapsed ? `${locale?.toUpperCase()}` : undefined}>
               <Globe className="w-3.5 h-3.5 flex-shrink-0" />
               {!collapsed && locale?.toUpperCase()}
             </button>
             <div className="relative">
-              <button onClick={() => setNotifOpen(!notifOpen)} className="p-2 rounded-lg hover:bg-gray-100 transition text-gray-600 relative">
+              <button onClick={() => setNotifOpen(!notifOpen)} className="p-2 rounded-lg hover:bg-white/5 transition text-white/45 relative">
                 <Bell className="w-3.5 h-3.5" />
-                {notifCount > 0 && <div className="absolute top-0.5 right-0.5 min-w-[14px] h-3.5 px-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{notifCount > 9 ? '9+' : notifCount}</div>}
+                {notifCount > 0 && <div className="absolute top-0.5 right-0.5 min-w-[14px] h-3.5 px-0.5 bg-indigo-400 text-slate-950 text-[9px] font-bold rounded-full flex items-center justify-center">{notifCount > 9 ? '9+' : notifCount}</div>}
               </button>
               {notifOpen && (
-                <div className="absolute bottom-full left-0 mb-1 w-80 bg-white rounded-xl shadow-lg border z-[60] overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b">
-                    <span className="text-sm font-semibold text-gray-900">Notificaciones</span>
+                <div className="absolute bottom-full left-0 mb-1 w-80 bg-[#0C1822] rounded-xl shadow-lg border border-white/10 z-[60] overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                    <span className="text-sm font-semibold text-white">Notificaciones</span>
                     {notifCount > 0 && (
-                      <button onClick={markAllNotifRead} className="text-xs text-indigo-600 hover:underline">
+                      <button onClick={markAllNotifRead} className="text-xs text-indigo-200 hover:underline">
                         Marcar todo le&iacute;do
                       </button>
                     )}
                   </div>
-                  <div className="max-h-72 overflow-y-auto divide-y">
+                  <div className="max-h-72 overflow-y-auto divide-y divide-white/[0.06]">
                     {notifications.length === 0 ? (
-                      <div className="px-4 py-6 text-center text-sm text-gray-400">Sin notificaciones</div>
+                      <div className="px-4 py-6 text-center text-sm text-white/35">Sin notificaciones</div>
                     ) : notifications.map(n => (
-                      <div key={n.id} onClick={() => { if (n.link) router.push(n.link); if (!n.read) { fetch('/api/notifications', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id }) }); } setNotifOpen(false); }} className={`px-4 py-3 hover:bg-gray-50 cursor-pointer transition ${!n.read ? 'bg-indigo-50/50' : ''}`}>
-                        <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
-                        <p className="text-[10px] text-gray-400 mt-1">{new Date(n.createdAt).toLocaleDateString('es-UY')}</p>
+                      <div key={n.id} onClick={() => { if (n.link) router.push(n.link); if (!n.read) { fetch('/api/notifications', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id }) }); } setNotifOpen(false); }} className={`px-4 py-3 hover:bg-white/[0.04] cursor-pointer transition ${!n.read ? 'bg-indigo-500/10' : ''}`}>
+                        <p className="text-sm font-medium text-white">{n.title}</p>
+                        <p className="text-xs text-white/45 mt-0.5 line-clamp-2">{n.message}</p>
+                        <p className="text-[10px] text-white/30 mt-1">{new Date(n.createdAt).toLocaleDateString('es-UY')}</p>
                       </div>
                     ))}
                   </div>
@@ -333,36 +341,33 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
 
-          {/* User info */}
           {!collapsed && (
             <div className="flex items-center gap-3 px-3 py-2 mt-1">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+              <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0', sysTheme.avatar[ACCENT])}>
                 {getInitials(session?.user?.name)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{session?.user?.name ?? ''}</p>
-                <p className="text-xs text-gray-500 truncate">{session?.user?.email ?? ''}</p>
+                <p className="text-sm font-medium text-white truncate">{session?.user?.name ?? ''}</p>
+                <p className="text-xs text-white/40 truncate">{session?.user?.email ?? ''}</p>
               </div>
-              <button onClick={() => signOut({ callbackUrl: '/login' })} className="text-gray-400 hover:text-red-500 transition" title={tr('auth.logout')}>
+              <button onClick={() => signOut({ callbackUrl: '/login' })} className="text-white/35 hover:text-red-300 transition" title={tr('auth.logout')}>
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
           )}
           {collapsed && (
-            <button onClick={() => signOut({ callbackUrl: '/login' })} className="flex items-center justify-center w-full py-2 rounded-lg text-gray-400 hover:text-red-500 transition mt-1" title={tr('auth.logout')}>
+            <button onClick={() => signOut({ callbackUrl: '/login' })} className="flex items-center justify-center w-full py-2 rounded-lg text-white/35 hover:text-red-300 transition mt-1" title={tr('auth.logout')}>
               <LogOut className="w-4 h-4" />
             </button>
           )}
         </div>
       </aside>
 
-      {sidebarOpen && <div className="fixed inset-0 bg-black/20 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+      {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      {/* Main content — offset by sidebar width, NO top header */}
-      <div className={cn('flex-1 flex flex-col min-h-screen min-w-0 transition-all', collapsed ? 'lg:ml-16' : 'lg:ml-64')}>
-        {/* Mobile-only top bar for hamburger */}
-        <div className="lg:hidden sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 py-3 flex items-center gap-3">
-          <button onClick={() => setSidebarOpen(true)} className="text-gray-600 hover:text-gray-900"><Menu className="w-5 h-5" /></button>
+      <div className={cn('relative z-10 flex-1 flex flex-col min-h-screen min-w-0 transition-all', collapsed ? 'lg:ml-16' : 'lg:ml-64')}>
+        <div className="lg:hidden sticky top-0 z-30 bg-[#07111A]/70 backdrop-blur-md border-b border-white/10 px-4 py-3 flex items-center gap-3">
+          <button onClick={() => setSidebarOpen(true)} className="text-white/70 hover:text-white"><Menu className="w-5 h-5" /></button>
           {activeCompany && (
             <div className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: (activeCompany?.color ?? '#4F46E5') + '15', color: activeCompany?.color ?? '#4F46E5' }}>
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: activeCompany?.color ?? '#4F46E5' }} />
@@ -370,7 +375,7 @@ export default function SiepLayout({ children }: { children: React.ReactNode }) 
             </div>
           )}
         </div>
-        <main className="flex-1 p-4 md:p-6 overflow-auto">
+        <main className="sys-canvas flex-1 p-4 md:p-6 overflow-auto">
           <SystemLicenseGate system="SIEP">{children}</SystemLicenseGate>
         </main>
       </div>

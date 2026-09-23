@@ -174,189 +174,185 @@
   margin-top: 0.35em;
 }
 
-/* FUNDHUB — mesma atmosfera do Hub, acento âmbar do sistema */
+/* Sistemas — mesma atmosfera do Hub; canvas partilhado */
+.etholys-system,
 .etholys-fundhub {
   color-scheme: dark;
-  --fh-ink: #e8eef2;
-  --fh-muted: rgba(232, 238, 242, 0.55);
-  --fh-line: rgba(255, 255, 255, 0.1);
-  --fh-panel: rgba(12, 24, 34, 0.86);
-  --fh-panel-soft: rgba(255, 255, 255, 0.04);
-  --fh-accent: #f59e0b;
+  --sys-ink: #e8eef2;
+  --sys-line: rgba(255, 255, 255, 0.1);
+  --sys-panel: rgba(12, 24, 34, 0.86);
+  --sys-panel-soft: rgba(255, 255, 255, 0.04);
 }
 
+.etholys-system .sys-canvas,
 .etholys-fundhub .fh-canvas {
-  color: var(--fh-ink);
+  color: var(--sys-ink);
 }
 
+.etholys-system .sys-canvas input:not([type='checkbox']):not([type='radio']):not([type='range']),
+.etholys-system .sys-canvas textarea,
+.etholys-system .sys-canvas select,
 .etholys-fundhub .fh-canvas input:not([type='checkbox']):not([type='radio']):not([type='range']),
 .etholys-fundhub .fh-canvas textarea,
 .etholys-fundhub .fh-canvas select {
   background-color: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.14);
-  color: var(--fh-ink);
+  color: var(--sys-ink);
 }
 
+.etholys-system .sys-canvas input::placeholder,
+.etholys-system .sys-canvas textarea::placeholder,
 .etholys-fundhub .fh-canvas input::placeholder,
 .etholys-fundhub .fh-canvas textarea::placeholder {
   color: rgba(232, 238, 242, 0.35);
 }
 
+.etholys-system .sys-canvas .bg-white,
+.etholys-system .sys-canvas .bg-gray-50,
+.etholys-system .sys-canvas .bg-slate-50,
+.etholys-system .sys-canvas .bg-slate-50\/80,
 .etholys-fundhub .fh-canvas .bg-white,
 .etholys-fundhub .fh-canvas .bg-gray-50,
 .etholys-fundhub .fh-canvas .bg-slate-50,
 .etholys-fundhub .fh-canvas .bg-slate-50\/80 {
-  background-color: var(--fh-panel) !important;
+  background-color: var(--sys-panel) !important;
 }
 
-.etholys-fundhub .fh-canvas .bg-gray-100,
-.etholys-fundhub .fh-canvas .bg-gray-50\/80 {
-  background-color: var(--fh-panel-soft) !important;
+.etholys-system .sys-canvas .bg-gray-100,
+.etholys-fundhub .fh-canvas .bg-gray-100 {
+  background-color: var(--sys-panel-soft) !important;
 }
 
-.etholys-fundhub .fh-canvas .bg-gradient-to-br.from-gray-50.to-gray-100,
+.etholys-system .sys-canvas .min-h-screen.bg-gray-50,
+.etholys-system .sys-canvas .bg-\[\#f4f6f8\],
 .etholys-fundhub .fh-canvas .min-h-screen.bg-gray-50,
 .etholys-fundhub .fh-canvas .min-h-screen.bg-gradient-to-br {
   background: transparent !important;
 }
 
+.etholys-system .sys-canvas .text-gray-900,
+.etholys-system .sys-canvas .text-slate-800,
+.etholys-system .sys-canvas .text-slate-900,
 .etholys-fundhub .fh-canvas .text-gray-900,
 .etholys-fundhub .fh-canvas .text-slate-800,
 .etholys-fundhub .fh-canvas .text-slate-900 {
   color: #f8fafc !important;
 }
 
+.etholys-system .sys-canvas .text-gray-700,
+.etholys-system .sys-canvas .text-gray-600,
+.etholys-system .sys-canvas .text-slate-600,
 .etholys-fundhub .fh-canvas .text-gray-700,
 .etholys-fundhub .fh-canvas .text-gray-600,
 .etholys-fundhub .fh-canvas .text-slate-600 {
   color: rgba(232, 238, 242, 0.62) !important;
 }
 
+.etholys-system .sys-canvas .text-gray-500,
+.etholys-system .sys-canvas .text-gray-400,
+.etholys-system .sys-canvas .text-slate-500,
 .etholys-fundhub .fh-canvas .text-gray-500,
 .etholys-fundhub .fh-canvas .text-gray-400,
 .etholys-fundhub .fh-canvas .text-slate-500 {
   color: rgba(232, 238, 242, 0.42) !important;
 }
 
+.etholys-system .sys-canvas .text-gray-300,
 .etholys-fundhub .fh-canvas .text-gray-300 {
   color: rgba(232, 238, 242, 0.28) !important;
 }
 
+.etholys-system .sys-canvas .border-gray-100,
+.etholys-system .sys-canvas .border-gray-200,
+.etholys-system .sys-canvas .border-gray-300,
+.etholys-system .sys-canvas .border-slate-200,
+.etholys-system .sys-canvas .ring-gray-200,
 .etholys-fundhub .fh-canvas .border-gray-100,
 .etholys-fundhub .fh-canvas .border-gray-200,
 .etholys-fundhub .fh-canvas .border-gray-300,
 .etholys-fundhub .fh-canvas .border-slate-200,
 .etholys-fundhub .fh-canvas .ring-gray-200 {
-  border-color: var(--fh-line) !important;
-  --tw-ring-color: var(--fh-line) !important;
+  border-color: var(--sys-line) !important;
+  --tw-ring-color: var(--sys-line) !important;
 }
 
+.etholys-system .sys-canvas .hover\:bg-gray-50:hover,
+.etholys-system .sys-canvas .hover\:bg-gray-100:hover,
 .etholys-fundhub .fh-canvas .hover\:bg-gray-50:hover,
-.etholys-fundhub .fh-canvas .hover\:bg-gray-100:hover,
-.etholys-fundhub .fh-canvas .hover\:bg-white:hover {
+.etholys-fundhub .fh-canvas .hover\:bg-gray-100:hover {
   background-color: rgba(255, 255, 255, 0.06) !important;
 }
 
-.etholys-fundhub .fh-canvas .hover\:text-gray-900:hover,
-.etholys-fundhub .fh-canvas .hover\:text-gray-600:hover {
+.etholys-system .sys-canvas .hover\:text-gray-900:hover,
+.etholys-fundhub .fh-canvas .hover\:text-gray-900:hover {
   color: #fff !important;
 }
 
+.etholys-system .sys-canvas .bg-teal-50,
+.etholys-system .sys-canvas .bg-indigo-50,
+.etholys-system .sys-canvas .bg-blue-50,
+.etholys-system .sys-canvas .bg-violet-50,
+.etholys-system .sys-canvas .bg-amber-50,
+.etholys-system .sys-canvas .bg-orange-50,
+.etholys-system .sys-canvas .bg-emerald-100,
+.etholys-system .sys-canvas .bg-sky-100,
+.etholys-system .sys-canvas .bg-red-50,
 .etholys-fundhub .fh-canvas .bg-amber-50,
 .etholys-fundhub .fh-canvas .bg-amber-50\/60,
-.etholys-fundhub .fh-canvas .bg-amber-50\/90,
 .etholys-fundhub .fh-canvas .bg-orange-50,
-.etholys-fundhub .fh-canvas .bg-orange-50\/90 {
-  background-color: rgba(245, 158, 11, 0.12) !important;
+.etholys-fundhub .fh-canvas .bg-violet-50,
+.etholys-fundhub .fh-canvas .bg-red-50 {
+  background-color: rgba(255, 255, 255, 0.06) !important;
 }
 
-.etholys-fundhub .fh-canvas .bg-amber-100 {
-  background-color: rgba(245, 158, 11, 0.18) !important;
-}
-
-.etholys-fundhub .fh-canvas .border-amber-200,
-.etholys-fundhub .fh-canvas .border-orange-200 {
-  border-color: rgba(245, 158, 11, 0.28) !important;
-}
-
+.etholys-system .sys-canvas .text-teal-700,
+.etholys-system .sys-canvas .text-teal-800,
+.etholys-system .sys-canvas .text-indigo-700,
+.etholys-system .sys-canvas .text-blue-700,
+.etholys-system .sys-canvas .text-blue-800,
+.etholys-system .sys-canvas .text-violet-800,
+.etholys-system .sys-canvas .text-amber-800,
 .etholys-fundhub .fh-canvas .text-amber-700,
 .etholys-fundhub .fh-canvas .text-amber-800,
-.etholys-fundhub .fh-canvas .text-amber-900,
-.etholys-fundhub .fh-canvas .text-amber-950,
-.etholys-fundhub .fh-canvas .text-orange-800,
-.etholys-fundhub .fh-canvas .text-orange-900 {
+.etholys-fundhub .fh-canvas .text-amber-900 {
   color: #fde68a !important;
 }
 
-.etholys-fundhub .fh-canvas .bg-gray-900 {
-  background-color: #d97706 !important;
+.etholys-system[data-accent='teal'] .sys-canvas .text-teal-700,
+.etholys-system[data-accent='teal'] .sys-canvas .text-teal-800 {
+  color: #5eead4 !important;
 }
 
-.etholys-fundhub .fh-canvas .hover\:bg-gray-800:hover {
-  background-color: #b45309 !important;
+.etholys-system[data-accent='indigo'] .sys-canvas .text-indigo-700,
+.etholys-system[data-accent='indigo'] .sys-canvas .text-blue-600,
+.etholys-system[data-accent='indigo'] .sys-canvas .text-blue-700 {
+  color: #c7d2fe !important;
 }
 
+.etholys-system[data-accent='violet'] .sys-canvas .text-blue-700,
+.etholys-system[data-accent='violet'] .sys-canvas .text-violet-800 {
+  color: #ddd6fe !important;
+}
+
+.etholys-fundhub .fh-canvas .bg-gray-900,
 .etholys-fundhub .fh-canvas .bg-blue-600 {
   background-color: #d97706 !important;
 }
 
+.etholys-fundhub .fh-canvas .hover\:bg-gray-800:hover,
 .etholys-fundhub .fh-canvas .hover\:bg-blue-700:hover {
   background-color: #b45309 !important;
 }
 
-.etholys-fundhub .fh-canvas .text-blue-600,
-.etholys-fundhub .fh-canvas .border-blue-600 {
-  color: #fbbf24 !important;
-  border-color: #f59e0b !important;
-}
-
-.etholys-fundhub .fh-canvas .bg-violet-50,
-.etholys-fundhub .fh-canvas .bg-sky-100,
-.etholys-fundhub .fh-canvas .bg-emerald-100,
-.etholys-fundhub .fh-canvas .bg-blue-100,
-.etholys-fundhub .fh-canvas .bg-green-100,
-.etholys-fundhub .fh-canvas .bg-purple-100,
-.etholys-fundhub .fh-canvas .bg-red-50,
-.etholys-fundhub .fh-canvas .bg-red-50\/90 {
-  background-color: rgba(255, 255, 255, 0.06) !important;
-}
-
-.etholys-fundhub .fh-canvas .text-violet-800,
-.etholys-fundhub .fh-canvas .text-violet-900,
-.etholys-fundhub .fh-canvas .text-sky-800,
-.etholys-fundhub .fh-canvas .text-emerald-800,
-.etholys-fundhub .fh-canvas .text-blue-700,
-.etholys-fundhub .fh-canvas .text-green-700,
-.etholys-fundhub .fh-canvas .text-purple-700,
-.etholys-fundhub .fh-canvas .text-red-900,
-.etholys-fundhub .fh-canvas .text-red-800,
-.etholys-fundhub .fh-canvas .text-red-700 {
-  color: #fecaca !important;
-}
-
-.etholys-fundhub .fh-canvas .text-emerald-800 {
-  color: #6ee7b7 !important;
-}
-
-.etholys-fundhub .fh-canvas .text-sky-800,
-.etholys-fundhub .fh-canvas .text-violet-800,
-.etholys-fundhub .fh-canvas .text-violet-900 {
-  color: #c4b5fd !important;
-}
-
-.etholys-fundhub .fh-canvas .border-red-200,
-.etholys-fundhub .fh-canvas .border-violet-200,
-.etholys-fundhub .fh-canvas .border-dashed {
-  border-color: rgba(255, 255, 255, 0.14) !important;
-}
-
+.etholys-system .sys-canvas .shadow-sm,
+.etholys-system .sys-canvas .shadow-lg,
 .etholys-fundhub .fh-canvas .shadow-sm,
 .etholys-fundhub .fh-canvas .shadow-lg,
 .etholys-fundhub .fh-canvas .shadow-xl {
   box-shadow: 0 24px 80px -48px rgba(0, 0, 0, 0.9) !important;
 }
 
+.etholys-system .sys-canvas .divide-y > :not([hidden]) ~ :not([hidden]),
 .etholys-fundhub .fh-canvas .divide-y > :not([hidden]) ~ :not([hidden]) {
   border-color: rgba(255, 255, 255, 0.08);
 }
-
