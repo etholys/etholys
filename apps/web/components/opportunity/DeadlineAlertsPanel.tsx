@@ -73,8 +73,8 @@ export function DeadlineAlertsPanel({ variant = 'button', className }: Props) {
 
   const btnClass =
     variant === 'inline'
-      ? 'inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-medium text-orange-900 hover:bg-orange-100'
-      : 'inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-900 hover:bg-orange-100';
+      ? 'inline-flex items-center gap-1.5 rounded-md border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-100 hover:bg-amber-500/20'
+      : 'inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-100 hover:bg-amber-500/20';
 
   return (
     <>

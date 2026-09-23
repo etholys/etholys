@@ -11,16 +11,16 @@ export default function FundHubSettingsPage() {
     locale === 'pt' ? pt : locale === 'es' ? es : en;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <div className="space-y-6">
+      <main>
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <Link href="/hub/fundhub" className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
               <ArrowLeft className="w-4 h-4" />
-              {t('Voltar ao OPPORTUNITY', 'Volver a OPPORTUNITY', 'Back to OPPORTUNITY')}
+              {t('Voltar ao FUNDHUB', 'Volver a FUNDHUB', 'Back to FUNDHUB')}
             </Link>
             <h1 className="mt-3 text-3xl font-bold text-gray-900">
-              {t('Configurações OPPORTUNITY', 'Configuración OPPORTUNITY', 'OPPORTUNITY settings')}
+              {t('Configurações FUNDHUB', 'Configuración FUNDHUB', 'FUNDHUB settings')}
             </h1>
             <p className="text-sm text-gray-600 mt-2">
               {t(
@@ -78,9 +78,9 @@ export default function FundHubSettingsPage() {
             </div>
             <p className="mt-2 text-sm text-gray-600">
               {t(
-                'Quem pode abrir OPPORTUNITY e outros sistemas da empresa.',
-                'Quién puede abrir OPPORTUNITY y otros sistemas de la empresa.',
-                'Who can open OPPORTUNITY and other company systems.',
+                'Quem pode abrir FUNDHUB e outros sistemas da empresa.',
+                'Quién puede abrir FUNDHUB y otros sistemas de la empresa.',
+                'Who can open FUNDHUB and other company systems.',
               )}
             </p>
             <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-amber-700 group-hover:underline">

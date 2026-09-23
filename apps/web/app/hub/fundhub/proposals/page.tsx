@@ -277,19 +277,17 @@ export default function ProposalsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <header className="border-b border-gray-200 bg-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-6 py-4 sm:px-8">
-          <Link href="/hub/fundhub" className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900">
-            <ArrowLeft className="h-4 w-4" />
-            Voltar
-          </Link>
-          <h1 className="mt-3 text-3xl font-bold text-gray-900">Propostas</h1>
-          <p className="mt-1 text-gray-600">Gerencie suas propostas de edital</p>
-        </div>
+    <div className="space-y-6">
+      <header>
+        <Link href="/hub/fundhub" className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900">
+          <ArrowLeft className="h-4 w-4" />
+          FUNDHUB
+        </Link>
+        <h1 className="mt-3 text-3xl font-bold text-gray-900">Propostas</h1>
+        <p className="mt-1 text-gray-600">Redija, organize e acompanhe as candidaturas a fundos.</p>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-8 sm:px-8">
+      <div>
         {error && (
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
             <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -595,7 +593,7 @@ export default function ProposalsPage() {
             </aside>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }

@@ -132,15 +132,14 @@ export default function FundHubCompliancePage() {
   const overallProgress = Math.round((completedItems / totalItems) * 100);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="space-y-6">
+      <header className="rounded-2xl border border-gray-200 bg-white p-6 md:p-8">
+        <div>
           <Link
             href="/hub/fundhub"
-            className="text-sm text-gray-600 hover:text-gray-900 mb-4 inline-flex items-center gap-1"
+            className="mb-4 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
           >
-            ← Voltar ao FundHub
+            ← FUNDHUB
           </Link>
           <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
             <div>
@@ -165,7 +164,7 @@ export default function FundHubCompliancePage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <main>
         <div className="grid gap-8 lg:grid-cols-[1.4fr_0.6fr]">
           <div className="space-y-6">
             {checklists.map((checklist) => {

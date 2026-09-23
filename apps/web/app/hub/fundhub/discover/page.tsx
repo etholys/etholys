@@ -459,107 +459,127 @@ export default function OpportunityDiscoverPage() {
       )
     : null;
 
+  const scanStatusLabel = (status: string) => {
+    if (status === 'completed') return t('Concluída', 'Completada', 'Completed');
+    if (status === 'failed') return t('Falhou', 'Falló', 'Failed');
+    if (status === 'running') return t('Em curso', 'En curso', 'Running');
+    return status;
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Link
-            href="/hub/fundhub"
-            className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            OPPORTUNITY
-          </Link>
-          <h1 className="mt-2 text-2xl font-bold text-gray-900 md:text-3xl">
-            {t('Descobrir oportunidades', 'Descubrir oportunidades', 'Discover opportunities')}
-          </h1>
-          {briefing.scanName && (
-            <p className="mt-1 text-sm font-medium text-violet-800">
-              {t('Perfil activo:', 'Perfil activo:', 'Active profile:')} {briefing.scanName}
-              {briefing.amountMax != null ? ` · ≤ ${briefing.amountMax.toLocaleString()} USD` : ''}
+      <header className="rounded-2xl border border-gray-200 bg-white px-5 py-5 shadow-sm md:px-7">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div className="min-w-0 max-w-2xl">
+            <Link
+              href="/hub/fundhub"
+              className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-800"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              FUNDHUB
+            </Link>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-gray-900 md:text-[1.75rem]">
+              {t('Descobrir oportunidades', 'Descubrir oportunidades', 'Discover opportunities')}
+            </h1>
+            <p className="mt-1.5 text-sm leading-relaxed text-gray-600">
+              {t(
+                'A IA pesquisa fontes oficiais. Você valida o que importa. O catálogo aprende com cada decisão.',
+                'La IA busca fuentes oficiales. Usted valida lo que importa. El catálogo aprende con cada decisión.',
+                'AI searches official sources. You validate what matters. The catalog learns from every decision.',
+              )}
             </p>
-          )}
-          {lastScanLabel && (
-            <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-              <span>
-                {t('Última varredura:', 'Último barrido:', 'Last scan:')} {lastScanLabel}
-                {latest && ` · +${latest.created} ${t('candidatos', 'candidatos', 'candidates')}`}
-              </span>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+              {briefing.scanName && (
+                <span className="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-900">
+                  {briefing.scanName}
+                  {briefing.amountMax != null ? ` · ≤ ${briefing.amountMax.toLocaleString()} USD` : ''}
+                </span>
+              )}
+              {lastScanLabel && (
+                <span>
+                  {t('Última busca', 'Última búsqueda', 'Last search')} {lastScanLabel}
+                  {latest ? ` · ${latest.created} ${t('encontradas', 'encontradas', 'found')}` : ''}
+                </span>
+              )}
               {latest?.discoveryMode === 'web' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 font-medium text-sky-800">
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700">
                   <Search className="h-3 w-3" />
                   {t('Pesquisa web', 'Búsqueda web', 'Web search')}
                 </span>
               )}
-            </p>
-          )}
+            </div>
+          </div>
+          <div className="flex flex-col items-stretch gap-2 sm:items-end">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                disabled={scanning}
+                onClick={() => void startScan('open_now')}
+                className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 disabled:opacity-60"
+              >
+                {(scanning || scanUi === 'error') && discoveryFocus === 'open_now' ? (
+                  <ScanProgressRing
+                    percent={scanPercent}
+                    state={scanUi === 'error' ? 'error' : scanUi === 'done' ? 'done' : 'running'}
+                    size={20}
+                    tone="onDark"
+                    onRetry={scanUi === 'error' ? retryLastScan : undefined}
+                  />
+                ) : (
+                  <Radar className="h-4 w-4" />
+                )}
+                {t('Buscar abertos agora', 'Buscar abiertos ahora', 'Find open calls')}
+              </button>
+              <button
+                type="button"
+                disabled={scanning}
+                onClick={() => void startScan('reference')}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                {(scanning || scanUi === 'error') && discoveryFocus === 'reference' ? (
+                  <ScanProgressRing
+                    percent={scanPercent}
+                    state={scanUi === 'error' ? 'error' : scanUi === 'done' ? 'done' : 'running'}
+                    size={20}
+                    onRetry={scanUi === 'error' ? retryLastScan : undefined}
+                  />
+                ) : (
+                  <Database className="h-4 w-4" />
+                )}
+                {t('Mapear programas', 'Mapear programas', 'Map programs')}
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <DeadlineAlertsPanel variant="inline" />
+              {recentRuns.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setHistoryOpen((v) => !v)}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                >
+                  <History className="h-3.5 w-3.5" />
+                  {t('Histórico', 'Historial', 'History')}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setBriefingOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                {t('Critérios', 'Criterios', 'Criteria')}
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <DeadlineAlertsPanel variant="inline" />
-          {recentRuns.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setHistoryOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              <History className="h-4 w-4" />
-              {t('Histórico', 'Historial', 'History')}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setBriefingOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            <Settings2 className="h-4 w-4" />
-            {t('Briefing', 'Briefing', 'Briefing')}
-          </button>
-          <button
-            type="button"
-            disabled={scanning}
-            onClick={() => void startScan('open_now')}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
-          >
-            {(scanning || scanUi === 'error') && discoveryFocus === 'open_now' ? (
-              <ScanProgressRing
-                percent={scanPercent}
-                state={scanUi === 'error' ? 'error' : scanUi === 'done' ? 'done' : 'running'}
-                size={20}
-                tone="onDark"
-                onRetry={scanUi === 'error' ? retryLastScan : undefined}
-              />
-            ) : (
-              <Radar className="h-4 w-4" />
-            )}
-            {t('Buscar abertos', 'Buscar abiertos', 'Find open calls')}
-          </button>
-          <button
-            type="button"
-            disabled={scanning}
-            onClick={() => void startScan('reference')}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-900 hover:bg-violet-100 disabled:opacity-60"
-          >
-            {(scanning || scanUi === 'error') && discoveryFocus === 'reference' ? (
-              <ScanProgressRing
-                percent={scanPercent}
-                state={scanUi === 'error' ? 'error' : scanUi === 'done' ? 'done' : 'running'}
-                size={20}
-                onRetry={scanUi === 'error' ? retryLastScan : undefined}
-              />
-            ) : (
-              <Database className="h-4 w-4" />
-            )}
-            {t('Mapear base', 'Mapear base', 'Map reference')}
-          </button>
-        </div>
-      </div>
+      </header>
 
       {msg && (
         <div
-          className={`flex flex-wrap items-center gap-3 rounded-lg border px-4 py-2 text-sm ${
+          className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 text-sm ${
             scanUi === 'error'
               ? 'border-red-200 bg-red-50 text-red-900'
-              : 'border-amber-200 bg-amber-50 text-amber-900'
+              : 'border-gray-200 bg-white text-gray-800 shadow-sm'
           }`}
         >
           {(scanning || scanUi === 'error' || scanUi === 'done') && (
@@ -595,10 +615,14 @@ export default function OpportunityDiscoverPage() {
                     </span>
                     <span
                       className={`rounded-full px-2 py-0.5 font-medium ${
-                        run.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
+                        run.status === 'completed'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : run.status === 'failed'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-gray-100 text-gray-600'
                       }`}
                     >
-                      {run.status}
+                      {scanStatusLabel(run.status)}
                     </span>
                   </li>
                 ))}
@@ -606,21 +630,21 @@ export default function OpportunityDiscoverPage() {
             </div>
           )}
 
-          <div className="flex gap-2 border-b border-gray-200">
+          <div className="flex gap-1 border-b border-gray-200">
             {(
               [
-                ['new', t('Validar', 'Validar', 'Validate')],
-                ['catalog', t(`Catálogo (${catalogTotal})`, `Catálogo (${catalogTotal})`, `Catalog (${catalogTotal})`)],
-                ['later', t(`Rever (${later.length})`, `Revisar (${later.length})`, `Review (${later.length})`)],
+                ['new', t(`Novas (${pendingOpen.length + pendingReference.length})`, `Nuevas (${pendingOpen.length + pendingReference.length})`, `New (${pendingOpen.length + pendingReference.length})`)],
+                ['catalog', t(`Guardadas (${catalogTotal})`, `Guardadas (${catalogTotal})`, `Saved (${catalogTotal})`)],
+                ['later', t(`Mais tarde (${later.length})`, `Más tarde (${later.length})`, `Later (${later.length})`)],
               ] as const
             ).map(([key, label]) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setTab(key)}
-                className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
+                className={`border-b-2 px-4 py-2.5 text-sm font-medium transition ${
                   tab === key
-                    ? 'border-amber-600 text-amber-800'
+                    ? 'border-gray-900 text-gray-900'
                     : 'border-transparent text-gray-500 hover:text-gray-800'
                 }`}
               >
@@ -630,22 +654,20 @@ export default function OpportunityDiscoverPage() {
           </div>
 
           {tab === 'new' && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {(
                 [
-                  ['open_now', t(`Abertos agora (${pendingOpen.length})`, `Abiertos ahora (${pendingOpen.length})`, `Open now (${pendingOpen.length})`)],
-                  ['reference', t(`Base / referência (${pendingReference.length})`, `Base / referencia (${pendingReference.length})`, `Reference (${pendingReference.length})`)],
+                  ['open_now', t(`Abertos agora · ${pendingOpen.length}`, `Abiertos ahora · ${pendingOpen.length}`, `Open now · ${pendingOpen.length}`)],
+                  ['reference', t(`Programas · ${pendingReference.length}`, `Programas · ${pendingReference.length}`, `Programs · ${pendingReference.length}`)],
                 ] as const
               ).map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setDiscoveryFocus(key)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
                     discoveryFocus === key
-                      ? key === 'open_now'
-                        ? 'bg-emerald-100 text-emerald-900'
-                        : 'bg-violet-100 text-violet-900'
+                      ? 'bg-gray-900 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
@@ -655,45 +677,64 @@ export default function OpportunityDiscoverPage() {
               <p className="w-full text-xs text-gray-500">
                 {discoveryFocus === 'open_now'
                   ? t(
-                      'Só editais com submissão aberta ou rolling — verificados na pesquisa web.',
-                      'Solo convocatorias abiertas o rolling — verificadas en búsqueda web.',
-                      'Only calls with open or rolling submission — verified via web search.',
+                      'Convocatórias com prazo activo ou janela contínua.',
+                      'Convocatorias con plazo activo o ventana continua.',
+                      'Calls with an active deadline or rolling window.',
                     )
                   : t(
-                      'Programas permanentes, sazonais ou fechados — alimenta a base Etholys e a IA.',
-                      'Programas permanentes, estacionales o cerrados — alimenta la base Etholys.',
-                      'Permanent, seasonal, or closed programs — feeds Etholys base and AI.',
+                      'Programas permanentes ou sazonais para acompanhar — mesmo sem prazo aberto hoje.',
+                      'Programas permanentes o estacionales para seguir — aunque no haya plazo hoy.',
+                      'Standing or seasonal programs to track — even if no window is open today.',
                     )}
               </p>
             </div>
           )}
 
           {tab === 'new' && pendingForFocus.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
-              <Radar className="mx-auto h-12 w-12 text-gray-300" />
-              <h2 className="mt-4 text-lg font-semibold text-gray-900">
-                {discoveryFocus === 'open_now'
-                  ? t('Nenhum edital aberto encontrado', 'Ninguna convocatoria abierta', 'No open calls found')
-                  : t('Base ainda vazia', 'Base aún vacía', 'Reference base empty')}
+            <div className="rounded-2xl border border-gray-200 bg-white px-8 py-12 text-center shadow-sm">
+              {scanning ? (
+                <ScanProgressRing
+                  percent={scanPercent}
+                  state={scanUi === 'done' ? 'done' : 'running'}
+                  size={48}
+                  className="mx-auto"
+                />
+              ) : (
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+                  <Radar className="h-6 w-6 text-gray-500" />
+                </div>
+              )}
+              <h2 className="mt-5 text-lg font-semibold text-gray-900">
+                {scanning
+                  ? t('A pesquisar fontes oficiais…', 'Buscando fuentes oficiales…', 'Searching official sources…')
+                  : discoveryFocus === 'open_now'
+                    ? t('Ainda sem convocatórias abertas', 'Aún sin convocatorias abiertas', 'No open calls yet')
+                    : t('Ainda sem programas mapeados', 'Aún sin programas mapeados', 'No programs mapped yet')}
               </h2>
-              <p className="mx-auto mt-2 max-w-md text-sm text-gray-600">
-                {discoveryFocus === 'open_now'
+              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-gray-600">
+                {scanning
                   ? t(
-                      'Execute «Buscar abertos» — a IA procura convocatórias com prazo activo hoje.',
-                      'Ejecute «Buscar abiertos» — la IA busca convocatorias con plazo activo hoy.',
-                      'Run «Find open calls» — AI searches for calls with an active deadline today.',
+                      'Isto pode demorar um ou dois minutos. O anel mostra o avanço da busca.',
+                      'Puede tardar uno o dos minutos. El anillo muestra el avance.',
+                      'This can take a minute or two. The ring shows search progress.',
                     )
-                  : t(
-                      'Execute «Mapear base» para registar programas relevantes mesmo fechados.',
-                      'Ejecute «Mapear base» para programas relevantes aunque cerrados.',
-                      'Run «Map reference» to catalog relevant programs even when closed.',
-                    )}
+                  : discoveryFocus === 'open_now'
+                    ? t(
+                        'Lance uma busca — a IA identifica convocatórias com prazo activo e traz o que precisa para decidir.',
+                        'Lance una búsqueda — la IA identifica convocatorias con plazo activo.',
+                        'Start a search — AI finds calls with an active deadline and the facts you need to decide.',
+                      )
+                    : t(
+                        'Mapeie programas permanentes e sazonais para a equipa acompanhar ao longo do ano.',
+                        'Mapee programas permanentes y estacionales para seguirlos durante el año.',
+                        'Map standing and seasonal programs for the team to track through the year.',
+                      )}
               </p>
               <button
                 type="button"
                 disabled={scanning}
                 onClick={() => (scanUi === 'error' ? retryLastScan() : void startScan(discoveryFocus))}
-                className="mt-6 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
+                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-60"
               >
                 {scanning || scanUi === 'error' ? (
                   <ScanProgressRing
@@ -862,7 +903,7 @@ export default function OpportunityDiscoverPage() {
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">
-                {t('Briefing de varredura', 'Briefing de barrido', 'Scan briefing')}
+                {t('Critérios de busca', 'Criterios de búsqueda', 'Search criteria')}
               </h2>
               <button type="button" onClick={() => setBriefingOpen(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
@@ -948,7 +989,7 @@ export default function OpportunityDiscoverPage() {
                 onClick={() => void saveBriefing()}
                 className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white"
               >
-                {t('Guardar briefing', 'Guardar briefing', 'Save briefing')}
+                {t('Guardar critérios', 'Guardar criterios', 'Save criteria')}
               </button>
             </div>
           </div>
@@ -992,7 +1033,7 @@ function CandidateCard({
     countries && countries.length > 48 ? `${countries.slice(0, 48).trim()}…` : countries;
 
   return (
-    <article className="group rounded-xl border border-gray-200 bg-white shadow-sm transition hover:border-amber-300 hover:shadow-md">
+    <article className="group rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:border-gray-300 hover:shadow-md">
       <button
         type="button"
         onClick={() => onOpen('overview')}
@@ -1016,7 +1057,7 @@ function CandidateCard({
               </span>
             )}
             {c.classification && (
-              <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-900">
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-700">
                 {c.classification === 'direct'
                   ? t('Directo', 'Directo', 'Direct')
                   : c.classification === 'client_bridge'
@@ -1025,7 +1066,7 @@ function CandidateCard({
               </span>
             )}
           </div>
-          <h3 className="mt-1.5 line-clamp-1 text-sm font-semibold text-gray-900 group-hover:text-amber-900">
+          <h3 className="mt-1.5 line-clamp-1 text-sm font-semibold text-gray-900">
             {c.name}
           </h3>
           <p className="line-clamp-1 text-xs text-gray-600">{c.institution}</p>
@@ -1056,14 +1097,14 @@ function CandidateCard({
               {Math.round(c.matchScore)}%
             </span>
           )}
-          <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-amber-600" />
+          <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-gray-700" />
         </div>
       </button>
       <div className="flex flex-wrap gap-1.5 border-t border-gray-100 px-3 py-2">
         <button
           type="button"
           onClick={() => onOpen('analyze')}
-          className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-900 hover:bg-amber-100"
+          className="inline-flex items-center gap-1 rounded-md bg-gray-900 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-gray-800"
         >
           <MessageSquare className="h-3 w-3" />
           {t('Analisar', 'Analizar', 'Analyze')}
@@ -1071,16 +1112,11 @@ function CandidateCard({
         <button
           type="button"
           onClick={() => onOpen('overview')}
-          className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+          className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
         >
           {t('Ver detalhes', 'Ver detalles', 'View details')}
           <ChevronRight className="h-3 w-3" />
         </button>
-        {!c.linkOficial && (
-          <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-[11px] text-red-800">
-            {t('Sem link oficial', 'Sin enlace oficial', 'No official link')}
-          </span>
-        )}
       </div>
     </article>
   );

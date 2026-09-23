@@ -37,20 +37,6 @@ type NavGroup = {
   items: { href: string; icon: React.ComponentType<{ className?: string }>; label: string }[];
 };
 
-/** Cor de sistema FundHub (laranja/âmbar) — ATLAS=teal, SIEP=indigo */
-const fh = {
-  grad: 'from-amber-500 to-orange-600',
-  activeBg: 'bg-amber-50',
-  activeText: 'text-amber-800',
-  mutedActive: 'text-amber-700',
-  hoverHub: 'hover:text-amber-600 hover:bg-amber-50',
-  companyFallback: '#d97706',
-  avatar: 'bg-amber-100 text-amber-800',
-  notifUnread: 'bg-amber-50/50',
-  notifLink: 'text-amber-600',
-  spin: 'border-amber-600/30 border-t-amber-600',
-};
-
 export default function FundHubLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -119,8 +105,8 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className={cn('w-8 h-8 border-2 rounded-full animate-spin', fh.spin)} />
+      <div className="flex min-h-screen items-center justify-center bg-[#07111A]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-400/25 border-t-amber-400" />
       </div>
     );
   }
@@ -152,7 +138,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
         {
           href: '/hub/fundhub/discover',
           icon: Search,
-          label: locale === 'es' ? 'Varredura' : locale === 'pt' ? 'Varredura' : 'Scan',
+          label: locale === 'es' ? 'Descubrir' : locale === 'pt' ? 'Descobrir' : 'Discover',
         },
         {
           href: '/hub/fundhub/my-funds',
@@ -192,7 +178,6 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
 
   const bottomItems = [
     { href: '/chat', icon: MessageCircle, label: 'Chat', badge: chatUnread > 0 ? chatUnread : undefined },
-    { href: '/reports', icon: BarChart3, label: tr('nav.reports') },
     { href: '/hub/fundhub/settings', icon: Settings, label: tr('nav.settings') },
   ];
 
@@ -209,82 +194,97 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
     });
   };
 
+  const navClass = (active: boolean, collapsedNav: boolean) =>
+    cn(
+      'flex items-center rounded-lg text-sm font-medium transition',
+      collapsedNav ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
+      active
+        ? 'bg-amber-500/15 text-amber-100'
+        : 'text-white/55 hover:bg-white/[0.05] hover:text-white',
+    );
+
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="etholys-fundhub etholys-hub relative isolate flex min-h-screen overflow-hidden bg-[#07111A] text-[#E8EEF2]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_78%_8%,rgba(217,119,6,0.22),transparent_52%),radial-gradient(90%_70%_at_8%_92%,rgba(15,23,42,0.9),transparent_50%),linear-gradient(165deg,#041018_0%,#0B1C24_42%,#07111A_100%)]"
+      />
+      <div aria-hidden className="etholys-site-grid pointer-events-none absolute inset-0 opacity-[0.12]" />
+      <div
+        aria-hidden
+        className="etholys-site-orbit pointer-events-none absolute -right-[24%] top-[-10%] h-[78vmin] w-[78vmin] rounded-full border border-amber-400/15"
+      />
+      <div
+        aria-hidden
+        className="etholys-site-orbit-slow pointer-events-none absolute -right-[8%] top-[18%] h-[46vmin] w-[46vmin] rounded-full border border-amber-300/10"
+      />
+
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 bg-white border-r border-gray-200 transform transition-all flex flex-col',
+          'fixed inset-y-0 left-0 z-50 flex transform flex-col border-r border-white/10 bg-[#07111A]/88 backdrop-blur-md transition-all',
           collapsed ? 'w-16' : 'w-64',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         )}
       >
-        <div className={cn('border-b border-gray-100 flex-shrink-0', collapsed ? 'p-2' : 'p-4')}>
+        <div className={cn('flex-shrink-0 border-b border-white/10', collapsed ? 'p-2' : 'p-4')}>
           <div className="flex items-center justify-between">
-            <Link href="/hub/fundhub" className="flex items-center gap-2 min-w-0">
-              <div
-                className={cn(
-                  'w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center text-white font-bold text-sm flex-shrink-0',
-                  fh.grad
-                )}
-              >
-                F
+            <Link href="/hub/fundhub" className="flex min-w-0 items-center gap-2">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-amber-400/30 bg-amber-500/15">
+                <HandCoins className="h-4 w-4 text-amber-300" strokeWidth={1.75} />
               </div>
               {!collapsed && (
-                <span className="font-bold text-gray-900 truncate">
-                  OPPORT<span className={fh.activeText}>UNITY</span>
+                <span className="truncate font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-[0.14em] text-white">
+                  FUNDHUB
                 </span>
               )}
             </Link>
-            <div className="flex items-center gap-1 flex-shrink-0">
+            <div className="flex flex-shrink-0 items-center gap-1">
               <button
                 type="button"
                 onClick={() => setCollapsed(!collapsed)}
-                className="hidden lg:flex items-center justify-center p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition"
+                className="hidden items-center justify-center rounded-lg p-1.5 text-white/35 transition hover:bg-white/5 hover:text-white lg:flex"
                 title={collapsed ? 'Expandir' : 'Minimizar'}
               >
-                {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+                {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
               </button>
               <button
                 type="button"
                 onClick={() => setSidebarOpen(false)}
-                className="lg:hidden text-gray-400 hover:text-gray-600"
+                className="text-white/40 hover:text-white lg:hidden"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
           </div>
           {!collapsed && (
             <Link
               href="/hub"
-              className={cn(
-                'mt-2 flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 rounded-md transition',
-                fh.hoverHub
-              )}
+              className="mt-2 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-white/40 transition hover:bg-white/5 hover:text-amber-200"
             >
-              <ChevronDown className="w-3 h-3 rotate-90" />
+              <ChevronDown className="h-3 w-3 rotate-90" />
               {locale === 'es' ? 'Volver al Hub' : locale === 'pt' ? 'Voltar ao Hub' : 'Back to Hub'}
             </Link>
           )}
         </div>
 
         {!collapsed && companies.length > 0 && (
-          <div className="p-3 border-b border-gray-100 flex-shrink-0">
+          <div className="flex-shrink-0 border-b border-white/10 p-3">
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setCompanyMenuOpen(!companyMenuOpen)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition text-sm"
+                className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/80 transition hover:bg-white/[0.07]"
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <Building2 className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                  <span className="font-medium text-gray-700 truncate">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Building2 className="h-4 w-4 flex-shrink-0 text-white/40" />
+                  <span className="truncate font-medium">
                     {activeCompany ? activeCompany?.shortName : tr('company.allCompanies')}
                   </span>
                 </div>
-                <ChevronDown className={cn('w-4 h-4 text-gray-400 transition flex-shrink-0', companyMenuOpen && 'rotate-180')} />
+                <ChevronDown className={cn('h-4 w-4 flex-shrink-0 text-white/35 transition', companyMenuOpen && 'rotate-180')} />
               </button>
               {companyMenuOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border z-50 py-1">
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-white/10 bg-[#0C1822] py-1 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.9)]">
                   <button
                     type="button"
                     onClick={() => {
@@ -292,11 +292,11 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
                       setCompanyMenuOpen(false);
                     }}
                     className={cn(
-                      'w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2',
-                      !activeCompanyId && cn(fh.mutedActive, 'font-medium')
+                      'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/5',
+                      !activeCompanyId ? 'font-medium text-amber-200' : 'text-white/70',
                     )}
                   >
-                    <div className="w-3 h-3 rounded-full bg-gray-400" />
+                    <div className="h-3 w-3 rounded-full bg-white/30" />
                     {tr('company.allCompanies')}
                   </button>
                   {(companies ?? []).map((c: any) => (
@@ -308,13 +308,13 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
                         setCompanyMenuOpen(false);
                       }}
                       className={cn(
-                        'w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2',
-                        activeCompanyId === c?.id && cn(fh.mutedActive, 'font-medium')
+                        'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/5',
+                        activeCompanyId === c?.id ? 'font-medium text-amber-200' : 'text-white/70',
                       )}
                     >
                       <div
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: c?.color ?? fh.companyFallback }}
+                        className="h-3 w-3 flex-shrink-0 rounded-full"
+                        style={{ backgroundColor: c?.color ?? '#d97706' }}
                       />
                       {c?.shortName ?? ''}
                     </button>
@@ -334,26 +334,22 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
                 title={collapsed ? item.label : undefined}
-                className={cn(
-                  'flex items-center rounded-lg text-sm font-medium transition',
-                  collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
-                  isActive ? cn(fh.activeBg, fh.activeText) : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                )}
+                className={navClass(isActive, collapsed)}
               >
-                <item.icon className="w-5 h-5 flex-shrink-0" />
+                <item.icon className="h-5 w-5 flex-shrink-0" />
                 {!collapsed && item.label}
               </Link>
             );
           })}
 
-          <div className="pt-2 pb-1">
-            <div className="h-px bg-gray-100" />
+          <div className="py-2">
+            <div className="h-px bg-white/10" />
           </div>
 
           {navGroups.map((group) => {
             const isOpen = openGroups[group.key] ?? false;
             const hasActiveChild = group.items.some(
-              (i) => pathname === i.href || pathname?.startsWith(i.href + '/')
+              (i) => pathname === i.href || pathname?.startsWith(i.href + '/'),
             );
             if (collapsed) {
               return group.items.map((item) => {
@@ -364,34 +360,31 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
                     href={item.href}
                     onClick={() => setSidebarOpen(false)}
                     title={item.label}
-                    className={cn(
-                      'flex items-center justify-center px-2 py-2.5 rounded-lg text-sm transition',
-                      isActive ? cn(fh.activeBg, fh.activeText, 'font-medium') : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    )}
+                    className={navClass(isActive, true)}
                   >
-                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                    <item.icon className="h-5 w-5 flex-shrink-0" />
                   </Link>
                 );
               });
             }
             return (
-              <div key={group.key}>
+              <div key={group.key} className="mb-2">
                 <button
                   type="button"
                   onClick={() => toggleGroup(group.key)}
                   className={cn(
-                    'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition',
-                    hasActiveChild ? fh.mutedActive : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                    'flex w-full items-center justify-between rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] transition',
+                    hasActiveChild ? 'text-amber-200' : 'text-white/35 hover:bg-white/[0.04] hover:text-white/70',
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    <group.icon className="w-4 h-4" />
+                    <group.icon className="h-3.5 w-3.5" />
                     {group.label}
                   </div>
-                  <ChevronRight className={cn('w-3.5 h-3.5 transition-transform duration-200', isOpen && 'rotate-90')} />
+                  <ChevronRight className={cn('h-3.5 w-3.5 transition-transform duration-200', isOpen && 'rotate-90')} />
                 </button>
                 {isOpen && (
-                  <div className="ml-3 pl-3 border-l border-gray-100 space-y-0.5 mt-0.5 mb-1">
+                  <div className="ml-3 mt-0.5 space-y-0.5 border-l border-white/10 pl-3">
                     {group.items.map((item) => {
                       const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
                       return (
@@ -400,13 +393,13 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
                           href={item.href}
                           onClick={() => setSidebarOpen(false)}
                           className={cn(
-                            'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition',
+                            'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition',
                             isActive
-                              ? cn(fh.activeBg, fh.activeText, 'font-medium')
-                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                              ? 'bg-amber-500/15 font-medium text-amber-100'
+                              : 'text-white/55 hover:bg-white/[0.04] hover:text-white',
                           )}
                         >
-                          <item.icon className="w-4 h-4" />
+                          <item.icon className="h-4 w-4" />
                           {item.label}
                         </Link>
                       );
@@ -417,8 +410,8 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
             );
           })}
 
-          <div className="pt-2 pb-1">
-            <div className="h-px bg-gray-100" />
+          <div className="py-2">
+            <div className="h-px bg-white/10" />
           </div>
 
           {bottomItems.map((item) => {
@@ -429,16 +422,12 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
                 title={collapsed ? item.label : undefined}
-                className={cn(
-                  'flex items-center rounded-lg text-sm font-medium transition',
-                  collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
-                  isActive ? cn(fh.activeBg, fh.activeText) : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                )}
+                className={navClass(isActive, collapsed)}
               >
                 <div className="relative">
-                  <item.icon className="w-5 h-5" />
+                  <item.icon className="h-5 w-5" />
                   {(item as { badge?: number }).badge != null && (item as { badge?: number }).badge! > 0 && (
-                    <div className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    <div className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-slate-950">
                       {(item as { badge?: number }).badge! > 9 ? '9+' : (item as { badge?: number }).badge}
                     </div>
                   )}
@@ -449,48 +438,48 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
           })}
         </nav>
 
-        <div className={cn('border-t border-gray-100 flex-shrink-0', collapsed ? 'p-1.5' : 'p-3')}>
-          <div className={cn('flex items-center mb-2', collapsed ? 'flex-col gap-1' : 'gap-1')}>
+        <div className={cn('flex-shrink-0 border-t border-white/10', collapsed ? 'p-1.5' : 'p-3')}>
+          <div className={cn('mb-2 flex items-center', collapsed ? 'flex-col gap-1' : 'gap-1')}>
             <button
               type="button"
               onClick={() => setLocale(locale === 'es' ? 'pt' : locale === 'pt' ? 'en' : 'es')}
               className={cn(
-                'flex items-center gap-1.5 text-xs rounded-lg hover:bg-gray-100 transition text-gray-600',
-                collapsed ? 'p-2 justify-center' : 'px-2.5 py-1.5 flex-1'
+                'flex items-center gap-1.5 rounded-lg text-xs uppercase tracking-wider text-white/45 transition hover:bg-white/5 hover:text-white',
+                collapsed ? 'justify-center p-2' : 'flex-1 px-2.5 py-1.5',
               )}
               title={collapsed ? String(locale?.toUpperCase()) : undefined}
             >
-              <Globe className="w-3.5 h-3.5 flex-shrink-0" />
+              <Globe className="h-3.5 w-3.5 flex-shrink-0" />
               {!collapsed && locale?.toUpperCase()}
             </button>
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setNotifOpen(!notifOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition text-gray-600 relative"
+                className="relative rounded-lg p-2 text-white/45 transition hover:bg-white/5 hover:text-white"
               >
-                <Bell className="w-3.5 h-3.5" />
+                <Bell className="h-3.5 w-3.5" />
                 {notifCount > 0 && (
-                  <div className="absolute top-0.5 right-0.5 min-w-[14px] h-3.5 px-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  <div className="absolute right-0.5 top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-amber-500 px-0.5 text-[9px] font-bold text-slate-950">
                     {notifCount > 9 ? '9+' : notifCount}
                   </div>
                 )}
               </button>
               {notifOpen && (
-                <div className="absolute bottom-full left-0 mb-1 w-80 bg-white rounded-xl shadow-lg border z-[60] overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b">
-                    <span className="text-sm font-semibold text-gray-900">
+                <div className="absolute bottom-full left-0 z-[60] mb-1 w-80 overflow-hidden rounded-xl border border-white/10 bg-[#0C1822] shadow-[0_24px_80px_-40px_rgba(0,0,0,0.9)]">
+                  <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                    <span className="text-sm font-semibold text-white">
                       {locale === 'es' ? 'Notificaciones' : locale === 'pt' ? 'Notificações' : 'Notifications'}
                     </span>
                     {notifCount > 0 && (
-                      <button type="button" onClick={markAllNotifRead} className={cn('text-xs hover:underline', fh.notifLink)}>
+                      <button type="button" onClick={markAllNotifRead} className="text-xs text-amber-200 hover:underline">
                         {locale === 'es' ? 'Marcar leídas' : locale === 'pt' ? 'Marcar lidas' : 'Mark all read'}
                       </button>
                     )}
                   </div>
-                  <div className="max-h-72 overflow-y-auto divide-y">
+                  <div className="max-h-72 divide-y divide-white/[0.06] overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <div className="px-4 py-6 text-center text-sm text-gray-400">
+                      <div className="px-4 py-6 text-center text-sm text-white/35">
                         {locale === 'es' ? 'Sin notificaciones' : locale === 'pt' ? 'Sem notificações' : 'No notifications'}
                       </div>
                     ) : (
@@ -525,13 +514,13 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
                             setNotifOpen(false);
                           }}
                           className={cn(
-                            'px-4 py-3 hover:bg-gray-50 cursor-pointer transition',
-                            !n.read && fh.notifUnread
+                            'cursor-pointer px-4 py-3 transition hover:bg-white/[0.04]',
+                            !n.read && 'bg-amber-500/10',
                           )}
                         >
-                          <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
-                          <p className="text-[10px] text-gray-400 mt-1">
+                          <p className="text-sm font-medium text-white">{n.title}</p>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-white/45">{n.message}</p>
+                          <p className="mt-1 text-[10px] text-white/30">
                             {new Date(n.createdAt).toLocaleDateString('es-UY')}
                           </p>
                         </div>
@@ -544,26 +533,21 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
           </div>
 
           {!collapsed && (
-            <div className="flex items-center gap-3 px-3 py-2 mt-1">
-              <div
-                className={cn(
-                  'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
-                  fh.avatar
-                )}
-              >
+            <div className="mt-1 flex items-center gap-3 px-3 py-2">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-xs font-bold text-amber-100">
                 {getInitials(session?.user?.name)}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{session?.user?.name ?? ''}</p>
-                <p className="text-xs text-gray-500 truncate">{session?.user?.email ?? ''}</p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-white">{session?.user?.name ?? ''}</p>
+                <p className="truncate text-xs text-white/40">{session?.user?.email ?? ''}</p>
               </div>
               <button
                 type="button"
                 onClick={() => signOut({ callbackUrl: '/login' })}
-                className="text-gray-400 hover:text-red-500 transition"
+                className="text-white/35 transition hover:text-red-300"
                 title={tr('auth.logout')}
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="h-4 w-4" />
               </button>
             </div>
           )}
@@ -571,48 +555,39 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
             <button
               type="button"
               onClick={() => signOut({ callbackUrl: '/login' })}
-              className="flex items-center justify-center w-full py-2 rounded-lg text-gray-400 hover:text-red-500 transition mt-1"
+              className="mt-1 flex w-full items-center justify-center rounded-lg py-2 text-white/35 transition hover:text-red-300"
               title={tr('auth.logout')}
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="h-4 w-4" />
             </button>
           )}
         </div>
       </aside>
 
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/20 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} aria-hidden />
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} aria-hidden />
       )}
 
-      <div
-        className={cn(
-          'flex-1 flex flex-col min-h-screen min-w-0 transition-all',
-          collapsed ? 'lg:ml-16' : 'lg:ml-64'
-        )}
-      >
-        <div className="lg:hidden sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 py-3 flex items-center gap-3">
-          <button type="button" onClick={() => setSidebarOpen(true)} className="text-gray-600 hover:text-gray-900">
-            <Menu className="w-5 h-5" />
+      <div className={cn('relative z-10 flex min-h-screen min-w-0 flex-1 flex-col transition-all', collapsed ? 'lg:ml-16' : 'lg:ml-64')}>
+        <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 bg-[#07111A]/70 px-4 py-3 backdrop-blur-md lg:hidden">
+          <button type="button" onClick={() => setSidebarOpen(true)} className="text-white/70 hover:text-white">
+            <Menu className="h-5 w-5" />
           </button>
+          <span className="font-[family-name:var(--font-etholys-display)] text-xs font-bold tracking-[0.16em] text-white">
+            FUNDHUB
+          </span>
           {activeCompany && (
-            <div
-              className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium min-w-0"
-              style={{
-                backgroundColor: `${activeCompany?.color ?? fh.companyFallback}15`,
-                color: activeCompany?.color ?? fh.companyFallback,
-              }}
-            >
-              <div
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ backgroundColor: activeCompany?.color ?? fh.companyFallback }}
-              />
+            <div className="ml-auto flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/70">
+              <div className="h-2 w-2 flex-shrink-0 rounded-full" style={{ backgroundColor: activeCompany?.color ?? '#d97706' }} />
               <span className="truncate">{activeCompany?.name ?? ''}</span>
             </div>
           )}
         </div>
 
-        <main className="flex-1 p-4 md:p-6 overflow-auto">
-          <SystemLicenseGate system="FUNDHUB">{children}</SystemLicenseGate>
+        <main className="fh-canvas min-w-0 flex-1 overflow-auto p-4 md:p-6">
+          <div className="mx-auto max-w-6xl">
+            <SystemLicenseGate system="FUNDHUB">{children}</SystemLicenseGate>
+          </div>
         </main>
       </div>
     </div>

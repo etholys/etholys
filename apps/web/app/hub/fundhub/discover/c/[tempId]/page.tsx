@@ -88,14 +88,14 @@ function CandidatePreviewInner() {
             : error || t('Erro', 'Error', 'Error')}
         </p>
         <Link href="/hub/fundhub/discover" className="text-sm font-medium text-amber-700 hover:underline">
-          ← OPPORTUNITY
+          ← FUNDHUB
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-[60vh] bg-gray-50 p-4 md:p-8">
+    <div className="space-y-4">
       <Link
         href="/hub/fundhub/discover"
         className="mb-4 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
