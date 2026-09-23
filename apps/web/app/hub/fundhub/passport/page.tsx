@@ -9,19 +9,21 @@ import {
   ArrowLeft,
   ArrowRight,
   Building2,
-  CheckCircle2,
   Circle,
   FileText,
   Globe,
   HandCoins,
   MapPin,
+  Pencil,
   Printer,
   Sprout,
   Users,
+  X,
 } from 'lucide-react';
 import { PassportSharePanel } from '@/components/fundhub/PassportSharePanel';
 
 type PassportPayload = {
+  canEdit?: boolean;
   company: {
     name: string;
     shortName?: string | null;
@@ -154,6 +156,19 @@ export default function InstitutionalProfilePage() {
   const [data, setData] = useState<PassportPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    name: '',
+    shortName: '',
+    description: '',
+    sector: '',
+    country: '',
+    currency: 'USD',
+    themes: '',
+    countries: '',
+  });
 
   const load = useCallback(async () => {
     if (!companyId) {
@@ -180,7 +195,55 @@ export default function InstitutionalProfilePage() {
 
   useEffect(() => {
     void load();
+    setEditing(false);
+    setSaveErr(null);
   }, [load]);
+
+  const startEdit = () => {
+    if (!data) return;
+    setForm({
+      name: data.company.name ?? '',
+      shortName: data.company.shortName ?? '',
+      description: data.company.description ?? '',
+      sector: data.company.sector ?? '',
+      country: data.company.country ?? '',
+      currency: data.company.currency ?? 'USD',
+      themes: (data.captureProfile?.themes ?? []).join(', '),
+      countries: (data.captureProfile?.countries ?? []).join(', '),
+    });
+    setSaveErr(null);
+    setEditing(true);
+  };
+
+  const saveProfile = async () => {
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      const r = await fetch('/api/fundhub/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          name: form.name,
+          shortName: form.shortName,
+          description: form.description,
+          sector: form.sector,
+          country: form.country,
+          currency: form.currency,
+          themes: form.themes,
+          countries: form.countries,
+        }),
+      });
+      const d = (await r.json()) as PassportPayload & { error?: string };
+      if (!r.ok) throw new Error(d.error || 'Erro');
+      setData({ ...d, canEdit: true });
+      setEditing(false);
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (!companyId) {
     return (
@@ -236,6 +299,16 @@ export default function InstitutionalProfilePage() {
           </p>
         </div>
         <div className="no-print flex flex-wrap items-center gap-2">
+          {data.canEdit && !editing && (
+            <button
+              type="button"
+              onClick={startEdit}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              {t('Editar perfil', 'Editar perfil', 'Edit profile')}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => window.print()}
@@ -249,115 +322,199 @@ export default function InstitutionalProfilePage() {
       </div>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-start gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-amber-100">
-            <Building2 className="h-7 w-7 text-amber-700" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-bold text-gray-900">{data.company.name}</h2>
-            {data.company.shortName && (
-              <p className="text-sm text-gray-500">{data.company.shortName}</p>
-            )}
-            <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-600">
-              {data.company.sector && (
-                <span className="inline-flex items-center gap-1">
-                  <Building2 className="h-4 w-4" />
-                  {data.company.sector}
+        {editing ? (
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveProfile();
+            }}
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm">
+                <span className="text-xs font-medium text-gray-500">{t('Nome', 'Nombre', 'Name')}</span>
+                <input
+                  required
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-xs font-medium text-gray-500">{t('Nome curto', 'Nombre corto', 'Short name')}</span>
+                <input
+                  value={form.shortName}
+                  onChange={(e) => setForm((f) => ({ ...f, shortName: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-xs font-medium text-gray-500">{t('Sector', 'Sector', 'Sector')}</span>
+                <input
+                  value={form.sector}
+                  onChange={(e) => setForm((f) => ({ ...f, sector: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-xs font-medium text-gray-500">{t('País', 'País', 'Country')}</span>
+                <input
+                  value={form.country}
+                  onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-xs font-medium text-gray-500">{t('Moeda', 'Moneda', 'Currency')}</span>
+                <input
+                  value={form.currency}
+                  onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm sm:col-span-2">
+                <span className="text-xs font-medium text-gray-500">{t('Descrição', 'Descripción', 'Description')}</span>
+                <textarea
+                  rows={4}
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-xs font-medium text-gray-500">
+                  {t('Temas de captação', 'Temas de captación', 'Funding themes')}
                 </span>
-              )}
-              {data.company.country && (
-                <span className="inline-flex items-center gap-1">
-                  <MapPin className="h-4 w-4" />
-                  {data.company.country}
+                <input
+                  value={form.themes}
+                  onChange={(e) => setForm((f) => ({ ...f, themes: e.target.value }))}
+                  placeholder="agro, clima, educação"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-xs font-medium text-gray-500">
+                  {t('Países de interesse', 'Países de interés', 'Countries of interest')}
                 </span>
-              )}
-              {data.company.currency && <span>{data.company.currency}</span>}
+                <input
+                  value={form.countries}
+                  onChange={(e) => setForm((f) => ({ ...f, countries: e.target.value }))}
+                  placeholder="UY, AR, BR"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </label>
             </div>
-            {data.company.description ? (
-              <p className="mt-3 text-sm leading-relaxed text-gray-700">{data.company.description}</p>
-            ) : (
-              <p className="mt-3 text-sm text-gray-500">
-                {t(
-                  'Sem descrição — adicione uma em Configurações para financiadores entenderem a missão da organização.',
-                  'Sin descripción — añádala en Configuración para que los financiadores entiendan la misión.',
-                  'No description yet — add one in Settings so funders understand your mission.',
+            {saveErr && <p className="text-sm text-red-600">{saveErr}</p>}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+              >
+                {saving ? t('A guardar…', 'Guardando…', 'Saving…') : t('Guardar', 'Guardar', 'Save')}
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => {
+                  setEditing(false);
+                  setSaveErr(null);
+                }}
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <X className="h-3.5 w-3.5" />
+                {t('Cancelar', 'Cancelar', 'Cancel')}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-start gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-amber-100">
+                <Building2 className="h-7 w-7 text-amber-700" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-xl font-bold text-gray-900">{data.company.name}</h2>
+                {data.company.shortName && (
+                  <p className="text-sm text-gray-500">{data.company.shortName}</p>
                 )}
-              </p>
-            )}
-          </div>
-        </div>
+                <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-600">
+                  {data.company.sector && (
+                    <span className="inline-flex items-center gap-1">
+                      <Building2 className="h-4 w-4" />
+                      {data.company.sector}
+                    </span>
+                  )}
+                  {data.company.country && (
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="h-4 w-4" />
+                      {data.company.country}
+                    </span>
+                  )}
+                  {data.company.currency && <span>{data.company.currency}</span>}
+                </div>
+                {data.company.description ? (
+                  <p className="mt-3 text-sm leading-relaxed text-gray-700">{data.company.description}</p>
+                ) : (
+                  <p className="mt-3 text-sm text-gray-500">
+                    {data.canEdit
+                      ? t('Sem descrição — clique em Editar perfil.', 'Sin descripción — pulse Editar perfil.', 'No description — click Edit profile.')
+                      : t('Sem descrição.', 'Sin descripción.', 'No description.')}
+                  </p>
+                )}
+              </div>
+            </div>
 
-        {data.captureProfile && (data.captureProfile.themes.length > 0 || data.captureProfile.countries.length > 0) && (
-          <div className="mt-5 flex flex-wrap gap-2 border-t border-gray-100 pt-4">
-            <span className="w-full text-xs font-medium uppercase tracking-wide text-gray-500">
-              {t('Interesses de captação', 'Intereses de captación', 'Funding interests')}
-            </span>
-            {data.captureProfile.themes.map((theme) => (
-              <span key={theme} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900">
-                {theme}
-              </span>
-            ))}
-            {data.captureProfile.countries.map((c) => (
-              <span key={c} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                {c}
-              </span>
-            ))}
-          </div>
+            {data.captureProfile && (data.captureProfile.themes.length > 0 || data.captureProfile.countries.length > 0) && (
+              <div className="mt-5 flex flex-wrap gap-2 border-t border-gray-100 pt-4">
+                <span className="w-full text-xs font-medium uppercase tracking-wide text-gray-500">
+                  {t('Interesses de captação', 'Intereses de captación', 'Funding interests')}
+                </span>
+                {data.captureProfile.themes.map((theme) => (
+                  <span key={theme} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900">
+                    {theme}
+                  </span>
+                ))}
+                {data.captureProfile.countries.map((c) => (
+                  <span key={c} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                    {c}
+                  </span>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </section>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              {t('Completude do perfil', 'Completitud del perfil', 'Profile completeness')}
-            </h3>
-            <p className="mt-1 text-sm text-gray-600">
+      {missingItems.length > 0 && (
+        <section className="no-print rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-gray-700">
               {t(
-                `${completedCount} de ${PROFILE_ITEMS.length} áreas`,
-                `${completedCount} de ${PROFILE_ITEMS.length} áreas`,
-                `${completedCount} of ${PROFILE_ITEMS.length} areas`,
+                `${completedCount}/${PROFILE_ITEMS.length} áreas do perfil`,
+                `${completedCount}/${PROFILE_ITEMS.length} áreas del perfil`,
+                `${completedCount}/${PROFILE_ITEMS.length} profile areas`,
               )}
             </p>
+            <span className="text-sm font-semibold text-amber-700">{score}%</span>
           </div>
-          <div className="text-right">
-            <p className="text-3xl font-bold text-amber-700">{score}%</p>
+          <div className="mt-2 h-1 overflow-hidden rounded-full bg-gray-100">
+            <div className="h-full rounded-full bg-amber-500" style={{ width: `${score}%` }} />
           </div>
-        </div>
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-gray-100">
-          <div
-            className="h-full rounded-full bg-amber-500 transition-all"
-            style={{ width: `${score}%` }}
-          />
-        </div>
-
-        {missingItems.length > 0 && (
-          <ul className="no-print mt-5 divide-y divide-gray-100 rounded-xl border border-gray-100">
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
             {missingItems.map((item) => (
-              <li key={item.key} className="flex items-center justify-between gap-3 px-4 py-3">
-                <div className="flex items-start gap-2.5 min-w-0">
-                  <Circle className="mt-0.5 h-4 w-4 shrink-0 text-gray-300" />
-                  <span className="text-sm text-gray-700">{t(item.pt, item.es, item.en)}</span>
-                </div>
-                <Link
-                  href={item.href}
-                  className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-amber-700 hover:text-amber-900"
-                >
-                  {t(item.actionPt, item.actionEs, item.actionEn)}
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </li>
+              <Link
+                key={item.key}
+                href={item.href}
+                className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:underline"
+              >
+                <Circle className="h-3 w-3" />
+                {t(item.actionPt, item.actionEs, item.actionEn)}
+              </Link>
             ))}
-          </ul>
-        )}
-
-        {missingItems.length === 0 && (
-          <p className="mt-4 flex items-center gap-2 text-sm text-emerald-700">
-            <CheckCircle2 className="h-4 w-4" />
-            {t('Perfil completo — pronto para partilhar.', 'Perfil completo — listo para compartir.', 'Profile complete — ready to share.')}
-          </p>
-        )}
-      </section>
+          </div>
+        </section>
+      )}
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
