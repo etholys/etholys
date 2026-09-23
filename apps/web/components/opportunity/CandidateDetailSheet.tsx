@@ -240,10 +240,10 @@ export function CandidateDetailSheet({
               <div className="grid gap-3 sm:grid-cols-2">
                 {(opensLabel || closesLabel || c.applicationWindow) && (
                   <div className="rounded-lg bg-gray-50 px-3 py-2">
-                    <p className="text-[10px] font-semibold uppercase text-gray-500">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
                       {t('Janela', 'Ventana', 'Window')}
                     </p>
-                    <p className="mt-0.5 text-gray-900">
+                    <p className="mt-0.5 font-medium text-white">
                       {opensLabel && closesLabel
                         ? `${opensLabel} → ${closesLabel}`
                         : closesLabel || opensLabel || c.applicationWindow}
@@ -252,20 +252,20 @@ export function CandidateDetailSheet({
                 )}
                 {c.amount != null && (
                   <div className="rounded-lg bg-gray-50 px-3 py-2">
-                    <p className="text-[10px] font-semibold uppercase text-gray-500">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
                       {t('Montante', 'Monto', 'Amount')}
                     </p>
-                    <p className="mt-0.5 text-gray-900">
+                    <p className="mt-0.5 font-medium text-white">
                       {c.amount.toLocaleString()} {c.currency ?? 'USD'}
                     </p>
                   </div>
                 )}
                 {countries && (
                   <div className="rounded-lg bg-gray-50 px-3 py-2 sm:col-span-2">
-                    <p className="text-[10px] font-semibold uppercase text-gray-500">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
                       {t('Países elegíveis', 'Países elegibles', 'Eligible countries')}
                     </p>
-                    <p className="mt-0.5 flex gap-1 text-gray-900">
+                    <p className="mt-0.5 flex gap-1 font-medium text-white">
                       <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
                       {countries}
                     </p>
@@ -275,10 +275,10 @@ export function CandidateDetailSheet({
 
               {c.description && (
                 <div>
-                  <p className="text-[10px] font-semibold uppercase text-gray-500">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
                     {t('Descrição', 'Descripción', 'Description')}
                   </p>
-                  <p className="mt-1 whitespace-pre-wrap leading-relaxed text-gray-800">
+                  <p className="mt-1 whitespace-pre-wrap leading-relaxed text-slate-100">
                     {c.description}
                   </p>
                 </div>
@@ -286,7 +286,7 @@ export function CandidateDetailSheet({
 
               {(c.whoCanApply || c.eligibility || c.requirements) && (
                 <div className="rounded-lg border border-gray-100 bg-slate-50/80 px-3 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
                     {t(
                       'Resumo de requisitos / elegibilidade',
                       'Resumen de requisitos / elegibilidad',
@@ -296,26 +296,26 @@ export function CandidateDetailSheet({
                   <div className="mt-2 space-y-3">
                     {c.whoCanApply && (
                       <div>
-                        <p className="text-[11px] font-semibold text-slate-700">
+                        <p className="text-[11px] font-semibold text-white">
                           {t('Quem pode candidatar', 'Quién puede postular', 'Who can apply')}
                         </p>
-                        <p className="mt-0.5 whitespace-pre-wrap text-gray-800">{c.whoCanApply}</p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-slate-100">{c.whoCanApply}</p>
                       </div>
                     )}
                     {c.eligibility && (
                       <div>
-                        <p className="text-[11px] font-semibold text-slate-700">
+                        <p className="text-[11px] font-semibold text-white">
                           {t('Elegibilidade', 'Elegibilidad', 'Eligibility')}
                         </p>
-                        <p className="mt-0.5 whitespace-pre-wrap text-gray-800">{c.eligibility}</p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-slate-100">{c.eligibility}</p>
                       </div>
                     )}
                     {c.requirements && (
                       <div>
-                        <p className="text-[11px] font-semibold text-slate-700">
+                        <p className="text-[11px] font-semibold text-white">
                           {t('Requisitos-chave', 'Requisitos clave', 'Key requirements')}
                         </p>
-                        <p className="mt-0.5 whitespace-pre-wrap text-gray-800">{c.requirements}</p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-slate-100">{c.requirements}</p>
                       </div>
                     )}
                   </div>
@@ -324,10 +324,10 @@ export function CandidateDetailSheet({
 
               {c.howToApply && (
                 <div>
-                  <p className="text-[10px] font-semibold uppercase text-gray-500">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
                     {t('Como candidatar', 'Cómo postular', 'How to apply')}
                   </p>
-                  <p className="mt-1 whitespace-pre-wrap text-gray-800">{c.howToApply}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-slate-100">{c.howToApply}</p>
                 </div>
               )}
 
@@ -336,7 +336,7 @@ export function CandidateDetailSheet({
                   <p className="text-[10px] font-semibold uppercase text-amber-800/80">
                     {t('Riscos / avisos', 'Riesgos / avisos', 'Risks / caveats')}
                   </p>
-                  <p className="mt-1 whitespace-pre-wrap text-gray-700">{c.risksCaveats}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-slate-100">{c.risksCaveats}</p>
                 </div>
               )}
 
@@ -345,7 +345,7 @@ export function CandidateDetailSheet({
                   <p className="text-[10px] font-semibold uppercase text-gray-500">
                     {t('Porquê este match', 'Por qué este match', 'Why this match')}
                   </p>
-                  <p className="mt-1 text-gray-700">{c.matchJustification}</p>
+                  <p className="mt-1 text-slate-100">{c.matchJustification}</p>
                 </div>
               )}
               {(c.availabilityNote || c.classificationNote) && (
@@ -353,7 +353,7 @@ export function CandidateDetailSheet({
                   <p className="text-[10px] font-semibold uppercase text-gray-500">
                     {t('Notas', 'Notas', 'Notes')}
                   </p>
-                  <p className="mt-1 text-gray-600">
+                  <p className="mt-1 text-slate-200">
                     {[c.availabilityNote, c.classificationNote].filter(Boolean).join(' · ')}
                   </p>
                 </div>

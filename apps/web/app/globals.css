@@ -178,10 +178,10 @@
 .etholys-system,
 .etholys-fundhub {
   color-scheme: dark;
-  --sys-ink: #f1f5f9;
-  --sys-muted: rgba(241, 245, 249, 0.82);
-  --sys-faint: rgba(241, 245, 249, 0.68);
-  --sys-icon: rgba(241, 245, 249, 0.55);
+  --sys-ink: #f8fafc;
+  --sys-muted: #e2e8f0;
+  --sys-faint: #cbd5e1;
+  --sys-icon: #94a3b8;
   --sys-line: rgba(255, 255, 255, 0.14);
   --sys-panel: rgba(12, 24, 34, 0.92);
   --sys-panel-soft: rgba(255, 255, 255, 0.07);
@@ -485,4 +485,53 @@
 .etholys-system .sys-canvas .divide-y > :not([hidden]) ~ :not([hidden]),
 .etholys-fundhub .divide-y > :not([hidden]) ~ :not([hidden]) {
   border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Catch-all no canvas: cobre variantes com /50, /80 e gradientes pastéis */
+.etholys-fundhub .fh-canvas [class*="text-gray-"],
+.etholys-fundhub .fh-canvas [class*="text-slate-"]:not([class*="text-slate-950"]):not([class*="text-slate-50"]):not([class*="text-slate-100"]):not([class*="text-slate-200"]):not([class*="text-slate-300"]) {
+  color: #f1f5f9 !important;
+}
+
+.etholys-fundhub .fh-canvas [class*="text-amber-6"],
+.etholys-fundhub .fh-canvas [class*="text-amber-7"],
+.etholys-fundhub .fh-canvas [class*="text-amber-8"],
+.etholys-fundhub .fh-canvas [class*="text-amber-9"] {
+  color: #fcd34d !important;
+}
+
+.etholys-fundhub .fh-canvas [class*="text-violet-"],
+.etholys-fundhub .fh-canvas [class*="text-purple-"],
+.etholys-fundhub .fh-canvas [class*="text-indigo-6"],
+.etholys-fundhub .fh-canvas [class*="text-indigo-7"],
+.etholys-fundhub .fh-canvas [class*="text-indigo-8"],
+.etholys-fundhub .fh-canvas [class*="text-indigo-9"] {
+  color: #e9d5ff !important;
+}
+
+.etholys-fundhub .fh-canvas [class*="text-emerald-6"],
+.etholys-fundhub .fh-canvas [class*="text-emerald-7"],
+.etholys-fundhub .fh-canvas [class*="text-emerald-8"],
+.etholys-fundhub .fh-canvas [class*="text-emerald-9"] {
+  color: #6ee7b7 !important;
+}
+
+.etholys-fundhub .fh-canvas [class*="bg-gradient-to-"][class*="from-amber-50"],
+.etholys-fundhub .fh-canvas [class*="bg-gradient-to-"][class*="from-orange-50"],
+.etholys-fundhub .fh-canvas [class*="bg-gradient-to-"][class*="from-white"],
+.etholys-fundhub .fh-canvas [class*="from-amber-50"],
+.etholys-fundhub .fh-canvas [class*="to-orange-50"],
+.etholys-fundhub .fh-canvas [class*="to-amber-50"] {
+  background-image: none !important;
+  background-color: rgba(12, 24, 34, 0.94) !important;
+}
+
+.etholys-fundhub .fh-canvas [class*="bg-amber-50"],
+.etholys-fundhub .fh-canvas [class*="bg-orange-50"] {
+  background-color: rgba(245, 158, 11, 0.16) !important;
+}
+
+.etholys-fundhub .fh-count-chip {
+  background-color: #f59e0b !important;
+  color: #111827 !important;
 }

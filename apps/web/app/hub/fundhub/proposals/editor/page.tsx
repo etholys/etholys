@@ -647,12 +647,12 @@ export default function FundHubProposalEditorPage() {
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
               {brainstorming && chatMessages.length === 0 && (
-                <div className="rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-950">
-                  <p className="flex items-center gap-2 font-medium">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="rounded-xl bg-amber-500/15 px-3 py-3 text-sm text-amber-100">
+                  <p className="flex items-center gap-2 font-medium text-amber-100">
+                    <Loader2 className="h-4 w-4 animate-spin text-amber-300" />
                     Chuva de ideias…
                   </p>
-                  <p className="mt-1 text-xs text-amber-800">Pode escrever no chat já — o documento está ao lado.</p>
+                  <p className="mt-1 text-xs text-amber-200/90">Pode escrever no chat já — o documento está ao lado.</p>
                 </div>
               )}
               {chatMessages.map((message, index) => (
