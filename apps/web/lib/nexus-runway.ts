@@ -56,10 +56,10 @@ export const NEXUS_RUNWAY_CHAPTERS: RunwayChapter[] = [
   },
   {
     id: 'services',
-    path: '/hub/nexus/roadmap',
-    labelPt: 'Rota viva',
-    labelEs: 'Ruta viva',
-    labelEn: 'Live roadmap',
+    path: '/hub/nexus/coach',
+    labelPt: 'Copiloto',
+    labelEs: 'Copiloto',
+    labelEn: 'Copilot',
   },
   {
     id: 'library',
@@ -185,4 +185,26 @@ export function runwayProgress(
     if (isChapterComplete(c.id, touch, metrics)) done += 1;
   }
   return { done, total, percent: total === 0 ? 0 : Math.round((done / total) * 100) };
+}
+
+/** AT a terceiros / redes — não misturar com a jornada da empresa ativa. */
+export function isNexusDeliverPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  return (
+    pathname.startsWith('/hub/nexus/at') ||
+    pathname.startsWith('/hub/nexus/networks') ||
+    pathname.startsWith('/hub/nexus/services')
+  );
+}
+
+/** Diagnóstico com ?company= de cliente AT (≠ empresa do seletor). */
+export function isAtClientDiagnosisPath(
+  pathname: string | null | undefined,
+  searchParams: { get: (k: string) => string | null },
+  activeCompanyId: string | null | undefined
+): boolean {
+  if (!pathname?.startsWith('/hub/nexus/diagnosis')) return false;
+  const company = searchParams.get('company');
+  if (!company) return false;
+  return !activeCompanyId || company !== activeCompanyId;
 }

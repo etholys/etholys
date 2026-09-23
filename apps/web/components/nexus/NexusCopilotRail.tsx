@@ -9,12 +9,13 @@ import { stageLabel, type VentureStageId } from '@/lib/nexus-venture';
 import {
   NEXUS_RUNWAY_CHAPTERS,
   activeRunwayId,
+  isAtClientDiagnosisPath,
   isChapterComplete,
+  isNexusDeliverPath,
   runwayChapterLabel,
   withNetworkPath,
 } from '@/lib/nexus-runway';
 import { useNexusRunway } from './NexusRunwayContext';
-import { isAtClientDiagnosisPath, isNexusDeliverPath } from './NexusRunwayBar';
 import { cn } from '@/lib/utils';
 
 type OverviewLite = {

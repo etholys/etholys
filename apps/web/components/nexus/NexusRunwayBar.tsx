@@ -7,7 +7,9 @@ import { useApp } from '@/app/providers';
 import {
   NEXUS_RUNWAY_CHAPTERS,
   activeRunwayId,
+  isAtClientDiagnosisPath,
   isChapterComplete,
+  isNexusDeliverPath,
   runwayChapterLabel,
   withNetworkPath,
 } from '@/lib/nexus-runway';
@@ -17,47 +19,52 @@ import { cn } from '@/lib/utils';
 function copy(locale: string) {
   if (locale === 'es') {
     return {
-      title: 'Onde ficas no processo',
+      title: 'Proceso de tu empresa activa',
       detail:
-        'NEXUS é um fluxo contínuo: fase, diagnóstico, rota, apoio e método.',
-      continue: 'Seguinte',
-      allDone: 'Rever fase e metas',
+        'Esta barra sigue solo la empresa del selector (tu organización), no las MIPYMEs atendidas en Asistencia técnica. Cada cliente AT tiene su propio proceso en la ficha del contrato.',
+      continue: 'Seguir',
+      allDone: 'Revisar fase y metas',
     };
   }
   if (locale === 'en') {
     return {
-      title: 'Where you are in the process',
+      title: 'Active company process',
       detail:
-        'NEXUS is one flow: phase, diagnosis, roadmap, support, and method.',
+        'This bar tracks only the company in the switcher (your org), not AT client MSMEs. Each assisted company has its own process on the contract page.',
       continue: 'Next',
       allDone: 'Review phase & goals',
     };
   }
   return {
-    title: 'Onde ficas no processo',
+    title: 'Processo da empresa ativa',
     detail:
-      'NEXUS é um fluxo contínuo: fase, diagnóstico, rota, apoio e método.',
+      'Esta barra segue só a empresa do seletor (a tua organização), não as MIPYMEs atendidas em Assistência técnica. Cada cliente AT tem o seu processo na ficha do contrato.',
     continue: 'Seguinte',
     allDone: 'Rever fase e metas',
   };
 }
 
-/** Barra mínima: sem “5 caixas” a competir com o ecrã. */
+/** Barra da jornada interna da empresa ativa — nunca na AT multi-cliente. */
 export function NexusRunwayBar() {
-  const { locale } = useApp();
+  const { locale, activeCompanyId } = useApp();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const networkId = searchParams.get('network');
   const { touch, metrics, continueHref, percent, done, total, loading } = useNexusRunway();
-  const t = copy(locale);
-  const L = locale === 'en' ? 'en' : locale === 'es' ? 'es' : 'pt';
   const active = activeRunwayId(pathname);
   const allComplete = NEXUS_RUNWAY_CHAPTERS.every((c) => isChapterComplete(c.id, touch, metrics));
 
   const isNexusHome = pathname === '/hub/nexus' || pathname === '/hub/nexus/';
-  if (isNexusHome) {
+  if (
+    isNexusHome ||
+    isNexusDeliverPath(pathname) ||
+    isAtClientDiagnosisPath(pathname, searchParams, activeCompanyId)
+  ) {
     return null;
   }
+
+  const t = copy(locale);
+  const L = locale === 'en' ? 'en' : locale === 'es' ? 'es' : 'pt';
 
   const isJourney = pathname === '/hub/nexus/journey' || pathname?.startsWith('/hub/nexus/journey/');
 
@@ -65,11 +72,19 @@ export function NexusRunwayBar() {
     return (
       <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-center text-sm text-slate-600">
         {locale === 'es' ? (
-          <>Para ver toda la trilha, volvé al resumen. Aquí ajustas solo la fase y el foco.</>
+          <>
+            Aquí ajustas fase y foco de <strong>tu empresa activa</strong> (selector). La AT a clientes está en Asistencia
+            técnica.
+          </>
         ) : locale === 'en' ? (
-          <>See the full path on the overview. Here you only adjust phase and focus.</>
+          <>
+            Adjust phase and focus for your <strong>active company</strong>. Client AT lives under Technical assistance.
+          </>
         ) : (
-          <>Para vês a trilha completa, usa a visão geral. Aqui ajustas só a fase e o foco.</>
+          <>
+            Aqui ajustas fase e foco da <strong>empresa ativa</strong> (seletor). A AT a clientes está em Assistência
+            técnica.
+          </>
         )}{' '}
         <Link href={withNetworkPath('/hub/nexus', networkId)} className="font-medium text-violet-700 underline">
           {locale === 'en' ? 'Overview' : locale === 'es' ? 'Resumen' : 'Visão geral'}
@@ -138,12 +153,32 @@ export function NexusRunwayContinueLink({
   networkId: string | null;
   onNavigate?: () => void;
 }) {
-  const { locale } = useApp();
+  const { locale, activeCompanyId } = useApp();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { continueHref, touch, metrics } = useNexusRunway();
+
+  if (
+    isNexusDeliverPath(pathname) ||
+    isAtClientDiagnosisPath(pathname, searchParams, activeCompanyId)
+  ) {
+    return null;
+  }
+
   const allComplete = NEXUS_RUNWAY_CHAPTERS.every((c) => isChapterComplete(c.id, touch, metrics));
   const href = allComplete ? withNetworkPath('/hub/nexus/journey', networkId) : continueHref;
   const label =
-    locale === 'es' ? (allComplete ? 'Revisar' : 'Seguir') : locale === 'en' ? (allComplete ? 'Review' : 'Next') : allComplete ? 'Rever' : 'Seguinte';
+    locale === 'es'
+      ? allComplete
+        ? 'Revisar'
+        : 'Seguir (mi empresa)'
+      : locale === 'en'
+        ? allComplete
+          ? 'Review'
+          : 'Next (my company)'
+        : allComplete
+          ? 'Rever'
+          : 'Seguinte (minha empresa)';
   return (
     <Link
       href={href}
@@ -152,7 +187,7 @@ export function NexusRunwayContinueLink({
       className={cn(
         'mb-1 flex items-center rounded-lg text-sm font-semibold transition',
         collapsed ? 'justify-center px-2 py-2.5' : 'gap-2 px-3 py-2.5',
-        'bg-violet-600 text-white shadow-sm hover:bg-violet-700',
+        'bg-violet-600 text-white shadow-sm hover:bg-violet-700'
       )}
     >
       {collapsed ? <Play className="h-4 w-4 flex-shrink-0" /> : <ChevronRight className="h-4 w-4 flex-shrink-0" />}
