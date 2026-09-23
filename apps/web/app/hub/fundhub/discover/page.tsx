@@ -284,9 +284,10 @@ export default function OpportunityDiscoverPage() {
       });
       setScanPercent(8);
 
-      // Poll até completed / failed
+      // Poll até completed / failed — web search pode levar 5–8 min
       let attempts = 0;
-      while (attempts < 90) {
+      let finished = false;
+      while (attempts < 240) {
         await new Promise((res) => setTimeout(res, 2000));
         attempts += 1;
         const pr = await fetch(q(`/api/opportunity/scans?runId=${encodeURIComponent(runId)}`), {
@@ -302,6 +303,8 @@ export default function OpportunityDiscoverPage() {
             progressPct?: number | null;
             phase?: string | null;
           };
+          pendingOpen?: ScanCandidate[];
+          pendingReference?: ScanCandidate[];
           error?: string;
         } = {};
         try {
@@ -321,17 +324,31 @@ export default function OpportunityDiscoverPage() {
         if (st === 'completed') {
           setScanPercent(100);
           setScanUi('done');
+          setPendingOpen(pd.pendingOpen ?? []);
+          setPendingReference(pd.pendingReference ?? []);
+          const n = pd.run?.created ?? 0;
           const focusLabel =
             focus === 'open_now'
               ? t('Abertos agora', 'Abiertos ahora', 'Open now')
               : t('Base de referência', 'Base de referencia', 'Reference base');
+          const modeNote =
+            pd.run?.discoveryMode === 'web'
+              ? t(' (pesquisa web)', ' (búsqueda web)', ' (web search)')
+              : t(' (base de conhecimento)', ' (base de conocimiento)', ' (knowledge base)');
           setMsg(
-            t(
-              `${focusLabel}: ${pd.run?.created ?? 0} candidatos${pd.run?.discoveryMode === 'web' ? ' (pesquisa web)' : ''}.`,
-              `${focusLabel}: ${pd.run?.created ?? 0} candidatos${pd.run?.discoveryMode === 'web' ? ' (búsqueda web)' : ''}.`,
-              `${focusLabel}: ${pd.run?.created ?? 0} candidates${pd.run?.discoveryMode === 'web' ? ' (web search)' : ''}.`,
-            ),
+            n > 0
+              ? t(
+                  `${focusLabel}: ${n} candidatos${modeNote}.`,
+                  `${focusLabel}: ${n} candidatos${modeNote}.`,
+                  `${focusLabel}: ${n} candidates${modeNote}.`,
+                )
+              : t(
+                  'Pesquisa concluída sem convocatórias novas. Tente alargar temas ou Mapear programas.',
+                  'Búsqueda terminada sin convocatorias nuevas. Amplíe temas o mapee programas.',
+                  'Search finished with no new calls. Widen themes or map programs.',
+                ),
           );
+          finished = true;
           break;
         }
         if (st === 'failed') {
@@ -352,6 +369,17 @@ export default function OpportunityDiscoverPage() {
             ),
           );
         }
+      }
+
+      if (!finished) {
+        setScanUi('error');
+        setMsg(
+          t(
+            'A pesquisa ainda corre no servidor (5–8 min). Recarregue daqui a um minuto — os resultados aparecem quando terminar.',
+            'La búsqueda sigue en el servidor (5–8 min). Recargue en un minuto: los resultados aparecen al terminar.',
+            'Search is still running on the server (5–8 min). Reload in a minute — results appear when it finishes.',
+          ),
+        );
       }
 
       await Promise.all([loadScan(), loadCatalog()]);

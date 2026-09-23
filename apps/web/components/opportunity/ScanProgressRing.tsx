@@ -110,7 +110,7 @@ export function ScanProgressRing({
 
 /** Estimativa suave 0–88% enquanto o servidor ainda não reporta fases. */
 export function estimateScanPercent(elapsedMs: number, serverPct?: number | null): number {
-  const expectedMs = 120_000;
+  const expectedMs = 240_000;
   const t = Math.min(1, elapsedMs / expectedMs);
   // ease-out toward 88%
   const soft = Math.round(88 * (1 - Math.pow(1 - t, 1.6)));

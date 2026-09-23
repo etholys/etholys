@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import type { ScanCandidate, ScanFocus, ScanResultsPayload } from '@/lib/opportunity/scan-types';
 import { normalizeAvailabilityStatus } from '@/lib/opportunity/availability';
+import { coerceOpenAvailability } from '@/lib/opportunity/scan-filters';
 import { sanitizeFundingLinks } from '@/lib/opportunity/official-url';
 
 export const SCAN_MEMORY_CATEGORY = 'opportunity_scan';
@@ -78,7 +79,10 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
     const institution = typeof o.institution === 'string' ? o.institution.trim() : '';
     if (!name || !institution) continue;
 
-    const availabilityStatus = normalizeAvailabilityStatus(o.availabilityStatus);
+    let availabilityStatus = normalizeAvailabilityStatus(o.availabilityStatus);
+    if (scanFocus === 'open_now') {
+      availabilityStatus = coerceOpenAvailability(availabilityStatus);
+    }
     const eligibleCountries =
       typeof o.eligibleCountries === 'string'
         ? o.eligibleCountries.slice(0, 300)

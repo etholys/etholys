@@ -213,6 +213,8 @@ export type LlmGenerateOptions = {
   webSearch?: boolean;
   /** Força um modelo específico (ex.: claude-opus-4-6 para redacção SIEP). */
   model?: string;
+  /** Timeout do fetch (web search precisa de mais do que o default 90s). */
+  timeoutMs?: number;
 };
 
 export type LlmGenerateResult = {
@@ -429,7 +431,7 @@ async function llmGenerateContentWithModel(
       'anthropic-version': ANTHROPIC_VERSION,
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(LLM_FETCH_TIMEOUT_MS),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? LLM_FETCH_TIMEOUT_MS),
   });
 
   const errText = await response.text();
@@ -540,10 +542,12 @@ export async function llmCompleteJsonText(
 export async function llmCompleteWithWebSearch(
   systemInstruction: string,
   userText: string,
-  options?: { maxOutputTokens?: number; temperature?: number },
+  options?: { maxOutputTokens?: number; temperature?: number; timeoutMs?: number },
 ): Promise<{ text: string; searchQueries: string[] }> {
   const models = getLlmModelCandidates();
   let lastError: Error | null = null;
+  const timeoutMs = options?.timeoutMs ?? 180_000;
+  let timedOut = false;
 
   for (const model of models) {
     try {
@@ -554,6 +558,7 @@ export async function llmCompleteWithWebSearch(
           maxOutputTokens: options?.maxOutputTokens ?? 16384,
           temperature: options?.temperature ?? 0.2,
           webSearch: true,
+          timeoutMs,
         },
         model,
       );
@@ -564,7 +569,16 @@ export async function llmCompleteWithWebSearch(
         throw lastError;
       }
       if (/API key|authentication_error|invalid.?api.?key/i.test(lastError.message)) throw lastError;
+      // Um timeout de web search já gastou minutos — não repetir em 3 modelos.
+      if (/timeout|aborted|AbortError|TimeoutError/i.test(lastError.message)) {
+        timedOut = true;
+        break;
+      }
     }
+  }
+
+  if (timedOut && lastError) {
+    throw lastError;
   }
 
   if (lastError instanceof LlmProviderError) throw lastError;

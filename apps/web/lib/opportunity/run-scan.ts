@@ -7,6 +7,7 @@ import { buildLearningContext } from '@/lib/opportunity/scan-context';
 import { fetchSourceSnippets, snippetsToPromptBlock } from '@/lib/opportunity/fetch-sources';
 import { listUserMonitoredUrls } from '@/lib/opportunity/source-catalog';
 import { discoverOpportunitiesOnline } from '@/lib/opportunity/web-discovery';
+import { dropDuplicateFunds } from '@/lib/opportunity/scan-filters';
 import type { OpportunityBriefing, ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
 
 async function setScanProgress(runId: string, progressPct: number, phase: string) {
@@ -90,12 +91,11 @@ export async function runOpportunityScan(opts: {
     onProgress: (pct, phase) => setScanProgress(run.id, pct, phase),
   });
 
-  let candidates = discovery.candidates.filter(
-    (c) => !existingSet.has(`${c.name.toLowerCase()}|${c.institution.toLowerCase()}`),
-  );
-
+  let candidates = dropDuplicateFunds(discovery.candidates, existingFunds);
   if (candidates.length === 0) {
-    candidates = discovery.candidates;
+    candidates = discovery.candidates.filter(
+      (c) => !existingSet.has(`${c.name.toLowerCase()}|${c.institution.toLowerCase()}`),
+    );
   }
 
   await writeScanResults(
@@ -130,6 +130,7 @@ export async function runOpportunityScan(opts: {
         mode: discovery.discoveryMode,
         scanFocus,
         scanName: briefing.scanName ?? null,
+        fallbackReason: discovery.fallbackReason ?? null,
       }),
       finishedAt: new Date(),
       durationMs,

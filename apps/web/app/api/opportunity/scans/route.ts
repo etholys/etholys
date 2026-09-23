@@ -1,5 +1,5 @@
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300;
+export const maxDuration = 600;
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
     // body opcional
   }
 
-  if (!briefing) {
+  if (!briefing || (!briefing.themes?.length && !briefing.countries?.length)) {
     briefing = await readOpportunityBriefing(ctx.companyId);
   } else {
     await writeOpportunityBriefing(ctx.companyId, briefing);

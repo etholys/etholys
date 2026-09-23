@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { llmCompleteJsonText, llmCompleteWithWebSearch } from '@/lib/llm-client';
 import { normalizeCandidates } from '@/lib/opportunity/candidate-store';
 import { OFFICIAL_LINK_PROMPT_RULES } from '@/lib/opportunity/official-url';
+import { dropDuplicateFunds, isOpenNowCandidate } from '@/lib/opportunity/scan-filters';
 import type { OpportunityBriefing, ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
 
 const TYPE_MAP: Record<string, string> = {
@@ -143,6 +144,7 @@ export type WebDiscoveryResult = {
   candidates: ScanCandidate[];
   discoveryMode: 'web' | 'knowledge';
   searchQueries: string[];
+  fallbackReason?: string;
 };
 
 export async function discoverOpportunitiesOnline(opts: {
@@ -173,12 +175,14 @@ export async function discoverOpportunitiesOnline(opts: {
       existingBlock,
       scanFocus,
       opts.optionalExtraContext,
+      opts.existingFunds,
     );
     await report(90, 'structuring');
-    return result;
+    return { ...result, fallbackReason: 'web_search_disabled' };
   }
 
   const { research: RESEARCH_SYSTEM, structure: STRUCTURE_SYSTEM } = promptsForFocus(scanFocus);
+  let webFailure: string | undefined;
 
   try {
     const focusHint =
@@ -202,7 +206,11 @@ export async function discoverOpportunitiesOnline(opts: {
     const { text: research, searchQueries } = await llmCompleteWithWebSearch(
       RESEARCH_SYSTEM,
       userResearch,
-      { maxOutputTokens: 16384, temperature: scanFocus === 'open_now' ? 0.15 : 0.25 },
+      {
+        maxOutputTokens: 16384,
+        temperature: scanFocus === 'open_now' ? 0.15 : 0.25,
+        timeoutMs: 180_000,
+      },
     );
 
     await report(65, 'structuring');
@@ -222,19 +230,22 @@ export async function discoverOpportunitiesOnline(opts: {
       tempId: c.tempId || randomUUID(),
       scanFocus,
     }));
+    candidates = dropDuplicateFunds(candidates, opts.existingFunds);
 
     if (scanFocus === 'open_now') {
-      candidates = candidates.filter(
-        (c) => c.availabilityStatus === 'open_now' || c.availabilityStatus === 'rolling',
-      );
+      const open = candidates.filter(isOpenNowCandidate);
+      // Se o estruturador omitiu availabilityStatus, não deitar fora a pesquisa web.
+      candidates = open.length > 0 ? open : candidates;
     }
 
     await report(88, 'filtering');
     if (candidates.length > 0) {
       return { candidates, discoveryMode: 'web', searchQueries };
     }
+    console.warn('[opportunity/web-discovery] web search returned 0 candidates, fallback');
   } catch (e) {
     console.warn('[opportunity/web-discovery] web search failed, fallback:', e);
+    webFailure = e instanceof Error ? e.message.slice(0, 240) : String(e).slice(0, 240);
   }
 
   await report(50, 'knowledge_fallback');
@@ -244,9 +255,13 @@ export async function discoverOpportunitiesOnline(opts: {
     existingBlock,
     scanFocus,
     opts.optionalExtraContext,
+    opts.existingFunds,
   );
   await report(90, 'structuring');
-  return fallback;
+  return {
+    ...fallback,
+    fallbackReason: webFailure ? `web_failed:${webFailure}` : 'web_empty',
+  };
 }
 
 async function knowledgeOnlyDiscovery(
@@ -255,13 +270,14 @@ async function knowledgeOnlyDiscovery(
   existingBlock: string,
   scanFocus: ScanFocus,
   optionalExtraContext?: string,
+  existingFunds: Array<{ name: string; institution: string }> = [],
 ): Promise<WebDiscoveryResult> {
   const { structure: STRUCTURE_SYSTEM } = promptsForFocus(scanFocus);
-  const system = `You are an opportunity discovery agent. ${scanFocus === 'open_now' ? 'Only return programs verifiably open for applications now.' : 'Map funding programs for intelligence base.'} Return JSON { "candidates": [...] } with 6-10 items. ${STRUCTURE_SYSTEM}`;
+  const system = `You are an opportunity discovery agent. ${scanFocus === 'open_now' ? 'Only return programs verifiably open for applications now.' : 'Map funding programs for intelligence base.'} Return JSON { "candidates": [...] } with 6-10 REAL official programs. NEVER copy items listed under EXISTING (including demo/sandbox funds). ${STRUCTURE_SYSTEM}`;
   const user = [
     `BRIEFING:\n${briefingLines(briefing)}`,
     `\nLEARNING:\n${learningContext}`,
-    `\nEXISTING:\n${existingBlock}`,
+    `\nEXISTING (do not repeat names):\n${existingBlock}`,
     optionalExtraContext?.trim() ? `\nOPTIONAL PORTALS:\n${optionalExtraContext.trim()}` : '',
     `\nTODAY: ${todayIso()}`,
   ].join('');
@@ -272,10 +288,10 @@ async function knowledgeOnlyDiscovery(
     tempId: c.tempId || randomUUID(),
     scanFocus,
   }));
+  candidates = dropDuplicateFunds(candidates, existingFunds);
   if (scanFocus === 'open_now') {
-    candidates = candidates.filter(
-      (c) => c.availabilityStatus === 'open_now' || c.availabilityStatus === 'rolling',
-    );
+    const open = candidates.filter(isOpenNowCandidate);
+    candidates = open.length > 0 ? open : candidates;
   }
   return { candidates, discoveryMode: 'knowledge', searchQueries: [] };
 }
