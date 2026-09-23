@@ -6,6 +6,11 @@ import type { ScanCandidate, ScanFocus, ScanResultsPayload } from '@/lib/opportu
 import { normalizeAvailabilityStatus } from '@/lib/opportunity/availability';
 import { coerceOpenAvailability } from '@/lib/opportunity/scan-filters';
 import { sanitizeFundingLinks } from '@/lib/opportunity/official-url';
+import {
+  buildScanInbox,
+  splitInboxByFocus,
+  type InboxCandidate,
+} from '@/lib/opportunity/scan-inbox';
 
 export const SCAN_MEMORY_CATEGORY = 'opportunity_scan';
 
@@ -170,4 +175,45 @@ export function pendingCandidates(payload: ScanResultsPayload, focus?: ScanFocus
     const itemFocus = c.scanFocus ?? payload.scanFocus ?? 'open_now';
     return itemFocus === focus;
   });
+}
+
+const INBOX_RUN_LIMIT = 40;
+
+export async function readCompanyScanInbox(companyId: string): Promise<{
+  pending: InboxCandidate[];
+  pendingOpen: InboxCandidate[];
+  pendingReference: InboxCandidate[];
+  later: InboxCandidate[];
+}> {
+  const runs = await prisma.fundhubDiscoveryRun.findMany({
+    where: { companyId, status: { in: ['completed', 'running'] } },
+    orderBy: { startedAt: 'desc' },
+    take: INBOX_RUN_LIMIT,
+    select: { id: true },
+  });
+  if (runs.length === 0) {
+    return { pending: [], pendingOpen: [], pendingReference: [], later: [] };
+  }
+
+  const rows = await prisma.aiCompanyMemory.findMany({
+    where: {
+      companyId,
+      category: SCAN_MEMORY_CATEGORY,
+      key: { in: runs.map((r) => runKey(r.id)) },
+    },
+  });
+  const byKey = new Map(rows.map((r) => [r.key, r.value]));
+  const inbox = buildScanInbox(
+    runs.map((r) => ({
+      runId: r.id,
+      payload: parseScanResults(byKey.get(runKey(r.id)), r.id),
+    })),
+  );
+
+  return {
+    pending: inbox.pending,
+    pendingOpen: splitInboxByFocus(inbox.pending, 'open_now'),
+    pendingReference: splitInboxByFocus(inbox.pending, 'reference'),
+    later: inbox.later,
+  };
 }

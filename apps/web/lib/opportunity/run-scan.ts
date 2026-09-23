@@ -2,7 +2,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { readOpportunityBriefing } from '@/lib/opportunity/briefing';
-import { writeScanResults } from '@/lib/opportunity/candidate-store';
+import { readCompanyScanInbox, writeScanResults } from '@/lib/opportunity/candidate-store';
 import { buildLearningContext } from '@/lib/opportunity/scan-context';
 import { fetchSourceSnippets, snippetsToPromptBlock } from '@/lib/opportunity/fetch-sources';
 import { listUserMonitoredUrls } from '@/lib/opportunity/source-catalog';
@@ -43,7 +43,7 @@ export async function runOpportunityScan(opts: {
   const started = Date.now();
   const briefing = opts.briefing ?? (await readOpportunityBriefing(opts.companyId));
 
-  const [existingFunds, learningContext, optionalUrls] = await Promise.all([
+  const [existingFunds, learningContext, optionalUrls, inbox] = await Promise.all([
     prisma.fund.findMany({
       where: { companyId: opts.companyId, isActive: true },
       select: { name: true, institution: true },
@@ -51,6 +51,7 @@ export async function runOpportunityScan(opts: {
     }),
     buildLearningContext(opts.companyId),
     listUserMonitoredUrls(opts.companyId),
+    readCompanyScanInbox(opts.companyId),
   ]);
 
   const existingSet = new Set(
@@ -91,18 +92,20 @@ export async function runOpportunityScan(opts: {
     onProgress: (pct, phase) => setScanProgress(run.id, pct, phase),
   });
 
-  let candidates = dropDuplicateFunds(discovery.candidates, existingFunds);
+  const alreadyInInbox = [...inbox.pending, ...inbox.later];
+  let candidates = dropDuplicateFunds(discovery.candidates, [...existingFunds, ...alreadyInInbox]);
   if (candidates.length === 0) {
-    candidates = discovery.candidates.filter(
+    candidates = dropDuplicateFunds(discovery.candidates, existingFunds).filter(
       (c) => !existingSet.has(`${c.name.toLowerCase()}|${c.institution.toLowerCase()}`),
     );
+    candidates = dropDuplicateFunds(candidates, alreadyInInbox);
   }
 
   await writeScanResults(
     opts.companyId,
     {
       runId: run.id,
-      candidates,
+      candidates: candidates.map((c) => ({ ...c, scanFocus, runId: run.id })),
       savedTempIds: [],
       discardedTempIds: [],
       laterTempIds: [],

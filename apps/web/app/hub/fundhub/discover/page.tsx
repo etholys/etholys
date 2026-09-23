@@ -18,6 +18,12 @@ import {
   availabilityLabel,
   formatDateShort,
 } from '@/lib/opportunity/availability';
+import {
+  deadlineUrgency,
+  daysUntilClose,
+  filterInboxCandidates,
+  uniqueCandidateTypes,
+} from '@/lib/opportunity/scan-inbox';
 import type { AvailabilityStatus, ScanFocus } from '@/lib/opportunity/scan-types';
 import {
   ArrowLeft,
@@ -78,6 +84,7 @@ type ScanCandidate = {
   scanFocus?: ScanFocus;
   classification?: 'direct' | 'client_bridge' | 'joint';
   classificationNote?: string;
+  runId?: string;
 };
 
 type ScanMeta = {
@@ -142,6 +149,9 @@ export default function OpportunityDiscoverPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [detail, setDetail] = useState<ScanCandidate | null>(null);
   const [detailTab, setDetailTab] = useState<'overview' | 'analyze'>('overview');
+  const [listQuery, setListQuery] = useState('');
+  const [dueSoonOnly, setDueSoonOnly] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
 
   const openDetail = (c: ScanCandidate, tab: 'overview' | 'analyze' = 'overview') => {
     setDetailTab(tab);
@@ -177,11 +187,21 @@ export default function OpportunityDiscoverPage() {
     setRecentRuns(d.recentRuns ?? []);
     setPendingOpen(d.pendingOpen ?? []);
     setPendingReference(d.pendingReference ?? []);
-    if (d.latest?.scanFocus) setDiscoveryFocus(d.latest.scanFocus);
     setLater(d.later ?? []);
   }, [companyId]);
 
   const pendingForFocus = discoveryFocus === 'open_now' ? pendingOpen : pendingReference;
+  const listSource = tab === 'later' ? later : pendingForFocus;
+  const typeOptions = useMemo(() => uniqueCandidateTypes(listSource), [listSource]);
+  const visibleList = useMemo(
+    () =>
+      filterInboxCandidates(listSource, {
+        query: listQuery,
+        dueSoon: dueSoonOnly,
+        type: typeFilter ?? undefined,
+      }),
+    [listSource, listQuery, dueSoonOnly, typeFilter],
+  );
 
   const loadCatalog = useCallback(async () => {
     const r = await fetch(q('/api/opportunity/catalog'), { cache: 'no-store' });
@@ -324,8 +344,6 @@ export default function OpportunityDiscoverPage() {
         if (st === 'completed') {
           setScanPercent(100);
           setScanUi('done');
-          setPendingOpen(pd.pendingOpen ?? []);
-          setPendingReference(pd.pendingReference ?? []);
           const n = pd.run?.created ?? 0;
           const focusLabel =
             focus === 'open_now'
@@ -407,16 +425,17 @@ export default function OpportunityDiscoverPage() {
   const validate = async (
     tempId: string,
     action: 'save' | 'not_now' | 'reject_type',
-    opts?: { reasons?: string[]; note?: string },
+    opts?: { reasons?: string[]; note?: string; runId?: string },
   ) => {
-    if (!latest?.id) return;
+    const runId = opts?.runId || latest?.id;
+    if (!runId) return;
     setBusyId(tempId);
     try {
       const r = await fetch(q('/api/opportunity/candidates/validate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          runId: latest.id,
+          runId,
           tempId,
           action,
           reasons: opts?.reasons,
@@ -700,11 +719,46 @@ export default function OpportunityDiscoverPage() {
                   {label}
                 </button>
               ))}
-              <p className="w-full text-xs text-gray-500">
-                {discoveryFocus === 'open_now'
-                  ? t('Com prazo activo agora.', 'Con plazo activo ahora.', 'Active window now.')
-                  : t('Programas para acompanhar, mesmo sem prazo hoje.', 'Programas para seguir, aunque no haya plazo hoy.', 'Programs to track, even without a window today.')}
-              </p>
+            </div>
+          )}
+
+          {listSource.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="relative min-w-[12rem] flex-1">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={listQuery}
+                  onChange={(e) => setListQuery(e.target.value)}
+                  placeholder={t('Filtrar por nome…', 'Filtrar por nombre…', 'Filter by name…')}
+                  className="w-full rounded-lg border border-gray-200 bg-white py-1.5 pl-8 pr-3 text-sm text-gray-800 placeholder:text-gray-400"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => setDueSoonOnly((v) => !v)}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                  dueSoonOnly
+                    ? 'bg-amber-100 text-amber-900'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {t('Por vencer', 'Por vencer', 'Due soon')}
+              </button>
+              {typeOptions.length > 1 &&
+                typeOptions.map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setTypeFilter((cur) => (cur === type ? null : type))}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                      typeFilter === type
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
             </div>
           )}
 
@@ -762,10 +816,16 @@ export default function OpportunityDiscoverPage() {
             </div>
           )}
 
+          {tab === 'new' && pendingForFocus.length > 0 && visibleList.length === 0 && (
+            <p className="text-sm text-gray-500">
+              {t('Nenhum fundo com este filtro.', 'Ningún fondo con este filtro.', 'No funds match this filter.')}
+            </p>
+          )}
+
           {tab === 'new' &&
-            pendingForFocus.map((c) => (
+            visibleList.map((c) => (
               <CandidateCard
-                key={c.tempId}
+                key={`${c.runId ?? 'run'}-${c.tempId}`}
                 candidate={c}
                 locale={locale}
                 onOpen={(openTab) => openDetail(c, openTab)}
@@ -776,10 +836,14 @@ export default function OpportunityDiscoverPage() {
           {tab === 'later' &&
             (later.length === 0 ? (
               <p className="text-sm text-gray-500">{t('Nada para rever.', 'Nada para revisar.', 'Nothing to review.')}</p>
+            ) : visibleList.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                {t('Nenhum fundo com este filtro.', 'Ningún fondo con este filtro.', 'No funds match this filter.')}
+              </p>
             ) : (
-              later.map((c) => (
+              visibleList.map((c) => (
                 <CandidateCard
-                  key={c.tempId}
+                  key={`${c.runId ?? 'run'}-${c.tempId}`}
                   candidate={c}
                   locale={locale}
                   onOpen={(openTab) => openDetail(c, openTab)}
@@ -835,13 +899,13 @@ export default function OpportunityDiscoverPage() {
       {detail && (
         <CandidateDetailSheet
           candidate={detail}
-          runId={latest?.id}
+          runId={detail.runId ?? latest?.id}
           open
           initialTab={detailTab}
           busy={busyId === detail.tempId}
           onClose={() => setDetail(null)}
           onFeedback={(action, opts) => {
-            void validate(detail.tempId, action, opts).then(() => setDetail(null));
+            void validate(detail.tempId, action, { ...opts, runId: detail.runId }).then(() => setDetail(null));
           }}
         />
       )}
@@ -959,6 +1023,29 @@ function CandidateCard({
   const opensLabel = formatDateShort(c.opensAt, locale);
   const closesLabel = formatDateShort(closes, locale);
   const status = c.availabilityStatus;
+  const daysLeft = daysUntilClose(c);
+  const urgencyKind = deadlineUrgency(daysLeft);
+  const urgency =
+    urgencyKind === 'none'
+      ? null
+      : {
+          label:
+            urgencyKind === 'overdue'
+              ? t('Prazo passou', 'Plazo vencido', 'Deadline passed')
+              : urgencyKind === 'today'
+                ? daysLeft === 0
+                  ? t('Vence hoje', 'Vence hoy', 'Due today')
+                  : t('Vence amanhã', 'Vence mañana', 'Due tomorrow')
+                : urgencyKind === 'soon'
+                  ? t(`Vence em ${daysLeft} dias`, `Vence en ${daysLeft} días`, `Due in ${daysLeft} days`)
+                  : t(`Vence em ${daysLeft} dias`, `Vence en ${daysLeft} días`, `Due in ${daysLeft} days`),
+          className:
+            urgencyKind === 'overdue'
+              ? 'bg-gray-100 text-gray-600'
+              : urgencyKind === 'today' || urgencyKind === 'soon'
+                ? 'bg-red-50 text-red-800'
+                : 'bg-amber-50 text-amber-900',
+        };
   const host = (() => {
     if (!c.linkOficial) return null;
     try {
@@ -1015,11 +1102,22 @@ function CandidateCard({
           </h3>
           <p className="line-clamp-1 text-xs text-gray-600">{c.institution}</p>
           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
-            {dateLine && (
+            {urgency && (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${urgency.className}`}
+              >
+                <CalendarDays className="h-3 w-3 shrink-0" />
+                {urgency.label}
+              </span>
+            )}
+            {dateLine && !urgency && (
               <span className="inline-flex items-center gap-1">
                 <CalendarDays className="h-3 w-3 shrink-0" />
                 {dateLine}
               </span>
+            )}
+            {dateLine && urgency && (
+              <span className="inline-flex items-center gap-1 text-gray-400">{dateLine}</span>
             )}
             {countryShort && (
               <span className="inline-flex items-center gap-1">

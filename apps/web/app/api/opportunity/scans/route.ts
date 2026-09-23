@@ -4,7 +4,7 @@ export const maxDuration = 600;
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { readOpportunityBriefing, writeOpportunityBriefing } from '@/lib/opportunity/briefing';
-import { pendingCandidates, readScanResults } from '@/lib/opportunity/candidate-store';
+import { pendingCandidates, readCompanyScanInbox, readScanResults } from '@/lib/opportunity/candidate-store';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import { runOpportunityScan } from '@/lib/opportunity/run-scan';
 import type { OpportunityBriefing, ScanFocus } from '@/lib/opportunity/scan-types';
@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
     if (!run) return NextResponse.json({ error: 'Varredura não encontrada' }, { status: 404 });
     const results = await readScanResults(ctx.companyId, run.id);
     const progress = progressFromErrorsJson(run.errorsJson);
+    const stamp = <T extends { runId?: string }>(c: T) => ({ ...c, runId: run.id });
     return NextResponse.json({
       companyId: ctx.companyId,
       run: {
@@ -56,14 +57,14 @@ export async function GET(req: NextRequest) {
         scanFocus: results.scanFocus ?? null,
         scanProfileName: results.scanProfileName ?? null,
       },
-      pending: pendingCandidates(results),
-      pendingOpen: pendingCandidates(results, 'open_now'),
-      pendingReference: pendingCandidates(results, 'reference'),
-      later: results.candidates.filter((c) => results.laterTempIds.includes(c.tempId)),
+      pending: pendingCandidates(results).map(stamp),
+      pendingOpen: pendingCandidates(results, 'open_now').map(stamp),
+      pendingReference: pendingCandidates(results, 'reference').map(stamp),
+      later: results.candidates.filter((c) => results.laterTempIds.includes(c.tempId)).map(stamp),
     });
   }
 
-  const [latest, recentRuns] = await Promise.all([
+  const [latest, recentRuns, inbox] = await Promise.all([
     prisma.fundhubDiscoveryRun.findFirst({
       where: { companyId: ctx.companyId },
       orderBy: { startedAt: 'desc' },
@@ -82,6 +83,7 @@ export async function GET(req: NextRequest) {
         errorCount: true,
       },
     }),
+    readCompanyScanInbox(ctx.companyId),
   ]);
 
   if (!latest) {
@@ -112,10 +114,10 @@ export async function GET(req: NextRequest) {
       scanFocus: results.scanFocus ?? null,
       scanProfileName: results.scanProfileName ?? null,
     },
-    pending: pendingCandidates(results),
-    pendingOpen: pendingCandidates(results, 'open_now'),
-    pendingReference: pendingCandidates(results, 'reference'),
-    later: results.candidates.filter((c) => results.laterTempIds.includes(c.tempId)),
+    pending: inbox.pending,
+    pendingOpen: inbox.pendingOpen,
+    pendingReference: inbox.pendingReference,
+    later: inbox.later,
     recentRuns,
   });
 }

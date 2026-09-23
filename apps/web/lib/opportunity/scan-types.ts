@@ -75,6 +75,8 @@ export type ScanCandidate = {
   /** Classificação sugerida pela IA. */
   classification?: OpportunityClassification;
   classificationNote?: string;
+  /** Varredura de origem — necessário para validar depois de juntar o inbox. */
+  runId?: string;
 };
 
 export type ScanResultsPayload = {
