@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       canManage: false,
       companyLicensedSystems,
+      addOnCodes: entitlements.addOnCodes,
       billing: {
         enforced: entitlements.billingEnforced,
         status: entitlements.subscriptionStatus,
@@ -64,6 +65,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     canManage: true,
     companyLicensedSystems,
+    addOnCodes: entitlements.addOnCodes,
     billing: {
       enforced: entitlements.billingEnforced,
       status: entitlements.subscriptionStatus,

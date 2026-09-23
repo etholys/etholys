@@ -18,6 +18,8 @@ test('catalog covers plans, systems, add-ons, licenses and commissions', () => {
   assert.ok(getSku('plan.institucional'));
   assert.ok(getSku('addon.siep.smart_import'));
   assert.ok(getSku('addon.atlas.smart_import'));
+  assert.ok(getSku('addon.tool.studio'));
+  assert.ok(getSku('addon.tool.work'));
   assert.ok(getSku('commission.fundhub.success_fee'));
 });
 

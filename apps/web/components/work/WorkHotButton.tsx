@@ -18,7 +18,8 @@ const HIDDEN_PREFIXES = [
 ];
 
 /**
- * Atalho flutuante Work — acima do Studio (canto inferior esquerdo).
+ * Atalho flutuante Work — desmontado do chrome global.
+ * Tapava texto nas sidebars e aparecia sem a empresa ter o add-on.
  */
 export function WorkHotButton() {
   const { data: session, status } = useSession();

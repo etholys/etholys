@@ -17,8 +17,8 @@ const HIDDEN_PREFIXES = [
 ];
 
 /**
- * Atalho flutuante Studio — canto inferior esquerdo.
- * Work fica acima (`bottom-[4.75rem]`); Studio permanece em `bottom-6`.
+ * Atalho flutuante Studio — desmontado do chrome global.
+ * Tapava texto nas sidebars e aparecia sem a empresa ter o add-on.
  */
 export function StudioHotButton() {
   const { data: session, status } = useSession();

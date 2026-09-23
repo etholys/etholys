@@ -43,9 +43,11 @@ Candidato futuro (Tools, fora de Work): **Board** — mural da empresa (links, d
 
 ## 3. UI
 
-- Secção **Ferramentas** no Hub (`apps/web/app/hub/page.tsx`).
+- Secção **Etholys Tools** no Hub (`apps/web/app/hub/page.tsx`).
 - Badge `productTier: 'tool' | 'advisor'` nos cartões.
 - Cada ferramenta mantém rota própria sob `/hub/…` (`/hub/carta` redireciona para `/hub/work`).
+- **Sem atalhos flutuantes** nas páginas dos sistemas (tapavam texto e anunciavam tools não contratadas).
+- **Studio** e **Work** só entram no Hub se a empresa tiver o add-on (`addon.tool.studio` / `addon.tool.work`) quando a faturação está activa. Sem contrato registado (legado), o Hub continua a listá-las.
 
 ---
 

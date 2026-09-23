@@ -1,4 +1,5 @@
 import type { WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
+import { companyHasHubTool, hubToolAddonSku } from '@/lib/hub-tool-addons';
 
 /** Mapeamento id do cartão Hub → chave de licença (IntegratedWorkspaceAccess.systems). */
 export const HUB_SYSTEM_ID_TO_LICENSE_KEY: Record<string, WorkspaceSystemKey> = {
@@ -23,10 +24,10 @@ export function hubSystemIdToLicenseKey(systemId: string): WorkspaceSystemKey | 
   return HUB_SYSTEM_ID_TO_LICENSE_KEY[systemId.toUpperCase()] ?? null;
 }
 
-/** Advisor, Studio, Meet/Chorus, Work — não passam por grant por sistema. PRISM continua licenciado. */
+/** Advisor e Chorus — sem SKU próprio. Studio/Work exigem add-on quando há faturação. PRISM é sistema. */
 export function isHubLicenseExempt(systemId: string): boolean {
   const id = systemId.toUpperCase();
-  return id === 'ADVISOR' || id === 'STUDIO' || id === 'MEET' || id === 'WORK' || id === 'CHORUS';
+  return id === 'ADVISOR' || id === 'MEET' || id === 'CHORUS';
 }
 
 export type HubCardAccess = 'open' | 'locked' | 'coming_soon';
@@ -35,6 +36,8 @@ export type HubCardAccessOptions = {
   canManage?: boolean;
   loading?: boolean;
   companyLicensedSystems?: WorkspaceSystemKey[] | null;
+  billingEnforced?: boolean;
+  addOnCodes?: string[] | null;
 };
 
 export function resolveHubCardAccess(
@@ -44,6 +47,15 @@ export function resolveHubCardAccess(
   opts?: HubCardAccessOptions,
 ): HubCardAccess {
   if (!active) return 'coming_soon';
+  if (hubToolAddonSku(systemId)) {
+    if (opts?.loading) return 'locked';
+    return companyHasHubTool(systemId, {
+      billingEnforced: opts?.billingEnforced,
+      addOnCodes: opts?.addOnCodes,
+    })
+      ? 'open'
+      : 'locked';
+  }
   if (isHubLicenseExempt(systemId)) return 'open';
 
   const key = hubSystemIdToLicenseKey(systemId);

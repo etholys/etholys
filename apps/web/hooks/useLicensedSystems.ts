@@ -8,6 +8,8 @@ export type UserAccessScope = 'loading' | 'full' | 'systems' | 'none';
 export function useLicensedSystems(companyId: string | null) {
   const [licensedSystems, setLicensedSystems] = useState<WorkspaceSystemKey[] | null>(null);
   const [companyLicensedSystems, setCompanyLicensedSystems] = useState<WorkspaceSystemKey[] | null>(null);
+  const [addOnCodes, setAddOnCodes] = useState<string[]>([]);
+  const [billingEnforced, setBillingEnforced] = useState(false);
   const [canManage, setCanManage] = useState(false);
   const [accessScope, setAccessScope] = useState<UserAccessScope>('loading');
   const [showIntegratedWorkspace, setShowIntegratedWorkspace] = useState(false);
@@ -17,6 +19,8 @@ export function useLicensedSystems(companyId: string | null) {
     if (!companyId) {
       setLicensedSystems(null);
       setCompanyLicensedSystems(null);
+      setAddOnCodes([]);
+      setBillingEnforced(false);
       setCanManage(false);
       setAccessScope('none');
       setShowIntegratedWorkspace(false);
@@ -32,6 +36,8 @@ export function useLicensedSystems(companyId: string | null) {
       if (!res.ok) {
         setLicensedSystems([]);
         setCompanyLicensedSystems([]);
+        setAddOnCodes([]);
+        setBillingEnforced(false);
         setCanManage(false);
         setAccessScope('none');
         setShowIntegratedWorkspace(false);
@@ -41,10 +47,14 @@ export function useLicensedSystems(companyId: string | null) {
         canManage?: boolean;
         me?: { enabled?: boolean; systems?: WorkspaceSystemKey[] } | null;
         companyLicensedSystems?: WorkspaceSystemKey[] | null;
+        addOnCodes?: string[] | null;
+        billing?: { enforced?: boolean };
       };
       const manage = data.canManage === true;
       setCanManage(manage);
       setCompanyLicensedSystems(data.companyLicensedSystems ?? null);
+      setAddOnCodes(Array.isArray(data.addOnCodes) ? data.addOnCodes : []);
+      setBillingEnforced(data.billing?.enforced === true);
 
       if (manage) {
         setLicensedSystems(data.companyLicensedSystems ?? null);
@@ -75,6 +85,8 @@ export function useLicensedSystems(companyId: string | null) {
     } catch {
       setLicensedSystems([]);
       setCompanyLicensedSystems([]);
+      setAddOnCodes([]);
+      setBillingEnforced(false);
       setCanManage(false);
       setAccessScope('none');
       setShowIntegratedWorkspace(false);
@@ -90,6 +102,8 @@ export function useLicensedSystems(companyId: string | null) {
   return {
     licensedSystems,
     companyLicensedSystems,
+    addOnCodes,
+    billingEnforced,
     canManage,
     accessScope,
     showIntegratedWorkspace,

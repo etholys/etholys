@@ -5,8 +5,6 @@ import type { Session } from 'next-auth';
 import { useState, useEffect, createContext, useContext } from 'react';
 import type { Locale } from '@/lib/i18n';
 import { t } from '@/lib/i18n';
-import { StudioHotButton } from '@/components/studio/StudioHotButton';
-import { WorkHotButton } from '@/components/work/WorkHotButton';
 import { ActiveCompanyBootstrap } from '@/components/hub/ActiveCompanyBootstrap';
 
 interface AppContextType {
@@ -74,8 +72,6 @@ export default function Providers({
       <AppContext.Provider value={{ locale, setLocale: handleSetLocale, activeCompanyId, setActiveCompanyId: handleSetCompany, tr }}>
         <ActiveCompanyBootstrap />
         {children}
-        <WorkHotButton />
-        <StudioHotButton />
       </AppContext.Provider>
     </SessionProvider>
   );

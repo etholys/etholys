@@ -181,6 +181,8 @@ export default function HubPage() {
   const {
     licensedSystems,
     companyLicensedSystems,
+    addOnCodes,
+    billingEnforced,
     canManage,
     showIntegratedWorkspace,
     loading: accessLoading,
@@ -273,16 +275,23 @@ export default function HubPage() {
   }
 
   const firstName = session?.user?.name?.split(' ')?.[0] || '';
-  const toolCards = systems.filter(isEtholysTool);
+  const cardOpts = {
+    canManage,
+    loading: accessLoading,
+    companyLicensedSystems,
+    billingEnforced,
+    addOnCodes,
+  };
+  const toolCards = systems.filter(
+    (sys) =>
+      isEtholysTool(sys) &&
+      resolveHubCardAccess(sys.id, sys.active, licensedSystems, cardOpts) === 'open',
+  );
   const systemCards = systems.filter((sys) => !isEtholysTool(sys));
 
   const renderRow = (sys: HubEntry, index: number) => {
     const Icon = sys.icon;
-    const cardAccess = resolveHubCardAccess(sys.id, sys.active, licensedSystems, {
-      canManage,
-      loading: accessLoading,
-      companyLicensedSystems,
-    });
+    const cardAccess = resolveHubCardAccess(sys.id, sys.active, licensedSystems, cardOpts);
 
     const rowShell =
       'group flex items-center gap-4 px-4 py-4 transition sm:px-5 sm:py-[1.125rem]';

@@ -406,6 +406,24 @@ const ADDON_SKUS: BillingSku[] = [
     commissionBps: null,
     selfServe: true,
   },
+  {
+    code: 'addon.tool.work',
+    kind: 'addon',
+    name: L('Work (tarefas)', 'Work (tareas)', 'Work (tasks)'),
+    blurb: L(
+      'Gestor de tarefas da equipa — só aparece se contratado.',
+      'Gestor de tareas del equipo — solo aparece si está contratado.',
+      'Team task manager — only shown if contracted.',
+    ),
+    systems: [],
+    requiresSystems: [],
+    interval: 'MONTH',
+    priceCents: 1900,
+    currency: 'USD',
+    maxSeats: null,
+    commissionBps: null,
+    selfServe: true,
+  },
 ];
 
 const LICENSE_SKUS: BillingSku[] = [
