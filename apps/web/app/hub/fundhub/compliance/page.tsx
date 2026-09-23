@@ -139,13 +139,13 @@ export default function FundHubCompliancePage() {
             href="/hub/fundhub"
             className="mb-4 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
           >
-            ← FUNDHUB
+            ← OPPORTUNITY
           </Link>
           <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">Rota de Compliance</h1>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">Compliance</h1>
               <p className="text-lg text-gray-600 max-w-2xl">
-                Acompanhe e gerencie requisitos de governança, auditoria, ESG e compliance para ser elegível em fundos grandes.
+                Governança, auditoria, ESG e legal — o que falta para ser elegível.
               </p>
               {fundId && (
                 <p className="mt-3 text-sm text-amber-600">Foco no fundo selecionado: {fundId}</p>

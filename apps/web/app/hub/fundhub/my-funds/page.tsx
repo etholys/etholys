@@ -96,16 +96,16 @@ export default function OpportunitiesPage() {
         <div>
           <Link href="/hub/fundhub" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
             <ArrowLeft className="h-4 w-4" />
-            FUNDHUB
+            OPPORTUNITY
           </Link>
           <h1 className="mt-2 text-2xl font-bold text-gray-900 md:text-3xl">
-            {t('Oportunidades', 'Oportunidades', 'Opportunities')}
+            {t('Em curso', 'En curso', 'In progress')}
           </h1>
           <p className="mt-1 text-sm text-gray-600">
             {t(
-              'Catálogo validado da sua organização.',
-              'Catálogo validado de su organización.',
-              'Your organization\'s validated catalog.',
+              'Fundos que já decidiu acompanhar.',
+              'Fondos que ya decidió seguir.',
+              'Funds you chose to track.',
             )}
           </p>
         </div>
@@ -113,7 +113,7 @@ export default function OpportunitiesPage() {
           <DeadlineAlertsPanel variant="inline" />
           <div className="text-right">
             <p className="text-3xl font-bold text-amber-700">{total}</p>
-            <p className="text-xs text-gray-500">{t('no catálogo', 'en catálogo', 'in catalog')}</p>
+            <p className="text-xs text-gray-500">{t('em curso', 'en curso', 'in progress')}</p>
           </div>
         </div>
       </div>
@@ -134,7 +134,7 @@ export default function OpportunitiesPage() {
           className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
         >
           <Radar className="h-4 w-4" />
-          {t('Nova varredura', 'Nuevo barrido', 'New scan')}
+          {t('Buscar novas', 'Buscar nuevas', 'Search new')}
         </Link>
       </div>
 
@@ -144,13 +144,13 @@ export default function OpportunitiesPage() {
         <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
           <Radar className="mx-auto h-12 w-12 text-gray-300" />
           <h2 className="mt-4 text-lg font-semibold text-gray-900">
-            {t('Catálogo vazio', 'Catálogo vacío', 'Empty catalog')}
+            {t('Ainda não guardou nenhum fundo', 'Aún no guardó ningún fondo', 'You have not saved a fund yet')}
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-gray-600">
             {t(
-              'Inicie uma varredura e guarde os candidatos que fazem sentido para a sua organização.',
-              'Inicie un barrido y guarde los candidatos relevantes.',
-              'Run a scan and save candidates that fit your organization.',
+              'Em Buscar, escolha o que importa e use Guardar.',
+              'En Buscar, elija lo que importa y pulse Guardar.',
+              'In Search, pick what matters and Save.',
             )}
           </p>
           <Link
@@ -158,7 +158,7 @@ export default function OpportunitiesPage() {
             className="mt-6 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700"
           >
             <Radar className="h-4 w-4" />
-            {t('Ir para varredura', 'Ir al barrido', 'Go to scan')}
+            {t('Ir a Buscar', 'Ir a Buscar', 'Go to Search')}
           </Link>
         </div>
       ) : (

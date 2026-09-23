@@ -220,9 +220,9 @@ export function SearchCoachingPanel({
       </div>
       <p className="mt-1 text-xs text-gray-600">
         {t(
-          'Cada atalho é um comando de varredura com nome, orientação e classificações. Edite ou execute quando quiser.',
-          'Cada atajo es un comando de barrido. Edite o ejecute cuando quiera.',
-          'Each shortcut is a named scan command. Edit or run anytime.',
+          'Um atalho = um tipo de busca. Clique em Buscar.',
+          'Un atajo = un tipo de búsqueda. Pulse Buscar.',
+          'One shortcut = one search type. Click Search.',
         )}
       </p>
 

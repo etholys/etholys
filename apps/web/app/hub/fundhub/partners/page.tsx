@@ -83,16 +83,16 @@ export default function FundHubPartnersPage() {
         <div>
           <Link href="/hub/fundhub" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
             <ArrowLeft className="h-4 w-4" />
-            FundHub
+            OPPORTUNITY
           </Link>
           <h1 className="mt-2 text-2xl font-bold text-gray-900 md:text-3xl">
-            {t('Parceiros locais e jurídicos', 'Socios locales y jurídicos', 'Local & legal partners')}
+            {t('Parceiros', 'Socios', 'Partners')}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-600">
             {t(
-              'Rede persistida por empresa — alimenta o perfil institucional.',
-              'Red persistida por empresa — alimenta el perfil institucional.',
-              'Per-company network — feeds the institutional profile.',
+              'Rede local e jurídica da organização.',
+              'Red local y jurídica de la organización.',
+              'Your local and legal network.',
             )}
           </p>
         </div>

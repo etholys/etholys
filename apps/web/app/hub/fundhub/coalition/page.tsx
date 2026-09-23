@@ -95,17 +95,17 @@ export default function FundHubCoalitionPage() {
       <div>
         <Link href="/hub/fundhub" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
           <ArrowLeft className="h-4 w-4" />
-          FundHub
+          OPPORTUNITY
         </Link>
         <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold text-gray-900">
           <Users className="h-7 w-7 text-emerald-600" />
-          {t('Coalizão de candidatura', 'Coalición de candidatura', 'Application coalition')}
+          {t('Coalizão', 'Coalición', 'Coalition')}
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-gray-600">
           {t(
-            'Organizações que entram na mesma proposta (consórcio). Aparece no perfil institucional e nas notas de proposta — sem duplicar dados do SIEP.',
-            'Organizaciones que entran en la misma propuesta (consorcio). Aparece en el perfil institucional y en las notas — sin duplicar SIEP.',
-            'Orgs on the same application (consortium). Shows on the institutional profile and proposal notes — without duplicating SIEP.',
+            'Quem entra consigo na mesma proposta.',
+            'Quién entra con usted en la misma propuesta.',
+            'Who joins you on the same application.',
           )}
         </p>
       </div>

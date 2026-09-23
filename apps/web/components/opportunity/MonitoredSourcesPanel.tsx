@@ -89,15 +89,11 @@ export function MonitoredSourcesPanel({ compact }: { compact?: boolean }) {
       <div className="flex items-center gap-2">
         <Link2 className="h-4 w-4 text-amber-600" />
         <h3 className="text-sm font-semibold text-gray-900">
-          {t('Portais que já conheço (extra)', 'Portales que ya conozco (extra)', 'Portals I already know (extra)')}
+          {t('Portais extra', 'Portales extra', 'Extra portals')}
         </h3>
       </div>
       <p className="mt-1 text-xs text-gray-500">
-        {t(
-          'Opcional — só se já conhece um portal específico e quer que a próxima varredura o cruze. A descoberta principal vem do briefing, não disto.',
-          'Opcional — solo si ya conoce un portal y quiere cruzarlo. La búsqueda principal viene del briefing.',
-          'Optional — only if you already know a portal and want the next scan to cross-check it. Main discovery comes from the briefing.',
-        )}
+        {t('Opcional. A busca principal vem dos critérios.', 'Opcional. La búsqueda principal viene de los criterios.', 'Optional. Main search comes from criteria.')}
       </p>
 
       <div className={`mt-3 flex gap-2 ${compact ? 'flex-col' : 'flex-col sm:flex-row'}`}>
@@ -129,11 +125,7 @@ export function MonitoredSourcesPanel({ compact }: { compact?: boolean }) {
         <p className="mt-3 text-xs text-gray-400">{t('A carregar…', 'Cargando…', 'Loading…')}</p>
       ) : sources.length === 0 ? (
         <p className="mt-3 text-xs text-gray-500">
-          {t(
-            'Nenhum extra configurado — normal. A varredura descobre a partir do briefing.',
-            'Sin extras — normal. El barrido descubre desde el briefing.',
-            'No extras configured — that is normal. Scans discover from the briefing.',
-          )}
+          {t('Nenhum extra — a busca usa os critérios.', 'Sin extras — la búsqueda usa los criterios.', 'No extras — search uses your criteria.')}
         </p>
       ) : (
         <ul className="mt-3 space-y-2">

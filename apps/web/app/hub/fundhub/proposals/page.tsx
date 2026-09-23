@@ -281,10 +281,10 @@ export default function ProposalsPage() {
       <header>
         <Link href="/hub/fundhub" className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900">
           <ArrowLeft className="h-4 w-4" />
-          FUNDHUB
+          OPPORTUNITY
         </Link>
         <h1 className="mt-3 text-3xl font-bold text-gray-900">Propostas</h1>
-        <p className="mt-1 text-gray-600">Redija, organize e acompanhe as candidaturas a fundos.</p>
+        <p className="mt-1 text-gray-600">Escrever e acompanhar candidaturas.</p>
       </header>
 
       <div>
@@ -337,9 +337,7 @@ export default function ProposalsPage() {
               <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-12 text-center">
                 <FileText className="mx-auto h-12 w-12 text-gray-300" />
                 <h3 className="mt-4 text-lg font-medium text-gray-900">Nenhuma proposta em rascunho</h3>
-                <p className="mt-2 text-gray-600">
-                  Você não tem propostas salvas. Clique em "Começar Nova" para criar sua primeira proposta.
-                </p>
+                <p className="mt-2 text-gray-600">Comece uma nova a partir de um edital.</p>
                 <button
                   onClick={() => setActiveTab('new')}
                   className="mt-6 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"
@@ -406,7 +404,7 @@ export default function ProposalsPage() {
             <div className="lg:col-span-2">
               {coalitionCount > 0 && (
                 <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                  Coalizão com <strong>{coalitionCount}</strong> organização(ões) — incluída no perfil institucional e notas.{' '}
+                  Coalizão com <strong>{coalitionCount}</strong> organização(ões).{' '}
                   <Link href="/hub/fundhub/coalition" className="font-medium underline">
                     Gerir
                   </Link>
@@ -414,10 +412,8 @@ export default function ProposalsPage() {
               )}
               <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
                 <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Começar Nova Proposta</h2>
-                  <p className="mt-2 text-gray-600">
-                    Cole o link e carregue o documento base e os anexos do edital para análise
-                  </p>
+                  <h2 className="text-2xl font-bold text-gray-900">Nova proposta</h2>
+                  <p className="mt-2 text-gray-600">Link do edital ou ficheiros. Depois a IA ajuda a escrever.</p>
                 </div>
 
                 <div className="space-y-6">
@@ -430,7 +426,7 @@ export default function ProposalsPage() {
                       onChange={(e) => setEditalLink(e.target.value)}
                       className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
                     />
-                    <p className="mt-1 text-xs text-gray-500">Opcional: Cole aqui a URL do edital para análise remota</p>
+                    <p className="mt-1 text-xs text-gray-500">Opcional</p>
                   </div>
 
                   <div>
@@ -513,7 +509,7 @@ export default function ProposalsPage() {
                       rows={4}
                       className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 font-mono text-sm text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
                     />
-                    <p className="mt-1 text-xs text-gray-500">Contexto que será enviado ao assistente para análise</p>
+                    <p className="mt-1 text-xs text-gray-500">Vai para o assistente</p>
                   </div>
 
                   {fund ? (
@@ -527,8 +523,7 @@ export default function ProposalsPage() {
                     </div>
                   ) : (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                      Sem fundo vinculado — a proposta será aberta como <strong>avulsa</strong>. Pode associar um
-                      fundo depois em Descobrir / Meus fundos.
+                      Sem fundo vinculado — proposta avulsa. Pode associar depois em Em curso.
                     </div>
                   )}
 
@@ -563,31 +558,11 @@ export default function ProposalsPage() {
 
             <aside>
               <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h3 className="flex items-center gap-2 font-bold text-gray-900">
-                  <AlertCircle className="h-5 w-5 text-blue-600" />
-                  Como Funciona
-                </h3>
-                <ol className="mt-4 space-y-3">
-                  <li className="flex gap-3">
-                    <span className="font-semibold text-blue-600 min-w-fit">1.</span>
-                    <span className="text-sm text-gray-600">Cole o link e carregue o documento base e os anexos do edital</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="font-semibold text-blue-600 min-w-fit">2.</span>
-                    <span className="text-sm text-gray-600">O sistema analisa a estrutura do edital</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="font-semibold text-blue-600 min-w-fit">3.</span>
-                    <span className="text-sm text-gray-600">Seções dinâmicas são geradas automaticamente</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="font-semibold text-blue-600 min-w-fit">4.</span>
-                    <span className="text-sm text-gray-600">Preencha cada seção com o assistente de IA</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="font-semibold text-blue-600 min-w-fit">5.</span>
-                    <span className="text-sm text-gray-600">Salve e envie sua proposta</span>
-                  </li>
+                <h3 className="font-semibold text-gray-900">Fluxo</h3>
+                <ol className="mt-3 space-y-2 text-sm text-gray-600">
+                  <li>1. Link ou ficheiros do edital</li>
+                  <li>2. A IA estrutura a proposta</li>
+                  <li>3. Você revê e submete</li>
                 </ol>
               </div>
             </aside>

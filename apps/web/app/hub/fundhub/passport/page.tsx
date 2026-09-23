@@ -105,9 +105,9 @@ const PROFILE_ITEMS: ProfileItem[] = [
     es: 'Fondos de interés guardados',
     en: 'Saved funds of interest',
     href: '/hub/fundhub/discover',
-    actionPt: 'Explorar fundos',
-    actionEs: 'Explorar fondos',
-    actionEn: 'Explore funds',
+    actionPt: 'Ir a Buscar',
+    actionEs: 'Ir a Buscar',
+    actionEn: 'Go to Search',
   },
   {
     key: 'proposals',
@@ -187,9 +187,9 @@ export default function InstitutionalProfilePage() {
       <StateEmpty
         title={t('Empresa não seleccionada', 'Empresa no seleccionada', 'No company selected')}
         description={t(
-          'Escolha a empresa activa na barra lateral do FundHub.',
-          'Elija la empresa activa en la barra lateral de FundHub.',
-          'Pick the active company in the FundHub sidebar.',
+          'Escolha a empresa na barra lateral.',
+          'Elija la empresa en la barra lateral.',
+          'Pick the company in the sidebar.',
         )}
       />
     );
@@ -222,16 +222,16 @@ export default function InstitutionalProfilePage() {
             className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4" />
-            {t('Voltar ao FundHub', 'Volver a FundHub', 'Back to FundHub')}
+            OPPORTUNITY
           </Link>
           <h1 className="mt-2 text-2xl font-bold text-gray-900 md:text-3xl">
-            {t('Perfil institucional', 'Perfil institucional', 'Institutional profile')}
+            {t('Perfil', 'Perfil', 'Profile')}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-600">
             {t(
-              'Resumo da sua organização para financiadores — quem somos, o que já entregamos e em que estamos a candidatar.',
-              'Resumen de su organización para financiadores — quiénes somos, qué ya entregamos y a qué nos estamos postulando.',
-              'Your organization at a glance for funders — who you are, what you deliver, and what you are applying for.',
+              'O que um financiador vê da sua organização.',
+              'Lo que un financiador ve de su organización.',
+              'What a funder sees about your organization.',
             )}
           </p>
         </div>
@@ -314,9 +314,9 @@ export default function InstitutionalProfilePage() {
             </h3>
             <p className="mt-1 text-sm text-gray-600">
               {t(
-                `${completedCount} de ${PROFILE_ITEMS.length} áreas preenchidas — quanto mais completo, mais credível perante um financiador.`,
-                `${completedCount} de ${PROFILE_ITEMS.length} áreas completadas — cuanto más completo, más creíble ante un financiador.`,
-                `${completedCount} of ${PROFILE_ITEMS.length} areas filled — a fuller profile builds funder trust.`,
+                `${completedCount} de ${PROFILE_ITEMS.length} áreas`,
+                `${completedCount} de ${PROFILE_ITEMS.length} áreas`,
+                `${completedCount} of ${PROFILE_ITEMS.length} areas`,
               )}
             </p>
           </div>

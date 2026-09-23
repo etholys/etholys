@@ -88,7 +88,7 @@ function CandidatePreviewInner() {
             : error || t('Erro', 'Error', 'Error')}
         </p>
         <Link href="/hub/fundhub/discover" className="text-sm font-medium text-amber-700 hover:underline">
-          ← FUNDHUB
+          ← {t('Voltar a Buscar', 'Volver a Buscar', 'Back to Search')}
         </Link>
       </div>
     );
@@ -101,7 +101,7 @@ function CandidatePreviewInner() {
         className="mb-4 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="h-4 w-4" />
-        {t('Voltar à descoberta', 'Volver al descubrimiento', 'Back to discover')}
+        {t('Voltar a Buscar', 'Volver a Buscar', 'Back to Search')}
       </Link>
       <CandidateDetailSheet
         candidate={candidate}

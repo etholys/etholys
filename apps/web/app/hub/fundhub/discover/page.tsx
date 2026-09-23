@@ -80,12 +80,6 @@ type ScanCandidate = {
   classificationNote?: string;
 };
 
-type CatalogFund = ScanCandidate & {
-  id: string;
-  status: string;
-  userStatus?: { status: string } | null;
-};
-
 type ScanMeta = {
   id: string;
   status: string;
@@ -116,7 +110,7 @@ export default function OpportunityDiscoverPage() {
   const t = (pt: string, es: string, en: string) =>
     locale === 'pt' ? pt : locale === 'es' ? es : en;
 
-  const [tab, setTab] = useState<'new' | 'catalog' | 'later'>('new');
+  const [tab, setTab] = useState<'new' | 'later'>('new');
   const [discoveryFocus, setDiscoveryFocus] = useState<ScanFocus>('open_now');
   const [briefing, setBriefing] = useState<Briefing>({
     themes: [],
@@ -134,7 +128,6 @@ export default function OpportunityDiscoverPage() {
   const [pendingOpen, setPendingOpen] = useState<ScanCandidate[]>([]);
   const [pendingReference, setPendingReference] = useState<ScanCandidate[]>([]);
   const [later, setLater] = useState<ScanCandidate[]>([]);
-  const [catalog, setCatalog] = useState<CatalogFund[]>([]);
   const [catalogTotal, setCatalogTotal] = useState(0);
 
   const [loading, setLoading] = useState(true);
@@ -193,8 +186,7 @@ export default function OpportunityDiscoverPage() {
   const loadCatalog = useCallback(async () => {
     const r = await fetch(q('/api/opportunity/catalog'), { cache: 'no-store' });
     if (!r.ok) return;
-    const d = (await r.json()) as { funds?: CatalogFund[]; pagination?: { total: number } };
-    setCatalog(d.funds ?? []);
+    const d = (await r.json()) as { pagination?: { total: number } };
     setCatalogTotal(d.pagination?.total ?? 0);
   }, [companyId]);
 
@@ -479,13 +471,13 @@ export default function OpportunityDiscoverPage() {
               OPPORTUNITY
             </Link>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-gray-900 md:text-[1.75rem]">
-              {t('Descobrir oportunidades', 'Descubrir oportunidades', 'Discover opportunities')}
+              {t('Buscar', 'Buscar', 'Search')}
             </h1>
-            <p className="mt-1.5 text-sm leading-relaxed text-gray-600">
+            <p className="mt-1.5 text-sm text-gray-600">
               {t(
-                'A IA pesquisa fontes oficiais. Você valida o que importa. O catálogo aprende com cada decisão.',
-                'La IA busca fuentes oficiales. Usted valida lo que importa. El catálogo aprende con cada decisión.',
-                'AI searches official sources. You validate what matters. The catalog learns from every decision.',
+                'A IA encontra. Você decide. O que guardar vai para Em curso.',
+                'La IA encuentra. Usted decide. Lo que guarde va a En curso.',
+                'AI finds. You decide. Saved items go to In progress.',
               )}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
@@ -630,11 +622,10 @@ export default function OpportunityDiscoverPage() {
             </div>
           )}
 
-          <div className="flex gap-1 border-b border-gray-200">
+          <div className="flex flex-wrap items-center gap-1 border-b border-gray-200">
             {(
               [
-                ['new', t(`Novas (${pendingOpen.length + pendingReference.length})`, `Nuevas (${pendingOpen.length + pendingReference.length})`, `New (${pendingOpen.length + pendingReference.length})`)],
-                ['catalog', t(`Guardadas (${catalogTotal})`, `Guardadas (${catalogTotal})`, `Saved (${catalogTotal})`)],
+                ['new', t(`Para decidir (${pendingOpen.length + pendingReference.length})`, `Por decidir (${pendingOpen.length + pendingReference.length})`, `To decide (${pendingOpen.length + pendingReference.length})`)],
                 ['later', t(`Mais tarde (${later.length})`, `Más tarde (${later.length})`, `Later (${later.length})`)],
               ] as const
             ).map(([key, label]) => (
@@ -651,6 +642,13 @@ export default function OpportunityDiscoverPage() {
                 {label}
               </button>
             ))}
+            <Link
+              href="/hub/fundhub/my-funds"
+              className="ml-auto mb-1 inline-flex items-center gap-1 px-2 py-2 text-xs font-medium text-gray-500 hover:text-gray-900"
+            >
+              {t(`Em curso (${catalogTotal})`, `En curso (${catalogTotal})`, `In progress (${catalogTotal})`)}
+              <ChevronRight className="h-3 w-3" />
+            </Link>
           </div>
 
           {tab === 'new' && (
@@ -676,16 +674,8 @@ export default function OpportunityDiscoverPage() {
               ))}
               <p className="w-full text-xs text-gray-500">
                 {discoveryFocus === 'open_now'
-                  ? t(
-                      'Convocatórias com prazo activo ou janela contínua.',
-                      'Convocatorias con plazo activo o ventana continua.',
-                      'Calls with an active deadline or rolling window.',
-                    )
-                  : t(
-                      'Programas permanentes ou sazonais para acompanhar — mesmo sem prazo aberto hoje.',
-                      'Programas permanentes o estacionales para seguir — aunque no haya plazo hoy.',
-                      'Standing or seasonal programs to track — even if no window is open today.',
-                    )}
+                  ? t('Com prazo activo agora.', 'Con plazo activo ahora.', 'Active window now.')
+                  : t('Programas para acompanhar, mesmo sem prazo hoje.', 'Programas para seguir, aunque no haya plazo hoy.', 'Programs to track, even without a window today.')}
               </p>
             </div>
           )}
@@ -713,22 +703,10 @@ export default function OpportunityDiscoverPage() {
               </h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-gray-600">
                 {scanning
-                  ? t(
-                      'Isto pode demorar um ou dois minutos. O anel mostra o avanço da busca.',
-                      'Puede tardar uno o dos minutos. El anillo muestra el avance.',
-                      'This can take a minute or two. The ring shows search progress.',
-                    )
+                  ? t('Um ou dois minutos. O anel mostra o avanço.', 'Uno o dos minutos. El anillo muestra el avance.', 'A minute or two. The ring shows progress.')
                   : discoveryFocus === 'open_now'
-                    ? t(
-                        'Lance uma busca — a IA identifica convocatórias com prazo activo e traz o que precisa para decidir.',
-                        'Lance una búsqueda — la IA identifica convocatorias con plazo activo.',
-                        'Start a search — AI finds calls with an active deadline and the facts you need to decide.',
-                      )
-                    : t(
-                        'Mapeie programas permanentes e sazonais para a equipa acompanhar ao longo do ano.',
-                        'Mapee programas permanentes y estacionales para seguirlos durante el año.',
-                        'Map standing and seasonal programs for the team to track through the year.',
-                      )}
+                    ? t('Clique em Buscar abertos agora.', 'Pulse Buscar abiertos ahora.', 'Click Find open calls.')
+                    : t('Clique em Mapear programas.', 'Pulse Mapear programas.', 'Click Map programs.')}
               </p>
               <button
                 type="button"
@@ -782,67 +760,6 @@ export default function OpportunityDiscoverPage() {
               ))
             ))}
 
-          {tab === 'catalog' &&
-            (catalog.length === 0 ? (
-              <div className="rounded-2xl border border-gray-200 bg-white px-8 py-10 text-center shadow-sm">
-                <Search className="mx-auto h-8 w-8 text-gray-400" />
-                <p className="mt-3 text-sm font-medium text-gray-900">
-                  {t('Ainda sem oportunidades guardadas', 'Aún sin oportunidades guardadas', 'No saved opportunities yet')}
-                </p>
-                <p className="mx-auto mt-1 max-w-sm text-sm text-gray-600">
-                  {t(
-                    'Valide uma descoberta ou registe um fundo que já conhece.',
-                    'Valide un hallazgo o registre un fondo que ya conoce.',
-                    'Validate a discovery or register a fund you already know.',
-                  )}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {catalog.map((f) => (
-                  <div
-                    key={f.id}
-                    className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-gray-300"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-gray-900">{f.name}</p>
-                        <p className="text-sm text-gray-600">{f.institution}</p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          {f.type}
-                          {f.countries ? ` · ${f.countries}` : ''}
-                        </p>
-                      </div>
-                      {f.matchScore != null && (
-                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
-                          {Math.round(f.matchScore)}%
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-3 flex gap-2">
-                      <Link
-                        href={`/hub/fundhub/discover/${f.id}`}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                      >
-                        {t('Detalhe', 'Detalle', 'Detail')}
-                      </Link>
-                      <Link
-                        href={`/hub/fundhub/proposals?fundId=${encodeURIComponent(f.id)}`}
-                        className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
-                      >
-                        {t('Proposta', 'Propuesta', 'Proposal')}
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-                <Link
-                  href="/hub/fundhub/my-funds"
-                  className="inline-flex text-sm font-medium text-amber-700 hover:underline"
-                >
-                  {t('Ver todas as oportunidades guardadas →', 'Ver todas guardadas →', 'View all saved →')}
-                </Link>
-              </div>
-            ))}
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
@@ -913,11 +830,7 @@ export default function OpportunityDiscoverPage() {
               </button>
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              {t(
-                'O que procura? A IA usa isto para priorizar fontes e oportunidades.',
-                '¿Qué busca? La IA usa esto para priorizar.',
-                'What are you looking for? AI uses this to prioritize.',
-              )}
+              {t('A IA usa isto para priorizar.', 'La IA usa esto para priorizar.', 'AI uses this to prioritize.')}
             </p>
 
             <label className="mt-4 block text-xs font-semibold uppercase text-gray-500">

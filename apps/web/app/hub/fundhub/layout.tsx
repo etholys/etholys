@@ -13,11 +13,9 @@ import {
   Menu,
   X,
   ChevronDown,
-  ChevronRight,
   Globe,
   Bell,
   MessageCircle,
-  BarChart3,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
@@ -26,16 +24,11 @@ import {
   ShieldCheck,
   Users,
   HandCoins,
+  MapPin,
+  Handshake,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
-
-type NavGroup = {
-  key: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  items: { href: string; icon: React.ComponentType<{ className?: string }>; label: string }[];
-};
 
 export default function FundHubLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -49,7 +42,6 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [chatUnread, setChatUnread] = useState(0);
 
   useEffect(() => {
@@ -87,22 +79,6 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
     }
   }, [status]);
 
-  const groupRoutes: Record<string, string[]> = {
-    funds: ['/hub/fundhub/passport', '/hub/fundhub/demand', '/hub/fundhub/discover', '/hub/fundhub/my-funds'],
-    pipeline: ['/hub/fundhub/proposals', '/hub/fundhub/compliance', '/hub/fundhub/coalition', '/hub/fundhub/partners'],
-  };
-
-  useEffect(() => {
-    for (const [key, routes] of Object.entries(groupRoutes)) {
-      if (routes.some((r) => pathname === r || pathname?.startsWith(r + '/'))) {
-        setOpenGroups((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
-        break;
-      }
-    }
-  }, [pathname]);
-
-  const toggleGroup = (key: string) => setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
-
   if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#07111A]">
@@ -119,60 +95,49 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
     },
   ];
 
-  const navGroups: NavGroup[] = [
+  const workItems = [
     {
-      key: 'funds',
-      label: locale === 'es' ? 'Captación' : locale === 'pt' ? 'Captação' : 'Funding',
-      icon: HandCoins,
-      items: [
-        {
-          href: '/hub/fundhub/passport',
-          icon: ShieldCheck,
-          label: locale === 'es' ? 'Perfil institucional' : locale === 'pt' ? 'Perfil institucional' : 'Institutional profile',
-        },
-        {
-          href: '/hub/fundhub/demand',
-          icon: BarChart3,
-          label: locale === 'es' ? 'Demanda' : locale === 'pt' ? 'Procura' : 'Demand',
-        },
-        {
-          href: '/hub/fundhub/discover',
-          icon: Search,
-          label: locale === 'es' ? 'Descubrir' : locale === 'pt' ? 'Descobrir' : 'Discover',
-        },
-        {
-          href: '/hub/fundhub/my-funds',
-          icon: Heart,
-          label: locale === 'es' ? 'Oportunidades' : locale === 'pt' ? 'Oportunidades' : 'Opportunities',
-        },
-      ],
+      href: '/hub/fundhub/discover',
+      icon: Search,
+      label: locale === 'es' ? 'Buscar' : locale === 'pt' ? 'Buscar' : 'Search',
     },
     {
-      key: 'pipeline',
-      label: locale === 'es' ? 'Propuestas y alianzas' : locale === 'pt' ? 'Propostas e parcerias' : 'Proposals & partners',
+      href: '/hub/fundhub/my-funds',
+      icon: Heart,
+      label: locale === 'es' ? 'En curso' : locale === 'pt' ? 'Em curso' : 'In progress',
+    },
+    {
+      href: '/hub/fundhub/proposals',
       icon: Lightbulb,
-      items: [
-        {
-          href: '/hub/fundhub/proposals',
-          icon: Lightbulb,
-          label: locale === 'es' ? 'Propuestas' : locale === 'pt' ? 'Propostas' : 'Proposals',
-        },
-        {
-          href: '/hub/fundhub/compliance',
-          icon: ShieldCheck,
-          label: 'Compliance',
-        },
-        {
-          href: '/hub/fundhub/coalition',
-          icon: Users,
-          label: locale === 'es' ? 'Coalición' : locale === 'pt' ? 'Coalizão' : 'Coalition',
-        },
-        {
-          href: '/hub/fundhub/partners',
-          icon: HandCoins,
-          label: locale === 'es' ? 'Socios' : locale === 'pt' ? 'Parceiros' : 'Partners',
-        },
-      ],
+      label: locale === 'es' ? 'Propuestas' : locale === 'pt' ? 'Propostas' : 'Proposals',
+    },
+  ];
+
+  const setupItems = [
+    {
+      href: '/hub/fundhub/passport',
+      icon: Building2,
+      label: locale === 'es' ? 'Perfil' : locale === 'pt' ? 'Perfil' : 'Profile',
+    },
+    {
+      href: '/hub/fundhub/demand',
+      icon: MapPin,
+      label: locale === 'es' ? 'Mapa' : locale === 'pt' ? 'Mapa' : 'Map',
+    },
+    {
+      href: '/hub/fundhub/compliance',
+      icon: ShieldCheck,
+      label: 'Compliance',
+    },
+    {
+      href: '/hub/fundhub/coalition',
+      icon: Users,
+      label: locale === 'es' ? 'Coalición' : locale === 'pt' ? 'Coalizão' : 'Coalition',
+    },
+    {
+      href: '/hub/fundhub/partners',
+      icon: Handshake,
+      label: locale === 'es' ? 'Socios' : locale === 'pt' ? 'Parceiros' : 'Partners',
     },
   ];
 
@@ -346,67 +311,39 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
             <div className="h-px bg-white/10" />
           </div>
 
-          {navGroups.map((group) => {
-            const isOpen = openGroups[group.key] ?? false;
-            const hasActiveChild = group.items.some(
-              (i) => pathname === i.href || pathname?.startsWith(i.href + '/'),
-            );
-            if (collapsed) {
-              return group.items.map((item) => {
-                const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setSidebarOpen(false)}
-                    title={item.label}
-                    className={navClass(isActive, true)}
-                  >
-                    <item.icon className="h-5 w-5 flex-shrink-0" />
-                  </Link>
-                );
-              });
-            }
+          {workItems.map((item) => {
+            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
             return (
-              <div key={group.key} className="mb-2">
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(group.key)}
-                  className={cn(
-                    'flex w-full items-center justify-between rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] transition',
-                    hasActiveChild ? 'text-amber-200' : 'text-white/35 hover:bg-white/[0.04] hover:text-white/70',
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <group.icon className="h-3.5 w-3.5" />
-                    {group.label}
-                  </div>
-                  <ChevronRight className={cn('h-3.5 w-3.5 transition-transform duration-200', isOpen && 'rotate-90')} />
-                </button>
-                {isOpen && (
-                  <div className="ml-3 mt-0.5 space-y-0.5 border-l border-white/10 pl-3">
-                    {group.items.map((item) => {
-                      const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          onClick={() => setSidebarOpen(false)}
-                          className={cn(
-                            'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition',
-                            isActive
-                              ? 'bg-amber-500/15 font-medium text-amber-100'
-                              : 'text-white/55 hover:bg-white/[0.04] hover:text-white',
-                          )}
-                        >
-                          <item.icon className="h-4 w-4" />
-                          {item.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                title={collapsed ? item.label : undefined}
+                className={navClass(isActive, collapsed)}
+              >
+                <item.icon className="h-5 w-5 flex-shrink-0" />
+                {!collapsed && item.label}
+              </Link>
+            );
+          })}
+
+          <div className="py-2">
+            <div className="h-px bg-white/10" />
+          </div>
+
+          {setupItems.map((item) => {
+            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                title={collapsed ? item.label : undefined}
+                className={navClass(isActive, collapsed)}
+              >
+                <item.icon className="h-5 w-5 flex-shrink-0" />
+                {!collapsed && item.label}
+              </Link>
             );
           })}
 

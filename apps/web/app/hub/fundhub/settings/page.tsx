@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Settings2, Bell, UserCog, ShieldCheck, Building2, ArrowRight, Radar } from 'lucide-react';
+import { ArrowLeft, Settings2, ShieldCheck, Building2, ArrowRight, Radar } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { MonitoredSourcesPanel } from '@/components/opportunity/MonitoredSourcesPanel';
 
@@ -17,17 +17,13 @@ export default function FundHubSettingsPage() {
           <div>
             <Link href="/hub/fundhub" className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
               <ArrowLeft className="w-4 h-4" />
-              {t('Voltar ao FUNDHUB', 'Volver a FUNDHUB', 'Back to FUNDHUB')}
+              OPPORTUNITY
             </Link>
             <h1 className="mt-3 text-3xl font-bold text-gray-900">
-              {t('Configurações FUNDHUB', 'Configuración FUNDHUB', 'FUNDHUB settings')}
+              {t('Definições', 'Ajustes', 'Settings')}
             </h1>
             <p className="text-sm text-gray-600 mt-2">
-              {t(
-                'Briefing, fontes monitorizadas, alertas e perfil da organização.',
-                'Briefing, fuentes monitoreadas, alertas y perfil.',
-                'Briefing, monitored sources, alerts, and organization profile.',
-              )}
+              {t('Fontes extra, acesso e perfil.', 'Fuentes extra, acceso y perfil.', 'Extra sources, access, and profile.')}
             </p>
           </div>
           <div className="inline-flex items-center gap-3 rounded-3xl bg-white px-4 py-3 text-sm text-gray-700 shadow-sm ring-1 ring-gray-200">
@@ -36,31 +32,7 @@ export default function FundHubSettingsPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <UserCog className="w-6 h-6 text-gray-700" />
-              <h2 className="text-lg font-semibold text-gray-900">Perfil da organização</h2>
-            </div>
-            <p className="text-sm text-gray-600">{t('Nome, setor, localização e contactos.', 'Nombre, sector, ubicación y contactos.', 'Name, sector, location, and contacts.')}</p>
-          </div>
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <Bell className="w-6 h-6 text-amber-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Notificações</h2>
-            </div>
-            <p className="text-sm text-gray-600">Configure alertas de prazos, novas oportunidades e atualizações de compliance.</p>
-          </div>
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <ShieldCheck className="w-6 h-6 text-emerald-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Permissões</h2>
-            </div>
-            <p className="text-sm text-gray-600">Defina quem do seu time pode acessar rascunhos, fundos salvos e relatórios de compliance.</p>
-          </div>
-        </div>
-
-        <section className="mt-8 space-y-2">
+        <section className="space-y-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
             {t('Extras opcionais', 'Extras opcionales', 'Optional extras')}
           </h2>
@@ -78,9 +50,9 @@ export default function FundHubSettingsPage() {
             </div>
             <p className="mt-2 text-sm text-gray-600">
               {t(
-                'Quem pode abrir FUNDHUB e outros sistemas da empresa.',
-                'Quién puede abrir FUNDHUB y otros sistemas de la empresa.',
-                'Who can open FUNDHUB and other company systems.',
+                'Quem pode abrir OPPORTUNITY e outros sistemas.',
+                'Quién puede abrir OPPORTUNITY y otros sistemas.',
+                'Who can open OPPORTUNITY and other systems.',
               )}
             </p>
             <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-amber-700 group-hover:underline">
@@ -95,17 +67,13 @@ export default function FundHubSettingsPage() {
           >
             <div className="flex items-center gap-2 text-amber-800">
               <Radar className="h-5 w-5" />
-              <span className="font-semibold">{t('Varredura e briefing', 'Barrido y briefing', 'Scan & briefing')}</span>
+              <span className="font-semibold">{t('Buscar', 'Buscar', 'Search')}</span>
             </div>
             <p className="mt-2 text-sm text-gray-600">
-              {t(
-                'Configure o que procura e inicie varreduras de oportunidades.',
-                'Configure qué busca e inicie barridos.',
-                'Configure what you need and run opportunity scans.',
-              )}
+              {t('Critérios e atalhos de busca.', 'Criterios y atajos de búsqueda.', 'Search criteria and shortcuts.')}
             </p>
             <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-amber-700 group-hover:underline">
-              {t('Abrir varredura', 'Abrir barrido', 'Open scan')}
+              {t('Abrir Buscar', 'Abrir Buscar', 'Open Search')}
               <ArrowRight className="h-4 w-4" />
             </span>
           </Link>
@@ -132,25 +100,6 @@ export default function FundHubSettingsPage() {
           </Link>
         </section>
 
-        <div className="mt-10 rounded-[2rem] border border-gray-200 bg-white p-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            {t('Configurações rápidas', 'Ajustes rápidos', 'Quick settings')}
-          </h2>
-          <div className="space-y-4">
-            <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-              <p className="font-semibold text-gray-900">1. Atualizar nome e dados da organização</p>
-              <p className="text-sm text-gray-600 mt-1">Mantenha seu perfil empresarial alinhado com requerimentos dos editais.</p>
-            </div>
-            <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-              <p className="font-semibold text-gray-900">2. Notificações de novos editais</p>
-              <p className="text-sm text-gray-600 mt-1">Ative alertas por setor e região para não perder prazos importantes.</p>
-            </div>
-            <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-              <p className="font-semibold text-gray-900">3. Preferências de relatórios</p>
-              <p className="text-sm text-gray-600 mt-1">Escolha o formato de relatórios e frequência de entregas.</p>
-            </div>
-          </div>
-        </div>
       </main>
     </div>
   );

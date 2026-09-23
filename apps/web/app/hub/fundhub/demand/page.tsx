@@ -82,17 +82,17 @@ export default function DemandBoardPage() {
       <div>
         <Link href="/hub/fundhub" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
           <ArrowLeft className="h-4 w-4" />
-          FundHub
+          OPPORTUNITY
         </Link>
         <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold text-gray-900 md:text-3xl">
           <MapPin className="h-7 w-7 text-violet-600" />
-          {t('Quadro de procura territorial', 'Tablero de demanda territorial', 'Territory demand board')}
+          {t('Mapa', 'Mapa', 'Map')}
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-gray-600">
           {t(
-            'Onde há editais abertos no seu portfólio — por país, sector e prazo. Dados reais da tabela Fund.',
-            'Dónde hay convocatorias abiertas en su cartera — por país, sector y plazo. Datos reales de Fund.',
-            'Where open calls cluster in your portfolio — by country, sector, and deadline. Live Fund table data.',
+            'Onde estão os fundos que já guardou — por país, sector e prazo.',
+            'Dónde están los fondos que ya guardó — por país, sector y plazo.',
+            'Where saved funds sit — by country, sector, and deadline.',
           )}
         </p>
       </div>

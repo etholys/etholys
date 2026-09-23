@@ -68,9 +68,9 @@ export function KnownFundsPanel({ onAdded }: { onAdded?: () => void }) {
       setBulk('');
       setMsg(
         t(
-          `${d.count} fundo(s) registado(s). A IA usará isto nas próximas varreduras.`,
-          `${d.count} fondo(s) registrado(s). La IA usará esto en próximos barridos.`,
-          `${d.count} fund(s) saved. AI will use this in future scans.`,
+          `${d.count} registado(s).`,
+          `${d.count} registrado(s).`,
+          `${d.count} saved.`,
         ),
       );
       await loadRecent();
@@ -93,11 +93,7 @@ export function KnownFundsPanel({ onAdded }: { onAdded?: () => void }) {
         </h3>
       </div>
       <p className="mt-1 text-xs text-gray-500">
-        {t(
-          'Registe o que já sabe — a IA evita duplicar e aprende o seu universo.',
-          'Registre lo que ya sabe — la IA evita duplicar y aprende su universo.',
-          'Register what you already know — AI avoids duplicates and learns your universe.',
-        )}
+        {t('A IA não volta a sugerir estes.', 'La IA no volverá a sugerir estos.', 'AI will not suggest these again.')}
       </p>
 
       <button
