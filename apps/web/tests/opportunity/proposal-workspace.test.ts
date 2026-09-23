@@ -115,6 +115,6 @@ test('normalizeFundhubMode accepts brainstorm', () => {
 test('brainstorm prompt asks for chuva de ideias and forbids FUNDHUB leftovers', () => {
   const sys = buildFundhubProposalSystemPrompt('brainstorm');
   assert.match(sys, /chuva de ideias/i);
-  assert.match(sys, /OPPORTUNITY/);
+  assert.match(sys, /FundHub/);
   assert.match(sys, /Não menciones nomes internos de produto/);
 });
