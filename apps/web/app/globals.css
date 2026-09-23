@@ -178,13 +178,22 @@
 .etholys-system,
 .etholys-fundhub {
   color-scheme: dark;
-  --sys-ink: #e8eef2;
-  --sys-line: rgba(255, 255, 255, 0.1);
-  --sys-panel: rgba(12, 24, 34, 0.86);
-  --sys-panel-soft: rgba(255, 255, 255, 0.04);
+  --sys-ink: #f1f5f9;
+  --sys-muted: rgba(241, 245, 249, 0.82);
+  --sys-faint: rgba(241, 245, 249, 0.68);
+  --sys-icon: rgba(241, 245, 249, 0.55);
+  --sys-line: rgba(255, 255, 255, 0.14);
+  --sys-panel: rgba(12, 24, 34, 0.92);
+  --sys-panel-soft: rgba(255, 255, 255, 0.07);
+  --sys-amber: #fcd34d;
+  --sys-mint: #6ee7b7;
+  --sys-lilac: #e9d5ff;
+  --sys-rose: #fca5a5;
+  --sys-peach: #fdba74;
 }
 
 .etholys-system .sys-canvas,
+.etholys-fundhub,
 .etholys-fundhub .fh-canvas {
   color: var(--sys-ink);
 }
@@ -192,74 +201,88 @@
 .etholys-system .sys-canvas input:not([type='checkbox']):not([type='radio']):not([type='range']),
 .etholys-system .sys-canvas textarea,
 .etholys-system .sys-canvas select,
-.etholys-fundhub .fh-canvas input:not([type='checkbox']):not([type='radio']):not([type='range']),
-.etholys-fundhub .fh-canvas textarea,
-.etholys-fundhub .fh-canvas select {
-  background-color: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.14);
+.etholys-fundhub input:not([type='checkbox']):not([type='radio']):not([type='range']),
+.etholys-fundhub textarea,
+.etholys-fundhub select {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
   color: var(--sys-ink);
 }
 
 .etholys-system .sys-canvas input::placeholder,
 .etholys-system .sys-canvas textarea::placeholder,
-.etholys-fundhub .fh-canvas input::placeholder,
-.etholys-fundhub .fh-canvas textarea::placeholder {
-  color: rgba(232, 238, 242, 0.35);
+.etholys-fundhub input::placeholder,
+.etholys-fundhub textarea::placeholder,
+.etholys-fundhub .placeholder\:text-gray-400::placeholder,
+.etholys-fundhub .placeholder\:text-gray-500::placeholder,
+.etholys-fundhub .placeholder\:text-slate-400::placeholder {
+  color: rgba(241, 245, 249, 0.55) !important;
 }
 
 .etholys-system .sys-canvas .bg-white,
 .etholys-system .sys-canvas .bg-gray-50,
 .etholys-system .sys-canvas .bg-slate-50,
 .etholys-system .sys-canvas .bg-slate-50\/80,
-.etholys-fundhub .fh-canvas .bg-white,
-.etholys-fundhub .fh-canvas .bg-gray-50,
-.etholys-fundhub .fh-canvas .bg-slate-50,
-.etholys-fundhub .fh-canvas .bg-slate-50\/80 {
+.etholys-fundhub .bg-white,
+.etholys-fundhub .bg-gray-50,
+.etholys-fundhub .bg-slate-50,
+.etholys-fundhub .bg-slate-50\/80 {
   background-color: var(--sys-panel) !important;
 }
 
 .etholys-system .sys-canvas .bg-gray-100,
-.etholys-fundhub .fh-canvas .bg-gray-100 {
+.etholys-system .sys-canvas .bg-gray-200,
+.etholys-system .sys-canvas .bg-slate-100,
+.etholys-fundhub .bg-gray-100,
+.etholys-fundhub .bg-gray-200,
+.etholys-fundhub .bg-slate-100 {
   background-color: var(--sys-panel-soft) !important;
 }
 
 .etholys-system .sys-canvas .min-h-screen.bg-gray-50,
 .etholys-system .sys-canvas .bg-\[\#f4f6f8\],
-.etholys-fundhub .fh-canvas .min-h-screen.bg-gray-50,
-.etholys-fundhub .fh-canvas .min-h-screen.bg-gradient-to-br {
+.etholys-fundhub .min-h-screen.bg-gray-50,
+.etholys-fundhub .min-h-screen.bg-gradient-to-br {
   background: transparent !important;
 }
 
+/* Títulos e corpo — nunca deixar tinta escura no painel escuro */
 .etholys-system .sys-canvas .text-gray-900,
-.etholys-system .sys-canvas .text-slate-800,
+.etholys-system .sys-canvas .text-gray-800,
 .etholys-system .sys-canvas .text-slate-900,
-.etholys-fundhub .fh-canvas .text-gray-900,
-.etholys-fundhub .fh-canvas .text-slate-800,
-.etholys-fundhub .fh-canvas .text-slate-900 {
+.etholys-system .sys-canvas .text-slate-800,
+.etholys-system .sys-canvas .text-slate-700,
+.etholys-fundhub .text-gray-900,
+.etholys-fundhub .text-gray-800,
+.etholys-fundhub .text-slate-900,
+.etholys-fundhub .text-slate-800,
+.etholys-fundhub .text-slate-700 {
   color: #f8fafc !important;
 }
 
 .etholys-system .sys-canvas .text-gray-700,
 .etholys-system .sys-canvas .text-gray-600,
 .etholys-system .sys-canvas .text-slate-600,
-.etholys-fundhub .fh-canvas .text-gray-700,
-.etholys-fundhub .fh-canvas .text-gray-600,
-.etholys-fundhub .fh-canvas .text-slate-600 {
-  color: rgba(232, 238, 242, 0.62) !important;
+.etholys-fundhub .text-gray-700,
+.etholys-fundhub .text-gray-600,
+.etholys-fundhub .text-slate-600 {
+  color: var(--sys-muted) !important;
 }
 
 .etholys-system .sys-canvas .text-gray-500,
 .etholys-system .sys-canvas .text-gray-400,
 .etholys-system .sys-canvas .text-slate-500,
-.etholys-fundhub .fh-canvas .text-gray-500,
-.etholys-fundhub .fh-canvas .text-gray-400,
-.etholys-fundhub .fh-canvas .text-slate-500 {
-  color: rgba(232, 238, 242, 0.42) !important;
+.etholys-system .sys-canvas .text-slate-400,
+.etholys-fundhub .text-gray-500,
+.etholys-fundhub .text-gray-400,
+.etholys-fundhub .text-slate-500,
+.etholys-fundhub .text-slate-400 {
+  color: var(--sys-faint) !important;
 }
 
 .etholys-system .sys-canvas .text-gray-300,
-.etholys-fundhub .fh-canvas .text-gray-300 {
-  color: rgba(232, 238, 242, 0.28) !important;
+.etholys-fundhub .text-gray-300 {
+  color: var(--sys-icon) !important;
 }
 
 .etholys-system .sys-canvas .border-gray-100,
@@ -267,55 +290,153 @@
 .etholys-system .sys-canvas .border-gray-300,
 .etholys-system .sys-canvas .border-slate-200,
 .etholys-system .sys-canvas .ring-gray-200,
-.etholys-fundhub .fh-canvas .border-gray-100,
-.etholys-fundhub .fh-canvas .border-gray-200,
-.etholys-fundhub .fh-canvas .border-gray-300,
-.etholys-fundhub .fh-canvas .border-slate-200,
-.etholys-fundhub .fh-canvas .ring-gray-200 {
+.etholys-fundhub .border-gray-100,
+.etholys-fundhub .border-gray-200,
+.etholys-fundhub .border-gray-300,
+.etholys-fundhub .border-slate-200,
+.etholys-fundhub .ring-gray-200 {
   border-color: var(--sys-line) !important;
   --tw-ring-color: var(--sys-line) !important;
 }
 
+.etholys-fundhub .border-gray-900,
+.etholys-fundhub .border-b-gray-900 {
+  border-color: #f8fafc !important;
+}
+
 .etholys-system .sys-canvas .hover\:bg-gray-50:hover,
 .etholys-system .sys-canvas .hover\:bg-gray-100:hover,
-.etholys-fundhub .fh-canvas .hover\:bg-gray-50:hover,
-.etholys-fundhub .fh-canvas .hover\:bg-gray-100:hover {
-  background-color: rgba(255, 255, 255, 0.06) !important;
+.etholys-fundhub .hover\:bg-gray-50:hover,
+.etholys-fundhub .hover\:bg-gray-100:hover,
+.etholys-fundhub .hover\:bg-gray-200:hover,
+.etholys-fundhub .hover\:bg-white:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .etholys-system .sys-canvas .hover\:text-gray-900:hover,
-.etholys-fundhub .fh-canvas .hover\:text-gray-900:hover {
+.etholys-fundhub .hover\:text-gray-900:hover,
+.etholys-fundhub .hover\:text-gray-800:hover,
+.etholys-fundhub .hover\:text-gray-700:hover,
+.etholys-fundhub .hover\:text-gray-600:hover {
   color: #fff !important;
 }
 
+/* Pastéis claros → tintas escuras (evita branco-em-branco / branco-em-cinza) */
 .etholys-system .sys-canvas .bg-teal-50,
 .etholys-system .sys-canvas .bg-indigo-50,
 .etholys-system .sys-canvas .bg-blue-50,
-.etholys-system .sys-canvas .bg-violet-50,
-.etholys-system .sys-canvas .bg-amber-50,
-.etholys-system .sys-canvas .bg-orange-50,
-.etholys-system .sys-canvas .bg-emerald-100,
 .etholys-system .sys-canvas .bg-sky-100,
-.etholys-system .sys-canvas .bg-red-50,
-.etholys-fundhub .fh-canvas .bg-amber-50,
-.etholys-fundhub .fh-canvas .bg-amber-50\/60,
-.etholys-fundhub .fh-canvas .bg-orange-50,
-.etholys-fundhub .fh-canvas .bg-violet-50,
-.etholys-fundhub .fh-canvas .bg-red-50 {
-  background-color: rgba(255, 255, 255, 0.06) !important;
+.etholys-fundhub .bg-amber-50,
+.etholys-fundhub .bg-amber-50\/30,
+.etholys-fundhub .bg-amber-50\/60,
+.etholys-fundhub .bg-amber-50\/90,
+.etholys-fundhub .bg-amber-100,
+.etholys-fundhub .hover\:bg-amber-50:hover,
+.etholys-fundhub .hover\:bg-amber-50\/30:hover,
+.etholys-fundhub .hover\:bg-amber-100:hover {
+  background-color: rgba(245, 158, 11, 0.18) !important;
 }
 
+.etholys-fundhub .bg-orange-50,
+.etholys-fundhub .bg-orange-100,
+.etholys-fundhub .bg-orange-200 {
+  background-color: rgba(251, 146, 60, 0.2) !important;
+}
+
+.etholys-fundhub .bg-yellow-100 {
+  background-color: rgba(234, 179, 8, 0.2) !important;
+}
+
+.etholys-system .sys-canvas .bg-emerald-100,
+.etholys-fundhub .bg-emerald-50,
+.etholys-fundhub .bg-emerald-100 {
+  background-color: rgba(16, 185, 129, 0.18) !important;
+}
+
+.etholys-system .sys-canvas .bg-violet-50,
+.etholys-fundhub .bg-violet-50,
+.etholys-fundhub .bg-violet-100,
+.etholys-fundhub .bg-purple-100,
+.etholys-fundhub .hover\:bg-violet-100:hover {
+  background-color: rgba(167, 139, 250, 0.2) !important;
+}
+
+.etholys-system .sys-canvas .bg-red-50,
+.etholys-fundhub .bg-red-50,
+.etholys-fundhub .bg-red-50\/90,
+.etholys-fundhub .bg-red-100,
+.etholys-fundhub .hover\:bg-red-50:hover,
+.etholys-fundhub .hover\:bg-red-100:hover {
+  background-color: rgba(239, 68, 68, 0.18) !important;
+}
+
+/* Acentos escuros (amber/violeta/roxo) sobre fundo escuro */
 .etholys-system .sys-canvas .text-teal-700,
 .etholys-system .sys-canvas .text-teal-800,
+.etholys-system .sys-canvas .text-amber-800,
+.etholys-fundhub .text-amber-600,
+.etholys-fundhub .text-amber-700,
+.etholys-fundhub .text-amber-800,
+.etholys-fundhub .text-amber-900,
+.etholys-fundhub .text-amber-950,
+.etholys-fundhub .text-amber-950\/95 {
+  color: var(--sys-amber) !important;
+}
+
+.etholys-fundhub .text-emerald-600,
+.etholys-fundhub .text-emerald-700,
+.etholys-fundhub .text-emerald-800,
+.etholys-fundhub .text-emerald-900 {
+  color: var(--sys-mint) !important;
+}
+
 .etholys-system .sys-canvas .text-indigo-700,
 .etholys-system .sys-canvas .text-blue-700,
 .etholys-system .sys-canvas .text-blue-800,
 .etholys-system .sys-canvas .text-violet-800,
-.etholys-system .sys-canvas .text-amber-800,
-.etholys-fundhub .fh-canvas .text-amber-700,
-.etholys-fundhub .fh-canvas .text-amber-800,
-.etholys-fundhub .fh-canvas .text-amber-900 {
-  color: #fde68a !important;
+.etholys-fundhub .text-violet-600,
+.etholys-fundhub .text-violet-700,
+.etholys-fundhub .text-violet-800,
+.etholys-fundhub .text-violet-900,
+.etholys-fundhub .text-purple-600,
+.etholys-fundhub .text-purple-700,
+.etholys-fundhub .text-purple-800,
+.etholys-fundhub .text-indigo-600,
+.etholys-fundhub .text-indigo-700 {
+  color: var(--sys-lilac) !important;
+}
+
+.etholys-fundhub .text-red-600,
+.etholys-fundhub .text-red-700,
+.etholys-fundhub .text-red-800,
+.etholys-fundhub .text-red-900,
+.etholys-fundhub .hover\:text-red-600:hover {
+  color: var(--sys-rose) !important;
+}
+
+.etholys-fundhub .text-orange-700,
+.etholys-fundhub .text-orange-800,
+.etholys-fundhub .text-yellow-800 {
+  color: var(--sys-peach) !important;
+}
+
+.etholys-fundhub .border-amber-200,
+.etholys-fundhub .border-orange-200,
+.etholys-fundhub .border-yellow-200 {
+  border-color: rgba(251, 191, 36, 0.35) !important;
+}
+
+.etholys-fundhub .border-emerald-200 {
+  border-color: rgba(52, 211, 153, 0.35) !important;
+}
+
+.etholys-fundhub .border-violet-200,
+.etholys-fundhub .border-purple-200 {
+  border-color: rgba(196, 181, 253, 0.4) !important;
+}
+
+.etholys-fundhub .border-red-200 {
+  border-color: rgba(252, 165, 165, 0.4) !important;
 }
 
 .etholys-system[data-accent='teal'] .sys-canvas .text-teal-700,
@@ -334,25 +455,34 @@
   color: #ddd6fe !important;
 }
 
-.etholys-fundhub .fh-canvas .bg-gray-900,
-.etholys-fundhub .fh-canvas .bg-blue-600 {
+.etholys-fundhub .bg-gray-900,
+.etholys-fundhub .bg-blue-600 {
   background-color: #d97706 !important;
 }
 
-.etholys-fundhub .fh-canvas .hover\:bg-gray-800:hover,
-.etholys-fundhub .fh-canvas .hover\:bg-blue-700:hover {
+.etholys-fundhub .hover\:bg-gray-800:hover,
+.etholys-fundhub .hover\:bg-blue-700:hover {
   background-color: #b45309 !important;
+}
+
+/* Spinner de loading (StateLoading) no canvas escuro */
+.etholys-fundhub .border-slate-300\/40 {
+  border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+.etholys-fundhub .border-t-slate-600 {
+  border-top-color: #fbbf24 !important;
 }
 
 .etholys-system .sys-canvas .shadow-sm,
 .etholys-system .sys-canvas .shadow-lg,
-.etholys-fundhub .fh-canvas .shadow-sm,
-.etholys-fundhub .fh-canvas .shadow-lg,
-.etholys-fundhub .fh-canvas .shadow-xl {
+.etholys-fundhub .shadow-sm,
+.etholys-fundhub .shadow-lg,
+.etholys-fundhub .shadow-xl {
   box-shadow: 0 24px 80px -48px rgba(0, 0, 0, 0.9) !important;
 }
 
 .etholys-system .sys-canvas .divide-y > :not([hidden]) ~ :not([hidden]),
-.etholys-fundhub .fh-canvas .divide-y > :not([hidden]) ~ :not([hidden]) {
-  border-color: rgba(255, 255, 255, 0.08);
+.etholys-fundhub .divide-y > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(255, 255, 255, 0.1);
 }

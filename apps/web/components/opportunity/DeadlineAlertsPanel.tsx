@@ -86,7 +86,7 @@ export function DeadlineAlertsPanel({ variant = 'button', className }: Props) {
       >
         <Calendar className="h-3.5 w-3.5" />
         {t('Prazos', 'Plazos', 'Deadlines')}
-        <span className="rounded-full bg-orange-200 px-1.5 py-0.5 text-[10px] font-bold leading-none">
+        <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold leading-none text-slate-950">
           {total}
         </span>
       </button>

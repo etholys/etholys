@@ -98,7 +98,7 @@ export default function FundHubPage() {
               className="group rounded-2xl border border-white/10 bg-[#0C1822]/70 p-5 transition hover:border-amber-400/30 hover:bg-white/[0.03]"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-white/35">{step.n}</span>
+                <span className="text-[11px] font-semibold text-white/75">{step.n}</span>
                 {step.meta && (
                   <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-200">
                     {step.meta}
@@ -111,8 +111,8 @@ export default function FundHubPage() {
                   {step.title}
                 </h2>
               </div>
-              <p className="mt-2 text-sm text-white/45">{step.detail}</p>
-              <p className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-white/35 group-hover:text-amber-300">
+              <p className="mt-2 text-sm text-white/75">{step.detail}</p>
+              <p className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-white/70 group-hover:text-amber-300">
                 {t('Abrir', 'Abrir', 'Open')}
                 <ArrowRight className="h-3 w-3" />
               </p>

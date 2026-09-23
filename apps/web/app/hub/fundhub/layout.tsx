@@ -165,7 +165,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
       collapsedNav ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
       active
         ? 'bg-amber-500/15 text-amber-100'
-        : 'text-white/55 hover:bg-white/[0.05] hover:text-white',
+        : 'text-white/75 hover:bg-white/[0.05] hover:text-white',
     );
 
   return (
@@ -207,7 +207,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
               <button
                 type="button"
                 onClick={() => setCollapsed(!collapsed)}
-                className="hidden items-center justify-center rounded-lg p-1.5 text-white/35 transition hover:bg-white/5 hover:text-white lg:flex"
+                className="hidden items-center justify-center rounded-lg p-1.5 text-white/70 transition hover:bg-white/5 hover:text-white lg:flex"
                 title={collapsed ? 'Expandir' : 'Minimizar'}
               >
                 {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
@@ -215,7 +215,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
               <button
                 type="button"
                 onClick={() => setSidebarOpen(false)}
-                className="text-white/40 hover:text-white lg:hidden"
+                className="text-white/70 hover:text-white lg:hidden"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -224,7 +224,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
           {!collapsed && (
             <Link
               href="/hub"
-              className="mt-2 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-white/40 transition hover:bg-white/5 hover:text-amber-200"
+              className="mt-2 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-white/70 transition hover:bg-white/5 hover:text-amber-200"
             >
               <ChevronDown className="h-3 w-3 rotate-90" />
               {locale === 'es' ? 'Volver al Hub' : locale === 'pt' ? 'Voltar ao Hub' : 'Back to Hub'}
@@ -241,12 +241,12 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
                 className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/80 transition hover:bg-white/[0.07]"
               >
                 <div className="flex min-w-0 items-center gap-2">
-                  <Building2 className="h-4 w-4 flex-shrink-0 text-white/40" />
+                  <Building2 className="h-4 w-4 flex-shrink-0 text-white/65" />
                   <span className="truncate font-medium">
                     {activeCompany ? activeCompany?.shortName : tr('company.allCompanies')}
                   </span>
                 </div>
-                <ChevronDown className={cn('h-4 w-4 flex-shrink-0 text-white/35 transition', companyMenuOpen && 'rotate-180')} />
+                <ChevronDown className={cn('h-4 w-4 flex-shrink-0 text-white/65 transition', companyMenuOpen && 'rotate-180')} />
               </button>
               {companyMenuOpen && (
                 <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-white/10 bg-[#0C1822] py-1 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.9)]">
@@ -381,7 +381,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
               type="button"
               onClick={() => setLocale(locale === 'es' ? 'pt' : locale === 'pt' ? 'en' : 'es')}
               className={cn(
-                'flex items-center gap-1.5 rounded-lg text-xs uppercase tracking-wider text-white/45 transition hover:bg-white/5 hover:text-white',
+                'flex items-center gap-1.5 rounded-lg text-xs uppercase tracking-wider text-white/70 transition hover:bg-white/5 hover:text-white',
                 collapsed ? 'justify-center p-2' : 'flex-1 px-2.5 py-1.5',
               )}
               title={collapsed ? String(locale?.toUpperCase()) : undefined}
@@ -393,7 +393,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
               <button
                 type="button"
                 onClick={() => setNotifOpen(!notifOpen)}
-                className="relative rounded-lg p-2 text-white/45 transition hover:bg-white/5 hover:text-white"
+                className="relative rounded-lg p-2 text-white/70 transition hover:bg-white/5 hover:text-white"
               >
                 <Bell className="h-3.5 w-3.5" />
                 {notifCount > 0 && (
@@ -416,7 +416,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
                   </div>
                   <div className="max-h-72 divide-y divide-white/[0.06] overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <div className="px-4 py-6 text-center text-sm text-white/35">
+                      <div className="px-4 py-6 text-center text-sm text-white/70">
                         {locale === 'es' ? 'Sin notificaciones' : locale === 'pt' ? 'Sem notificações' : 'No notifications'}
                       </div>
                     ) : (
@@ -456,8 +456,8 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
                           )}
                         >
                           <p className="text-sm font-medium text-white">{n.title}</p>
-                          <p className="mt-0.5 line-clamp-2 text-xs text-white/45">{n.message}</p>
-                          <p className="mt-1 text-[10px] text-white/30">
+                          <p className="mt-0.5 line-clamp-2 text-xs text-white/70">{n.message}</p>
+                          <p className="mt-1 text-[10px] text-white/55">
                             {new Date(n.createdAt).toLocaleDateString('es-UY')}
                           </p>
                         </div>
@@ -476,12 +476,12 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-white">{session?.user?.name ?? ''}</p>
-                <p className="truncate text-xs text-white/40">{session?.user?.email ?? ''}</p>
+                <p className="truncate text-xs text-white/70">{session?.user?.email ?? ''}</p>
               </div>
               <button
                 type="button"
                 onClick={() => signOut({ callbackUrl: '/login' })}
-                className="text-white/35 transition hover:text-red-300"
+                className="text-white/70 transition hover:text-red-300"
                 title={tr('auth.logout')}
               >
                 <LogOut className="h-4 w-4" />
@@ -492,7 +492,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
             <button
               type="button"
               onClick={() => signOut({ callbackUrl: '/login' })}
-              className="mt-1 flex w-full items-center justify-center rounded-lg py-2 text-white/35 transition hover:text-red-300"
+              className="mt-1 flex w-full items-center justify-center rounded-lg py-2 text-white/70 transition hover:text-red-300"
               title={tr('auth.logout')}
             >
               <LogOut className="h-4 w-4" />
