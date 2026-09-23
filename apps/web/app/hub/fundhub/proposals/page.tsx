@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/app/providers';
@@ -14,40 +14,27 @@ import {
   Calendar,
   AlertCircle,
 } from 'lucide-react';
+import {
+  PROPOSAL_CANDIDATE_KEY,
+  SELECTED_FUND_KEY,
+  buildProposalIntake,
+  createProposalWorkspaceId,
+  editorHref,
+  findReusableDraft,
+  persistProposalIntake,
+  seedFromCandidate,
+  shouldSkipProposalIntake,
+  type ProposalDraftIndex,
+  type ProposalFundSeed,
+} from '@/lib/opportunity/proposal-workspace';
 
-interface FundSummary {
+interface FundSummary extends ProposalFundSeed {
   id: string;
   name: string;
   institution: string;
-  description?: string;
 }
 
-interface ProposalDraft {
-  workspaceId: string;
-  fundId: string;
-  fundName: string;
-  fundInstitution: string;
-  editalLink: string;
-  editalSummary: string;
-  createdAt: string;
-  updatedAt: string;
-  status: 'draft' | 'submitted' | 'archived';
-}
-
-interface ProposalIntake {
-  workspaceId: string;
-  fundId: string;
-  fundName: string;
-  fundInstitution: string;
-  editalLink: string;
-  intakeNotes: string;
-  attachedFiles?: Array<{
-    name: string;
-    type: string;
-    size: number;
-    uploadedAt: string;
-  }>;
-}
+type ProposalDraft = ProposalDraftIndex;
 
 const MAX_FILES = 50;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -62,6 +49,43 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function asFundSeed(raw: unknown): FundSummary | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const f = raw as Record<string, unknown>;
+  const tempId = String(f.tempId ?? '').trim();
+  const id = String(f.id ?? '').trim() || (tempId ? `candidate:${tempId}` : '');
+  const name = String(f.name ?? '').trim();
+  if (!id || !name) return null;
+  const requirements =
+    typeof f.requirements === 'string'
+      ? f.requirements
+      : typeof f.requisites === 'string'
+        ? f.requisites
+        : undefined;
+  return {
+    id,
+    name,
+    institution: String(f.institution ?? ''),
+    description: typeof f.description === 'string' ? f.description : undefined,
+    linkOficial: typeof f.linkOficial === 'string' ? f.linkOficial : undefined,
+    eligibilityCriteria: typeof f.eligibilityCriteria === 'string' ? f.eligibilityCriteria : undefined,
+    whoCanApply: typeof f.whoCanApply === 'string' ? f.whoCanApply : undefined,
+    eligibility: typeof f.eligibility === 'string' ? f.eligibility : undefined,
+    requirements,
+    howToApply: typeof f.howToApply === 'string' ? f.howToApply : undefined,
+    risksCaveats: typeof f.risksCaveats === 'string' ? f.risksCaveats : undefined,
+    deadline: (f.deadline as string | Date | null | undefined) ?? undefined,
+    countries: typeof f.countries === 'string' ? f.countries : undefined,
+    amount: typeof f.amount === 'number' ? f.amount : undefined,
+    currency: typeof f.currency === 'string' ? f.currency : undefined,
+    type: typeof f.type === 'string' ? f.type : undefined,
+    category: typeof f.category === 'string' ? f.category : undefined,
+    notes: typeof f.notes === 'string' ? f.notes : undefined,
+    summary: typeof f.summary === 'string' ? f.summary : undefined,
+    matchJustification: typeof f.matchJustification === 'string' ? f.matchJustification : undefined,
+  };
+}
+
 export default function ProposalsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -70,6 +94,9 @@ export default function ProposalsPage() {
     const s = String(activeCompanyId ?? '').trim();
     return isLikelyDbId(s) ? s : '';
   }, [activeCompanyId]);
+  const fundIdParam = searchParams.get('fundId')?.trim() || '';
+  const fromCandidate = searchParams.get('from') === 'candidate';
+
   const [coalitionCount, setCoalitionCount] = useState(0);
   const [activeTab, setActiveTab] = useState<'drafts' | 'new'>('drafts');
   const [fund, setFund] = useState<FundSummary | null>(null);
@@ -77,45 +104,61 @@ export default function ProposalsPage() {
   const [intakeNotes, setIntakeNotes] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [openingKnown, setOpeningKnown] = useState(Boolean(fundIdParam || fromCandidate));
   const [drafts, setDrafts] = useState<ProposalDraft[]>([]);
+  const [draftsReady, setDraftsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const openedRef = useRef(false);
 
-  useEffect(() => {
-    const fundId = searchParams.get('fundId')?.trim();
-    if (fundId && companyId) {
-      fetch(`/api/funds/${encodeURIComponent(fundId)}?companyId=${encodeURIComponent(companyId)}`)
-        .then((r) => r.json())
-        .then((d) => {
-          const f = d?.fund as FundSummary | undefined;
-          if (f?.id) {
-            setFund(f);
-            setActiveTab('new');
-            localStorage.setItem('selectedFund', JSON.stringify(f));
-          }
-        })
-        .catch(() => {});
-      return;
-    }
-    const fundData = localStorage.getItem('selectedFund');
-    if (fundData) {
-      try {
-        setFund(JSON.parse(fundData) as FundSummary);
-      } catch {
-        // ignore
+  const openWorkspace = useCallback(
+    (seed: ProposalFundSeed, source: 'fund' | 'candidate' | 'manual', extras?: { notes?: string }) => {
+      const reusable = findReusableDraft(drafts, seed.id);
+      if (reusable) {
+        router.replace(editorHref(reusable.workspaceId, reusable.fundId));
+        return;
       }
-    }
-  }, [searchParams, companyId]);
+      const workspaceId = createProposalWorkspaceId(seed.id);
+      const intake = buildProposalIntake(workspaceId, seed, {
+        notes: extras?.notes,
+        source,
+      });
+      persistProposalIntake(intake);
+      try {
+        localStorage.setItem(SELECTED_FUND_KEY, JSON.stringify(seed));
+      } catch {
+        /* ignore */
+      }
+      router.replace(editorHref(workspaceId, seed.id));
+    },
+    [drafts, router],
+  );
 
   useEffect(() => {
+    let local: ProposalDraft[] = [];
     const stored = localStorage.getItem('proposalDrafts');
     if (stored) {
       try {
-        setDrafts(JSON.parse(stored));
-      } catch (e) {
-        console.error('Error loading drafts:', e);
+        const parsed = JSON.parse(stored) as ProposalDraft[];
+        if (Array.isArray(parsed)) local = parsed;
+      } catch {
+        /* ignore */
       }
     }
-  }, []);
+    if (!companyId) {
+      setDrafts(local);
+      setDraftsReady(true);
+      return;
+    }
+    fetch(`/api/fundhub/proposals?companyId=${encodeURIComponent(companyId)}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d: { proposals?: ProposalDraft[] }) => {
+        const server = Array.isArray(d.proposals) ? d.proposals : [];
+        const seen = new Set(server.map((p) => p.workspaceId));
+        setDrafts([...server, ...local.filter((p) => p.workspaceId && !seen.has(p.workspaceId))]);
+      })
+      .catch(() => setDrafts(local))
+      .finally(() => setDraftsReady(true));
+  }, [companyId]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -124,6 +167,91 @@ export default function ProposalsPage() {
       .then((d) => setCoalitionCount(Array.isArray(d.members) ? d.members.length : 0))
       .catch(() => {});
   }, [companyId]);
+
+  useEffect(() => {
+    if (!draftsReady || openedRef.current) return;
+
+    if (fromCandidate) {
+      try {
+        const raw = sessionStorage.getItem(PROPOSAL_CANDIDATE_KEY);
+        const candidate = asFundSeed(raw ? JSON.parse(raw) : null);
+        if (candidate && shouldSkipProposalIntake({ candidate })) {
+          openedRef.current = true;
+          sessionStorage.removeItem(PROPOSAL_CANDIDATE_KEY);
+          try {
+            openWorkspace(seedFromCandidate(candidate), 'candidate');
+          } catch (e) {
+            openedRef.current = false;
+            setOpeningKnown(false);
+            setError(e instanceof Error ? e.message : 'Não foi possível abrir a proposta.');
+          }
+          return;
+        }
+        if (candidate) {
+          setFund(candidate);
+          setEditalLink(candidate.linkOficial || '');
+          setIntakeNotes(candidate.description || '');
+          setActiveTab('new');
+        }
+      } catch {
+        /* ignore */
+      }
+      setOpeningKnown(false);
+    }
+
+    if (!fundIdParam) {
+      if (!fromCandidate) setOpeningKnown(false);
+      return;
+    }
+
+    if (!companyId) {
+      setOpeningKnown(false);
+      return;
+    }
+
+    let cancelled = false;
+    fetch(`/api/funds/${encodeURIComponent(fundIdParam)}?companyId=${encodeURIComponent(companyId)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        const f = asFundSeed(d?.fund);
+        if (!f) {
+          setOpeningKnown(false);
+          setError('Fundo não encontrado.');
+          return;
+        }
+        setFund(f);
+        try {
+          localStorage.setItem(SELECTED_FUND_KEY, JSON.stringify(f));
+        } catch {
+          /* ignore */
+        }
+        if (shouldSkipProposalIntake({ fundId: f.id, fund: f })) {
+          openedRef.current = true;
+          try {
+            openWorkspace(f, 'fund');
+          } catch (e) {
+            openedRef.current = false;
+            setOpeningKnown(false);
+            setError(e instanceof Error ? e.message : 'Não foi possível abrir a proposta.');
+          }
+          return;
+        }
+        setEditalLink(f.linkOficial || '');
+        setActiveTab('new');
+        setOpeningKnown(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOpeningKnown(false);
+          setError('Não foi possível carregar o fundo.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, draftsReady, fundIdParam, fromCandidate, openWorkspace]);
 
   const addFiles = useCallback((incoming: FileList | File[]) => {
     const list = Array.from(incoming);
@@ -183,6 +311,14 @@ export default function ProposalsPage() {
   }, []);
 
   const handleOpenWorkspace = useCallback(async () => {
+    if (fund && shouldSkipProposalIntake({ fundId: fund.id, fund })) {
+      setIsLoading(true);
+      openWorkspace(fund, fund.id.startsWith('candidate:') ? 'candidate' : 'fund', {
+        notes: intakeNotes,
+      });
+      return;
+    }
+
     if (!editalLink.trim() && selectedFiles.length === 0) {
       setError('Cole um link do edital ou selecione pelo menos um arquivo');
       return;
@@ -192,23 +328,22 @@ export default function ProposalsPage() {
     setError(null);
 
     try {
-      const resolvedFund = fund ?? {
+      const resolvedFund: FundSummary = fund ?? {
         id: `adhoc-${Date.now()}`,
         name: selectedFiles[0]?.name?.replace(/\.[^.]+$/, '') || 'Proposta avulsa',
         institution: 'Sem fundo vinculado',
-        description: '',
+        description: intakeNotes,
+        linkOficial: editalLink.trim() || undefined,
       };
-      const workspaceId = `workspace:${resolvedFund.id}:${Date.now()}`;
+      const workspaceId = createProposalWorkspaceId(resolvedFund.id);
       const uploadedAt = new Date().toISOString();
-
-      const intakeData: ProposalIntake = {
-        workspaceId,
-        fundId: resolvedFund.id,
-        fundName: resolvedFund.name,
-        fundInstitution: resolvedFund.institution,
-        editalLink: editalLink.trim(),
-        intakeNotes,
-        attachedFiles: selectedFiles.length
+      const intake = buildProposalIntake(workspaceId, {
+        ...resolvedFund,
+        linkOficial: editalLink.trim() || resolvedFund.linkOficial,
+      }, {
+        notes: intakeNotes,
+        source: fund ? 'fund' : 'manual',
+        files: selectedFiles.length
           ? selectedFiles.map((file) => ({
               name: file.name,
               type: file.type || 'application/octet-stream',
@@ -216,10 +351,10 @@ export default function ProposalsPage() {
               uploadedAt,
             }))
           : undefined,
-      };
+      });
 
       try {
-        localStorage.setItem(`proposalIntake:${workspaceId}`, JSON.stringify(intakeData));
+        persistProposalIntake(intake);
       } catch {
         throw new Error(
           'Não foi possível guardar os anexos no browser (armazenamento cheio). Remova alguns ficheiros ou limpe o cache e tente de novo.',
@@ -244,22 +379,20 @@ export default function ProposalsPage() {
             JSON.stringify({ name: stored[0]!.name, content: stored[0]!.content, uploadedAt }),
           );
         } catch {
-          // Metadados já gravados — segue sem conteúdo textual completo
+          /* metadados já gravados */
         }
       }
 
       if (!fund) {
-        localStorage.setItem('selectedFund', JSON.stringify(resolvedFund));
+        localStorage.setItem(SELECTED_FUND_KEY, JSON.stringify(resolvedFund));
       }
 
-      const qs = new URLSearchParams({ workspace: workspaceId });
-      if (resolvedFund.id) qs.set('fundId', resolvedFund.id);
-      router.push(`/hub/fundhub/proposals/editor?${qs.toString()}`);
+      router.push(editorHref(workspaceId, resolvedFund.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao abrir workspace');
       setIsLoading(false);
     }
-  }, [fund, editalLink, selectedFiles, intakeNotes, router]);
+  }, [fund, editalLink, selectedFiles, intakeNotes, router, openWorkspace]);
 
   const handleDeleteDraft = useCallback((workspaceId: string) => {
     const updated = drafts.filter((d) => d.workspaceId !== workspaceId);
@@ -273,8 +406,17 @@ export default function ProposalsPage() {
     (workspaceId: string) => {
       router.push(`/hub/fundhub/proposals/editor?workspace=${encodeURIComponent(workspaceId)}`);
     },
-    [router]
+    [router],
   );
+
+  if (openingKnown) {
+    return (
+      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-amber-600" />
+        <p className="text-sm text-gray-600">A abrir a proposta com os dados do fundo…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -298,14 +440,13 @@ export default function ProposalsPage() {
           </div>
         )}
 
-        {/* Tabbed Navigation */}
         <div className="mb-8 border-b border-gray-200">
           <div className="flex gap-8">
             <button
               onClick={() => setActiveTab('drafts')}
               className={`border-b-2 px-1 py-3 text-sm font-medium transition ${
                 activeTab === 'drafts'
-                  ? 'border-blue-600 text-blue-600'
+                  ? 'border-amber-600 text-amber-700'
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -318,32 +459,31 @@ export default function ProposalsPage() {
               onClick={() => setActiveTab('new')}
               className={`border-b-2 px-1 py-3 text-sm font-medium transition ${
                 activeTab === 'new'
-                  ? 'border-blue-600 text-blue-600'
+                  ? 'border-amber-600 text-amber-700'
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
               <div className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
-                Começar Nova
+                Avulsa
               </div>
             </button>
           </div>
         </div>
 
-        {/* Tab Content: Drafts */}
         {activeTab === 'drafts' && (
           <div>
             {drafts.length === 0 ? (
               <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-12 text-center">
                 <FileText className="mx-auto h-12 w-12 text-gray-300" />
                 <h3 className="mt-4 text-lg font-medium text-gray-900">Nenhuma proposta em rascunho</h3>
-                <p className="mt-2 text-gray-600">Comece uma nova a partir de um edital.</p>
+                <p className="mt-2 text-gray-600">Abra um fundo em Em curso, ou comece uma avulsa.</p>
                 <button
                   onClick={() => setActiveTab('new')}
-                  className="mt-6 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"
+                  className="mt-6 inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition"
                 >
                   <Plus className="h-4 w-4" />
-                  Criar Proposta
+                  Proposta avulsa
                 </button>
               </div>
             ) : (
@@ -352,8 +492,11 @@ export default function ProposalsPage() {
                   <div key={draft.workspaceId} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition">
                     <div className="mb-4 flex items-start justify-between">
                       <div>
-                        <h3 className="font-semibold text-gray-900">{draft.fundName}</h3>
-                        <p className="text-xs text-gray-500">{draft.fundInstitution}</p>
+                        <h3 className="font-semibold text-gray-900">{draft.title || draft.fundName}</h3>
+                        <p className="text-xs text-gray-500">
+                          {draft.fundName}
+                          {draft.fundInstitution ? ` · ${draft.fundInstitution}` : ''}
+                        </p>
                       </div>
                       <span
                         className={`inline-block px-2.5 py-1 text-xs font-medium rounded-full ${
@@ -369,7 +512,7 @@ export default function ProposalsPage() {
                     </div>
                     <div className="mb-4 space-y-2 border-t border-gray-100 pt-4">
                       <p className="line-clamp-2 text-sm text-gray-600">
-                        <span className="font-medium text-gray-700">Link:</span> {draft.editalLink || 'Sem link'}
+                        {draft.editalLink || draft.fundInstitution || 'Sem link'}
                       </p>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <Calendar className="h-3.5 w-3.5" />
@@ -379,7 +522,7 @@ export default function ProposalsPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleContinueDraft(draft.workspaceId)}
-                        className="flex-1 rounded-lg bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-100 transition"
+                        className="flex-1 rounded-lg bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 hover:bg-amber-100 transition"
                       >
                         Continuar
                       </button>
@@ -398,174 +541,142 @@ export default function ProposalsPage() {
           </div>
         )}
 
-        {/* Tab Content: New Proposal */}
         {activeTab === 'new' && (
-          <div className="grid gap-8 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              {coalitionCount > 0 && (
-                <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                  Coalizão com <strong>{coalitionCount}</strong> organização(ões).{' '}
-                  <Link href="/hub/fundhub/coalition" className="font-medium underline">
-                    Gerir
-                  </Link>
-                </div>
-              )}
-              <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-                <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Nova proposta</h2>
-                  <p className="mt-2 text-gray-600">Link do edital ou ficheiros. Depois a IA ajuda a escrever.</p>
+          <div className="max-w-2xl">
+            {coalitionCount > 0 && (
+              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                Coalizão com <strong>{coalitionCount}</strong> organização(ões).{' '}
+                <Link href="/hub/fundhub/coalition" className="font-medium underline">
+                  Gerir
+                </Link>
+              </div>
+            )}
+            <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Proposta avulsa</h2>
+                <p className="mt-2 text-gray-600">Sem fundo guardado — cole o edital ou anexe ficheiros.</p>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Link do edital</label>
+                  <input
+                    type="url"
+                    placeholder="https://…"
+                    value={editalLink}
+                    onChange={(e) => setEditalLink(e.target.value)}
+                    className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition"
+                  />
                 </div>
 
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Link do Edital</label>
-                    <input
-                      type="url"
-                      placeholder="https://www.example.com/edital"
-                      value={editalLink}
-                      onChange={(e) => setEditalLink(e.target.value)}
-                      className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
-                    />
-                    <p className="mt-1 text-xs text-gray-500">Opcional</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Upload do Edital e Anexos
-                      {selectedFiles.length > 0 && (
-                        <span className="ml-2 font-normal text-gray-500">
-                          ({selectedFiles.length}/{MAX_FILES})
-                        </span>
-                      )}
-                    </label>
-                    <div className="mt-2">
-                      <label
-                        htmlFor="file-upload"
-                        className="flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 px-6 py-10 transition hover:border-blue-400 hover:bg-blue-50"
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
-                        }}
-                      >
-                        <div className="text-center">
-                          <UploadCloud className="mx-auto h-12 w-12 text-gray-400" />
-                          <p className="mt-2 text-sm font-medium text-gray-900">
-                            Clique para selecionar ou arraste vários arquivos
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            PDF, Word, Excel, PowerPoint, imagens, ZIP, TXT… — até 25MB cada · máx.{' '}
-                            {MAX_FILES} arquivos
-                          </p>
-                        </div>
-                        <input
-                          id="file-upload"
-                          type="file"
-                          multiple
-                          onChange={handleFileSelect}
-                          accept={ACCEPT_ATTR}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Ficheiros
                     {selectedFiles.length > 0 && (
-                      <ul className="mt-3 space-y-2">
-                        {selectedFiles.map((file, index) => (
-                          <li
-                            key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
-                            className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
-                          >
-                            <div className="flex min-w-0 items-center gap-2">
-                              <FileText className="h-4 w-4 flex-shrink-0 text-blue-600" />
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-gray-900">{file.name}</p>
-                                <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
-                              </div>
+                      <span className="ml-2 font-normal text-gray-500">
+                        ({selectedFiles.length}/{MAX_FILES})
+                      </span>
+                    )}
+                  </label>
+                  <div className="mt-2">
+                    <label
+                      htmlFor="file-upload"
+                      className="flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 px-6 py-10 transition hover:border-amber-400 hover:bg-amber-50"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
+                      }}
+                    >
+                      <div className="text-center">
+                        <UploadCloud className="mx-auto h-12 w-12 text-gray-400" />
+                        <p className="mt-2 text-sm font-medium text-gray-900">
+                          Clique ou arraste
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          PDF, Word, Excel… — até 25MB · máx. {MAX_FILES}
+                        </p>
+                      </div>
+                      <input
+                        id="file-upload"
+                        type="file"
+                        multiple
+                        onChange={handleFileSelect}
+                        accept={ACCEPT_ATTR}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  {selectedFiles.length > 0 && (
+                    <ul className="mt-3 space-y-2">
+                      {selectedFiles.map((file, index) => (
+                        <li
+                          key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                        >
+                          <div className="flex min-w-0 items-center gap-2">
+                            <FileText className="h-4 w-4 flex-shrink-0 text-amber-700" />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-gray-900">{file.name}</p>
+                              <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveFile(index)}
-                              className="rounded-md p-1.5 text-red-600 hover:bg-red-50"
-                              title="Remover arquivo"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Anotações Iniciais</label>
-                    <textarea
-                      value={intakeNotes}
-                      onChange={(e) => setIntakeNotes(e.target.value)}
-                      placeholder="Resumo do edital, pontos importantes, requisitos específicos..."
-                      rows={4}
-                      className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 font-mono text-sm text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
-                    />
-                    <p className="mt-1 text-xs text-gray-500">Vai para o assistente</p>
-                  </div>
-
-                  {fund ? (
-                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium text-gray-900">Fund:</span> {fund.name}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium text-gray-900">Instituição:</span> {fund.institution}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                      Sem fundo vinculado — proposta avulsa. Pode associar depois em Em curso.
-                    </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFile(index)}
+                            className="rounded-md p-1.5 text-red-600 hover:bg-red-50"
+                            title="Remover arquivo"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-
-                  {error && activeTab === 'new' && (
-                    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                      <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                      <span>{error}</span>
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={handleOpenWorkspace}
-                    disabled={isLoading || (!editalLink.trim() && selectedFiles.length === 0)}
-                    className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 font-medium text-white shadow hover:shadow-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                  >
-                    {isLoading ? (
-                      <>
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Carregando...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="h-5 w-5" />
-                        Abrir Workspace
-                      </>
-                    )}
-                  </button>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Notas</label>
+                  <textarea
+                    value={intakeNotes}
+                    onChange={(e) => setIntakeNotes(e.target.value)}
+                    placeholder="Pontos do edital, se quiser…"
+                    rows={3}
+                    className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition"
+                  />
+                </div>
+
+                {fund && !fund.id.startsWith('adhoc-') && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-gray-800">
+                    <p className="font-medium text-gray-900">{fund.name}</p>
+                    <p className="text-gray-600">{fund.institution}</p>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => void handleOpenWorkspace()}
+                  disabled={isLoading || (!fund && !editalLink.trim() && selectedFiles.length === 0)}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-gray-900 px-6 py-3 font-medium text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      A abrir…
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-5 w-5" />
+                      Começar
+                    </>
+                  )}
+                </button>
               </div>
             </div>
-
-            <aside>
-              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h3 className="font-semibold text-gray-900">Fluxo</h3>
-                <ol className="mt-3 space-y-2 text-sm text-gray-600">
-                  <li>1. Link ou ficheiros do edital</li>
-                  <li>2. A IA estrutura a proposta</li>
-                  <li>3. Você revê e submete</li>
-                </ol>
-              </div>
-            </aside>
           </div>
         )}
       </div>

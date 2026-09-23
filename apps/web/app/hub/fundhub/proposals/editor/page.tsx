@@ -1,36 +1,33 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useApp } from '@/app/providers';
+import { isLikelyDbId } from '@/lib/utils';
 import Link from 'next/link';
 import {
   ArrowLeft,
   Save,
-  Sparkle,
-  ClipboardList,
   AlertCircle,
-  MessageCircle,
   Paperclip,
   Lightbulb,
   PenLine,
   Loader2,
+  Send,
+  Eye,
+  ExternalLink,
 } from 'lucide-react';
+import { StudioMarkdown } from '@/lib/studio/markdown-lite';
+import {
+  seedDocumentMarkdown,
+  sectionsFromMarkdown,
+  type ProposalFundSeed,
+} from '@/lib/opportunity/proposal-workspace';
 
-interface Fund {
+interface Fund extends ProposalFundSeed {
   id: string;
   name: string;
   institution: string;
-  type: string;
-  category: string;
-  amount: number;
-  currency: string;
-  deadline: string;
-  countries: string;
-  sectors: string;
-  description?: string;
-  linkOficial?: string;
-  matchScore?: number;
-  status: string;
 }
 
 interface ChatMessage {
@@ -46,345 +43,310 @@ interface AttachedFile {
   uploadedAt: string;
 }
 
-interface SectionData {
-  id: string;
-  title: string;
-  content: string;
-}
-
 export default function FundHubProposalEditorPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { activeCompanyId } = useApp();
+  const companyId = isLikelyDbId(String(activeCompanyId ?? '').trim())
+    ? String(activeCompanyId).trim()
+    : '';
   const workspaceId = searchParams.get('workspace') || searchParams.get('workspaceId');
   const fundId = searchParams.get('fundId');
-  const initialLink = searchParams.get('editalLink') || '';
 
   const [fund, setFund] = useState<Fund | null>(null);
-  const [loadingFund, setLoadingFund] = useState(true);
-  const [editalLink, setEditalLink] = useState(initialLink);
+  const [loading, setLoading] = useState(true);
+  const [editalLink, setEditalLink] = useState('');
   const [intakeNotes, setIntakeNotes] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
-  const [proposalSections, setProposalSections] = useState<SectionData[]>([]);
-  const [activeSection, setActiveSection] = useState('workflow');
-  const [analysisResult, setAnalysisResult] = useState('');
-  const [analysisLoading, setAnalysisLoading] = useState(false);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { role: 'assistant', content: 'O assistente de editais está pronto. Peça para analisar o edital ou gerar seções da proposta.', createdAt: new Date().toISOString() },
-  ]);
+  const [documentMarkdown, setDocumentMarkdown] = useState('');
+  const [docMode, setDocMode] = useState<'edit' | 'preview'>('edit');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [brainstorming, setBrainstorming] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showAttach, setShowAttach] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openingStudio, setOpeningStudio] = useState(false);
+  const brainstormRef = useRef(false);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
-  const sectionTabs = useMemo(() => {
-    const baseTabs = [
-      { id: 'workflow', label: 'Fluxo' },
-      { id: 'chat', label: 'Chat' },
-    ];
-    return [...baseTabs, ...proposalSections.map((section) => ({ id: section.id, label: section.title }))];
-  }, [proposalSections]);
-
-  useEffect(() => {
-    if (!workspaceId) {
-      setLoadingFund(false);
-      setError('ID do workspace não encontrado. Volte e tente novamente.');
-      return;
-    }
-
-    const intakeKey = `proposalIntake:${workspaceId}`;
-    const draftKey = `proposalDraft:${workspaceId}`;
-
-    if (typeof window !== 'undefined') {
-      // Load intake data (from initial creation)
-      const savedIntake = window.localStorage.getItem(intakeKey);
-      if (savedIntake) {
-        try {
-          const intake = JSON.parse(savedIntake);
-          setEditalLink(intake.editalLink || initialLink);
-          setAttachedFiles(intake.attachedFiles || []);
-          setIntakeNotes(intake.intakeNotes || '');
-          if (intake.fundName) {
-            setFund((prev) =>
-              prev || {
-                id: intake.fundId || 'adhoc',
-                name: intake.fundName,
-                institution: intake.fundInstitution || '',
-                type: '',
-                category: '',
-                amount: 0,
-                currency: '',
-                deadline: '',
-                countries: '',
-                sectors: '',
-                status: 'draft',
-              },
-            );
-          }
-        } catch (err) {
-          console.error('Error loading intake:', err);
-        }
-      }
-
-      // Load existing draft (from previous edits)
-      const savedDraft = window.localStorage.getItem(draftKey);
-      if (savedDraft) {
-        try {
-          const draft = JSON.parse(savedDraft);
-          setProposalSections(draft.sections || []);
-          // Don't override intakeNotes if already set from intake
-          if (!savedIntake && draft.editalSummary) {
-            setIntakeNotes(draft.editalSummary);
-          }
-          setDraftSaved(true);
-        } catch (err) {
-          console.error('Error loading draft:', err);
-        }
-      }
-    }
-    setLoadingFund(false);
-  }, [workspaceId, initialLink]);
-
-  useEffect(() => {
-    if (!fundId) {
-      setLoadingFund(false);
-      return;
-    }
-
-    const fetchFund = async () => {
-      try {
-        setLoadingFund(true);
-        const response = await fetch(`/api/funds/${fundId}`);
-        if (!response.ok) throw new Error('Fundo não encontrado');
-        const data = await response.json();
-        setFund(data.fund);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoadingFund(false);
-      }
-    };
-
-    fetchFund();
-  }, [fundId]);
-
-  const saveDraft = useCallback(() => {
-    if (!workspaceId) {
-      setError('Workspace não identificado.');
-      return;
-    }
-    if (typeof window === 'undefined') return;
-
-    try {
+  const persistDraft = useCallback(
+    (patch?: { documentMarkdown?: string; intakeNotes?: string; chat?: ChatMessage[] }) => {
+      if (!workspaceId || typeof window === 'undefined') return;
+      const md = patch?.documentMarkdown ?? documentMarkdown;
+      const notes = patch?.intakeNotes ?? intakeNotes;
+      const chats = patch?.chat ?? chatMessages;
       const draftKey = `proposalDraft:${workspaceId}`;
-      const proposalDrafts = localStorage.getItem('proposalDrafts') || '[]';
-      const drafts = JSON.parse(proposalDrafts);
-      
-      const draftIndex = drafts.findIndex((d: any) => d.workspaceId === workspaceId);
+      const listRaw = localStorage.getItem('proposalDrafts') || '[]';
+      let drafts: Array<Record<string, unknown>> = [];
+      try {
+        drafts = JSON.parse(listRaw);
+      } catch {
+        drafts = [];
+      }
+      const idx = drafts.findIndex((d) => d.workspaceId === workspaceId);
       const draftData = {
         workspaceId,
-        fundId: fund?.id || null,
-        fundName: fund?.name || 'Sem fund',
+        fundId: fund?.id || fundId || null,
+        fundName: fund?.name || 'Proposta',
         fundInstitution: fund?.institution || '',
         editalLink,
-        editalSummary: intakeNotes,
+        editalSummary: notes,
         status: 'draft' as const,
-        createdAt: draftIndex >= 0 ? drafts[draftIndex].createdAt : new Date().toISOString(),
+        createdAt: idx >= 0 ? drafts[idx]!.createdAt : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        title: fund?.name,
       };
-
-      if (draftIndex >= 0) {
-        drafts[draftIndex] = draftData;
-      } else {
-        drafts.push(draftData);
-      }
-
+      if (idx >= 0) drafts[idx] = draftData;
+      else drafts.push(draftData);
       localStorage.setItem('proposalDrafts', JSON.stringify(drafts));
       localStorage.setItem(
         draftKey,
         JSON.stringify({
           ...draftData,
           attachedFiles,
-          sections: proposalSections,
-        })
+          documentMarkdown: md,
+          chatMessages: chats,
+          brainstormDone: chats.some((m) => m.role === 'assistant'),
+          sections: sectionsFromMarkdown(md),
+        }),
       );
-
       setDraftSaved(true);
-      setError(null);
-      setTimeout(() => setError(null), 2000);
-    } catch (err) {
-      console.error('Error saving draft:', err);
-      setError('Erro ao salvar rascunho.');
-    }
-  }, [workspaceId, fund, editalLink, intakeNotes, attachedFiles, proposalSections]);
+    },
+    [workspaceId, fund, fundId, editalLink, intakeNotes, attachedFiles, documentMarkdown, chatMessages],
+  );
 
-  const handleCopySection = useCallback(async () => {
-    const section = proposalSections.find((item) => item.id === activeSection);
-    if (!section) return;
-    try {
-      await navigator.clipboard.writeText(section.content);
-      setError('Conteúdo copiado');
-    } catch {
-      setError('Não foi possível copiar o conteúdo.');
-    }
-  }, [proposalSections, activeSection]);
-
-  const handleAttachFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    event.target.value = '';
-    if (!files.length) return;
-
-    const MAX_FILES = 50;
-    const MAX_FILE_BYTES = 25 * 1024 * 1024;
-    const ACCEPTED_EXT =
-      /\.(pdf|docx?|xlsx?|pptx?|txt|md|csv|rtf|odt|ods|odp|zip|rar|7z|png|jpe?g|gif|webp)$/i;
-    const errors: string[] = [];
-    const additions: AttachedFile[] = [];
-    let skippedFormat = 0;
-    let skippedSize = 0;
-
-    setAttachedFiles((prev) => {
-      const next = [...prev];
-      for (const file of files) {
-        if (next.length + additions.length >= MAX_FILES) {
-          errors.push(`Máximo de ${MAX_FILES} arquivos por proposta.`);
-          break;
-        }
-        if (!ACCEPTED_EXT.test(file.name)) {
-          skippedFormat += 1;
-          continue;
-        }
-        if (file.size > MAX_FILE_BYTES) {
-          skippedSize += 1;
-          continue;
-        }
-        if (next.some((f) => f.name === file.name && f.size === file.size)) continue;
-        additions.push({
-          name: file.name,
-          size: file.size,
-          type: file.type || 'application/octet-stream',
-          uploadedAt: new Date().toISOString(),
-        });
-      }
-      return [...next, ...additions];
-    });
-
-    for (const file of files) {
-      if (file.type.startsWith('text') || file.name.endsWith('.md') || file.name.endsWith('.txt')) {
-        try {
-          const text = await file.text();
-          setIntakeNotes((prev) => prev || text.slice(0, 10000));
-          break;
-        } catch {
-          // ignore read errors for binary-like text
-        }
-      }
-    }
-
-    if (skippedFormat) {
-      errors.push(
-        `${skippedFormat} arquivo(s) ignorado(s): formato não suportado (PDF, Word, Excel, PPT, imagens, ZIP…).`,
-      );
-    }
-    if (skippedSize) {
-      errors.push(`${skippedSize} arquivo(s) ignorado(s): cada um deve ter menos de 25MB.`);
-    }
-    if (errors.length) setError(errors.join(' '));
-  }, []);
-
-  const handleRemoveAttachedFile = useCallback((index: number) => {
-    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const parseSectionTitles = (answer: string) => {
-    const lines = answer
-      .split(/\r?\n/)
-      .map((line) => line.replace(/^\s*[\d\-\)\.]+\s*/, '').trim())
-      .filter(Boolean);
-
-    if (lines.length === 0) {
-      return ['Objetivos', 'Finanças', 'Cronograma', 'Impacto', 'Equipe'];
-    }
-
-    return lines;
-  };
-
-  const handleGenerateStructure = useCallback(async () => {
+  useEffect(() => {
     if (!workspaceId) {
-      setError('Workspace não encontrado. Volte à página de propostas e inicie novamente.');
+      setLoading(false);
+      setError('Workspace não encontrado. Volte a Propostas.');
       return;
     }
 
-    setError(null);
-    setAnalysisResult('');
-    setAnalysisLoading(true);
+    const intakeKey = `proposalIntake:${workspaceId}`;
+    const draftKey = `proposalDraft:${workspaceId}`;
+    let seededFund: Fund | null = null;
+    let notes = '';
+    let link = '';
+    let md = '';
+    let chats: ChatMessage[] = [];
 
+    const savedIntake = window.localStorage.getItem(intakeKey);
+    if (savedIntake) {
+      try {
+        const intake = JSON.parse(savedIntake);
+        link = intake.editalLink || '';
+        notes = intake.intakeNotes || '';
+        setAttachedFiles(intake.attachedFiles || []);
+        if (intake.fundName) {
+          seededFund = {
+            id: intake.fundId || fundId || 'adhoc',
+            name: intake.fundName,
+            institution: intake.fundInstitution || '',
+            linkOficial: intake.editalLink,
+            description: intake.intakeNotes,
+          };
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const savedDraft = window.localStorage.getItem(draftKey);
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        if (draft.documentMarkdown) md = draft.documentMarkdown;
+        else if (Array.isArray(draft.sections) && draft.sections.length) {
+          md = draft.sections
+            .map((s: { title?: string; content?: string }) => `## ${s.title || 'Secção'}\n\n${s.content || ''}`)
+            .join('\n\n');
+        }
+        if (!notes && draft.editalSummary) notes = draft.editalSummary;
+        if (Array.isArray(draft.chatMessages)) chats = draft.chatMessages;
+        if (draft.fundName && !seededFund) {
+          seededFund = {
+            id: draft.fundId || fundId || 'adhoc',
+            name: draft.fundName,
+            institution: draft.fundInstitution || '',
+          };
+        }
+        setDraftSaved(true);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (seededFund) setFund(seededFund);
+    setEditalLink(link);
+    setIntakeNotes(notes);
+    setDocumentMarkdown(md);
+    setChatMessages(chats);
+    setLoading(false);
+  }, [workspaceId, fundId]);
+
+  useEffect(() => {
+    if (!fundId || !companyId) return;
+    fetch(`/api/funds/${encodeURIComponent(fundId)}?companyId=${encodeURIComponent(companyId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.fund?.id) {
+          setFund((prev) => ({ ...(prev || {}), ...d.fund }));
+          if (d.fund.linkOficial) setEditalLink((cur) => cur || d.fund.linkOficial);
+        }
+      })
+      .catch(() => {});
+  }, [fundId, companyId]);
+
+  useEffect(() => {
+    if (!workspaceId || !companyId) return;
+    const draftKey = `proposalDraft:${workspaceId}`;
+    const saved = window.localStorage.getItem(draftKey);
+    if (saved) {
+      try {
+        const draft = JSON.parse(saved);
+        if (draft.documentMarkdown || (Array.isArray(draft.sections) && draft.sections.length)) return;
+      } catch {
+        /* load server */
+      }
+    }
+    fetch(
+      `/api/fundhub/proposals?companyId=${encodeURIComponent(companyId)}&workspaceId=${encodeURIComponent(workspaceId)}`,
+      { cache: 'no-store' },
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const p = d?.proposal;
+        if (!p) return;
+        if (p.editalLink) setEditalLink(p.editalLink);
+        if (p.editalSummary) setIntakeNotes(p.editalSummary);
+        if (p.sections?.length && !documentMarkdown) {
+          const md = p.sections
+            .map((s: { title?: string; content?: string }) => `## ${s.title || 'Secção'}\n\n${s.content || ''}`)
+            .join('\n\n');
+          setDocumentMarkdown(md);
+        }
+        if (p.fundName) {
+          setFund((prev) =>
+            prev || {
+              id: p.fundId || 'adhoc',
+              name: p.fundName,
+              institution: p.fundInstitution || '',
+            },
+          );
+        }
+        setDraftSaved(true);
+      })
+      .catch(() => {});
+  }, [workspaceId, companyId, documentMarkdown]);
+
+  const assistantBody = useCallback(
+    (mode: string, userMessage: string) => ({
+      mode,
+      userMessage,
+      companyId,
+      fundName: fund?.name,
+      fundInstitution: fund?.institution,
+      editalLink: editalLink || fund?.linkOficial,
+      editalSummary: intakeNotes,
+      documentMarkdown,
+    }),
+    [companyId, fund, editalLink, intakeNotes, documentMarkdown],
+  );
+
+  const runBrainstorm = useCallback(async () => {
+    if (!workspaceId || brainstormRef.current) return;
+    const lockKey = `proposalBrainstorm:${workspaceId}`;
+    try {
+      if (sessionStorage.getItem(lockKey)) return;
+      sessionStorage.setItem(lockKey, '1');
+    } catch {
+      /* continue */
+    }
+    brainstormRef.current = true;
+    setBrainstorming(true);
+    setError(null);
     try {
       const response = await fetch('/api/proposals/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fundName: fund?.name,
-          fundInstitution: fund?.institution,
-          editalLink,
-          editalSummary: intakeNotes,
-          userMessage:
-            'Analise o edital e gere apenas os nomes das seções sugeridas para a proposta com base na estrutura do edital. Responda cada seção em uma linha.',
-          mode: 'structure',
-        }),
+        body: JSON.stringify(assistantBody('brainstorm', 'Chuva de ideias inicial para esta proposta.')),
       });
-
       const data = await response.json();
-      if (data.error) throw new Error(data.error);
-
-      const titles = parseSectionTitles(data.answer || '');
-      const sections = titles.map((title, index) => ({
-        id: `section-${index}`,
-        title,
-        content: '',
-      }));
-
-      setProposalSections(sections);
-      setActiveSection(sections[0]?.id || 'workflow');
-      setAnalysisResult(data.answer || 'Estrutura gerada.');
-    } catch (err: any) {
-      console.error(err);
-      setError('Não foi possível gerar a estrutura do edital. Tente novamente.');
+      if (!response.ok || !data.answer) {
+        throw new Error(data.error || 'Não foi possível gerar a ideia geral.');
+      }
+      const answer = String(data.answer);
+      const seed = fund || { id: fundId || 'adhoc', name: 'Proposta', institution: '' };
+      const nextDoc = documentMarkdown.trim()
+        ? documentMarkdown
+        : seedDocumentMarkdown(seed, answer);
+      const nextChat: ChatMessage[] = [
+        ...chatMessages,
+        { role: 'assistant', content: answer, createdAt: new Date().toISOString() },
+      ];
+      setDocumentMarkdown(nextDoc);
+      setChatMessages(nextChat);
+      persistDraft({ documentMarkdown: nextDoc, chat: nextChat });
+    } catch {
+      brainstormRef.current = false;
+      try {
+        sessionStorage.removeItem(`proposalBrainstorm:${workspaceId}`);
+      } catch {
+        /* ignore */
+      }
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Não consegui abrir a chuva de ideias. Escreva no chat — já está activo.',
+          createdAt: new Date().toISOString(),
+        },
+      ]);
     } finally {
-      setAnalysisLoading(false);
+      setBrainstorming(false);
     }
-  }, [workspaceId, fund, editalLink, intakeNotes]);
+  }, [workspaceId, assistantBody, fund, fundId, documentMarkdown, chatMessages, persistDraft]);
+
+  useEffect(() => {
+    if (loading || !workspaceId) return;
+    if (chatMessages.some((m) => m.role === 'assistant')) return;
+    if (documentMarkdown.trim().length > 80) return;
+    void runBrainstorm();
+  }, [loading, workspaceId, chatMessages, documentMarkdown, runBrainstorm]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ block: 'end' });
+  }, [chatMessages, chatLoading, brainstorming]);
 
   const handleSendChat = useCallback(async () => {
     const message = chatInput.trim();
-    if (!message) return;
-
-    setChatMessages((prev) => [...prev, { role: 'user', content: message, createdAt: new Date().toISOString() }]);
+    if (!message || chatLoading) return;
+    const nextUser: ChatMessage = { role: 'user', content: message, createdAt: new Date().toISOString() };
+    setChatMessages((prev) => [...prev, nextUser]);
     setChatInput('');
     setChatLoading(true);
-
     try {
       const response = await fetch('/api/proposals/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fundName: fund?.name,
-          fundInstitution: fund?.institution,
-          editalLink,
-          editalSummary: intakeNotes,
-          userMessage: message,
-        }),
+        body: JSON.stringify(assistantBody('chat', message)),
       });
-
       const data = await response.json();
-      setChatMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: data.answer || 'Não foi possível gerar a resposta.', createdAt: new Date().toISOString() },
-      ]);
-    } catch (err) {
-      console.error(err);
+      const reply: ChatMessage = {
+        role: 'assistant',
+        content: data.answer || data.error || 'Não foi possível gerar a resposta.',
+        createdAt: new Date().toISOString(),
+      };
+      setChatMessages((prev) => {
+        const next = [...prev, reply];
+        persistDraft({ chat: next });
+        return next;
+      });
+    } catch {
       setChatMessages((prev) => [
         ...prev,
         { role: 'assistant', content: 'Erro ao conectar com o assistente.', createdAt: new Date().toISOString() },
@@ -392,59 +354,130 @@ export default function FundHubProposalEditorPage() {
     } finally {
       setChatLoading(false);
     }
-  }, [fund, editalLink, intakeNotes, chatInput]);
+  }, [chatInput, chatLoading, assistantBody, persistDraft]);
 
-  const updateSectionContent = useCallback((sectionId: string, content: string) => {
-    setProposalSections((sections) =>
-      sections.map((section) => (section.id === sectionId ? { ...section, content } : section))
-    );
-    setDraftSaved(false);
+  const insertIntoDocument = useCallback(
+    (text: string) => {
+      const block = text.trim();
+      if (!block) return;
+      setDocumentMarkdown((prev) => {
+        const next = prev.trim()
+          ? `${prev.trim()}\n\n${block}\n`
+          : seedDocumentMarkdown(fund || { id: 'adhoc', name: 'Proposta' }, block);
+        persistDraft({ documentMarkdown: next });
+        return next;
+      });
+      setDocMode('edit');
+      setDraftSaved(false);
+    },
+    [fund, persistDraft],
+  );
+
+  const handleGenerateStructure = useCallback(async () => {
+    setChatLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/proposals/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(assistantBody('structure', 'Gera a estrutura da proposta.')),
+      });
+      const data = await response.json();
+      const answer = String(data.answer || '');
+      const titles = answer
+        .split(/\r?\n/)
+        .map((line) => line.replace(/^\s*[\d\-\)\.]+\s*/, '').trim())
+        .filter(Boolean);
+      if (titles.length) {
+        setDocumentMarkdown((prev) => {
+          const existing = prev.trim();
+          const extra = titles
+            .filter((t) => !existing.toLowerCase().includes(`## ${t.toLowerCase()}`))
+            .map((t) => `## ${t}\n\n`)
+            .join('\n');
+          const next = extra ? `${existing}\n\n${extra}` : existing;
+          persistDraft({ documentMarkdown: next });
+          return next;
+        });
+      }
+      setChatMessages((prev) => {
+        const next = [
+          ...prev,
+          { role: 'assistant' as const, content: answer || 'Estrutura gerada.', createdAt: new Date().toISOString() },
+        ];
+        persistDraft({ chat: next });
+        return next;
+      });
+    } catch {
+      setError('Não foi possível gerar a estrutura.');
+    } finally {
+      setChatLoading(false);
+    }
+  }, [assistantBody, persistDraft]);
+
+  const handleAttachFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!files.length) return;
+    const MAX_FILES = 50;
+    const MAX_FILE_BYTES = 25 * 1024 * 1024;
+    const ACCEPTED_EXT =
+      /\.(pdf|docx?|xlsx?|pptx?|txt|md|csv|rtf|odt|ods|odp|zip|rar|7z|png|jpe?g|gif|webp)$/i;
+    setAttachedFiles((prev) => {
+      const next = [...prev];
+      for (const file of files) {
+        if (next.length >= MAX_FILES) break;
+        if (!ACCEPTED_EXT.test(file.name) || file.size > MAX_FILE_BYTES) continue;
+        if (next.some((f) => f.name === file.name && f.size === file.size)) continue;
+        next.push({
+          name: file.name,
+          size: file.size,
+          type: file.type || 'application/octet-stream',
+          uploadedAt: new Date().toISOString(),
+        });
+      }
+      return next;
+    });
   }, []);
 
   const exportAsMarkdown = useCallback(() => {
-    let markdown = `# Proposta: ${fund?.name || 'Sem título'}\n\n`;
-    markdown += `**Edital:** ${editalLink || 'N/A'}\n\n`;
-    markdown += `**Data:** ${new Date().toLocaleDateString('pt-BR')}\n\n---\n\n`;
-    
-    if (intakeNotes) {
-      markdown += `## Notas do Edital\n\n${intakeNotes}\n\n---\n\n`;
-    }
+    if (documentMarkdown.trim()) return documentMarkdown;
+    return `# ${fund?.name || 'Proposta'}\n`;
+  }, [documentMarkdown, fund]);
 
-    proposalSections.forEach((section, idx) => {
-      markdown += `## ${idx + 1}. ${section.title}\n\n${section.content || '(Vazio)'}\n\n`;
-    });
-
-    return markdown;
-  }, [fund, editalLink, intakeNotes, proposalSections]);
-
-  const downloadProposal = useCallback((format: 'markdown' | 'json') => {
-    const content = format === 'markdown' ? exportAsMarkdown() : JSON.stringify(
-      {
-        fund: fund?.name,
-        editalLink,
-        intakeNotes,
-        sections: proposalSections,
-        exportedAt: new Date().toISOString(),
-      },
-      null,
-      2
-    );
-
-    const blob = new Blob([content], { type: format === 'markdown' ? 'text/markdown' : 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `proposta_${fund?.name || 'export'}_${Date.now()}.${format === 'markdown' ? 'md' : 'json'}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [exportAsMarkdown, fund, editalLink, intakeNotes, proposalSections]);
+  const downloadProposal = useCallback(
+    (format: 'markdown' | 'json') => {
+      const content =
+        format === 'markdown'
+          ? exportAsMarkdown()
+          : JSON.stringify(
+              {
+                fund: fund?.name,
+                editalLink,
+                intakeNotes,
+                documentMarkdown,
+                exportedAt: new Date().toISOString(),
+              },
+              null,
+              2,
+            );
+      const blob = new Blob([content], { type: format === 'markdown' ? 'text/markdown' : 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `proposta_${fund?.name || 'export'}_${Date.now()}.${format === 'markdown' ? 'md' : 'json'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    },
+    [exportAsMarkdown, fund, editalLink, intakeNotes, documentMarkdown],
+  );
 
   const openInStudio = useCallback(async () => {
-    const contentSections = proposalSections.filter((s) => s.title.trim() || s.content.trim());
-    if (!contentSections.length) {
-      setError('Adicione conteúdo às seções antes de abrir no Studio.');
+    const sections = sectionsFromMarkdown(documentMarkdown).filter((s) => s.title.trim() || s.content.trim());
+    if (!sections.length) {
+      setError('Escreva no documento antes de abrir no Studio.');
       return;
     }
     setOpeningStudio(true);
@@ -455,8 +488,8 @@ export default function FundHubProposalEditorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source: 'fundhub_proposal',
-          title: fund?.name ? `Proposta · ${fund.name}` : 'Proposta FundHub',
-          sections: contentSections.map((s) => ({ title: s.title, content: s.content })),
+          title: fund?.name ? `Proposta · ${fund.name}` : 'Proposta',
+          sections: sections.map((s) => ({ title: s.title, content: s.content })),
         }),
       });
       const d = (await r.json()) as { document?: { id: string }; error?: string };
@@ -467,388 +500,288 @@ export default function FundHubProposalEditorPage() {
     } finally {
       setOpeningStudio(false);
     }
-  }, [proposalSections, fund, router]);
+  }, [documentMarkdown, fund, router]);
 
   const submitProposal = useCallback(async () => {
-    if (proposalSections.length === 0 || proposalSections.some(s => !s.content?.trim())) {
-      setError('Todas as seções devem ser preenchidas antes de enviar.');
+    if (!documentMarkdown.trim()) {
+      setError('Escreva a proposta antes de marcar como enviada.');
       return;
     }
-
     if (!workspaceId) {
       setError('Workspace não identificado.');
       return;
     }
-
     setIsSubmitting(true);
     try {
+      persistDraft();
       const proposalDrafts = localStorage.getItem('proposalDrafts') || '[]';
       const drafts = JSON.parse(proposalDrafts);
-      const draftIndex = drafts.findIndex((d: any) => d.workspaceId === workspaceId);
-
+      const draftIndex = drafts.findIndex((d: { workspaceId?: string }) => d.workspaceId === workspaceId);
       if (draftIndex >= 0) {
         drafts[draftIndex].status = 'submitted';
         localStorage.setItem('proposalDrafts', JSON.stringify(drafts));
       }
-
-      const draftKey = `proposalDraft:${workspaceId}`;
-      const existingDraft = localStorage.getItem(draftKey);
-      if (existingDraft) {
-        const draft = JSON.parse(existingDraft);
-        draft.status = 'submitted';
-        draft.submittedAt = new Date().toISOString();
-        localStorage.setItem(draftKey, JSON.stringify(draft));
-      }
-
       setError(null);
-      alert('✓ Proposta enviada com sucesso!');
-    } catch (err) {
-      console.error('Error submitting proposal:', err);
+    } catch {
       setError('Erro ao enviar proposta.');
     } finally {
       setIsSubmitting(false);
     }
-  }, [workspaceId, proposalSections]);
+  }, [documentMarkdown, workspaceId, persistDraft]);
 
-  const activeSectionData = proposalSections.find((section) => section.id === activeSection);
+  const officialUrl = editalLink || fund?.linkOficial || '';
+
+  const headerMeta = useMemo(() => {
+    const bits = [fund?.institution, fund?.countries].filter(Boolean);
+    return bits.join(' · ');
+  }, [fund]);
 
   return (
-    <div className="space-y-6">
-      <main>
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Link href="/hub/fundhub/proposals" className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
-              <ArrowLeft className="w-4 h-4" /> Voltar a Propostas
-            </Link>
-            <h1 className="mt-4 text-4xl font-bold text-gray-900">Workspace de proposta</h1>
-            <p className="mt-2 text-gray-600 max-w-3xl">
-              Organize a proposta em abas por seção do edital, não em um texto corrido.
-            </p>
-          </div>
-          <div className="space-y-3 text-right">
-            {fund ? (
-              <p className="text-sm text-gray-500">Fundo vinculado: <span className="font-semibold text-gray-900">{fund.name}</span></p>
-            ) : (
-              <p className="text-sm text-gray-500">Nenhum fundo vinculado.</p>
-            )}
-            <div className="flex gap-2 justify-end">
-              <div className="relative">
+    <div className="flex min-h-[calc(100vh-6rem)] flex-col gap-3">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Link href="/hub/fundhub/proposals" className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
+            <ArrowLeft className="h-4 w-4" /> Propostas
+          </Link>
+          <h1 className="mt-2 truncate text-2xl font-bold text-gray-900">{fund?.name || 'Proposta'}</h1>
+          {headerMeta && <p className="text-sm text-gray-600">{headerMeta}</p>}
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {officialUrl && (
+            <a
+              href={officialUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Edital
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => persistDraft()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <Save className="h-3.5 w-3.5" />
+            {draftSaved ? 'Guardado' : 'Guardar'}
+          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowExportMenu((v) => !v)}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Exportar
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-lg border border-gray-200 bg-white shadow-lg">
                 <button
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  type="button"
+                  onClick={() => {
+                    downloadProposal('markdown');
+                    setShowExportMenu(false);
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50"
                 >
-                  Exportar
+                  Markdown
                 </button>
-                {showExportMenu && (
-                  <div className="absolute right-0 top-full mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg z-10">
-                    <button
-                      onClick={() => {
-                        downloadProposal('markdown');
-                        setShowExportMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      📄 Markdown (.md)
-                    </button>
-                    <button
-                      onClick={() => {
-                        downloadProposal('json');
-                        setShowExportMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 border-t border-gray-200 flex items-center gap-2"
-                    >
-                      ⚙️ JSON (.json)
-                    </button>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    downloadProposal('json');
+                    setShowExportMenu(false);
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50"
+                >
+                  JSON
+                </button>
               </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => void openInStudio()}
+            disabled={openingStudio || !documentMarkdown.trim()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-medium text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+          >
+            {openingStudio ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PenLine className="h-3.5 w-3.5" />}
+            Studio
+          </button>
+          <button
+            type="button"
+            onClick={() => void submitProposal()}
+            disabled={isSubmitting || !documentMarkdown.trim()}
+            className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {isSubmitting ? 'A enviar…' : 'Marcar enviada'}
+          </button>
+        </div>
+      </header>
+
+      {error && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex flex-1 items-center justify-center rounded-2xl border border-gray-200 bg-white">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-amber-600" />
+        </div>
+      ) : (
+        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.2fr)]">
+          <section className="flex min-h-[28rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
+              <p className="text-sm font-semibold text-gray-900">Chat</p>
               <button
                 type="button"
-                onClick={() => void openInStudio()}
-                disabled={openingStudio || proposalSections.length === 0}
-                className="inline-flex items-center gap-2 rounded-lg border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-900 hover:bg-violet-100 disabled:opacity-50"
-                title="Cria uma cópia editável no Etholys Studio"
+                onClick={() => void handleGenerateStructure()}
+                disabled={chatLoading}
+                className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 hover:underline disabled:opacity-50"
               >
-                {openingStudio ? <Loader2 className="w-4 h-4 animate-spin" /> : <PenLine className="w-4 h-4" />}
-                Abrir no Studio
-              </button>
-              <button
-                onClick={submitProposal}
-                disabled={isSubmitting || proposalSections.length === 0}
-                className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? 'Enviando...' : '✓ Enviar Proposta'}
+                <Lightbulb className="h-3.5 w-3.5" />
+                Estrutura
               </button>
             </div>
-          </div>
-        </div>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+              {brainstorming && chatMessages.length === 0 && (
+                <div className="rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-950">
+                  <p className="flex items-center gap-2 font-medium">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Chuva de ideias…
+                  </p>
+                  <p className="mt-1 text-xs text-amber-800">Pode escrever no chat já — o documento está ao lado.</p>
+                </div>
+              )}
+              {chatMessages.map((message, index) => (
+                <div
+                  key={`${message.createdAt}-${index}`}
+                  className={`rounded-xl px-3 py-2.5 text-sm ${
+                    message.role === 'assistant' ? 'bg-gray-50 text-gray-800' : 'bg-amber-50 text-gray-900'
+                  }`}
+                >
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                    {message.role === 'assistant' ? 'IA' : 'Você'}
+                  </p>
+                  <StudioMarkdown text={message.content} />
+                  {message.role === 'assistant' && (
+                    <button
+                      type="button"
+                      onClick={() => insertIntoDocument(message.content)}
+                      className="mt-2 text-xs font-medium text-amber-800 hover:underline"
+                    >
+                      Inserir no documento
+                    </button>
+                  )}
+                </div>
+              ))}
+              {chatLoading && (
+                <p className="flex items-center gap-2 text-xs text-gray-500">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> A escrever…
+                </p>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+            <form
+              className="border-t border-gray-100 p-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSendChat();
+              }}
+            >
+              <textarea
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    void handleSendChat();
+                  }
+                }}
+                rows={3}
+                placeholder="Pergunte ou peça para redigir uma secção…"
+                className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+              />
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={chatLoading || !chatInput.trim()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Enviar
+                </button>
+              </div>
+            </form>
+          </section>
 
-        {loadingFund ? (
-          <div className="rounded-3xl border border-gray-200 bg-white p-12 text-center">
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-amber-600" />
-          </div>
-        ) : (
-          <>
-            {error && (
-              <div className={`mb-6 rounded-lg border px-4 py-3 flex items-start gap-3 ${
-                error.includes('✓') 
-                  ? 'border-green-200 bg-green-50 text-green-800' 
-                  : 'border-red-200 bg-red-50 text-red-800'
-              }`}>
-                <AlertCircle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
-                  error.includes('✓') ? 'text-green-600' : 'text-red-600'
-                }`} />
-                <p className="text-sm">{error}</p>
+          <section className="flex min-h-[28rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
+              <p className="text-sm font-semibold text-gray-900">Documento</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDocMode((m) => (m === 'edit' ? 'preview' : 'edit'))}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900"
+                >
+                  {docMode === 'edit' ? <Eye className="h-3.5 w-3.5" /> : <PenLine className="h-3.5 w-3.5" />}
+                  {docMode === 'edit' ? 'Pré-ver' : 'Editar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAttach((v) => !v)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900"
+                >
+                  <Paperclip className="h-3.5 w-3.5" />
+                  Anexos{attachedFiles.length ? ` (${attachedFiles.length})` : ''}
+                </button>
+              </div>
+            </div>
+            {showAttach && (
+              <div className="border-b border-gray-100 px-4 py-3 text-xs">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 hover:bg-gray-50">
+                  <Paperclip className="h-3.5 w-3.5" />
+                  Anexar
+                  <input type="file" multiple className="hidden" onChange={handleAttachFile} />
+                </label>
+                {attachedFiles.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-gray-600">
+                    {attachedFiles.map((file, index) => (
+                      <li key={`${file.name}-${index}`} className="flex justify-between gap-2">
+                        <span className="truncate">{file.name}</span>
+                        <button
+                          type="button"
+                          className="text-red-600"
+                          onClick={() => setAttachedFiles((prev) => prev.filter((_, i) => i !== index))}
+                        >
+                          Remover
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
-            <div className="grid gap-8 lg:grid-cols-[1.75fr_0.85fr]">
-              <div className="space-y-6">
-              <div className="rounded-[2rem] border border-gray-200 bg-white p-8 shadow-sm">
-                <div className="flex items-center justify-between gap-4 mb-6">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.25em] text-amber-600 font-semibold">Edital</p>
-                    <h2 className="mt-3 text-2xl font-semibold text-gray-900">Intake do edital</h2>
-                  </div>
-                  <button
-                    onClick={handleGenerateStructure}
-                    disabled={analysisLoading}
-                    className="inline-flex items-center gap-2 rounded-3xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
-                  >
-                    <Lightbulb className="w-4 h-4" /> Gerar fluxo do edital
-                  </button>
-                </div>
-
-                <div className="grid gap-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">Link do edital</label>
-                    <input
-                      value={editalLink}
-                      onChange={(event) => setEditalLink(event.target.value)}
-                      placeholder="Cole o link do edital aqui"
-                      className="w-full rounded-3xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">Notas do edital</label>
-                    <textarea
-                      value={intakeNotes}
-                      onChange={(event) => setIntakeNotes(event.target.value)}
-                      rows={5}
-                      className="w-full rounded-3xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
-                      placeholder="Cole os pontos-chave do edital, exigências e observações para que o fluxo seja preciso."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">
-                      Arquivos do edital
-                      {attachedFiles.length > 0 && (
-                        <span className="ml-2 font-normal text-gray-500">({attachedFiles.length})</span>
-                      )}
-                    </label>
-                    <label className="group flex cursor-pointer items-center gap-3 rounded-3xl border border-dashed border-gray-300 bg-gray-50 px-4 py-4 text-sm font-medium text-gray-700 hover:border-amber-300 hover:bg-amber-50">
-                      <Paperclip className="w-5 h-5 text-amber-600" />
-                      <span>Anexar arquivos (documento base + anexos)</span>
-                      <input
-                        type="file"
-                        multiple
-                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.rtf,.odt,.ods,.odp,.zip,.rar,.7z,.png,.jpg,.jpeg,.gif,.webp"
-                        onChange={handleAttachFile}
-                        className="hidden"
-                      />
-                    </label>
-                    {attachedFiles.length > 0 && (
-                      <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
-                        <p className="font-semibold">Arquivos anexados</p>
-                        <ul className="mt-2 space-y-2">
-                          {attachedFiles.map((file, index) => (
-                            <li key={`${file.name}-${file.uploadedAt}-${index}`} className="flex items-center justify-between gap-3">
-                              <span>
-                                {file.name} • {(file.size / 1024).toFixed(1)} KB
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveAttachedFile(index)}
-                                className="text-xs font-medium text-red-600 hover:text-red-800"
-                              >
-                                Remover
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {analysisResult && (
-                  <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-gray-800">
-                    <p className="font-semibold text-amber-900 mb-3">Estrutura sugerida</p>
-                    <p className="whitespace-pre-line">{analysisResult}</p>
-                  </div>
-                )}
+            {docMode === 'edit' ? (
+              <textarea
+                value={documentMarkdown}
+                onChange={(e) => {
+                  setDocumentMarkdown(e.target.value);
+                  setDraftSaved(false);
+                }}
+                className="min-h-0 flex-1 resize-none border-0 px-4 py-3 font-mono text-sm leading-relaxed text-gray-900 outline-none"
+                placeholder="O documento abre aqui. A chuva de ideias entra na secção Ideia geral."
+              />
+            ) : (
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                <StudioMarkdown text={documentMarkdown} emptyHint="Documento vazio." />
               </div>
-
-              <div className="rounded-[2rem] border border-gray-200 bg-white p-8 shadow-sm">
-                <div className="flex flex-wrap gap-2 mb-5">
-                  {sectionTabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveSection(tab.id)}
-                      className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                        activeSection === tab.id
-                          ? 'bg-amber-600 text-white shadow'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {activeSection === 'workflow' && (
-                  <div className="space-y-6">
-                    <p className="text-sm text-gray-600">
-                      O fluxo abaixo representa a estrutura de seções sugerida para este edital. Cada aba deve ser preenchida como um segmento independente da proposta.
-                    </p>
-                    {proposalSections.length === 0 ? (
-                      <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500">
-                        Nenhuma seção gerada ainda. Clique em "Gerar fluxo do edital" para começar.
-                      </div>
-                    ) : (
-                      <div className="grid gap-4">
-                        {proposalSections.map((section, index) => (
-                          <div key={section.id} className="rounded-3xl border border-gray-200 bg-gray-50 p-5">
-                            <p className="font-semibold text-gray-900">{index + 1}. {section.title}</p>
-                            <p className="text-sm text-gray-600 mt-2">Preencha os pontos deste bloco na aba correspondente.</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {activeSection === 'chat' && (
-                  <div className="space-y-4">
-                    <div className="space-y-3">
-                      {chatMessages.map((message, index) => (
-                        <div
-                          key={`${message.createdAt}-${index}`}
-                          className={`rounded-3xl p-4 ${message.role === 'assistant' ? 'bg-gray-50 text-gray-800' : 'bg-amber-50 text-gray-900'}`}
-                        >
-                          <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">{message.role === 'assistant' ? 'IA' : 'Você'}</p>
-                          <p className="whitespace-pre-line text-sm">{message.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
-                      <textarea
-                        value={chatInput}
-                        onChange={(event) => setChatInput(event.target.value)}
-                        rows={4}
-                        className="w-full resize-none rounded-3xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
-                        placeholder="Pergunte sobre o edital ou peça recomendações para preencher uma seção."
-                      />
-                      <div className="mt-4 flex items-center justify-between gap-3">
-                        <p className="text-xs text-gray-500">A IA usa o contexto do edital para responder.</p>
-                        <button
-                          onClick={handleSendChat}
-                          disabled={chatLoading}
-                          className="inline-flex items-center gap-2 rounded-3xl bg-amber-600 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
-                        >
-                          Enviar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeSection !== 'workflow' && activeSection !== 'chat' && activeSectionData && (
-                  <div className="space-y-4">
-                    <div className="rounded-[1.75rem] border border-gray-200 bg-gray-50 p-6">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.25em] text-amber-600 font-semibold">Seção</p>
-                          <h3 className="mt-2 text-xl font-semibold text-gray-900">{activeSectionData.title}</h3>
-                        </div>
-                        <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                          <ClipboardList className="w-4 h-4" /> {draftSaved ? 'Rascunho salvo' : 'Não salvo'}
-                        </span>
-                      </div>
-
-                      <textarea
-                        value={activeSectionData.content}
-                        onChange={(event) => updateSectionContent(activeSectionData.id, event.target.value)}
-                        rows={14}
-                        className="mt-6 w-full rounded-3xl border border-gray-200 bg-white px-5 py-4 text-sm text-gray-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
-                        placeholder={`Escreva o conteúdo para ${activeSectionData.title}...`}
-                      />
-
-                      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-                        <button
-                          onClick={handleCopySection}
-                          className="inline-flex items-center gap-2 rounded-3xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                        >
-                          <Sparkle className="w-4 h-4 text-amber-600" /> Copiar seção
-                        </button>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={saveDraft}
-                            className="inline-flex items-center gap-2 rounded-3xl bg-amber-600 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-700"
-                          >
-                            <Save className="w-4 h-4" /> Salvar rascunho
-                          </button>
-                        </div>
-                      </div>
-
-                      {error && (
-                        <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
-                          <AlertCircle className="inline-block w-4 h-4 mr-2 align-text-bottom" /> {error}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <aside className="space-y-6">
-              <div className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm">
-                <p className="text-xs uppercase tracking-[0.25em] text-amber-600 font-semibold">Resumo do workspace</p>
-                <div className="mt-4 space-y-4 text-sm text-gray-600">
-                  <div>
-                    <p className="font-semibold text-gray-900">Link do edital</p>
-                    <p>{editalLink || 'Nenhum link informado'}</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-900">Arquivos</p>
-                    {attachedFiles.length > 0 ? (
-                      attachedFiles.map((file) => (
-                        <p key={file.uploadedAt}>{file.name}</p>
-                      ))
-                    ) : (
-                      <p>Sem anexos</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-900">Seções geradas</p>
-                    <p>{proposalSections.length} seção(ões)</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-[2rem] border border-gray-200 bg-gray-50 p-6 text-sm text-gray-600 shadow-sm">
-                <p className="font-semibold text-gray-900 mb-3">Como usar</p>
-                <p>
-                  Use esta página para definir a estrutura do edital e preencher cada categoria em abas separadas. Aqui não se escreve mais tudo em um único bloco longo.
-                </p>
-              </div>
-            </aside>
-            </div>
-          </>
-        )}
-      </main>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }
