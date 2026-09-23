@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useApp } from '@/app/providers';
+import { isLikelyDbId } from '@/lib/utils';
 import { CheckCircle2, Circle, AlertCircle, FileCheck, TrendingUp } from 'lucide-react';
 
 const defaultComplianceChecklists = [
@@ -56,42 +58,132 @@ const defaultComplianceChecklists = [
   },
 ];
 
+const ICONS = {
+  governance: FileCheck,
+  financial: TrendingUp,
+  esg: AlertCircle,
+  compliance: CheckCircle2,
+} as const;
+
+type ChecklistId = keyof typeof ICONS;
+type ChecklistState = (typeof defaultComplianceChecklists)[number];
+
 const getStorageKey = (fundId?: string | null) => `fundhubCompliance:${fundId || 'generic'}`;
+
+function completedCount(items: Array<{ completed?: boolean }>) {
+  return items.filter((item) => item.completed).length;
+}
+
+function hydrateChecklists(raw: unknown): ChecklistState[] {
+  const saved = Array.isArray(raw) ? raw : [];
+  return defaultComplianceChecklists.map((list) => {
+    const hit = saved.find((row) => row && typeof row === 'object' && (row as { id?: string }).id === list.id) as
+      | { items?: Array<{ id?: string; completed?: boolean }> }
+      | undefined;
+    return {
+      ...list,
+      icon: ICONS[list.id as ChecklistId] ?? FileCheck,
+      items: list.items.map((item) => ({
+        ...item,
+        completed: Boolean(hit?.items?.find((savedItem) => savedItem.id === item.id)?.completed),
+      })),
+    };
+  });
+}
 
 export default function FundHubCompliancePage() {
   const searchParams = useSearchParams();
+  const { activeCompanyId } = useApp();
+  const companyId = isLikelyDbId(String(activeCompanyId ?? '').trim())
+    ? String(activeCompanyId).trim()
+    : '';
   const fundId = searchParams.get('fundId');
   const storageKey = getStorageKey(fundId);
 
   const [checklists, setChecklists] = useState(defaultComplianceChecklists);
   const [notes, setNotes] = useState('');
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    let cancelled = false;
+    const apply = (nextLists: typeof defaultComplianceChecklists, nextNotes: string, at: string | null) => {
+      if (cancelled) return;
+      setChecklists(nextLists);
+      setNotes(nextNotes);
+      setSavedAt(at);
+      setReady(true);
+    };
 
-    const saved = window.localStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.checklists) setChecklists(parsed.checklists);
-        if (parsed.notes) setNotes(parsed.notes);
-        if (parsed.savedAt) setSavedAt(parsed.savedAt);
-      } catch {
-        setChecklists(defaultComplianceChecklists);
+    let localLists = defaultComplianceChecklists;
+    let localNotes = '';
+    let localAt: string | null = null;
+    let localDone = 0;
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem(storageKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.checklists) localLists = hydrateChecklists(parsed.checklists);
+          if (parsed.notes) localNotes = parsed.notes;
+          if (parsed.savedAt) localAt = parsed.savedAt;
+          localDone = localLists.reduce((n, list) => n + completedCount(list.items || []), 0);
+        } catch {
+          localLists = defaultComplianceChecklists;
+        }
       }
     }
-  }, [storageKey]);
+
+    if (!companyId || fundId) {
+      apply(localLists, localNotes, localAt);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    fetch(`/api/fundhub/compliance?companyId=${encodeURIComponent(companyId)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { checklists?: Array<{ id: string; items: Record<string, boolean> }>; notes?: string } | null) => {
+        const server = d?.checklists ?? [];
+        const merged = defaultComplianceChecklists.map((list) => {
+          const hit = server.find((row) => row.id === list.id);
+          if (!hit) return list;
+          return {
+            ...list,
+            items: list.items.map((item) => ({
+              ...item,
+              completed: hit.items?.[item.id] ?? item.completed,
+            })),
+          };
+        });
+        const serverDone = merged.reduce((n, list) => n + completedCount(list.items), 0);
+        if (localDone === 0 && serverDone > 0) {
+          apply(merged, d?.notes || localNotes, new Date().toISOString());
+        } else {
+          apply(localLists, localNotes, localAt);
+        }
+      })
+      .catch(() => apply(localLists, localNotes, localAt));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [storageKey, companyId, fundId]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(storageKey, JSON.stringify({
-      checklists,
-      notes,
-      savedAt: new Date().toISOString(),
-    }));
-    setSavedAt(new Date().toISOString());
-  }, [checklists, notes, storageKey]);
+    if (!ready || typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        checklists: checklists.map((list) => ({
+          id: list.id,
+          items: list.items.map((item) => ({ id: item.id, completed: item.completed })),
+        })),
+        notes,
+        savedAt: savedAt || new Date().toISOString(),
+      }),
+    );
+  }, [checklists, notes, storageKey, ready, savedAt]);
 
   const toggleItem = (checklistId: string, itemId: string) => {
     setChecklists(
@@ -169,7 +261,7 @@ export default function FundHubCompliancePage() {
           <div className="space-y-6">
             {checklists.map((checklist) => {
               const progress = getProgress(checklist.items);
-              const Icon = checklist.icon;
+              const Icon = ICONS[checklist.id as ChecklistId] ?? FileCheck;
 
               return (
                 <div key={checklist.id} className="rounded-2xl border border-gray-200 bg-white">
