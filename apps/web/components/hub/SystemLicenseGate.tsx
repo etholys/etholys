@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useApp } from '@/app/providers';
 import { Lock, ArrowLeft, Layers } from 'lucide-react';
-import { parseSystemsJson, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
+import { parseSystemsJson, systemDisplayName, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
 import { isLikelyDbId } from '@/lib/utils';
 import { StateLoading } from '@/components/ui/StateBlocks';
 
@@ -126,9 +126,9 @@ export function SystemLicenseGate({ system, children, isExemptPath }: Props) {
                   'This account can only use the FORGE course you were invited to. No access to the rest of Etholys.',
                 )
               : t(
-                  `A sua conta não tem acesso a ${system} nesta organização.`,
-                  `Su cuenta no tiene acceso a ${system} en esta organización.`,
-                  `Your account does not have access to ${system} in this organization.`,
+                  `A sua conta não tem acesso a ${systemDisplayName(system)} nesta organização.`,
+                  `Su cuenta no tiene acceso a ${systemDisplayName(system)} en esta organización.`,
+                  `Your account does not have access to ${systemDisplayName(system)} in this organization.`,
                 )}
           </p>
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">

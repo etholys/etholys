@@ -578,9 +578,9 @@ export default function DocumentsPage() {
             title: L(ml('Document links', 'Vínculos del documento', 'Vínculos do documento')),
             hint: L(
               ml(
-                'Link this file to NEXUS, SIEP, FUNDHUB, company, etc.',
-                'Vincula este archivo a NEXUS, SIEP, FUNDHUB, empresa, etc.',
-                'Liga este ficheiro a NEXUS, SIEP, FUNDHUB, empresa, etc.',
+                'Link this file to NEXUS, SIEP, FundHub, company, etc.',
+                'Vincula este archivo a NEXUS, SIEP, FundHub, empresa, etc.',
+                'Liga este ficheiro a NEXUS, SIEP, FundHub, empresa, etc.',
               ),
             ),
             system: L(ml('System', 'Sistema', 'Sistema')),

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, CreditCard, Layers, Users } from 'lucide-react';
 import { useApp } from '@/app/providers';
-import type { WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
+import { systemDisplayName, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
 
 type BillingState = {
   billingEnforced: boolean;
@@ -91,7 +91,7 @@ export function BillingOverview({ companyId }: { companyId: string | null }) {
             {t('Sistemas', 'Sistemas', 'Systems')}
           </div>
           <p className="text-sm font-medium text-slate-800">
-            {state.licensedSystems.length > 0 ? state.licensedSystems.join(' · ') : '—'}
+            {state.licensedSystems.length > 0 ? state.licensedSystems.map(systemDisplayName).join(' · ') : '—'}
           </p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">

@@ -183,7 +183,7 @@ function LoginContent() {
           <div className="mt-10 pt-6 border-t border-slate-700/50">
             <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">{locale === 'es' ? 'Sistemas del ecosistema' : locale === 'pt' ? 'Sistemas do ecossistema' : 'Ecosystem systems'}</p>
             <div className="flex flex-wrap gap-2">
-              {['ATLAS', 'SIEP', 'FUNDHUB', 'NEXUS', 'FORGE', 'PRISM'].map(name => (
+              {['ATLAS', 'SIEP', 'FundHub', 'NEXUS', 'FORGE', 'PRISM'].map(name => (
                 <span key={name} className={`px-2.5 py-1 rounded-md text-xs font-medium ${name === 'ATLAS' ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-slate-700/50 text-slate-400 border border-slate-600/30'}`}>
                   {name}
                 </span>

@@ -61,7 +61,7 @@ export const MODULE_HINT_LABEL: Record<
 > = {
   ATLAS: { pt: 'ATLAS (ERP 360°, finanças, stock)', es: 'ATLAS (ERP 360°, finanzas, stock)', en: 'ATLAS (ERP 360°, finance, stock)' },
   SIEP: { pt: 'SIEP (execução e inovação de projetos)', es: 'SIEP (ejecución e innovación de proyectos)', en: 'SIEP (project execution & innovation)' },
-  FUNDHUB: { pt: 'FUNDHUB (captação e propostas)', es: 'FUNDHUB (captación y propuestas)', en: 'FUNDHUB (funding & proposals)' },
+  FUNDHUB: { pt: 'FundHub (captação e propostas)', es: 'FundHub (captación y propuestas)', en: 'FundHub (funding & proposals)' },
   NEXUS: { pt: 'NEXUS (diagnóstico MIPYME, rota)', es: 'NEXUS (diagnóstico MIPYME, ruta)', en: 'NEXUS (MIPYME diagnosis, roadmap)' },
   PRISM: { pt: 'PRISM (dados, ESG e impacto)', es: 'PRISM (datos, ESG e impacto)', en: 'PRISM (data, ESG & impact)' },
   FORGE: { pt: 'FORGE (cursos e formação)', es: 'FORGE (cursos y formación)', en: 'FORGE (courses & learning)' },

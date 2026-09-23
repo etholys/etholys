@@ -17,6 +17,7 @@ import { useApp } from '@/app/providers';
 import type { Locale } from '@/lib/i18n';
 import {
   WORKSPACE_SYSTEM_KEYS,
+  systemDisplayName,
   type WorkspaceSystemKey,
 } from '@/lib/integrated-workspace-shared';
 import {
@@ -525,7 +526,7 @@ export function EtholysInviteWizard({
                               licensed && setSystems((s) => ({ ...s, [k]: e.target.checked }))
                             }
                           />
-                          <span>{k}</span>
+                          <span>{systemDisplayName(k)}</span>
                           {!licensed && (
                             <span className="text-[10px] uppercase tracking-wide">
                               {t('Sem licença', 'Sin licencia', 'No license')}

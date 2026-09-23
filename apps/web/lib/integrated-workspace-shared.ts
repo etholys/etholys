@@ -3,6 +3,20 @@
 export const WORKSPACE_SYSTEM_KEYS = ['ATLAS', 'SIEP', 'FUNDHUB', 'NEXUS', 'FORGE', 'PRISM'] as const;
 export type WorkspaceSystemKey = (typeof WORKSPACE_SYSTEM_KEYS)[number];
 
+/** Nome comercial — chaves de licença/API continuam em maiúsculas (FUNDHUB). */
+export const WORKSPACE_SYSTEM_DISPLAY: Record<WorkspaceSystemKey, string> = {
+  ATLAS: 'ATLAS',
+  SIEP: 'SIEP',
+  FUNDHUB: 'FundHub',
+  NEXUS: 'NEXUS',
+  FORGE: 'FORGE',
+  PRISM: 'PRISM',
+};
+
+export function systemDisplayName(key: string): string {
+  return WORKSPACE_SYSTEM_DISPLAY[key as WorkspaceSystemKey] ?? key;
+}
+
 const KEY_SET = new Set<string>(WORKSPACE_SYSTEM_KEYS);
 
 export function parseSystemsJson(raw: unknown): WorkspaceSystemKey[] {

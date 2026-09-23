@@ -33,7 +33,7 @@ const SYSTEMS: Array<{
   },
   {
     id: 'fundhub',
-    name: 'FUNDHUB',
+    name: 'FundHub',
     accent: '#D97706',
     tagline: {
       es: 'Captación de fondos: convocatorias, redacción de propuestas y seguimiento.',
@@ -153,7 +153,7 @@ function copy(locale: Locale) {
       ? [
           {
             title: 'Sistemas propios',
-            body: 'Cinco sistemas — ATLAS, SIEP, FUNDHUB, NEXUS y FORGE — más herramientas: Advisor, Studio, Work, Chorus y Prism. Contrate solo lo que necesita hoy.',
+            body: 'Cinco sistemas — ATLAS, SIEP, FundHub, NEXUS y FORGE — más herramientas: Advisor, Studio, Work, Chorus y Prism. Contrate solo lo que necesita hoy.',
             cta: 'Ver sistemas',
             href: '#sistemas',
           },
@@ -174,7 +174,7 @@ function copy(locale: Locale) {
         ? [
             {
               title: 'Sistemas próprios',
-              body: 'Cinco sistemas — ATLAS, SIEP, FUNDHUB, NEXUS e FORGE — mais ferramentas: Advisor, Studio, Work, Chorus e Prism. Contrate apenas o que precisa hoje.',
+              body: 'Cinco sistemas — ATLAS, SIEP, FundHub, NEXUS e FORGE — mais ferramentas: Advisor, Studio, Work, Chorus e Prism. Contrate apenas o que precisa hoje.',
               cta: 'Ver sistemas',
               href: '#sistemas',
             },
@@ -194,7 +194,7 @@ function copy(locale: Locale) {
         : [
             {
               title: 'Proprietary systems',
-              body: 'Five systems — ATLAS, SIEP, FUNDHUB, NEXUS and FORGE — plus tools: Advisor, Studio, Work, Chorus and Prism. License only what you need today.',
+              body: 'Five systems — ATLAS, SIEP, FundHub, NEXUS and FORGE — plus tools: Advisor, Studio, Work, Chorus and Prism. License only what you need today.',
               cta: 'See systems',
               href: '#sistemas',
             },

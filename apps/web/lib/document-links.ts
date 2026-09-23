@@ -318,7 +318,7 @@ export async function listDocLinkOptions(opts: {
         entityType: 'proposal',
         entityId: p.id,
         label: p.title,
-        hint: p.status || 'FUNDHUB',
+        hint: p.status || 'FundHub',
       });
     }
   }

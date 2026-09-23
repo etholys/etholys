@@ -285,7 +285,7 @@ export default function InstitutionalProfilePage() {
             className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4" />
-            OPPORTUNITY
+            FundHub
           </Link>
           <h1 className="mt-2 text-2xl font-bold text-gray-900 md:text-3xl">
             {t('Perfil', 'Perfil', 'Profile')}

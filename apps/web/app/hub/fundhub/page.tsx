@@ -72,7 +72,7 @@ export default function FundHubPage() {
   return (
     <div className="space-y-6">
       <section className="etholys-site-rise overflow-hidden rounded-2xl border border-white/10 bg-[#0C1822]/80 p-6 md:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-400/90">OPPORTUNITY</p>
+            <p className="text-xs font-semibold tracking-[0.18em] text-amber-400/90">FundHub</p>
         <h1 className="mt-3 font-[family-name:var(--font-etholys-display)] text-3xl font-semibold tracking-tight text-white md:text-4xl">
           {t('Buscar. Decidir. Candidatar.', 'Buscar. Decidir. Postular.', 'Search. Decide. Apply.')}
         </h1>

@@ -17,7 +17,7 @@ export default function FundHubSettingsPage() {
           <div>
             <Link href="/hub/fundhub" className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
               <ArrowLeft className="w-4 h-4" />
-              OPPORTUNITY
+              FundHub
             </Link>
             <h1 className="mt-3 text-3xl font-bold text-gray-900">
               {t('Definições', 'Ajustes', 'Settings')}
@@ -50,9 +50,9 @@ export default function FundHubSettingsPage() {
             </div>
             <p className="mt-2 text-sm text-gray-600">
               {t(
-                'Quem pode abrir OPPORTUNITY e outros sistemas.',
-                'Quién puede abrir OPPORTUNITY y otros sistemas.',
-                'Who can open OPPORTUNITY and other systems.',
+                'Quem pode abrir o FundHub e outros sistemas.',
+                'Quién puede abrir FundHub y otros sistemas.',
+                'Who can open FundHub and other systems.',
               )}
             </p>
             <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-amber-700 group-hover:underline">

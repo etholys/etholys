@@ -198,8 +198,8 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
                 <HandCoins className="h-4 w-4 text-amber-300" strokeWidth={1.75} />
               </div>
               {!collapsed && (
-                <span className="truncate font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-[0.14em] text-white">
-                  OPPORTUNITY
+                <span className="truncate font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-wide text-white">
+                  FundHub
                 </span>
               )}
             </Link>
@@ -510,8 +510,8 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
           <button type="button" onClick={() => setSidebarOpen(true)} className="text-white/70 hover:text-white">
             <Menu className="h-5 w-5" />
           </button>
-          <span className="font-[family-name:var(--font-etholys-display)] text-xs font-bold tracking-[0.16em] text-white">
-            OPPORTUNITY
+          <span className="font-[family-name:var(--font-etholys-display)] text-xs font-bold tracking-wide text-white">
+            FundHub
           </span>
           {activeCompany && (
             <div className="ml-auto flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/70">
@@ -521,8 +521,8 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
           )}
         </div>
 
-        <main className="fh-canvas min-w-0 flex-1 overflow-auto p-4 md:p-6">
-          <div className="mx-auto max-w-6xl">
+        <main className={cn('fh-canvas min-w-0 flex-1 overflow-auto', pathname?.includes('/fundhub/proposals/editor') ? 'p-3 md:p-4' : 'p-4 md:p-6')}>
+          <div className={cn('mx-auto', pathname?.includes('/fundhub/proposals/editor') ? 'max-w-[1400px]' : 'max-w-6xl')}>
             <SystemLicenseGate system="FUNDHUB">{children}</SystemLicenseGate>
           </div>
         </main>

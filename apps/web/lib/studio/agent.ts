@@ -24,7 +24,7 @@ export const STUDIO_ECOSYSTEM_CATALOG: StudioConsentSource[] = [
   },
   {
     id: 'fundhub.proposals',
-    label: 'Propostas FUNDHUB',
+    label: 'Propostas FundHub',
     system: 'FUNDHUB',
     description: 'Rascunhos e propostas em curso',
   },

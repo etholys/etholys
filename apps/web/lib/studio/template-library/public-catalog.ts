@@ -396,9 +396,9 @@ export const STUDIO_PUBLIC_TEMPLATES: PublicTemplate[] = [
     nameEs: 'Propuesta a donante (visual)',
     namePt: 'Proposta a doador (visual)',
     nameEn: 'Donor proposal (visual)',
-    descriptionEs: 'Estructura FUNDHUB con layout Design.',
-    descriptionPt: 'Estrutura FUNDHUB com layout Design.',
-    descriptionEn: 'FUNDHUB structure with Design layout.',
+    descriptionEs: 'Estructura FundHub con layout Design.',
+    descriptionPt: 'Estrutura FundHub com layout Design.',
+    descriptionEn: 'FundHub structure with Design layout.',
     sortOrder: 33,
     buildCanvas: () =>
       page(

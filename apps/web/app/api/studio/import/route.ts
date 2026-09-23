@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'sections obrigatórias' }, { status: 400 });
       }
 
-      const title = (titleRaw || 'Proposta FUNDHUB').slice(0, 180);
+      const title = (titleRaw || 'Proposta FundHub').slice(0, 180);
       const studioCanvas = fundhubProposalToStudioCanvas(title, sections);
       const created = await createStudioDocument({
         userId: user.id,
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
         templateKey: 'funding-proposal-outline',
         canvasState: studioCanvas,
         activityKind: 'imported',
-        activitySummary: `Importado da proposta FUNDHUB «${title}»`,
+        activitySummary: `Importado da proposta FundHub «${title}»`,
         activityMeta: { source: 'fundhub_proposal', sectionCount: sections.length },
       });
       if (!created.ok) {

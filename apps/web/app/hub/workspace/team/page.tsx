@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import { useApp } from '@/app/providers';
 import { WorkspaceTopBar } from '@/components/workspace/WorkspaceTopBar';
 import { useHubWorkspaceRoute } from '@/components/hub/HubWorkspaceShell';
-import { WORKSPACE_SYSTEM_KEYS, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
+import { WORKSPACE_SYSTEM_KEYS, systemDisplayName, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
 import { Shield, Lock } from 'lucide-react';
 import { getSiepPermissionGroups, type SiepPermissionKey } from '@/lib/siep/permissions-shared';
 import type { Locale } from '@/lib/i18n';
@@ -368,7 +368,7 @@ export default function WorkspaceTeamPage() {
                     checked={sel[k]}
                     onChange={(e) => setSel((s) => ({ ...s, [k]: e.target.checked }))}
                   />
-                  {k}
+                  {systemDisplayName(k)}
                 </label>
               ))}
             </div>
@@ -454,7 +454,7 @@ export default function WorkspaceTeamPage() {
                 className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 py-2"
               >
                 <span>
-                  {g.name} — {g.systems.join(', ')}
+                  {g.name} — {g.systems.map(systemDisplayName).join(', ')}
                 </span>
                 <button type="button" onClick={() => void remove(g.userId)} className="text-red-600 hover:underline">
                   {t('Remover', 'Quitar', 'Remove')}

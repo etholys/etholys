@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { formatCents } from '@/lib/billing/catalog';
-import type { WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
+import { systemDisplayName, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
 
 type CatalogItem = {
   code: string;
@@ -351,7 +351,7 @@ export function BillingConsole({ companyId }: { companyId: string }) {
             <Package className="h-3.5 w-3.5" />
             {t('Sistemas', 'Sistemas', 'Systems')}
           </p>
-          <p className="text-sm font-medium text-slate-800">{snap?.licensedSystems.join(' · ') || '—'}</p>
+          <p className="text-sm font-medium text-slate-800">{snap?.licensedSystems.map(systemDisplayName).join(' · ') || '—'}</p>
           {snap?.currentPeriodEnd && (
             <p className="mt-1 text-xs text-slate-500">
               {t('Próxima renovação', 'Próxima renovación', 'Next renewal')}:{' '}
@@ -448,9 +448,9 @@ export function BillingConsole({ companyId }: { companyId: string }) {
         <div className="space-y-4">
           <p className="text-sm text-slate-600">
             {t(
-              'Active a regra nos produtos que cobram comissão. Depois acumule eventos (FUNDHUB: propostas ganhas) e gere a fatura.',
-              'Active la regla en los productos que cobran comisión. Luego acumule eventos (FUNDHUB: propuestas ganadas) y genere la factura.',
-              'Enable the rule on products that charge commission. Then accrue events (FUNDHUB: won proposals) and issue the invoice.',
+              'Active a regra nos produtos que cobram comissão. Depois acumule eventos (FundHub: propostas ganhas) e gere a fatura.',
+              'Active la regla en los productos que cobran comisión. Luego acumule eventos (FundHub: propuestas ganadas) y genere la factura.',
+              'Enable the rule on products that charge commission. Then accrue events (FundHub: won proposals) and issue the invoice.',
             )}
           </p>
           <div className="grid gap-3 md:grid-cols-2">
@@ -465,7 +465,7 @@ export function BillingConsole({ companyId }: { companyId: string }) {
               onClick={() => void commissionAction('scan')}
               className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:opacity-50"
             >
-              {t('Varrer propostas FUNDHUB', 'Escanear propuestas FUNDHUB', 'Scan FUNDHUB proposals')}
+              {t('Varrer propostas FundHub', 'Escanear propuestas FundHub', 'Scan FundHub proposals')}
             </button>
             <button
               type="button"

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useApp } from '@/app/providers';
 import { useSession } from 'next-auth/react';
-import { WORKSPACE_SYSTEM_KEYS, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
+import { WORKSPACE_SYSTEM_KEYS, systemDisplayName, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
 import { isLikelyDbId } from '@/lib/utils';
 import { StateLoading } from '@/components/ui/StateBlocks';
 import { ArrowRight, LayoutGrid, Shield, User } from 'lucide-react';
@@ -137,7 +137,7 @@ export function LicenseOverviewPanel() {
           <div className="flex flex-wrap gap-2">
             {mySystems.map((key) => (
               <span key={key} className={`rounded-full px-2.5 py-1 text-xs font-semibold ${SYSTEM_COLORS[key]}`}>
-                {key}
+                {systemDisplayName(key)}
               </span>
             ))}
           </div>
@@ -193,7 +193,7 @@ export function LicenseOverviewPanel() {
                                 SYSTEM_COLORS[key as WorkspaceSystemKey] ?? 'bg-slate-100 text-slate-700'
                               }`}
                             >
-                              {key}
+                              {systemDisplayName(key)}
                             </span>
                           ))}
                         </div>

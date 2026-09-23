@@ -121,7 +121,7 @@ const systems: HubEntry[] = [
   },
   {
     id: 'fundhub',
-    name: 'FUNDHUB',
+    name: 'FundHub',
     tagline: {
       es: 'Captación de fondos, convocatorias y redacción de propuestas',
       pt: 'Captação de fundos, concursos e redação de propostas',

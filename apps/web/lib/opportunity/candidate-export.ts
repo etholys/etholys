@@ -33,7 +33,7 @@ td{border:1px solid #ccc;padding:6px 10px;vertical-align:top}
 </style></head>
 <body>
 <h1>${escape(opts.title)}</h1>
-<p class="muted">${escape(opts.institution)} — resumo OPPORTUNITY / Etholys</p>
+<p class="muted">${escape(opts.institution)} — resumo FundHub / Etholys</p>
 <table>${metaRows}</table>
 <h2>Análise</h2>
 <div>${bodyHtml}</div>

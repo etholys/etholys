@@ -532,7 +532,7 @@ async function seedSandboxContent(
       sectors: 'agro,educación,clima',
       matchScore: 82,
       matchJustification: 'Alineado con cadenas verdes y formación híbrida (sandbox).',
-      summary: 'Fondo ficticio para probar matching y propuestas en FUNDHUB.',
+      summary: 'Fondo ficticio para probar matching y propuestas en FundHub.',
       description: 'Datos de demostración Etholys Sandbox.',
     },
   });

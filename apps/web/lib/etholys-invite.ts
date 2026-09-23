@@ -11,6 +11,7 @@ import {
 import {
   WORKSPACE_SYSTEM_KEYS,
   normalizeSystemsInput,
+  systemDisplayName,
   type WorkspaceSystemKey,
 } from '@/lib/integrated-workspace-shared';
 import type { Locale } from '@/lib/i18n';
@@ -141,7 +142,7 @@ export function buildInviteSummaryLines(
     );
   }
   if (payload.systems.length) {
-    lines.push(`Sistemas: ${payload.systems.join(', ')}`);
+    lines.push(`Sistemas: ${payload.systems.map(systemDisplayName).join(', ')}`);
   } else if (payload.inviteKind !== 'ally' && payload.role !== 'ADMIN') {
     lines.push(
       locale === 'pt'

@@ -41,7 +41,7 @@ type Props = {
 const SYSTEM_LABEL: Record<string, string> = {
   NEXUS: 'NEXUS',
   SIEP: 'SIEP',
-  FUNDHUB: 'FUNDHUB',
+  FUNDHUB: 'FundHub',
   FORGE: 'FORGE',
   MEET: 'Meet',
   ATLAS: 'ATLAS',

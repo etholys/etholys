@@ -3414,9 +3414,9 @@ export default function StudioDocumentPage() {
         labels={{
           title: t('Vínculos do documento', 'Vínculos del documento', 'Document links'),
           hint: t(
-            'Liga este documento a NEXUS (AT), SIEP, FUNDHUB, empresa, etc. A IA usa estes vínculos como contexto.',
-            'Vincula este documento a NEXUS (AT), SIEP, FUNDHUB, empresa, etc. La IA usa estos vínculos como contexto.',
-            'Link this document to NEXUS (AT), SIEP, FUNDHUB, company, etc. AI uses these links as context.',
+            'Liga este documento a NEXUS (AT), SIEP, FundHub, empresa, etc. A IA usa estes vínculos como contexto.',
+            'Vincula este documento a NEXUS (AT), SIEP, FundHub, empresa, etc. La IA usa estos vínculos como contexto.',
+            'Link this document to NEXUS (AT), SIEP, FundHub, company, etc. AI uses these links as context.',
           ),
           system: t('Sistema', 'Sistema', 'System'),
           entity: t('Entidade', 'Entidad', 'Entity'),

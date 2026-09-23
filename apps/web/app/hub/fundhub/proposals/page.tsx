@@ -281,7 +281,7 @@ export default function ProposalsPage() {
       <header>
         <Link href="/hub/fundhub" className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900">
           <ArrowLeft className="h-4 w-4" />
-          OPPORTUNITY
+          FundHub
         </Link>
         <h1 className="mt-3 text-3xl font-bold text-gray-900">Propostas</h1>
         <p className="mt-1 text-gray-600">Escrever e acompanhar candidaturas.</p>

@@ -1,53 +1,100 @@
 export const dynamic = 'force-dynamic';
+export const maxDuration = 120;
 
 import { NextResponse, NextRequest } from 'next/server';
-import { llmCompleteText } from '@/lib/llm-client';
+import { llmCompleteText, publicLlmErrorMessage } from '@/lib/llm-client';
+import { prisma } from '@/lib/prisma';
+import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
+import {
+  buildFundhubProposalSystemPrompt,
+  buildFundhubProposalUserPrompt,
+  normalizeFundhubMode,
+  type FundhubProposalContext,
+} from '@/lib/agents/fundhub-proposal-prompt';
+
+async function loadOrgProfileText(companyId: string): Promise<string> {
+  const [company, profile] = await Promise.all([
+    prisma.company.findUnique({
+      where: { id: companyId },
+      select: {
+        name: true,
+        shortName: true,
+        description: true,
+        businessActivity: true,
+        incorporationCountry: true,
+      },
+    }),
+    prisma.fundingCaptureProfile.findUnique({
+      where: { companyId },
+      select: { themesCsv: true, countriesCsv: true },
+    }),
+  ]);
+  if (!company) return '';
+  const lines = [
+    `Nome: ${company.name}`,
+    company.shortName && company.shortName !== company.name ? `Nome curto: ${company.shortName}` : '',
+    company.description ? `Descrição: ${company.description}` : '',
+    company.businessActivity ? `Sector: ${company.businessActivity}` : '',
+    company.incorporationCountry ? `País: ${company.incorporationCountry}` : '',
+    profile?.themesCsv ? `Temas: ${profile.themesCsv}` : '',
+    profile?.countriesCsv ? `Países de actuação: ${profile.countriesCsv}` : '',
+  ].filter(Boolean);
+  return lines.join('\n');
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const {
-      fundName,
-      fundInstitution,
-      editalLink,
-      editalSummary,
-      userMessage,
-      mode,
-    } = body;
+    const body = (await req.json()) as FundhubProposalContext & {
+      userMessage?: string;
+      mode?: unknown;
+      companyId?: string;
+    };
 
-    if (!userMessage || typeof userMessage !== 'string') {
+    const mode = normalizeFundhubMode(body.mode);
+    const userMessage =
+      typeof body.userMessage === 'string' ? body.userMessage : '';
+
+    if (mode !== 'brainstorm' && mode !== 'structure' && !userMessage.trim()) {
       return NextResponse.json({ error: 'É necessário informar a pergunta ou instrução.' }, { status: 400 });
     }
 
-    const contextParts = [];
-    if (fundName) contextParts.push(`Fundo: ${fundName}`);
-    if (fundInstitution) contextParts.push(`Instituição: ${fundInstitution}`);
-    if (editalLink) contextParts.push(`Link do edital: ${editalLink}`);
-    if (editalSummary) contextParts.push(`Resumo do edital: ${editalSummary}`);
-
-    const contextText = contextParts.length > 0 ? `${contextParts.join('\n')}\n\n` : '';
-
-    let systemInstruction =
-      'Você é um assistente de elaboração de propostas para editais. Responda de forma objetiva, com foco em requisitos, riscos e próximos passos para preparar a proposta.';
-    let prompt = `${contextText}Usuário: ${userMessage}\n\nResposta:`;
-
-    if (mode === 'structure') {
-      systemInstruction =
-        'Você é um especialista em análise de editais e estruturação de propostas. Você deve analisar cuidadosamente a estrutura do edital e sugerir uma estrutura clara de seções para a proposta. Cada seção sugerida deve ser clara, específica e alinhada com os requisitos do edital. Responda APENAS com os nomes das seções, uma por linha, numeradas (1. 2. 3. etc).';
-      prompt = `Analise o seguinte edital e gere os nomes das seções sugeridas para uma proposta bem estruturada:\n\n${contextText}\n\nSeções sugeridas:\n`;
-    } else if (mode === 'chat') {
-      systemInstruction =
-        'Você é um especialista em elaboração de propostas para editais de financiamento. Você tem profundo conhecimento em estrutura de projetos, viabilidade financeira, gestão de risco, e melhores práticas em propostas. Responda de forma clara, objetiva e prátitica, dando recomendações concretas baseadas nos requisitos do edital. Quando necessário, peça esclarecimentos sobre pontos específicos do projeto.';
+    let orgProfile = typeof body.orgProfile === 'string' ? body.orgProfile : '';
+    const tenant = await resolveOpportunityCompanyId(body.companyId ?? req.nextUrl.searchParams.get('companyId'));
+    if (tenant && !orgProfile.trim()) {
+      orgProfile = await loadOrgProfileText(tenant.companyId);
     }
 
-    const answer = await llmCompleteText(systemInstruction, prompt, {
-      maxOutputTokens: 800,
-      temperature: mode === 'structure' ? 0.15 : 0.25,
-    });
+    const ctx: FundhubProposalContext = {
+      fundName: body.fundName,
+      fundInstitution: body.fundInstitution,
+      editalLink: body.editalLink,
+      editalSummary: body.editalSummary,
+      documentMarkdown: body.documentMarkdown,
+      proposalOutline: body.proposalOutline,
+      sectionTitle: body.sectionTitle,
+      sectionContent: body.sectionContent,
+      orgProfile,
+    };
 
-    return NextResponse.json({ answer });
-  } catch (error: any) {
-    const message = error?.message || 'Erro desconhecido';
-    return NextResponse.json({ error: message }, { status: 500 });
+    const defaultMessage =
+      mode === 'brainstorm'
+        ? 'Chuva de ideias inicial para esta proposta.'
+        : mode === 'structure'
+          ? 'Gera a estrutura da proposta.'
+          : userMessage;
+
+    const maxOutputTokens = mode === 'structure' ? 800 : mode === 'brainstorm' ? 2500 : 2000;
+    const temperature = mode === 'structure' ? 0.15 : mode === 'brainstorm' ? 0.4 : 0.25;
+
+    const answer = await llmCompleteText(
+      buildFundhubProposalSystemPrompt(mode),
+      buildFundhubProposalUserPrompt(mode, ctx, userMessage || defaultMessage),
+      { maxOutputTokens, temperature },
+    );
+
+    return NextResponse.json({ answer, mode });
+  } catch (error: unknown) {
+    console.error('[proposals/assistant] LLM', error);
+    return NextResponse.json({ error: publicLlmErrorMessage(error) }, { status: 503 });
   }
 }

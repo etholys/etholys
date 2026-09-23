@@ -18,6 +18,7 @@ import {
   Clock,
   Download,
   ExternalLink,
+  FileText,
   Loader2,
   MapPin,
   MessageSquare,
@@ -25,6 +26,7 @@ import {
   ThumbsDown,
   X,
 } from 'lucide-react';
+import { PROPOSAL_CANDIDATE_KEY } from '@/lib/opportunity/proposal-workspace';
 
 type FeedbackAction = 'save' | 'not_now' | 'reject_type';
 
@@ -493,6 +495,20 @@ export function CandidateDetailSheet({
                 </button>
               </>
             )}
+            <Link
+              href="/hub/fundhub/proposals?from=candidate"
+              onClick={() => {
+                try {
+                  sessionStorage.setItem(PROPOSAL_CANDIDATE_KEY, JSON.stringify(c));
+                } catch {
+                  /* ignore */
+                }
+              }}
+              className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {t('Proposta', 'Propuesta', 'Proposal')}
+            </Link>
             <button
               type="button"
               disabled={briefLoading}

@@ -69,7 +69,7 @@ const SYSTEM_SKUS: BillingSku[] = [
   {
     code: 'sys.FUNDHUB',
     kind: 'system',
-    name: L('FUNDHUB — Captação', 'FUNDHUB — Captación', 'FUNDHUB — Fundraising'),
+    name: L('FundHub — Captação', 'FundHub — Captación', 'FundHub — Fundraising'),
     blurb: L(
       'Convocatórias, matching e propostas.',
       'Convocatorias, matching y propuestas.',
@@ -164,9 +164,9 @@ const PLAN_SKUS: BillingSku[] = [
     kind: 'plan',
     name: L('Pacote Institucional', 'Paquete Institucional', 'Institutional pack'),
     blurb: L(
-      'ATLAS + FUNDHUB + FORGE para ONGs e universidades.',
-      'ATLAS + FUNDHUB + FORGE para ONGs y universidades.',
-      'ATLAS + FUNDHUB + FORGE for NGOs and universities.',
+      'ATLAS + FundHub + FORGE para ONGs e universidades.',
+      'ATLAS + FundHub + FORGE para ONGs y universidades.',
+      'ATLAS + FundHub + FORGE for NGOs and universities.',
     ),
     systems: ['ATLAS', 'FUNDHUB', 'FORGE'],
     requiresSystems: [],
@@ -301,7 +301,7 @@ const ADDON_SKUS: BillingSku[] = [
   {
     code: 'addon.fundhub.post_award',
     kind: 'addon',
-    name: L('FUNDHUB pós-aprovação', 'FUNDHUB post-aprobación', 'FUNDHUB post-award'),
+    name: L('FundHub pós-aprovação', 'FundHub post-aprobación', 'FundHub post-award'),
     blurb: L(
       'Gestão do fundo ganho e reportes ao doador.',
       'Gestión del fondo ganado y reportes al donante.',
@@ -451,7 +451,7 @@ const COMMISSION_SKUS: BillingSku[] = [
   {
     code: 'commission.fundhub.success_fee',
     kind: 'commission',
-    name: L('FUNDHUB success fee', 'FUNDHUB success fee', 'FUNDHUB success fee'),
+    name: L('FundHub success fee', 'FundHub success fee', 'FundHub success fee'),
     blurb: L(
       'Comissão 2–5% sobre fundos captados com assistência da plataforma.',
       'Comisión 2–5% sobre fondos captados con asistencia de la plataforma.',

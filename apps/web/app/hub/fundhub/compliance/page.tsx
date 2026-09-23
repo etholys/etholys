@@ -139,7 +139,7 @@ export default function FundHubCompliancePage() {
             href="/hub/fundhub"
             className="mb-4 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
           >
-            ← OPPORTUNITY
+            ← FundHub
           </Link>
           <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
             <div>

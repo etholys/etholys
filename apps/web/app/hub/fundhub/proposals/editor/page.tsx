@@ -455,7 +455,7 @@ export default function FundHubProposalEditorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source: 'fundhub_proposal',
-          title: fund?.name ? `Proposta · ${fund.name}` : 'Proposta FUNDHUB',
+          title: fund?.name ? `Proposta · ${fund.name}` : 'Proposta FundHub',
           sections: contentSections.map((s) => ({ title: s.title, content: s.content })),
         }),
       });
