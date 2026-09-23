@@ -5,9 +5,12 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   ArrowRight,
+  FileText,
+  FolderOpen,
   HandCoins,
-  Layers,
   LogIn,
+  Mail,
+  Search,
 } from 'lucide-react';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 import { FundHubProductStage, type StageView } from '@/components/briefing/FundHubProductStage';
@@ -15,168 +18,59 @@ import { cn } from '@/lib/utils';
 
 const DEMO_HREF = '/login?callbackUrl=/hub/fundhub';
 
-type Slide = {
-  id: string;
-  accent: 'teal' | 'amber';
-  kicker: string;
-  title: string;
-  body?: string;
-  stage?: StageView;
-  cards?: { title: string; text: string; tone?: 'no' | 'yes' | 'amber' | 'teal' }[];
-};
+const PAIN = [
+  {
+    icon: Search,
+    title: 'Alguien busca en tres portales.',
+    desk: 'Twitter, un sitio del donante, otro del gobierno. Cada uno guarda un link distinto.',
+  },
+  {
+    icon: FolderOpen,
+    title: 'Otro mantiene una hoja.',
+    desk: 'Nombre del fondo, fecha a ojo, “hay que ver”. Nadie sabe qué se descartó ni por qué.',
+  },
+  {
+    icon: FileText,
+    title: 'La propuesta se escribe en Word.',
+    desk: 'Sin el edital a mano. El perfil institucional se pide por correo, otra vez.',
+  },
+  {
+    icon: Mail,
+    title: 'El financiador pide evidencia.',
+    desk: 'Quiénes son, con quién se postulan, si la gobernanza está en orden. Eso no está junto a la convocatoria.',
+  },
+];
 
-const SLIDES: Slide[] = [
+const VALUE = [
   {
-    id: 'cover',
-    accent: 'amber',
-    kicker: 'Etholys · FundHub',
-    title: 'Encontrar fondos.\nDecidir. Postular.',
-    body: 'La captación institucional — buscar convocatorias, decidir en equipo y escribir la candidatura — en un solo expediente.',
-    stage: 'home',
+    view: 'search' as StageView,
+    title: 'Encuentra. Usted decide.',
+    text: 'Convocatorias en fuentes oficiales. Elegibilidad, plazo, monto y riesgo. Guardar o descartar queda registrado.',
   },
   {
-    id: 'what',
-    accent: 'amber',
-    kicker: 'Qué es',
-    title: 'El trabajo de captación.\nNo otra herramienta suelta.',
-    body: 'Encontrar en fuentes oficiales, validar con criterio humano, guardar las que importan y construir la candidatura sobre el fondo ya encontrado — con el perfil a la vista.',
-    cards: [
-      { title: 'Buscar', text: 'La IA encuentra. Usted decide.', tone: 'amber' },
-      { title: 'En curso', text: 'Lo que ya guardó y sus plazos.', tone: 'amber' },
-      { title: 'Propuestas', text: 'Idea, chat y documento.', tone: 'amber' },
-    ],
-    stage: 'home',
+    view: 'pipeline' as StageView,
+    title: 'El equipo ve lo mismo.',
+    text: 'Un portafolio. Un plazo. El siguiente paso. No un correo suelto.',
   },
   {
-    id: 'not',
-    accent: 'teal',
-    kicker: 'Qué no es',
-    title: 'No es un buscador con otro nombre.',
-    cards: [
-      { title: 'No es un buscador de internet', text: 'Se priorizan enlaces oficiales. No se vende un agregador.', tone: 'no' },
-      { title: 'No es un Excel compartido', text: 'Portafolio, plazos y lo descartado viven aquí.', tone: 'no' },
-      { title: 'No es un redactor genérico de IA', text: 'La candidatura nace del fondo y del perfil reales.', tone: 'no' },
-      { title: 'Sí: captación institucional', text: 'Una firma. Toda la red. Español y portugués.', tone: 'yes' },
-    ],
-  },
-  {
-    id: 'problem',
-    accent: 'teal',
-    kicker: 'El problema',
-    title: 'Las convocatorias existen.\nEl trabajo está partido.',
-    cards: [
-      { title: 'Hoy', text: 'Portales, una hoja, Word sin el edital, compliance en otra carpeta, socios en la cabeza de alguien. Cuando llega el plazo hay personas ocupadas — no un portafolio.', tone: 'no' },
-      { title: 'Con FundHub', text: 'Un rastro. Un expediente. No promete ganar más fondos por magia. Promete que buscar, decidir, postular y dejar expediente dejen de estar partidos.', tone: 'yes' },
-    ],
-  },
-  {
-    id: 'who',
-    accent: 'teal',
-    kicker: 'Para quién',
-    title: 'Lo contrata una institución.\nLo usa su red.',
-    cards: [
-      { title: 'Quien firma', text: 'ONG, fundaciones, institutos, universidades. Agencias y operadores de fondo — como el PNUD — que necesitan ver la cartera.', tone: 'teal' },
-      { title: 'Quien ejecuta debajo', text: 'Subproyecto, empresa atendida, socio de consorcio. Dentro de ese contrato. No otra cuenta como si fuera otro cliente.', tone: 'amber' },
-      { title: 'Por qué importa', text: 'Una firma. Una red. Un rastro. El próximo programa no debería exigir otra hoja y otro Word.', tone: 'amber' },
-    ],
-  },
-  {
-    id: 'flow',
-    accent: 'amber',
-    kicker: 'El flujo',
-    title: 'Tres pasos. Nada más.',
-    body: 'El menú no es un catálogo de módulos. Es el trabajo. Pulse los verbos — es la misma pantalla del producto.',
-    stage: 'home',
-  },
-  {
-    id: 'search',
-    accent: 'amber',
-    kicker: '01 · Buscar',
-    title: 'La IA encuentra.\nUsted decide.',
-    body: 'Temas, países, tipo, techo de monto. Fuentes oficiales. Cada candidato llega listo para decidir. Pulse una ficha.',
-    stage: 'search',
-  },
-  {
-    id: 'pipeline',
-    accent: 'amber',
-    kicker: '02 · En curso',
-    title: 'No es otra búsqueda.\nEs el portafolio.',
-    body: 'Plazos, institución, siguiente paso. El equipo ve lo mismo. De aquí se abre la propuesta sin pedir el edital otra vez.',
-    stage: 'pipeline',
-  },
-  {
-    id: 'proposal',
-    accent: 'amber',
-    kicker: '03 · Propuestas',
-    title: 'El fondo ya está.\nLa candidatura no parte de cero.',
-    body: 'Lluvia de ideas para ese fondo y este perfil. Pulse una idea: entra al canvas. El rastro queda.',
-    stage: 'proposal',
-  },
-  {
-    id: 'around',
-    accent: 'amber',
-    kicker: 'El expediente',
-    title: 'El financiador no compra un PowerPoint.',
-    cards: [
-      { title: 'Perfil', text: 'Nombre, sector, país, intereses. Quien administra lo edita. Si falta algo, una línea lo señala.', tone: 'amber' },
-      { title: 'Mapa', text: 'La cartera ya guardada: país, sector, plazo.', tone: 'amber' },
-      { title: 'Compliance', text: 'Gobernanza, auditoría, ESG, legal. El rastro — no sustituye a un abogado.', tone: 'amber' },
-      { title: 'Coalición y socios', text: 'El consorcio del edital y la red local, sin duplicar datos.', tone: 'amber' },
-    ],
-    stage: 'profile',
-  },
-  {
-    id: 'ai',
-    accent: 'teal',
-    kicker: 'La IA, en su lugar',
-    title: 'La IA no es el producto.\nEstá dentro del trabajo.',
-    cards: [
-      { title: 'Hace', text: 'Busca. Resume. Propone una idea. Escribe junto al documento.', tone: 'yes' },
-      { title: 'No hace', text: 'No postula sola. No firma. No inventa un financiador. La decisión sigue siendo humana.', tone: 'no' },
-    ],
-  },
-  {
-    id: 'scale',
-    accent: 'teal',
-    kicker: 'A escala',
-    title: 'Se licencia y se vuelve a usar.',
-    cards: [
-      { title: 'Solo FundHub', text: 'No exige ATLAS, SIEP, NEXUS ni el resto. Si ya hay otros productos Etholys, los datos se cruzan.', tone: 'teal' },
-      { title: 'Multi-empresa', text: 'Cada programa o red ve su cartera. Quien ejecuta debajo, dentro del contrato de quien firmó.', tone: 'teal' },
-      { title: 'ES y PT', text: 'En servidores Etholys o en los de la institución.', tone: 'teal' },
-    ],
-  },
-  {
-    id: 'demo',
-    accent: 'amber',
-    kicker: 'Momento demostración',
-    title: 'Horizonte, en vivo.',
-    body: 'Tres minutos en el producto real. Buscar → guardar → propuesta. Si la búsqueda falla, se ve el reintento. Eso también es FundHub.',
-    stage: 'search',
-  },
-  {
-    id: 'close',
-    accent: 'amber',
-    kicker: 'Cierre',
-    title: 'El ciclo deja de estar partido.',
-    body: 'Buscar. Decidir. Postular. Un expediente para quien firma — y para quien ejecuta debajo.',
-    cards: [
-      { title: 'ONG', text: 'Un rastro compartido. Menos Word suelto.', tone: 'amber' },
-      { title: 'PNUD', text: 'Cartera visible. Una red, un contrato.', tone: 'teal' },
-      { title: 'Siguiente paso', text: 'Probar FundHub con un programa real.', tone: 'yes' },
-    ],
+    view: 'proposal' as StageView,
+    title: 'La candidatura ya conoce el fondo.',
+    text: 'Abre con el edital y el perfil de la institución. Idea, chat y documento en el mismo expediente.',
   },
 ];
 
 export function FundHubBriefing() {
   const [i, setI] = useState(0);
-  const [stageOverride, setStageOverride] = useState<StageView | null>(null);
-  const slide = SLIDES[i];
-  const stage = stageOverride ?? slide.stage;
+  const [beat, setBeat] = useState(0);
+  const [stage, setStage] = useState<StageView>('home');
+  const [valuePick, setValuePick] = useState(0);
 
   const go = useCallback((next: number) => {
-    setStageOverride(null);
-    setI(Math.max(0, Math.min(SLIDES.length - 1, next)));
+    const n = Math.max(0, Math.min(6, next));
+    setI(n);
+    setBeat(0);
+    setValuePick(0);
+    setStage(n === 0 ? 'home' : n === 4 ? 'profile' : n === 5 ? 'home' : 'search');
   }, []);
 
   useEffect(() => {
@@ -189,113 +83,59 @@ export function FundHubBriefing() {
         e.preventDefault();
         go(i - 1);
       }
-      if (e.key === 'Home') go(0);
-      if (e.key === 'End') go(SLIDES.length - 1);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [go, i]);
 
+  useEffect(() => {
+    if (i !== 1) return;
+    const t = window.setInterval(() => setBeat((b) => (b + 1) % PAIN.length), 3200);
+    return () => window.clearInterval(t);
+  }, [i]);
+
   return (
-    <div
-      className={cn(
-        'relative isolate min-h-[100dvh] overflow-hidden bg-[#07111A] text-[#E8EEF2]',
-        slide.accent === 'amber' ? 'etholys-fundhub' : 'etholys-hub',
-      )}
-    >
-      <SystemAtmosphere accent={slide.accent} />
+    <div className="etholys-fundhub relative isolate min-h-[100dvh] overflow-hidden bg-[#07111A] text-[#E8EEF2]">
+      <SystemAtmosphere accent="amber" />
 
       <header className="relative z-20 border-b border-white/10 bg-[#07111A]/55 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <div
-              className={cn(
-                'flex h-9 w-9 items-center justify-center rounded-lg border',
-                slide.accent === 'amber'
-                  ? 'border-amber-400/30 bg-amber-500/15'
-                  : 'border-teal-400/25 bg-teal-500/10',
-              )}
-            >
-              {slide.accent === 'amber' ? (
-                <HandCoins className="h-4 w-4 text-amber-300" strokeWidth={1.75} />
-              ) : (
-                <Layers className="h-4 w-4 text-teal-300" />
-              )}
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-amber-400/30 bg-amber-500/15">
+              <HandCoins className="h-4 w-4 text-amber-300" strokeWidth={1.75} />
             </div>
-            <p className="font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-[0.16em] text-white">
-              {slide.accent === 'amber' ? 'FundHub' : 'ETHOLYS'}
+            <p className="font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-wide text-white">
+              FundHub
             </p>
-            <span className="hidden text-xs text-white/35 sm:inline">briefing · 15 min</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href={DEMO_HREF}
-              className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-3.5 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-amber-400"
-            >
-              <LogIn className="h-3.5 w-3.5" />
-              Entrar al Hub
-            </Link>
-          </div>
+          <Link
+            href={DEMO_HREF}
+            className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-3.5 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-amber-400"
+          >
+            <LogIn className="h-3.5 w-3.5" />
+            Entrar al Hub
+          </Link>
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto grid min-h-[calc(100dvh-7.5rem)] max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center">
-        <div key={slide.id} className="etholys-site-rise">
-          <p
-            className={cn(
-              'text-xs font-semibold tracking-[0.22em]',
-              slide.accent === 'amber' ? 'text-amber-400/90' : 'text-teal-400/90',
-            )}
-          >
-            {slide.kicker}
-          </p>
-          <h1 className="mt-3 whitespace-pre-line font-[family-name:var(--font-etholys-display)] text-3xl font-semibold leading-tight tracking-tight text-white sm:text-4xl">
-            {slide.title}
-          </h1>
-          {slide.body && <p className="mt-4 max-w-xl text-base leading-relaxed text-white/55">{slide.body}</p>}
-          {slide.cards && (
-            <div className={cn('mt-6 grid gap-3', slide.cards.length > 3 ? 'sm:grid-cols-2' : 'sm:grid-cols-1')}>
-              {slide.cards.map((c) => (
-                <div
-                  key={c.title}
-                  className={cn(
-                    'rounded-2xl border p-4',
-                    c.tone === 'yes' && 'border-teal-400/20 bg-teal-500/10',
-                    c.tone === 'no' && 'border-white/10 bg-[#0C1822]/70',
-                    c.tone === 'amber' && 'border-white/10 bg-[#0C1822]/80 hover:border-amber-400/30',
-                    c.tone === 'teal' && 'border-white/10 bg-[#0C1822]/80',
-                    !c.tone && 'border-white/10 bg-[#0C1822]/70',
-                  )}
-                >
-                  <p className="font-[family-name:var(--font-etholys-display)] text-sm text-white">{c.title}</p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-white/50">{c.text}</p>
-                </div>
-              ))}
-            </div>
-          )}
-          {slide.id === 'demo' && (
-            <Link
-              href={DEMO_HREF}
-              className="mt-6 inline-flex items-center gap-2 rounded-md bg-amber-500 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-amber-400"
-            >
-              Abrir FundHub con Horizonte
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          )}
-        </div>
-
-        <div className={cn(!stage && 'hidden lg:block')}>
-          {stage ? (
-            <FundHubProductStage view={stage} onView={setStageOverride} />
-          ) : (
-            <div className="hidden rounded-2xl border border-white/10 bg-[#0C1822]/40 p-6 lg:block">
-              <p className="text-xs tracking-[0.18em] text-white/30">ETHOLYS</p>
-              <p className="mt-3 font-[family-name:var(--font-etholys-display)] text-lg text-white/70">
-                Un ecosistema. Un acceso. FundHub se contrata solo.
-              </p>
-            </div>
-          )}
-        </div>
+      <main className="relative z-10 mx-auto min-h-[calc(100dvh-7.25rem)] max-w-6xl px-4 py-6 sm:px-6">
+        {i === 0 && <Cover onOpen={() => go(1)} />}
+        {i === 1 && <Pain beat={beat} onBeat={setBeat} />}
+        {i === 2 && (
+          <Value
+            pick={valuePick}
+            onPick={(n) => {
+              setValuePick(n);
+              setStage(VALUE[n].view);
+            }}
+            stage={stage}
+            onStage={setStage}
+          />
+        )}
+        {i === 3 && <How stage={stage} onStage={setStage} />}
+        {i === 4 && <Expediente stage={stage} onStage={setStage} />}
+        {i === 5 && <Who />}
+        {i === 6 && <Demo />}
       </main>
 
       <footer className="relative z-20 border-t border-white/10 bg-[#07111A]/70 backdrop-blur-md">
@@ -309,13 +149,12 @@ export function FundHubBriefing() {
             <ArrowLeft className="h-3.5 w-3.5" />
             Anterior
           </button>
-          <div className="flex flex-wrap justify-center gap-1.5">
-            {SLIDES.map((s, idx) => (
+          <div className="flex gap-1.5">
+            {Array.from({ length: 7 }).map((_, idx) => (
               <button
-                key={s.id}
+                key={idx}
                 type="button"
                 onClick={() => go(idx)}
-                aria-label={s.kicker}
                 className={cn(
                   'h-1.5 rounded-full transition',
                   idx === i ? 'w-6 bg-amber-400' : 'w-1.5 bg-white/20 hover:bg-white/40',
@@ -323,31 +162,255 @@ export function FundHubBriefing() {
               />
             ))}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden text-[11px] text-white/30 sm:inline">
-              {String(i + 1).padStart(2, '0')} / {String(SLIDES.length).padStart(2, '0')}
-            </span>
-            {i < SLIDES.length - 1 ? (
-              <button
-                type="button"
-                onClick={() => go(i + 1)}
-                className="inline-flex items-center gap-1 rounded-md bg-white/5 px-2.5 py-1.5 text-xs text-white/80 transition hover:bg-white/10"
-              >
-                Siguiente
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            ) : (
-              <Link
-                href={DEMO_HREF}
-                className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2.5 py-1.5 text-xs font-semibold text-slate-950"
-              >
-                Demo
-                <LogIn className="h-3.5 w-3.5" />
-              </Link>
-            )}
-          </div>
+          {i < 6 ? (
+            <button
+              type="button"
+              onClick={() => go(i + 1)}
+              className="inline-flex items-center gap-1 rounded-md bg-white/5 px-2.5 py-1.5 text-xs text-white/80 hover:bg-white/10"
+            >
+              Siguiente
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            <Link
+              href={DEMO_HREF}
+              className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2.5 py-1.5 text-xs font-semibold text-slate-950"
+            >
+              Demo
+              <LogIn className="h-3.5 w-3.5" />
+            </Link>
+          )}
         </div>
       </footer>
+    </div>
+  );
+}
+
+function Cover({ onOpen }: { onOpen: () => void }) {
+  return (
+    <div className="grid min-h-[calc(100dvh-9rem)] items-center gap-8 lg:grid-cols-2">
+      <div className="etholys-site-rise">
+        <p className="text-xs font-semibold tracking-[0.22em] text-amber-400/90">FundHub</p>
+        <h1 className="mt-3 font-[family-name:var(--font-etholys-display)] text-4xl font-semibold leading-tight text-white sm:text-5xl">
+          Encontrar fondos.
+          <br />
+          Decidir. Postular.
+        </h1>
+        <p className="mt-5 max-w-md text-lg leading-relaxed text-white/65">
+          De la convocatoria a la candidatura, sin perder el rastro.
+        </p>
+        <button
+          type="button"
+          onClick={onOpen}
+          className="mt-8 inline-flex items-center gap-2 rounded-md bg-amber-500 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-amber-400"
+        >
+          El problema
+          <ArrowRight className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="etholys-site-rise" style={{ animationDelay: '120ms' }}>
+        <FundHubProductStage view="home" />
+      </div>
+    </div>
+  );
+}
+
+function Pain({ beat, onBeat }: { beat: number; onBeat: (n: number) => void }) {
+  const active = PAIN[beat];
+  const Icon = active.icon;
+  return (
+    <div className="grid min-h-[calc(100dvh-9rem)] items-center gap-8 lg:grid-cols-[1fr_1.05fr]">
+      <div className="etholys-site-rise">
+        <p className="text-xs font-semibold tracking-[0.22em] text-amber-400/90">El dolor</p>
+        <h1 className="mt-3 font-[family-name:var(--font-etholys-display)] text-3xl font-semibold leading-tight text-white sm:text-4xl">
+          El plazo llega.
+          <br />
+          El expediente no.
+        </h1>
+        <div className="mt-6 space-y-2">
+          {PAIN.map((p, n) => (
+            <button
+              key={p.title}
+              type="button"
+              onClick={() => onBeat(n)}
+              className={cn(
+                'w-full rounded-xl border px-4 py-3 text-left transition',
+                n === beat
+                  ? 'border-amber-400/35 bg-amber-500/10'
+                  : 'border-white/10 bg-[#0C1822]/50 hover:border-white/20',
+              )}
+            >
+              <p className={cn('text-sm font-medium', n === beat ? 'text-white' : 'text-white/50')}>{p.title}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div
+        key={beat}
+        className="etholys-site-rise overflow-hidden rounded-2xl border border-white/10 bg-[#0C1822]/80 p-6 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.85)]"
+      >
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-amber-400/30 bg-amber-500/15 text-amber-300">
+          <Icon className="h-5 w-5" />
+        </div>
+        <p className="mt-5 font-[family-name:var(--font-etholys-display)] text-xl text-white">{active.title}</p>
+        <p className="mt-3 text-base leading-relaxed text-white/55">{active.desk}</p>
+        <div className="mt-6 flex gap-1.5">
+          {PAIN.map((_, n) => (
+            <span key={n} className={cn('h-1 flex-1 rounded-full', n === beat ? 'bg-amber-400' : 'bg-white/10')} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Value({
+  pick,
+  onPick,
+  stage,
+  onStage,
+}: {
+  pick: number;
+  onPick: (n: number) => void;
+  stage: StageView;
+  onStage: (v: StageView) => void;
+}) {
+  return (
+    <div className="grid min-h-[calc(100dvh-9rem)] items-center gap-8 lg:grid-cols-2">
+      <div className="etholys-site-rise">
+        <p className="text-xs font-semibold tracking-[0.22em] text-amber-400/90">El valor</p>
+        <h1 className="mt-3 font-[family-name:var(--font-etholys-display)] text-3xl font-semibold leading-tight text-white sm:text-4xl">
+          Un rastro.
+          <br />
+          De punta a punta.
+        </h1>
+        <div className="mt-6 space-y-2">
+          {VALUE.map((v, n) => (
+            <button
+              key={v.title}
+              type="button"
+              onClick={() => onPick(n)}
+              className={cn(
+                'w-full rounded-xl border px-4 py-3 text-left transition',
+                pick === n
+                  ? 'border-amber-400/35 bg-amber-500/10'
+                  : 'border-white/10 bg-[#0C1822]/50 hover:border-white/20',
+              )}
+            >
+              <p className="text-sm font-semibold text-white">{v.title}</p>
+              <p className={cn('mt-1 text-sm leading-relaxed', pick === n ? 'text-white/60' : 'text-white/40')}>
+                {v.text}
+              </p>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="etholys-site-rise" style={{ animationDelay: '80ms' }}>
+        <FundHubProductStage view={stage} onView={onStage} playKey={`${pick}-${stage}`} />
+      </div>
+    </div>
+  );
+}
+
+function How({ stage, onStage }: { stage: StageView; onStage: (v: StageView) => void }) {
+  const steps: { view: StageView; n: string; title: string; text: string }[] = [
+    { view: 'search', n: '1', title: 'Buscar', text: 'La IA recorre fuentes oficiales. Usted valida.' },
+    { view: 'pipeline', n: '2', title: 'En curso', text: 'Lo que ya decidieron seguir. Plazos a la vista.' },
+    { view: 'proposal', n: '3', title: 'Propuestas', text: 'El fondo ya está. Pulse una idea e insértela.' },
+  ];
+  return (
+    <div className="etholys-site-rise min-h-[calc(100dvh-9rem)] space-y-5 py-2">
+      <div>
+        <p className="text-xs font-semibold tracking-[0.22em] text-amber-400/90">Cómo funciona</p>
+        <h1 className="mt-2 font-[family-name:var(--font-etholys-display)] text-3xl font-semibold text-white">
+          Tres verbos. El trabajo.
+        </h1>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {steps.map((s) => (
+          <button
+            key={s.view}
+            type="button"
+            onClick={() => onStage(s.view)}
+            className={cn(
+              'rounded-2xl border p-4 text-left transition',
+              stage === s.view
+                ? 'border-amber-400/40 bg-amber-500/10'
+                : 'border-white/10 bg-[#0C1822]/70 hover:border-amber-400/25',
+            )}
+          >
+            <p className="text-[11px] text-white/35">{s.n}</p>
+            <p className="mt-1 font-[family-name:var(--font-etholys-display)] text-lg text-white">{s.title}</p>
+            <p className="mt-1 text-sm text-white/45">{s.text}</p>
+          </button>
+        ))}
+      </div>
+      <FundHubProductStage view={stage === 'home' ? 'search' : stage} onView={onStage} playKey={stage} />
+    </div>
+  );
+}
+
+function Expediente({ stage, onStage }: { stage: StageView; onStage: (v: StageView) => void }) {
+  return (
+    <div className="grid min-h-[calc(100dvh-9rem)] items-center gap-8 lg:grid-cols-2">
+      <div className="etholys-site-rise">
+        <p className="text-xs font-semibold tracking-[0.22em] text-amber-400/90">Lo que viaja con la propuesta</p>
+        <h1 className="mt-3 font-[family-name:var(--font-etholys-display)] text-3xl font-semibold leading-tight text-white sm:text-4xl">
+          El perfil, el compliance y la coalición ya están.
+        </h1>
+        <p className="mt-4 max-w-md text-base leading-relaxed text-white/55">
+          No se reconstruyen por correo. Abren con la candidatura. Pulse Perfil en el menú.
+        </p>
+      </div>
+      <FundHubProductStage view={stage === 'home' ? 'profile' : stage} onView={onStage} playKey="profile" />
+    </div>
+  );
+}
+
+function Who() {
+  return (
+    <div className="etholys-site-rise mx-auto flex min-h-[calc(100dvh-9rem)] max-w-3xl flex-col justify-center">
+      <p className="text-xs font-semibold tracking-[0.22em] text-amber-400/90">Quién lo usa</p>
+      <h1 className="mt-3 font-[family-name:var(--font-etholys-display)] text-3xl font-semibold leading-tight text-white sm:text-4xl">
+        Una firma. Toda la red.
+      </h1>
+      <div className="mt-8 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-white/10 bg-[#0C1822]/80 p-5">
+          <p className="font-[family-name:var(--font-etholys-display)] text-lg text-white">ONG, fundación, universidad</p>
+          <p className="mt-2 text-sm leading-relaxed text-white/50">
+            El equipo de captación deja de partir el trabajo. El implementador entra dentro del mismo contrato.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-[#0C1822]/80 p-5">
+          <p className="font-[family-name:var(--font-etholys-display)] text-lg text-white">PNUD y operadores</p>
+          <p className="mt-2 text-sm leading-relaxed text-white/50">
+            Ven la cartera de quien ejecuta debajo. No abren una cuenta por socio.
+          </p>
+        </div>
+      </div>
+      <p className="mt-6 text-sm text-white/40">Se contrata solo FundHub. No exige el resto de Etholys.</p>
+    </div>
+  );
+}
+
+function Demo() {
+  return (
+    <div className="grid min-h-[calc(100dvh-9rem)] items-center gap-8 lg:grid-cols-2">
+      <div className="etholys-site-rise">
+        <p className="text-xs font-semibold tracking-[0.22em] text-amber-400/90">Horizonte</p>
+        <h1 className="mt-3 font-[family-name:var(--font-etholys-display)] text-3xl font-semibold leading-tight text-white sm:text-4xl">
+          Tres minutos en el producto.
+        </h1>
+        <p className="mt-4 max-w-md text-base text-white/55">Buscar. Guardar. Abrir la propuesta. Eso es la demo.</p>
+        <Link
+          href={DEMO_HREF}
+          className="mt-8 inline-flex items-center gap-2 rounded-md bg-amber-500 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-amber-400"
+        >
+          Entrar al Hub
+          <LogIn className="h-4 w-4" />
+        </Link>
+      </div>
+      <FundHubProductStage view="search" playKey="demo" />
     </div>
   );
 }

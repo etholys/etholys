@@ -64,9 +64,11 @@ const IDEAS = [
 export function FundHubProductStage({
   view,
   onView,
+  playKey,
 }: {
   view: StageView;
   onView?: (v: StageView) => void;
+  playKey?: string;
 }) {
   const [scan, setScan] = useState(0);
   const [scanning, setScanning] = useState(false);
@@ -78,7 +80,8 @@ export function FundHubProductStage({
       setScanning(false);
       return;
     }
-    setScan(8);
+    setScan(6);
+    setPicked(-1);
     setScanning(true);
     const t = window.setInterval(() => {
       setScan((p) => {
@@ -87,11 +90,11 @@ export function FundHubProductStage({
           setScanning(false);
           return 100;
         }
-        return p + 7;
+        return p + 6;
       });
-    }, 180);
+    }, 160);
     return () => window.clearInterval(t);
-  }, [view]);
+  }, [view, playKey]);
 
   const activeNav =
     view === 'home' ? 'home' : view === 'search' ? 'search' : view === 'pipeline' ? 'pipeline' : view === 'proposal' ? 'proposal' : 'profile';
@@ -144,7 +147,7 @@ export function FundHubProductStage({
           })}
         </aside>
         <div className="min-w-0 flex-1 p-4 md:p-5">
-          {view === 'home' && <HomePane />}
+          {view === 'home' && <HomePane onOpen={onView} />}
           {view === 'search' && (
             <SearchPane scan={scan} scanning={scanning} picked={picked} onPick={setPicked} />
           )}
@@ -159,11 +162,11 @@ export function FundHubProductStage({
   );
 }
 
-function HomePane() {
-  const cards = [
-    { n: '1', title: 'Buscar', detail: 'La IA encuentra. Usted decide.' },
-    { n: '2', title: 'En curso', detail: 'Lo que ya guardó y sus plazos.' },
-    { n: '3', title: 'Propuestas', detail: 'Idea, chat y documento.' },
+function HomePane({ onOpen }: { onOpen?: (v: StageView) => void }) {
+  const cards: { n: string; title: string; detail: string; view: StageView }[] = [
+    { n: '1', title: 'Buscar', detail: 'La IA encuentra. Usted decide.', view: 'search' },
+    { n: '2', title: 'En curso', detail: 'Lo que ya guardó y sus plazos.', view: 'pipeline' },
+    { n: '3', title: 'Propuestas', detail: 'Idea, chat y documento.', view: 'proposal' },
   ];
   return (
     <div className="etholys-site-rise space-y-4">
@@ -174,7 +177,8 @@ function HomePane() {
         </h3>
         <button
           type="button"
-          className="mt-4 inline-flex items-center gap-2 rounded-md bg-amber-500 px-4 py-2 text-xs font-semibold text-slate-950"
+          onClick={() => onOpen?.('search')}
+          className="mt-4 inline-flex items-center gap-2 rounded-md bg-amber-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-amber-400"
         >
           <Search className="h-3.5 w-3.5" />
           Empezar a buscar
@@ -182,11 +186,16 @@ function HomePane() {
       </section>
       <div className="grid gap-2 sm:grid-cols-3">
         {cards.map((c) => (
-          <div key={c.n} className="rounded-2xl border border-white/10 bg-[#0C1822]/70 p-3">
+          <button
+            key={c.n}
+            type="button"
+            onClick={() => onOpen?.(c.view)}
+            className="rounded-2xl border border-white/10 bg-[#0C1822]/70 p-3 text-left transition hover:border-amber-400/30"
+          >
             <p className="text-[10px] text-white/35">{c.n}</p>
             <p className="mt-1 font-[family-name:var(--font-etholys-display)] text-sm text-white">{c.title}</p>
             <p className="mt-1 text-[11px] text-white/45">{c.detail}</p>
-          </div>
+          </button>
         ))}
       </div>
     </div>
@@ -218,13 +227,23 @@ function SearchPane({
         </span>
       </div>
       <div className="space-y-2">
-        {CANDIDATES.map((row, i) => (
+        {CANDIDATES.map((row, i) => {
+          const visible = scan >= 28 + i * 24;
+          if (!visible) {
+            return (
+              <div
+                key={row.name}
+                className="h-[4.25rem] rounded-xl border border-dashed border-white/10 bg-white/[0.02]"
+              />
+            );
+          }
+          return (
           <button
             key={row.name}
             type="button"
             onClick={() => onPick(i)}
             className={cn(
-              'w-full rounded-xl border p-3 text-left transition',
+              'etholys-site-rise w-full rounded-xl border p-3 text-left transition',
               picked === i
                 ? 'border-amber-400/40 bg-amber-500/10'
                 : 'border-white/10 bg-[#0C1822]/70 hover:border-amber-400/25',
@@ -240,7 +259,8 @@ function SearchPane({
             </div>
             {row.saved && <p className="mt-2 text-[11px] font-medium text-teal-300">Guardado en En curso</p>}
           </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
