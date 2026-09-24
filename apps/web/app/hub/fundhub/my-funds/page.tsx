@@ -32,6 +32,8 @@ type Opportunity = {
   matchScore?: number | null;
   status: string;
   pipelineStatus?: PipelineStatus;
+  watchOpen?: boolean;
+  ownerUserId?: string | null;
 };
 
 export default function OpportunitiesPage() {
@@ -52,6 +54,7 @@ export default function OpportunitiesPage() {
   const [search, setSearch] = useState('');
   const [pipeline, setPipeline] = useState<'all' | 'decide' | 'prepare' | 'submitted' | 'closed'>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [members, setMembers] = useState<Array<{ id: string; name: string | null; email: string | null }>>([]);
 
   const q = (path: string) =>
     `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
@@ -89,22 +92,36 @@ export default function OpportunitiesPage() {
     void load(1);
   }, [load]);
 
-  const changePipeline = async (fundId: string, pipelineStatus: PipelineStatus) => {
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/users?companyId=${encodeURIComponent(companyId)}`)
+      .then((r) => r.json())
+      .then((d) => setMembers(Array.isArray(d.users) ? d.users : Array.isArray(d) ? d : []))
+      .catch(() => setMembers([]));
+  }, [companyId]);
+
+  const patchFund = async (
+    fundId: string,
+    body: { pipelineStatus?: PipelineStatus; watchOpen?: boolean; ownerUserId?: string | null },
+  ) => {
     if (!companyId) return;
     setBusyId(fundId);
     try {
       const r = await fetch(q('/api/opportunity/catalog'), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fundId, pipelineStatus }),
+        body: JSON.stringify({ fundId, ...body }),
       });
       if (r.ok) {
-        setItems((prev) => prev.map((item) => (item.id === fundId ? { ...item, pipelineStatus } : item)));
+        setItems((prev) => prev.map((item) => (item.id === fundId ? { ...item, ...body } : item)));
       }
     } finally {
       setBusyId(null);
     }
   };
+
+  const changePipeline = (fundId: string, pipelineStatus: PipelineStatus) =>
+    patchFund(fundId, { pipelineStatus });
 
   if (!companyId) {
     return (
@@ -252,6 +269,30 @@ export default function OpportunitiesPage() {
                       </span>
                     )}
                     <div className="flex gap-2">
+                      <label className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1.5 text-[11px] text-gray-700">
+                        <input
+                          type="checkbox"
+                          disabled={busyId === f.id}
+                          checked={Boolean(f.watchOpen)}
+                          onChange={(e) => void patchFund(f.id, { watchOpen: e.target.checked })}
+                        />
+                        {t('Avisar se abrir', 'Avisar si abre', 'Watch if it opens')}
+                      </label>
+                      {members.length > 0 && (
+                        <select
+                          disabled={busyId === f.id}
+                          value={f.ownerUserId ?? ''}
+                          onChange={(e) => void patchFund(f.id, { ownerUserId: e.target.value || null })}
+                          className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800"
+                        >
+                          <option value="">{t('Sem dono', 'Sin dueño', 'No owner')}</option>
+                          {members.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name || m.email || m.id.slice(0, 6)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       <select
                         disabled={busyId === f.id}
                         value={f.pipelineStatus ?? 'decide'}

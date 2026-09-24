@@ -3,6 +3,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { commissionAmountCents, getSku } from '@/lib/billing/catalog';
 import { issuePlatformInvoice } from '@/lib/billing/checkout';
+import { successFeeAllowed } from '@/lib/fundhub/success-fee-policy';
 
 const WON_PROPOSAL = new Set(['approved', 'awarded', 'won']);
 
@@ -62,6 +63,13 @@ export async function accrueCommission(opts: {
 
 /** FUNDHUB: propostas aprovadas/ganhas com montante no fundo. */
 export async function scanFundhubSuccessFees(companyId: string): Promise<{ scanned: number; created: number }> {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { entityType: true, description: true },
+  });
+  if (!successFeeAllowed(company?.entityType, company?.description)) {
+    return { scanned: 0, created: 0 };
+  }
   const rate = await getCommissionRateBps(companyId, 'commission.fundhub.success_fee');
   if (rate == null) return { scanned: 0, created: 0 };
 

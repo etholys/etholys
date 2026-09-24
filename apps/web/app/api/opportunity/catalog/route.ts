@@ -4,8 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import { isAggregatorFundingUrl, sanitizeFundingLinks } from '@/lib/opportunity/official-url';
+import { syncWindowOpenNotifications } from '@/lib/opportunity/deadline-alerts';
 import {
   isPipelineStatus,
+  parseFundHubMeta,
   pipelineFilterMatch,
   pipelineOf,
   writeFundHubMeta,
@@ -55,11 +57,16 @@ export async function GET(req: NextRequest) {
       : 'all';
 
   const mapped = raw
-    .map((f) => ({
-      ...f,
-      pipelineStatus: pipelineOf(f.notes),
-      userStatus: f.userStatus[0] ?? null,
-    }))
+    .map((f) => {
+      const meta = parseFundHubMeta(f.notes);
+      return {
+        ...f,
+        pipelineStatus: meta.pipelineStatus ?? pipelineOf(f.notes),
+        watchOpen: Boolean(meta.watchOpen),
+        ownerUserId: meta.ownerUserId ?? null,
+        userStatus: f.userStatus[0] ?? null,
+      };
+    })
     .filter((f) => pipelineFilterMatch(f.pipelineStatus, pipelineFilter));
 
   const total = mapped.length;
@@ -184,23 +191,46 @@ export async function PATCH(req: NextRequest) {
   const ctx = await resolveOpportunityCompanyId(req.nextUrl.searchParams.get('companyId'));
   if (!ctx) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
-  const body = (await req.json()) as { fundId?: string; pipelineStatus?: PipelineStatus };
+  const body = (await req.json()) as {
+    fundId?: string;
+    pipelineStatus?: PipelineStatus;
+    watchOpen?: boolean;
+    ownerUserId?: string | null;
+  };
   const fundId = String(body.fundId ?? '').trim();
-  if (!fundId || !isPipelineStatus(body.pipelineStatus)) {
-    return NextResponse.json({ error: 'fundId e pipelineStatus obrigatórios' }, { status: 400 });
+  if (!fundId) {
+    return NextResponse.json({ error: 'fundId obrigatório' }, { status: 400 });
+  }
+  if (body.pipelineStatus != null && !isPipelineStatus(body.pipelineStatus)) {
+    return NextResponse.json({ error: 'pipelineStatus inválido' }, { status: 400 });
   }
 
   const fund = await prisma.fund.findFirst({
     where: { id: fundId, companyId: ctx.companyId, isActive: true },
-    select: { id: true, notes: true },
+    select: { id: true, notes: true, status: true, name: true, institution: true },
   });
   if (!fund) return NextResponse.json({ error: 'Fundo não encontrado' }, { status: 404 });
 
-  const notes = writeFundHubMeta(fund.notes, { pipelineStatus: body.pipelineStatus });
+  const notes = writeFundHubMeta(fund.notes, {
+    ...(body.pipelineStatus ? { pipelineStatus: body.pipelineStatus } : {}),
+    ...(typeof body.watchOpen === 'boolean' ? { watchOpen: body.watchOpen } : {}),
+    ...(body.ownerUserId !== undefined ? { ownerUserId: body.ownerUserId || undefined } : {}),
+  });
   await prisma.fund.update({
     where: { id: fund.id },
     data: { notes, lastReviewedAt: new Date() },
   });
 
-  return NextResponse.json({ ok: true, fundId: fund.id, pipelineStatus: body.pipelineStatus });
+  const meta = parseFundHubMeta(notes);
+  if (meta.watchOpen && fund.status === 'open') {
+    void syncWindowOpenNotifications(ctx.companyId, ctx.userId, [fund]);
+  }
+
+  return NextResponse.json({
+    ok: true,
+    fundId: fund.id,
+    pipelineStatus: meta.pipelineStatus ?? 'decide',
+    watchOpen: Boolean(meta.watchOpen),
+    ownerUserId: meta.ownerUserId ?? null,
+  });
 }

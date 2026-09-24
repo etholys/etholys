@@ -14,7 +14,7 @@ Documentação detalhada para implementação. O mapa geral do ecossistema está
 | **Billing** (licenças, assinaturas, add-ons, comissões) | [etholys-billing.md](./etholys-billing.md) | 🔧 v0.2 (ago/2026) — catálogo + faturas + Stripe Checkout/Invoicing |
 | ATLAS | — | Ver `ETHOLYS_Arquitectura_v2.md` |
 | SIEP | — | Ver `ETHOLYS_Arquitectura_v2.md` + `etholys-web/.project_instructions.md` |
-| **FundHub** (captação) | [etholys-fundhub.md](./etholys-fundhub.md) | ✅ v1.0 (set/2026) — F0–F1; F2–F9 no doc |
+| **FundHub** (captação) | [etholys-fundhub.md](./etholys-fundhub.md) | ✅ v1.0 (set/2026) — F0–F9 no código |
 | NEXUS | — | Ver `ETHOLYS_Arquitectura_v2.md` + código em `apps/web/lib/nexus-*` |
 | PRISM | — | Ver `ETHOLYS_Arquitectura_v2.md` |
 

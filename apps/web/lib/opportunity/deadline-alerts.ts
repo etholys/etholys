@@ -130,3 +130,45 @@ export async function syncDeadlineNotifications(
 
   return { created, upcoming: upcoming.length };
 }
+
+/** F5 — programas com relógio ligado avisam quando a janela está aberta. */
+export async function syncWindowOpenNotifications(
+  companyId: string,
+  userId: string,
+  funds?: Array<{ id: string; name: string; institution: string; status: string }>,
+): Promise<{ created: number }> {
+  const rows =
+    funds ??
+    (
+      await prisma.fund.findMany({
+        where: { companyId, isActive: true, status: 'open' },
+        select: { id: true, name: true, institution: true, status: true, notes: true },
+        take: 80,
+      })
+    ).filter((f) => /"watchOpen":true/.test(f.notes ?? ''));
+
+  let created = 0;
+  for (const item of rows) {
+    if (item.status !== 'open') continue;
+    const link = `/hub/fundhub/discover/${item.id}`;
+    const title = 'Janela aberta';
+    const existing = await prisma.notification.findFirst({
+      where: {
+        userId,
+        type: 'opportunity_window_open',
+        link,
+        createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+      },
+    });
+    if (existing) continue;
+    await createNotification({
+      userId,
+      type: 'opportunity_window_open',
+      title,
+      message: `${item.name} (${item.institution}) voltou a ter janela aberta.`,
+      link,
+    });
+    created += 1;
+  }
+  return { created };
+}

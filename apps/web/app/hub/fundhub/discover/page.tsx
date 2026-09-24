@@ -158,6 +158,7 @@ export default function OpportunityDiscoverPage() {
   const [listQuery, setListQuery] = useState('');
   const [dueSoonOnly, setDueSoonOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [operatorHint, setOperatorHint] = useState<string | null>(null);
 
   const openDetail = (c: ScanCandidate, tab: 'overview' | 'analyze' = 'overview') => {
     setDetailTab(tab);
@@ -194,6 +195,26 @@ export default function OpportunityDiscoverPage() {
     setPendingOpen(d.pendingOpen ?? []);
     setPendingReference(d.pendingReference ?? []);
     setLater(d.later ?? []);
+    fetch(q('/api/fundhub/operator/inbox'), { cache: 'no-store' })
+      .then((or) => or.json())
+      .then((od: { operator?: boolean; companies?: Array<{ companyId: string; pending: number }> }) => {
+        if (!od.operator || !od.companies) {
+          setOperatorHint(null);
+          return;
+        }
+        const others = od.companies.filter((c) => c.companyId !== companyId);
+        const extra = others.reduce((n, c) => n + c.pending, 0);
+        setOperatorHint(
+          extra > 0
+            ? t(
+                `Operador WL · ${extra} pendente(s) noutras orgs`,
+                `Operador WL · ${extra} pendiente(s) en otras orgs`,
+                `WL operator · ${extra} pending in other orgs`,
+              )
+            : t('Operador white-label activo', 'Operador white-label activo', 'White-label operator active'),
+        );
+      })
+      .catch(() => setOperatorHint(null));
   }, [companyId]);
 
   const pendingForFocus = discoveryFocus === 'open_now' ? pendingOpen : pendingReference;
@@ -673,6 +694,10 @@ export default function OpportunityDiscoverPage() {
                 ))}
               </ul>
             </div>
+          )}
+
+          {operatorHint && (
+            <p className="rounded-lg bg-slate-50 px-3 py-1.5 text-[11px] text-slate-600">{operatorHint}</p>
           )}
 
           <div className="flex flex-wrap items-center gap-1 border-b border-gray-200">

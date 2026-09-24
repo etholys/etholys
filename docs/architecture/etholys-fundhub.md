@@ -2,7 +2,7 @@
 
 **Versão:** 1.0  
 **Data:** 2026-09-24  
-**Status:** F0 em produção; F1 ficha de evidência no código (deploy em curso)  
+**Status:** F0 em produção; F1–F9 no código (F1 a entrar em produção; F2–F9 no mesmo ramo)  
 **Público:** product, desenvolvedores, agentes de IA  
 **Licença interna:** `FUNDHUB` (`sys.FUNDHUB`)  
 **Entrada para agentes:** [AGENTS.md](../../AGENTS.md) → este ficheiro.
@@ -133,7 +133,7 @@ ou `Não confirmado — sem página oficial da convocatória`
 - Proposta **não abre às cegas** se `status !== verified` (aviso + confirmação explícita)
 - Sem ecrã novo
 
-### F2 — Go / no-go (em implementação)
+### F2 — Go / no-go (feito)
 
 No mesmo popup, 5–8 critérios do `FundingCaptureProfile` + briefing:
 
@@ -141,31 +141,31 @@ país · tipo de org · privado elegível · teto · grant vs crédito · prazo 
 
 Verde / âmbar / vermelho. «Não somos elegíveis» → `not_now` + aprendizagem. Sem página nova.
 
-### F3 — Pipeline em Em curso (em implementação)
+### F3 — Pipeline em Em curso (feito)
 
 Filtro ou colunas: **Decidir / Preparar / Submetido / Fechado**. Prazo no card. Default ao guardar: `decide`. Sem menu novo.
 
-### F4 — Proposta a partir das bases (em implementação)
+### F4 — Proposta a partir das bases (feito)
 
 Extrair texto dos PDFs oficiais (já listados) → `sourceExcerpt` longo por documento → secções do editor + chat com «ver bases». Sem inventar requisitos em falta.
 
-### F5 — Relógio de programas
+### F5 — Relógio de programas (feito)
 
 Em **Mapear programas**, toggle «Avisar quando abrir». Digest / notificação in-app. Reutiliza alertas; não cria «Watch» no menu.
 
-### F6 — Equipa
+### F6 — Equipa (feito)
 
 `ownerUserId` no fundo + avatar no card Em curso. Lista de membros da empresa (já existe no Hub). Sem módulo de RH.
 
-### F7 — Coligação na proposta
+### F7 — Coligação na proposta (feito)
 
 Membros de `/hub/fundhub/coalition` escolhidos no editor: papel + % orçamento. Grava no intake JSON. Não duplicar a página Coalizão.
 
-### F8 — Operador / white-label
+### F8 — Operador / white-label (feito)
 
 Inbox partilhada por `companyId` do operador + orgs hospedadas. SKU `license.whitelabel` (não self-serve). Sem success fee em governo.
 
-### F9 — Success fee (só consultoria)
+### F9 — Success fee (só consultoria) (feito)
 
 Rider 1–3% com tecto no contrato privado. SKU `commission.fundhub.success_fee` já existe (2–5%). **Proibido** em universidade pública, ministério, operador de programa.
 

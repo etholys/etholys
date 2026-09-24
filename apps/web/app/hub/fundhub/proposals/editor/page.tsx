@@ -70,11 +70,13 @@ export default function FundHubProposalEditorPage() {
   const [showAttach, setShowAttach] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openingStudio, setOpeningStudio] = useState(false);
+  const [coalitionPool, setCoalitionPool] = useState<Array<{ id: string; orgName: string; role: string }>>([]);
+  const [coalition, setCoalition] = useState<Array<{ id: string; orgName: string; role: string; budgetPct?: number }>>([]);
   const brainstormRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const persistDraft = useCallback(
-    (patch?: { documentMarkdown?: string; intakeNotes?: string; chat?: ChatMessage[] }) => {
+    (patch?: { documentMarkdown?: string; intakeNotes?: string; chat?: ChatMessage[]; coalition?: typeof coalition }) => {
       if (!workspaceId || typeof window === 'undefined') return;
       const md = patch?.documentMarkdown ?? documentMarkdown;
       const notes = patch?.intakeNotes ?? intakeNotes;
@@ -99,6 +101,7 @@ export default function FundHubProposalEditorPage() {
         createdAt: idx >= 0 ? drafts[idx]!.createdAt : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         title: fund?.name,
+        coalition: patch?.coalition ?? coalition,
       };
       if (idx >= 0) drafts[idx] = draftData;
       else drafts.push(draftData);
@@ -116,7 +119,7 @@ export default function FundHubProposalEditorPage() {
       );
       setDraftSaved(true);
     },
-    [workspaceId, fund, fundId, editalLink, intakeNotes, attachedFiles, documentMarkdown, chatMessages],
+    [workspaceId, fund, fundId, editalLink, intakeNotes, attachedFiles, documentMarkdown, chatMessages, coalition],
   );
 
   useEffect(() => {
@@ -167,6 +170,7 @@ export default function FundHubProposalEditorPage() {
         }
         if (!notes && draft.editalSummary) notes = draft.editalSummary;
         if (Array.isArray(draft.chatMessages)) chats = draft.chatMessages;
+        if (Array.isArray(draft.coalition)) setCoalition(draft.coalition);
         if (draft.fundName && !seededFund) {
           seededFund = {
             id: draft.fundId || fundId || 'adhoc',
@@ -187,6 +191,14 @@ export default function FundHubProposalEditorPage() {
     setChatMessages(chats);
     setLoading(false);
   }, [workspaceId, fundId]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/fundhub/coalition?companyId=${encodeURIComponent(companyId)}`)
+      .then((r) => r.json())
+      .then((d) => setCoalitionPool(Array.isArray(d.members) ? d.members : []))
+      .catch(() => setCoalitionPool([]));
+  }, [companyId]);
 
   useEffect(() => {
     if (!fundId || !companyId) return;
@@ -623,6 +635,52 @@ export default function FundHubProposalEditorPage() {
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {coalitionPool.length > 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
+          <p className="text-xs font-semibold text-gray-900">Coligação nesta proposta</p>
+          <p className="mt-0.5 text-[11px] text-gray-500">Membros já na página Coalizão — papel e % do orçamento.</p>
+          <ul className="mt-2 space-y-1.5">
+            {coalitionPool.map((m) => {
+              const picked = coalition.find((c) => c.id === m.id);
+              return (
+                <li key={m.id} className="flex flex-wrap items-center gap-2 text-xs">
+                  <label className="inline-flex items-center gap-1.5 text-gray-800">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(picked)}
+                      onChange={(e) => {
+                        const next = e.target.checked
+                          ? [...coalition, { id: m.id, orgName: m.orgName, role: m.role, budgetPct: 0 }]
+                          : coalition.filter((c) => c.id !== m.id);
+                        setCoalition(next);
+                        persistDraft({ coalition: next });
+                      }}
+                    />
+                    <span className="font-medium">{m.orgName}</span>
+                    <span className="text-gray-500">{m.role}</span>
+                  </label>
+                  {picked && (
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={picked.budgetPct ?? 0}
+                      onChange={(e) => {
+                        const budgetPct = Number(e.target.value);
+                        const next = coalition.map((c) => (c.id === m.id ? { ...c, budgetPct } : c));
+                        setCoalition(next);
+                        persistDraft({ coalition: next });
+                      }}
+                      className="w-16 rounded border border-gray-200 px-1.5 py-0.5 text-xs"
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
