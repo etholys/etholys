@@ -11,6 +11,12 @@ import {
   splitInboxByFocus,
   type InboxCandidate,
 } from '@/lib/opportunity/scan-inbox';
+import {
+  looksInventedWithoutEvidence,
+  normalizeCallDocuments,
+  pickInstitutionUrl,
+  pickOfficialCallUrl,
+} from '@/lib/opportunity/call-evidence';
 
 export const SCAN_MEMORY_CATEGORY = 'opportunity_scan';
 
@@ -103,8 +109,21 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
     const opensAt = typeof o.opensAt === 'string' ? o.opensAt : null;
 
     const rawLink = typeof o.linkOficial === 'string' ? o.linkOficial : undefined;
+    const rawCall = typeof o.callUrl === 'string' ? o.callUrl : undefined;
+    const rawInstitution = typeof o.institutionUrl === 'string' ? o.institutionUrl : undefined;
     const rawSource = typeof o.sourceUrl === 'string' ? o.sourceUrl : undefined;
-    const links = sanitizeFundingLinks(rawLink, rawSource);
+    const links = sanitizeFundingLinks(rawCall || rawLink, rawSource);
+    const callUrl = pickOfficialCallUrl({
+      callUrl: sanitizeFundingLinks(rawCall).linkOficial,
+      linkOficial: links.linkOficial,
+      sourceUrl: links.sourceUrl,
+    });
+    const institutionUrl = pickInstitutionUrl({
+      institutionUrl: sanitizeFundingLinks(rawInstitution).linkOficial,
+      linkOficial: links.linkOficial,
+      callUrl,
+    });
+    const documents = normalizeCallDocuments(o.documents);
 
     let availabilityNote =
       typeof o.availabilityNote === 'string' ? o.availabilityNote.slice(0, 400) : undefined;
@@ -122,8 +141,10 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
     const clip = (v: unknown, max: number): string | undefined =>
       typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined;
 
-    // Nunca mostrar link de agregador; candidata sem link oficial mantém-se (pesquisa genérica).
-    // open_now já não descarta — cobrir tudo; o utilizador valida.
+    if (scanFocus === 'open_now' && looksInventedWithoutEvidence({ callUrl, linkOficial: links.linkOficial, sourceUrl: links.sourceUrl, documents, name })) {
+      continue;
+    }
+
     out.push({
       tempId: typeof o.tempId === 'string' ? o.tempId : randomUUID(),
       name: name.slice(0, 300),
@@ -136,7 +157,11 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
       requirements: clip(o.requirements, 1500),
       howToApply: clip(o.howToApply, 1200),
       risksCaveats: clip(o.risksCaveats, 1200),
-      linkOficial: links.linkOficial,
+      linkOficial: callUrl || links.linkOficial,
+      callUrl,
+      institutionUrl,
+      documents,
+      sourceExcerpt: clip(o.sourceExcerpt, 8000),
       amount: typeof o.amount === 'number' ? o.amount : undefined,
       currency: typeof o.currency === 'string' ? o.currency.slice(0, 8) : 'USD',
       deadline: closesAt,
@@ -165,6 +190,21 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
     });
   }
   return out.slice(0, 20);
+}
+
+export async function patchScanCandidate(
+  companyId: string,
+  runId: string,
+  tempId: string,
+  patch: Partial<ScanCandidate>,
+): Promise<ScanCandidate | null> {
+  const payload = await readScanResults(companyId, runId);
+  const idx = payload.candidates.findIndex((c) => c.tempId === tempId);
+  if (idx < 0) return null;
+  const next = { ...payload.candidates[idx], ...patch, tempId, runId } as ScanCandidate;
+  payload.candidates[idx] = next;
+  await writeScanResults(companyId, payload, `enrich:${runId}`);
+  return next;
 }
 
 export function pendingCandidates(payload: ScanResultsPayload, focus?: ScanFocus): ScanCandidate[] {

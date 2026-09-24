@@ -1,5 +1,3 @@
-import 'server-only';
-
 /**
  * Domínios de agregadores / concorrentes — NUNCA usar como linkOficial.
  * A oportunidade pode ser descoberta via pesquisa, mas o link mostrado ao utilizador
@@ -177,10 +175,13 @@ export function candidateHasAcceptableOfficialLink(
 }
 
 export const OFFICIAL_LINK_PROMPT_RULES = `
-LINK RULES (MANDATORY — violations invalidate the candidate):
-- linkOficial MUST be the funder's website or the official call portal (e.g. ec.europa.eu, funding-tenders.europa.eu, worldbank.org, usaid.gov).
-- NEVER use third-party grant aggregators, directories, or competitors as linkOficial or sourceUrl.
-- FORBIDDEN domains include: grantbite.com, fundsforngos, grantwatch, instrumentl, grantstation, opengrants, proposalsforngos, and similar listing sites.
-- If you only find the opportunity on an aggregator, search again for the SAME call on the funder's official site. If no official URL exists, OMIT that candidate entirely.
-- sourceUrl must also be official (same rules). Do not cite aggregator pages as sources.
+LINK + REALITY RULES (MANDATORY — invented programmes are forbidden):
+- NEVER invent a fund, agency, programme name, or URL. If you did not see it in a live web-search result, OMIT it.
+- Generic "Programa de apoio a empreendimentos rurais" style names without a cited official call page are invalid.
+- callUrl MUST be the official CONVOCATORIA / call / edital page (the page with deadlines, bases, apply button) — not the institution homepage.
+- linkOficial / institutionUrl may be the funder homepage. That is NOT enough by itself for an "open now" result.
+- NEVER use third-party grant aggregators as callUrl or linkOficial (grantbite, fundsforngos, grantwatch, instrumentl, grantstation, opengrants, proposalsforngos).
+- If the call exists only on an aggregator and you cannot find the official page, OMIT the candidate.
+- documents[]: only URLs of official PDFs/Word/Excel you actually saw (bases, anexos, formularios). Do not invent files.
+- sourceUrl must also be official.
 `.trim();

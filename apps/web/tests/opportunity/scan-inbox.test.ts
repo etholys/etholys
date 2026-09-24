@@ -15,6 +15,7 @@ function cand(partial: Partial<ScanCandidate> & { name: string }): ScanCandidate
     name: partial.name,
     institution: partial.institution ?? 'Org',
     type: partial.type ?? 'Grant',
+    callUrl: partial.callUrl ?? 'https://ande.org.uy/convocatoria/rural-2026',
     ...partial,
   };
 }

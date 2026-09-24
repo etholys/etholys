@@ -85,6 +85,10 @@ type ScanCandidate = {
   classification?: 'direct' | 'client_bridge' | 'joint';
   classificationNote?: string;
   runId?: string;
+  callUrl?: string;
+  institutionUrl?: string;
+  documents?: Array<{ title: string; url: string; kind?: string }>;
+  sourceExcerpt?: string;
 };
 
 type ScanMeta = {

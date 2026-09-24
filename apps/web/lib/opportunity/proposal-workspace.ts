@@ -9,6 +9,10 @@ export type ProposalFundSeed = {
   institution?: string | null;
   description?: string | null;
   linkOficial?: string | null;
+  callUrl?: string | null;
+  institutionUrl?: string | null;
+  documents?: Array<{ title: string; url: string; kind?: string }>;
+  sourceExcerpt?: string | null;
   eligibilityCriteria?: string | null;
   whoCanApply?: string | null;
   eligibility?: string | null;
@@ -82,6 +86,13 @@ export function buildEditalSummaryFromSeed(seed: ProposalFundSeed): string {
     ['Categoria', seed.category],
     ['Notas', seed.notes],
     ['Encaixe', seed.matchJustification],
+    ['Página da convocatória', seed.callUrl || seed.linkOficial],
+    [
+      'Documentos oficiais',
+      seed.documents?.length
+        ? seed.documents.map((d) => `${d.title}: ${d.url}`).join('\n')
+        : undefined,
+    ],
   ];
   return blocks
     .filter(([, value]) => Boolean(String(value ?? '').trim()))
@@ -146,7 +157,7 @@ export function buildProposalIntake(
     fundId: seed.id,
     fundName: seed.name,
     fundInstitution: seed.institution || '',
-    editalLink: seed.linkOficial?.trim() || '',
+    editalLink: seed.callUrl?.trim() || seed.linkOficial?.trim() || '',
     intakeNotes: extras?.notes?.trim() || buildEditalSummaryFromSeed(seed),
     attachedFiles: extras?.files,
     seedSource: extras?.source ?? (seed.id.startsWith('adhoc-') ? 'manual' : seed.id.startsWith('candidate:') ? 'candidate' : 'fund'),

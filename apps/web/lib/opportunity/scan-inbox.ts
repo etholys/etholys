@@ -1,3 +1,4 @@
+import { looksInventedWithoutEvidence } from '@/lib/opportunity/call-evidence';
 import { isLikelyDuplicateFund, normalizeFundIdentity } from '@/lib/opportunity/scan-filters';
 import type { ScanCandidate, ScanFocus, ScanResultsPayload } from '@/lib/opportunity/scan-types';
 
@@ -151,6 +152,9 @@ export function buildScanInbox(
       if (laterIds.has(c.tempId)) {
         if (laterKeys.has(key) || pendingKeys.has(key)) continue;
         if (isLikelyDuplicateFund(c, later) || isLikelyDuplicateFund(c, pending)) continue;
+        if ((c.scanFocus ?? payload.scanFocus) === 'open_now' && looksInventedWithoutEvidence(c)) {
+          continue;
+        }
         later.push(item);
         laterKeys.add(key);
         continue;
@@ -158,6 +162,9 @@ export function buildScanInbox(
 
       if (pendingKeys.has(key) || laterKeys.has(key)) continue;
       if (isLikelyDuplicateFund(c, pending) || isLikelyDuplicateFund(c, later)) continue;
+      if ((c.scanFocus ?? payload.scanFocus) === 'open_now' && looksInventedWithoutEvidence(c)) {
+        continue;
+      }
       pending.push(item);
       pendingKeys.add(key);
     }

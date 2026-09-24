@@ -68,6 +68,14 @@ function asFundSeed(raw: unknown): FundSummary | null {
     institution: String(f.institution ?? ''),
     description: typeof f.description === 'string' ? f.description : undefined,
     linkOficial: typeof f.linkOficial === 'string' ? f.linkOficial : undefined,
+    callUrl: typeof f.callUrl === 'string' ? f.callUrl : undefined,
+    institutionUrl: typeof f.institutionUrl === 'string' ? f.institutionUrl : undefined,
+    documents: Array.isArray(f.documents)
+      ? (f.documents as Array<{ title?: string; url?: string; kind?: string }>)
+          .filter((d) => typeof d?.url === 'string' && d.url)
+          .map((d) => ({ title: String(d.title || d.url), url: String(d.url), kind: d.kind }))
+      : undefined,
+    sourceExcerpt: typeof f.sourceExcerpt === 'string' ? f.sourceExcerpt : undefined,
     eligibilityCriteria: typeof f.eligibilityCriteria === 'string' ? f.eligibilityCriteria : undefined,
     whoCanApply: typeof f.whoCanApply === 'string' ? f.whoCanApply : undefined,
     eligibility: typeof f.eligibility === 'string' ? f.eligibility : undefined,
@@ -189,7 +197,7 @@ export default function ProposalsPage() {
         }
         if (candidate) {
           setFund(candidate);
-          setEditalLink(candidate.linkOficial || '');
+          setEditalLink(candidate.callUrl || candidate.linkOficial || '');
           setIntakeNotes(candidate.description || '');
           setActiveTab('new');
         }

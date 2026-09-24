@@ -38,6 +38,12 @@ export type ScanProfile = {
   updatedAt: string;
 };
 
+export type CallDocument = {
+  title: string;
+  url: string;
+  kind?: 'pdf' | 'doc' | 'sheet' | 'zip' | 'other';
+};
+
 export type ScanCandidate = {
   tempId: string;
   name: string;
@@ -56,7 +62,16 @@ export type ScanCandidate = {
   howToApply?: string;
   /** Riscos, contrapartidas ou incertezas — sem inventar. */
   risksCaveats?: string;
+  /** Site da instituição (homepage). */
   linkOficial?: string;
+  /** Página da convocatória / edital — preferir este ao homepage. */
+  callUrl?: string;
+  /** Homepage da instituição se distinta da convocatória. */
+  institutionUrl?: string;
+  /** Anexos oficiais (PDF, Word, Excel) extraídos da página da convocatória. */
+  documents?: CallDocument[];
+  /** Texto extraído da página oficial — contexto para a IA. */
+  sourceExcerpt?: string;
   amount?: number;
   currency?: string;
   deadline?: string | null;

@@ -131,7 +131,7 @@ async function upsertFundFromCandidate(
 
   const closesAt = c.closesAt ?? c.deadline;
   const countries = c.eligibleCountries ?? c.countries ?? null;
-  const links = sanitizeFundingLinks(c.linkOficial, c.sourceUrl);
+  const links = sanitizeFundingLinks(c.callUrl || c.linkOficial, c.sourceUrl);
   const eligibilityCriteria =
     [c.whoCanApply, c.eligibility, c.requirements].filter(Boolean).join('\n\n') ||
     c.applicationWindow ||
@@ -142,6 +142,11 @@ async function upsertFundFromCandidate(
     c.risksCaveats ? `Avisos: ${c.risksCaveats}` : '',
     c.availabilityNote ? c.availabilityNote : '',
     c.opensAt ? `Abre: ${c.opensAt}` : '',
+    c.callUrl ? `Convocatória: ${c.callUrl}` : '',
+    c.institutionUrl && c.institutionUrl !== c.callUrl ? `Instituição: ${c.institutionUrl}` : '',
+    c.documents?.length
+      ? `Documentos: ${c.documents.map((d) => `${d.title} ${d.url}`).join(' | ')}`
+      : '',
   ].filter(Boolean);
 
   const data = {
@@ -174,7 +179,7 @@ async function upsertFundFromCandidate(
     data: {
       companyId,
       ...data,
-      notes: `Descoberto na varredura ${runId}`,
+      notes: [`Descoberto na varredura ${runId}`, ...noteParts].filter(Boolean).join(' · ') || null,
     },
   });
   return created.id;

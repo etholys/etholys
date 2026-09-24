@@ -9,6 +9,7 @@ import {
   availabilityLabel,
   formatDateShort,
 } from '@/lib/opportunity/availability';
+import { pickInstitutionUrl, pickOfficialCallUrl } from '@/lib/opportunity/call-evidence';
 import { buildCandidateWordHtml, downloadBlob } from '@/lib/opportunity/candidate-export';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import type { ScanCandidate } from '@/lib/opportunity/scan-types';
@@ -31,7 +32,7 @@ import { PROPOSAL_CANDIDATE_KEY } from '@/lib/opportunity/proposal-workspace';
 type FeedbackAction = 'save' | 'not_now' | 'reject_type';
 
 export function CandidateDetailSheet({
-  candidate: c,
+          candidate: live,
   runId,
   open,
   onClose,
@@ -62,6 +63,9 @@ export function CandidateDetailSheet({
   const t = (pt: string, es: string, en: string) =>
     locale === 'pt' ? pt : locale === 'es' ? es : en;
 
+  const q = (path: string) =>
+    `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
+
   const [tab, setTab] = useState<'overview' | 'analyze'>(initialTab ?? 'overview');
   const [chat, setChat] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const [input, setInput] = useState('');
@@ -70,6 +74,10 @@ export function CandidateDetailSheet({
   const [briefLoading, setBriefLoading] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
+  const [live, setLive] = useState(c);
+  const [docsOpen, setDocsOpen] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -78,7 +86,37 @@ export function CandidateDetailSheet({
     setInput('');
     setBrief(null);
     setRejectOpen(false);
-  }, [open, c.tempId, initialTab]);
+    setDocsOpen(false);
+    setLive(c);
+  }, [open, c.tempId, initialTab, c]);
+
+  useEffect(() => {
+    if (!open || !companyId) return;
+    const hasPage = Boolean(c.callUrl || c.linkOficial || c.sourceUrl);
+    if (!hasPage) return;
+    let cancelled = false;
+    setEnriching(true);
+    void (async () => {
+      try {
+        const r = await fetch(q('/api/opportunity/candidates/enrich'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ candidate: c, runId: runId ?? c.runId, tempId: c.tempId }),
+        });
+        const d = (await r.json()) as { candidate?: typeof c };
+        if (!cancelled && r.ok && d.candidate) setLive(d.candidate);
+      } catch {
+        /* keep the original candidate */
+      } finally {
+        if (!cancelled) setEnriching(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // q/companyId are stable enough for this sheet open
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, c.tempId, companyId, runId]);
 
   if (!open) return null;
 
@@ -91,9 +129,6 @@ export function CandidateDetailSheet({
       ? `/hub/fundhub/discover/c/${encodeURIComponent(c.tempId)}?runId=${encodeURIComponent(runId)}`
       : null;
 
-  const q = (path: string) =>
-    `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
-
   const ask = async (message: string, asBrief = false) => {
     if (!companyId) return;
     if (asBrief) setBriefLoading(true);
@@ -103,7 +138,7 @@ export function CandidateDetailSheet({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          candidate: c,
+          candidate: live,
           message: asBrief ? undefined : message,
           mode: asBrief ? 'brief' : 'chat',
           history: asBrief ? undefined : chat,
@@ -139,7 +174,7 @@ export function CandidateDetailSheet({
         const r = await fetch(q('/api/opportunity/candidates/analyze'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ candidate: c, mode: 'brief' }),
+          body: JSON.stringify({ candidate: live, mode: 'brief' }),
         });
         const d = (await r.json()) as { reply?: string };
         analysis = d.reply ?? '';
@@ -170,6 +205,33 @@ export function CandidateDetailSheet({
     });
     const safe = c.name.replace(/[^\w\-]+/g, '_').slice(0, 60);
     downloadBlob(blob, `${safe || 'oportunidade'}.doc`);
+  };
+
+  const callPage = pickOfficialCallUrl(live);
+  const institutionPage = pickInstitutionUrl(live);
+  const docs = live.documents ?? [];
+
+  const downloadOfficial = async (urls: string[], zip: boolean, key: string) => {
+    if (!companyId || urls.length === 0) return;
+    setDownloading(key);
+    try {
+      const r = await fetch(q('/api/opportunity/candidates/documents'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(zip ? { urls, zip: true } : { url: urls[0] }),
+      });
+      if (!r.ok) {
+        const d = (await r.json().catch(() => ({}))) as { error?: string };
+        throw new Error(d.error || 'Falha no download');
+      }
+      const blob = await r.blob();
+      const name = zip ? 'documentos-convocatoria.zip' : urls[0]?.split('/').pop()?.split('?')[0] || 'documento';
+      downloadBlob(blob, decodeURIComponent(name));
+    } catch (e) {
+      setBrief((prev) => prev ?? (e instanceof Error ? e.message : 'Falha no download'));
+    } finally {
+      setDownloading(null);
+    }
   };
 
   const shell =
@@ -499,7 +561,7 @@ export function CandidateDetailSheet({
               href="/hub/fundhub/proposals?from=candidate"
               onClick={() => {
                 try {
-                  sessionStorage.setItem(PROPOSAL_CANDIDATE_KEY, JSON.stringify(c));
+                  sessionStorage.setItem(PROPOSAL_CANDIDATE_KEY, JSON.stringify(live));
                 } catch {
                   /* ignore */
                 }
@@ -518,16 +580,41 @@ export function CandidateDetailSheet({
               {briefLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
               {t('Descarregar .doc', 'Descargar .doc', 'Download .doc')}
             </button>
-            {c.linkOficial && (
+            <button
+              type="button"
+              onClick={() => setDocsOpen(true)}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {enriching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+              {t('Documentos', 'Documentos', 'Documents')}
+              {docs.length > 0 ? ` (${docs.length})` : ''}
+            </button>
+            {callPage && (
               <a
-                href={c.linkOficial}
+                href={callPage}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                {t('Página da convocatória', 'Página de la convocatoria', 'Call page')}
+              </a>
+            )}
+            {institutionPage && institutionPage !== callPage && (
+              <a
+                href={institutionPage}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
               >
                 <Bookmark className="h-3.5 w-3.5" />
-                {t('Site oficial', 'Sitio oficial', 'Official site')}
+                {t('Site da instituição', 'Sitio de la institución', 'Institution site')}
               </a>
+            )}
+            {!callPage && (
+              <span className="inline-flex items-center rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-900">
+                {t('Sem página oficial da convocatória', 'Sin página oficial de la convocatoria', 'No official call page')}
+              </span>
             )}
             {previewHref && variant === 'modal' && (
               <Link
@@ -574,11 +661,119 @@ export function CandidateDetailSheet({
       </div>
   );
 
-  if (variant === 'page') return body;
+  const docsModal = docsOpen ? (
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+      <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">
+              {t('Documentos da convocatória', 'Documentos de la convocatoria', 'Call documents')}
+            </h3>
+            <p className="mt-1 text-xs text-gray-500">
+              {t(
+                'Anexos oficiais para ler, para a IA e para a proposta.',
+                'Anexos oficiales para leer, para la IA y para la propuesta.',
+                'Official attachments for reading, AI, and the proposal.',
+              )}
+            </p>
+          </div>
+          <button type="button" onClick={() => setDocsOpen(false)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        {enriching && (
+          <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            {t('A procurar anexos na página oficial…', 'Buscando anexos en la página oficial…', 'Looking for attachments on the official page…')}
+          </p>
+        )}
+        {docs.length === 0 && !enriching && (
+          <p className="mt-4 text-sm text-gray-600">
+            {callPage
+              ? t(
+                  'Ainda sem anexos extraídos. Abra a página da convocatória — a IA usará esse endereço.',
+                  'Aún sin anexos extraídos. Abra la página de la convocatoria.',
+                  'No attachments extracted yet. Open the call page — AI will use that URL.',
+                )
+              : t(
+                  'Sem página oficial da convocatória. Não descarregue nada até haver um edital real.',
+                  'Sin página oficial de la convocatoria.',
+                  'No official call page. Do not download until a real call exists.',
+                )}
+          </p>
+        )}
+        {docs.length > 0 && (
+          <ul className="mt-4 max-h-64 space-y-2 overflow-y-auto">
+            {docs.map((doc) => (
+              <li key={doc.url} className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900">{doc.title}</p>
+                  <p className="truncate text-[11px] text-gray-400">{doc.kind ?? 'file'}</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={downloading !== null}
+                  onClick={() => void downloadOfficial([doc.url], false, doc.url)}
+                  className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  {downloading === doc.url ? <Loader2 className="h-3 w-3 animate-spin" /> : t('Baixar', 'Descargar', 'Download')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          {docs.length > 1 && (
+            <button
+              type="button"
+              disabled={downloading !== null}
+              onClick={() => void downloadOfficial(docs.map((d) => d.url), true, 'zip')}
+              className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+            >
+              {downloading === 'zip' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              {t('Baixar todos (ZIP)', 'Descargar todos (ZIP)', 'Download all (ZIP)')}
+            </button>
+          )}
+          {docs.length === 1 && (
+            <button
+              type="button"
+              disabled={downloading !== null}
+              onClick={() => void downloadOfficial([docs[0]!.url], false, docs[0]!.url)}
+              className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {t('Baixar ficheiro', 'Descargar archivo', 'Download file')}
+            </button>
+          )}
+          {callPage && (
+            <a
+              href={callPage}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              {t('Abrir convocatória', 'Abrir convocatoria', 'Open call')}
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  if (variant === 'page') {
+    return (
+      <>
+        {body}
+        {docsModal}
+      </>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
       {body}
+      {docsModal}
     </div>
   );
 }

@@ -34,7 +34,14 @@ function candidateBrief(c: ScanCandidate): string {
     c.matchJustification ? `Match: ${c.matchJustification}` : '',
     c.classification ? `Classificação sugerida: ${c.classification}` : '',
     c.classificationNote ? `Nota classificação: ${c.classificationNote}` : '',
-    c.linkOficial ? `Link oficial: ${c.linkOficial}` : '(sem link oficial)',
+    c.callUrl ? `Página da convocatória: ${c.callUrl}` : '',
+    c.institutionUrl && c.institutionUrl !== c.callUrl ? `Site da instituição: ${c.institutionUrl}` : '',
+    c.linkOficial && !c.callUrl ? `Link oficial: ${c.linkOficial}` : '',
+    !c.callUrl && !c.linkOficial ? '(sem página oficial da convocatória — não inventar factos)' : '',
+    c.documents?.length
+      ? `Documentos oficiais:\n${c.documents.map((d) => `- ${d.title}: ${d.url}`).join('\n')}`
+      : '',
+    c.sourceExcerpt ? `Excerto da página oficial:\n${c.sourceExcerpt.slice(0, 6000)}` : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -58,8 +65,9 @@ export async function POST(req: NextRequest) {
   const mode = body.mode === 'brief' ? 'brief' : 'chat';
   const system = `És um analista sénior de captação de fundos (FundHub / Etholys).
 Responde em português (ou no idioma da pergunta do utilizador).
-Baseia-te nos dados do candidato; se algo for incerto, diga-o claramente.
-Não inventes deadlines, montantes ou elegibilidade.
+Baseia-te nos dados do candidato, na página da convocatória e nos documentos oficiais listados.
+Se não houver página/documentos oficiais, diz que a oportunidade pode ser genérica ou não verificada.
+Não inventes deadlines, montantes, elegibilidade nem anexos.
 Quando útil, sugere perguntas a verificar no site oficial e riscos (contrapartida, elegibilidade, timeline).
 Sê concreto e operacional.`;
 

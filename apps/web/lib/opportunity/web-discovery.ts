@@ -3,6 +3,7 @@ import 'server-only';
 import { randomUUID } from 'crypto';
 import { llmCompleteJsonText, llmCompleteWithWebSearch } from '@/lib/llm-client';
 import { normalizeCandidates } from '@/lib/opportunity/candidate-store';
+import { enrichAndFilterCandidates } from '@/lib/opportunity/enrich-call';
 import { OFFICIAL_LINK_PROMPT_RULES } from '@/lib/opportunity/official-url';
 import { dropDuplicateFunds, isOpenNowCandidate } from '@/lib/opportunity/scan-filters';
 import type { OpportunityBriefing, ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
@@ -78,8 +79,8 @@ function promptsForFocus(scanFocus: ScanFocus) {
 TODAY'S DATE: ${today}
 
 CRITICAL RULES:
-- Prefer official funder pages for linkOficial; if found only on aggregators, still INCLUDE the opportunity but leave linkOficial empty (never put aggregator URL in linkOficial).
-- Generic web search is valuable — use it; then try to resolve the official call URL.
+- ONLY include calls you found in live search results with a real official callUrl (the convocatoria page, not the agency homepage).
+- If you cannot cite a live official call page, skip the item. Invented agencies (e.g. fake "ANDEDE") are forbidden.
 - EXCLUDE: expired calls, closed windows, generic program homepages WITHOUT an active open call.
 - For each item gather: closesAt, opensAt, eligibleCountries, classification (direct|client_bridge|joint), classificationNote, PLUS full operational content (what it funds, who can apply, eligibility, requirements, how to apply, risks).
 - Search broadly AND with site: filters for official portals.
@@ -93,7 +94,11 @@ Each item MUST include:
 name, institution, type (Grant|Crédito|Aliança|Técnico local), category,
 description (2–4 substantive paragraphs — see content rules),
 whoCanApply, eligibility, requirements, howToApply, risksCaveats,
-linkOficial (OFFICIAL funder URL only — never aggregators; omit if unknown), amount, currency,
+callUrl (official convocatoria / edital PAGE — required for open_now),
+institutionUrl (funder homepage if different),
+linkOficial (same as callUrl if only one official page),
+documents (array of {title,url} official PDFs/docs you saw — omit if none),
+amount, currency,
 opensAt, closesAt, applicationWindow, eligibleCountries,
 availabilityStatus ("open_now" or "rolling"),
 availabilityNote, classification (direct|client_bridge|joint), classificationNote,
@@ -128,7 +133,9 @@ ${OFFICIAL_LINK_PROMPT_RULES}`,
 Each item: name, institution, type, category,
 description (2–4 substantive paragraphs),
 whoCanApply, eligibility, requirements, howToApply, risksCaveats,
-linkOficial (official program page on funder domain),
+callUrl (official programme / convocatoria page), institutionUrl (homepage if different),
+linkOficial (same as callUrl if only one page),
+documents (official PDFs/docs actually seen),
 amount, currency, opensAt, closesAt, applicationWindow, eligibleCountries,
 availabilityStatus (seasonal|rolling|closed|reference — NOT open_now unless verified open),
 availabilityNote (typical windows, last call date, reopening hints),
@@ -238,14 +245,35 @@ export async function discoverOpportunitiesOnline(opts: {
       candidates = open.length > 0 ? open : candidates;
     }
 
+    await report(78, 'verifying_official_pages');
+    candidates = await enrichAndFilterCandidates(candidates, scanFocus);
+
     await report(88, 'filtering');
     if (candidates.length > 0) {
       return { candidates, discoveryMode: 'web', searchQueries };
     }
-    console.warn('[opportunity/web-discovery] web search returned 0 candidates, fallback');
+    console.warn('[opportunity/web-discovery] web search returned 0 verifiable candidates');
+    if (scanFocus === 'open_now') {
+      return {
+        candidates: [],
+        discoveryMode: 'web',
+        searchQueries,
+        fallbackReason: 'no_official_call_page',
+      };
+    }
   } catch (e) {
     console.warn('[opportunity/web-discovery] web search failed, fallback:', e);
     webFailure = e instanceof Error ? e.message.slice(0, 240) : String(e).slice(0, 240);
+  }
+
+  if (scanFocus === 'open_now') {
+    await report(90, 'no_verified_calls');
+    return {
+      candidates: [],
+      discoveryMode: 'web',
+      searchQueries: [],
+      fallbackReason: webFailure ? `web_failed:${webFailure}` : 'no_official_call_page',
+    };
   }
 
   await report(50, 'knowledge_fallback');
