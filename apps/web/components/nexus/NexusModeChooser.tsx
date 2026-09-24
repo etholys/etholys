@@ -23,26 +23,26 @@ export function NexusModeChooser({ withNet, openAtCases }: Props) {
           brand: 'NEXUS',
           line: 'Elegí el camino',
           mine: 'Autodesarrollo',
-          mineHint: 'Tu módulo · cuaderno',
+          mineHint: 'Diagnóstico, plan y cuaderno',
           deliver: 'Asistencia técnica',
-          deliverHint: 'Clientes MIPYME',
+          deliverHint: 'Contratos con MIPYMEs',
         }
       : L === 'en'
         ? {
             brand: 'NEXUS',
             line: 'Choose your path',
             mine: 'Self-development',
-            mineHint: 'Your module · field book',
+            mineHint: 'Diagnosis, plan and field book',
             deliver: 'Technical assistance',
-            deliverHint: 'MSME clients',
+            deliverHint: 'MSME contracts',
           }
         : {
             brand: 'NEXUS',
             line: 'Escolhe o caminho',
             mine: 'Autodesenvolvimento',
-            mineHint: 'O teu módulo · caderno',
+            mineHint: 'Diagnóstico, plano e caderno',
             deliver: 'Assistência técnica',
-            deliverHint: 'Clientes MIPYME',
+            deliverHint: 'Contratos com MIPYMEs',
           };
 
   return (

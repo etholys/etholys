@@ -20,7 +20,6 @@ export function NexusAtProcessRail({
   engagementId,
   clientCount,
   selectedCompanyId,
-  sectorId,
   hasOpenCases,
   hasDiagnosisHint,
   es,
@@ -37,65 +36,43 @@ export function NexusAtProcessRail({
     {
       id: 'legal',
       label: es ? '1. Contrato' : '1. Contrato',
-      done: true,
-      href: null as string | null,
-      hint: es
-        ? 'Permanente, proyecto o puntual — el contrato decide el loop'
-        : 'Permanente, projeto ou pontual — o contrato decide o loop',
-    },
-    {
-      id: 'clients',
-      label: es ? '2. Sector y oferta' : '2. Setor e oferta',
       done: clientCount > 0,
-      href: null,
+      href: null as string | null,
       hint:
         clientCount > 0
           ? es
-            ? `${clientCount} empresa(s) · qué vende cada una`
-            : `${clientCount} empresa(s) · o que cada uma vende`
+            ? `${clientCount} MIPYME · sector y oferta`
+            : `${clientCount} MIPYME · setor e oferta`
           : es
-            ? 'Registrar cada MIPYME, sector y si vende producto/servicio'
-            : 'Registar cada MIPYME, setor e se vende produto/serviço',
+            ? 'Registra la empresa, el sector y qué vende'
+            : 'Regista a empresa, o setor e o que vende',
     },
     {
       id: 'dx',
-      label: es ? '3. Diagnóstico 360' : '3. Diagnóstico 360',
+      label: es ? '2. Diagnóstico 360' : '2. Diagnóstico 360',
       done: hasDiagnosisHint,
       href: dxBase,
-      hint: deep
-        ? es
-          ? 'Estructura · gestión · producción 1/2/3 · comercial'
-          : 'Estrutura · gestão · produção 1/2/3 · comercial'
-        : es
-          ? '360 del perfil: brechas, potenciales, madurez'
-          : '360 do perfil: lacunas, potenciais, maturidade',
+      hint: es
+        ? 'Estructura, gestión, producción y comercial'
+        : 'Estrutura, gestão, produção e comercial',
     },
     {
       id: 'plan',
-      label: es ? '4. Documento + plan' : '4. Documento + plano',
+      label: es ? '3. Plan' : '3. Plano',
       done: hasOpenCases,
       href: hasOpenCases ? roadmapHref : planHref,
       hint: es
-        ? 'Quanti + quali · acciones, compras, fechas, indicadores'
-        : 'Quanti + quali · ações, compras, datas, indicadores',
+        ? 'Acciones, compras, fechas, indicadores'
+        : 'Ações, compras, datas, indicadores',
     },
     {
       id: 'campo',
-      label: es ? '5. Ejecución / módulo' : '5. Execução / módulo',
+      label: es ? '4. Módulo' : '4. Módulo',
       done: false,
       href: selectedCompanyId
         ? `/hub/nexus/campo?company=${encodeURIComponent(selectedCompanyId)}&engagement=${encodeURIComponent(engagementId)}`
         : null,
       hint: es ? 'Cuaderno y sensores del sector' : 'Caderno e sensores do setor',
-    },
-    {
-      id: 'loop',
-      label: es ? '6. Ciclo anual o cierre' : '6. Ciclo anual ou fecho',
-      done: false,
-      href: dxBase,
-      hint: es
-        ? 'Permanente: análisis del año + nuevo 360. Otro contrato: cierra.'
-        : 'Permanente: análise do ano + novo 360. Outro contrato: fecha.',
     },
   ];
 
@@ -131,10 +108,15 @@ export function NexusAtProcessRail({
       {clientCount > 0 && !selectedCompanyId && (
         <p className="mt-2 text-xs text-amber-800">
           {es
-            ? 'Selecciona una MIPYME en la lista para continuar el proceso.'
-            : 'Seleciona uma MIPYME na lista para continuar o processo.'}
+            ? 'Selecciona una MIPYME en la lista para continuar.'
+            : 'Seleciona uma MIPYME na lista para continuar.'}
         </p>
       )}
+      <p className="mt-2 text-[11px] text-slate-400">
+        {es
+          ? 'Contrato permanente: cada año se vuelve a diagnosticar. Proyecto o puntual: se cierra al terminar el plan.'
+          : 'Contrato permanente: cada ano volta-se a diagnosticar. Projeto ou pontual: fecha-se ao terminar o plano.'}
+      </p>
     </div>
   );
 }

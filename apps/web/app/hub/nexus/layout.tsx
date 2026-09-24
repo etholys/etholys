@@ -13,26 +13,15 @@ import {
   Menu,
   X,
   ChevronDown,
-  ChevronRight,
   Globe,
   Bell,
   MessageCircle,
   BarChart3,
   PanelLeftClose,
   PanelLeftOpen,
-  Share2,
-  ClipboardCheck,
-  Route,
-  Wrench,
   Headphones,
-  BookOpen,
-  History,
-  Rocket,
   Sparkles,
   GraduationCap,
-  LayoutGrid,
-  Factory,
-  Kanban,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { NexusRunwayProvider } from '@/components/nexus/NexusRunwayContext';
@@ -41,30 +30,16 @@ import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 import { sysTheme } from '@/lib/system-shell';
 
-type NavGroup = {
-  key: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  items: { href: string; icon: React.ComponentType<{ className?: string }>; label: string }[];
-};
-
-/** Rotas por grupo — estável para efeitos de navegação */
-const NEXUS_GROUP_ROUTES: Record<string, string[]> = {
-  /** Módulos Etholys ligados à gestão (fora de /hub/nexus, mas o mesmo fluxo NEXUS) */
-  integrated: ['/hub/workspace', '/dashboard', '/siep'],
-  /** Percurso da EMPRESA ativa: melhorar com IA (não é AT a terceiros) */
-  mine: [
-    '/hub/nexus/journey',
-    '/hub/nexus/coach',
-    '/hub/nexus/diagnosis',
-    '/hub/nexus/roadmap',
-    '/hub/nexus/campo',
-    '/hub/nexus/monitor',
-  ],
-  /** Prestação de AT a outras MIPYMEs: serviços → projetos → empresas */
-  deliver: ['/hub/nexus/at', '/hub/nexus/networks', '/hub/nexus/services'],
-  resources: ['/hub/nexus/library', '/hub/nexus/history'],
-};
+/** Capítulos internos — não são itens de menu. Só servem para realçar o caminho. */
+const NEXUS_MINE_PATHS = [
+  '/hub/nexus/journey',
+  '/hub/nexus/coach',
+  '/hub/nexus/diagnosis',
+  '/hub/nexus/roadmap',
+  '/hub/nexus/campo',
+  '/hub/nexus/monitor',
+];
+const NEXUS_DELIVER_PATHS = ['/hub/nexus/at', '/hub/nexus/networks', '/hub/nexus/services'];
 
 /** Tema NEXUS — ink + teal (autodesarrollo); AT usa acento próprio nas secções */
 
@@ -99,7 +74,6 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [chatUnread, setChatUnread] = useState(0);
   const [atSubjectLabel, setAtSubjectLabel] = useState<string | null>(null);
 
@@ -191,19 +165,6 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
     }
   }, [status]);
 
-  useEffect(() => {
-    for (const [key, routes] of Object.entries(NEXUS_GROUP_ROUTES)) {
-      if (routes.some((r) => pathname === r || pathname?.startsWith(r + '/'))) {
-        queueMicrotask(() => {
-          setOpenGroups((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
-        });
-        break;
-      }
-    }
-  }, [pathname]);
-
-  const toggleGroup = (key: string) => setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
-
   if (status === 'loading' || status === 'unauthenticated') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#07111A]">
@@ -212,137 +173,39 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const topItems = [
+  const pathIn = (routes: string[]) =>
+    routes.some((r) => pathname === r || pathname?.startsWith(`${r}/`));
+
+  const primaryItems = [
     {
+      key: 'home',
       href: withNet('/hub/nexus'),
       icon: LayoutDashboard,
-      label: locale === 'es' ? 'Resumen' : locale === 'pt' ? 'Visão geral' : 'Overview',
+      label: locale === 'es' ? 'Inicio' : locale === 'pt' ? 'Início' : 'Home',
+      active: pathname === '/hub/nexus' || pathname === '/hub/nexus/',
+      tone: 'home' as const,
     },
-  ];
-
-  const navGroups: NavGroup[] = [
     {
       key: 'mine',
-      label:
-        locale === 'es'
-          ? 'Autodesarrollo'
-          : locale === 'pt'
-            ? 'Autodesenvolvimento'
-            : 'Self-development',
+      href: withNet('/hub/nexus/campo'),
       icon: Sparkles,
-      items: [
-        {
-          href: withNet('/hub/nexus/journey'),
-          icon: Rocket,
-          label: locale === 'es' ? 'Fase y metas' : locale === 'pt' ? 'Fase e metas' : 'Phase & goals',
-        },
-        {
-          href: withNet('/hub/nexus/coach'),
-          icon: Sparkles,
-          label: locale === 'es' ? 'Copiloto IA' : locale === 'pt' ? 'Copiloto IA' : 'AI copilot',
-        },
-        {
-          href: withNet('/hub/nexus/diagnosis'),
-          icon: ClipboardCheck,
-          label:
-            locale === 'es'
-              ? 'Autodiagnóstico'
-              : locale === 'pt'
-                ? 'Autodiagnóstico'
-                : 'Self-diagnosis',
-        },
-        {
-          href: withNet('/hub/nexus/roadmap'),
-          icon: Route,
-          label: locale === 'es' ? 'Plan' : locale === 'pt' ? 'Plano' : 'Plan',
-        },
-        {
-          href: withNet('/hub/nexus/campo'),
-          icon: ClipboardCheck,
-          label: locale === 'es' ? 'Cuaderno' : locale === 'pt' ? 'Caderno' : 'Field book',
-        },
-        {
-          href: withNet('/hub/nexus/monitor'),
-          icon: BarChart3,
-          label: locale === 'es' ? 'Monitoreo' : locale === 'pt' ? 'Monitorização' : 'Monitoring',
-        },
-      ],
+      label:
+        locale === 'es' ? 'Mi módulo' : locale === 'pt' ? 'O meu módulo' : 'My module',
+      active: !isAtClientDiagnosis && pathIn(NEXUS_MINE_PATHS),
+      tone: 'mine' as const,
     },
     {
       key: 'deliver',
+      href: withNet('/hub/nexus/at'),
+      icon: Headphones,
       label:
         locale === 'es'
           ? 'Asistencia técnica'
           : locale === 'pt'
             ? 'Assistência técnica'
             : 'Technical assistance',
-      icon: Headphones,
-      items: [
-        {
-          href: withNet('/hub/nexus/at'),
-          icon: ClipboardCheck,
-          label:
-            locale === 'es'
-              ? 'Contratos y MIPYMEs'
-              : locale === 'pt'
-                ? 'Contratos e MIPYMEs'
-                : 'Contracts & MSMEs',
-        },
-        {
-          href: withNet('/hub/nexus/networks'),
-          icon: Share2,
-          label: locale === 'es' ? 'Redes de clientes' : locale === 'pt' ? 'Redes de clientes' : 'Client networks',
-        },
-        {
-          href: withNet('/hub/nexus/services'),
-          icon: Wrench,
-          label:
-            locale === 'es'
-              ? 'Pedidos internos'
-              : locale === 'pt'
-                ? 'Pedidos internos'
-                : 'Internal requests',
-        },
-      ],
-    },
-    {
-      key: 'integrated',
-      label: locale === 'es' ? 'Gestión Etholys' : locale === 'pt' ? 'Gestão Etholys' : 'Etholys ops',
-      icon: Factory,
-      items: [
-        {
-          href: '/hub/workspace',
-          icon: LayoutGrid,
-          label: locale === 'es' ? 'Centro hoy' : locale === 'pt' ? 'Centro hoje' : 'Today hub',
-        },
-        {
-          href: '/dashboard',
-          icon: BarChart3,
-          label: 'ATLAS',
-        },
-        {
-          href: '/siep',
-          icon: Kanban,
-          label: 'SIEP',
-        },
-      ],
-    },
-    {
-      key: 'resources',
-      label: locale === 'es' ? 'Biblioteca' : locale === 'pt' ? 'Biblioteca' : 'Library',
-      icon: BookOpen,
-      items: [
-        {
-          href: withNet('/hub/nexus/library'),
-          icon: BookOpen,
-          label: locale === 'es' ? 'Método y plantillas' : locale === 'pt' ? 'Método e modelos' : 'Method & templates',
-        },
-        {
-          href: withNet('/hub/nexus/history'),
-          icon: History,
-          label: locale === 'es' ? 'Historial' : locale === 'pt' ? 'Histórico' : 'History',
-        },
-      ],
+      active: isAtClientDiagnosis || pathIn(NEXUS_DELIVER_PATHS),
+      tone: 'deliver' as const,
     },
   ];
 
@@ -363,21 +226,6 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
       setNotifCount(0);
       setNotifications((ns) => ns.map((n) => ({ ...n, read: true })));
     });
-  };
-
-  const pathMatches = (href: string) => {
-    const path = href.split('?')[0];
-    // Diagnóstico AT de cliente não é o "Diagnóstico" da empresa operadora
-    if (isAtClientDiagnosis) {
-      if (path === '/hub/nexus/diagnosis' || path === '/hub/nexus/campo' || path === '/hub/nexus/monitor') {
-        return pathname === path || pathname?.startsWith(`${path}/`);
-      }
-      if (path === '/hub/nexus/at') return true;
-    }
-    if (path === '/hub/nexus' || path === '/hub/nexus/') {
-      return pathname === '/hub/nexus' || pathname === '/hub/nexus/';
-    }
-    return pathname === path || pathname?.startsWith(`${path}/`);
   };
 
   return (
@@ -505,111 +353,26 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
         )}
 
         <nav className={cn('flex-1 space-y-0.5 overflow-y-auto', collapsed ? 'p-1.5' : 'p-3')}>
-          {topItems.map((item) => {
-            const isActive = pathMatches(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                title={collapsed ? item.label : undefined}
-                className={cn(
-                  'flex items-center rounded-lg text-sm font-medium transition',
-                  collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
-                  isActive ? cn(nx.activeBg, nx.activeText) : sysTheme.navIdle
-                )}
-              >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
-                {!collapsed && item.label}
-              </Link>
-            );
-          })}
-
-          <div className="py-1 pb-2">
-            <div className="h-px bg-white/10" />
-          </div>
-
-          {navGroups.map((group) => {
-            const isOpen = openGroups[group.key] ?? (group.key === 'mine' || group.key === 'deliver');
-            const hasActiveChild = group.items.some((i) => pathMatches(i.href));
-            const isDeliver = group.key === 'deliver';
-            const isMine = group.key === 'mine';
-            if (collapsed) {
-              return group.items.map((item) => {
-                const isActive = pathMatches(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setSidebarOpen(false)}
-                    title={item.label}
-                    className={cn(
-                      'flex items-center justify-center rounded-lg px-2 py-2.5 text-sm transition',
-                      isActive ? cn(nx.activeBg, nx.activeText, 'font-medium') : sysTheme.navIdle
-                    )}
-                  >
-                    <item.icon className="h-5 w-5 flex-shrink-0" />
-                  </Link>
-                );
-              });
-            }
-            return (
-              <div
-                key={group.key}
-                className={cn(
-                  'mb-3 border-l-2 pl-1',
-                  isMine && 'border-teal-500',
-                  isDeliver && 'border-orange-400',
-                  !isMine && !isDeliver && 'border-transparent'
-                )}
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(group.key)}
-                  className={cn(
-                    'flex w-full items-center justify-between px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide transition',
-                    hasActiveChild
-                      ? isDeliver
-                        ? 'text-orange-900'
-                        : isMine
-                          ? 'text-teal-900'
-                          : nx.mutedActive
-                      : 'text-white/35 hover:text-white/70'
-                  )}
-                >
-                  <span className="flex items-center gap-2">
-                    <group.icon className="h-3.5 w-3.5" />
-                    {group.label}
-                  </span>
-                  <ChevronRight className={cn('h-3.5 w-3.5 transition-transform duration-200', isOpen && 'rotate-90')} />
-                </button>
-                {isOpen && (
-                  <div className="space-y-0.5 pb-1">
-                    {group.items.map((item) => {
-                      const isActive = pathMatches(item.href);
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          onClick={() => setSidebarOpen(false)}
-                          className={cn(
-                            'flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition',
-                            isActive
-                              ? isDeliver
-                                ? 'bg-orange-50 font-medium text-orange-950'
-                                : cn(nx.activeBg, nx.activeText, 'font-medium')
-                              : sysTheme.navIdle
-                          )}
-                        >
-                          <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {primaryItems.map((item) => (
+            <Link
+              key={item.key}
+              href={item.href}
+              onClick={() => setSidebarOpen(false)}
+              title={collapsed ? item.label : undefined}
+              className={cn(
+                'flex items-center rounded-lg text-sm font-medium transition',
+                collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
+                item.active
+                  ? item.tone === 'deliver'
+                    ? 'bg-orange-500/15 text-orange-100'
+                    : cn(nx.activeBg, nx.activeText)
+                  : sysTheme.navIdle
+              )}
+            >
+              <item.icon className="h-5 w-5 flex-shrink-0" />
+              {!collapsed && item.label}
+            </Link>
+          ))}
 
           <div className="py-1 pb-2">
             <div className="h-px bg-white/10" />
