@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
         linkOficial: enriched.linkOficial,
         documents: enriched.documents,
         sourceExcerpt: enriched.sourceExcerpt,
+        evidence: enriched.evidence,
       });
     }
     return NextResponse.json({ candidate: enriched });

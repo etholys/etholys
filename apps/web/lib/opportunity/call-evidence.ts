@@ -1,5 +1,5 @@
 import { isAggregatorFundingUrl, sanitizeFundingLinks } from '@/lib/opportunity/official-url';
-import type { CallDocument, ScanCandidate } from '@/lib/opportunity/scan-types';
+import type { CallDocument, CallEvidence, ScanCandidate } from '@/lib/opportunity/scan-types';
 
 const CALL_PATH_HINT =
   /convocator|edital|edicto|call-for|callfor|calls\/|funding|apply|aplicac|postul|oportunid|chamada|grant|licitac|tender|rfp|notice|fondo|fund|programme|programa\/|bekend|ausschreib|subvenc/i;
@@ -166,6 +166,120 @@ export function hasOfficialCallEvidence(
   if (call && isLikelyCallPageUrl(call)) return true;
   if ((c.documents?.length ?? 0) > 0) return true;
   return false;
+}
+
+export function parseCallEvidence(raw: unknown): CallEvidence | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const o = raw as Record<string, unknown>;
+  if (o.status !== 'verified' && o.status !== 'unconfirmed' && o.status !== 'failed') return undefined;
+  return {
+    status: o.status,
+    verifiedAt: typeof o.verifiedAt === 'string' ? o.verifiedAt : undefined,
+    callUrl: typeof o.callUrl === 'string' ? o.callUrl : undefined,
+    documentCount: typeof o.documentCount === 'number' ? o.documentCount : 0,
+    httpOk: typeof o.httpOk === 'boolean' ? o.httpOk : undefined,
+  };
+}
+
+export function buildCallEvidence(
+  c: Pick<ScanCandidate, 'callUrl' | 'linkOficial' | 'sourceUrl' | 'documents' | 'evidence'>,
+  opts?: { httpOk?: boolean; verifiedAt?: string },
+): CallEvidence {
+  const call = pickOfficialCallUrl(c);
+  const documentCount = c.documents?.length ?? 0;
+  const httpOk = opts?.httpOk ?? c.evidence?.httpOk;
+  const official = hasOfficialCallEvidence(c);
+  if (httpOk === false && (call || official)) {
+    return {
+      status: 'failed',
+      callUrl: call,
+      documentCount,
+      httpOk: false,
+      verifiedAt: opts?.verifiedAt ?? c.evidence?.verifiedAt,
+    };
+  }
+  if (httpOk === true && official) {
+    return {
+      status: 'verified',
+      callUrl: call,
+      documentCount,
+      httpOk: true,
+      verifiedAt: opts?.verifiedAt ?? c.evidence?.verifiedAt ?? new Date().toISOString(),
+    };
+  }
+  return {
+    status: 'unconfirmed',
+    callUrl: call,
+    documentCount,
+    httpOk,
+    verifiedAt: c.evidence?.verifiedAt,
+  };
+}
+
+export function canOpenProposalBlind(c: Pick<ScanCandidate, 'evidence' | 'callUrl' | 'documents' | 'linkOficial' | 'sourceUrl'>): boolean {
+  const ev = c.evidence ?? buildCallEvidence(c);
+  return ev.status === 'verified';
+}
+
+export function evidenceLine(
+  ev: CallEvidence,
+  locale: string,
+): { label: string; tone: 'ok' | 'warn' | 'bad' } {
+  const pt = locale === 'pt';
+  const es = locale === 'es';
+  const docs =
+    ev.documentCount > 0
+      ? pt
+        ? `${ev.documentCount} documento${ev.documentCount === 1 ? '' : 's'}`
+        : es
+          ? `${ev.documentCount} documento${ev.documentCount === 1 ? '' : 's'}`
+          : `${ev.documentCount} document${ev.documentCount === 1 ? '' : 's'}`
+      : pt
+        ? 'sem anexos'
+        : es
+          ? 'sin anexos'
+          : 'no attachments';
+  if (ev.status === 'verified') {
+    const when = ev.verifiedAt
+      ? new Date(ev.verifiedAt).toLocaleDateString(pt ? 'pt-PT' : es ? 'es-ES' : 'en-US', {
+          day: 'numeric',
+          month: 'short',
+        })
+      : '';
+    const head = when
+      ? pt
+        ? `Verificado ${when}`
+        : es
+          ? `Verificado ${when}`
+          : `Verified ${when}`
+      : pt
+        ? 'Verificado'
+        : es
+          ? 'Verificado'
+          : 'Verified';
+    return {
+      label: `${head} · ${pt || es ? 'página oficial' : 'official page'} · ${docs}`,
+      tone: 'ok',
+    };
+  }
+  if (ev.status === 'failed') {
+    return {
+      label: pt
+        ? 'Página oficial não respondeu'
+        : es
+          ? 'La página oficial no respondió'
+          : 'Official page did not respond',
+      tone: 'bad',
+    };
+  }
+  return {
+    label: pt
+      ? 'Não confirmado — sem página oficial da convocatória'
+      : es
+        ? 'No confirmado — sin página oficial de la convocatoria'
+        : 'Unconfirmed — no official call page',
+    tone: 'warn',
+  };
 }
 
 /** Sem página de convocatória e nome genérico = quase certamente inventado. */

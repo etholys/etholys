@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildCallEvidence,
+  canOpenProposalBlind,
+  evidenceLine,
   hasOfficialCallEvidence,
   isLikelyCallPageUrl,
   isLikelyHomepageUrl,
@@ -73,4 +76,31 @@ test('hasOfficialCallEvidence needs a call page or attachments', () => {
     }),
     true,
   );
+});
+
+test('evidence is verified only after HTTP OK on an official call page', () => {
+  const call = { callUrl: 'https://www.ande.org.uy/convocatorias/emprendimientos-2026' };
+  assert.equal(buildCallEvidence(call).status, 'unconfirmed');
+  assert.equal(canOpenProposalBlind(call), false);
+
+  const verified = buildCallEvidence(call, {
+    httpOk: true,
+    verifiedAt: '2026-09-23T12:00:00.000Z',
+  });
+  assert.equal(verified.status, 'verified');
+  assert.equal(verified.documentCount, 0);
+  assert.equal(canOpenProposalBlind({ ...call, evidence: verified }), true);
+  assert.match(evidenceLine(verified, 'pt').label, /Verificado/);
+  assert.match(evidenceLine(verified, 'pt').label, /página oficial/);
+
+  const failed = buildCallEvidence(call, { httpOk: false });
+  assert.equal(failed.status, 'failed');
+  assert.equal(canOpenProposalBlind({ ...call, evidence: failed }), false);
+  assert.equal(evidenceLine(failed, 'pt').tone, 'bad');
+});
+
+test('homepage-only stays unconfirmed even if the site responds', () => {
+  const ev = buildCallEvidence({ linkOficial: 'https://www.ande.org.uy/' }, { httpOk: true });
+  assert.equal(ev.status, 'unconfirmed');
+  assert.equal(canOpenProposalBlind({ linkOficial: 'https://www.ande.org.uy/', evidence: ev }), false);
 });

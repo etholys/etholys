@@ -12,6 +12,7 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 | **FORGE — EAD unificado + jogos + gamificação** | [docs/architecture/forge-ead.md](./docs/architecture/forge-ead.md) | Qualquer trabalho em `/hub/forge`, APIs `forge`, LMS, jogos, IA geradora de jogos |
 | **Etholys Meet → CHORUS** | [docs/architecture/etholys-meet.md](./docs/architecture/etholys-meet.md) | Produto **CHORUS** (`/hub/meet`); Jitsi, breakouts, convites, gravação, Whisper+diarização pós-chamada |
 | **Etholys Studio — documentos com IA (ferramenta)** | [docs/architecture/etholys-studio.md](./docs/architecture/etholys-studio.md) | `/hub/studio`, pastas, templates, canvas+chat, agente com consentimento, atalho hot |
+| **FundHub — captação de fundos** | [docs/architecture/etholys-fundhub.md](./docs/architecture/etholys-fundhub.md) | Qualquer trabalho em `/hub/fundhub`, APIs `opportunity`/`fundhub`; evidência oficial, pipeline, proposta |
 | **Lab MUSE — inovação / I+D+i interno** | [docs/architecture/lab-muse.md](./docs/architecture/lab-muse.md) | `/lab/muse` — sugestões estratégicas, observatório; pipeline → ANVIL (não fundir) |
 | **Lab ANVIL — agente de engenharia interno** | [docs/architecture/lab-anvil.md](./docs/architecture/lab-anvil.md) | `/lab/anvil` — 1 agente/projeto, OSS vs Etholys, deploy targets, owners+convites |
 | **System admin vs empresa** | [docs/architecture/system-admin.md](./docs/architecture/system-admin.md) | Master Etholys (`ETHOLYS_PLATFORM_ADMIN_EMAILS`) ≠ admin de cliente |

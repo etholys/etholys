@@ -44,6 +44,18 @@ export type CallDocument = {
   kind?: 'pdf' | 'doc' | 'sheet' | 'zip' | 'other';
 };
 
+export const CALL_EVIDENCE_STATUSES = ['verified', 'unconfirmed', 'failed'] as const;
+export type CallEvidenceStatus = (typeof CALL_EVIDENCE_STATUSES)[number];
+
+/** F1 — linha de evidência na ficha / card. */
+export type CallEvidence = {
+  status: CallEvidenceStatus;
+  verifiedAt?: string;
+  callUrl?: string;
+  documentCount: number;
+  httpOk?: boolean;
+};
+
 export type ScanCandidate = {
   tempId: string;
   name: string;
@@ -92,6 +104,8 @@ export type ScanCandidate = {
   classificationNote?: string;
   /** Varredura de origem — necessário para validar depois de juntar o inbox. */
   runId?: string;
+  /** F1 — verificação da página oficial. */
+  evidence?: CallEvidence;
 };
 
 export type ScanResultsPayload = {

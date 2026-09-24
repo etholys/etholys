@@ -12,8 +12,10 @@ import {
   type InboxCandidate,
 } from '@/lib/opportunity/scan-inbox';
 import {
+  buildCallEvidence,
   looksInventedWithoutEvidence,
   normalizeCallDocuments,
+  parseCallEvidence,
   pickInstitutionUrl,
   pickOfficialCallUrl,
 } from '@/lib/opportunity/call-evidence';
@@ -162,6 +164,9 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
       institutionUrl,
       documents,
       sourceExcerpt: clip(o.sourceExcerpt, 8000),
+      evidence:
+        parseCallEvidence(o.evidence) ??
+        buildCallEvidence({ callUrl, linkOficial: links.linkOficial, sourceUrl: links.sourceUrl, documents }),
       amount: typeof o.amount === 'number' ? o.amount : undefined,
       currency: typeof o.currency === 'string' ? o.currency.slice(0, 8) : 'USD',
       deadline: closesAt,

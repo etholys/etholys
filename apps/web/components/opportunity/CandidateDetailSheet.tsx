@@ -9,11 +9,18 @@ import {
   availabilityLabel,
   formatDateShort,
 } from '@/lib/opportunity/availability';
-import { pickInstitutionUrl, pickOfficialCallUrl } from '@/lib/opportunity/call-evidence';
+import {
+  buildCallEvidence,
+  canOpenProposalBlind,
+  evidenceLine,
+  pickInstitutionUrl,
+  pickOfficialCallUrl,
+} from '@/lib/opportunity/call-evidence';
 import { buildCandidateWordHtml, downloadBlob } from '@/lib/opportunity/candidate-export';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import type { ScanCandidate } from '@/lib/opportunity/scan-types';
 import {
+  AlertTriangle,
   Bookmark,
   Check,
   Clock,
@@ -24,6 +31,7 @@ import {
   MapPin,
   MessageSquare,
   Send,
+  ShieldCheck,
   ThumbsDown,
   X,
 } from 'lucide-react';
@@ -78,6 +86,7 @@ export function CandidateDetailSheet({
   const [docsOpen, setDocsOpen] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [forceProposal, setForceProposal] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -87,6 +96,7 @@ export function CandidateDetailSheet({
     setBrief(null);
     setRejectOpen(false);
     setDocsOpen(false);
+    setForceProposal(false);
     setLive(c);
   }, [open, c.tempId, initialTab, c]);
 
@@ -210,6 +220,17 @@ export function CandidateDetailSheet({
   const callPage = pickOfficialCallUrl(live);
   const institutionPage = pickInstitutionUrl(live);
   const docs = live.documents ?? [];
+  const ev = live.evidence ?? buildCallEvidence(live);
+  const evLine = evidenceLine(ev, locale);
+  const proposalReady = canOpenProposalBlind(live);
+
+  const persistProposalSeed = () => {
+    try {
+      sessionStorage.setItem(PROPOSAL_CANDIDATE_KEY, JSON.stringify(live));
+    } catch {
+      /* ignore */
+    }
+  };
 
   const downloadOfficial = async (urls: string[], zip: boolean, key: string) => {
     if (!companyId || urls.length === 0) return;
@@ -262,6 +283,25 @@ export function CandidateDetailSheet({
             </div>
             <h2 className="mt-2 text-lg font-semibold text-gray-900">{c.name}</h2>
             <p className="text-sm text-gray-600">{c.institution}</p>
+            {evLine && (
+              <p
+                className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                  evLine.tone === 'ok'
+                    ? 'bg-emerald-50 text-emerald-800'
+                    : evLine.tone === 'bad'
+                      ? 'bg-red-50 text-red-800'
+                      : 'bg-amber-50 text-amber-900'
+                }`}
+              >
+                {evLine.tone === 'ok' ? (
+                  <ShieldCheck className="h-3 w-3 shrink-0" />
+                ) : (
+                  <AlertTriangle className="h-3 w-3 shrink-0" />
+                )}
+                {evLine.label}
+                {enriching ? ` · ${t('a verificar…', 'verificando…', 'checking…')}` : ''}
+              </p>
+            )}
           </div>
           {variant === 'modal' && (
             <button
@@ -557,20 +597,25 @@ export function CandidateDetailSheet({
                 </button>
               </>
             )}
-            <Link
-              href="/hub/fundhub/proposals?from=candidate"
-              onClick={() => {
-                try {
-                  sessionStorage.setItem(PROPOSAL_CANDIDATE_KEY, JSON.stringify(live));
-                } catch {
-                  /* ignore */
-                }
-              }}
-              className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              {t('Proposta', 'Propuesta', 'Proposal')}
-            </Link>
+            {proposalReady ? (
+              <Link
+                href="/hub/fundhub/proposals?from=candidate"
+                onClick={persistProposalSeed}
+                className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                {t('Proposta', 'Propuesta', 'Proposal')}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setForceProposal((v) => !v)}
+                className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-100"
+              >
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {t('Proposta', 'Propuesta', 'Proposal')}
+              </button>
+            )}
             <button
               type="button"
               disabled={briefLoading}
@@ -627,6 +672,34 @@ export function CandidateDetailSheet({
               </Link>
             )}
           </div>
+
+          {!proposalReady && forceProposal && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <p className="text-xs text-amber-950">
+                {t(
+                  'A convocatória ainda não está verificada. Abrir a proposta mesmo assim?',
+                  'La convocatoria aún no está verificada. ¿Abrir la propuesta de todos modos?',
+                  'This call is not verified yet. Open the proposal anyway?',
+                )}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Link
+                  href="/hub/fundhub/proposals?from=candidate"
+                  onClick={persistProposalSeed}
+                  className="inline-flex items-center rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+                >
+                  {t('Abrir mesmo assim', 'Abrir de todos modos', 'Open anyway')}
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setForceProposal(false)}
+                  className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100"
+                >
+                  {t('Cancelar', 'Cancelar', 'Cancel')}
+                </button>
+              </div>
+            </div>
+          )}
 
           {rejectOpen && onFeedback && (
             <div className="mt-3 rounded-lg border border-red-100 bg-red-50/50 p-3">

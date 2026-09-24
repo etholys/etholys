@@ -15,6 +15,8 @@
 | **[architecture/etholys-meet.md](./architecture/etholys-meet.md)** | **Meet — reuniões transversais (motor + espelhos FORGE/SIEP/NEXUS)** |
 | **[architecture/lab-muse.md](./architecture/lab-muse.md)** | **Lab MUSE — inteligência de inovação interna (pipeline → ANVIL)** |
 | **[architecture/lab-anvil.md](./architecture/lab-anvil.md)** | **Lab ANVIL — agente de engenharia interno (Cursor/Abacus Lab)** |
+| **[architecture/etholys-billing.md](./architecture/etholys-billing.md)** | **Billing — licenças, faturas Etholys, Stripe Checkout/Invoicing** |
+| **[architecture/etholys-fundhub.md](./architecture/etholys-fundhub.md)** | **FundHub — captação: evidência oficial, pipeline, proposta** |
 | **[MEET-JITSI-CONTABO.md](./MEET-JITSI-CONTABO.md)** | **Subir Jitsi no Contabo (`meet.etholys.com`)** |
 | **[MEET-VPS-JIBRI.md](./MEET-VPS-JIBRI.md)** | **VPS dedicado + Jibri → R2 / webhook** |
 
@@ -23,6 +25,12 @@
 | Documento | Descrição |
 |-----------|-----------|
 | [design/ux-audit.md](./design/ux-audit.md) | Auditoria de UX/UI do ecossistema (análise por blocos) |
+
+## Marca e comunicação
+
+| Documento | Descrição |
+|-----------|-----------|
+| **[marca/apresentacao-publica.md](./marca/apresentacao-publica.md)** | **Kit externo: quem somos, copy ES/PT, pitch, o que não afirmar** (sites, anúncios, financiadores) |
 
 ## Operações
 

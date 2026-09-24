@@ -1,6 +1,7 @@
 import 'server-only';
 
 import {
+  buildCallEvidence,
   extractDocumentLinks,
   hasOfficialCallEvidence,
   isLikelyCallPageUrl,
@@ -59,12 +60,16 @@ export async function enrichCandidateEvidence(c: ScanCandidate): Promise<ScanCan
   const seedDocs = normalizeCallDocuments(c.documents);
   const target = pickOfficialCallUrl(c);
   if (!target) {
-    return { ...c, documents: seedDocs };
+    return { ...c, documents: seedDocs, evidence: buildCallEvidence({ ...c, documents: seedDocs }) };
   }
 
   const page = await fetchOfficialPage(target);
   if (!page.ok) {
-    return { ...c, documents: seedDocs, callUrl: c.callUrl, availabilityNote: c.availabilityNote };
+    const failed = { ...c, documents: seedDocs, callUrl: c.callUrl ?? target };
+    return {
+      ...failed,
+      evidence: buildCallEvidence(failed, { httpOk: false }),
+    };
   }
 
   const extracted = page.html ? extractDocumentLinks(page.html, page.finalUrl) : [];
@@ -80,13 +85,17 @@ export async function enrichCandidateEvidence(c: ScanCandidate): Promise<ScanCan
   const callUrl = isLikelyCallPageUrl(page.finalUrl) || documents.length > 0 ? page.finalUrl : c.callUrl ?? target;
   const institutionUrl = pickInstitutionUrl({ ...c, callUrl, institutionUrl: c.institutionUrl });
 
-  return {
+  const next = {
     ...c,
     callUrl,
     institutionUrl,
     linkOficial: callUrl || c.linkOficial,
     documents,
     sourceExcerpt: excerpt,
+  };
+  return {
+    ...next,
+    evidence: buildCallEvidence(next, { httpOk: true, verifiedAt: new Date().toISOString() }),
   };
 }
 

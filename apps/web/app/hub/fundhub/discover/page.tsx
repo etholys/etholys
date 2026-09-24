@@ -18,6 +18,7 @@ import {
   availabilityLabel,
   formatDateShort,
 } from '@/lib/opportunity/availability';
+import { buildCallEvidence, evidenceLine } from '@/lib/opportunity/call-evidence';
 import {
   deadlineUrgency,
   daysUntilClose,
@@ -89,6 +90,7 @@ type ScanCandidate = {
   institutionUrl?: string;
   documents?: Array<{ title: string; url: string; kind?: string }>;
   sourceExcerpt?: string;
+  evidence?: { status: 'verified' | 'unconfirmed' | 'failed'; verifiedAt?: string; documentCount: number };
 };
 
 type ScanMeta = {
@@ -1066,6 +1068,7 @@ function CandidateCard({
 
   const countryShort =
     countries && countries.length > 48 ? `${countries.slice(0, 48).trim()}…` : countries;
+  const evLine = evidenceLine(c.evidence ?? buildCallEvidence(c), locale);
 
   return (
     <article className="group rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:border-gray-300 hover:shadow-md">
@@ -1133,6 +1136,19 @@ function CandidateCard({
               <span className="inline-flex items-center gap-1 text-gray-400">
                 <ExternalLink className="h-3 w-3 shrink-0" />
                 {host}
+              </span>
+            )}
+            {evLine && (
+              <span
+                className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                  evLine.tone === 'ok'
+                    ? 'bg-emerald-50 text-emerald-800'
+                    : evLine.tone === 'bad'
+                      ? 'bg-red-50 text-red-800'
+                      : 'bg-amber-50 text-amber-900'
+                }`}
+              >
+                {evLine.label}
               </span>
             )}
           </div>
