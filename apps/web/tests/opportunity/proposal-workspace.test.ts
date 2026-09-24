@@ -11,7 +11,11 @@ import {
   type ProposalDraftIndex,
   type ProposalFundSeed,
 } from '../../lib/opportunity/proposal-workspace';
-import { normalizeFundhubMode, buildFundhubProposalSystemPrompt } from '../../lib/agents/fundhub-proposal-prompt';
+import {
+  normalizeFundhubMode,
+  normalizeFundhubLocale,
+  buildFundhubProposalSystemPrompt,
+} from '../../lib/agents/fundhub-proposal-prompt';
 
 const richFund: ProposalFundSeed = {
   id: 'fund_horizonte_1',
@@ -95,7 +99,7 @@ test('reuse only draft proposals for the same fund', () => {
 });
 
 test('seed document has ideia geral and rascunho', () => {
-  const md = seedDocumentMarkdown(richFund, 'Ideia: corredor nativo com escolas rurais.');
+  const md = seedDocumentMarkdown(richFund, 'Ideia: corredor nativo com escolas rurais.', 'pt');
   assert.match(md, /^# Fondo Verde Regional/m);
   assert.match(md, /## Ideia geral/);
   assert.match(md, /escolas rurais/);
@@ -107,7 +111,7 @@ test('seed document cites official bases when present', () => {
   const md = seedDocumentMarkdown({
     ...richFund,
     basesText: '### Bases\nSó cooperativas rurais do Uruguai.',
-  });
+  }, undefined, 'pt');
   assert.match(md, /## Bases oficiais/);
   assert.match(md, /cooperativas rurais/);
 });
@@ -126,11 +130,22 @@ test('normalizeFundhubMode accepts understand and brainstorm', () => {
 });
 
 test('understand prompt is first and forbids brainstorm plus fake login', () => {
-  const sys = buildFundhubProposalSystemPrompt('understand');
+  const sys = buildFundhubProposalSystemPrompt('understand', 'es');
   assert.match(sys, /entender o edital/i);
   assert.match(sys, /chuva de ideias/i);
   assert.match(sys, /login/i);
   assert.match(sys, /FundHub/);
+  assert.match(sys, /español/);
+  assert.match(sys, /IDIOMA OBRIGATÓRIO/);
+});
+
+test('hub locale drives the reply language', () => {
+  assert.equal(normalizeFundhubLocale('en'), 'en');
+  assert.equal(normalizeFundhubLocale('xx'), 'es');
+  const en = buildFundhubProposalSystemPrompt('chat', 'en');
+  assert.match(en, /English/);
+  const pt = buildFundhubProposalSystemPrompt('chat', 'pt');
+  assert.match(pt, /português/);
 });
 
 test('brainstorm prompt asks for chuva de ideias and forbids FUNDHUB leftovers', () => {
@@ -141,11 +156,19 @@ test('brainstorm prompt asks for chuva de ideias and forbids FUNDHUB leftovers',
 });
 
 test('understand seed has leitura, write appends rascunho', () => {
-  const md = seedUnderstandMarkdown(richFund, 'GO 123 aceita ONG australianas.');
+  const md = seedUnderstandMarkdown(richFund, 'GO 123 aceita ONG australianas.', 'pt');
   assert.match(md, /## Leitura do edital/);
   assert.match(md, /ONG australianas/);
   assert.equal(/^##\s+Ideia geral/im.test(md), false);
-  const next = appendWriteSections(md);
+  const next = appendWriteSections(md, 'pt');
   assert.match(next, /## Ideia geral/);
   assert.match(next, /## Rascunho/);
+});
+
+test('understand seed follows Spanish hub locale', () => {
+  const md = seedUnderstandMarkdown(richFund, 'GO 123 admite ONG australianas.', 'es');
+  assert.match(md, /## Lectura de la convocatoria/);
+  const next = appendWriteSections(md, 'es');
+  assert.match(next, /## Idea general/);
+  assert.match(next, /## Borrador/);
 });

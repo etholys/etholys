@@ -1,6 +1,18 @@
 const PROMPT_VERSION = 'fundhub-proposal-v2';
 
 export type FundhubProposalMode = 'chat' | 'structure' | 'draft_section' | 'brainstorm' | 'understand';
+export type FundhubLocale = 'es' | 'pt' | 'en';
+
+export function normalizeFundhubLocale(raw: unknown): FundhubLocale {
+  if (raw === 'pt' || raw === 'en' || raw === 'es') return raw;
+  return 'es';
+}
+
+export function fundhubLanguageName(locale: FundhubLocale): string {
+  if (locale === 'pt') return 'português';
+  if (locale === 'en') return 'English';
+  return 'español';
+}
 
 export type FundhubProposalContext = {
   fundName?: string | null;
@@ -19,10 +31,13 @@ export type FundhubProposalContext = {
   sourceExcerpt?: string | null;
   basesText?: string | null;
   documents?: Array<{ title?: string; url?: string }> | null;
+  /** Hub UI locale — source of truth for the reply language */
+  locale?: FundhubLocale | null;
 };
 
 function buildContextBlock(ctx: FundhubProposalContext): string {
-  const lines: string[] = [];
+  const locale = normalizeFundhubLocale(ctx.locale);
+  const lines: string[] = [`Idioma da interface do Hub: ${locale} (${fundhubLanguageName(locale)})`];
   if (ctx.fundName) lines.push(`Fundo / chamada: ${ctx.fundName}`);
   if (ctx.fundInstitution) lines.push(`Instituição doadora: ${ctx.fundInstitution}`);
   if (ctx.editalLink) lines.push(`Link do edital: ${ctx.editalLink}`);
@@ -61,12 +76,20 @@ const SHARED_RULES = `## REGRAS
 - Se faltar um dado pontual depois de ler o que há, marca no máximo 1–2 [FALTA: …]. Nunca abras com uma lista de [FALTA].
 - Não faças diagnóstico de negócio NEXUS, informes SIEP, layout Studio nem prioridades do Workspace Advisor.
 - Não menciones nomes internos de produto (FUNDHUB, OPPORTUNITY, license keys). Diz FundHub se precisares de te nomear.
-- Tom profissional, claro, alinhado ao doador quando o edital o permitir.
-- Responde no idioma do utilizador (pt/es/en) salvo pedido explícito.`;
+- Tom profissional, claro, alinhado ao doador quando o edital o permitir.`;
 
-export function buildFundhubProposalSystemPrompt(mode: FundhubProposalMode): string {
+function languageRule(locale: FundhubLocale): string {
+  const name = fundhubLanguageName(locale);
+  return `- IDIOMA OBRIGATÓRIO: o Hub está em ${locale} (${name}). Escreve TODA a resposta em ${name}. Ignora o idioma destas instruções, o da página oficial e o das notas internas. Só muda se o utilizador pedir explicitamente outro idioma nesta mensagem.`;
+}
+
+export function buildFundhubProposalSystemPrompt(mode: FundhubProposalMode, locale: FundhubLocale = 'es'): string {
+  const rules = `## REGRAS
+${languageRule(locale)}
+${SHARED_RULES.replace('## REGRAS\n', '')}`;
+
   if (mode === 'structure') {
-    return `${SHARED_RULES}
+    return `${rules}
 
 ## TRABALHO (estrutura)
 Analisa o edital/notas e propõe uma estrutura de secções para a proposta.
@@ -76,7 +99,7 @@ Analisa o edital/notas e propõe uma estrutura de secções para a proposta.
   }
 
   if (mode === 'draft_section') {
-    return `${SHARED_RULES}
+    return `${rules}
 
 ## TRABALHO (rascunho de secção)
 Redige ou melhora a secção activa com base no edital e no perfil disponível.
@@ -86,7 +109,7 @@ Redige ou melhora a secção activa com base no edital e no perfil disponível.
   }
 
   if (mode === 'understand') {
-    return `${SHARED_RULES}
+    return `${rules}
 
 ## TRABALHO (entender o edital)
 Primeiro passo obrigatório: ler a convocatória. Ainda NÃO faças chuva de ideias nem rascunho de candidatura.
@@ -95,11 +118,12 @@ Primeiro passo obrigatório: ler a convocatória. Ainda NÃO faças chuva de ide
 - Janela, montante, tipo (grant/crédito).
 - Requisitos e anexos oficiais (com URL se existirem no contexto).
 - 3 pontos a confirmar na postulação.
-- Tom de briefing institucional. Sem tabelas markdown partidas. Sem pedir o edital outra vez se o texto já veio no contexto.`;
+- Tom de briefing institucional. Sem tabelas markdown partidas. Sem pedir o edital outra vez se o texto já veio no contexto.
+- Escreve o briefing no idioma da interface, mesmo que a convocatória esteja em inglês ou outro idioma.`;
   }
 
   if (mode === 'brainstorm') {
-    return `${SHARED_RULES}
+    return `${rules}
 
 ## TRABALHO (chuva de ideias)
 Só depois do edital lido: ideia geral do que desenvolver NESTE fundo para ESTA organização.
@@ -110,7 +134,7 @@ Só depois do edital lido: ideia geral do que desenvolver NESTE fundo para ESTA 
 - Curto e operacional. Não escrevas a proposta inteira. Sem tutorial, sem “como usar”.`;
   }
 
-  return `${SHARED_RULES}
+  return `${rules}
 
 ## TRABALHO (chat)
 Ajuda a preparar a proposta: requisitos, riscos, enquadramento, linguagem do doador, próximos passos.
@@ -141,7 +165,7 @@ ${userMessage.trim()}`;
   if (mode === 'understand') {
     return `${block}
 
-Pedido: briefing do edital — o que a convocatória diz de facto. Sem postulação ainda.`;
+Pedido: briefing do edital — o que a convocatória diz de facto. Sem postulação ainda. Resposta no idioma da interface (${fundhubLanguageName(normalizeFundhubLocale(ctx.locale))}).`;
   }
   if (mode === 'brainstorm') {
     return `${block}

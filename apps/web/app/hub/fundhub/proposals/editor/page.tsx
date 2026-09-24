@@ -49,7 +49,7 @@ interface AttachedFile {
 export default function FundHubProposalEditorPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { activeCompanyId } = useApp();
+  const { activeCompanyId, locale } = useApp();
   const companyId = isLikelyDbId(String(activeCompanyId ?? '').trim())
     ? String(activeCompanyId).trim()
     : '';
@@ -317,8 +317,9 @@ export default function FundHubProposalEditorPage() {
       sourceExcerpt: fund?.sourceExcerpt,
       basesText: fund?.basesText,
       documents: fund?.documents,
+      locale,
     }),
-    [companyId, fund, editalLink, intakeNotes, documentMarkdown],
+    [companyId, fund, editalLink, intakeNotes, documentMarkdown, locale],
   );
 
   const runUnderstand = useCallback(async () => {
@@ -337,17 +338,26 @@ export default function FundHubProposalEditorPage() {
       const response = await fetch('/api/proposals/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(assistantBody('understand', 'Lê o edital oficial e explica o que a convocatória pede.')),
+        body: JSON.stringify(assistantBody('understand', '')),
       });
       const data = await response.json();
       if (!response.ok || !data.answer) {
-        throw new Error(data.error || 'Não foi possível ler o edital.');
+        throw new Error(
+          data.error ||
+            (locale === 'en'
+              ? 'Could not read the call.'
+              : locale === 'pt'
+                ? 'Não foi possível ler o edital.'
+                : 'No se pudo leer la convocatoria.'),
+        );
       }
       const answer = String(data.answer);
       const seed = fund || { id: fundId || 'adhoc', name: 'Proposta', institution: '' };
-      const nextDoc = documentMarkdown.trim()
-        ? documentMarkdown
-        : seedUnderstandMarkdown(seed, answer);
+      const replaceBriefing = !chatMessages.some((m) => m.role === 'user');
+      const nextDoc =
+        !replaceBriefing && documentMarkdown.trim()
+          ? documentMarkdown
+          : seedUnderstandMarkdown(seed, answer, locale);
       const nextChat: ChatMessage[] = [
         ...chatMessages,
         { role: 'assistant', content: answer, createdAt: new Date().toISOString() },
@@ -367,19 +377,26 @@ export default function FundHubProposalEditorPage() {
         {
           role: 'assistant',
           content:
-            'Não consegui ler o edital automaticamente. Cole o link outra vez ou anexe o PDF — não avance para a postulação sem esta leitura.',
+            locale === 'en'
+              ? 'I could not read the call automatically. Paste the official link again or attach the PDF — do not start writing without this briefing.'
+              : locale === 'pt'
+                ? 'Não consegui ler o edital automaticamente. Cole o link outra vez ou anexe o PDF — não avance para a postulação sem esta leitura.'
+                : 'No pude leer la convocatoria automáticamente. Vuelva a pegar el enlace oficial o adjunte el PDF — no pase a la postulación sin esta lectura.',
           createdAt: new Date().toISOString(),
         },
       ]);
     } finally {
       setUnderstanding(false);
     }
-  }, [workspaceId, assistantBody, fund, fundId, documentMarkdown, chatMessages, persistDraft]);
+  }, [workspaceId, assistantBody, fund, fundId, documentMarkdown, chatMessages, persistDraft, locale]);
 
   const passToWrite = useCallback(() => {
     setStage('write');
     setDocumentMarkdown((prev) => {
-      const next = appendWriteSections(prev || seedDocumentMarkdown(fund || { id: 'adhoc', name: fund?.name || 'Proposta' }));
+      const next = appendWriteSections(
+        prev || seedDocumentMarkdown(fund || { id: 'adhoc', name: fund?.name || 'Proposta' }, undefined, locale),
+        locale,
+      );
       persistDraft({ documentMarkdown: next, stage: 'write' });
       return next;
     });
@@ -389,14 +406,18 @@ export default function FundHubProposalEditorPage() {
         {
           role: 'assistant',
           content:
-            'Edital lido. Pode estruturar a candidatura, pedir um rascunho de secção ou usar o canvas ao lado.',
+            locale === 'en'
+              ? 'Call read. You can structure the application, ask for a section draft, or use the canvas.'
+              : locale === 'pt'
+                ? 'Edital lido. Pode estruturar a candidatura, pedir um rascunho de secção ou usar o canvas ao lado.'
+                : 'Convocatoria leída. Puede estructurar la candidatura, pedir un borrador de sección o usar el canvas.',
           createdAt: new Date().toISOString(),
         },
       ];
       persistDraft({ chat: next, stage: 'write' });
       return next;
     });
-  }, [fund, persistDraft]);
+  }, [fund, persistDraft, locale]);
 
   useEffect(() => {
     if (loading || !workspaceId) return;
@@ -404,6 +425,22 @@ export default function FundHubProposalEditorPage() {
     if (chatMessages.some((m) => m.role === 'assistant')) return;
     void runUnderstand();
   }, [loading, workspaceId, stage, chatMessages, runUnderstand]);
+
+  const localeAppliedRef = useRef(locale);
+  useEffect(() => {
+    if (loading || !workspaceId) return;
+    if (stage !== 'understand') return;
+    if (localeAppliedRef.current === locale) return;
+    localeAppliedRef.current = locale;
+    if (chatMessages.some((m) => m.role === 'user')) return;
+    understandRef.current = false;
+    try {
+      sessionStorage.removeItem(`proposalUnderstand:${workspaceId}`);
+    } catch {
+      /* ignore */
+    }
+    setChatMessages([]);
+  }, [locale, loading, workspaceId, stage, chatMessages]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ block: 'end' });
@@ -425,7 +462,14 @@ export default function FundHubProposalEditorPage() {
       const data = await response.json();
       const reply: ChatMessage = {
         role: 'assistant',
-        content: data.answer || data.error || 'Não foi possível gerar a resposta.',
+        content:
+          data.answer ||
+          data.error ||
+          (locale === 'en'
+            ? 'Could not generate a reply.'
+            : locale === 'pt'
+              ? 'Não foi possível gerar a resposta.'
+              : 'No se pudo generar la respuesta.'),
         createdAt: new Date().toISOString(),
       };
       setChatMessages((prev) => {
@@ -436,12 +480,21 @@ export default function FundHubProposalEditorPage() {
     } catch {
       setChatMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: 'Erro ao conectar com o assistente.', createdAt: new Date().toISOString() },
+        {
+          role: 'assistant',
+          content:
+            locale === 'en'
+              ? 'Could not reach the assistant.'
+              : locale === 'pt'
+                ? 'Erro ao conectar com o assistente.'
+                : 'Error al conectar con el asistente.',
+          createdAt: new Date().toISOString(),
+        },
       ]);
     } finally {
       setChatLoading(false);
     }
-  }, [chatInput, chatLoading, assistantBody, persistDraft]);
+  }, [chatInput, chatLoading, assistantBody, persistDraft, locale]);
 
   const insertIntoDocument = useCallback(
     (text: string) => {
@@ -450,14 +503,14 @@ export default function FundHubProposalEditorPage() {
       setDocumentMarkdown((prev) => {
         const next = prev.trim()
           ? `${prev.trim()}\n\n${block}\n`
-          : seedDocumentMarkdown(fund || { id: 'adhoc', name: 'Proposta' }, block);
+          : seedDocumentMarkdown(fund || { id: 'adhoc', name: 'Proposta' }, block, locale);
         persistDraft({ documentMarkdown: next });
         return next;
       });
       setDocMode('edit');
       setDraftSaved(false);
     },
-    [fund, persistDraft],
+    [fund, persistDraft, locale],
   );
 
   const handleGenerateStructure = useCallback(async () => {

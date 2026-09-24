@@ -1,5 +1,46 @@
 /** Client-safe helpers to open a FundHub proposal from a known fund or a manual edital. */
 
+import type { Locale } from '@/lib/i18n';
+
+const DOC_HEAD: Record<
+  Locale,
+  { read: string; idea: string; draft: string; elig: string; bases: string; waitingRead: string; waitingIdea: string }
+> = {
+  es: {
+    read: 'Lectura de la convocatoria',
+    idea: 'Idea general',
+    draft: 'Borrador',
+    elig: 'Elegibilidad y requisitos',
+    bases: 'Bases oficiales (citar; no inventar)',
+    waitingRead: 'La IA está leyendo la convocatoria oficial. La postulación empieza solo después de esta lectura.',
+    waitingIdea: 'La IA está preparando una idea general para este fondo y el perfil de la organización.',
+  },
+  pt: {
+    read: 'Leitura do edital',
+    idea: 'Ideia geral',
+    draft: 'Rascunho',
+    elig: 'Elegibilidade e requisitos',
+    bases: 'Bases oficiais (citar; não inventar)',
+    waitingRead: 'A IA está a ler a convocatória oficial. A postulação começa só depois desta leitura.',
+    waitingIdea: 'A IA está a preparar uma ideia geral para este fundo e o perfil da organização.',
+  },
+  en: {
+    read: 'Call reading',
+    idea: 'General idea',
+    draft: 'Draft',
+    elig: 'Eligibility and requirements',
+    bases: 'Official guidelines (quote; do not invent)',
+    waitingRead: 'The AI is reading the official call. Writing starts only after this briefing.',
+    waitingIdea: 'The AI is preparing a general idea for this fund and the organisation profile.',
+  },
+};
+
+function docHead(locale?: string | null) {
+  if (locale === 'pt') return DOC_HEAD.pt;
+  if (locale === 'en') return DOC_HEAD.en;
+  return DOC_HEAD.es;
+}
+
 export const PROPOSAL_CANDIDATE_KEY = 'opportunityProposalCandidate';
 export const SELECTED_FUND_KEY = 'selectedFund';
 
@@ -207,52 +248,46 @@ export function sectionsFromMarkdown(md: string): Array<{ id: string; title: str
   return sections;
 }
 
-export function seedUnderstandMarkdown(seed: ProposalFundSeed, briefing?: string): string {
+export function seedUnderstandMarkdown(seed: ProposalFundSeed, briefing?: string, locale?: string | null): string {
+  const h = docHead(locale);
   const title = seed.name?.trim() || 'Proposta';
-  const brief = briefing?.trim()
-    ? briefing.trim()
-    : 'A IA está a ler a convocatória oficial. A postulação começa só depois desta leitura.';
+  const brief = briefing?.trim() ? briefing.trim() : h.waitingRead;
   const eligibility = [seed.whoCanApply, seed.eligibility || seed.eligibilityCriteria, seed.requirements, seed.howToApply]
     .filter((s) => Boolean(String(s ?? '').trim()))
     .join('\n\n');
   const bases = String(seed.basesText || seed.sourceExcerpt || '').trim();
-  const parts = [`# ${title}`, `## Leitura do edital\n\n${brief}`];
-  if (eligibility) parts.push(`## Elegibilidade e requisitos\n\n${eligibility}`);
+  const parts = [`# ${title}`, `## ${h.read}\n\n${brief}`];
+  if (eligibility) parts.push(`## ${h.elig}\n\n${eligibility}`);
   if (bases) {
     const clip = bases.length > 4500 ? `${bases.slice(0, 4500).trim()}…` : bases;
-    parts.push(`## Bases oficiais (citar; não inventar)\n\n${clip}`);
+    parts.push(`## ${h.bases}\n\n${clip}`);
   }
   return parts.join('\n\n');
 }
 
-export function appendWriteSections(md: string): string {
+export function appendWriteSections(md: string, locale?: string | null): string {
+  const h = docHead(locale);
   const text = md.trim();
-  const hasIdea = /^##\s+Ideia geral\b/im.test(text);
-  const hasDraft = /^##\s+Rascunho\b/im.test(text);
-  const extra = [
-    hasIdea ? '' : '## Ideia geral\n\n',
-    hasDraft ? '' : '## Rascunho\n\n',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const hasIdea = /^##\s+(Ideia geral|Idea general|General idea)\b/im.test(text);
+  const hasDraft = /^##\s+(Rascunho|Borrador|Draft)\b/im.test(text);
+  const extra = [hasIdea ? '' : `## ${h.idea}\n\n`, hasDraft ? '' : `## ${h.draft}\n\n`].filter(Boolean).join('\n');
   return extra ? `${text}\n\n${extra}` : text;
 }
 
-export function seedDocumentMarkdown(seed: ProposalFundSeed, brainstorm?: string): string {
+export function seedDocumentMarkdown(seed: ProposalFundSeed, brainstorm?: string, locale?: string | null): string {
+  const h = docHead(locale);
   const title = seed.name?.trim() || 'Proposta';
-  const idea = brainstorm?.trim()
-    ? brainstorm.trim()
-    : 'A IA está a preparar uma ideia geral para este fundo e o perfil da organização.';
+  const idea = brainstorm?.trim() ? brainstorm.trim() : h.waitingIdea;
   const eligibility = [seed.whoCanApply, seed.eligibility || seed.eligibilityCriteria, seed.requirements, seed.howToApply]
     .filter((s) => Boolean(String(s ?? '').trim()))
     .join('\n\n');
   const bases = String(seed.basesText || seed.sourceExcerpt || '').trim();
-  const parts = [`# ${title}`, `## Ideia geral\n\n${idea}`];
-  if (eligibility) parts.push(`## Elegibilidade e requisitos\n\n${eligibility}`);
+  const parts = [`# ${title}`, `## ${h.idea}\n\n${idea}`];
+  if (eligibility) parts.push(`## ${h.elig}\n\n${eligibility}`);
   if (bases) {
     const clip = bases.length > 4500 ? `${bases.slice(0, 4500).trim()}…` : bases;
-    parts.push(`## Bases oficiais (citar; não inventar)\n\n${clip}`);
+    parts.push(`## ${h.bases}\n\n${clip}`);
   }
-  parts.push('## Rascunho\n\n');
+  parts.push(`## ${h.draft}\n\n`);
   return parts.join('\n\n');
 }

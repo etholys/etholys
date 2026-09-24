@@ -98,7 +98,7 @@ function asFundSeed(raw: unknown): FundSummary | null {
 export default function ProposalsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { activeCompanyId } = useApp();
+  const { activeCompanyId, locale } = useApp();
   const companyId = useMemo(() => {
     const s = String(activeCompanyId ?? '').trim();
     return isLikelyDbId(s) ? s : '';
@@ -353,7 +353,7 @@ export default function ProposalsPage() {
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ url: officialUrl }),
+              body: JSON.stringify({ url: officialUrl, locale }),
             },
           );
           const ingestData = (await ingestRes.json()) as {
@@ -445,7 +445,7 @@ export default function ProposalsPage() {
       setError(err instanceof Error ? err.message : 'Erro ao abrir workspace');
       setIsLoading(false);
     }
-  }, [fund, editalLink, selectedFiles, intakeNotes, router, openWorkspace, companyId]);
+  }, [fund, editalLink, selectedFiles, intakeNotes, router, openWorkspace, companyId, locale]);
 
   const handleDeleteDraft = useCallback((workspaceId: string) => {
     const updated = drafts.filter((d) => d.workspaceId !== workspaceId);

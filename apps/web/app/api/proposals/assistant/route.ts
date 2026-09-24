@@ -8,6 +8,8 @@ import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import {
   buildFundhubProposalSystemPrompt,
   buildFundhubProposalUserPrompt,
+  fundhubLanguageName,
+  normalizeFundhubLocale,
   normalizeFundhubMode,
   type FundhubProposalContext,
 } from '@/lib/agents/fundhub-proposal-prompt';
@@ -55,6 +57,7 @@ export async function POST(req: NextRequest) {
     };
 
     const mode = normalizeFundhubMode(body.mode);
+    const locale = normalizeFundhubLocale(body.locale);
     const userMessage = typeof body.userMessage === 'string' ? body.userMessage : '';
 
     if (mode !== 'brainstorm' && mode !== 'structure' && mode !== 'understand' && !userMessage.trim()) {
@@ -84,15 +87,17 @@ export async function POST(req: NextRequest) {
       sourceExcerpt: body.sourceExcerpt,
       basesText: body.basesText,
       documents,
+      locale,
     };
 
+    const lang = fundhubLanguageName(locale);
     const defaultMessage =
       mode === 'understand'
-        ? 'Lê a convocatória oficial e faz o briefing. Não peças o PDF se já há texto no contexto. Não inventes login.'
+        ? `Read the official call and write the briefing in ${lang}. Do not ask for the PDF if excerpt/bases are already in context. Do not invent a login wall.`
         : mode === 'brainstorm'
-          ? 'Chuva de ideias para esta proposta — só depois do edital lido.'
+          ? `Brainstorm for this proposal in ${lang} — only after the call is understood.`
           : mode === 'structure'
-            ? 'Gera a estrutura da proposta.'
+            ? `Generate the proposal section titles in ${lang}.`
             : userMessage;
 
     const excerptLen = contextChars(ctx);
@@ -105,7 +110,7 @@ export async function POST(req: NextRequest) {
     const temperature = mode === 'structure' || mode === 'understand' ? 0.15 : mode === 'brainstorm' ? 0.4 : 0.25;
 
     const { text: answer } = await llmGenerateContent({
-      systemInstruction: buildFundhubProposalSystemPrompt(mode),
+      systemInstruction: buildFundhubProposalSystemPrompt(mode, locale),
       userText: buildFundhubProposalUserPrompt(mode, ctx, userMessage || defaultMessage),
       maxOutputTokens,
       temperature,

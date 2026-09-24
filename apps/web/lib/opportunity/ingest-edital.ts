@@ -10,6 +10,7 @@ import {
   titleFromHtml,
 } from '@/lib/opportunity/official-fetch';
 import type { CallDocument, CallEvidence } from '@/lib/opportunity/scan-types';
+import { fundhubLanguageName, normalizeFundhubLocale, type FundhubLocale } from '@/lib/agents/fundhub-proposal-prompt';
 
 export type IngestedEdital = {
   name: string;
@@ -31,11 +32,12 @@ function hostOrigin(url: string): string | undefined {
   }
 }
 
-async function supplementWithWebSearch(url: string, seed: string): Promise<string> {
+async function supplementWithWebSearch(url: string, seed: string, locale: FundhubLocale): Promise<string> {
+  const lang = fundhubLanguageName(locale);
   try {
     const { text } = await llmCompleteWithWebSearch(
-      'És analista de editais. Abre a página oficial e os PDFs ligados. Não inventes. Cita o que a página diz.',
-      `Lê esta convocatória oficial e devolve um resumo factual em português (ou no idioma da página):\n${url}\n\nJá extraímos isto da página (pode estar incompleto):\n${seed.slice(0, 2500)}\n\nInclui: nome do fundo, financiador, quem pode candidatar, países, montante, prazo, documentos/anexos com URL se os vires, e requisitos-chave. Se a página estiver pública, NÃO digas que precisa de login.`,
+      `You analyse official grant calls. Open the official page and linked PDFs. Do not invent. Quote what the page says. Write the summary in ${lang} (Hub UI locale: ${locale}).`,
+      `Read this official call and return a factual summary in ${lang}:\n${url}\n\nAlready extracted (may be incomplete):\n${seed.slice(0, 2500)}\n\nInclude: fund name, funder, who can apply, countries, amount, deadline, annexes with URL if visible, and key requirements. If the page is public, do NOT say it needs a login.`,
       { maxOutputTokens: 3500, temperature: 0.1, timeoutMs: 90_000 },
     );
     return text.trim();
@@ -44,7 +46,8 @@ async function supplementWithWebSearch(url: string, seed: string): Promise<strin
   }
 }
 
-export async function ingestOfficialEdital(url: string): Promise<IngestedEdital> {
+export async function ingestOfficialEdital(url: string, opts?: { locale?: unknown }): Promise<IngestedEdital> {
+  const locale = normalizeFundhubLocale(opts?.locale);
   const page = await fetchOfficialResource(url);
   const callUrl = page.finalUrl || url;
   const documents = page.html ? extractDocumentLinks(page.html, callUrl) : [];
@@ -64,7 +67,7 @@ export async function ingestOfficialEdital(url: string): Promise<IngestedEdital>
   const thin = !page.ok || excerpt.length < 800 || spaShell || (!basesText && uniqueDocs.length === 0);
   let sourceExcerpt = excerpt;
   if (thin) {
-    const extra = await supplementWithWebSearch(url, excerpt || basesText);
+    const extra = await supplementWithWebSearch(url, excerpt || basesText, locale);
     if (extra) {
       sourceExcerpt = excerpt ? `${excerpt}\n\n${extra}`.slice(0, 12_000) : extra.slice(0, 12_000);
     }
