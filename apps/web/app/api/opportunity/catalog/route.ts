@@ -4,6 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import { isAggregatorFundingUrl, sanitizeFundingLinks } from '@/lib/opportunity/official-url';
+import {
+  isPipelineStatus,
+  pipelineFilterMatch,
+  pipelineOf,
+  writeFundHubMeta,
+  type PipelineStatus,
+} from '@/lib/opportunity/pipeline';
 
 /** Oportunidades validadas (catálogo da empresa). */
 export async function GET(req: NextRequest) {
@@ -13,6 +20,7 @@ export async function GET(req: NextRequest) {
   const search = req.nextUrl.searchParams.get('search')?.trim();
   const status = req.nextUrl.searchParams.get('status')?.trim();
   const type = req.nextUrl.searchParams.get('type')?.trim();
+  const pipeline = req.nextUrl.searchParams.get('pipeline')?.trim() || 'all';
   const page = Math.max(1, parseInt(req.nextUrl.searchParams.get('page') || '1', 10));
   const limit = Math.min(50, Math.max(1, parseInt(req.nextUrl.searchParams.get('limit') || '20', 10)));
 
@@ -30,30 +38,38 @@ export async function GET(req: NextRequest) {
   }
 
   const skip = (page - 1) * limit;
-  const [funds, total] = await Promise.all([
-    prisma.fund.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: [{ matchScore: 'desc' }, { updatedAt: 'desc' }],
-      include: {
-        userStatus: {
-          where: { userId: ctx.userId },
-          select: { status: true },
-        },
+  const raw = await prisma.fund.findMany({
+    where,
+    orderBy: [{ deadline: { sort: 'asc', nulls: 'last' } }, { updatedAt: 'desc' }],
+    include: {
+      userStatus: {
+        where: { userId: ctx.userId },
+        select: { status: true },
       },
-    }),
-    prisma.fund.count({ where }),
-  ]);
+    },
+  });
+
+  const pipelineFilter =
+    pipeline === 'decide' || pipeline === 'prepare' || pipeline === 'submitted' || pipeline === 'closed'
+      ? pipeline
+      : 'all';
+
+  const mapped = raw
+    .map((f) => ({
+      ...f,
+      pipelineStatus: pipelineOf(f.notes),
+      userStatus: f.userStatus[0] ?? null,
+    }))
+    .filter((f) => pipelineFilterMatch(f.pipelineStatus, pipelineFilter));
+
+  const total = mapped.length;
+  const funds = mapped.slice(skip, skip + limit);
 
   return NextResponse.json({
-    funds: funds.map((f) => ({
-      ...f,
-      userStatus: f.userStatus[0] ?? null,
-    })),
+    funds,
     pagination: {
       total,
-      pages: Math.ceil(total / limit),
+      pages: Math.max(1, Math.ceil(total / limit)),
       current: page,
       pageSize: limit,
     },
@@ -154,10 +170,37 @@ async function createKnownFund(
       linkOficial,
       type: data.type?.slice(0, 80) || 'Grant',
       status: 'open',
-      notes: data.notes?.slice(0, 500) ?? 'Importado manualmente pelo utilizador',
+      notes: writeFundHubMeta(data.notes?.slice(0, 500) ?? 'Importado manualmente pelo utilizador', {
+        pipelineStatus: 'decide',
+      }),
       sourceOfInformation: 'known_by_user',
       lastReviewedAt: new Date(),
     },
   });
   return fund.id;
+}
+
+export async function PATCH(req: NextRequest) {
+  const ctx = await resolveOpportunityCompanyId(req.nextUrl.searchParams.get('companyId'));
+  if (!ctx) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+
+  const body = (await req.json()) as { fundId?: string; pipelineStatus?: PipelineStatus };
+  const fundId = String(body.fundId ?? '').trim();
+  if (!fundId || !isPipelineStatus(body.pipelineStatus)) {
+    return NextResponse.json({ error: 'fundId e pipelineStatus obrigatórios' }, { status: 400 });
+  }
+
+  const fund = await prisma.fund.findFirst({
+    where: { id: fundId, companyId: ctx.companyId, isActive: true },
+    select: { id: true, notes: true },
+  });
+  if (!fund) return NextResponse.json({ error: 'Fundo não encontrado' }, { status: 404 });
+
+  const notes = writeFundHubMeta(fund.notes, { pipelineStatus: body.pipelineStatus });
+  await prisma.fund.update({
+    where: { id: fund.id },
+    data: { notes, lastReviewedAt: new Date() },
+  });
+
+  return NextResponse.json({ ok: true, fundId: fund.id, pipelineStatus: body.pipelineStatus });
 }

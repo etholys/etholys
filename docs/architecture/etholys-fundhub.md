@@ -141,7 +141,7 @@ país · tipo de org · privado elegível · teto · grant vs crédito · prazo 
 
 Verde / âmbar / vermelho. «Não somos elegíveis» → `not_now` + aprendizagem. Sem página nova.
 
-### F3 — Pipeline em Em curso
+### F3 — Pipeline em Em curso (em implementação)
 
 Filtro ou colunas: **Decidir / Preparar / Submetido / Fechado**. Prazo no card. Default ao guardar: `decide`. Sem menu novo.
 

@@ -7,6 +7,10 @@ import { isLikelyDbId } from '@/lib/utils';
 import { DeadlineAlertsPanel } from '@/components/opportunity/DeadlineAlertsPanel';
 import { StateEmpty, StateLoading } from '@/components/ui/StateBlocks';
 import {
+  pipelineLabel,
+  type PipelineStatus,
+} from '@/lib/opportunity/pipeline';
+import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
@@ -27,6 +31,7 @@ type Opportunity = {
   countries?: string | null;
   matchScore?: number | null;
   status: string;
+  pipelineStatus?: PipelineStatus;
 };
 
 export default function OpportunitiesPage() {
@@ -45,6 +50,8 @@ export default function OpportunitiesPage() {
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [pipeline, setPipeline] = useState<'all' | 'decide' | 'prepare' | 'submitted' | 'closed'>('all');
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const q = (path: string) =>
     `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
@@ -59,6 +66,7 @@ export default function OpportunitiesPage() {
       try {
         const params = new URLSearchParams({ page: String(pageNum), limit: '12' });
         if (search.trim()) params.set('search', search.trim());
+        if (pipeline !== 'all') params.set('pipeline', pipeline);
         const r = await fetch(q(`/api/opportunity/catalog?${params}`), { cache: 'no-store' });
         const d = (await r.json()) as {
           funds?: Opportunity[];
@@ -74,12 +82,29 @@ export default function OpportunitiesPage() {
         setLoading(false);
       }
     },
-    [companyId, search],
+    [companyId, search, pipeline],
   );
 
   useEffect(() => {
     void load(1);
   }, [load]);
+
+  const changePipeline = async (fundId: string, pipelineStatus: PipelineStatus) => {
+    if (!companyId) return;
+    setBusyId(fundId);
+    try {
+      const r = await fetch(q('/api/opportunity/catalog'), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fundId, pipelineStatus }),
+      });
+      if (r.ok) {
+        setItems((prev) => prev.map((item) => (item.id === fundId ? { ...item, pipelineStatus } : item)));
+      }
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   if (!companyId) {
     return (
@@ -116,6 +141,31 @@ export default function OpportunitiesPage() {
             <p className="text-xs text-gray-500">{t('em curso', 'en curso', 'in progress')}</p>
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {(
+          [
+            ['all', t('Todos', 'Todos', 'All')],
+            ['decide', t('Decidir', 'Decidir', 'Decide')],
+            ['prepare', t('Preparar', 'Preparar', 'Prepare')],
+            ['submitted', t('Submetido', 'Enviado', 'Submitted')],
+            ['closed', t('Fechado', 'Cerrado', 'Closed')],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setPipeline(key)}
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              pipeline === key
+                ? 'bg-gray-900 text-white'
+                : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -182,6 +232,9 @@ export default function OpportunitiesPage() {
                       <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
                         {f.type}
                       </span>
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
+                        {pipelineLabel(f.pipelineStatus ?? 'decide', locale)}
+                      </span>
                     </div>
                     <h3 className="mt-2 font-semibold text-gray-900">{f.name}</h3>
                     <p className="text-sm text-gray-600">{f.institution}</p>
@@ -199,6 +252,18 @@ export default function OpportunitiesPage() {
                       </span>
                     )}
                     <div className="flex gap-2">
+                      <select
+                        disabled={busyId === f.id}
+                        value={f.pipelineStatus ?? 'decide'}
+                        onChange={(e) => void changePipeline(f.id, e.target.value as PipelineStatus)}
+                        className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800"
+                      >
+                        {(['decide', 'prepare', 'submitted', 'won', 'lost'] as const).map((s) => (
+                          <option key={s} value={s}>
+                            {pipelineLabel(s, locale)}
+                          </option>
+                        ))}
+                      </select>
                       <Link
                         href={`/hub/fundhub/discover/${f.id}`}
                         className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"

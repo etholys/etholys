@@ -16,6 +16,7 @@ import {
   type LikeReason,
   type RejectReason,
 } from '@/lib/opportunity/learning-feedback';
+import { pipelineOf, writeFundHubMeta } from '@/lib/opportunity/pipeline';
 
 function parseDeadline(raw: string | null | undefined): Date | null {
   if (!raw) return null;
@@ -126,7 +127,7 @@ async function upsertFundFromCandidate(
       institution: c.institution,
       isActive: true,
     },
-    select: { id: true },
+    select: { id: true, notes: true },
   });
 
   const closesAt = c.closesAt ?? c.deadline;
@@ -166,7 +167,9 @@ async function upsertFundFromCandidate(
     matchJustification: c.matchJustification ?? null,
     sourceOfInformation: links.sourceUrl ?? links.linkOficial ?? null,
     eligibilityCriteria,
-    notes: noteParts.length ? noteParts.join(' · ') : null,
+    notes: writeFundHubMeta(noteParts.length ? noteParts.join(' · ') : '', {
+      pipelineStatus: existing ? pipelineOf(existing.notes) : 'decide',
+    }),
     lastReviewedAt: new Date(),
   };
 
@@ -179,7 +182,10 @@ async function upsertFundFromCandidate(
     data: {
       companyId,
       ...data,
-      notes: [`Descoberto na varredura ${runId}`, ...noteParts].filter(Boolean).join(' · ') || null,
+      notes: writeFundHubMeta(
+        [`Descoberto na varredura ${runId}`, ...noteParts].filter(Boolean).join(' · '),
+        { pipelineStatus: 'decide' },
+      ),
     },
   });
   return created.id;
