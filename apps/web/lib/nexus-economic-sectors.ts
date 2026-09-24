@@ -38,11 +38,26 @@ export const NEXUS_ECONOMIC_SECTORS: EconomicSector[] = [
   {
     id: 'agriculture',
     groupId: 'agro',
-    label: { es: 'Agricultura (cultivos)', pt: 'Agricultura (culturas)', en: 'Agriculture (crops)' },
+    label: {
+      es: 'Agricultura (cultivos extensivos)',
+      pt: 'Agricultura (culturas extensivas)',
+      en: 'Agriculture (field crops)',
+    },
     focusAreas: [
       { es: 'Plan de siembra/cosecha y costes por hectárea', pt: 'Plano de sementeira/colheita e custos por hectare', en: 'Crop plan and cost per hectare' },
       { es: 'Acceso a insumos y trazabilidad', pt: 'Acesso a insumos e rastreabilidade', en: 'Inputs access and traceability' },
       { es: 'Comercialización y precios de mercado', pt: 'Comercialização e preços de mercado', en: 'Market access and pricing' },
+    ],
+    suggestedCaseKinds: ['visit', 'diagnosis', 'followup'],
+  },
+  {
+    id: 'horticulture',
+    groupId: 'agro',
+    label: { es: 'Horta / hortícolas', pt: 'Horta / hortícolas', en: 'Horticulture / market garden' },
+    focusAreas: [
+      { es: 'Calendario de siembra y rotación de canteros', pt: 'Calendário de plantio e rotação de canteiros', en: 'Bed planting calendar and rotation' },
+      { es: 'Riego, insumos y mermas de poscosecha', pt: 'Irrigação, insumos e perdas pós-colheita', en: 'Irrigation, inputs and postharvest loss' },
+      { es: 'Venta fresca, ferias y contratos locales', pt: 'Venda fresca, feiras e contratos locais', en: 'Fresh sales, markets and local contracts' },
     ],
     suggestedCaseKinds: ['visit', 'diagnosis', 'followup'],
   },
@@ -56,6 +71,29 @@ export const NEXUS_ECONOMIC_SECTORS: EconomicSector[] = [
       { es: 'Cadena de frío y venta de carne/leche', pt: 'Cadeia de frio e venda de carne/leite', en: 'Cold chain and product sales' },
     ],
     suggestedCaseKinds: ['visit', 'diagnosis', 'call'],
+  },
+  {
+    id: 'poultry',
+    groupId: 'agro',
+    label: { es: 'Aves / huevos (gallinas)', pt: 'Aves / ovos (galinhas)', en: 'Poultry / eggs' },
+    focusAreas: [
+      { es: 'Manejo de postura, densidad y bioseguridad', pt: 'Manejo de postura, densidade e biossegurança', en: 'Laying management, density and biosecurity' },
+      { es: 'Coste por huevo / ave y conversión alimenticia', pt: 'Custo por ovo / ave e conversão alimentar', en: 'Cost per egg/bird and feed conversion' },
+      { es: 'Comercialización de huevo y pollos', pt: 'Comercialização de ovos e frangos', en: 'Egg and bird commercialization' },
+    ],
+    suggestedCaseKinds: ['visit', 'diagnosis', 'followup'],
+  },
+  {
+    id: 'apiculture',
+    groupId: 'agro',
+    label: { es: 'Apicultura (abejas / miel)', pt: 'Apicultura (abelhas / mel)', en: 'Apiculture (bees / honey)' },
+    focusAreas: [
+      { es: 'Sanidad de colmenas (varroa, nosema) y manejo', pt: 'Sanidade das colmeias (varroa, nosema) e manejo', en: 'Hive health (varroa, nosema) and husbandry' },
+      { es: 'Flora, floración y trashumancia / ubicación', pt: 'Flora, floração e transumância / localização', en: 'Forage, bloom and migration / siting' },
+      { es: 'Cosecha, extracción y calidad de miel y derivados', pt: 'Colheita, extração e qualidade do mel e derivados', en: 'Harvest, extraction and honey quality' },
+      { es: 'Comercialización (miel, polen, cera, polinización)', pt: 'Comercialização (mel, pólen, cera, polinização)', en: 'Sales (honey, pollen, wax, pollination)' },
+    ],
+    suggestedCaseKinds: ['visit', 'diagnosis', 'followup'],
   },
   {
     id: 'agroindustry',
@@ -225,6 +263,29 @@ const LEGACY_SECTOR_MAP: Record<string, string> = {
   public: 'other',
   cooperative: 'cooperative',
   other: 'other',
+  horta: 'horticulture',
+  horticultura: 'horticulture',
+  hortícolas: 'horticulture',
+  horticolas: 'horticulture',
+  garden: 'horticulture',
+  aves: 'poultry',
+  gallinas: 'poultry',
+  galinhas: 'poultry',
+  huevos: 'poultry',
+  ovos: 'poultry',
+  poultry: 'poultry',
+  eggs: 'poultry',
+  apiculture: 'apiculture',
+  apicultura: 'apiculture',
+  bees: 'apiculture',
+  beekeeping: 'apiculture',
+  miel: 'apiculture',
+  honey: 'apiculture',
+  abejas: 'apiculture',
+  abelhas: 'apiculture',
+  agroindustria: 'agroindustry',
+  'agro-indústria': 'agroindustry',
+  'agro-industria': 'agroindustry',
 };
 
 export function isEconomicSectorId(id: string): boolean {
@@ -235,7 +296,9 @@ export function normalizeEconomicSectorId(raw: string | null | undefined): strin
   if (!raw?.trim()) return null;
   const id = raw.trim();
   if (byId.has(id)) return id;
-  return LEGACY_SECTOR_MAP[id] || null;
+  const lower = id.toLowerCase();
+  if (byId.has(lower)) return lower;
+  return LEGACY_SECTOR_MAP[lower] || LEGACY_SECTOR_MAP[id] || null;
 }
 
 export function getEconomicSector(id: string | null | undefined): EconomicSector | null {
@@ -251,10 +314,40 @@ export function sectorLabel(
   return s ? s.label[locale] : null;
 }
 
+export function parseCompanySectorIds(contextSetupJson: unknown): string[] {
+  if (!contextSetupJson || typeof contextSetupJson !== 'object') return [];
+  const o = contextSetupJson as { sectorIds?: unknown; sectorId?: unknown };
+  const fromArr = Array.isArray(o.sectorIds)
+    ? [
+        ...new Set(
+          o.sectorIds
+            .map((x) => (typeof x === 'string' ? normalizeEconomicSectorId(x) : null))
+            .filter(Boolean) as string[]
+        ),
+      ]
+    : [];
+  if (fromArr.length > 0) return fromArr;
+  const one = typeof o.sectorId === 'string' ? normalizeEconomicSectorId(o.sectorId) : null;
+  return one ? [one] : [];
+}
+
 export function parseCompanySectorId(contextSetupJson: unknown): string | null {
-  if (!contextSetupJson || typeof contextSetupJson !== 'object') return null;
-  const sectorId = (contextSetupJson as { sectorId?: unknown }).sectorId;
-  return typeof sectorId === 'string' ? normalizeEconomicSectorId(sectorId) : null;
+  return parseCompanySectorIds(contextSetupJson)[0] || null;
+}
+
+/** Normaliza lista de ids de setor a partir de sectorIds[] e/ou sectorId. */
+export function normalizeSectorIdList(input: {
+  sectorIds?: unknown;
+  sectorId?: unknown;
+}): string[] {
+  const fromArr = Array.isArray(input.sectorIds)
+    ? input.sectorIds.map((x) => (typeof x === 'string' ? normalizeEconomicSectorId(x) : null))
+    : [];
+  const one =
+    input.sectorId != null && String(input.sectorId).trim()
+      ? normalizeEconomicSectorId(String(input.sectorId).trim())
+      : null;
+  return [...new Set([...(fromArr.filter(Boolean) as string[]), ...(one ? [one] : [])])];
 }
 
 export type SectorCatalogRow = {

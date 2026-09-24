@@ -7,6 +7,12 @@ import { AlertTriangle, Plus, Search, X } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { NexusAtCaseCard, type AtCaseCardModel } from '@/components/nexus/NexusAtCaseCard';
 import { groupSectorsForSelect, sectorBadgeLabel } from '@/components/nexus/NexusAtSectorPlaybook';
+import {
+  AT_DELIVERY_MODEL_LABELS,
+  AT_DELIVERY_MODELS,
+  isAttendedMemberRole,
+  type AtDeliveryModel,
+} from '@/lib/nexus-at-shared';
 
 type Company = { id: string; name: string; shortName: string; sectorId?: string | null };
 type SectorCatalogRow = {
@@ -22,6 +28,7 @@ type Service = {
   kind: string;
   status: string;
   contractRef: string | null;
+  deliveryModel?: string | null;
   operatorCompany: { id: string; name: string; shortName: string };
   sponsorCompany?: { id: string; name: string; shortName: string } | null;
   siepProject?: { id: string; name: string; code?: string | null } | null;
@@ -82,6 +89,7 @@ export default function NexusAtPage() {
   const [sectorPortfolio, setSectorPortfolio] = useState<SectorPortfolioRow[]>([]);
   const [sectorFilter, setSectorFilter] = useState<string>('all');
   const [selectedSectorIds, setSelectedSectorIds] = useState<string[]>([]);
+  const [deliveryModel, setDeliveryModel] = useState<AtDeliveryModel>('MULTI');
 
   const [services, setServices] = useState<Service[]>([]);
   const [inbox, setInbox] = useState<AtCaseCardModel[]>([]);
@@ -266,7 +274,8 @@ export default function NexusAtPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: title.trim(),
-          kind: 'CONTRACT',
+          kind: deliveryModel === 'COLLECTIVE' ? 'PROJECT' : 'CONTRACT',
+          deliveryModel,
           operatorCompanyId,
           primarySectorId: primarySectorId || undefined,
           sectorIds: selectedSectorIds,
@@ -281,7 +290,14 @@ export default function NexusAtPage() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || (es ? 'No se pudo crear' : 'Falha ao criar'));
 
-      const projectName = es ? 'Diagnóstico inicial' : 'Diagnóstico inicial';
+      const projectName =
+        deliveryModel === 'COLLECTIVE'
+          ? es
+            ? 'Producto / red colectiva'
+            : 'Produto / rede coletiva'
+          : es
+            ? 'Diagnóstico inicial'
+            : 'Diagnóstico inicial';
       await fetch(`/api/nexus/at/engagements/${encodeURIComponent(d.engagement.id)}/projects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -294,6 +310,7 @@ export default function NexusAtPage() {
       setSponsor(null);
       setSiepProjectId('');
       setSelectedSectorIds([]);
+      setDeliveryModel('MULTI');
       router.push(`/hub/nexus/at/${d.engagement.id}?import=1`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
@@ -424,7 +441,7 @@ export default function NexusAtPage() {
           >
             <div className="mb-4 flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-slate-900">
-                {es ? 'Nuevo contrato / servicio' : 'Novo contrato / serviço'}
+                {es ? 'Nuevo marco de AT' : 'Novo marco de AT'}
               </h2>
               <button
                 type="button"
@@ -449,15 +466,44 @@ export default function NexusAtPage() {
 
               <div>
                 <p className="text-sm font-medium text-slate-700">
-                  {es ? 'Sectores del programa' : 'Setores do programa'}
+                  {es ? '¿Cómo se presta este marco?' : 'Como se presta este marco?'}
+                </p>
+                <div className="mt-2 space-y-2">
+                  {AT_DELIVERY_MODELS.map((id) => {
+                    const row = AT_DELIVERY_MODEL_LABELS[id];
+                    const on = deliveryModel === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setDeliveryModel(id)}
+                        className={`w-full rounded-xl border px-3 py-2.5 text-left ${
+                          on ? 'border-teal-700 bg-teal-50' : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <span className="text-sm font-semibold text-slate-900">{row[loc]}</span>
+                        <span className="mt-0.5 block text-[11px] leading-snug text-slate-600">
+                          {row.hint[loc]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-slate-700">
+                  {es ? 'Ámbito del programa (opcional)' : 'Âmbito do programa (opcional)'}
                   <span className="ml-1 font-normal text-slate-400">
                     ({selectedSectorIds.length})
                   </span>
                 </p>
                 <p className="mt-0.5 text-[11px] text-slate-500">
-                  {es ? 'Puede elegir varias áreas de intervención.' : 'Pode escolher várias áreas de intervenção.'}
+                  {es
+                    ? 'No sustituye el sector de cada MIPYME. Horta, gallinas, etc. se eligen al registrar cada negocio.'
+                    : 'Não substitui o setor de cada MIPYME. Horta, galinhas, etc. escolhem-se ao registar cada negócio.'}
                 </p>
-                <div className="mt-2 max-h-44 space-y-2 overflow-y-auto rounded-lg border border-slate-200 p-2">
+                <div className="mt-2 max-h-36 space-y-2 overflow-y-auto rounded-lg border border-slate-200 p-2">
                   {sectorSelectGroups.map((g) => (
                     <div key={g.groupId}>
                       <p className="text-[10px] font-semibold uppercase text-slate-400">{g.groupLabel}</p>
@@ -644,7 +690,7 @@ export default function NexusAtPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={saving || title.trim().length < 2 || !operatorCompanyId || selectedSectorIds.length === 0}
+                  disabled={saving || title.trim().length < 2 || !operatorCompanyId}
                   onClick={create}
                   className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40"
                 >
@@ -733,11 +779,15 @@ export default function NexusAtPage() {
             ) : (
               <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
                 {filteredServices.map((s) => {
-                  const clients = s.members.filter((m) => m.memberRole === 'client');
+                  const clients = s.members.filter((m) => isAttendedMemberRole(m.memberRole));
                   const sponsorLabel = s.sponsorCompany
                     ? s.sponsorCompany.shortName || s.sponsorCompany.name
                     : null;
                   const siepLabel = s.siepProject?.name || null;
+                  const deliveryLabel =
+                    s.deliveryModel && s.deliveryModel in AT_DELIVERY_MODEL_LABELS
+                      ? AT_DELIVERY_MODEL_LABELS[s.deliveryModel as AtDeliveryModel][loc]
+                      : null;
                   const sectorLabelMain = sectorBadgeLabel(s.primarySectorId, loc);
                   return (
                     <li key={s.id}>
@@ -747,11 +797,18 @@ export default function NexusAtPage() {
                       >
                         <div className="min-w-0">
                           <p className="truncate font-medium text-slate-900">{s.title}</p>
-                          {sectorLabelMain && (
-                            <span className="mt-1 inline-block rounded bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-900">
-                              {sectorLabelMain}
-                            </span>
-                          )}
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {deliveryLabel && (
+                              <span className="inline-block rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+                                {deliveryLabel}
+                              </span>
+                            )}
+                            {sectorLabelMain && (
+                              <span className="inline-block rounded bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-900">
+                                {es ? 'Ámbito' : 'Âmbito'}: {sectorLabelMain}
+                              </span>
+                            )}
+                          </div>
                           <p className="mt-0.5 truncate text-xs text-slate-500">
                             {s.contractRef ? `${s.contractRef} · ` : ''}
                             {sponsorLabel

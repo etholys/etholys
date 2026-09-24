@@ -5,6 +5,7 @@ import {
   listSectorCatalog,
   normalizeEconomicSectorId,
   parseCompanySectorId,
+  parseCompanySectorIds,
   sectorLabel,
 } from '../../lib/nexus-economic-sectors';
 
@@ -27,4 +28,10 @@ test('reads sector from company context json', () => {
   assert.equal(parseCompanySectorId({ sectorId: 'livestock' }), 'livestock');
   assert.equal(parseCompanySectorId({ sectorId: 'bad' }), null);
   assert.equal(parseCompanySectorId(null), null);
+  assert.deepEqual(parseCompanySectorIds({ sectorIds: ['horticulture', 'poultry'] }), [
+    'horticulture',
+    'poultry',
+  ]);
+  assert.deepEqual(parseCompanySectorIds({ sectorId: 'poultry' }), ['poultry']);
+  assert.equal(parseCompanySectorId({ sectorIds: ['horticulture', 'poultry'] }), 'horticulture');
 });

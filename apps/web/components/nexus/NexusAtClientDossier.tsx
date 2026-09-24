@@ -6,6 +6,7 @@ import { sectorProgramSummary } from '@/lib/nexus-at-sector-playbook';
 import { loadDiagnosisHistory, type NexusDiagnosisSnapshot } from '@/lib/nexus-diagnosis-history';
 import { sectorBadgeLabel } from '@/components/nexus/NexusAtSectorPlaybook';
 import { NexusIncubationProcessPanel } from '@/components/nexus/NexusIncubationProcessPanel';
+import { NexusModulePulse } from '@/components/nexus/NexusModulePulse';
 import { hasDeepSectorMatrix } from '@/lib/nexus-sector-matrices';
 
 type Locale = 'es' | 'pt' | 'en';
@@ -14,25 +15,34 @@ type Props = {
   companyId: string;
   companyName: string;
   sectorId: string | null | undefined;
+  sectorIds?: string[] | null;
   locale: Locale;
   es: boolean;
   engagementId?: string | null;
   networkId?: string | null;
+  /** Quando o CTA de diagnóstico já está na barra sticky do contrato */
+  hideDiagnosisCta?: boolean;
 };
 
 export function NexusAtClientDossier({
   companyId,
   companyName,
   sectorId,
+  sectorIds,
   locale,
   es,
   engagementId,
   networkId,
+  hideDiagnosisCta = false,
 }: Props) {
-  const program = sectorProgramSummary(sectorId, locale);
-  const sectorLabel = sectorBadgeLabel(sectorId, locale);
+  const ids =
+    sectorIds && sectorIds.length > 0 ? sectorIds : sectorId ? [sectorId] : [];
+  const program = sectorProgramSummary(ids[0], locale);
+  const sectorLabels = ids
+    .map((sid) => sectorBadgeLabel(sid, locale))
+    .filter(Boolean) as string[];
+  const deepMatrix = hasDeepSectorMatrix(ids[0]);
   const [lastDx, setLastDx] = useState<NexusDiagnosisSnapshot | null>(null);
-  const deepMatrix = hasDeepSectorMatrix(sectorId);
 
   useEffect(() => {
     const hist = loadDiagnosisHistory({ companyId, networkId: networkId || null });
@@ -50,9 +60,9 @@ export function NexusAtClientDossier({
           {es ? 'Ficha de consultoría' : 'Ficha de consultoria'}
         </p>
         <p className="mt-1 text-sm font-semibold text-slate-900">{companyName}</p>
-        {sectorLabel && (
+        {sectorLabels.length > 0 && (
           <p className="mt-1 text-xs text-teal-800">
-            {es ? 'Sector' : 'Setor'}: {sectorLabel}
+            {es ? 'Temáticas' : 'Temáticas'}: {sectorLabels.join(' · ')}
           </p>
         )}
 
@@ -80,29 +90,35 @@ export function NexusAtClientDossier({
           </div>
         )}
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link
-            href={diagnosisHref}
-            className="rounded-md bg-teal-800 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-teal-900"
-          >
-            {lastDx
-              ? es
-                ? 'Repetir diagnóstico CMM'
-                : 'Repetir diagnóstico CMM'
-              : deepMatrix
-                ? es
-                  ? 'Diagnóstico matriz sectorial (1–5)'
-                  : 'Diagnóstico matriz setorial (1–5)'
-                : es
-                  ? 'Correr diagnóstico'
-                  : 'Correr diagnóstico'}
-          </Link>
+        <div className="mt-3">
+          <NexusModulePulse companyId={companyId} engagementId={engagementId} locale={locale} />
         </div>
+
+        {!hideDiagnosisCta && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={diagnosisHref}
+              className="rounded-md bg-teal-800 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-teal-900"
+            >
+              {lastDx
+                ? es
+                  ? 'Repetir diagnóstico CMM'
+                  : 'Repetir diagnóstico CMM'
+                : deepMatrix
+                  ? es
+                    ? 'Diagnóstico matriz sectorial (1–5)'
+                    : 'Diagnóstico matriz setorial (1–5)'
+                  : es
+                    ? 'Correr diagnóstico'
+                    : 'Correr diagnóstico'}
+            </Link>
+          </div>
+        )}
         {deepMatrix && (
           <p className="mt-2 text-[11px] text-slate-500">
             {es
-              ? 'Este sector usa matriz profunda CMM (gobernanza, operaciones, finanzas…) — no el quiz genérico.'
-              : 'Este setor usa matriz profunda CMM (governança, operações, finanças…) — não o quiz genérico.'}
+              ? 'En profundidad (deep/exhaustive) se añade matriz CMM. El diagnóstico estándar usa capas: negocio, nivel, comercialización y sector.'
+              : 'Em profundidade (deep/exhaustive) acrescenta-se matriz CMM. O diagnóstico standard usa camadas: negócio, nível, comercialização e setor.'}
           </p>
         )}
       </div>

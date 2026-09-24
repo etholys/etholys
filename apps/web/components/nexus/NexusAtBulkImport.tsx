@@ -78,8 +78,8 @@ export function NexusAtBulkImport({ engagementId, es, onDone }: Props) {
       </h3>
       <p className="text-xs text-slate-600">
         {es
-          ? 'Una empresa por línea. Opcional: nombre, sigla, sector. También CSV con cabecera nombre,sigla,sector.'
-          : 'Uma empresa por linha. Opcional: nome, sigla, setor. Também CSV com cabeçalho nome,sigla,setor.'}
+          ? 'Una empresa por línea. Incluye la temática: nombre;sigla;sector (horticulture, poultry, agroindustry…). También CSV con cabecera nombre,sigla,sector.'
+          : 'Uma empresa por linha. Inclui a temática: nome;sigla;setor (horticulture, poultry, agroindustry…). Também CSV com cabeçalho nome,sigla,setor.'}
       </p>
       <textarea
         value={text}
@@ -87,8 +87,8 @@ export function NexusAtBulkImport({ engagementId, es, onDone }: Props) {
         rows={6}
         placeholder={
           es
-            ? 'Cooperativa El Sol\nPanadería Norte\nTransportes Lima;TL;transport\n…'
-            : 'Cooperativa El Sol\nPadaria Norte\nTransportes Lima;TL;transport\n…'
+            ? 'Huerto Familiar Sur;HFS;horticulture\nGranja Huevos Norte;GHN;poultry\n…'
+            : 'Horta Familiar Sul;HFS;horticulture\nGranja Ovos Norte;GON;poultry\n…'
         }
         className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs"
       />

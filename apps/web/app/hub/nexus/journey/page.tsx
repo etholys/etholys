@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useApp } from '@/app/providers';
 import type { VentureStageId } from '@/lib/nexus-venture';
 import { VENTURE_STAGE_ORDER, internationalReadinessScore, stageLabel, stageSummary } from '@/lib/nexus-venture';
-import { touchRunwayChapter } from '@/lib/nexus-runway';
 import { ArrowRight, ListChecks, Loader2 } from 'lucide-react';
 import { NexusIncubationProcessPanel } from '@/components/nexus/NexusIncubationProcessPanel';
 import { mergeHumanNotesIntoIncubatorNotes, parseHumanNotesFromIncubatorNotes } from '@/lib/nexus-incubation-run';
@@ -92,10 +91,6 @@ function NexusJourneyInner() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    touchRunwayChapter('journey');
-  }, []);
 
   useEffect(() => {
     const onVis = () => {

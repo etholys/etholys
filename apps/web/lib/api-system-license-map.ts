@@ -126,6 +126,7 @@ export function isApiLicenseExempt(pathname: string): boolean {
     pathname.startsWith('/api/comments') ||
     pathname.startsWith('/api/users/me') ||
     pathname.startsWith('/api/public/') ||
+    pathname.startsWith('/api/nexus/ingest/') ||
     pathname === '/api/health'
   );
 }

@@ -3,25 +3,25 @@
  * Progresso: eventos leves (localStorage) + métricas do overview quando existem.
  */
 
-export const NEXUS_RUNWAY_LS = 'nexusRunwayV1';
+export const NEXUS_RUNWAY_LS = 'nexusRunwayV2';
 
 export type RunwayTouch = {
-  journey: boolean;
   diagnosis: boolean;
   roadmap: boolean;
+  campo: boolean;
+  monitor: boolean;
   services: boolean;
-  library: boolean;
 };
 
 export const emptyTouch = (): RunwayTouch => ({
-  journey: false,
   diagnosis: false,
   roadmap: false,
+  campo: false,
+  monitor: false,
   services: false,
-  library: false,
 });
 
-export type RunwayChapterId = 'journey' | 'diagnosis' | 'roadmap' | 'services' | 'library';
+export type RunwayChapterId = 'diagnosis' | 'roadmap' | 'campo' | 'monitor' | 'services';
 
 export type RunwayChapter = {
   id: RunwayChapterId;
@@ -33,14 +33,6 @@ export type RunwayChapter = {
 
 export const NEXUS_RUNWAY_CHAPTERS: RunwayChapter[] = [
   {
-    id: 'journey',
-    path: '/hub/nexus/journey',
-    /** Fase, mercados e prontidão — parte do mesmo processo; não "incubação" como módulo à parte. */
-    labelPt: 'Fase e metas',
-    labelEs: 'Fase y metas',
-    labelEn: 'Phase & goals',
-  },
-  {
     id: 'diagnosis',
     path: '/hub/nexus/diagnosis',
     labelPt: 'Diagnóstico',
@@ -50,9 +42,23 @@ export const NEXUS_RUNWAY_CHAPTERS: RunwayChapter[] = [
   {
     id: 'roadmap',
     path: '/hub/nexus/roadmap',
-    labelPt: 'Rota viva',
-    labelEs: 'Ruta viva',
-    labelEn: 'Live roadmap',
+    labelPt: 'Plano',
+    labelEs: 'Plan',
+    labelEn: 'Plan',
+  },
+  {
+    id: 'campo',
+    path: '/hub/nexus/campo',
+    labelPt: 'Caderno',
+    labelEs: 'Cuaderno',
+    labelEn: 'Field book',
+  },
+  {
+    id: 'monitor',
+    path: '/hub/nexus/monitor',
+    labelPt: 'Monitorização',
+    labelEs: 'Monitoreo',
+    labelEn: 'Monitoring',
   },
   {
     id: 'services',
@@ -60,13 +66,6 @@ export const NEXUS_RUNWAY_CHAPTERS: RunwayChapter[] = [
     labelPt: 'Copiloto',
     labelEs: 'Copiloto',
     labelEn: 'Copilot',
-  },
-  {
-    id: 'library',
-    path: '/hub/nexus/library',
-    labelPt: 'Método',
-    labelEs: 'Método',
-    labelEn: 'Method',
   },
 ];
 
@@ -96,16 +95,16 @@ export function isChapterComplete(
   const roadmapActivity =
     m != null && m.pendingRoadmapActions + m.completedRoadmapActions > 0;
   switch (id) {
-    case 'journey':
-      return touch.journey;
     case 'diagnosis':
       return touch.diagnosis;
     case 'roadmap':
       return roadmapActivity;
+    case 'campo':
+      return touch.campo;
+    case 'monitor':
+      return touch.monitor;
     case 'services':
       return (m != null && m.openServiceTickets > 0) || touch.services;
-    case 'library':
-      return touch.library;
     default:
       return false;
   }
@@ -127,11 +126,11 @@ export function readRunwayTouch(): RunwayTouch {
     if (!raw) return emptyTouch();
     const j = JSON.parse(raw) as Record<string, unknown>;
     return {
-      journey: Boolean(j.journey),
       diagnosis: Boolean(j.diagnosis),
       roadmap: Boolean(j.roadmap),
+      campo: Boolean(j.campo),
+      monitor: Boolean(j.monitor),
       services: Boolean(j.services),
-      library: Boolean(j.library),
     };
   } catch {
     return emptyTouch();
@@ -172,7 +171,7 @@ export function continueChapterHref(
       return withNetworkPath(c.path, networkId);
     }
   }
-  return withNetworkPath('/hub/nexus/journey', networkId);
+  return withNetworkPath('/hub/nexus/campo', networkId);
 }
 
 export function runwayProgress(
@@ -197,13 +196,19 @@ export function isNexusDeliverPath(pathname: string | null | undefined): boolean
   );
 }
 
-/** Diagnóstico com ?company= de cliente AT (≠ empresa do seletor). */
+/** Diagnóstico / caderno / monitor com ?company= de cliente AT (≠ empresa do seletor). */
 export function isAtClientDiagnosisPath(
   pathname: string | null | undefined,
   searchParams: { get: (k: string) => string | null },
   activeCompanyId: string | null | undefined
 ): boolean {
-  if (!pathname?.startsWith('/hub/nexus/diagnosis')) return false;
+  if (
+    !pathname?.startsWith('/hub/nexus/diagnosis') &&
+    !pathname?.startsWith('/hub/nexus/campo') &&
+    !pathname?.startsWith('/hub/nexus/monitor')
+  ) {
+    return false;
+  }
   const company = searchParams.get('company');
   if (!company) return false;
   return !activeCompanyId || company !== activeCompanyId;

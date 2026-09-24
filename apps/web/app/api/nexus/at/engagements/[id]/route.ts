@@ -13,7 +13,8 @@ import {
   userIsOperator,
   validateEngagementSiep,
 } from '@/lib/nexus-at';
-import { normalizeEconomicSectorId, parseCompanySectorId } from '@/lib/nexus-economic-sectors';
+import { normalizeEconomicSectorId, parseCompanySectorIds } from '@/lib/nexus-economic-sectors';
+import { isAttendedMemberRole } from '@/lib/nexus-at-shared';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -38,7 +39,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
         })
       : [];
   const sectorByCompany = new Map(
-    clientRows.map((c) => [c.id, parseCompanySectorId(c.contextSetupJson)])
+    clientRows.map((c) => [c.id, parseCompanySectorIds(c.contextSetupJson)])
   );
 
   const casesRaw = await listAtCasesForEngagement(
@@ -53,16 +54,24 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
   return NextResponse.json({
     engagement: {
       ...engagement,
-      members: engagement.members.map((m) => ({
-        ...m,
-        sectorId: m.memberRole === 'client' ? sectorByCompany.get(m.companyId) || null : null,
-      })),
+      members: engagement.members.map((m) => {
+        const ids = isAttendedMemberRole(m.memberRole)
+          ? sectorByCompany.get(m.companyId) || []
+          : [];
+        return {
+          ...m,
+          sectorIds: ids,
+          sectorId: ids[0] || null,
+        };
+      }),
     },
     cases,
     isOperator: userIsOperator(engagement, tenant.companyIds),
     companyIds: engagementCompanyIds(engagement),
     openCount,
-    companySectors: Object.fromEntries(sectorByCompany),
+    companySectors: Object.fromEntries(
+      [...sectorByCompany.entries()].map(([cid, ids]) => [cid, ids[0] || null])
+    ),
   });
 }
 

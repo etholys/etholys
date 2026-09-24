@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { hasDeepSectorMatrix } from '@/lib/nexus-sector-matrices';
 
 type Props = {
   engagementId: string;
@@ -26,59 +25,77 @@ export function NexusAtProcessRail({
   hasDiagnosisHint,
   es,
 }: Props) {
-  const deep = hasDeepSectorMatrix(sectorId);
+  const dxBase = selectedCompanyId
+    ? `/hub/nexus/diagnosis?company=${encodeURIComponent(selectedCompanyId)}&engagement=${encodeURIComponent(engagementId)}`
+    : null;
+  const planHref = dxBase ? `${dxBase}&resume=plan` : null;
+  const roadmapHref = selectedCompanyId
+    ? `/hub/nexus/roadmap?company=${encodeURIComponent(selectedCompanyId)}`
+    : '/hub/nexus/roadmap';
+
   const steps = [
     {
       id: 'legal',
-      label: es ? '1. Marco legal' : '1. Marco legal',
+      label: es ? '1. Contrato' : '1. Contrato',
       done: true,
       href: null as string | null,
-      hint: es ? 'Contrato creado' : 'Contrato criado',
+      hint: es
+        ? 'Permanente, proyecto o puntual — el contrato decide el loop'
+        : 'Permanente, projeto ou pontual — o contrato decide o loop',
     },
     {
       id: 'clients',
-      label: es ? '2. MIPYMEs' : '2. MIPYMEs',
+      label: es ? '2. Sector y oferta' : '2. Setor e oferta',
       done: clientCount > 0,
       href: null,
       hint:
         clientCount > 0
           ? es
-            ? `${clientCount} empresa(s)`
-            : `${clientCount} empresa(s)`
+            ? `${clientCount} empresa(s) · qué vende cada una`
+            : `${clientCount} empresa(s) · o que cada uma vende`
           : es
-            ? 'Importar lista'
-            : 'Importar lista',
+            ? 'Registrar cada MIPYME, sector y si vende producto/servicio'
+            : 'Registar cada MIPYME, setor e se vende produto/serviço',
     },
     {
       id: 'dx',
-      label: es ? '3. Diagnóstico CMM' : '3. Diagnóstico CMM',
+      label: es ? '3. Diagnóstico 360' : '3. Diagnóstico 360',
       done: hasDiagnosisHint,
-      href: selectedCompanyId
-        ? `/hub/nexus/diagnosis?company=${encodeURIComponent(selectedCompanyId)}&engagement=${encodeURIComponent(engagementId)}`
-        : null,
+      href: dxBase,
       hint: deep
         ? es
-          ? 'Matriz sectorial 1–5'
-          : 'Matriz setorial 1–5'
+          ? 'Estructura · gestión · producción 1/2/3 · comercial'
+          : 'Estrutura · gestão · produção 1/2/3 · comercial'
         : es
-          ? 'Cuestionario sectorial'
-          : 'Questionário setorial',
+          ? '360 del perfil: brechas, potenciales, madurez'
+          : '360 do perfil: lacunas, potenciais, maturidade',
     },
     {
       id: 'plan',
-      label: es ? '4. Plan de trabajo' : '4. Plano de trabalho',
+      label: es ? '4. Documento + plan' : '4. Documento + plano',
       done: hasOpenCases,
-      href: selectedCompanyId
-        ? `/hub/nexus/diagnosis?company=${encodeURIComponent(selectedCompanyId)}&engagement=${encodeURIComponent(engagementId)}`
-        : null,
-      hint: es ? 'Capas + casos AT' : 'Camadas + casos AT',
+      href: hasOpenCases ? roadmapHref : planHref,
+      hint: es
+        ? 'Quanti + quali · acciones, compras, fechas, indicadores'
+        : 'Quanti + quali · ações, compras, datas, indicadores',
     },
     {
-      id: 'tools',
-      label: es ? '5. Stack Etholys' : '5. Stack Etholys',
+      id: 'campo',
+      label: es ? '5. Ejecución / módulo' : '5. Execução / módulo',
       done: false,
-      href: null,
-      hint: es ? 'Próximo: mapear brechas→módulos' : 'Próximo: mapear brechas→módulos',
+      href: selectedCompanyId
+        ? `/hub/nexus/campo?company=${encodeURIComponent(selectedCompanyId)}&engagement=${encodeURIComponent(engagementId)}`
+        : null,
+      hint: es ? 'Cuaderno y sensores del sector' : 'Caderno e sensores do setor',
+    },
+    {
+      id: 'loop',
+      label: es ? '6. Ciclo anual o cierre' : '6. Ciclo anual ou fecho',
+      done: false,
+      href: dxBase,
+      hint: es
+        ? 'Permanente: análisis del año + nuevo 360. Otro contrato: cierra.'
+        : 'Permanente: análise do ano + novo 360. Outro contrato: fecha.',
     },
   ];
 
@@ -100,7 +117,7 @@ export function NexusAtProcessRail({
           );
           return (
             <li key={s.id}>
-              {s.href && !s.done ? (
+              {s.href ? (
                 <Link href={s.href} className="hover:opacity-90">
                   {inner}
                 </Link>
@@ -111,17 +128,11 @@ export function NexusAtProcessRail({
           );
         })}
       </ol>
-      {clientCount > 0 && !hasDiagnosisHint && selectedCompanyId && (
-        <p className="mt-2 text-xs text-slate-600">
+      {clientCount > 0 && !selectedCompanyId && (
+        <p className="mt-2 text-xs text-amber-800">
           {es
-            ? 'Siguiente: corre el diagnóstico CMM de la empresa seleccionada (agricultura/agroindustria usan matriz profunda).'
-            : 'Seguinte: corre o diagnóstico CMM da empresa selecionada (agricultura/agroindústria usam matriz profunda).'}{' '}
-          <Link
-            href={`/hub/nexus/diagnosis?company=${encodeURIComponent(selectedCompanyId)}&engagement=${encodeURIComponent(engagementId)}`}
-            className="font-medium text-teal-800 underline"
-          >
-            {es ? 'Abrir diagnóstico →' : 'Abrir diagnóstico →'}
-          </Link>
+            ? 'Selecciona una MIPYME en la lista para continuar el proceso.'
+            : 'Seleciona uma MIPYME na lista para continuar o processo.'}
         </p>
       )}
     </div>

@@ -20,11 +20,13 @@ import {
 } from '@/lib/nexus-incubation-run';
 import { normalizeProgram } from '@/lib/nexus-incubation-program';
 import type { DiagnosticAnalyzeResult } from '@/lib/nexus-diagnostic-analyze';
+import { canAccessAtClientCompany } from '@/lib/nexus-at';
 
 async function resolveScope(
   tenant: NonNullable<Awaited<ReturnType<typeof getUserCompanyIds>>>,
   networkIdRaw: string,
   companyIdRaw: string,
+  engagementIdRaw?: string
 ) {
   if (networkIdRaw) {
     const network = await loadNetworkForTenant(networkIdRaw, tenant.companyIds);
@@ -33,9 +35,10 @@ async function resolveScope(
     const companyId = companyIdRaw && ids.includes(companyIdRaw) ? companyIdRaw : network.anchorCompanyId;
     return { networkId: network.id, companyId, memberIds: ids };
   }
-  const companyId =
-    companyIdRaw && tenant.companyIds.includes(companyIdRaw) ? companyIdRaw : tenant.companyIds[0] || '';
+  const companyId = companyIdRaw || tenant.companyIds[0] || '';
   if (!companyId) return null;
+  const allowed = await canAccessAtClientCompany(tenant.companyIds, companyId, engagementIdRaw || null);
+  if (!allowed) return null;
   return { networkId: null as string | null, companyId, memberIds: [companyId] };
 }
 
@@ -76,7 +79,8 @@ export async function GET(req: NextRequest) {
 
   const networkIdRaw = String(req.nextUrl.searchParams.get('networkId') || '').trim();
   const companyIdRaw = String(req.nextUrl.searchParams.get('companyId') || '').trim();
-  const scope = await resolveScope(tenant, networkIdRaw, companyIdRaw);
+  const engagementIdRaw = String(req.nextUrl.searchParams.get('engagementId') || '').trim();
+  const scope = await resolveScope(tenant, networkIdRaw, companyIdRaw, engagementIdRaw);
   if (!scope) return NextResponse.json({ error: 'Âmbito inválido.' }, { status: 400 });
 
   const notes = await loadVentureNotes(scope.networkId, scope.companyId);
@@ -122,7 +126,15 @@ export async function PUT(req: NextRequest) {
 
   const networkIdRaw = String(body.networkId || '').trim();
   const companyIdRaw = String(body.companyId || body.targetCompanyId || '').trim();
-  const scope = await resolveScope(tenant, networkIdRaw, companyIdRaw);
+  const engagementIdRaw = String(
+    body.engagementId ||
+      body.atEngagementId ||
+      (body.program && typeof body.program === 'object'
+        ? (body.program as { atEngagementId?: string }).atEngagementId
+        : '') ||
+      ''
+  ).trim();
+  const scope = await resolveScope(tenant, networkIdRaw, companyIdRaw, engagementIdRaw);
   if (!scope) return NextResponse.json({ error: 'Âmbito inválido.' }, { status: 400 });
 
   const existingNotes = await loadVentureNotes(scope.networkId, scope.companyId);

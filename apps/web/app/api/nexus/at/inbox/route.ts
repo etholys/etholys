@@ -9,7 +9,7 @@ import {
   listAtInboxForTenant,
   listEngagementsForTenant,
 } from '@/lib/nexus-at';
-import { parseCompanySectorId, parseEngagementSectorIds } from '@/lib/nexus-economic-sectors';
+import { parseCompanySectorIds, parseEngagementSectorIds } from '@/lib/nexus-economic-sectors';
 
 /** Inbox AT + serviços com contagem de casos abertos. */
 export async function GET() {
@@ -31,7 +31,7 @@ export async function GET() {
           })
         : [];
     const sectorByCompany = new Map(
-      companyRows.map((c) => [c.id, parseCompanySectorId(c.contextSetupJson)])
+      companyRows.map((c) => [c.id, parseCompanySectorIds(c.contextSetupJson)])
     );
 
     const clientMap = new Map<string, string[]>();
@@ -51,9 +51,7 @@ export async function GET() {
     const services = engagements.map((e) => {
       const clients = clientCompanyIds(e);
       const storedSectors = parseEngagementSectorIds(e.sectorIds);
-      const clientSectors = clients
-        .map((cid) => sectorByCompany.get(cid))
-        .filter(Boolean) as string[];
+      const clientSectors = clients.flatMap((cid) => sectorByCompany.get(cid) || []);
       const sectorMix = [...new Set([...storedSectors, ...clientSectors])];
       const programSector = e.primarySectorId || storedSectors[0] || sectorMix[0] || null;
 
@@ -73,10 +71,19 @@ export async function GET() {
         primarySectorId: e.primarySectorId || programSector,
         sectorIds: storedSectors,
         sectorMix,
-        members: e.members.map((m) => ({
-          ...m,
-          sectorId: m.memberRole === 'client' ? sectorByCompany.get(m.companyId) || null : null,
-        })),
+        members: e.members.map((m) => {
+          const ids =
+            m.memberRole === 'client' ||
+            m.memberRole === 'principal' ||
+            m.memberRole === 'affiliate'
+              ? sectorByCompany.get(m.companyId) || []
+              : [];
+          return {
+            ...m,
+            sectorIds: ids,
+            sectorId: ids[0] || null,
+          };
+        }),
       };
     });
 

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Building2, Headphones, Sparkles } from 'lucide-react';
+import { ArrowRight, Headphones, Sparkles } from 'lucide-react';
 import { useApp } from '@/app/providers';
 
 type Props = {
@@ -9,6 +9,10 @@ type Props = {
   openAtCases?: number | null;
 };
 
+/**
+ * Entrada NEXUS — uma composição, dois caminhos claros.
+ * Sem grelha de cards genéricos.
+ */
 export function NexusModeChooser({ withNet, openAtCases }: Props) {
   const { locale } = useApp();
   const L = locale === 'es' || locale === 'en' ? locale : 'pt';
@@ -16,72 +20,81 @@ export function NexusModeChooser({ withNet, openAtCases }: Props) {
   const copy =
     L === 'es'
       ? {
-          title: '¿Qué querés hacer ahora?',
-          mineTitle: 'Mejorar mi empresa',
-          mineBody: 'Diagnóstico, ruta y copiloto para la empresa activa.',
-          mineCta: 'Continuar',
-          deliverTitle: 'Prestar asistencia a clientes',
-          deliverBody: 'Trabajo separado por cliente.',
-          deliverCta: 'Abrir asistencia técnica',
+          brand: 'NEXUS',
+          line: 'Elegí el camino',
+          mine: 'Autodesarrollo',
+          mineHint: 'Tu módulo · cuaderno',
+          deliver: 'Asistencia técnica',
+          deliverHint: 'Clientes MIPYME',
         }
       : L === 'en'
         ? {
-            title: 'What do you want to do now?',
-            mineTitle: 'Improve my company',
-            mineBody: 'Diagnosis, roadmap and copilot for the active company.',
-            mineCta: 'Continue',
-            deliverTitle: 'Support clients',
-            deliverBody: 'Separate work per client.',
-            deliverCta: 'Open technical assistance',
+            brand: 'NEXUS',
+            line: 'Choose your path',
+            mine: 'Self-development',
+            mineHint: 'Your module · field book',
+            deliver: 'Technical assistance',
+            deliverHint: 'MSME clients',
           }
         : {
-            title: 'O que queres fazer agora?',
-            mineTitle: 'Melhorar a minha empresa',
-            mineBody: 'Diagnóstico, rota e copiloto para a empresa ativa.',
-            mineCta: 'Continuar',
-            deliverTitle: 'Prestar assistência a clientes',
-            deliverBody: 'Trabalho separado por cliente.',
-            deliverCta: 'Abrir assistência técnica',
+            brand: 'NEXUS',
+            line: 'Escolhe o caminho',
+            mine: 'Autodesenvolvimento',
+            mineHint: 'O teu módulo · caderno',
+            deliver: 'Assistência técnica',
+            deliverHint: 'Clientes MIPYME',
           };
 
   return (
-    <div className="space-y-3">
-      <h2 className="text-base font-semibold text-slate-900">{copy.title}</h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Link
-          href={withNet('/hub/nexus/coach')}
-          className="group flex flex-col rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-4 shadow-sm transition hover:border-violet-400 hover:shadow"
-        >
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600 text-white">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <span className="mt-3 text-sm font-semibold text-violet-950">{copy.mineTitle}</span>
-          <span className="mt-1 flex-1 text-xs leading-relaxed text-slate-600">{copy.mineBody}</span>
-          <span className="mt-3 text-xs font-semibold text-violet-700 group-hover:underline">{copy.mineCta} →</span>
-        </Link>
+    <section className="relative overflow-hidden rounded-3xl bg-[#0c1222] text-white shadow-xl">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-80"
+        style={{
+          background:
+            'radial-gradient(ellipse 80% 60% at 10% 20%, rgba(45,212,191,0.18), transparent 55%), radial-gradient(ellipse 70% 50% at 90% 80%, rgba(251,146,60,0.12), transparent 50%)',
+        }}
+      />
+      <div className="relative px-6 py-10 sm:px-10 sm:py-14">
+        <p className="text-xs font-semibold tracking-[0.2em] text-teal-300/90">{copy.brand}</p>
+        <h1 className="mt-3 max-w-lg font-serif text-3xl leading-tight tracking-tight sm:text-4xl">
+          {copy.line}
+        </h1>
 
-        <Link
-          href={withNet('/hub/nexus/at')}
-          className="group flex flex-col rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm transition hover:border-emerald-400 hover:shadow"
-        >
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-700 text-white">
-            <Headphones className="h-4 w-4" />
-          </span>
-          <span className="mt-3 flex items-center gap-2 text-sm font-semibold text-emerald-950">
-            {copy.deliverTitle}
-            {typeof openAtCases === 'number' && openAtCases > 0 && (
-              <span className="rounded-full bg-emerald-700 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                {openAtCases}
+        <div className="mt-10 grid gap-3 sm:grid-cols-2">
+          <Link
+            href={withNet('/hub/nexus/campo')}
+            className="group flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-5 py-5 backdrop-blur-sm transition duration-300 hover:border-teal-400/40 hover:bg-white/10"
+          >
+            <div className="min-w-0">
+              <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Sparkles className="h-4 w-4 text-teal-300" />
+                {copy.mine}
               </span>
-            )}
-          </span>
-          <span className="mt-1 flex-1 text-xs leading-relaxed text-slate-600">{copy.deliverBody}</span>
-          <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 group-hover:underline">
-            <Building2 className="h-3 w-3" />
-            {copy.deliverCta} →
-          </span>
-        </Link>
+              <span className="mt-1 block text-xs text-slate-400">{copy.mineHint}</span>
+            </div>
+            <ArrowRight className="h-5 w-5 shrink-0 text-teal-300 transition group-hover:translate-x-1" />
+          </Link>
+
+          <Link
+            href={withNet('/hub/nexus/at')}
+            className="group flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-5 py-5 backdrop-blur-sm transition duration-300 hover:border-orange-400/35 hover:bg-white/10"
+          >
+            <div className="min-w-0">
+              <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Headphones className="h-4 w-4 text-orange-300" />
+                {copy.deliver}
+                {typeof openAtCases === 'number' && openAtCases > 0 && (
+                  <span className="rounded-md bg-orange-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    {openAtCases}
+                  </span>
+                )}
+              </span>
+              <span className="mt-1 block text-xs text-slate-400">{copy.deliverHint}</span>
+            </div>
+            <ArrowRight className="h-5 w-5 shrink-0 text-orange-300 transition group-hover:translate-x-1" />
+          </Link>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

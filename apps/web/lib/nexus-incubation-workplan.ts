@@ -10,8 +10,21 @@ import {
   workItemBudget,
   type StrategicHorizon,
 } from './nexus-incubation-program';
+import {
+  findSeedForQuestion,
+  getSectorModule,
+  linkDiagnosticToModule,
+  type ModuleHref,
+  type OpsPlanKind,
+} from './nexus-sector-modules';
 
-export type WorkPlanItemKind = 'visit' | 'workshop' | 'deliverable' | 'review' | 'training';
+export type WorkPlanItemKind =
+  | 'visit'
+  | 'workshop'
+  | 'deliverable'
+  | 'review'
+  | 'training'
+  | OpsPlanKind;
 
 export type WorkPlanItem = {
   id: string;
@@ -23,6 +36,12 @@ export type WorkPlanItem = {
   kind: WorkPlanItemKind;
   layerIndex: number;
   horizon: 'program' | '12m' | '36m';
+  href?: ModuleHref;
+  protocolId?: string;
+  questionId?: string;
+  dueMonth?: number;
+  kpi?: string;
+  spendType?: 'action' | 'hire' | 'purchase';
 };
 
 export type DevelopmentLayer = {
@@ -56,6 +75,28 @@ function L(row: { es: string; pt: string; en: string }, locale: DxLocale) {
   return row[locale] || row.es;
 }
 
+function spendForKind(kind: WorkPlanItemKind, pillar: string): 'action' | 'hire' | 'purchase' {
+  if (pillar === 'people') return 'hire';
+  if (kind === 'sensor') return 'purchase';
+  return 'action';
+}
+
+function kpiForItem(kind: WorkPlanItemKind, locale: DxLocale): string {
+  if (kind === 'field_book') {
+    return locale === 'en' ? '1 real line / week in the book' : locale === 'pt' ? '1 linha real / semana no caderno' : '1 línea real / semana en el cuaderno';
+  }
+  if (kind === 'sensor') {
+    return locale === 'en' ? '1 reading / day on the linked sensor' : locale === 'pt' ? '1 leitura / dia no sensor ligado' : '1 lectura / día en el sensor ligado';
+  }
+  if (kind === 'ops_unit') {
+    return locale === 'en' ? 'Units named and active in the module' : locale === 'pt' ? 'Unidades nomeadas e ativas no módulo' : 'Unidades nombradas y activas en el módulo';
+  }
+  if (kind === 'protocol') {
+    return locale === 'en' ? 'Protocol used: record + date in the book' : locale === 'pt' ? 'Protocolo usado: registo + data no caderno' : 'Protocolo usado: registro + fecha en el cuaderno';
+  }
+  return locale === 'en' ? 'Evidence + owner + review date' : locale === 'pt' ? 'Evidência + dono + data de revisão' : 'Evidencia + dueño + fecha de revisión';
+}
+
 function kindForPillar(pillar: string): WorkPlanItemKind {
   if (pillar === 'operations' || pillar === 'sector') return 'visit';
   if (pillar === 'people') return 'training';
@@ -63,36 +104,111 @@ function kindForPillar(pillar: string): WorkPlanItemKind {
   return 'deliverable';
 }
 
+function actionTitle(locale: DxLocale, early: boolean, label: string): string {
+  const short = label.slice(0, 90);
+  if (early) {
+    return locale === 'es'
+      ? `Construir base: ${short}`
+      : locale === 'pt'
+        ? `Construir base: ${short}`
+        : `Build foundation: ${short}`;
+  }
+  return locale === 'es'
+    ? `Intervención AT: ${short}`
+    : locale === 'pt'
+      ? `Intervenção AT: ${short}`
+      : `TA intervention: ${short}`;
+}
+
+function actionDescription(locale: DxLocale, early: boolean, score: number, label: string): string {
+  if (early) {
+    return locale === 'es'
+      ? `Negocio en arranque (score ${score}). Definir el mínimo viable para «${label.slice(0, 60)}»: qué hacer esta semana, con quién y cómo medir.`
+      : locale === 'pt'
+        ? `Negócio em arranque (score ${score}). Definir o mínimo viável para «${label.slice(0, 60)}»: o que fazer esta semana, com quem e como medir.`
+        : `Startup phase (score ${score}). Define the minimum viable for “${label.slice(0, 60)}”: what to do this week, with whom, how to measure.`;
+  }
+  return locale === 'es'
+    ? `Brecha (score ${score}) en «${label.slice(0, 70)}». Visita o taller: evidencias, dueño de la acción y fecha de revisión.`
+    : locale === 'pt'
+      ? `Lacuna (score ${score}) em «${label.slice(0, 70)}». Visita ou workshop: evidências, dono da ação e data de revisão.`
+      : `Gap (score ${score}) on “${label.slice(0, 70)}”. Visit or workshop: evidence, action owner and review date.`;
+}
+
+const FOUNDATION_SEEDS: Array<{ pillar: string; es: string; pt: string; en: string }> = [
+  {
+    pillar: 'strategy',
+    es: 'Definir oferta mínima (qué vende / a quién) en una página',
+    pt: 'Definir oferta mínima (o que vende / a quem) numa página',
+    en: 'Define minimum offer (what/to whom) on one page',
+  },
+  {
+    pillar: 'commercial',
+    es: 'Listar 10 clientes o canales posibles y probar 3 contactos',
+    pt: 'Listar 10 clientes ou canais possíveis e testar 3 contactos',
+    en: 'List 10 possible customers/channels and try 3 contacts',
+  },
+  {
+    pillar: 'finance',
+    es: 'Armar registro simple de caja (entradas/salidas) de 4 semanas',
+    pt: 'Montar registo simples de caixa (entradas/saídas) de 4 semanas',
+    en: 'Set up a simple 4-week cash in/out log',
+  },
+  {
+    pillar: 'operations',
+    es: 'Mapear el flujo pedido→entrega en 5 pasos',
+    pt: 'Mapear o fluxo pedido→entrega em 5 passos',
+    en: 'Map order→delivery flow in 5 steps',
+  },
+];
+
 export function buildIncubationWorkPlan(
   program: IncubationProgram,
   diagnostic: FullDiagnosticResult,
-  locale: DxLocale = 'es'
+  locale: DxLocale = 'es',
+  opts?: { earlyVenture?: boolean }
 ): { layers: DevelopmentLayer[]; items: WorkPlanItem[]; strategicPlan: StrategicPlanOutline | null } {
   const budget = workItemBudget(program);
   const layersN = layerCountForProgram(program);
   const monthsPerLayer = Math.max(1, Math.ceil(program.durationMonths / layersN));
   const hoursPerLayer = Math.round(program.totalHours / layersN);
+  const early = Boolean(opts?.earlyVenture);
 
   const candidates: WorkPlanItem[] = [];
 
   let n = 0;
+  const sectorMod = getSectorModule(diagnostic.sectorId);
+  const linked = linkDiagnosticToModule(sectorMod, diagnostic.weaknesses, locale, budget);
+  for (const a of linked) {
+    if (n >= budget) break;
+    candidates.push({
+      id: a.seedId,
+      title: a.title,
+      description: a.description,
+      pillar: a.pillar,
+      priority: a.priority,
+      estimatedHours: a.estimatedHours,
+      kind: a.kind,
+      layerIndex: 0,
+      horizon: 'program',
+      href: a.href,
+      protocolId: a.protocolId,
+      questionId: a.questionId,
+      dueMonth: 1,
+      kpi: kpiForItem(a.kind, locale),
+      spendType: spendForKind(a.kind, a.pillar),
+    });
+    n += 1;
+  }
+
   for (const w of diagnostic.weaknesses) {
     if (n >= budget) break;
+    if (findSeedForQuestion(sectorMod, w.questionId)) continue;
     const pillar = w.pillarSlug || 'sector';
     candidates.push({
       id: `wp_${n++}`,
-      title:
-        locale === 'es'
-          ? `Intervención AT: ${w.label.slice(0, 100)}`
-          : locale === 'pt'
-            ? `Intervenção AT: ${w.label.slice(0, 100)}`
-            : `TA intervention: ${w.label.slice(0, 100)}`,
-      description:
-        locale === 'es'
-          ? `Brecha detectada (score ${w.score}). Alinear con plano de incubación.`
-          : locale === 'pt'
-            ? `Lacuna detetada (score ${w.score}). Alinhar com plano de incubação.`
-            : `Gap detected (score ${w.score}). Align with incubation plan.`,
+      title: actionTitle(locale, early, w.label),
+      description: actionDescription(locale, early, w.score, w.label),
       pillar,
       priority: w.score < 40 ? 'critical' : w.score < 52 ? 'high' : 'medium',
       estimatedHours: w.score < 45 ? 6 : 4,
@@ -100,6 +216,29 @@ export function buildIncubationWorkPlan(
       layerIndex: 0,
       horizon: 'program',
     });
+  }
+
+  if (early) {
+    for (const seed of FOUNDATION_SEEDS) {
+      if (n >= budget) break;
+      if (candidates.some((c) => c.title.includes(seed[locale] || seed.es))) continue;
+      candidates.push({
+        id: `wp_${n++}`,
+        title: seed[locale] || seed.es,
+        description:
+          locale === 'es'
+            ? 'Acción de arranque — no asume procesos ya maduros.'
+            : locale === 'pt'
+              ? 'Ação de arranque — não assume processos já maduros.'
+              : 'Startup action — does not assume mature processes.',
+        pillar: seed.pillar,
+        priority: 'high',
+        estimatedHours: 4,
+        kind: kindForPillar(seed.pillar),
+        layerIndex: 0,
+        horizon: 'program',
+      });
+    }
   }
 
   for (const p of diagnostic.potentials) {
@@ -112,12 +251,38 @@ export function buildIncubationWorkPlan(
           : locale === 'pt'
             ? `Potenciar: ${p.label.slice(0, 100)}`
             : `Build on: ${p.label.slice(0, 100)}`,
-      description: p.note || '',
+      description:
+        p.note ||
+        (locale === 'es'
+          ? 'Ya hay base — subir un nivel con una acción concreta y fecha.'
+          : 'Já há base — subir um nível com uma ação concreta e data.'),
       pillar: p.pillarSlug || 'strategy',
       priority: 'medium',
       estimatedHours: 3,
       kind: 'review',
       layerIndex: Math.min(1, layersN - 1),
+      horizon: 'program',
+    });
+  }
+
+  while (n < Math.min(budget, 12) && candidates.length < 12) {
+    candidates.push({
+      id: `wp_${n++}`,
+      title:
+        locale === 'es'
+          ? 'Revisión quincenal de prioridades con el técnico'
+          : locale === 'pt'
+            ? 'Revisão quinzenal de prioridades com o técnico'
+            : 'Biweekly priority review with the technician',
+      description:
+        locale === 'es'
+          ? 'Ritmo de acompañamiento: qué se hizo, qué falta, próximo paso.'
+          : 'Ritmo de acompanhamento: o que foi feito, o que falta, próximo passo.',
+      pillar: 'strategy',
+      priority: 'medium',
+      estimatedHours: 2,
+      kind: 'review',
+      layerIndex: Math.min(candidates.length % layersN, layersN - 1),
       horizon: 'program',
     });
   }
@@ -129,7 +294,7 @@ export function buildIncubationWorkPlan(
     const end = Math.min(program.durationMonths, (i + 1) * monthsPerLayer);
     const layerItems = candidates
       .filter((_, idx) => idx % layersN === i)
-      .map((it) => ({ ...it, layerIndex: i }));
+      .map((it) => ({ ...it, layerIndex: i, dueMonth: it.dueMonth || start }));
     layers.push({
       index: i,
       title:

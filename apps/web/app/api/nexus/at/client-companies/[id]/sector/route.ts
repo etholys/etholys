@@ -4,11 +4,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { emptyContextSetup, type CompanyContextSetup } from '@/lib/company-context-setup';
-import { normalizeEconomicSectorId, parseCompanySectorId } from '@/lib/nexus-economic-sectors';
+import {
+  normalizeSectorIdList,
+  parseCompanySectorId,
+  parseCompanySectorIds,
+} from '@/lib/nexus-economic-sectors';
 
 type Ctx = { params: Promise<{ id: string }> };
 
-/** Operador AT pode definir sector económico da ficha empresa-cliente. */
+/** Operador AT pode definir uma ou várias temáticas da ficha empresa-cliente. */
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   const tenant = await getUserCompanyIds();
   if (!tenant) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -21,9 +25,14 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 });
   }
 
-  const raw = body.sectorId != null ? String(body.sectorId).trim() : '';
-  const sectorId = raw ? normalizeEconomicSectorId(raw) : null;
-  if (raw && !sectorId) {
+  const sectorIds = normalizeSectorIdList({
+    sectorIds: body.sectorIds,
+    sectorId: body.sectorId,
+  });
+  if (Array.isArray(body.sectorIds) && body.sectorIds.length > 0 && sectorIds.length === 0) {
+    return NextResponse.json({ error: 'Setor económico inválido.' }, { status: 400 });
+  }
+  if (body.sectorId != null && String(body.sectorId).trim() && sectorIds.length === 0) {
     return NextResponse.json({ error: 'Setor económico inválido.' }, { status: 400 });
   }
 
@@ -37,7 +46,12 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     company.contextSetupJson && typeof company.contextSetupJson === 'object'
       ? (company.contextSetupJson as CompanyContextSetup)
       : emptyContextSetup();
-  const context: CompanyContextSetup = { ...prev, v: 1, sectorId: sectorId || undefined };
+  const context: CompanyContextSetup = {
+    ...prev,
+    v: 1,
+    sectorIds: sectorIds.length > 0 ? sectorIds : undefined,
+    sectorId: sectorIds[0] || undefined,
+  };
 
   const updated = await prisma.company.update({
     where: { id },
@@ -52,6 +66,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       name: updated.name,
       shortName: updated.shortName,
       sectorId: parseCompanySectorId(updated.contextSetupJson),
+      sectorIds: parseCompanySectorIds(updated.contextSetupJson),
     },
   });
 }

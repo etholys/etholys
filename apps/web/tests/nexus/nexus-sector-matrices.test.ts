@@ -16,11 +16,18 @@ test('matrix questions use CMM 1-5 options', () => {
   assert.equal(qs[0]?.options.length, 5);
   assert.equal(qs[0]?.options[0]?.id, 'cmm1');
   assert.equal(qs[0]?.options[4]?.score, 100);
+  assert.match(qs[0]!.prompt.es, /Nivel de madurez/i);
+  assert.ok(qs[0]!.help.es.length > 40);
 });
 
-test('listDiagnosticQuestions prefers deep matrix for agriculture', () => {
-  const program = defaultIncubationProgram();
-  const qs = listDiagnosticQuestions('agriculture', program);
-  assert.ok(qs.some((q) => q.id.startsWith('AGR-')));
-  assert.ok(qs.every((q) => q.id.startsWith('AGR-') || q.id.startsWith('u_')));
+test('listDiagnosticQuestions uses layers first; matrix only on deep+', () => {
+  const standard = listDiagnosticQuestions('agriculture', defaultIncubationProgram());
+  assert.ok(standard.some((q) => q.id === 'core_scale'));
+  assert.ok(standard.some((q) => q.section === 'sector'));
+  assert.ok(!standard.some((q) => q.id.startsWith('AGR-')));
+
+  const deepProg = defaultIncubationProgram();
+  deepProg.diagnosticDepth = 'deep';
+  const deep = listDiagnosticQuestions('agriculture', deepProg);
+  assert.ok(deep.some((q) => q.id.startsWith('AGR-')));
 });

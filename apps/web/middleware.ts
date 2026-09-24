@@ -466,6 +466,10 @@ async function enforceApiLicense(req: NextRequest): Promise<NextResponse | null>
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
 
+  if (pathname === '/api/nexus/ingest/readings') {
+    return NextResponse.next();
+  }
+
   const courseOnlyBlock = await enforceCourseOnlyScope(req);
   if (courseOnlyBlock) return courseOnlyBlock;
 

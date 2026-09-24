@@ -1,23 +1,35 @@
-/**
- * Diagnóstico NEXUS por setor + pilares — camadas conforme programa de incubação.
+﻿/**
+ * Diagnóstico NEXUS — camadas (core → nível → comercial → setor → produção)
+ * + matriz profunda opcional em agricultura/agroindústria.
  */
 
-import {
-  NEXUS_DIAGNOSTIC_QUIZ,
-  type QuizQuestion,
-  type QuizSector,
-} from './nexus-diagnostic-quiz';
-import { NEXUS_ECONOMIC_SECTORS, getEconomicSector, normalizeEconomicSectorId, sectorLabel } from './nexus-economic-sectors';
+import { inferOfferKind, scoreAtQuads, type AtOfferKind, type AtQuadScore } from './nexus-at-cycle';
+import { NEXUS_DIAGNOSTIC_QUIZ } from './nexus-diagnostic-quiz';
+import { NEXUS_ECONOMIC_SECTORS, normalizeEconomicSectorId, sectorLabel } from './nexus-economic-sectors';
 import {
   depthFromProgram,
   type DiagnosticDepth,
   type IncubationProgram,
 } from './nexus-incubation-program';
 import { hasDeepSectorMatrix, matrixItemsToDxQuestions } from './nexus-sector-matrices';
+import {
+  buildLayeredDiagnosticQuestions,
+  DX_CORE,
+  DX_LEVEL,
+  DX_COMMERCIAL,
+} from './nexus-diagnostic-layers';
 
 export type DxLocale = 'es' | 'pt' | 'en';
 
-export type DxSection = 'universal' | 'sector' | 'pillar' | 'custom';
+export type DxSection =
+  | 'core'
+  | 'level'
+  | 'commercial'
+  | 'sector'
+  | 'production'
+  | 'universal'
+  | 'pillar'
+  | 'custom';
 
 export type DxOption = {
   id: string;
@@ -36,6 +48,8 @@ export type DxQuestion = {
   help?: { es: string; pt: string; en: string };
   options: DxOption[];
   weight: number;
+  multi?: boolean;
+  exclusiveOptionId?: string;
 };
 
 export type DxCustomQuestion = {
@@ -49,6 +63,7 @@ export type DiagnosticAreaRow = {
   label: string;
   score: number;
   pillarSlug?: string;
+  section?: string;
 };
 
 export type PillarScoreRow = {
@@ -73,24 +88,14 @@ export type FullDiagnosticResult = SectorDiagnosticResult & {
   weaknesses: DiagnosticAreaRow[];
   potentials: Array<DiagnosticAreaRow & { note?: string }>;
   pillarScores: PillarScoreRow[];
+  /** Visão 360: estruturação · gestão · produção · comercial */
+  quads: AtQuadScore[];
+  offerKind: AtOfferKind | null;
 };
 
 const L = (row: { es: string; pt: string; en: string }, locale: DxLocale) => row[locale] || row.es;
 
-const PILLAR_SLUGS = ['strategy', 'finance', 'operations', 'commercial', 'people', 'digital', 'risk'] as const;
-
-/** Prioridade de pilares por setor económico (peso relativo) */
-const SECTOR_PILLAR_WEIGHTS: Record<string, Partial<Record<(typeof PILLAR_SLUGS)[number], number>>> = {
-  agriculture: { operations: 1.4, commercial: 1.2, finance: 1.3, risk: 1.2 },
-  agroindustry: { operations: 1.4, finance: 1.3, risk: 1.35, commercial: 1.2, people: 1.1 },
-  livestock: { operations: 1.4, finance: 1.2, commercial: 1.1, risk: 1.2 },
-  food_hospitality: { operations: 1.3, finance: 1.3, commercial: 1.2, people: 1.1 },
-  retail_supermarket: { commercial: 1.3, finance: 1.2, operations: 1.2, digital: 1.0 },
-  chemical_industry: { operations: 1.3, risk: 1.4, finance: 1.1, people: 1.1 },
-  technology: { digital: 1.4, strategy: 1.2, commercial: 1.2, people: 1.1 },
-  professional_services: { commercial: 1.3, strategy: 1.2, people: 1.2, finance: 1.1 },
-};
-
+/** @deprecated — prefer opções específicas por pergunta nas camadas */
 export const MATURITY_OPTIONS: DxOption[] = [
   {
     id: 'weak',
@@ -114,113 +119,20 @@ export const MATURITY_OPTIONS: DxOption[] = [
   },
 ];
 
-const UNIVERSAL: Omit<DxQuestion, 'sectorId' | 'section'>[] = [
-  {
-    id: 'u_model',
-    source: 'base',
-    section: 'universal',
-    prompt: {
-      es: 'Claridad del modelo de negocio (qué vende, a quién, cómo cobra)',
-      pt: 'Clareza do modelo de negócio (o que vende, a quem, como cobra)',
-      en: 'Business model clarity (what, to whom, how you charge)',
-    },
-    options: MATURITY_OPTIONS,
-    weight: 1.2,
-  },
-  {
-    id: 'u_operations',
-    source: 'base',
-    section: 'universal',
-    prompt: {
-      es: 'Capacidad operativa semanal (entregar lo prometido)',
-      pt: 'Capacidade operacional semanal (entregar o prometido)',
-      en: 'Weekly operational capacity (deliver as promised)',
-    },
-    options: MATURITY_OPTIONS,
-    weight: 1.1,
-  },
-  {
-    id: 'u_blocker',
-    source: 'base',
-    section: 'universal',
-    prompt: {
-      es: 'Mayor bloqueo actual para crecer',
-      pt: 'Maior bloqueio actual para crescer',
-      en: 'Biggest current growth blocker',
-    },
-    options: MATURITY_OPTIONS,
-    weight: 1.2,
-  },
-  {
-    id: 'u_cash',
-    source: 'base',
-    section: 'universal',
-    prompt: {
-      es: 'Control de caja, márgenes y costes fijos',
-      pt: 'Controlo de caixa, margens e custos fixos',
-      en: 'Cash, margins and fixed cost control',
-    },
-    options: MATURITY_OPTIONS,
-    weight: 1.15,
-  },
-  {
-    id: 'u_team',
-    source: 'base',
-    section: 'universal',
-    prompt: {
-      es: 'Equipo / roles / dependencia del fundador',
-      pt: 'Equipa / papéis / dependência do fundador',
-      en: 'Team / roles / founder dependency',
-    },
-    options: MATURITY_OPTIONS,
-    weight: 1,
-  },
-];
+export const GROWTH_BLOCKER_OPTIONS: DxOption[] =
+  (DX_CORE.find((q) => q.id === 'core_blockers')?.options as DxOption[]) || [];
 
-function focusPrompt(focus: { es: string; pt: string; en: string }): { es: string; pt: string; en: string } {
-  return {
-    es: `En su sector — ${focus.es.charAt(0).toLowerCase()}${focus.es.slice(1)}`,
-    pt: `No seu setor — ${focus.pt.charAt(0).toLowerCase()}${focus.pt.slice(1)}`,
-    en: `In your sector — ${focus.en.charAt(0).toLowerCase()}${focus.en.slice(1)}`,
-  };
-}
+export const BUSINESS_SCALE_OPTIONS: DxOption[] =
+  (DX_CORE.find((q) => q.id === 'core_scale')?.options as DxOption[]) || [];
 
-function quizQuestionToDx(q: QuizQuestion, pillar: QuizSector, sectorNorm: string): DxQuestion {
-  return {
-    id: `p_${pillar.slug}_${q.id}`,
-    sectorId: sectorNorm,
-    source: 'base',
-    section: 'pillar',
-    pillarSlug: pillar.slug,
-    areaName: q.prompt.slice(0, 80),
-    prompt: { es: q.prompt, pt: q.prompt, en: q.prompt },
-    help: q.help ? { es: q.help, pt: q.help, en: q.help } : undefined,
-    options: q.options.map((o) => ({
-      id: o.id,
-      label: { es: o.label, pt: o.label, en: o.label },
-      score: o.score,
-    })),
-    weight: q.weight,
-  };
-}
-
-function rankedPillarsForSector(sectorId: string): QuizSector[] {
-  const weights = SECTOR_PILLAR_WEIGHTS[sectorId] || {};
-  return [...NEXUS_DIAGNOSTIC_QUIZ].sort((a, b) => {
-    const wa = weights[a.slug as (typeof PILLAR_SLUGS)[number]] ?? 1;
-    const wb = weights[b.slug as (typeof PILLAR_SLUGS)[number]] ?? 1;
-    return wb - wa;
-  });
-}
-
-function pillarQuestionCap(depth: DiagnosticDepth): number {
+function matrixExtraCap(depth: DiagnosticDepth): number {
   switch (depth) {
     case 'screening':
       return 0;
     case 'standard':
-      return 2;
+      return 0;
     case 'deep':
-      return 4;
+      return 10;
     case 'exhaustive':
       return 99;
   }
@@ -233,44 +145,57 @@ export function listDiagnosticQuestions(
   const norm = normalizeEconomicSectorId(sectorId) || 'other';
   const depth = program ? depthFromProgram(program) : 'standard';
 
-  /** Playbooks profundos (agricultura / agroindústria): matriz CMM 1–5 no lugar do quiz genérico. */
-  if (hasDeepSectorMatrix(norm)) {
-    const matrixQs = matrixItemsToDxQuestions(norm, depth) as DxQuestion[];
-    if (depth === 'screening') return matrixQs;
-    const universal: DxQuestion[] = UNIVERSAL.map((q) => ({ ...q, sectorId: 'universal' as const }));
-    return [...universal.slice(0, depth === 'standard' ? 3 : UNIVERSAL.length), ...matrixQs];
-  }
+  const layered = buildLayeredDiagnosticQuestions(norm, depth) as DxQuestion[];
 
-  const sector = getEconomicSector(norm);
-
-  const universal: DxQuestion[] = UNIVERSAL.map((q) => ({ ...q, sectorId: 'universal' as const }));
-  const sectorQs: DxQuestion[] = (sector?.focusAreas || getEconomicSector('other')!.focusAreas).map((area, i) => ({
-    id: `${norm}_f${i}`,
-    sectorId: norm,
-    source: 'base' as const,
-    section: 'sector' as const,
-    prompt: focusPrompt(area),
-    options: MATURITY_OPTIONS,
-    weight: 1.05,
-  }));
-
-  const perPillar = pillarQuestionCap(depth);
-  if (perPillar === 0) return [...universal, ...sectorQs];
-
-  const pillars = rankedPillarsForSector(norm);
-  const pillarQs: DxQuestion[] = [];
-  const pillarLimit = depth === 'exhaustive' ? pillars.length : Math.min(5, pillars.length);
-
-  for (let pi = 0; pi < pillarLimit; pi++) {
-    const pillar = pillars[pi]!;
-    const flat = pillar.areas.flatMap((a) => a.questions);
-    const take = depth === 'exhaustive' ? flat.length : Math.min(perPillar, flat.length);
-    for (let qi = 0; qi < take; qi++) {
-      pillarQs.push(quizQuestionToDx(flat[qi]!, pillar, norm));
+  const matrixTake = matrixExtraCap(depth);
+  if (matrixTake > 0 && hasDeepSectorMatrix(norm)) {
+    const matrixQs = matrixItemsToDxQuestions(norm, depth === 'exhaustive' ? 'exhaustive' : 'deep') as DxQuestion[];
+    const extras = matrixQs.slice(0, matrixTake).map((q) => ({
+      ...q,
+      section: 'production' as const,
+    }));
+    const seen = new Set(layered.map((q) => q.id));
+    for (const q of extras) {
+      if (seen.has(q.id)) continue;
+      seen.add(q.id);
+      layered.push(q);
     }
   }
 
-  return [...universal, ...sectorQs, ...pillarQs];
+  return layered;
+}
+
+export function listDiagnosticQuestionsForSectors(
+  sectorIds: string[] | null | undefined,
+  program?: IncubationProgram | null
+): DxQuestion[] {
+  const ids = [
+    ...new Set(
+      (sectorIds || [])
+        .map((id) => normalizeEconomicSectorId(id))
+        .filter(Boolean) as string[]
+    ),
+  ];
+  if (ids.length === 0) return listDiagnosticQuestions(null, program);
+  if (ids.length === 1) return listDiagnosticQuestions(ids[0], program);
+
+  const depth = program ? depthFromProgram(program) : 'standard';
+  const shared = buildLayeredDiagnosticQuestions(ids[0]!, depth).filter(
+    (q) => q.section === 'core' || q.section === 'level' || q.section === 'commercial'
+  ) as DxQuestion[];
+
+  const seen = new Set(shared.map((q) => q.id));
+  const merged: DxQuestion[] = [...shared];
+
+  for (const sid of ids) {
+    for (const q of listDiagnosticQuestions(sid, program)) {
+      if (q.section === 'core' || q.section === 'level' || q.section === 'commercial') continue;
+      if (seen.has(q.id)) continue;
+      seen.add(q.id);
+      merged.push(q);
+    }
+  }
+  return merged;
 }
 
 /** @deprecated use listDiagnosticQuestions */
@@ -286,9 +211,62 @@ export function optionLabel(o: DxOption, locale: DxLocale): string {
   return L(o.label, locale);
 }
 
-function scoreForAnswer(q: DxQuestion, answerId: string): number | null {
-  const opt = q.options.find((o) => o.id === answerId);
-  return opt ? opt.score : null;
+export function parseAnswerIds(raw: string | null | undefined): string[] {
+  if (!raw?.trim()) return [];
+  return [...new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))];
+}
+
+export function serializeAnswerIds(ids: string[]): string {
+  return [...new Set(ids.map((s) => s.trim()).filter(Boolean))].join(',');
+}
+
+export function toggleQuestionAnswer(
+  q: DxQuestion,
+  currentRaw: string | undefined,
+  optionId: string
+): string {
+  if (!q.multi) return optionId;
+  const exclusive = q.exclusiveOptionId;
+  let selected = parseAnswerIds(currentRaw);
+  const on = selected.includes(optionId);
+  if (exclusive && optionId === exclusive) {
+    return on ? '' : exclusive;
+  }
+  selected = selected.filter((id) => id !== exclusive);
+  if (on) selected = selected.filter((id) => id !== optionId);
+  else selected = [...selected, optionId];
+  return serializeAnswerIds(selected);
+}
+
+export function isOptionSelected(raw: string | undefined, optionId: string): boolean {
+  return parseAnswerIds(raw).includes(optionId);
+}
+
+function scoreForAnswer(q: DxQuestion, answerRaw: string): number | null {
+  const ids = parseAnswerIds(answerRaw);
+  if (ids.length === 0) return null;
+  const scores = ids
+    .map((id) => q.options.find((o) => o.id === id)?.score)
+    .filter((s): s is number => typeof s === 'number');
+  if (scores.length === 0) return null;
+  return Math.min(...scores);
+}
+
+function defaultPillarForSection(section: DxSection): string {
+  switch (section) {
+    case 'commercial':
+      return 'commercial';
+    case 'production':
+    case 'sector':
+      return 'operations';
+    case 'level':
+      return 'strategy';
+    case 'core':
+    case 'universal':
+      return 'strategy';
+    default:
+      return 'strategy';
+  }
 }
 
 export function computeFullDiagnosticResult(
@@ -310,20 +288,21 @@ export function computeFullDiagnosticResult(
     weighted += score * q.weight;
     wsum += q.weight;
     const label = questionLabel(q, locale);
+    const pillarSlug = q.pillarSlug || defaultPillarForSection(q.section);
     rows.push({
       questionId: q.id,
       label,
       score,
-      pillarSlug: q.pillarSlug || (q.section === 'sector' ? 'sector' : q.section === 'universal' ? 'strategy' : undefined),
+      pillarSlug,
+      section: q.section,
     });
 
-    const pslug = q.pillarSlug || 'sector';
-    const acc = pillarAcc.get(pslug) || { w: 0, ws: 0, n: 0, total: 0, name: pslug };
+    const acc = pillarAcc.get(pillarSlug) || { w: 0, ws: 0, n: 0, total: 0, name: pillarSlug };
     acc.w += score * q.weight;
     acc.ws += q.weight;
     acc.n += 1;
     acc.total += 1;
-    pillarAcc.set(pslug, acc);
+    pillarAcc.set(pillarSlug, acc);
   }
 
   rows.sort((a, b) => a.score - b.score);
@@ -343,9 +322,18 @@ export function computeFullDiagnosticResult(
 
   const pillarScores: PillarScoreRow[] = [...pillarAcc.entries()].map(([slug, acc]) => {
     const quizPillar = NEXUS_DIAGNOSTIC_QUIZ.find((p) => p.slug === slug);
+    const sectionNames: Record<string, string> = {
+      sector: sectorLabel(norm, locale) || 'Sector',
+      operations: locale === 'pt' ? 'Operações' : locale === 'en' ? 'Operations' : 'Operaciones',
+      commercial: locale === 'pt' ? 'Comercial' : locale === 'en' ? 'Commercial' : 'Comercial',
+      finance: locale === 'pt' ? 'Finanças' : locale === 'en' ? 'Finance' : 'Finanzas',
+      strategy: locale === 'pt' ? 'Estratégia' : locale === 'en' ? 'Strategy' : 'Estrategia',
+      people: locale === 'pt' ? 'Pessoas' : locale === 'en' ? 'People' : 'Personas',
+      digital: 'Digital',
+    };
     return {
       slug,
-      name: quizPillar?.name || (slug === 'sector' ? sectorLabel(norm, locale) || 'Sector' : slug),
+      name: quizPillar?.name || sectionNames[slug] || slug,
       score: acc.ws > 0 ? Math.round(acc.w / acc.ws) : 0,
       answered: acc.n,
       total: acc.total,
@@ -364,6 +352,8 @@ export function computeFullDiagnosticResult(
     weaknesses,
     potentials,
     pillarScores,
+    quads: scoreAtQuads(rows, locale),
+    offerKind: inferOfferKind(answers),
   };
 }
 
@@ -387,14 +377,19 @@ export function answersPayloadForAnalyze(
 ): Array<{ id: string; question: string; answer: string; score?: number }> {
   const rows: Array<{ id: string; question: string; answer: string; score?: number }> = [];
   for (const q of questions) {
-    const optId = answers[q.id];
-    if (!optId) continue;
-    const score = scoreForAnswer(q, optId);
-    const opt = q.options.find((o) => o.id === optId);
+    const raw = answers[q.id];
+    if (!raw) continue;
+    const ids = parseAnswerIds(raw);
+    if (ids.length === 0) continue;
+    const score = scoreForAnswer(q, raw);
+    const labels = ids.map((id) => {
+      const opt = q.options.find((o) => o.id === id);
+      return opt ? optionLabel(opt, locale) : id;
+    });
     rows.push({
       id: q.id,
       question: questionLabel(q, locale),
-      answer: opt ? optionLabel(opt, locale) : optId,
+      answer: labels.join('; '),
       score: score ?? undefined,
     });
   }
@@ -416,10 +411,26 @@ export function listSectorChoices(locale: DxLocale) {
 
 export function sectionLabel(section: DxSection, locale: DxLocale): string {
   const map: Record<DxSection, { es: string; pt: string; en: string }> = {
+    core: { es: '1 · Cualquier negocio', pt: '1 · Qualquer negócio', en: '1 · Any business' },
+    level: { es: '2 · Nivel general', pt: '2 · Nível geral', en: '2 · General level' },
+    commercial: { es: '3 · Comercialización', pt: '3 · Comercialização', en: '3 · Commercialization' },
+    sector: { es: '4 · Sector específico', pt: '4 · Setor específico', en: '4 · Sector-specific' },
+    production: {
+      es: '5 · Producción / agroindustria',
+      pt: '5 · Produção / agroindústria',
+      en: '5 · Production / agro-industry',
+    },
     universal: { es: 'Base empresa', pt: 'Base empresa', en: 'Business base' },
-    sector: { es: 'Sector económico', pt: 'Setor económico', en: 'Economic sector' },
     pillar: { es: 'Pilares de gestión', pt: 'Pilares de gestão', en: 'Management pillars' },
     custom: { es: 'Técnico', pt: 'Técnico', en: 'Technician' },
   };
   return L(map[section], locale);
+}
+
+export function layeredQuestionCounts() {
+  return {
+    core: DX_CORE.length,
+    level: DX_LEVEL.length,
+    commercial: DX_COMMERCIAL.length,
+  };
 }

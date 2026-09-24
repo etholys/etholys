@@ -14,6 +14,8 @@ type Props = {
   locale: Locale;
   compact?: boolean;
   engagementId?: string | null;
+  /** Não mostra o convite vazio — útil quando o questionário já está na mesma página. */
+  hideWhenEmpty?: boolean;
 };
 
 export function NexusIncubationProcessPanel({
@@ -22,6 +24,7 @@ export function NexusIncubationProcessPanel({
   locale,
   compact = false,
   engagementId,
+  hideWhenEmpty = false,
 }: Props) {
   const es = locale === 'es';
   const [run, setRun] = useState<IncubationRun | null>(null);
@@ -42,6 +45,7 @@ export function NexusIncubationProcessPanel({
       const qs = new URLSearchParams();
       if (networkId) qs.set('networkId', networkId);
       if (companyId) qs.set('companyId', companyId);
+      if (engagementId) qs.set('engagementId', engagementId);
       const r = await fetch(`/api/nexus/incubation/run?${qs}`, { cache: 'no-store' });
       const d = await r.json();
       if (r.ok) {
@@ -53,7 +57,7 @@ export function NexusIncubationProcessPanel({
     } finally {
       setLoading(false);
     }
-  }, [companyId, networkId]);
+  }, [companyId, networkId, engagementId]);
 
   useEffect(() => {
     void load();
@@ -90,6 +94,7 @@ export function NexusIncubationProcessPanel({
   }
 
   if (!run?.committedAt && !run?.diagnosis) {
+    if (hideWhenEmpty) return null;
     return (
       <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 p-4">
         <p className="text-sm font-medium text-slate-800">

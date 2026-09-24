@@ -307,6 +307,12 @@ export function kindLabel(kind: WorkPlanItemKind, locale: 'es' | 'pt' | 'en'): s
     deliverable: { es: 'Entregable', pt: 'Entregável', en: 'Deliverable' },
     review: { es: 'Revisión', pt: 'Revisão', en: 'Review' },
     training: { es: 'Formación', pt: 'Formação', en: 'Training' },
+    ops_unit: { es: 'Unidad del módulo', pt: 'Unidade do módulo', en: 'Module unit' },
+    field_book: { es: 'Cuaderno', pt: 'Caderno', en: 'Field book' },
+    sensor: { es: 'Sensor / monitoreo', pt: 'Sensor / monitorização', en: 'Sensor / monitoring' },
+    protocol: { es: 'Protocolo del módulo', pt: 'Protocolo do módulo', en: 'Module protocol' },
   };
-  return map[kind][locale] || map[kind].es;
+  const row = map[kind];
+  if (!row) return String(kind);
+  return row[locale] || row.es;
 }

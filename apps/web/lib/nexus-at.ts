@@ -81,6 +81,20 @@ export async function loadEngagementForTenant(engagementId: string, tenantCompan
   return engagement;
 }
 
+/** Operador AT pode atuar sobre MIPYME membro do contrato (não só empresas do tenant). */
+export async function canAccessAtClientCompany(
+  tenantCompanyIds: string[],
+  targetCompanyId: string,
+  engagementId?: string | null
+): Promise<boolean> {
+  if (!targetCompanyId) return false;
+  if (tenantCompanyIds.includes(targetCompanyId)) return true;
+  if (!engagementId) return false;
+  const engagement = await loadEngagementForTenant(engagementId, tenantCompanyIds);
+  if (!engagement) return false;
+  return engagement.members.some((m) => m.companyId === targetCompanyId);
+}
+
 export async function validateEngagementSiep(
   siepProjectId: string | null | undefined,
   allowedCompanyIds: string[]

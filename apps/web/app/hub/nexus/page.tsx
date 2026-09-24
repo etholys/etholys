@@ -9,6 +9,7 @@ import { getNexusHomeSecondary } from '@/lib/nexus-home-secondary';
 import { NexusCoachPanel } from '@/components/nexus/NexusCoachPanel';
 import { NexusMirrorRail } from '@/components/nexus/NexusMirrorRail';
 import { NexusModeChooser } from '@/components/nexus/NexusModeChooser';
+import { NexusModulePulse } from '@/components/nexus/NexusModulePulse';
 import { parseNexusAdvisorMirror, type NexusAdvisorMirrorState } from '@/lib/nexus-advisor-mirror';
 
 type OverviewCompany = {
@@ -194,16 +195,16 @@ function NexusHomeInner() {
 
   const continueMineLabel =
     loc === 'es'
-      ? 'Continuar mejora de mi empresa (copiloto)'
+      ? 'Abrir copiloto de mi empresa'
       : loc === 'en'
-        ? 'Continue improving my company (copilot)'
-        : 'Continuar melhoria da minha empresa (copiloto)';
+        ? 'Open my company copilot'
+        : 'Abrir copiloto da minha empresa';
 
   return (
     <div className="space-y-5">
       {loading ? (
         <div className="flex min-h-[30vh] items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-600" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-600/30 border-t-teal-700" />
         </div>
       ) : !data && msg ? (
         <div
@@ -214,7 +215,7 @@ function NexusHomeInner() {
           <button
             type="button"
             onClick={() => void loadOverview()}
-            className="mt-3 inline-flex items-center justify-center rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+            className="mt-3 inline-flex items-center justify-center rounded-xl bg-[#0c1222] px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
           >
             {s.retry}
           </button>
@@ -236,32 +237,39 @@ function NexusHomeInner() {
 
           <NexusModeChooser withNet={withNet} openAtCases={openAtCases} />
 
+          {data.mode === 'company' && data.companyId ? (
+            <NexusModulePulse
+              companyId={data.companyId}
+              locale={loc === 'es' || loc === 'en' ? loc : 'pt'}
+            />
+          ) : null}
+
           {!showMineWorkspace ? (
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+            <p className="text-center text-sm text-slate-500">
               <button
                 type="button"
                 onClick={() => setShowMineWorkspace(true)}
-                className="font-medium text-violet-700 hover:underline"
+                className="font-medium text-slate-800 underline-offset-4 transition hover:text-teal-800 hover:underline"
               >
-                {continueMineLabel} →
+                {continueMineLabel}
               </button>
-            </div>
+            </p>
           ) : (
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-100 bg-violet-50/80 px-3 py-2 text-xs text-violet-900">
-                <span className="font-semibold">
+            <div className="space-y-4 border-t border-slate-200/80 pt-6">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="font-serif text-xl tracking-tight text-slate-900">
                   {loc === 'es'
-                    ? 'Mejora de mi empresa'
+                    ? 'Copiloto'
                     : loc === 'en'
-                      ? 'Improving my company'
-                      : 'Melhoria da minha empresa'}
-                </span>
+                      ? 'Copilot'
+                      : 'Copiloto'}
+                </h2>
                 <button
                   type="button"
                   onClick={() => setShowMineWorkspace(false)}
-                  className="text-violet-700 hover:underline"
+                  className="text-xs font-medium text-slate-500 hover:text-slate-800"
                 >
-                  {loc === 'es' ? 'Volver' : loc === 'en' ? 'Back' : 'Voltar'}
+                  {loc === 'es' ? 'Cerrar' : loc === 'en' ? 'Close' : 'Fechar'}
                 </button>
               </div>
               <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
@@ -308,7 +316,7 @@ export default function NexusHomePage() {
     <Suspense
       fallback={
         <div className="flex min-h-[30vh] items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-600" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-600/30 border-t-teal-700" />
         </div>
       }
     >

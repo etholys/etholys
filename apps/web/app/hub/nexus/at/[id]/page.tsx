@@ -10,14 +10,16 @@ import { NexusAtSectorPlaybook, sectorBadgeLabel } from '@/components/nexus/Nexu
 import { NexusAtClientDossier } from '@/components/nexus/NexusAtClientDossier';
 import { NexusAtBulkImport } from '@/components/nexus/NexusAtBulkImport';
 import { NexusAtProcessRail } from '@/components/nexus/NexusAtProcessRail';
+import { NexusSectorMultiSelect } from '@/components/nexus/NexusSectorMultiSelect';
 import { loadDiagnosisHistory } from '@/lib/nexus-diagnosis-history';
-import { AT_CASE_KIND_LABELS, type AtCaseKind } from '@/lib/nexus-at-shared';
+import { AT_CASE_KIND_LABELS, AT_DELIVERY_MODEL_LABELS, type AtCaseKind, type AtDeliveryModel } from '@/lib/nexus-at-shared';
 import {
   buildAtBriefTemplate,
   buildSectorCaseChecklist,
   clearAtCaseDraft,
   loadAtCaseDraft,
 } from '@/lib/nexus-at-sector-playbook';
+import { hasDeepSectorMatrix } from '@/lib/nexus-sector-matrices';
 
 type Company = { id: string; name: string; shortName: string };
 type Member = {
@@ -25,6 +27,7 @@ type Member = {
   companyId: string;
   memberRole: string;
   sectorId?: string | null;
+  sectorIds?: string[] | null;
   company: { id: string; name: string; shortName: string };
 };
 type AtProject = {
@@ -42,6 +45,7 @@ type Service = {
   contractRef: string | null;
   description: string | null;
   operatorCompanyId: string;
+  deliveryModel?: string | null;
   operatorCompany: { id: string; name: string; shortName: string };
   sponsorCompany?: { id: string; name: string; shortName: string } | null;
   siepProject?: { id: string; name: string; code?: string | null } | null;
@@ -90,6 +94,13 @@ export default function NexusAtServicePage() {
   const [addingMember, setAddingMember] = useState(false);
   const [showAddCompany, setShowAddCompany] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [addSectorIds, setAddSectorIds] = useState<string[]>([]);
+  const [addMemberRole, setAddMemberRole] = useState<'client' | 'principal' | 'affiliate'>('client');
+  const [clientFilter, setClientFilter] = useState('');
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
+  const [bulkSectorIds, setBulkSectorIds] = useState<string[]>([]);
+  const [draftSectorIds, setDraftSectorIds] = useState<string[]>([]);
+  const [savingBulkSector, setSavingBulkSector] = useState(false);
 
   const [sectorCatalog, setSectorCatalog] = useState<
     Array<{ id: string; label: { es: string; pt: string; en: string } }>
@@ -113,7 +124,9 @@ export default function NexusAtServicePage() {
         if (prev && eng.projects.some((p) => p.id === prev)) return prev;
         return eng.projects[0]?.id || '';
       });
-      const clients = eng.members.filter((m) => m.memberRole === 'client');
+      const clients = eng.members.filter((m) =>
+        ['client', 'principal', 'affiliate'].includes(m.memberRole)
+      );
       setSelectedCompanyId((prev) => {
         if (prev && clients.some((m) => m.companyId === prev)) return prev;
         return clients[0]?.companyId || '';
@@ -170,38 +183,147 @@ export default function NexusAtServicePage() {
   }, [addQuery, showAddCompany]);
 
   const clients = useMemo(
-    () => (service?.members || []).filter((m) => m.memberRole === 'client'),
+    () =>
+      (service?.members || []).filter((m) =>
+        ['client', 'principal', 'affiliate'].includes(m.memberRole)
+      ),
     [service]
   );
 
+  const memberSectorIds = (m: Member | null | undefined): string[] => {
+    if (!m) return [];
+    if (m.sectorIds && m.sectorIds.length > 0) return m.sectorIds;
+    return m.sectorId ? [m.sectorId] : [];
+  };
+
+  const sectorChipsLabel = (ids: string[]) => {
+    if (ids.length === 0) return null;
+    return ids
+      .map((sid) => sectorBadgeLabel(sid, loc))
+      .filter(Boolean)
+      .join(' · ');
+  };
+
+  const filteredClients = useMemo(() => {
+    const q = clientFilter.trim().toLowerCase();
+    if (!q) return clients;
+    return clients.filter((m) => {
+      const name = (m.company.name || '').toLowerCase();
+      const short = (m.company.shortName || '').toLowerCase();
+      const sector = (sectorChipsLabel(memberSectorIds(m)) || '').toLowerCase();
+      return name.includes(q) || short.includes(q) || sector.includes(q);
+    });
+  }, [clients, clientFilter, loc]);
+
+  const selectedMember = useMemo(
+    () => clients.find((m) => m.companyId === selectedCompanyId) || null,
+    [clients, selectedCompanyId]
+  );
+
+  const selectedSectorIds = memberSectorIds(selectedMember);
+  const selectedSectorId = selectedSectorIds[0] || service?.primarySectorId || null;
+
+  useEffect(() => {
+    setDraftSectorIds(selectedSectorIds);
+  }, [selectedCompanyId, selectedSectorIds.join('|')]);
+
+  const diagnosisHref = selectedCompanyId
+    ? `/hub/nexus/diagnosis?company=${encodeURIComponent(selectedCompanyId)}&engagement=${encodeURIComponent(id)}`
+    : null;
+  const continuePlanHref = diagnosisHref ? `${diagnosisHref}&resume=plan` : null;
+
+  const isCollective = service?.deliveryModel === 'COLLECTIVE';
+
   const [hasLocalDx, setHasLocalDx] = useState(false);
+  const [hasLocalPlanDraft, setHasLocalPlanDraft] = useState(false);
   useEffect(() => {
     if (!selectedCompanyId) {
       setHasLocalDx(false);
+      setHasLocalPlanDraft(false);
       return;
     }
     const hist = loadDiagnosisHistory({ companyId: selectedCompanyId });
-    setHasLocalDx(hist.length > 0);
-  }, [selectedCompanyId, cases.length]);
+    let dx = hist.length > 0;
+    let plan = false;
+    try {
+      const key = `nexus-sector-dx-v6:${selectedCompanyId}:${id}:`;
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const draft = JSON.parse(raw) as { phase?: string; analyze?: unknown };
+        plan =
+          Boolean(draft.analyze) || draft.phase === 'map' || draft.phase === 'workplan' || draft.phase === 'summary';
+      }
+    } catch {
+      plan = false;
+    }
+    setHasLocalDx(dx);
+    setHasLocalPlanDraft(plan);
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await fetch(
+          `/api/nexus/incubation/run?companyId=${encodeURIComponent(selectedCompanyId)}&engagementId=${encodeURIComponent(id)}`,
+          { cache: 'no-store' },
+        );
+        const d = (await r.json()) as {
+          run?: { diagnosis?: unknown; committedAt?: string | null };
+          progress?: { tasksTotal?: number };
+        };
+        if (cancelled || !r.ok || !d.run) return;
+        if (d.run.diagnosis) setHasLocalDx(true);
+        if (d.run.committedAt || (d.progress?.tasksTotal || 0) > 0) setHasLocalPlanDraft(true);
+      } catch {
+        /* o rascunho local já ficou aplicado */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCompanyId, id, cases.length]);
+
+  useEffect(() => {
+    if (!isCollective) {
+      setAddMemberRole('client');
+      return;
+    }
+    const hasPrincipal = (service?.members || []).some((m) => m.memberRole === 'principal');
+    setAddMemberRole(hasPrincipal ? 'affiliate' : 'principal');
+  }, [isCollective, service?.members]);
 
   useEffect(() => {
     if (!loading && isOperator && clients.length === 0) setShowBulkImport(true);
   }, [loading, isOperator, clients.length]);
 
+  useEffect(() => {
+    const allowed = new Set(clients.map((m) => m.companyId));
+    setCheckedIds((prev) => {
+      const next = prev.filter((cid) => allowed.has(cid));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [clients]);
+
   const playbookSectorId = useMemo(() => {
     if (!service) return null;
     const selected = clients.find((m) => m.companyId === selectedCompanyId);
-    return selected?.sectorId || service.primarySectorId || null;
+    const ids = selected
+      ? selected.sectorIds && selected.sectorIds.length > 0
+        ? selected.sectorIds
+        : selected.sectorId
+          ? [selected.sectorId]
+          : []
+      : [];
+    return ids[0] || service.primarySectorId || null;
   }, [service, clients, selectedCompanyId]);
 
-  const updateClientSector = async (companyId: string, sectorId: string) => {
+  const updateClientSectors = async (companyId: string, sectorIds: string[]) => {
     setSavingSectorFor(companyId);
     setError(null);
     try {
       const r = await fetch(`/api/nexus/at/client-companies/${encodeURIComponent(companyId)}/sector`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sectorId: sectorId || null }),
+        body: JSON.stringify({ sectorIds }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Error');
@@ -213,13 +335,67 @@ export default function NexusAtServicePage() {
     }
   };
 
+  const updateBulkSectors = async (sectorIds: string[], companyIds: string[]) => {
+    const ids = [...new Set(companyIds.filter(Boolean))];
+    if (sectorIds.length === 0 || ids.length === 0) return;
+    setSavingBulkSector(true);
+    setError(null);
+    try {
+      const r = await fetch('/api/nexus/at/client-companies/sectors', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ engagementId: id, companyIds: ids, sectorIds }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Error');
+      setBulkSectorIds([]);
+      setCheckedIds([]);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setSavingBulkSector(false);
+    }
+  };
+
+  const toggleChecked = (companyId: string) => {
+    setCheckedIds((prev) =>
+      prev.includes(companyId) ? prev.filter((x) => x !== companyId) : [...prev, companyId]
+    );
+  };
+
+  const allFilteredChecked =
+    filteredClients.length > 0 && filteredClients.every((m) => checkedIds.includes(m.companyId));
+
+  const toggleCheckAllFiltered = () => {
+    if (allFilteredChecked) {
+      const drop = new Set(filteredClients.map((m) => m.companyId));
+      setCheckedIds((prev) => prev.filter((cid) => !drop.has(cid)));
+    } else {
+      setCheckedIds((prev) => [
+        ...new Set([...prev, ...filteredClients.map((m) => m.companyId)]),
+      ]);
+    }
+  };
+
+  const sectorOptions = useMemo(
+    () => sectorCatalog.map((s) => ({ id: s.id, label: s.label[loc] })),
+    [sectorCatalog, loc]
+  );
+
+  const bulkMode = checkedIds.length > 0;
+
   const presentIds = useMemo(() => new Set((service?.members || []).map((m) => m.companyId)), [service]);
 
   const companyLabel = useCallback(
     (companyId: string | null | undefined) => {
       if (!companyId) return null;
       const m = service?.members.find((x) => x.companyId === companyId);
-      return m ? m.company.shortName || m.company.name : companyId;
+      if (!m) return companyId;
+      const full = m.company.name?.trim();
+      const short = m.company.shortName?.trim();
+      if (full && short && full.toLowerCase() !== short.toLowerCase()) return `${full} (${short})`;
+      return full || short || companyId;
     },
     [service]
   );
@@ -354,19 +530,28 @@ export default function NexusAtServicePage() {
   };
 
   const addMemberById = async (companyId: string) => {
+    if (addSectorIds.length === 0) {
+      setError(es ? 'Elige al menos una temática del emprendimiento.' : 'Escolhe pelo menos uma temática do empreendimento.');
+      return;
+    }
     setAddingMember(true);
     setError(null);
     try {
       const r = await fetch(`/api/nexus/at/engagements/${encodeURIComponent(id)}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId }),
+        body: JSON.stringify({
+          companyId,
+          sectorIds: addSectorIds,
+          memberRole: isCollective ? addMemberRole : 'client',
+        }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Error');
       setAddQuery('');
       setShowAddCompany(false);
       setSelectedCompanyId(companyId);
+      setAddSectorIds([]);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
@@ -378,19 +563,28 @@ export default function NexusAtServicePage() {
   const addMemberByName = async () => {
     const name = addQuery.trim();
     if (name.length < 2) return;
+    if (addSectorIds.length === 0) {
+      setError(es ? 'Elige al menos una temática del emprendimiento.' : 'Escolhe pelo menos uma temática do empreendimento.');
+      return;
+    }
     setAddingMember(true);
     setError(null);
     try {
       const r = await fetch(`/api/nexus/at/engagements/${encodeURIComponent(id)}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({
+          name,
+          sectorIds: addSectorIds,
+          memberRole: isCollective ? addMemberRole : 'client',
+        }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Error');
       setAddQuery('');
       setShowAddCompany(false);
       if (d.member?.companyId) setSelectedCompanyId(d.member.companyId);
+      setAddSectorIds([]);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
@@ -435,20 +629,27 @@ export default function NexusAtServicePage() {
     );
   }
 
-  return (
-    <div className="mx-auto max-w-6xl space-y-5">
+return (
+    <div className="mx-auto max-w-6xl space-y-4">
       <div>
-        <Link href="/hub/nexus/at" className="mb-3 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
+        <Link href="/hub/nexus/at" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
           <ArrowLeft className="h-4 w-4" /> {es ? 'Contratos' : 'Contratos'}
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{service.title}</h1>
-            {service.primarySectorId && (
-              <span className="mt-1 inline-block rounded-md bg-teal-50 px-2.5 py-0.5 text-xs font-medium text-teal-900">
-                {sectorBadgeLabel(service.primarySectorId, loc)}
-              </span>
-            )}
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {service.deliveryModel && service.deliveryModel in AT_DELIVERY_MODEL_LABELS && (
+                <span className="inline-block rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-800">
+                  {AT_DELIVERY_MODEL_LABELS[service.deliveryModel as AtDeliveryModel][loc]}
+                </span>
+              )}
+              {service.primarySectorId && (
+                <span className="inline-block rounded-md bg-teal-50 px-2.5 py-0.5 text-xs font-medium text-teal-900">
+                  {es ? 'Ámbito' : 'Âmbito'}: {sectorBadgeLabel(service.primarySectorId, loc)}
+                </span>
+              )}
+            </div>
             <p className="mt-1 text-sm text-slate-500">
               {service.contractRef ? `${service.contractRef} · ` : ''}
               {es ? 'Opera' : 'Opera'}: {service.operatorCompany.shortName || service.operatorCompany.name}
@@ -460,19 +661,6 @@ export default function NexusAtServicePage() {
                 : ''}
             </p>
           </div>
-          {isOperator && selectedProjectId && selectedCompanyId && (
-            <button
-              type="button"
-              onClick={() => {
-                applyBriefTemplate(caseKind);
-                setShowNewCase(true);
-              }}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              <Plus className="h-4 w-4" />
-              {es ? 'Nuevo caso' : 'Novo caso'}
-            </button>
-          )}
         </div>
       </div>
 
@@ -482,92 +670,32 @@ export default function NexusAtServicePage() {
         engagementId={id}
         clientCount={clients.length}
         selectedCompanyId={selectedCompanyId}
-        sectorId={
-          clients.find((m) => m.companyId === selectedCompanyId)?.sectorId || service.primarySectorId
-        }
+        sectorId={selectedSectorId}
         hasOpenCases={cases.some((c) => c.isOpen !== false && !['DONE', 'CANCELLED'].includes(c.status))}
         hasDiagnosisHint={hasLocalDx}
         es={es}
       />
 
-      <div className="grid gap-5 lg:grid-cols-[200px_minmax(0,1fr)_260px]">
-        <aside className="space-y-1">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-            {es ? 'Proyectos' : 'Projetos'}
-          </p>
-          {service.projects.map((p) => {
-            const n = openByProject.get(p.id) || 0;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setSelectedProjectId(p.id)}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${
-                  selectedProjectId === p.id
-                    ? 'bg-slate-900 font-medium text-white'
-                    : 'text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <span className="truncate">{p.name}</span>
-                {n > 0 && (
-                  <span
-                    className={`ml-2 rounded-full px-1.5 text-[10px] font-semibold ${
-                      selectedProjectId === p.id ? 'bg-white/20' : 'bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    {n}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-          {isOperator && (
-            <div className="pt-3">
-              <input
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') createProject();
-                }}
-                className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-slate-400"
-                placeholder={es ? 'Nuevo proyecto…' : 'Novo projeto…'}
-              />
-              <button
-                type="button"
-                disabled={savingProject || newProjectName.trim().length < 2}
-                onClick={createProject}
-                className="mt-1.5 w-full rounded-lg border border-slate-200 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-              >
-                {es ? 'Añadir proyecto' : 'Adicionar projeto'}
-              </button>
-            </div>
-          )}
-        </aside>
-
-        <div className="space-y-4">
-          <div>
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                {es ? 'Empresas atendidas' : 'Empresas atendidas'}
+      <div className="grid gap-4 lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)] lg:items-start">
+        {/* Lista de MIPYMEs — coluna fixa com scroll */}
+        <aside className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white lg:sticky lg:top-3 lg:max-h-[calc(100vh-5.5rem)]">
+          <div className="shrink-0 space-y-2 border-b border-slate-100 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {es ? 'MIPYMEs' : 'MIPYMEs'} · {clients.length}
               </p>
               {isOperator && (
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   <button
                     type="button"
                     onClick={() => {
                       setShowBulkImport((v) => !v);
                       setShowAddCompany(false);
                     }}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-teal-800 hover:text-teal-950"
+                    className="rounded-md p-1 text-teal-800 hover:bg-teal-50"
+                    title={es ? 'Importar lista' : 'Importar lista'}
                   >
-                    <FileSpreadsheet className="h-3.5 w-3.5" />
-                    {showBulkImport
-                      ? es
-                        ? 'Ocultar importación'
-                        : 'Ocultar importação'
-                      : es
-                        ? 'Importar lista'
-                        : 'Importar lista'}
+                    <FileSpreadsheet className="h-4 w-4" />
                   </button>
                   <button
                     type="button"
@@ -575,120 +703,80 @@ export default function NexusAtServicePage() {
                       setShowAddCompany((v) => !v);
                       setShowBulkImport(false);
                     }}
-                    className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                    className="rounded-md p-1 text-slate-600 hover:bg-slate-100"
+                    title={es ? 'Añadir empresa' : 'Adicionar empresa'}
                   >
-                    {showAddCompany ? (es ? 'Cerrar' : 'Fechar') : es ? '+ Empresa' : '+ Empresa'}
+                    <Plus className="h-4 w-4" />
                   </button>
                 </div>
               )}
             </div>
-            {isOperator && showBulkImport && (
-              <div className="mb-3">
-                <NexusAtBulkImport
-                  engagementId={id}
-                  es={es}
-                  defaultSectorId={service.primarySectorId}
-                  onDone={() => void load()}
+            {clients.length > 0 && (
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-slate-400" />
+                <input
+                  value={clientFilter}
+                  onChange={(e) => setClientFilter(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 py-1.5 pl-7 pr-2 text-xs outline-none focus:border-slate-400"
+                  placeholder={es ? 'Buscar nombre o temática…' : 'Buscar nome ou temática…'}
                 />
               </div>
             )}
-            {clients.length === 0 ? (
-              <p className="text-sm text-slate-500">
+            {isOperator && clients.length > 0 && (
+              <label className="flex items-center gap-2 text-[11px] text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={allFilteredChecked}
+                  onChange={toggleCheckAllFiltered}
+                  className="rounded border-slate-300"
+                />
                 {es
-                  ? 'Importa la lista de MIPYMEs beneficiarias. Cada empresa tendrá su propio proceso de diagnóstico e incubación.'
-                  : 'Importa a lista de MIPYMEs beneficiárias. Cada empresa terá o seu próprio processo de diagnóstico e incubação.'}
+                  ? `Seleccionar visibles (${filteredClients.length})`
+                  : `Selecionar visíveis (${filteredClients.length})`}
+              </label>
+            )}
+          </div>
+
+          {isOperator && showBulkImport && (
+            <div className="shrink-0 border-b border-slate-100 p-3">
+              <NexusAtBulkImport
+                engagementId={id}
+                es={es}
+                defaultSectorId={service.primarySectorId}
+                onDone={() => {
+                  setShowBulkImport(false);
+                  void load();
+                }}
+              />
+            </div>
+          )}
+
+          {showAddCompany && isOperator && (
+            <div className="shrink-0 space-y-2 border-b border-slate-100 bg-slate-50 p-3">
+              <p className="text-[11px] font-medium text-slate-700">
+                {es ? 'Temáticas (una o varias)' : 'Temáticas (uma ou várias)'}
               </p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {clients.map((m) => {
-                  const n = openByCompany.get(m.companyId) || 0;
-                  const active = selectedCompanyId === m.companyId;
-                  return (
-                    <button
-                      key={m.companyId}
-                      type="button"
-                      onClick={() => setSelectedCompanyId(m.companyId)}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm ${
-                        active ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
-                      }`}
-                    >
-                      {m.company.shortName || m.company.name}
-                      {m.sectorId && (
-                        <span
-                          className={`rounded px-1.5 py-0.5 text-[10px] ${
-                            active ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-900'
-                          }`}
-                        >
-                          {sectorBadgeLabel(m.sectorId, loc)}
-                        </span>
-                      )}
-                      {n > 0 && (
-                        <span className={`text-[10px] font-semibold ${active ? 'text-white/80' : 'text-slate-500'}`}>
-                          {n}
-                        </span>
-                      )}
-                      {isOperator && (
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeMember(m.companyId);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.stopPropagation();
-                              removeMember(m.companyId);
-                            }
-                          }}
-                          className={`ml-0.5 ${active ? 'text-white/60 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {isOperator && clients.length > 0 && sectorCatalog.length > 0 && (
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <span>{es ? 'Sector de la empresa seleccionada:' : 'Setor da empresa selecionada:'}</span>
+              <NexusSectorMultiSelect
+                options={sectorOptions}
+                value={addSectorIds}
+                onChange={setAddSectorIds}
+                placeholder={es ? 'Elegir temáticas…' : 'Escolher temáticas…'}
+                emptyLabel={es ? 'Ninguna' : 'Nenhuma'}
+              />
+              {isCollective && (
                 <select
-                  value={clients.find((m) => m.companyId === selectedCompanyId)?.sectorId || service.primarySectorId || ''}
-                  disabled={!selectedCompanyId || savingSectorFor === selectedCompanyId}
-                  onChange={(e) => {
-                    if (selectedCompanyId) updateClientSector(selectedCompanyId, e.target.value);
-                  }}
-                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
-                >
-                  <option value="">{es ? '— sin sector —' : '— sem setor —'}</option>
-                  {sectorCatalog.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label[loc]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {selectedCompanyId && (
-              <div className="mt-3">
-                <NexusAtClientDossier
-                  companyId={selectedCompanyId}
-                  companyName={companyLabel(selectedCompanyId) || '—'}
-                  sectorId={
-                    clients.find((m) => m.companyId === selectedCompanyId)?.sectorId ||
-                    service.primarySectorId
+                  value={addMemberRole}
+                  onChange={(e) =>
+                    setAddMemberRole(e.target.value as 'client' | 'principal' | 'affiliate')
                   }
-                  locale={loc}
-                  es={es}
-                  engagementId={id}
-                />
-              </div>
-            )}
-            {showAddCompany && isOperator && (
-              <div className="relative mt-3">
-                <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                  className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                >
+                  <option value="principal">{es ? 'Principal' : 'Principal'}</option>
+                  <option value="affiliate">{es ? 'Filial' : 'Filha'}</option>
+                  <option value="client">{es ? 'Miembro' : 'Membro'}</option>
+                </select>
+              )}
+              <div className="relative">
                 <input
                   value={addQuery}
                   onChange={(e) => setAddQuery(e.target.value)}
@@ -700,21 +788,19 @@ export default function NexusAtServicePage() {
                     }
                   }}
                   disabled={addingMember}
-                  className="w-full rounded-lg border border-slate-200 py-2 pl-8 pr-3 text-sm outline-none focus:border-slate-400"
-                  placeholder={
-                    es ? 'Buscar o crear empresa…' : 'Pesquisar ou criar empresa…'
-                  }
+                  className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-slate-400"
+                  placeholder={es ? 'Nombre…' : 'Nome…'}
                 />
                 {addQuery.trim().length > 0 && (
-                  <ul className="absolute z-10 mt-1 max-h-44 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                  <ul className="absolute z-20 mt-1 max-h-36 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
                     {filteredSuggestions.map((c) => (
                       <li key={c.id}>
                         <button
                           type="button"
                           onClick={() => addMemberById(c.id)}
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                          className="w-full px-2 py-1.5 text-left text-xs hover:bg-slate-50"
                         >
-                          {c.shortName || c.name}
+                          {c.name}
                         </button>
                       </li>
                     ))}
@@ -723,7 +809,7 @@ export default function NexusAtServicePage() {
                         <button
                           type="button"
                           onClick={addMemberByName}
-                          className="w-full px-3 py-2 text-left text-sm font-medium text-emerald-800 hover:bg-slate-50"
+                          className="w-full px-2 py-1.5 text-left text-xs font-medium text-emerald-800 hover:bg-slate-50"
                         >
                           + {es ? 'Crear' : 'Criar'} «{addQuery.trim()}»
                         </button>
@@ -732,148 +818,453 @@ export default function NexusAtServicePage() {
                   </ul>
                 )}
               </div>
+            </div>
+          )}
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            {clients.length === 0 ? (
+              <p className="px-2 py-6 text-center text-xs text-slate-500">
+                {es
+                  ? 'Importa o añade MIPYMEs. La temática se elige por empresa.'
+                  : 'Importa ou adiciona MIPYMEs. A temática escolhe-se por empresa.'}
+              </p>
+            ) : filteredClients.length === 0 ? (
+              <p className="px-2 py-4 text-center text-xs text-slate-400">
+                {es ? 'Sin coincidencias' : 'Sem resultados'}
+              </p>
+            ) : (
+              <ul className="space-y-0.5">
+                {filteredClients.map((m) => {
+                  const n = openByCompany.get(m.companyId) || 0;
+                  const active = selectedCompanyId === m.companyId;
+                  const checked = checkedIds.includes(m.companyId);
+                  const fullName = m.company.name?.trim() || m.company.shortName || m.companyId;
+                  const sectorLbl = sectorChipsLabel(memberSectorIds(m));
+                  return (
+                    <li key={m.companyId}>
+                      <div
+                        className={`group flex w-full items-start gap-1.5 rounded-lg px-1.5 py-1.5 ${
+                          active
+                            ? 'bg-slate-900 text-white'
+                            : checked
+                              ? 'bg-teal-50 text-slate-800'
+                              : 'text-slate-800 hover:bg-slate-100'
+                        }`}
+                      >
+                        {isOperator && (
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleChecked(m.companyId)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-1.5 shrink-0 rounded border-slate-300"
+                            title={es ? 'Seleccionar para temática en lote' : 'Selecionar para temática em lote'}
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCompanyId(m.companyId)}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <span className="block truncate text-sm font-medium leading-snug">{fullName}</span>
+                          <span
+                            className={`mt-0.5 flex flex-wrap items-center gap-1 text-[10px] ${
+                              active ? 'text-white/70' : 'text-slate-500'
+                            }`}
+                          >
+                            {m.memberRole === 'principal' && (
+                              <span className={active ? 'text-amber-200' : 'text-amber-800'}>
+                                principal
+                              </span>
+                            )}
+                            {m.memberRole === 'affiliate' && (
+                              <span>{es ? 'filial' : 'filha'}</span>
+                            )}
+                            {sectorLbl ? (
+                              <span>{sectorLbl}</span>
+                            ) : (
+                              <span className={active ? 'text-amber-200' : 'text-amber-700'}>
+                                {es ? 'sin temática' : 'sem temática'}
+                              </span>
+                            )}
+                            {n > 0 && <span>· {n}</span>}
+                          </span>
+                        </button>
+                        {isOperator && (
+                          <button
+                            type="button"
+                            title={es ? 'Quitar' : 'Remover'}
+                            onClick={() => removeMember(m.companyId)}
+                            className={`mt-0.5 shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 ${
+                              active ? 'hover:bg-white/15' : 'hover:bg-slate-200'
+                            }`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 border-y border-slate-100 py-2 text-sm">
-            <span className="text-slate-700">
-              <span className="font-medium">{selectedProject?.name || '—'}</span>
-              <span className="mx-1.5 text-slate-300">/</span>
-              <span className="font-medium">{companyLabel(selectedCompanyId) || '—'}</span>
-            </span>
-            <label className="flex items-center gap-1.5 text-xs text-slate-500">
-              <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />
-              {es ? 'Incluir cerrados' : 'Incluir concluídos'}
-            </label>
-          </div>
-
-          {showNewCase && (
-            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-900">
-                  {es ? 'Nuevo caso' : 'Novo caso'}
-                </h3>
-                <button type="button" onClick={() => setShowNewCase(false)} className="text-slate-400 hover:text-slate-700">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <select
-                  value={caseKind}
-                  onChange={(e) => {
-                    const kind = e.target.value as AtCaseKind;
-                    setCaseKind(kind);
-                    applyBriefTemplate(kind);
-                  }}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                >
-                  {CASE_KINDS.map((k) => (
-                    <option key={k.id} value={k.id}>
-                      {k.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="LOW">{es ? 'Prioridad baja' : 'Prioridade baixa'}</option>
-                  <option value="MEDIUM">{es ? 'Media' : 'Média'}</option>
-                  <option value="HIGH">{es ? 'Alta' : 'Alta'}</option>
-                  <option value="CRITICAL">{es ? 'Crítica' : 'Crítica'}</option>
-                </select>
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                />
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input type="checkbox" checked={assignToMe} onChange={(e) => setAssignToMe(e.target.checked)} />
-                  {es ? 'Asignarme' : 'Atribuir a mim'}
-                </label>
-                <textarea
-                  value={brief}
-                  onChange={(e) => setBrief(e.target.value)}
-                  rows={8}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs leading-relaxed sm:col-span-2"
-                  placeholder={
-                    es
-                      ? 'Plano de intervenção… (use o quadro AT por sector)'
-                      : 'Plano de intervenção… (use o quadro AT por setor)'
-                  }
-                />
-                {checklistPreview.length > 0 && (
-                  <div className="rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2 sm:col-span-2">
-                    <p className="text-[11px] font-medium uppercase text-teal-900">
-                      {es ? 'Checklist sectorial' : 'Checklist sectorial'}
-                    </p>
-                    <ul className="mt-1 space-y-0.5 text-xs text-teal-950">
-                      {checklistPreview.map((line, i) => (
-                        <li key={i}>· {line}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+          {isOperator && checkedIds.length > 0 && (
+            <div className="shrink-0 border-t border-teal-200 bg-teal-50/80 px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-teal-950">
+                  {es
+                    ? `${checkedIds.length} seleccionada(s) — usa el selector de temáticas a la derecha`
+                    : `${checkedIds.length} selecionada(s) — usa o seletor de temáticas à direita`}
+                </p>
                 <button
                   type="button"
-                  disabled={savingCase || brief.trim().length < 8}
-                  onClick={createCase}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40 sm:col-span-2"
+                  onClick={() => {
+                    setCheckedIds([]);
+                    setBulkSectorIds([]);
+                  }}
+                  className="shrink-0 text-[11px] font-medium text-teal-800 underline"
                 >
-                  {savingCase ? (es ? 'Guardando…' : 'A guardar…') : es ? 'Abrir caso' : 'Abrir caso'}
+                  {es ? 'Limpiar' : 'Limpar'}
                 </button>
               </div>
             </div>
           )}
-
-          <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-slate-900">
-              {es ? 'Cola' : 'Fila'} · {filteredCases.length}
-            </h2>
-            {filteredCases.length === 0 ? (
-              <p className="py-6 text-center text-sm text-slate-400">
-                {es
-                  ? 'Sin casos para este proyecto + empresa.'
-                  : 'Sem casos neste projeto + empresa.'}
-              </p>
-            ) : (
-              filteredCases.map((c) => (
-                <NexusAtCaseCard
-                  key={c.id}
-                  caseItem={{
-                    ...c,
-                    companyLabel: companyLabel(c.companyId),
-                    projectName: projectLabel(c.projectId),
-                  }}
-                  onUpdated={(updated) => {
-                    setCases((prev) => prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)));
-                  }}
-                />
-              ))
-            )}
-          </section>
-        </div>
-
-        <aside className="hidden lg:block">
-          <NexusAtSectorPlaybook
-            sectorId={playbookSectorId}
-            locale={loc}
-            onSuggestCaseKind={isOperator && selectedProjectId && selectedCompanyId ? suggestCaseKind : undefined}
-            onSuggestFocusArea={isOperator && selectedProjectId && selectedCompanyId ? suggestFocusArea : undefined}
-          />
         </aside>
-      </div>
 
-      <div className="lg:hidden">
-        <NexusAtSectorPlaybook
-          sectorId={playbookSectorId}
-          locale={loc}
-          compact
-          onSuggestCaseKind={isOperator && selectedProjectId && selectedCompanyId ? suggestCaseKind : undefined}
-          onSuggestFocusArea={isOperator && selectedProjectId && selectedCompanyId ? suggestFocusArea : undefined}
-        />
+        {/* Workspace da empresa selecionada */}
+        <div className="min-w-0 space-y-4">
+          {!selectedCompanyId || !selectedMember ? (
+            <div className="rounded-xl border border-dashed border-slate-200 px-4 py-16 text-center text-sm text-slate-500">
+              {es
+                ? 'Selecciona una MIPYME a la izquierda para trabajar su temática y diagnóstico.'
+                : 'Seleciona uma MIPYME à esquerda para trabalhar a temática e o diagnóstico.'}
+            </div>
+          ) : (
+            <>
+              <div className="sticky top-3 z-10 space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                      {es ? 'Empresa seleccionada' : 'Empresa selecionada'}
+                    </p>
+                    <h2 className="mt-0.5 truncate text-lg font-semibold text-slate-900">
+                      {selectedMember.company.name}
+                    </h2>
+                    {selectedMember.company.shortName &&
+                      selectedMember.company.shortName !== selectedMember.company.name && (
+                        <p className="text-xs text-slate-500">{selectedMember.company.shortName}</p>
+                      )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {hasLocalPlanDraft && continuePlanHref && (
+                      <Link
+                        href={continuePlanHref}
+                        className="inline-flex items-center rounded-lg bg-teal-800 px-3.5 py-2 text-sm font-medium text-white hover:bg-teal-900"
+                      >
+                        {es ? 'Continuar plan' : 'Continuar plano'}
+                      </Link>
+                    )}
+                    {diagnosisHref && (
+                      <Link
+                        href={diagnosisHref}
+                        className={`inline-flex items-center rounded-lg px-3.5 py-2 text-sm font-medium ${
+                          hasLocalPlanDraft
+                            ? 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50'
+                            : 'bg-teal-800 text-white hover:bg-teal-900'
+                        }`}
+                      >
+                        {hasLocalDx || hasLocalPlanDraft
+                          ? es
+                            ? 'Reabrir diagnóstico'
+                            : 'Reabrir diagnóstico'
+                          : es
+                            ? 'Iniciar diagnóstico'
+                            : 'Iniciar diagnóstico'}
+                      </Link>
+                    )}
+                    {isOperator && selectedProjectId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          applyBriefTemplate(caseKind);
+                          setShowNewCase(true);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+                      >
+                        <Plus className="h-4 w-4" />
+                        {es ? 'Nuevo caso' : 'Novo caso'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs font-medium text-slate-600">
+                    {bulkMode
+                      ? es
+                        ? `Temáticas → ${checkedIds.length} seleccionadas`
+                        : `Temáticas → ${checkedIds.length} selecionadas`
+                      : es
+                        ? 'Temáticas'
+                        : 'Temáticas'}
+                    <div className="mt-1">
+                      <NexusSectorMultiSelect
+                        options={sectorOptions}
+                        value={bulkMode ? bulkSectorIds : draftSectorIds}
+                        disabled={
+                          !isOperator ||
+                          savingBulkSector ||
+                          savingSectorFor === selectedCompanyId
+                        }
+                        deferApply
+                        applying={savingBulkSector || savingSectorFor === selectedCompanyId}
+                        applyLabel={
+                          bulkMode
+                            ? es
+                              ? `Aplicar a ${checkedIds.length}`
+                              : `Aplicar a ${checkedIds.length}`
+                            : es
+                              ? 'Guardar'
+                              : 'Guardar'
+                        }
+                        onChange={(next) => {
+                          if (bulkMode) setBulkSectorIds(next);
+                          else setDraftSectorIds(next);
+                        }}
+                        onApply={(ids) => {
+                          if (bulkMode) void updateBulkSectors(ids, checkedIds);
+                          else void updateClientSectors(selectedCompanyId, ids);
+                        }}
+                        placeholder={
+                          bulkMode
+                            ? es
+                              ? 'Marcar temáticas y aplicar…'
+                              : 'Marcar temáticas e aplicar…'
+                            : es
+                              ? 'Elegir temáticas…'
+                              : 'Escolher temáticas…'
+                        }
+                        emptyLabel={es ? 'Ninguna' : 'Nenhuma'}
+                      />
+                    </div>
+                    {bulkMode ? (
+                      <span className="mt-1 block text-[11px] font-normal text-slate-500">
+                        {es
+                          ? 'Marca empresas a la izquierda; elige temáticas aquí y aplica.'
+                          : 'Marca empresas à esquerda; escolhe temáticas aqui e aplica.'}
+                      </span>
+                    ) : selectedSectorIds.length > 1 ? (
+                      <span className="mt-1 block text-[11px] font-normal text-slate-500">
+                        {es
+                          ? 'Primera temática = principal para el diagnóstico CMM.'
+                          : 'Primeira temática = principal para o diagnóstico CMM.'}
+                      </span>
+                    ) : null}
+                  </label>
+                  <label className="block text-xs font-medium text-slate-600">
+                    {es ? 'Proyecto / fase' : 'Projeto / fase'}
+                    <select
+                      value={selectedProjectId}
+                      onChange={(e) => setSelectedProjectId(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none focus:border-slate-400"
+                    >
+                      {service.projects.map((p) => {
+                        const n = openByProject.get(p.id) || 0;
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                            {n > 0 ? ` (${n})` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
+                </div>
+
+                {isOperator && (
+                  <div className="flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3">
+                    <input
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') createProject();
+                      }}
+                      className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-slate-400"
+                      placeholder={es ? 'Nuevo proyecto…' : 'Novo projeto…'}
+                    />
+                    <button
+                      type="button"
+                      disabled={savingProject || newProjectName.trim().length < 2}
+                      onClick={createProject}
+                      className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                    >
+                      {es ? 'Añadir' : 'Adicionar'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <NexusAtClientDossier
+                companyId={selectedCompanyId}
+                companyName={companyLabel(selectedCompanyId) || '—'}
+                sectorId={selectedSectorId}
+                sectorIds={selectedSectorIds}
+                locale={loc}
+                es={es}
+                engagementId={id}
+                hideDiagnosisCta
+              />
+
+              <NexusAtSectorPlaybook
+                sectorId={playbookSectorId}
+                locale={loc}
+                compact
+                onSuggestCaseKind={
+                  isOperator && selectedProjectId && selectedCompanyId ? suggestCaseKind : undefined
+                }
+                onSuggestFocusArea={
+                  isOperator && selectedProjectId && selectedCompanyId ? suggestFocusArea : undefined
+                }
+              />
+
+              {showNewCase && (
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      {es ? 'Nuevo caso' : 'Novo caso'}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewCase(false)}
+                      className="text-slate-400 hover:text-slate-700"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <select
+                      value={caseKind}
+                      onChange={(e) => {
+                        const kind = e.target.value as AtCaseKind;
+                        setCaseKind(kind);
+                        applyBriefTemplate(kind);
+                      }}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                    >
+                      {CASE_KINDS.map((k) => (
+                        <option key={k.id} value={k.id}>
+                          {k.label}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={priority}
+                      onChange={(e) => setPriority(e.target.value)}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="LOW">{es ? 'Prioridad baja' : 'Prioridade baixa'}</option>
+                      <option value="MEDIUM">{es ? 'Media' : 'Média'}</option>
+                      <option value="HIGH">{es ? 'Alta' : 'Alta'}</option>
+                      <option value="CRITICAL">{es ? 'Crítica' : 'Crítica'}</option>
+                    </select>
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                    />
+                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={assignToMe}
+                        onChange={(e) => setAssignToMe(e.target.checked)}
+                      />
+                      {es ? 'Asignarme' : 'Atribuir a mim'}
+                    </label>
+                    <textarea
+                      value={brief}
+                      onChange={(e) => setBrief(e.target.value)}
+                      rows={8}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs leading-relaxed sm:col-span-2"
+                      placeholder={
+                        es
+                          ? 'Plano de intervenção… (use o quadro AT por sector)'
+                          : 'Plano de intervenção… (use o quadro AT por setor)'
+                      }
+                    />
+                    {checklistPreview.length > 0 && (
+                      <div className="rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2 sm:col-span-2">
+                        <p className="text-[11px] font-medium uppercase text-teal-900">
+                          {es ? 'Checklist sectorial' : 'Checklist sectorial'}
+                        </p>
+                        <ul className="mt-1 space-y-0.5 text-xs text-teal-950">
+                          {checklistPreview.map((line, i) => (
+                            <li key={i}>· {line}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      disabled={savingCase || brief.trim().length < 8}
+                      onClick={createCase}
+                      className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40 sm:col-span-2"
+                    >
+                      {savingCase
+                        ? es
+                          ? 'Guardando…'
+                          : 'A guardar…'
+                        : es
+                          ? 'Abrir caso'
+                          : 'Abrir caso'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <section className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-slate-900">
+                    {es ? 'Cola de casos' : 'Fila de casos'} · {filteredCases.length}
+                  </h2>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <input
+                      type="checkbox"
+                      checked={showClosed}
+                      onChange={(e) => setShowClosed(e.target.checked)}
+                    />
+                    {es ? 'Incluir cerrados' : 'Incluir concluídos'}
+                  </label>
+                </div>
+                {filteredCases.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-400">
+                    {es
+                      ? 'Sin casos para este proyecto + empresa.'
+                      : 'Sem casos neste projeto + empresa.'}
+                  </p>
+                ) : (
+                  filteredCases.map((c) => (
+                    <NexusAtCaseCard
+                      key={c.id}
+                      caseItem={{
+                        ...c,
+                        companyLabel: companyLabel(c.companyId),
+                        projectName: projectLabel(c.projectId),
+                      }}
+                      onUpdated={(updated) => {
+                        setCases((prev) =>
+                          prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x))
+                        );
+                      }}
+                    />
+                  ))
+                )}
+              </section>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

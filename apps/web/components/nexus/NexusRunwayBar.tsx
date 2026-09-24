@@ -126,7 +126,7 @@ export function NexusRunwayBar() {
             <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${percent}%` }} />
           </div>
           <Link
-            href={allComplete ? withNetworkPath('/hub/nexus/journey', networkId) : continueHref}
+            href={allComplete ? withNetworkPath('/hub/nexus/campo', networkId) : continueHref}
             className="inline-flex items-center justify-center gap-1 rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700"
           >
             {allComplete ? t.allDone : t.continue}
@@ -166,7 +166,7 @@ export function NexusRunwayContinueLink({
   }
 
   const allComplete = NEXUS_RUNWAY_CHAPTERS.every((c) => isChapterComplete(c.id, touch, metrics));
-  const href = allComplete ? withNetworkPath('/hub/nexus/journey', networkId) : continueHref;
+  const href = allComplete ? withNetworkPath('/hub/nexus/campo', networkId) : continueHref;
   const label =
     locale === 'es'
       ? allComplete

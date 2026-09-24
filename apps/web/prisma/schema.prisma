@@ -125,6 +125,8 @@ model User {
   studioDocumentPresences       StudioDocumentPresence[]     @relation("StudioDocumentPresenceUser")
   taskApprovalsRequested        TaskApprovalRequest[]        @relation("TaskApprovalRequester")
   taskApprovalsToDecide         TaskApprovalRequest[]        @relation("TaskApprovalApprover")
+  nexusDiagnosesCreated         NexusDiagnosis[]             @relation("NexusDiagnosisCreator")
+  nexusFieldEntriesAuthored     NexusFieldEntry[]            @relation("NexusFieldEntryAuthor")
 }
 
 model Account {
@@ -213,6 +215,11 @@ model Company {
   nexusAtEngagementsSponsored NexusAtEngagement[]          @relation("NexusAtSponsor")
   nexusAtEngagementMemberships NexusAtEngagementMember[]
   nexusVentureState           NexusVentureState?
+  nexusDiagnoses              NexusDiagnosis[]
+  nexusOpsUnits               NexusOpsUnit[]
+  nexusFieldEntries           NexusFieldEntry[]
+  nexusSensors                NexusSensor[]
+  nexusReadings               NexusReading[]
   /// Quem pode usar o Centro de trabalho integrado nesta empresa (não duplica lógica dos sistemas; só espelha APIs).
   integratedWorkspaceAccesses  IntegratedWorkspaceAccess[]
   products                    Product[]
@@ -1783,15 +1790,17 @@ model NexusAtEngagement {
   title             String
   /// CONTRACT | PROJECT | PROGRAM — tipo comercial do serviço
   kind              String                     @default("CONTRACT")
+  /// SINGLE | MULTI | COLLECTIVE — como se presta a AT (1 empresa, várias, ou rede/cooperativa)
+  deliveryModel     String                     @default("MULTI")
   /// OPEN | ACTIVE | ON_HOLD | CLOSED
   status            String                     @default("ACTIVE")
   /// Empresa que presta a AT (operador)
   operatorCompanyId String
   /// Cliente contratante / quem paga (incubadora, instituição, doador) — ≠ empresas atendidas
   sponsorCompanyId  String?
-  /// Setor económico principal do programa (filtros, playbook, relatórios)
+  /// Setor económico principal do programa (opcional — tema real vive na ficha de cada MIPYME)
   primarySectorId   String?
-  /// Setores do programa AT (array JSON de ids — pode abranger várias áreas)
+  /// Setores do programa AT (array JSON de ids — âmbito opcional do contrato)
   sectorIds         Json?
   /// Rede NEXUS opcional (pré-agrupa empresas)
   networkId         String?
@@ -1846,7 +1855,7 @@ model NexusAtEngagementMember {
   id           String            @id @default(cuid())
   engagementId String
   companyId    String
-  /// operator | client
+  /// operator | client | principal | affiliate
   memberRole   String            @default("client")
   notes        String?
   sortOrder    Int               @default(0)
@@ -1892,6 +1901,114 @@ model NexusNetworkMember {
   @@unique([networkId, companyId])
   @@index([companyId])
   @@index([networkId, memberRole])
+}
+
+/// Diagnóstico NEXUS persistido (fonte de verdade — não localStorage).
+model NexusDiagnosis {
+  id              String   @id @default(cuid())
+  companyId       String
+  createdByUserId String
+  engagementId    String?
+  sectorIds       Json
+  overall         Int      @default(0)
+  scoresJson      Json
+  answersJson     Json
+  createdAt       DateTime @default(now())
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy       User     @relation("NexusDiagnosisCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, createdAt])
+  @@index([engagementId])
+  @@index([createdByUserId])
+}
+
+/// Unidade operativa do módulo setorial (parcela agro / operação genérica).
+model NexusOpsUnit {
+  id        String            @id @default(cuid())
+  companyId String
+  sectorId  String
+  /// parcel | herd | flock | hive | lot | generic
+  kind      String            @default("generic")
+  name      String
+  areaHa    Float?
+  /// Cabeças / aves / colmeias / capacidade — conforme o módulo.
+  qty       Float?
+  crop      String?
+  notes     String?
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  company   Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  entries   NexusFieldEntry[]
+  sensors   NexusSensor[]
+  readings  NexusReading[]
+
+  @@index([companyId, isActive])
+  @@index([companyId, sectorId])
+}
+
+/// Linha do caderno de campo / diário operativo.
+model NexusFieldEntry {
+  id           String        @id @default(cuid())
+  companyId    String
+  unitId       String?
+  /// planting | input | irrigation | pest | harvest | observation | visit | note
+  kind         String
+  occurredAt   DateTime
+  payloadJson  Json
+  authorUserId String
+  engagementId String?
+  taskId       String?
+  createdAt    DateTime      @default(now())
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  unit         NexusOpsUnit? @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  author       User          @relation("NexusFieldEntryAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, occurredAt])
+  @@index([unitId, occurredAt])
+  @@index([engagementId])
+}
+
+/// Sensor registado na exploração (token de ingest em hash).
+model NexusSensor {
+  id         String         @id @default(cuid())
+  companyId  String
+  unitId     String?
+  name       String
+  metric     String
+  tokenHash  String         @unique
+  lastSeenAt DateTime?
+  isActive   Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  company    Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  unit       NexusOpsUnit?  @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  readings   NexusReading[]
+
+  @@index([companyId, isActive])
+  @@index([unitId])
+}
+
+/// Leitura manual, de sensor ou ingest HTTP.
+model NexusReading {
+  id         String        @id @default(cuid())
+  companyId  String
+  sensorId   String?
+  unitId     String?
+  metric     String
+  value      Float
+  unit       String
+  /// manual | sensor | http
+  source     String
+  recordedAt DateTime
+  createdAt  DateTime      @default(now())
+  company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sensor     NexusSensor?  @relation(fields: [sensorId], references: [id], onDelete: SetNull)
+  opsUnit    NexusOpsUnit? @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, recordedAt])
+  @@index([sensorId, recordedAt])
+  @@index([unitId, recordedAt])
 }
 
 model MuseSuggestion {

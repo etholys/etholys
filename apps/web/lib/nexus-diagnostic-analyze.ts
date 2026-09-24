@@ -6,6 +6,15 @@ import {
   listDiagnosticQuestions,
 } from './nexus-sector-diagnostic';
 import type { IncubationProgram } from './nexus-incubation-program';
+import type { VentureStageId } from './nexus-venture';
+import {
+  buildInterventionNarrative,
+  buildStrategicDraft,
+  buildTechnicalBrief,
+  type InterventionNarrative,
+  type StrategicDraft,
+  type TechnicalBrief,
+} from './nexus-diagnostic-brief';
 
 export type DiagnosticAnalyzeInput = {
   sectorId: string;
@@ -33,6 +42,11 @@ export type DiagnosticAnalyzeResult = {
   potentials: FullDiagnosticResult['potentials'];
   pillarScores: FullDiagnosticResult['pillarScores'];
   aiUsed: boolean;
+  /** Fase da jornada inferida — não escolhida pelo utilizador */
+  inferredStage: VentureStageId;
+  technicalBrief: TechnicalBrief;
+  intervention: InterventionNarrative;
+  strategicDraft: StrategicDraft;
 };
 
 function truncate(s: string, max: number): string {
@@ -41,45 +55,70 @@ function truncate(s: string, max: number): string {
   return `${t.slice(0, max - 1).trim()}…`;
 }
 
+function isEarlyVenture(answerIds?: Record<string, string>): boolean {
+  const stage = answerIds?.core_stage;
+  return stage === 'idea' || stage === 'surviving';
+}
+
+function attachBrief(
+  base: Omit<DiagnosticAnalyzeResult, 'inferredStage' | 'technicalBrief' | 'intervention' | 'strategicDraft'>,
+  sectorId: string,
+  answerIds: Record<string, string>,
+  locale: DxLocale
+): DiagnosticAnalyzeResult {
+  const technicalBrief = buildTechnicalBrief(sectorId, base.computed, answerIds, locale);
+  const intervention = buildInterventionNarrative(technicalBrief, locale);
+  const strategicDraft = buildStrategicDraft(technicalBrief, locale);
+  return {
+    ...base,
+    inferredStage: technicalBrief.inferredStage,
+    technicalBrief,
+    intervention,
+    strategicDraft,
+  };
+}
+
 /** Deterministic analysis (no LLM) — exported for tests. */
 export function fallbackAnalyze(input: DiagnosticAnalyzeInput): DiagnosticAnalyzeResult {
   const answerIds = input.answerIds || buildAnswerIdsFromPayload(input.answers);
   const questions = listDiagnosticQuestions(input.sectorId, input.program);
   const computed = computeFullDiagnosticResult(input.sectorId, questions, answerIds, input.locale);
   const weak = computed.weaknesses.map((w) => w.label);
+  const early = isEarlyVenture(answerIds);
 
   const summary =
-    input.locale === 'es'
-      ? `Score ${computed.overall}/100 en ${computed.sectorName}. Priorizar: ${weak.slice(0, 2).join(' · ') || 'consolidar operación'}.`
-      : input.locale === 'pt'
-        ? `Score ${computed.overall}/100 em ${computed.sectorName}. Priorizar: ${weak.slice(0, 2).join(' · ') || 'consolidar operação'}.`
-        : `Score ${computed.overall}/100 in ${computed.sectorName}. Prioritize: ${weak.slice(0, 2).join(' · ') || 'core operations'}.`;
+    early
+      ? input.locale === 'es'
+        ? `Score ${computed.overall}/100 en ${computed.sectorName} (fase de arranque). Priorizar bases: ${weak.slice(0, 2).join(' · ') || 'modelo, caja y primeros clientes'}.`
+        : input.locale === 'pt'
+          ? `Score ${computed.overall}/100 em ${computed.sectorName} (fase de arranque). Priorizar bases: ${weak.slice(0, 2).join(' · ') || 'modelo, caixa e primeiros clientes'}.`
+          : `Score ${computed.overall}/100 in ${computed.sectorName} (startup phase). Prioritize basics: ${weak.slice(0, 2).join(' · ') || 'model, cash and first customers'}.`
+      : input.locale === 'es'
+        ? `Score ${computed.overall}/100 en ${computed.sectorName}. Priorizar: ${weak.slice(0, 2).join(' · ') || 'consolidar operación'}.`
+        : input.locale === 'pt'
+          ? `Score ${computed.overall}/100 em ${computed.sectorName}. Priorizar: ${weak.slice(0, 2).join(' · ') || 'consolidar operação'}.`
+          : `Score ${computed.overall}/100 in ${computed.sectorName}. Prioritize: ${weak.slice(0, 2).join(' · ') || 'core operations'}.`;
 
-  const needsExtension =
-    !input.finalize && computed.overall < 62 && computed.weaknesses.length >= 3 && input.answers.length < 35;
+  /** Extensão subjetiva («por qué no hace X») añade poco y castiga arranques — desligada no fallback. */
+  const needsExtension = false;
 
-  return {
-    summary: truncate(summary, 280),
-    priorities: weak.slice(0, 12),
-    needsExtension,
-    extensionQuestions: needsExtension
-      ? computed.weaknesses.slice(0, 3).map((w, i) => ({
-          id: `ext_${i}`,
-          prompt:
-            input.locale === 'es'
-              ? `¿Qué impide mejorar: ${w.label.slice(0, 90)}?`
-              : input.locale === 'pt'
-                ? `O que impede melhorar: ${w.label.slice(0, 90)}?`
-                : `What blocks improvement on: ${w.label.slice(0, 90)}?`,
-        }))
-      : [],
-    computed,
-    strengths: computed.strengths,
-    weaknesses: computed.weaknesses,
-    potentials: computed.potentials,
-    pillarScores: computed.pillarScores,
-    aiUsed: false,
-  };
+  return attachBrief(
+    {
+      summary: truncate(summary, 280),
+      priorities: weak.slice(0, 12),
+      needsExtension,
+      extensionQuestions: [],
+      computed,
+      strengths: computed.strengths,
+      weaknesses: computed.weaknesses,
+      potentials: computed.potentials,
+      pillarScores: computed.pillarScores,
+      aiUsed: false,
+    },
+    input.sectorId,
+    answerIds,
+    input.locale
+  );
 }
 
 function buildAnswerIdsFromPayload(
@@ -124,16 +163,18 @@ Idioma de salida: ${lang}.
 REGRAS ESTRICTAS:
 - summary: MÁXIMO 240 caracteres, 2 frases.
 - priorities: MÁXIMO 12 strings, cada una MÁXIMO 80 caracteres.
-- extensionQuestions: SOLO si faltan datos críticos tras las respuestas. MÁXIMO 2 preguntas. Cada prompt MÁXIMO 100 caracteres.
-- Si finalize=true O las respuestas son suficientes: needsExtension=false y extensionQuestions=[].
-- NO repitas preguntas ya respondidas. NO escribas párrafos largos.
+- Si el negocio está en arranque / nuevo modelo: NO asumas procesos ya existentes; habla de bases a construir.
+- needsExtension: casi siempre false. Solo true si falta UN dato factual crítico (número, canal, permiso). NUNCA preguntes «por qué no hace X».
+- Máximo 1 extensionQuestion si needsExtension=true. Prompt MÁXIMO 100 caracteres.
+- Si finalize=true O ya hay ≥12 respuestas: needsExtension=false y extensionQuestions=[].
 
 Schema:
-{"summary":"...","priorities":["..."],"needsExtension":false,"extensionQuestions":[{"id":"ext_0","prompt":"...","help":"..."}]}`;
+{"summary":"...","priorities":["..."],"needsExtension":false,"extensionQuestions":[]} `;
 
   const user = JSON.stringify({
     sectorId: input.sectorId,
     finalize: input.finalize ?? false,
+    earlyVenture: isEarlyVenture(input.answerIds),
     answers: input.answers,
     deterministicScore: fallback.computed.overall,
   });
@@ -153,29 +194,41 @@ Schema:
     const questions = listDiagnosticQuestions(input.sectorId, input.program);
     const computed = computeFullDiagnosticResult(input.sectorId, questions, answerIds, input.locale);
 
-    return {
-      summary: truncate(String(parsed.summary), 280),
-      priorities: (parsed.priorities || computed.weaknesses.map((w) => w.label))
-        .slice(0, 12)
-        .map((p) => truncate(String(p), 80)),
-      needsExtension: input.finalize ? false : Boolean(parsed.needsExtension),
-      extensionQuestions: input.finalize
-        ? []
-        : (parsed.extensionQuestions || [])
-            .slice(0, 3)
-            .map((q, i) => ({
-              id: String(q.id || `ext_${i}`),
-              prompt: truncate(String(q.prompt || ''), 120),
-              help: q.help ? truncate(String(q.help), 80) : undefined,
-            }))
-            .filter((q) => q.prompt.length >= 8),
-      computed,
-      strengths: computed.strengths,
-      weaknesses: computed.weaknesses,
-      potentials: computed.potentials,
-      pillarScores: computed.pillarScores,
-      aiUsed: true,
-    };
+    const early = isEarlyVenture(answerIds);
+    const allowExt =
+      !input.finalize &&
+      !early &&
+      input.answers.length < 12 &&
+      Boolean(parsed.needsExtension);
+
+    return attachBrief(
+      {
+        summary: truncate(String(parsed.summary), 280),
+        priorities: (parsed.priorities || computed.weaknesses.map((w) => w.label))
+          .slice(0, 12)
+          .map((p) => truncate(String(p), 80)),
+        needsExtension: allowExt,
+        extensionQuestions: allowExt
+          ? (parsed.extensionQuestions || [])
+              .slice(0, 1)
+              .map((q, i) => ({
+                id: String(q.id || `ext_${i}`),
+                prompt: truncate(String(q.prompt || ''), 120),
+                help: q.help ? truncate(String(q.help), 80) : undefined,
+              }))
+              .filter((q) => q.prompt.length >= 8)
+          : [],
+        computed,
+        strengths: computed.strengths,
+        weaknesses: computed.weaknesses,
+        potentials: computed.potentials,
+        pillarScores: computed.pillarScores,
+        aiUsed: true,
+      },
+      input.sectorId,
+      answerIds,
+      input.locale
+    );
   } catch {
     return fallback;
   }

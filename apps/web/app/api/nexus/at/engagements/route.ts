@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import {
   engagementCompanyIds,
+  isAtDeliveryModel,
   isAtEngagementKind,
   listEngagementsForTenant,
   validateEngagementSiep,
@@ -41,6 +42,11 @@ export async function POST(req: NextRequest) {
   if (!isAtEngagementKind(kindRaw)) {
     return NextResponse.json({ error: 'Tipo inválido (CONTRACT | PROJECT | PROGRAM).' }, { status: 400 });
   }
+
+  const deliveryRaw = String(body.deliveryModel || 'MULTI').trim().toUpperCase();
+  const deliveryModel = isAtDeliveryModel(deliveryRaw) ? deliveryRaw : 'MULTI';
+  /** Coletivo ≈ projeto de rede/cooperativa no tipo comercial */
+  const kindResolved = deliveryModel === 'COLLECTIVE' && kindRaw === 'CONTRACT' ? 'PROJECT' : kindRaw;
 
   const operatorCompanyId = String(body.operatorCompanyId || '').trim() || tenant.companyIds[0] || '';
   if (!operatorCompanyId || !tenant.companyIds.includes(operatorCompanyId)) {
@@ -189,7 +195,8 @@ export async function POST(req: NextRequest) {
   const engagement = await prisma.nexusAtEngagement.create({
     data: {
       title: title.slice(0, 200),
-      kind: kindRaw,
+      kind: kindResolved,
+      deliveryModel,
       status: 'ACTIVE',
       operatorCompanyId,
       sponsorCompanyId,

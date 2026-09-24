@@ -6,6 +6,48 @@
 export const AT_ENGAGEMENT_KINDS = ['CONTRACT', 'PROJECT', 'PROGRAM'] as const;
 export type AtEngagementKind = (typeof AT_ENGAGEMENT_KINDS)[number];
 
+/** Como se presta a AT neste marco legal */
+export const AT_DELIVERY_MODELS = ['SINGLE', 'MULTI', 'COLLECTIVE'] as const;
+export type AtDeliveryModel = (typeof AT_DELIVERY_MODELS)[number];
+
+export const AT_DELIVERY_MODEL_LABELS: Record<
+  AtDeliveryModel,
+  { es: string; pt: string; en: string; hint: { es: string; pt: string; en: string } }
+> = {
+  SINGLE: {
+    es: 'Un emprendimiento',
+    pt: 'Um empreendimento',
+    en: 'Single enterprise',
+    hint: {
+      es: 'Una sola MIPYME atendida; sector y temática se definen en su ficha.',
+      pt: 'Uma só MIPYME atendida; setor e temática definem-se na ficha dela.',
+      en: 'One assisted MSME; sector/theme set on its profile.',
+    },
+  },
+  MULTI: {
+    es: 'Varios emprendimientos',
+    pt: 'Vários empreendimentos',
+    en: 'Multiple enterprises',
+    hint: {
+      es: 'Cada empresa tiene su propio proceso y sector (ej. horta vs gallinas).',
+      pt: 'Cada empresa tem o seu processo e setor (ex. horta vs galinhas).',
+      en: 'Each firm has its own process and sector (e.g. garden vs poultry).',
+    },
+  },
+  COLLECTIVE: {
+    es: 'Proyecto colectivo (red / cooperativa)',
+    pt: 'Projeto coletivo (rede / cooperativa)',
+    en: 'Collective project (network / co-op)',
+    hint: {
+      es: 'Empresa principal + filiales. El foco es el producto/red colectiva; no todas reciben el mismo nivel de AT.',
+      pt: 'Empresa principal + filhas. O foco é o produto/rede coletiva; nem todas recebem o mesmo nível de AT.',
+      en: 'Principal + affiliates. Focus is collective product/network; AT intensity may differ.',
+    },
+  },
+};
+
+export const AT_ATTENDED_MEMBER_ROLES = ['client', 'principal', 'affiliate'] as const;
+
 export const AT_ENGAGEMENT_STATUSES = ['OPEN', 'ACTIVE', 'ON_HOLD', 'CLOSED'] as const;
 export type AtEngagementStatus = (typeof AT_ENGAGEMENT_STATUSES)[number];
 
@@ -26,6 +68,14 @@ export const AT_OPEN_STATUSES = ['TODO', 'IN_PROGRESS', 'IN_REVIEW'] as const;
 
 export function isAtEngagementKind(v: string): v is AtEngagementKind {
   return (AT_ENGAGEMENT_KINDS as readonly string[]).includes(v);
+}
+
+export function isAtDeliveryModel(v: string): v is AtDeliveryModel {
+  return (AT_DELIVERY_MODELS as readonly string[]).includes(v);
+}
+
+export function isAttendedMemberRole(role: string): boolean {
+  return (AT_ATTENDED_MEMBER_ROLES as readonly string[]).includes(role);
 }
 
 export function isAtEngagementStatus(v: string): v is AtEngagementStatus {
@@ -90,7 +140,7 @@ export function engagementCompanyIds(engagement: {
 
 /** Empresas beneficiárias (trabalho AT) — não inclui operador nem contratante. */
 export function clientCompanyIds(engagement: { members: { companyId: string; memberRole: string }[] }): string[] {
-  return engagement.members.filter((m) => m.memberRole === 'client').map((m) => m.companyId);
+  return engagement.members.filter((m) => isAttendedMemberRole(m.memberRole)).map((m) => m.companyId);
 }
 
 export function userIsOperator(engagement: { operatorCompanyId: string }, tenantCompanyIds: string[]): boolean {

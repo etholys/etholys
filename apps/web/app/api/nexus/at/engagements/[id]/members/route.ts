@@ -5,6 +5,10 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { loadEngagementForTenant, userIsOperator } from '@/lib/nexus-at';
 
+import { emptyContextSetup } from '@/lib/company-context-setup';
+import { normalizeSectorIdList } from '@/lib/nexus-economic-sectors';
+import { isAttendedMemberRole } from '@/lib/nexus-at-shared';
+
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, ctx: Ctx) {
@@ -26,6 +30,25 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   }
 
   let companyId = String(body.companyId || '').trim();
+  const sectorIds = normalizeSectorIdList({
+    sectorIds: body.sectorIds,
+    sectorId: body.sectorId,
+  });
+  if (sectorIds.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          'Temática / setor do empreendimento é obrigatória ao adicionar a empresa (podes marcar várias, ex. horta + aves).',
+      },
+      { status: 400 }
+    );
+  }
+
+  const sectorContext = {
+    ...emptyContextSetup(),
+    sectorIds,
+    sectorId: sectorIds[0],
+  };
 
   // Criar ficha de cliente no momento (empresa diferente, mesmo serviço/contrato).
   if (!companyId && body.name) {
@@ -44,7 +67,12 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         .slice(0, 12) ||
       name.slice(0, 12);
     const created = await prisma.company.create({
-      data: { name, shortName, color: '#6366F1' },
+      data: {
+        name,
+        shortName,
+        color: '#6366F1',
+        contextSetupJson: sectorContext,
+      },
       select: { id: true },
     });
     companyId = created.id;
@@ -56,7 +84,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   const company = await prisma.company.findFirst({
     where: { id: companyId, isActive: true },
-    select: { id: true },
+    select: { id: true, contextSetupJson: true },
   });
   if (!company) {
     return NextResponse.json({ error: 'Empresa não encontrada.' }, { status: 404 });
@@ -66,15 +94,35 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: 'Empresa já está no serviço.' }, { status: 409 });
   }
 
-  const memberRole =
-    companyId === engagement.operatorCompanyId ? 'operator' : String(body.memberRole || 'client').trim() || 'client';
+  const prev =
+    company.contextSetupJson && typeof company.contextSetupJson === 'object'
+      ? (company.contextSetupJson as Record<string, unknown>)
+      : {};
+  await prisma.company.update({
+    where: { id: companyId },
+    data: {
+      contextSetupJson: {
+        ...emptyContextSetup(),
+        ...prev,
+        v: 1,
+        sectorIds,
+        sectorId: sectorIds[0],
+      },
+    },
+  });
+
+  const roleRaw = String(body.memberRole || 'client').trim().toLowerCase();
+  let memberRole = 'client';
+  if (companyId === engagement.operatorCompanyId) memberRole = 'operator';
+  else if (roleRaw === 'principal' || roleRaw === 'affiliate' || roleRaw === 'client') memberRole = roleRaw;
+  else if (isAttendedMemberRole(roleRaw)) memberRole = roleRaw;
 
   const maxSort = engagement.members.reduce((acc, m) => Math.max(acc, m.sortOrder), 0);
   const member = await prisma.nexusAtEngagementMember.create({
     data: {
       engagementId: engagement.id,
       companyId,
-      memberRole: memberRole === 'operator' ? 'operator' : 'client',
+      memberRole,
       notes: body.notes ? String(body.notes).trim().slice(0, 500) : null,
       sortOrder: maxSort + 1,
     },
@@ -86,7 +134,10 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     data: { updatedAt: new Date() },
   });
 
-  return NextResponse.json({ ok: true, member }, { status: 201 });
+  return NextResponse.json(
+    { ok: true, member, sectorId: sectorIds[0], sectorIds },
+    { status: 201 }
+  );
 }
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {

@@ -58,6 +58,8 @@ const NEXUS_GROUP_ROUTES: Record<string, string[]> = {
     '/hub/nexus/coach',
     '/hub/nexus/diagnosis',
     '/hub/nexus/roadmap',
+    '/hub/nexus/campo',
+    '/hub/nexus/monitor',
   ],
   /** Prestação de AT a outras MIPYMEs: serviços → projetos → empresas */
   deliver: ['/hub/nexus/at', '/hub/nexus/networks', '/hub/nexus/services'],
@@ -103,7 +105,11 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
 
   /** Diagnóstico AT de uma MIPYME cliente — ≠ percurso da empresa operadora no seletor */
   const isAtClientDiagnosis =
-    Boolean(pathname?.startsWith('/hub/nexus/diagnosis')) &&
+    Boolean(
+      pathname?.startsWith('/hub/nexus/diagnosis') ||
+        pathname?.startsWith('/hub/nexus/campo') ||
+        pathname?.startsWith('/hub/nexus/monitor')
+    ) &&
     Boolean(atSubjectCompanyId) &&
     atSubjectCompanyId !== activeCompanyId;
 
@@ -248,7 +254,17 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
         {
           href: withNet('/hub/nexus/roadmap'),
           icon: Route,
-          label: locale === 'es' ? 'Ruta viva' : locale === 'pt' ? 'Rota viva' : 'Live roadmap',
+          label: locale === 'es' ? 'Plan' : locale === 'pt' ? 'Plano' : 'Plan',
+        },
+        {
+          href: withNet('/hub/nexus/campo'),
+          icon: ClipboardCheck,
+          label: locale === 'es' ? 'Cuaderno' : locale === 'pt' ? 'Caderno' : 'Field book',
+        },
+        {
+          href: withNet('/hub/nexus/monitor'),
+          icon: BarChart3,
+          label: locale === 'es' ? 'Monitoreo' : locale === 'pt' ? 'Monitorização' : 'Monitoring',
         },
       ],
     },
@@ -353,7 +369,9 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
     const path = href.split('?')[0];
     // Diagnóstico AT de cliente não é o "Diagnóstico" da empresa operadora
     if (isAtClientDiagnosis) {
-      if (path === '/hub/nexus/diagnosis') return false;
+      if (path === '/hub/nexus/diagnosis' || path === '/hub/nexus/campo' || path === '/hub/nexus/monitor') {
+        return pathname === path || pathname?.startsWith(`${path}/`);
+      }
       if (path === '/hub/nexus/at') return true;
     }
     if (path === '/hub/nexus' || path === '/hub/nexus/') {

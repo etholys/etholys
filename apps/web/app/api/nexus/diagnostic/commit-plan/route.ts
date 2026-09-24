@@ -6,7 +6,7 @@ import { getUserCompanyIds } from '@/lib/tenant';
 import { loadNetworkForTenant, memberCompanyIds } from '@/lib/nexus-network';
 import { normalizeProgram } from '@/lib/nexus-incubation-program';
 import { safeVentureStage } from '@/lib/nexus-guides';
-import { buildAtCaseTags, isAtCaseKind, loadEngagementForTenant } from '@/lib/nexus-at';
+import { buildAtCaseTags, canAccessAtClientCompany, isAtCaseKind, loadEngagementForTenant } from '@/lib/nexus-at';
 import type { IncubationProgram } from '@/lib/nexus-incubation-program';
 import type { DevelopmentLayer, StrategicPlanOutline } from '@/lib/nexus-incubation-workplan';
 import {
@@ -19,6 +19,7 @@ import {
   serializeIncubatorNotes,
   type IncubationDiagnosisSnapshot,
 } from '@/lib/nexus-incubation-run';
+import { persistNexusDiagnosis } from '@/lib/nexus-diagnosis-persist';
 
 type PlanItem = {
   id?: string;
@@ -38,6 +39,10 @@ const AT_KIND_MAP: Record<string, string> = {
   deliverable: 'deliverable',
   review: 'visit',
   training: 'training',
+  ops_unit: 'deliverable',
+  field_book: 'visit',
+  sensor: 'deliverable',
+  protocol: 'visit',
 };
 
 export async function POST(req: NextRequest) {
@@ -61,6 +66,7 @@ export async function POST(req: NextRequest) {
 
   const program = normalizeProgram(body.program as Partial<IncubationProgram>);
   const networkIdRaw = String(body.networkId || '').trim();
+  const atEngagementIdEarly = String(body.atEngagementId || program.atEngagementId || '').trim();
   let companyId = String(body.companyId || body.targetCompanyId || '').trim() || tenant.companyIds[0] || '';
   let tagSuffix = ',nexus:incubation';
 
@@ -74,11 +80,14 @@ export async function POST(req: NextRequest) {
     }
     companyId = target;
     tagSuffix += `,nexus:network:${networkIdRaw}`;
-  } else if (!companyId || !tenant.companyIds.includes(companyId)) {
-    return NextResponse.json({ error: 'Empresa inválida.' }, { status: 403 });
+  } else {
+    const allowed = await canAccessAtClientCompany(tenant.companyIds, companyId, atEngagementIdEarly || null);
+    if (!companyId || !allowed) {
+      return NextResponse.json({ error: 'Empresa inválida.' }, { status: 403 });
+    }
   }
 
-  const atEngagementId = String(body.atEngagementId || program.atEngagementId || '').trim();
+  const atEngagementId = atEngagementIdEarly;
   const atProjectId = String(body.atProjectId || program.atProjectId || '').trim();
   let siepProjectId = String(body.siepProjectId || program.siepProjectId || '').trim() || undefined;
 
@@ -180,6 +189,25 @@ export async function POST(req: NextRequest) {
 
   if (diagnosisIn?.sectorId) {
     run = recordDiagnosis(run, diagnosisIn);
+    try {
+      await persistNexusDiagnosis({
+        companyId,
+        createdByUserId: tenant.userId,
+        engagementId: atEngagementId || null,
+        sectorId: diagnosisIn.sectorId,
+        overall: diagnosisIn.overall,
+        scoresJson: {
+          strengths: diagnosisIn.strengths,
+          weaknesses: diagnosisIn.weaknesses,
+          potentials: diagnosisIn.potentials,
+          pillarScores: diagnosisIn.pillarScores,
+          summary: diagnosisIn.summary,
+        },
+        answersJson: { snapshotId: diagnosisIn.id, at: diagnosisIn.at },
+      });
+    } catch (e) {
+      console.error('[commit-plan] persist diagnosis', e);
+    }
   }
 
   const layerStates = layersFromWorkPlan(Array.isArray(layersIn) ? layersIn : []);

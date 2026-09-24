@@ -1,11 +1,10 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { BookOpen, ClipboardCheck, History, Route, Sparkles, Rocket } from 'lucide-react';
 import { useApp } from '@/app/providers';
-import { touchRunwayChapter } from '@/lib/nexus-runway';
 
 function NexusLibraryInner() {
   const { locale } = useApp();
@@ -13,10 +12,6 @@ function NexusLibraryInner() {
   const networkId = searchParams.get('network');
   const withNet = (href: string) =>
     networkId ? `${href.split('?')[0]}?network=${encodeURIComponent(networkId)}` : href;
-
-  useEffect(() => {
-    touchRunwayChapter('library');
-  }, []);
 
   const t = {
     title:

@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
 
   const questions = listDiagnosticQuestions(sectorId, program);
   const diagnostic = computeFullDiagnosticResult(sectorId, questions, answerIds, locale);
-  const plan = buildIncubationWorkPlan(program, diagnostic, locale);
+  const earlyVenture = answerIds.core_stage === 'idea' || answerIds.core_stage === 'surviving';
+  const plan = buildIncubationWorkPlan(program, diagnostic, locale, { earlyVenture });
 
   return NextResponse.json({ ok: true, diagnostic, ...plan, program });
 }
