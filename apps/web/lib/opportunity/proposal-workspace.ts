@@ -13,6 +13,7 @@ export type ProposalFundSeed = {
   institutionUrl?: string | null;
   documents?: Array<{ title: string; url: string; kind?: string }>;
   sourceExcerpt?: string | null;
+  basesText?: string | null;
   eligibilityCriteria?: string | null;
   whoCanApply?: string | null;
   eligibility?: string | null;
@@ -93,6 +94,7 @@ export function buildEditalSummaryFromSeed(seed: ProposalFundSeed): string {
         ? seed.documents.map((d) => `${d.title}: ${d.url}`).join('\n')
         : undefined,
     ],
+    ['Texto das bases', seed.basesText || seed.sourceExcerpt],
   ];
   return blocks
     .filter(([, value]) => Boolean(String(value ?? '').trim()))

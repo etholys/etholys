@@ -165,6 +165,7 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
       institutionUrl,
       documents,
       sourceExcerpt: clip(o.sourceExcerpt, 8000),
+      basesText: clip(o.basesText, 20000),
       evidence:
         parseCallEvidence(o.evidence) ??
         buildCallEvidence({ callUrl, linkOficial: links.linkOficial, sourceUrl: links.sourceUrl, documents }),

@@ -105,6 +105,8 @@ export type ScanCandidate = {
   documents?: CallDocument[];
   /** Texto extraído da página oficial — contexto para a IA. */
   sourceExcerpt?: string;
+  /** Texto das bases (PDFs/Word oficiais) — F4. */
+  basesText?: string;
   amount?: number;
   currency?: string;
   deadline?: string | null;

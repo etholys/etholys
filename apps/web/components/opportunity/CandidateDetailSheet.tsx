@@ -117,7 +117,26 @@ export function CandidateDetailSheet({
           body: JSON.stringify({ candidate: c, runId: runId ?? c.runId, tempId: c.tempId }),
         });
         const d = (await r.json()) as { candidate?: typeof c };
-        if (!cancelled && r.ok && d.candidate) setLive(d.candidate);
+        if (!cancelled && r.ok && d.candidate) {
+          setLive(d.candidate);
+          if ((d.candidate.documents?.length ?? 0) > 0) {
+            try {
+              const br = await fetch(q('/api/opportunity/candidates/bases'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  candidate: d.candidate,
+                  runId: runId ?? c.runId,
+                  tempId: c.tempId,
+                }),
+              });
+              const bd = (await br.json()) as { candidate?: typeof c };
+              if (!cancelled && br.ok && bd.candidate) setLive(bd.candidate);
+            } catch {
+              /* keep enriched candidate without bases text */
+            }
+          }
+        }
       } catch {
         /* keep the original candidate */
       } finally {
@@ -587,6 +606,7 @@ export function CandidateDetailSheet({
                     t('Somos elegíveis?', '¿Somos elegibles?', 'Are we eligible?'),
                     t('Riscos principais?', '¿Riesgos principales?', 'Main risks?'),
                     t('Como candidatar?', '¿Cómo postular?', 'How to apply?'),
+                    t('Ver bases — o que exigem?', 'Ver bases — ¿qué exigen?', 'See the call text — what do they require?'),
                   ] as string[]
                 ).map((qHint) => (
                   <button

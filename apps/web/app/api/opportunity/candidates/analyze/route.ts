@@ -42,6 +42,9 @@ function candidateBrief(c: ScanCandidate): string {
       ? `Documentos oficiais:\n${c.documents.map((d) => `- ${d.title}: ${d.url}`).join('\n')}`
       : '',
     c.sourceExcerpt ? `Excerto da página oficial:\n${c.sourceExcerpt.slice(0, 6000)}` : '',
+    c.basesText
+      ? `Texto extraído das bases oficiais (citar; não inventar o que não estiver aqui):\n${c.basesText.slice(0, 12000)}`
+      : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -65,7 +68,8 @@ export async function POST(req: NextRequest) {
   const mode = body.mode === 'brief' ? 'brief' : 'chat';
   const system = `És um analista sénior de captação de fundos (FundHub / Etholys).
 Responde em português (ou no idioma da pergunta do utilizador).
-Baseia-te nos dados do candidato, na página da convocatória e nos documentos oficiais listados.
+Baseia-te nos dados do candidato, na página da convocatória, nos documentos oficiais e no texto extraído das bases.
+Se o utilizador pedir para ver as bases, cita só o texto extraído.
 Se não houver página/documentos oficiais, diz que a oportunidade pode ser genérica ou não verificada.
 Não inventes deadlines, montantes, elegibilidade nem anexos.
 Quando útil, sugere perguntas a verificar no site oficial e riscos (contrapartida, elegibilidade, timeline).

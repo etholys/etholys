@@ -145,7 +145,7 @@ Verde / âmbar / vermelho. «Não somos elegíveis» → `not_now` + aprendizage
 
 Filtro ou colunas: **Decidir / Preparar / Submetido / Fechado**. Prazo no card. Default ao guardar: `decide`. Sem menu novo.
 
-### F4 — Proposta a partir das bases
+### F4 — Proposta a partir das bases (em implementação)
 
 Extrair texto dos PDFs oficiais (já listados) → `sourceExcerpt` longo por documento → secções do editor + chat com «ver bases». Sem inventar requisitos em falta.
 
