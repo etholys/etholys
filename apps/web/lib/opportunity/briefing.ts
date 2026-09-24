@@ -32,7 +32,7 @@ export async function readOpportunityBriefing(companyId: string): Promise<Opport
     prisma.fundingCaptureProfile.findUnique({ where: { companyId } }),
     prisma.company.findUnique({
       where: { id: companyId },
-      select: { businessActivity: true, incorporationCountry: true, description: true },
+      select: { businessActivity: true, incorporationCountry: true, description: true, entityType: true },
     }),
   ]);
 
@@ -68,6 +68,7 @@ export async function readOpportunityBriefing(companyId: string): Promise<Opport
       : undefined,
     privateEligible: prefs.privateEligible,
     reimbursable: prefs.reimbursable,
+    entityType: company?.entityType ?? undefined,
   };
 }
 

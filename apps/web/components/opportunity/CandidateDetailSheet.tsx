@@ -18,7 +18,7 @@ import {
 } from '@/lib/opportunity/call-evidence';
 import { buildCandidateWordHtml, downloadBlob } from '@/lib/opportunity/candidate-export';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
-import type { ScanCandidate } from '@/lib/opportunity/scan-types';
+import type { CandidateFit, FitItemStatus, ScanCandidate } from '@/lib/opportunity/scan-types';
 import {
   AlertTriangle,
   Bookmark,
@@ -87,6 +87,8 @@ export function CandidateDetailSheet({
   const [enriching, setEnriching] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [forceProposal, setForceProposal] = useState(false);
+  const [fit, setFit] = useState<CandidateFit | undefined>(c.fit);
+  const [fitLoading, setFitLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -97,6 +99,7 @@ export function CandidateDetailSheet({
     setRejectOpen(false);
     setDocsOpen(false);
     setForceProposal(false);
+    setFit(c.fit);
     setLive(c);
   }, [open, c.tempId, initialTab, c]);
 
@@ -125,6 +128,34 @@ export function CandidateDetailSheet({
       cancelled = true;
     };
     // q/companyId are stable enough for this sheet open
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, c.tempId, companyId, runId]);
+
+  useEffect(() => {
+    if (!open || !companyId) return;
+    let cancelled = false;
+    setFitLoading(true);
+    void (async () => {
+      try {
+        const r = await fetch(q('/api/opportunity/candidates/fit'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ candidate: c, runId: runId ?? c.runId, tempId: c.tempId }),
+        });
+        const d = (await r.json()) as { fit?: CandidateFit };
+        if (!cancelled && r.ok && d.fit) {
+          setFit(d.fit);
+          setLive((prev) => ({ ...prev, fit: d.fit }));
+        }
+      } catch {
+        /* keep existing fit */
+      } finally {
+        if (!cancelled) setFitLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, c.tempId, companyId, runId]);
 
@@ -374,6 +405,71 @@ export function CandidateDetailSheet({
                   </div>
                 )}
               </div>
+
+              {(fit || fitLoading) && (
+                <div className="rounded-lg border border-gray-100 bg-slate-50/80 px-3 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                      {t('Go / no-go', 'Go / no-go', 'Go / no-go')}
+                    </p>
+                    {fit && (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                          fit.verdict === 'go'
+                            ? 'bg-emerald-50 text-emerald-800'
+                            : fit.verdict === 'no_go'
+                              ? 'bg-red-50 text-red-800'
+                              : 'bg-amber-50 text-amber-900'
+                        }`}
+                      >
+                        {fit.verdict === 'go'
+                          ? t('Seguir', 'Seguir', 'Go')
+                          : fit.verdict === 'no_go'
+                            ? t('Não elegível', 'No elegible', 'No-go')
+                            : t('Rever', 'Revisar', 'Caution')}
+                      </span>
+                    )}
+                  </div>
+                  {fitLoading && !fit && (
+                    <p className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      {t('A comparar com o perfil…', 'Comparando con el perfil…', 'Checking against the profile…')}
+                    </p>
+                  )}
+                  {fit && (
+                    <ul className="mt-2 space-y-1.5">
+                      {fit.items.map((item) => (
+                        <li key={item.id} className="flex items-start gap-2 text-xs">
+                          <span
+                            className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${
+                              ({
+                                go: 'bg-emerald-500',
+                                caution: 'bg-amber-500',
+                                no_go: 'bg-red-500',
+                                unknown: 'bg-gray-300',
+                              } satisfies Record<FitItemStatus, string>)[item.status]
+                            }`}
+                          />
+                          <span>
+                            <span className="font-medium text-gray-800">{item.label}</span>
+                            {item.note ? <span className="text-gray-500"> — {item.note}</span> : null}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {fit?.verdict === 'no_go' && onFeedback && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => onFeedback('not_now', { reasons: ['not_eligible'] })}
+                      className="mt-3 inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100"
+                    >
+                      {t('Não somos elegíveis', 'No somos elegibles', 'We are not eligible')}
+                    </button>
+                  )}
+                </div>
+              )}
 
               {c.description && (
                 <div>

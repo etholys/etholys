@@ -133,7 +133,7 @@ ou `Não confirmado — sem página oficial da convocatória`
 - Proposta **não abre às cegas** se `status !== verified` (aviso + confirmação explícita)
 - Sem ecrã novo
 
-### F2 — Go / no-go
+### F2 — Go / no-go (em implementação)
 
 No mesmo popup, 5–8 critérios do `FundingCaptureProfile` + briefing:
 

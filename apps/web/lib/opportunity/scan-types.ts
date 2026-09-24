@@ -28,6 +28,8 @@ export type OpportunityBriefing = {
   privateEligible?: boolean;
   /** Preferir não reembolsável (grant). */
   reimbursable?: boolean;
+  /** Tipo societário da empresa (Company.entityType). */
+  entityType?: string;
 };
 
 export type ScanProfile = {
@@ -54,6 +56,25 @@ export type CallEvidence = {
   callUrl?: string;
   documentCount: number;
   httpOk?: boolean;
+};
+
+export const FIT_ITEM_STATUSES = ['go', 'caution', 'no_go', 'unknown'] as const;
+export type FitItemStatus = (typeof FIT_ITEM_STATUSES)[number];
+
+export const FIT_VERDICTS = ['go', 'caution', 'no_go'] as const;
+export type FitVerdict = (typeof FIT_VERDICTS)[number];
+
+export type FitItem = {
+  id: string;
+  label: string;
+  status: FitItemStatus;
+  note?: string;
+};
+
+export type CandidateFit = {
+  verdict: FitVerdict;
+  items: FitItem[];
+  evaluatedAt: string;
 };
 
 export type ScanCandidate = {
@@ -106,6 +127,8 @@ export type ScanCandidate = {
   runId?: string;
   /** F1 — verificação da página oficial. */
   evidence?: CallEvidence;
+  /** F2 — go/no-go contra o perfil. */
+  fit?: CandidateFit;
 };
 
 export type ScanResultsPayload = {

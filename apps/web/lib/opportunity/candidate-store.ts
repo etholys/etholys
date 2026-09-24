@@ -19,6 +19,7 @@ import {
   pickInstitutionUrl,
   pickOfficialCallUrl,
 } from '@/lib/opportunity/call-evidence';
+import { parseCandidateFit } from '@/lib/opportunity/fit';
 
 export const SCAN_MEMORY_CATEGORY = 'opportunity_scan';
 
@@ -167,6 +168,7 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
       evidence:
         parseCallEvidence(o.evidence) ??
         buildCallEvidence({ callUrl, linkOficial: links.linkOficial, sourceUrl: links.sourceUrl, documents }),
+      fit: parseCandidateFit(o.fit),
       amount: typeof o.amount === 'number' ? o.amount : undefined,
       currency: typeof o.currency === 'string' ? o.currency.slice(0, 8) : 'USD',
       deadline: closesAt,
