@@ -535,3 +535,27 @@
   background-color: #f59e0b !important;
   color: #111827 !important;
 }
+
+.etholys-fundhub .fh-pane-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(248, 250, 252, 0.28) transparent;
+}
+
+.etholys-fundhub .fh-pane-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.etholys-fundhub .fh-pane-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.etholys-fundhub .fh-pane-scroll::-webkit-scrollbar-thumb {
+  background: rgba(248, 250, 252, 0.28);
+  border-radius: 999px;
+}
+
+.etholys-fundhub .fh-pane-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(248, 250, 252, 0.45);
+}

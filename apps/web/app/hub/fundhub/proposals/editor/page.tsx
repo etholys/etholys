@@ -549,7 +549,7 @@ export default function FundHubProposalEditorPage() {
   }, [fund]);
 
   return (
-    <div className="flex min-h-[calc(100vh-6rem)] flex-col gap-3">
+    <div className="flex flex-col gap-3">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <Link href="/hub/fundhub/proposals" className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
@@ -689,8 +689,8 @@ export default function FundHubProposalEditorPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-amber-600" />
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.2fr)]">
-          <section className="flex min-h-[28rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white">
+        <div className="grid min-h-0 gap-3 lg:h-[calc(100dvh-11rem)] lg:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.2fr)]">
+          <section className="flex h-[70vh] min-h-[22rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white lg:h-full">
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
               <p className="text-sm font-semibold text-gray-900">Chat</p>
               <button
@@ -703,7 +703,7 @@ export default function FundHubProposalEditorPage() {
                 Estrutura
               </button>
             </div>
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+            <div className="fh-pane-scroll min-h-0 flex-1 space-y-3 px-4 py-3">
               {brainstorming && chatMessages.length === 0 && (
                 <div className="rounded-xl bg-amber-500/15 px-3 py-3 text-sm text-amber-100">
                   <p className="flex items-center gap-2 font-medium text-amber-100">
@@ -775,7 +775,7 @@ export default function FundHubProposalEditorPage() {
             </form>
           </section>
 
-          <section className="flex min-h-[28rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white">
+          <section className="flex h-[70vh] min-h-[22rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white lg:h-full">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
               <p className="text-sm font-semibold text-gray-900">Documento</p>
               <div className="flex items-center gap-2">
@@ -829,11 +829,11 @@ export default function FundHubProposalEditorPage() {
                   setDocumentMarkdown(e.target.value);
                   setDraftSaved(false);
                 }}
-                className="min-h-0 flex-1 resize-none border-0 px-4 py-3 font-mono text-sm leading-relaxed text-gray-900 outline-none"
+                className="fh-pane-scroll min-h-0 flex-1 resize-none border-0 px-4 py-3 font-mono text-sm leading-relaxed text-gray-900 outline-none"
                 placeholder="O documento abre aqui. A chuva de ideias entra na secção Ideia geral."
               />
             ) : (
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              <div className="fh-pane-scroll min-h-0 flex-1 px-5 py-4">
                 <StudioMarkdown text={documentMarkdown} emptyHint="Documento vazio." />
               </div>
             )}
