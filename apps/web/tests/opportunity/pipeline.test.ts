@@ -21,6 +21,18 @@ test('write then parse keeps pipeline and other notes', () => {
   assert.equal(parseFundHubMeta(next).watchOpen, true);
 });
 
+test('dossier survives a later pipeline patch', () => {
+  const first = writeFundHubMeta('', {
+    pipelineStatus: 'decide',
+    dossier: { callUrl: 'https://www.ande.org.uy/convocatorias/x', basesText: 'Elegíveis: cooperativas.' },
+  });
+  const second = writeFundHubMeta(first, { pipelineStatus: 'prepare' });
+  const meta = parseFundHubMeta(second);
+  assert.equal(meta.pipelineStatus, 'prepare');
+  assert.equal(meta.dossier?.callUrl, 'https://www.ande.org.uy/convocatorias/x');
+  assert.match(meta.dossier?.basesText ?? '', /cooperativas/);
+});
+
 test('closed filter groups won and lost', () => {
   assert.equal(pipelineFilterMatch('won', 'closed'), true);
   assert.equal(pipelineFilterMatch('lost', 'closed'), true);

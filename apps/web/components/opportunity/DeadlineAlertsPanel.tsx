@@ -21,6 +21,13 @@ type RollingFund = {
   type: string;
 };
 
+type WatchedFund = {
+  fundId: string;
+  name: string;
+  institution: string;
+  status: string;
+};
+
 type Props = {
   /** `button` — chip compacto; `inline` — botão na barra de acções */
   variant?: 'button' | 'inline';
@@ -39,6 +46,7 @@ export function DeadlineAlertsPanel({ variant = 'button', className }: Props) {
 
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [rolling, setRolling] = useState<RollingFund[]>([]);
+  const [watched, setWatched] = useState<WatchedFund[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
 
@@ -51,10 +59,15 @@ export function DeadlineAlertsPanel({ variant = 'button', className }: Props) {
     try {
       await fetch(q('/api/opportunity/alerts'), { method: 'POST' });
       const r = await fetch(q('/api/opportunity/alerts?days=30'), { cache: 'no-store' });
-      const d = (await r.json()) as { deadlines?: Deadline[]; rolling?: RollingFund[] };
+      const d = (await r.json()) as {
+        deadlines?: Deadline[];
+        rolling?: RollingFund[];
+        watched?: WatchedFund[];
+      };
       if (r.ok) {
         setDeadlines(d.deadlines ?? []);
         setRolling(d.rolling ?? []);
+        setWatched(d.watched ?? []);
       }
     } finally {
       setLoading(false);
@@ -65,7 +78,7 @@ export function DeadlineAlertsPanel({ variant = 'button', className }: Props) {
     void load();
   }, [load]);
 
-  const total = deadlines.length + rolling.length;
+  const total = deadlines.length + rolling.length + watched.length;
   if (!companyId || loading || total === 0) return null;
 
   const urgent = deadlines.filter((i) => i.daysLeft <= 7);
@@ -153,6 +166,25 @@ export function DeadlineAlertsPanel({ variant = 'button', className }: Props) {
                       institution={item.institution}
                       badge={`${item.daysLeft}d`}
                       badgeClass="bg-orange-100 text-orange-800"
+                      onNavigate={() => setOpen(false)}
+                    />
+                  ))}
+                </TaskSection>
+              )}
+
+              {watched.length > 0 && (
+                <TaskSection
+                  title={t('Relógio — avisar se abrir', 'Reloj — avisar si abre', 'Watch — alert if it opens')}
+                  accent="text-emerald-800"
+                >
+                  {watched.map((item) => (
+                    <TaskRow
+                      key={`watch-${item.fundId}`}
+                      href={`/hub/fundhub/discover/${item.fundId}`}
+                      name={item.name}
+                      institution={item.institution}
+                      badge={item.status === 'open' ? t('Aberto', 'Abierto', 'Open') : t('À espera', 'En espera', 'Waiting')}
+                      badgeClass="bg-emerald-50 text-emerald-800"
                       onNavigate={() => setOpen(false)}
                     />
                   ))}

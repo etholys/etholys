@@ -2,7 +2,7 @@
 
 **Versão:** 1.0  
 **Data:** 2026-09-24  
-**Status:** F0 em produção; F1–F9 no código (F1 a entrar em produção; F2–F9 no mesmo ramo)  
+**Status:** F0–F9 em produção (`289e191`); expediente (docs/bases/fit) persiste no Fund ao guardar  
 **Público:** product, desenvolvedores, agentes de IA  
 **Licença interna:** `FUNDHUB` (`sys.FUNDHUB`)  
 **Entrada para agentes:** [AGENTS.md](../../AGENTS.md) → este ficheiro.

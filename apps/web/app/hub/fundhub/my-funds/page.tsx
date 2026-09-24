@@ -253,8 +253,22 @@ export default function OpportunitiesPage() {
                         {pipelineLabel(f.pipelineStatus ?? 'decide', locale)}
                       </span>
                     </div>
-                    <h3 className="mt-2 font-semibold text-gray-900">{f.name}</h3>
-                    <p className="text-sm text-gray-600">{f.institution}</p>
+                    <div className="mt-2 flex items-start gap-2">
+                      {f.ownerUserId && (
+                        <span
+                          title={members.find((m) => m.id === f.ownerUserId)?.name || t('Dono', 'Dueño', 'Owner')}
+                          className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-900 text-[10px] font-bold text-white"
+                        >
+                          {(members.find((m) => m.id === f.ownerUserId)?.name || members.find((m) => m.id === f.ownerUserId)?.email || '?')
+                            .slice(0, 1)
+                            .toUpperCase()}
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-gray-900">{f.name}</h3>
+                        <p className="text-sm text-gray-600">{f.institution}</p>
+                      </div>
+                    </div>
                     <p className="mt-1 text-xs text-gray-500">
                       {f.countries || '—'}
                       {f.deadline

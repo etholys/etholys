@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { hydrateFundFromNotes } from '@/lib/opportunity/pipeline';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 
 export async function GET(
@@ -32,7 +33,7 @@ export async function GET(
 
     return NextResponse.json({
       fund: {
-        ...fund,
+        ...hydrateFundFromNotes(fund),
         userStatus: fund.userStatus[0] ?? null,
       },
     });

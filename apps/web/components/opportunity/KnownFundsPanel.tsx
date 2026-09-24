@@ -11,6 +11,7 @@ type KnownFund = {
   institution: string;
   linkOficial?: string | null;
   type: string;
+  watchOpen?: boolean;
 };
 
 export function KnownFundsPanel({ onAdded }: { onAdded?: () => void }) {
@@ -156,9 +157,27 @@ export function KnownFundsPanel({ onAdded }: { onAdded?: () => void }) {
       {recent.length > 0 && (
         <ul className="mt-4 space-y-1.5 border-t border-gray-100 pt-3">
           {recent.slice(0, 4).map((f) => (
-            <li key={f.id} className="text-xs">
-              <p className="truncate font-medium text-gray-800">{f.name}</p>
-              <p className="truncate text-gray-500">{f.institution}</p>
+            <li key={f.id} className="flex items-start justify-between gap-2 text-xs">
+              <div className="min-w-0">
+                <p className="truncate font-medium text-gray-800">{f.name}</p>
+                <p className="truncate text-gray-500">{f.institution}</p>
+              </div>
+              <label className="inline-flex shrink-0 items-center gap-1 text-[10px] text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={Boolean(f.watchOpen)}
+                  onChange={(e) => {
+                    const watchOpen = e.target.checked;
+                    setRecent((prev) => prev.map((item) => (item.id === f.id ? { ...item, watchOpen } : item)));
+                    void fetch(q('/api/opportunity/watch'), {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ fundId: f.id, watchOpen }),
+                    });
+                  }}
+                />
+                {t('Avisar se abrir', 'Avisar si abre', 'Watch')}
+              </label>
             </li>
           ))}
         </ul>

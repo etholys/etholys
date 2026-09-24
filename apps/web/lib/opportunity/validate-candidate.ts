@@ -16,7 +16,7 @@ import {
   type LikeReason,
   type RejectReason,
 } from '@/lib/opportunity/learning-feedback';
-import { pipelineOf, writeFundHubMeta } from '@/lib/opportunity/pipeline';
+import { dossierFromCandidate, pipelineOf, writeFundHubMeta } from '@/lib/opportunity/pipeline';
 
 function parseDeadline(raw: string | null | undefined): Date | null {
   if (!raw) return null;
@@ -49,7 +49,7 @@ export async function validateScanCandidate(opts: {
   let learning: LearningAction | undefined;
 
   if (action === 'save') {
-    fundId = await upsertFundFromCandidate(opts.companyId, candidate, opts.runId);
+    fundId = await upsertFundFromCandidate(opts.companyId, candidate, opts.runId, opts.userId);
     await prisma.userFundStatus.upsert({
       where: { fundId_userId: { fundId, userId: opts.userId } },
       update: { status: 'saved', notes: opts.note || 'Validado na varredura' },
@@ -119,6 +119,7 @@ async function upsertFundFromCandidate(
   companyId: string,
   c: ScanCandidate,
   runId: string,
+  ownerUserId?: string,
 ): Promise<string> {
   const existing = await prisma.fund.findFirst({
     where: {
@@ -169,6 +170,8 @@ async function upsertFundFromCandidate(
     eligibilityCriteria,
     notes: writeFundHubMeta(noteParts.length ? noteParts.join(' · ') : '', {
       pipelineStatus: existing ? pipelineOf(existing.notes) : 'decide',
+      ownerUserId: existing ? undefined : ownerUserId,
+      dossier: dossierFromCandidate(c),
     }),
     lastReviewedAt: new Date(),
   };
@@ -184,7 +187,7 @@ async function upsertFundFromCandidate(
       ...data,
       notes: writeFundHubMeta(
         [`Descoberto na varredura ${runId}`, ...noteParts].filter(Boolean).join(' · '),
-        { pipelineStatus: 'decide' },
+        { pipelineStatus: 'decide', dossier: dossierFromCandidate(c) },
       ),
     },
   });

@@ -204,5 +204,16 @@ export function seedDocumentMarkdown(seed: ProposalFundSeed, brainstorm?: string
   const idea = brainstorm?.trim()
     ? brainstorm.trim()
     : 'A IA está a preparar uma ideia geral para este fundo e o perfil da organização.';
-  return `# ${title}\n\n## Ideia geral\n\n${idea}\n\n## Rascunho\n\n`;
+  const eligibility = [seed.whoCanApply, seed.eligibility || seed.eligibilityCriteria, seed.requirements, seed.howToApply]
+    .filter((s) => Boolean(String(s ?? '').trim()))
+    .join('\n\n');
+  const bases = String(seed.basesText || seed.sourceExcerpt || '').trim();
+  const parts = [`# ${title}`, `## Ideia geral\n\n${idea}`];
+  if (eligibility) parts.push(`## Elegibilidade e requisitos\n\n${eligibility}`);
+  if (bases) {
+    const clip = bases.length > 4500 ? `${bases.slice(0, 4500).trim()}…` : bases;
+    parts.push(`## Bases oficiais (citar; não inventar)\n\n${clip}`);
+  }
+  parts.push('## Rascunho\n\n');
+  return parts.join('\n\n');
 }

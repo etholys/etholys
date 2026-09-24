@@ -6,10 +6,10 @@ import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import { isAggregatorFundingUrl, sanitizeFundingLinks } from '@/lib/opportunity/official-url';
 import { syncWindowOpenNotifications } from '@/lib/opportunity/deadline-alerts';
 import {
+  hydrateFundFromNotes,
   isPipelineStatus,
   parseFundHubMeta,
   pipelineFilterMatch,
-  pipelineOf,
   writeFundHubMeta,
   type PipelineStatus,
 } from '@/lib/opportunity/pipeline';
@@ -57,16 +57,10 @@ export async function GET(req: NextRequest) {
       : 'all';
 
   const mapped = raw
-    .map((f) => {
-      const meta = parseFundHubMeta(f.notes);
-      return {
-        ...f,
-        pipelineStatus: meta.pipelineStatus ?? pipelineOf(f.notes),
-        watchOpen: Boolean(meta.watchOpen),
-        ownerUserId: meta.ownerUserId ?? null,
-        userStatus: f.userStatus[0] ?? null,
-      };
-    })
+    .map((f) => ({
+      ...hydrateFundFromNotes(f),
+      userStatus: f.userStatus[0] ?? null,
+    }))
     .filter((f) => pipelineFilterMatch(f.pipelineStatus, pipelineFilter));
 
   const total = mapped.length;
@@ -179,6 +173,7 @@ async function createKnownFund(
       status: 'open',
       notes: writeFundHubMeta(data.notes?.slice(0, 500) ?? 'Importado manualmente pelo utilizador', {
         pipelineStatus: 'decide',
+        watchOpen: true,
       }),
       sourceOfInformation: 'known_by_user',
       lastReviewedAt: new Date(),

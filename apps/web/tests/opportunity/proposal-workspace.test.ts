@@ -98,6 +98,16 @@ test('seed document has ideia geral and rascunho', () => {
   assert.match(md, /## Ideia geral/);
   assert.match(md, /escolas rurais/);
   assert.match(md, /## Rascunho/);
+  assert.match(md, /## Elegibilidade e requisitos/);
+});
+
+test('seed document cites official bases when present', () => {
+  const md = seedDocumentMarkdown({
+    ...richFund,
+    basesText: '### Bases\nSó cooperativas rurais do Uruguai.',
+  });
+  assert.match(md, /## Bases oficiais/);
+  assert.match(md, /cooperativas rurais/);
 });
 
 test('sectionsFromMarkdown splits headings', () => {

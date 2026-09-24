@@ -20,6 +20,14 @@ export type RollingOpportunity = {
   type: string;
 };
 
+export type WatchedProgram = {
+  fundId: string;
+  name: string;
+  institution: string;
+  status: string;
+  watchOpen: true;
+};
+
 export async function getRollingOpportunities(companyId: string): Promise<RollingOpportunity[]> {
   const funds = await prisma.fund.findMany({
     where: {
@@ -80,6 +88,24 @@ export async function getUpcomingDeadlines(
       status: f.status,
     };
   });
+}
+
+export async function getWatchedPrograms(companyId: string): Promise<WatchedProgram[]> {
+  const funds = await prisma.fund.findMany({
+    where: { companyId, isActive: true },
+    orderBy: { updatedAt: 'desc' },
+    take: 80,
+    select: { id: true, name: true, institution: true, status: true, notes: true },
+  });
+  return funds
+    .filter((f) => /"watchOpen":true/.test(f.notes ?? ''))
+    .map((f) => ({
+      fundId: f.id,
+      name: f.name,
+      institution: f.institution,
+      status: f.status,
+      watchOpen: true as const,
+    }));
 }
 
 const ALERT_BUCKETS = [14, 7, 3, 1] as const;
