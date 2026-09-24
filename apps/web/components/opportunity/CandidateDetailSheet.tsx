@@ -32,7 +32,7 @@ import { PROPOSAL_CANDIDATE_KEY } from '@/lib/opportunity/proposal-workspace';
 type FeedbackAction = 'save' | 'not_now' | 'reject_type';
 
 export function CandidateDetailSheet({
-          candidate: live,
+  candidate: c,
   runId,
   open,
   onClose,
