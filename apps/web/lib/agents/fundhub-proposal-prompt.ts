@@ -1,3 +1,5 @@
+import { INSTITUTIONAL_PROSE_RULE } from '@/lib/agents/prose-rules';
+
 const PROMPT_VERSION = 'fundhub-proposal-v2';
 
 export type FundhubProposalMode = 'chat' | 'structure' | 'draft_section' | 'brainstorm' | 'understand';
@@ -69,6 +71,7 @@ function buildContextBlock(ctx: FundhubProposalContext): string {
 
 const SHARED_RULES = `## REGRAS
 - És o assistente de propostas FundHub (${PROMPT_VERSION}) — especialista em propostas a doadores/editais.
+${INSTITUTIONAL_PROSE_RULE}
 - Não inventes requisitos do edital, orçamentos, percentagens, resultados passados ou elegibilidade.
 - Se o CONTEXTO já tem texto da página ou das bases, USA-O. Não digas que não consegues aceder ao site.
 - Não peças ao utilizador para colar o PDF inteiro se já há excerpt/bases.

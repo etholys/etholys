@@ -23,6 +23,7 @@ import { useNexusCopilotSession } from '@/hooks/useNexusCopilotSession';
 import { useNexusVoiceDialog, type NexusVoiceLocaleCode } from '@/hooks/useNexusVoiceDialog';
 import { NexusVoiceToolbar } from '@/components/nexus/NexusVoiceToolbar';
 import { NEXUS_MAX_FILES } from '@/lib/nexus-chat-attachments';
+import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 
 type NetworkRow = {
   id: string;
@@ -448,7 +449,11 @@ export function NexusCoachPanel({
                     {nexusLocale === 'es' ? 'Copiloto' : nexusLocale === 'en' ? 'Co‑pilot' : 'Copiloto'}
                   </div>
                 )}
-                <p className="whitespace-pre-wrap">{m.content}</p>
+                {m.role === 'assistant' ? (
+                  <StudioMarkdown text={m.content} />
+                ) : (
+                  <p className="whitespace-pre-wrap">{m.content}</p>
+                )}
               </div>
             ))}
           {!loading && sending && (

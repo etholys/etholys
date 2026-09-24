@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 
 const COLLAPSE_LINES = 6;
 
@@ -16,12 +17,13 @@ export function StudioCollapsedChatContent({ content, locale }: Props) {
   const [open, setOpen] = useState(false);
 
   if (lines.length <= COLLAPSE_LINES) {
-    return (
-      <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{content}</div>
-    );
+    return <StudioMarkdown text={content} className="break-words [overflow-wrap:anywhere]" />;
   }
 
-  const preview = lines.slice(0, 2).join(' · ');
+  const preview = lines
+    .slice(0, 2)
+    .map((l) => l.replace(/^#+\s+/, '').replace(/\*\*/g, '').replace(/^\*\s+/, ''))
+    .join(' · ');
   const label =
     loc === 'es'
       ? `${lines.length} líneas`
@@ -55,7 +57,7 @@ export function StudioCollapsedChatContent({ content, locale }: Props) {
             <ChevronDown className="h-3 w-3" />
             {loc === 'es' ? 'Ocultar' : loc === 'en' ? 'Collapse' : 'Ocultar'}
           </button>
-          <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{content}</div>
+          <StudioMarkdown text={content} className="break-words [overflow-wrap:anywhere]" />
         </div>
       )}
     </div>

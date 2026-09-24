@@ -6,7 +6,7 @@ export function renderInlineMarkdown(text: string): ReactNode[] {
   return parts.map((p, i) => {
     if (p.startsWith('**') && p.endsWith('**') && p.length > 4) {
       return (
-        <strong key={i} className="font-semibold text-slate-900">
+        <strong key={i} className="font-semibold">
           {p.slice(2, -2)}
         </strong>
       );
@@ -135,7 +135,7 @@ export function StudioMarkdown({
   if (variant === 'heading') {
     return (
       <h2
-        className={`text-[1.65rem] font-bold leading-snug tracking-tight text-slate-900 [font-family:var(--font-etholys-display),ui-sans-serif,system-ui,sans-serif] ${className || ''}`}
+        className={`text-[1.65rem] font-bold leading-snug tracking-tight [font-family:var(--font-etholys-display),ui-sans-serif,system-ui,sans-serif] ${className || ''}`}
       >
         {renderInlineMarkdown(raw.replace(/^#+\s*/, ''))}
       </h2>
@@ -149,7 +149,7 @@ export function StudioMarkdown({
       .filter(Boolean);
     return (
       <ul
-        className={`list-disc space-y-2 pl-5 text-[15px] leading-[1.75] text-slate-800 marker:text-slate-400 ${className || ''}`}
+        className={`list-disc space-y-2 pl-5 text-[15px] leading-[1.75] marker:text-current/40 ${className || ''}`}
       >
         {items.map((item, i) => (
           <li key={i}>{renderInlineMarkdown(item)}</li>
@@ -221,7 +221,7 @@ export function StudioMarkdown({
     if (/^###\s+/.test(t)) {
       flushAllLists(i);
       nodes.push(
-        <h4 key={i} className="mt-3 text-base font-bold text-slate-800">
+        <h4 key={i} className="mt-3 text-base font-bold">
           {renderInlineMarkdown(t.slice(4))}
         </h4>,
       );
@@ -230,7 +230,7 @@ export function StudioMarkdown({
     if (/^##\s+/.test(t)) {
       flushAllLists(i);
       nodes.push(
-        <h3 key={i} className="mt-4 text-lg font-bold text-slate-900">
+        <h3 key={i} className="mt-4 text-lg font-bold">
           {renderInlineMarkdown(t.slice(3))}
         </h3>,
       );
@@ -239,7 +239,7 @@ export function StudioMarkdown({
     if (/^#\s+/.test(t)) {
       flushAllLists(i);
       nodes.push(
-        <h2 key={i} className="mt-4 text-xl font-bold text-slate-900">
+        <h2 key={i} className="mt-4 text-xl font-bold">
           {renderInlineMarkdown(t.slice(2))}
         </h2>,
       );
@@ -257,7 +257,7 @@ export function StudioMarkdown({
     }
     flushAllLists(i);
     nodes.push(
-      <p key={i} className="text-[15px] leading-[1.7] text-slate-800">
+      <p key={i} className="text-[15px] leading-[1.7]">
         {renderInlineMarkdown(t)}
       </p>,
     );

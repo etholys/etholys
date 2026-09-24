@@ -15,10 +15,10 @@ import {
   PenLine,
   Loader2,
   Send,
-  Eye,
   ExternalLink,
 } from 'lucide-react';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
+import { RichTextPane } from '@/components/etholys/RichTextPane';
 import {
   appendWriteSections,
   seedDocumentMarkdown,
@@ -62,7 +62,6 @@ export default function FundHubProposalEditorPage() {
   const [intakeNotes, setIntakeNotes] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [documentMarkdown, setDocumentMarkdown] = useState('');
-  const [docMode, setDocMode] = useState<'edit' | 'preview'>('edit');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
@@ -507,7 +506,6 @@ export default function FundHubProposalEditorPage() {
         persistDraft({ documentMarkdown: next });
         return next;
       });
-      setDocMode('edit');
       setDraftSaved(false);
     },
     [fund, persistDraft, locale],
@@ -941,14 +939,6 @@ export default function FundHubProposalEditorPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setDocMode((m) => (m === 'edit' ? 'preview' : 'edit'))}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900"
-                >
-                  {docMode === 'edit' ? <Eye className="h-3.5 w-3.5" /> : <PenLine className="h-3.5 w-3.5" />}
-                  {docMode === 'edit' ? 'Pré-ver' : 'Editar'}
-                </button>
-                <button
-                  type="button"
                   onClick={() => setShowAttach((v) => !v)}
                   className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900"
                 >
@@ -982,25 +972,18 @@ export default function FundHubProposalEditorPage() {
                 )}
               </div>
             )}
-            {docMode === 'edit' ? (
-              <textarea
-                value={documentMarkdown}
-                onChange={(e) => {
-                  setDocumentMarkdown(e.target.value);
-                  setDraftSaved(false);
-                }}
-                className="fh-pane-scroll min-h-0 flex-1 resize-none border-0 px-4 py-3 font-mono text-sm leading-relaxed text-gray-900 outline-none"
-                placeholder={
-                  stage === 'understand'
-                    ? 'A leitura do edital aparece aqui. A postulação só depois do botão ao lado.'
-                    : 'Escreva a candidatura. Use Estrutura no chat quando quiser as secções.'
-                }
-              />
-            ) : (
-              <div className="fh-pane-scroll min-h-0 flex-1 px-5 py-4">
-                <StudioMarkdown text={documentMarkdown} emptyHint="Documento vazio." />
-              </div>
-            )}
+            <RichTextPane
+              value={documentMarkdown}
+              onChange={(next) => {
+                setDocumentMarkdown(next);
+                setDraftSaved(false);
+              }}
+              placeholder={
+                stage === 'understand'
+                  ? 'A leitura do edital aparece aqui, já diagramada. A postulação só depois do botão ao lado.'
+                  : 'Escreva a candidatura. Títulos, negrito e listas na barra acima — sem # nem *.'
+              }
+            />
           </section>
         </div>
       )}

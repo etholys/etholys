@@ -1,3 +1,4 @@
+import { INSTITUTIONAL_PROSE_RULE } from '@/lib/agents/prose-rules';
 import type { VentureStageId } from '@/lib/nexus-venture';
 
 export type CopilotLocale = 'pt' | 'es' | 'en';
@@ -75,6 +76,7 @@ ${locale === 'en' ? 'English only.' : locale === 'es' ? 'Solo español.' : 'Apen
 ${t.behave}
 ${t.proact}
 ${t.oneQuestion}
+${INSTITUTIONAL_PROSE_RULE}
 Fase conhecida no NEXUS (apenas pista, não fiques preso a ela): ${stage}
 --- Estado / pendências (usa para nudges concretos) ---
 ${snapshotBlock}

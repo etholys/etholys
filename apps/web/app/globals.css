@@ -559,3 +559,68 @@
 .etholys-fundhub .fh-pane-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(248, 250, 252, 0.45);
 }
+
+.etholys-prose {
+  font-size: 15px;
+  line-height: 1.7;
+  color: inherit;
+}
+
+.etholys-prose h1 {
+  margin: 0.85em 0 0.35em;
+  font-family: var(--font-etholys-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.etholys-prose h2 {
+  margin: 0.9em 0 0.3em;
+  font-family: var(--font-etholys-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.etholys-prose h3 {
+  margin: 0.75em 0 0.25em;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.etholys-prose p {
+  margin: 0.45em 0;
+}
+
+.etholys-prose ul,
+.etholys-prose ol {
+  margin: 0.45em 0;
+  padding-left: 1.25rem;
+}
+
+.etholys-prose ul {
+  list-style: disc;
+}
+
+.etholys-prose ol {
+  list-style: decimal;
+}
+
+.etholys-prose li {
+  margin: 0.2em 0;
+}
+
+.etholys-prose strong {
+  font-weight: 650;
+}
+
+.etholys-prose p.is-editor-empty:first-child::before {
+  color: currentColor;
+  opacity: 0.4;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
