@@ -45,6 +45,10 @@ export type ProposalIntakeRecord = {
     uploadedAt: string;
   }>;
   seedSource?: 'fund' | 'candidate' | 'manual';
+  sourceExcerpt?: string;
+  basesText?: string;
+  documents?: Array<{ title: string; url: string; kind?: string }>;
+  stage?: 'understand' | 'write';
 };
 
 export type ProposalDraftIndex = {
@@ -163,6 +167,10 @@ export function buildProposalIntake(
     intakeNotes: extras?.notes?.trim() || buildEditalSummaryFromSeed(seed),
     attachedFiles: extras?.files,
     seedSource: extras?.source ?? (seed.id.startsWith('adhoc-') ? 'manual' : seed.id.startsWith('candidate:') ? 'candidate' : 'fund'),
+    sourceExcerpt: seed.sourceExcerpt?.trim()?.slice(0, 8000) || undefined,
+    basesText: seed.basesText?.trim()?.slice(0, 12_000) || undefined,
+    documents: seed.documents,
+    stage: 'understand',
   };
 }
 
@@ -197,6 +205,37 @@ export function sectionsFromMarkdown(md: string): Array<{ id: string; title: str
     sections.push({ id: `section-${index}`, title, content });
   });
   return sections;
+}
+
+export function seedUnderstandMarkdown(seed: ProposalFundSeed, briefing?: string): string {
+  const title = seed.name?.trim() || 'Proposta';
+  const brief = briefing?.trim()
+    ? briefing.trim()
+    : 'A IA está a ler a convocatória oficial. A postulação começa só depois desta leitura.';
+  const eligibility = [seed.whoCanApply, seed.eligibility || seed.eligibilityCriteria, seed.requirements, seed.howToApply]
+    .filter((s) => Boolean(String(s ?? '').trim()))
+    .join('\n\n');
+  const bases = String(seed.basesText || seed.sourceExcerpt || '').trim();
+  const parts = [`# ${title}`, `## Leitura do edital\n\n${brief}`];
+  if (eligibility) parts.push(`## Elegibilidade e requisitos\n\n${eligibility}`);
+  if (bases) {
+    const clip = bases.length > 4500 ? `${bases.slice(0, 4500).trim()}…` : bases;
+    parts.push(`## Bases oficiais (citar; não inventar)\n\n${clip}`);
+  }
+  return parts.join('\n\n');
+}
+
+export function appendWriteSections(md: string): string {
+  const text = md.trim();
+  const hasIdea = /^##\s+Ideia geral\b/im.test(text);
+  const hasDraft = /^##\s+Rascunho\b/im.test(text);
+  const extra = [
+    hasIdea ? '' : '## Ideia geral\n\n',
+    hasDraft ? '' : '## Rascunho\n\n',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  return extra ? `${text}\n\n${extra}` : text;
 }
 
 export function seedDocumentMarkdown(seed: ProposalFundSeed, brainstorm?: string): string {

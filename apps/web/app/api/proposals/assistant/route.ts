@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 import { NextResponse, NextRequest } from 'next/server';
-import { llmCompleteText, publicLlmErrorMessage } from '@/lib/llm-client';
+import { llmGenerateContent, publicLlmErrorMessage } from '@/lib/llm-client';
 import { prisma } from '@/lib/prisma';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import {
@@ -42,6 +42,10 @@ async function loadOrgProfileText(companyId: string): Promise<string> {
   return lines.join('\n');
 }
 
+function contextChars(ctx: FundhubProposalContext): number {
+  return (ctx.sourceExcerpt?.trim().length ?? 0) + (ctx.basesText?.trim().length ?? 0);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as FundhubProposalContext & {
@@ -51,10 +55,9 @@ export async function POST(req: NextRequest) {
     };
 
     const mode = normalizeFundhubMode(body.mode);
-    const userMessage =
-      typeof body.userMessage === 'string' ? body.userMessage : '';
+    const userMessage = typeof body.userMessage === 'string' ? body.userMessage : '';
 
-    if (mode !== 'brainstorm' && mode !== 'structure' && !userMessage.trim()) {
+    if (mode !== 'brainstorm' && mode !== 'structure' && mode !== 'understand' && !userMessage.trim()) {
       return NextResponse.json({ error: 'É necessário informar a pergunta ou instrução.' }, { status: 400 });
     }
 
@@ -63,6 +66,10 @@ export async function POST(req: NextRequest) {
     if (tenant && !orgProfile.trim()) {
       orgProfile = await loadOrgProfileText(tenant.companyId);
     }
+
+    const documents = Array.isArray(body.documents)
+      ? body.documents.filter((d) => d && (d.title || d.url)).slice(0, 12)
+      : undefined;
 
     const ctx: FundhubProposalContext = {
       fundName: body.fundName,
@@ -74,25 +81,40 @@ export async function POST(req: NextRequest) {
       sectionTitle: body.sectionTitle,
       sectionContent: body.sectionContent,
       orgProfile,
+      sourceExcerpt: body.sourceExcerpt,
+      basesText: body.basesText,
+      documents,
     };
 
     const defaultMessage =
-      mode === 'brainstorm'
-        ? 'Chuva de ideias inicial para esta proposta.'
-        : mode === 'structure'
-          ? 'Gera a estrutura da proposta.'
-          : userMessage;
+      mode === 'understand'
+        ? 'Lê a convocatória oficial e faz o briefing. Não peças o PDF se já há texto no contexto. Não inventes login.'
+        : mode === 'brainstorm'
+          ? 'Chuva de ideias para esta proposta — só depois do edital lido.'
+          : mode === 'structure'
+            ? 'Gera a estrutura da proposta.'
+            : userMessage;
 
-    const maxOutputTokens = mode === 'structure' ? 800 : mode === 'brainstorm' ? 2500 : 2000;
-    const temperature = mode === 'structure' ? 0.15 : mode === 'brainstorm' ? 0.4 : 0.25;
+    const excerptLen = contextChars(ctx);
+    const thin = excerptLen < 400;
+    const wantSearch =
+      Boolean(ctx.editalLink?.trim()) &&
+      (mode === 'understand' || ((mode === 'brainstorm' || mode === 'chat') && thin));
 
-    const answer = await llmCompleteText(
-      buildFundhubProposalSystemPrompt(mode),
-      buildFundhubProposalUserPrompt(mode, ctx, userMessage || defaultMessage),
-      { maxOutputTokens, temperature },
-    );
+    const maxOutputTokens = mode === 'structure' ? 800 : mode === 'understand' ? 3500 : mode === 'brainstorm' ? 2500 : 2000;
+    const temperature = mode === 'structure' || mode === 'understand' ? 0.15 : mode === 'brainstorm' ? 0.4 : 0.25;
 
-    return NextResponse.json({ answer, mode });
+    const { text: answer } = await llmGenerateContent({
+      systemInstruction: buildFundhubProposalSystemPrompt(mode),
+      userText: buildFundhubProposalUserPrompt(mode, ctx, userMessage || defaultMessage),
+      maxOutputTokens,
+      temperature,
+      webSearch: wantSearch,
+      model: thin && mode === 'understand' ? 'claude-opus-4-6' : undefined,
+      timeoutMs: wantSearch ? 90_000 : undefined,
+    });
+
+    return NextResponse.json({ answer, mode, usedWebSearch: wantSearch });
   } catch (error: unknown) {
     console.error('[proposals/assistant] LLM', error);
     return NextResponse.json({ error: publicLlmErrorMessage(error) }, { status: 503 });

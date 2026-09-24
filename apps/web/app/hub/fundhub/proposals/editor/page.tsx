@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Paperclip,
   Lightbulb,
+  BookOpen,
   PenLine,
   Loader2,
   Send,
@@ -19,7 +20,9 @@ import {
 } from 'lucide-react';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import {
+  appendWriteSections,
   seedDocumentMarkdown,
+  seedUnderstandMarkdown,
   sectionsFromMarkdown,
   type ProposalFundSeed,
 } from '@/lib/opportunity/proposal-workspace';
@@ -63,7 +66,8 @@ export default function FundHubProposalEditorPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
-  const [brainstorming, setBrainstorming] = useState(false);
+  const [stage, setStage] = useState<'understand' | 'write'>('understand');
+  const [understanding, setUnderstanding] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -72,15 +76,22 @@ export default function FundHubProposalEditorPage() {
   const [openingStudio, setOpeningStudio] = useState(false);
   const [coalitionPool, setCoalitionPool] = useState<Array<{ id: string; orgName: string; role: string }>>([]);
   const [coalition, setCoalition] = useState<Array<{ id: string; orgName: string; role: string; budgetPct?: number }>>([]);
-  const brainstormRef = useRef(false);
+  const understandRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const persistDraft = useCallback(
-    (patch?: { documentMarkdown?: string; intakeNotes?: string; chat?: ChatMessage[]; coalition?: typeof coalition }) => {
+    (patch?: {
+      documentMarkdown?: string;
+      intakeNotes?: string;
+      chat?: ChatMessage[];
+      coalition?: typeof coalition;
+      stage?: 'understand' | 'write';
+    }) => {
       if (!workspaceId || typeof window === 'undefined') return;
       const md = patch?.documentMarkdown ?? documentMarkdown;
       const notes = patch?.intakeNotes ?? intakeNotes;
       const chats = patch?.chat ?? chatMessages;
+      const nextStage = patch?.stage ?? stage;
       const draftKey = `proposalDraft:${workspaceId}`;
       const listRaw = localStorage.getItem('proposalDrafts') || '[]';
       let drafts: Array<Record<string, unknown>> = [];
@@ -106,6 +117,16 @@ export default function FundHubProposalEditorPage() {
       if (idx >= 0) drafts[idx] = draftData;
       else drafts.push(draftData);
       localStorage.setItem('proposalDrafts', JSON.stringify(drafts));
+      try {
+        const intakeRaw = localStorage.getItem(`proposalIntake:${workspaceId}`);
+        if (intakeRaw) {
+          const intake = JSON.parse(intakeRaw) as Record<string, unknown>;
+          intake.stage = nextStage;
+          localStorage.setItem(`proposalIntake:${workspaceId}`, JSON.stringify(intake));
+        }
+      } catch {
+        /* ignore */
+      }
       localStorage.setItem(
         draftKey,
         JSON.stringify({
@@ -113,13 +134,17 @@ export default function FundHubProposalEditorPage() {
           attachedFiles,
           documentMarkdown: md,
           chatMessages: chats,
+          stage: nextStage,
+          sourceExcerpt: fund?.sourceExcerpt,
+          basesText: fund?.basesText,
+          documents: fund?.documents,
           brainstormDone: chats.some((m) => m.role === 'assistant'),
           sections: sectionsFromMarkdown(md),
         }),
       );
       setDraftSaved(true);
     },
-    [workspaceId, fund, fundId, editalLink, intakeNotes, attachedFiles, documentMarkdown, chatMessages, coalition],
+    [workspaceId, fund, fundId, editalLink, intakeNotes, attachedFiles, documentMarkdown, chatMessages, coalition, stage],
   );
 
   useEffect(() => {
@@ -144,6 +169,7 @@ export default function FundHubProposalEditorPage() {
         link = intake.editalLink || '';
         notes = intake.intakeNotes || '';
         setAttachedFiles(intake.attachedFiles || []);
+        if (intake.stage === 'write' || intake.stage === 'understand') setStage(intake.stage);
         if (intake.fundName) {
           seededFund = {
             id: intake.fundId || fundId || 'adhoc',
@@ -151,6 +177,9 @@ export default function FundHubProposalEditorPage() {
             institution: intake.fundInstitution || '',
             linkOficial: intake.editalLink,
             description: intake.intakeNotes,
+            sourceExcerpt: intake.sourceExcerpt,
+            basesText: intake.basesText,
+            documents: Array.isArray(intake.documents) ? intake.documents : undefined,
           };
         }
       } catch {
@@ -171,11 +200,25 @@ export default function FundHubProposalEditorPage() {
         if (!notes && draft.editalSummary) notes = draft.editalSummary;
         if (Array.isArray(draft.chatMessages)) chats = draft.chatMessages;
         if (Array.isArray(draft.coalition)) setCoalition(draft.coalition);
+        if (draft.stage === 'write' || draft.stage === 'understand') setStage(draft.stage);
+        else if (Array.isArray(draft.chatMessages) && draft.chatMessages.some((m: ChatMessage) => m.role === 'assistant')) {
+          setStage('write');
+        }
         if (draft.fundName && !seededFund) {
           seededFund = {
             id: draft.fundId || fundId || 'adhoc',
             name: draft.fundName,
             institution: draft.fundInstitution || '',
+            sourceExcerpt: draft.sourceExcerpt,
+            basesText: draft.basesText,
+            documents: Array.isArray(draft.documents) ? draft.documents : undefined,
+          };
+        } else if (seededFund) {
+          seededFund = {
+            ...seededFund,
+            sourceExcerpt: seededFund.sourceExcerpt || draft.sourceExcerpt,
+            basesText: seededFund.basesText || draft.basesText,
+            documents: seededFund.documents || (Array.isArray(draft.documents) ? draft.documents : undefined),
           };
         }
         setDraftSaved(true);
@@ -206,7 +249,13 @@ export default function FundHubProposalEditorPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d?.fund?.id) {
-          setFund((prev) => ({ ...(prev || {}), ...d.fund }));
+          setFund((prev) => ({
+            ...(prev || {}),
+            ...d.fund,
+            sourceExcerpt: d.fund.sourceExcerpt || prev?.sourceExcerpt,
+            basesText: d.fund.basesText || prev?.basesText,
+            documents: d.fund.documents?.length ? d.fund.documents : prev?.documents,
+          }));
           if (d.fund.linkOficial) setEditalLink((cur) => cur || d.fund.linkOficial);
         }
       })
@@ -262,40 +311,43 @@ export default function FundHubProposalEditorPage() {
       companyId,
       fundName: fund?.name,
       fundInstitution: fund?.institution,
-      editalLink: editalLink || fund?.linkOficial,
+      editalLink: editalLink || fund?.linkOficial || fund?.callUrl,
       editalSummary: intakeNotes,
       documentMarkdown,
+      sourceExcerpt: fund?.sourceExcerpt,
+      basesText: fund?.basesText,
+      documents: fund?.documents,
     }),
     [companyId, fund, editalLink, intakeNotes, documentMarkdown],
   );
 
-  const runBrainstorm = useCallback(async () => {
-    if (!workspaceId || brainstormRef.current) return;
-    const lockKey = `proposalBrainstorm:${workspaceId}`;
+  const runUnderstand = useCallback(async () => {
+    if (!workspaceId || understandRef.current) return;
+    const lockKey = `proposalUnderstand:${workspaceId}`;
     try {
       if (sessionStorage.getItem(lockKey)) return;
       sessionStorage.setItem(lockKey, '1');
     } catch {
       /* continue */
     }
-    brainstormRef.current = true;
-    setBrainstorming(true);
+    understandRef.current = true;
+    setUnderstanding(true);
     setError(null);
     try {
       const response = await fetch('/api/proposals/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(assistantBody('brainstorm', 'Chuva de ideias inicial para esta proposta.')),
+        body: JSON.stringify(assistantBody('understand', 'Lê o edital oficial e explica o que a convocatória pede.')),
       });
       const data = await response.json();
       if (!response.ok || !data.answer) {
-        throw new Error(data.error || 'Não foi possível gerar a ideia geral.');
+        throw new Error(data.error || 'Não foi possível ler o edital.');
       }
       const answer = String(data.answer);
       const seed = fund || { id: fundId || 'adhoc', name: 'Proposta', institution: '' };
       const nextDoc = documentMarkdown.trim()
         ? documentMarkdown
-        : seedDocumentMarkdown(seed, answer);
+        : seedUnderstandMarkdown(seed, answer);
       const nextChat: ChatMessage[] = [
         ...chatMessages,
         { role: 'assistant', content: answer, createdAt: new Date().toISOString() },
@@ -304,9 +356,9 @@ export default function FundHubProposalEditorPage() {
       setChatMessages(nextChat);
       persistDraft({ documentMarkdown: nextDoc, chat: nextChat });
     } catch {
-      brainstormRef.current = false;
+      understandRef.current = false;
       try {
-        sessionStorage.removeItem(`proposalBrainstorm:${workspaceId}`);
+        sessionStorage.removeItem(`proposalUnderstand:${workspaceId}`);
       } catch {
         /* ignore */
       }
@@ -314,25 +366,48 @@ export default function FundHubProposalEditorPage() {
         ...prev,
         {
           role: 'assistant',
-          content: 'Não consegui abrir a chuva de ideias. Escreva no chat — já está activo.',
+          content:
+            'Não consegui ler o edital automaticamente. Cole o link outra vez ou anexe o PDF — não avance para a postulação sem esta leitura.',
           createdAt: new Date().toISOString(),
         },
       ]);
     } finally {
-      setBrainstorming(false);
+      setUnderstanding(false);
     }
   }, [workspaceId, assistantBody, fund, fundId, documentMarkdown, chatMessages, persistDraft]);
 
+  const passToWrite = useCallback(() => {
+    setStage('write');
+    setDocumentMarkdown((prev) => {
+      const next = appendWriteSections(prev || seedDocumentMarkdown(fund || { id: 'adhoc', name: fund?.name || 'Proposta' }));
+      persistDraft({ documentMarkdown: next, stage: 'write' });
+      return next;
+    });
+    setChatMessages((prev) => {
+      const next: ChatMessage[] = [
+        ...prev,
+        {
+          role: 'assistant',
+          content:
+            'Edital lido. Pode estruturar a candidatura, pedir um rascunho de secção ou usar o canvas ao lado.',
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      persistDraft({ chat: next, stage: 'write' });
+      return next;
+    });
+  }, [fund, persistDraft]);
+
   useEffect(() => {
     if (loading || !workspaceId) return;
+    if (stage !== 'understand') return;
     if (chatMessages.some((m) => m.role === 'assistant')) return;
-    if (documentMarkdown.trim().length > 80) return;
-    void runBrainstorm();
-  }, [loading, workspaceId, chatMessages, documentMarkdown, runBrainstorm]);
+    void runUnderstand();
+  }, [loading, workspaceId, stage, chatMessages, runUnderstand]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ block: 'end' });
-  }, [chatMessages, chatLoading, brainstorming]);
+  }, [chatMessages, chatLoading, understanding]);
 
   const handleSendChat = useCallback(async () => {
     const message = chatInput.trim();
@@ -692,25 +767,51 @@ export default function FundHubProposalEditorPage() {
         <div className="grid min-h-0 gap-3 lg:h-[calc(100dvh-11rem)] lg:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.2fr)]">
           <section className="flex h-[70vh] min-h-[22rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white lg:h-full">
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
-              <p className="text-sm font-semibold text-gray-900">Chat</p>
-              <button
-                type="button"
-                onClick={() => void handleGenerateStructure()}
-                disabled={chatLoading}
-                className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 hover:underline disabled:opacity-50"
-              >
-                <Lightbulb className="h-3.5 w-3.5" />
-                Estrutura
-              </button>
+              <p className="text-sm font-semibold text-gray-900">
+                {stage === 'understand' ? 'Leitura do edital' : 'Chat'}
+              </p>
+              {stage === 'write' ? (
+                <button
+                  type="button"
+                  onClick={() => void handleGenerateStructure()}
+                  disabled={chatLoading}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 hover:underline disabled:opacity-50"
+                >
+                  <Lightbulb className="h-3.5 w-3.5" />
+                  Estrutura
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800">
+                  <BookOpen className="h-3.5 w-3.5" />
+                  1 / 2 · Entender
+                </span>
+              )}
             </div>
             <div className="fh-pane-scroll min-h-0 flex-1 space-y-3 px-4 py-3">
-              {brainstorming && chatMessages.length === 0 && (
-                <div className="rounded-xl bg-amber-500/15 px-3 py-3 text-sm text-amber-100">
-                  <p className="flex items-center gap-2 font-medium text-amber-100">
-                    <Loader2 className="h-4 w-4 animate-spin text-amber-300" />
-                    Chuva de ideias…
+              {understanding && chatMessages.length === 0 && (
+                <div className="rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-950">
+                  <p className="flex items-center gap-2 font-medium">
+                    <Loader2 className="h-4 w-4 animate-spin text-amber-700" />
+                    A ler a convocatória oficial…
                   </p>
-                  <p className="mt-1 text-xs text-amber-200/90">Pode escrever no chat já — o documento está ao lado.</p>
+                  <p className="mt-1 text-xs text-amber-800/80">
+                    Página, anexos e bases — ainda sem chuva de ideias nem rascunho.
+                  </p>
+                </div>
+              )}
+              {stage === 'understand' && chatMessages.some((m) => m.role === 'assistant') && !understanding && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+                  <p className="text-xs text-amber-950">
+                    Confirme a leitura. Só depois avance para escrever a candidatura.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={passToWrite}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
+                  >
+                    <PenLine className="h-3.5 w-3.5" />
+                    Passar à postulação
+                  </button>
                 </div>
               )}
               {chatMessages.map((message, index) => (
@@ -759,7 +860,11 @@ export default function FundHubProposalEditorPage() {
                   }
                 }}
                 rows={3}
-                placeholder="Pergunte ou peça para redigir uma secção…"
+                placeholder={
+                  stage === 'understand'
+                    ? 'Pergunte sobre o edital (elegibilidade, prazo, anexos)…'
+                    : 'Peça para redigir uma secção ou ajustar o tom do doador…'
+                }
                 className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
               />
               <div className="mt-2 flex justify-end">
@@ -777,7 +882,9 @@ export default function FundHubProposalEditorPage() {
 
           <section className="flex h-[70vh] min-h-[22rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white lg:h-full">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
-              <p className="text-sm font-semibold text-gray-900">Documento</p>
+              <p className="text-sm font-semibold text-gray-900">
+                {stage === 'understand' ? 'Notas do edital' : 'Documento'}
+              </p>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -830,7 +937,11 @@ export default function FundHubProposalEditorPage() {
                   setDraftSaved(false);
                 }}
                 className="fh-pane-scroll min-h-0 flex-1 resize-none border-0 px-4 py-3 font-mono text-sm leading-relaxed text-gray-900 outline-none"
-                placeholder="O documento abre aqui. A chuva de ideias entra na secção Ideia geral."
+                placeholder={
+                  stage === 'understand'
+                    ? 'A leitura do edital aparece aqui. A postulação só depois do botão ao lado.'
+                    : 'Escreva a candidatura. Use Estrutura no chat quando quiser as secções.'
+                }
               />
             ) : (
               <div className="fh-pane-scroll min-h-0 flex-1 px-5 py-4">

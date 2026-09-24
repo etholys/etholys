@@ -113,9 +113,12 @@ export function extractDocumentLinks(html: string, pageUrl: string): CallDocumen
     const isFile = /\.(pdf|docx?|xlsx?|zip)(?:$|[?#])/i.test(abs);
     const looksDoc =
       isFile ||
-      /bases|anexo|formulario|guia|guide|terms|edital|convocator|application\s+pack|descarg/i.test(text);
+      /bases|anexo|formulario|guia|guide|guidelines|applicants|terms|edital|convocator|application\s+pack|descarg|grant.?opp/i.test(
+        text,
+      );
     if (!looksDoc) continue;
-    if (!isFile && !/\.(pdf|docx?|xlsx?|zip)(?:$|[?#])/i.test(text)) {
+    const namedGuidelines = /guidelines|bases|anexo|guide|applicants/i.test(text);
+    if (!isFile && !/\.(pdf|docx?|xlsx?|zip)(?:$|[?#])/i.test(text) && !namedGuidelines) {
       if (!/download|documento|attachment|file|pdf/i.test(abs)) continue;
     }
     found.push({ title: text || abs.split('/').pop() || 'Documento', url: abs });

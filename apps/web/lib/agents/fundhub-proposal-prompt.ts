@@ -1,6 +1,6 @@
-const PROMPT_VERSION = 'fundhub-proposal-v1';
+const PROMPT_VERSION = 'fundhub-proposal-v2';
 
-export type FundhubProposalMode = 'chat' | 'structure' | 'draft_section' | 'brainstorm';
+export type FundhubProposalMode = 'chat' | 'structure' | 'draft_section' | 'brainstorm' | 'understand';
 
 export type FundhubProposalContext = {
   fundName?: string | null;
@@ -16,6 +16,9 @@ export type FundhubProposalContext = {
   sectionContent?: string | null;
   /** Short org profile (mission, geography, track record) — never invent if missing */
   orgProfile?: string | null;
+  sourceExcerpt?: string | null;
+  basesText?: string | null;
+  documents?: Array<{ title?: string; url?: string }> | null;
 };
 
 function buildContextBlock(ctx: FundhubProposalContext): string {
@@ -24,6 +27,15 @@ function buildContextBlock(ctx: FundhubProposalContext): string {
   if (ctx.fundInstitution) lines.push(`Instituição doadora: ${ctx.fundInstitution}`);
   if (ctx.editalLink) lines.push(`Link do edital: ${ctx.editalLink}`);
   if (ctx.editalSummary?.trim()) lines.push(`Resumo / notas do edital:\n${ctx.editalSummary.trim()}`);
+  if (ctx.documents?.length) {
+    lines.push(
+      `Documentos oficiais extraídos:\n${ctx.documents
+        .map((d) => `- ${d.title || 'Documento'}: ${d.url || ''}`)
+        .join('\n')}`,
+    );
+  }
+  if (ctx.sourceExcerpt?.trim()) lines.push(`Texto da página oficial:\n${ctx.sourceExcerpt.trim().slice(0, 7000)}`);
+  if (ctx.basesText?.trim()) lines.push(`Texto das bases / PDFs:\n${ctx.basesText.trim().slice(0, 10000)}`);
   if (ctx.orgProfile?.trim()) lines.push(`Perfil da organização (usar; não inventar para além disto):\n${ctx.orgProfile.trim()}`);
   if (ctx.documentMarkdown?.trim()) {
     lines.push(`Documento actual no canvas:\n${ctx.documentMarkdown.trim().slice(0, 8000)}`);
@@ -43,7 +55,10 @@ function buildContextBlock(ctx: FundhubProposalContext): string {
 const SHARED_RULES = `## REGRAS
 - És o assistente de propostas FundHub (${PROMPT_VERSION}) — especialista em propostas a doadores/editais.
 - Não inventes requisitos do edital, orçamentos, percentagens, resultados passados ou elegibilidade.
-- Se faltar informação, diz o que falta e propõe 1–3 perguntas concretas. Marca [FALTA: …].
+- Se o CONTEXTO já tem texto da página ou das bases, USA-O. Não digas que não consegues aceder ao site.
+- Não peças ao utilizador para colar o PDF inteiro se já há excerpt/bases.
+- Não inventes barreiras de login/UUID/registo salvo o CONTEXTO dizer HTTP 401/403.
+- Se faltar um dado pontual depois de ler o que há, marca no máximo 1–2 [FALTA: …]. Nunca abras com uma lista de [FALTA].
 - Não faças diagnóstico de negócio NEXUS, informes SIEP, layout Studio nem prioridades do Workspace Advisor.
 - Não menciones nomes internos de produto (FUNDHUB, OPPORTUNITY, license keys). Diz FundHub se precisares de te nomear.
 - Tom profissional, claro, alinhado ao doador quando o edital o permitir.
@@ -70,11 +85,24 @@ Redige ou melhora a secção activa com base no edital e no perfil disponível.
 - Não reescrevas a proposta inteira — só a secção pedida.`;
   }
 
+  if (mode === 'understand') {
+    return `${SHARED_RULES}
+
+## TRABALHO (entender o edital)
+Primeiro passo obrigatório: ler a convocatória. Ainda NÃO faças chuva de ideias nem rascunho de candidatura.
+- O que é o fundo (1 parágrafo).
+- Quem pode candidatar e onde.
+- Janela, montante, tipo (grant/crédito).
+- Requisitos e anexos oficiais (com URL se existirem no contexto).
+- 3 pontos a confirmar na postulação.
+- Tom de briefing institucional. Sem tabelas markdown partidas. Sem pedir o edital outra vez se o texto já veio no contexto.`;
+  }
+
   if (mode === 'brainstorm') {
     return `${SHARED_RULES}
 
 ## TRABALHO (chuva de ideias)
-Abre a sessão com uma ideia geral do que desenvolver NESTE fundo para ESTA organização.
+Só depois do edital lido: ideia geral do que desenvolver NESTE fundo para ESTA organização.
 - 4–7 ideias concretas (não genéricas) do que escrever / como enquadrar.
 - Diz o encaixe só com dados do perfil; se faltar, [FALTA: …].
 - 2–4 riscos ou pontos a verificar no edital oficial.
@@ -110,10 +138,15 @@ ${userMessage.trim() ? `Nota do utilizador: ${userMessage.trim()}` : ''}`.trim()
 Pedido de rascunho / melhoria da secção activa:
 ${userMessage.trim()}`;
   }
+  if (mode === 'understand') {
+    return `${block}
+
+Pedido: briefing do edital — o que a convocatória diz de facto. Sem postulação ainda.`;
+  }
   if (mode === 'brainstorm') {
     return `${block}
 
-Pedido: chuva de ideias inicial — o que desenvolver nesta proposta (este fundo + este perfil).
+Pedido: chuva de ideias — só depois de o edital estar lido. O que desenvolver nesta proposta (este fundo + este perfil).
 
 ${userMessage.trim() ? `Nota: ${userMessage.trim()}` : ''}`.trim();
   }
@@ -124,6 +157,8 @@ ${userMessage.trim()}`;
 }
 
 export function normalizeFundhubMode(raw: unknown): FundhubProposalMode {
-  if (raw === 'structure' || raw === 'draft_section' || raw === 'chat' || raw === 'brainstorm') return raw;
+  if (raw === 'structure' || raw === 'draft_section' || raw === 'chat' || raw === 'brainstorm' || raw === 'understand') {
+    return raw;
+  }
   return 'chat';
 }

@@ -68,6 +68,13 @@ test('extracts official PDFs from the call HTML', () => {
   assert.equal(docs[0]?.kind, 'pdf');
 });
 
+test('keeps Guidelines for Applicants even without .pdf in the href', () => {
+  const html = `<a href="/Grant/ViewGuidelines/GO123">Guidelines for Applicants</a>`;
+  const docs = extractDocumentLinks(html, 'https://www.grants.gov.au/Go/Show?GoUuid=abc');
+  assert.equal(docs.length, 1);
+  assert.match(docs[0]?.url || '', /ViewGuidelines/);
+});
+
 test('hasOfficialCallEvidence needs a call page or attachments', () => {
   assert.equal(hasOfficialCallEvidence({ linkOficial: 'https://www.ande.org.uy/' }), false);
   assert.equal(

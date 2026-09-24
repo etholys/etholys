@@ -2,7 +2,7 @@
 
 **Versão:** 1.0  
 **Data:** 2026-09-24  
-**Status:** F0–F9 em produção (`289e191`); expediente (docs/bases/fit) persiste no Fund ao guardar  
+**Status:** F0–F9 em produção; avulsa lê o edital oficial antes da postulação  
 **Público:** product, desenvolvedores, agentes de IA  
 **Licença interna:** `FUNDHUB` (`sys.FUNDHUB`)  
 **Entrada para agentes:** [AGENTS.md](../../AGENTS.md) → este ficheiro.
@@ -148,6 +148,8 @@ Filtro ou colunas: **Decidir / Preparar / Submetido / Fechado**. Prazo no card. 
 ### F4 — Proposta a partir das bases (feito)
 
 Extrair texto dos PDFs oficiais (já listados) → `sourceExcerpt` longo por documento → secções do editor + chat com «ver bases». Sem inventar requisitos em falta.
+
+Avulsa: `POST /api/fundhub/proposals/ingest-edital` lê a página oficial (UA de browser) e os anexos **antes** do editor. O chat abre em **entender o edital**; «Passar à postulação» é o único salto para estrutura/rascunho. Sem `[FALTA]` de abertura nem «não consigo aceder ao site» em páginas públicas.
 
 ### F5 — Relógio de programas (feito)
 

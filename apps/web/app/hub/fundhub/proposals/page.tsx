@@ -91,6 +91,7 @@ function asFundSeed(raw: unknown): FundSummary | null {
     notes: typeof f.notes === 'string' ? f.notes : undefined,
     summary: typeof f.summary === 'string' ? f.summary : undefined,
     matchJustification: typeof f.matchJustification === 'string' ? f.matchJustification : undefined,
+    basesText: typeof f.basesText === 'string' ? f.basesText : undefined,
   };
 }
 
@@ -336,13 +337,57 @@ export default function ProposalsPage() {
     setError(null);
 
     try {
-      const resolvedFund: FundSummary = fund ?? {
+      let resolvedFund: FundSummary = fund ?? {
         id: `adhoc-${Date.now()}`,
         name: selectedFiles[0]?.name?.replace(/\.[^.]+$/, '') || 'Proposta avulsa',
         institution: 'Sem fundo vinculado',
         description: intakeNotes,
         linkOficial: editalLink.trim() || undefined,
       };
+
+      const officialUrl = editalLink.trim() || resolvedFund.callUrl || resolvedFund.linkOficial || '';
+      if (officialUrl && companyId) {
+        try {
+          const ingestRes = await fetch(
+            `/api/fundhub/proposals/ingest-edital?companyId=${encodeURIComponent(companyId)}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: officialUrl }),
+            },
+          );
+          const ingestData = (await ingestRes.json()) as {
+            edital?: {
+              name?: string;
+              institution?: string;
+              callUrl?: string;
+              documents?: Array<{ title?: string; url?: string; kind?: string }>;
+              sourceExcerpt?: string;
+              basesText?: string;
+            };
+          };
+          const ed = ingestData.edital;
+          if (ed) {
+            const docs = Array.isArray(ed.documents)
+              ? ed.documents
+                  .filter((d) => d?.url)
+                  .map((d) => ({ title: String(d.title || d.url), url: String(d.url), kind: d.kind }))
+              : resolvedFund.documents;
+            resolvedFund = {
+              ...resolvedFund,
+              name: fund?.name || ed.name || resolvedFund.name,
+              institution: fund?.institution || ed.institution || resolvedFund.institution,
+              linkOficial: ed.callUrl || officialUrl,
+              callUrl: ed.callUrl || officialUrl,
+              documents: docs,
+              sourceExcerpt: ed.sourceExcerpt || resolvedFund.sourceExcerpt,
+              basesText: ed.basesText || resolvedFund.basesText,
+            };
+          }
+        } catch {
+          /* o editor ainda tenta ler o URL no briefing */
+        }
+      }
       const workspaceId = createProposalWorkspaceId(resolvedFund.id);
       const uploadedAt = new Date().toISOString();
       const intake = buildProposalIntake(workspaceId, {
@@ -400,7 +445,7 @@ export default function ProposalsPage() {
       setError(err instanceof Error ? err.message : 'Erro ao abrir workspace');
       setIsLoading(false);
     }
-  }, [fund, editalLink, selectedFiles, intakeNotes, router, openWorkspace]);
+  }, [fund, editalLink, selectedFiles, intakeNotes, router, openWorkspace, companyId]);
 
   const handleDeleteDraft = useCallback((workspaceId: string) => {
     const updated = drafts.filter((d) => d.workspaceId !== workspaceId);
@@ -562,7 +607,9 @@ export default function ProposalsPage() {
             <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
               <div className="mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">Proposta avulsa</h2>
-                <p className="mt-2 text-gray-600">Sem fundo guardado — cole o edital ou anexe ficheiros.</p>
+                <p className="mt-2 text-gray-600">
+                  Sem fundo guardado — cole o link oficial. A IA lê a página e os anexos antes de qualquer postulação.
+                </p>
               </div>
 
               <div className="space-y-6">
@@ -674,12 +721,12 @@ export default function ProposalsPage() {
                   {isLoading ? (
                     <>
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      A abrir…
+                      {editalLink.trim() ? 'A ler o edital oficial…' : 'A abrir…'}
                     </>
                   ) : (
                     <>
                       <Plus className="h-5 w-5" />
-                      Começar
+                      Ler o edital
                     </>
                   )}
                 </button>

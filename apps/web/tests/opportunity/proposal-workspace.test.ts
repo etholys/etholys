@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   buildEditalSummaryFromSeed,
   findReusableDraft,
+  appendWriteSections,
   seedDocumentMarkdown,
+  seedUnderstandMarkdown,
   sectionsFromMarkdown,
   shouldSkipProposalIntake,
   type ProposalDraftIndex,
@@ -116,10 +118,19 @@ test('sectionsFromMarkdown splits headings', () => {
   assert.equal(sections.some((s) => s.title === 'Rascunho' && s.content.includes('Texto B')), true);
 });
 
-test('normalizeFundhubMode accepts brainstorm', () => {
+test('normalizeFundhubMode accepts understand and brainstorm', () => {
+  assert.equal(normalizeFundhubMode('understand'), 'understand');
   assert.equal(normalizeFundhubMode('brainstorm'), 'brainstorm');
   assert.equal(normalizeFundhubMode('structure'), 'structure');
   assert.equal(normalizeFundhubMode('nope'), 'chat');
+});
+
+test('understand prompt is first and forbids brainstorm plus fake login', () => {
+  const sys = buildFundhubProposalSystemPrompt('understand');
+  assert.match(sys, /entender o edital/i);
+  assert.match(sys, /chuva de ideias/i);
+  assert.match(sys, /login/i);
+  assert.match(sys, /FundHub/);
 });
 
 test('brainstorm prompt asks for chuva de ideias and forbids FUNDHUB leftovers', () => {
@@ -127,4 +138,14 @@ test('brainstorm prompt asks for chuva de ideias and forbids FUNDHUB leftovers',
   assert.match(sys, /chuva de ideias/i);
   assert.match(sys, /FundHub/);
   assert.match(sys, /Não menciones nomes internos de produto/);
+});
+
+test('understand seed has leitura, write appends rascunho', () => {
+  const md = seedUnderstandMarkdown(richFund, 'GO 123 aceita ONG australianas.');
+  assert.match(md, /## Leitura do edital/);
+  assert.match(md, /ONG australianas/);
+  assert.equal(/^##\s+Ideia geral/im.test(md), false);
+  const next = appendWriteSections(md);
+  assert.match(next, /## Ideia geral/);
+  assert.match(next, /## Rascunho/);
 });
