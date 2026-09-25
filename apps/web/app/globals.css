@@ -321,11 +321,22 @@
   color: #fff !important;
 }
 
-/* Pastéis claros → tintas escuras (evita branco-em-branco / branco-em-cinza) */
+/* Pastéis claros → tintas do tema (nunca misturar teal NEXUS com âmbar FundHub) */
 .etholys-system .sys-canvas .bg-teal-50,
+.etholys-system .sys-canvas .bg-teal-50\/50,
+.etholys-system .sys-canvas .bg-teal-50\/70,
+.etholys-system .sys-canvas .bg-teal-50\/80,
+.etholys-system .sys-canvas .bg-teal-100 {
+  background-color: rgba(45, 212, 191, 0.2) !important;
+}
+
 .etholys-system .sys-canvas .bg-indigo-50,
 .etholys-system .sys-canvas .bg-blue-50,
-.etholys-system .sys-canvas .bg-sky-100,
+.etholys-system .sys-canvas .bg-sky-50,
+.etholys-system .sys-canvas .bg-sky-100 {
+  background-color: rgba(129, 140, 248, 0.2) !important;
+}
+
 .etholys-fundhub .bg-amber-50,
 .etholys-fundhub .bg-amber-50\/30,
 .etholys-fundhub .bg-amber-50\/60,
@@ -371,8 +382,14 @@
 }
 
 /* Acentos escuros (amber/violeta/roxo) sobre fundo escuro */
+.etholys-system .sys-canvas .text-teal-600,
 .etholys-system .sys-canvas .text-teal-700,
 .etholys-system .sys-canvas .text-teal-800,
+.etholys-system .sys-canvas .text-teal-900,
+.etholys-system .sys-canvas .text-teal-950 {
+  color: #5eead4 !important;
+}
+
 .etholys-system .sys-canvas .text-amber-800,
 .etholys-fundhub .text-amber-600,
 .etholys-fundhub .text-amber-700,
@@ -487,6 +504,61 @@
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+/* Native <select> popup no Windows é claro — options nunca herdam tinta do canvas */
+.etholys-system .sys-canvas select option,
+.etholys-fundhub select option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.etholys-system .sys-canvas .hover\:bg-slate-50:hover,
+.etholys-system .sys-canvas .hover\:bg-slate-100:hover,
+.etholys-system .sys-canvas .hover\:bg-teal-50:hover,
+.etholys-system .sys-canvas .hover\:bg-violet-50:hover,
+.etholys-system .sys-canvas .hover\:bg-violet-100:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.etholys-system .sys-canvas .bg-white\/60,
+.etholys-system .sys-canvas .bg-white\/70,
+.etholys-system .sys-canvas .bg-white\/80,
+.etholys-system .sys-canvas .bg-white\/90,
+.etholys-system .sys-canvas .bg-white\/95 {
+  background-color: var(--sys-panel) !important;
+}
+
+.etholys-system .sys-canvas .border-teal-200,
+.etholys-system .sys-canvas .border-teal-300 {
+  border-color: rgba(94, 234, 212, 0.38) !important;
+}
+
+.etholys-system .sys-canvas .text-emerald-600,
+.etholys-system .sys-canvas .text-emerald-700,
+.etholys-system .sys-canvas .text-emerald-800,
+.etholys-system .sys-canvas .text-emerald-900,
+.etholys-system .sys-canvas .text-emerald-950 {
+  color: #6ee7b7 !important;
+}
+
+.etholys-system .sys-canvas .text-orange-600,
+.etholys-system .sys-canvas .text-orange-700,
+.etholys-system .sys-canvas .text-orange-800,
+.etholys-system .sys-canvas .text-orange-900,
+.etholys-system .sys-canvas .text-amber-700,
+.etholys-system .sys-canvas .text-amber-900 {
+  color: #fdba74 !important;
+}
+
+.etholys-system .sys-canvas .text-violet-600,
+.etholys-system .sys-canvas .text-violet-700,
+.etholys-system .sys-canvas .text-violet-900,
+.etholys-system .sys-canvas .text-violet-950,
+.etholys-system .sys-canvas .text-sky-700,
+.etholys-system .sys-canvas .text-sky-800,
+.etholys-system .sys-canvas .text-sky-900 {
+  color: #ddd6fe !important;
+}
+
 /* Catch-all no canvas: cobre variantes com /50, /80 e gradientes pastéis */
 .etholys-fundhub .fh-canvas [class*="text-gray-"],
 .etholys-fundhub .fh-canvas [class*="text-slate-"]:not([class*="text-slate-950"]):not([class*="text-slate-50"]):not([class*="text-slate-100"]):not([class*="text-slate-200"]):not([class*="text-slate-300"]) {
@@ -529,6 +601,79 @@
 .etholys-fundhub .fh-canvas [class*="bg-amber-50"],
 .etholys-fundhub .fh-canvas [class*="bg-orange-50"] {
   background-color: rgba(245, 158, 11, 0.16) !important;
+}
+
+/* NEXUS / sistemas — catch-all: chips, badges, títulos e corpo no canvas escuro */
+.etholys-system .sys-canvas [class*="text-gray-"],
+.etholys-system .sys-canvas [class*="text-slate-"]:not([class*="text-slate-50"]):not([class*="text-slate-100"]):not([class*="text-slate-200"]):not([class*="text-slate-300"]) {
+  color: #f1f5f9 !important;
+}
+
+.etholys-system .sys-canvas [class*="text-teal-6"],
+.etholys-system .sys-canvas [class*="text-teal-7"],
+.etholys-system .sys-canvas [class*="text-teal-8"],
+.etholys-system .sys-canvas [class*="text-teal-9"] {
+  color: #5eead4 !important;
+}
+
+.etholys-system .sys-canvas [class*="text-orange-"],
+.etholys-system .sys-canvas [class*="text-amber-6"],
+.etholys-system .sys-canvas [class*="text-amber-7"],
+.etholys-system .sys-canvas [class*="text-amber-8"],
+.etholys-system .sys-canvas [class*="text-amber-9"] {
+  color: #fdba74 !important;
+}
+
+.etholys-system .sys-canvas [class*="text-emerald-6"],
+.etholys-system .sys-canvas [class*="text-emerald-7"],
+.etholys-system .sys-canvas [class*="text-emerald-8"],
+.etholys-system .sys-canvas [class*="text-emerald-9"] {
+  color: #6ee7b7 !important;
+}
+
+.etholys-system .sys-canvas [class*="text-violet-"],
+.etholys-system .sys-canvas [class*="text-purple-"],
+.etholys-system .sys-canvas [class*="text-indigo-6"],
+.etholys-system .sys-canvas [class*="text-indigo-7"],
+.etholys-system .sys-canvas [class*="text-indigo-8"],
+.etholys-system .sys-canvas [class*="text-indigo-9"],
+.etholys-system .sys-canvas [class*="text-sky-"] {
+  color: #ddd6fe !important;
+}
+
+.etholys-system .sys-canvas [class*="text-red-6"],
+.etholys-system .sys-canvas [class*="text-red-7"],
+.etholys-system .sys-canvas [class*="text-red-8"],
+.etholys-system .sys-canvas [class*="text-red-9"] {
+  color: #fca5a5 !important;
+}
+
+.etholys-system .sys-canvas [class*="bg-teal-50"],
+.etholys-system .sys-canvas [class*="bg-teal-100"] {
+  background-color: rgba(45, 212, 191, 0.2) !important;
+}
+
+.etholys-system .sys-canvas [class*="bg-violet-50"],
+.etholys-system .sys-canvas [class*="bg-indigo-50"],
+.etholys-system .sys-canvas [class*="bg-sky-50"],
+.etholys-system .sys-canvas [class*="bg-purple-50"],
+.etholys-system .sys-canvas [class*="bg-violet-100"] {
+  background-color: rgba(167, 139, 250, 0.18) !important;
+}
+
+.etholys-system .sys-canvas [class*="bg-amber-50"],
+.etholys-system .sys-canvas [class*="bg-orange-50"] {
+  background-color: rgba(251, 146, 60, 0.18) !important;
+}
+
+.etholys-system .sys-canvas [class*="bg-emerald-50"] {
+  background-color: rgba(16, 185, 129, 0.18) !important;
+}
+
+.etholys-system .sys-canvas [class*="bg-gradient-to-"][class*="from-white"],
+.etholys-system .sys-canvas [class*="from-white"] {
+  background-image: none !important;
+  background-color: var(--sys-panel) !important;
 }
 
 .etholys-fundhub .fh-count-chip {

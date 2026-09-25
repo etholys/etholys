@@ -391,8 +391,10 @@ export default function NexusAtPage() {
               <button
                 type="button"
                 onClick={() => setSectorFilter('all')}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium ${
-                  sectorFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                  sectorFilter === 'all'
+                    ? 'border-white/25 bg-[#f8fafc] text-[#07111A]'
+                    : 'border-white/20 bg-white/10 text-slate-100 hover:bg-white/15'
                 }`}
               >
                 {es ? 'Todos' : 'Todos'}
@@ -402,8 +404,10 @@ export default function NexusAtPage() {
                   key={row.sectorId}
                   type="button"
                   onClick={() => setSectorFilter(row.sectorId)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium ${
-                    sectorFilter === row.sectorId ? 'bg-teal-800 text-white' : 'bg-teal-50 text-teal-900'
+                  className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                    sectorFilter === row.sectorId
+                      ? 'border-teal-300/60 bg-teal-400 text-[#042f2e]'
+                      : 'border-white/20 bg-white/10 text-slate-100 hover:bg-white/15'
                   }`}
                 >
                   {sectorBadgeLabel(row.sectorId, loc) || row.sectorId} · {row.companies}

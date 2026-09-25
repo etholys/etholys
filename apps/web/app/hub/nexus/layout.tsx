@@ -270,7 +270,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
           {!collapsed && (
             <Link
               href="/hub"
-              className={cn('mt-2 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-gray-500 transition', nx.hoverHub)}
+              className={cn('mt-2 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-white/50 transition', nx.hoverHub)}
             >
               <ChevronDown className="h-3 w-3 rotate-90" />
               {locale === 'es' ? 'Volver al Hub' : locale === 'pt' ? 'Voltar ao Hub' : 'Back to Hub'}
@@ -303,7 +303,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
                       setCompanyMenuOpen(false);
                     }}
                     className={cn(
-                      'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50',
+                      'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#E8EEF2] hover:bg-white/10',
                       !activeCompanyId && cn(nx.mutedActive, 'font-medium')
                     )}
                   >
@@ -319,7 +319,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
                         setCompanyMenuOpen(false);
                       }}
                       className={cn(
-                        'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50',
+                        'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#E8EEF2] hover:bg-white/10',
                         activeCompanyId === c?.id && cn(nx.mutedActive, 'font-medium')
                       )}
                     >
@@ -334,14 +334,14 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
             {isAtClientDiagnosis && (
-              <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2">
-                <p className="mt-0.5 truncate text-xs font-medium text-teal-950">
+              <div className="rounded-lg border border-teal-400/25 bg-teal-500/10 px-3 py-2">
+                <p className="mt-0.5 truncate text-xs font-medium text-teal-100">
                   {atSubjectLabel || '…'}
                 </p>
                 {atEngagementId && (
                   <Link
                     href={`/hub/nexus/at/${encodeURIComponent(atEngagementId)}`}
-                    className="mt-1 inline-block text-[11px] font-medium text-teal-800 underline"
+                    className="mt-1 inline-block text-[11px] font-medium text-teal-200 underline"
                     onClick={() => setSidebarOpen(false)}
                   >
                     {locale === 'es' ? 'Volver al contrato' : locale === 'pt' ? 'Voltar ao contrato' : 'Back to contract'}
@@ -406,13 +406,13 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className={cn('flex-shrink-0 border-t border-gray-100', collapsed ? 'p-1.5' : 'p-3')}>
+        <div className={cn('flex-shrink-0 border-t border-white/10', collapsed ? 'p-1.5' : 'p-3')}>
           <div className={cn('mb-2 flex items-center', collapsed ? 'flex-col gap-1' : 'gap-1')}>
             <button
               type="button"
               onClick={() => setLocale(locale === 'es' ? 'pt' : locale === 'pt' ? 'en' : 'es')}
               className={cn(
-                'flex items-center gap-1.5 rounded-lg text-xs text-gray-600 transition hover:bg-gray-100',
+                'flex items-center gap-1.5 rounded-lg text-xs text-white/60 transition hover:bg-white/10 hover:text-white',
                 collapsed ? 'justify-center p-2' : 'flex-1 px-2.5 py-1.5'
               )}
               title={collapsed ? String(locale?.toUpperCase()) : undefined}
@@ -424,7 +424,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => setNotifOpen(!notifOpen)}
-                className="relative rounded-lg p-2 text-gray-600 transition hover:bg-gray-100"
+                className="relative rounded-lg p-2 text-white/60 transition hover:bg-white/10 hover:text-white"
               >
                 <Bell className="h-3.5 w-3.5" />
                 {notifCount > 0 && (
@@ -509,7 +509,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => signOut({ callbackUrl: '/login' })}
-                className="text-gray-400 transition hover:text-red-500"
+                className="text-white/40 transition hover:text-red-400"
                 title={tr('auth.logout')}
               >
                 <LogOut className="h-4 w-4" />
@@ -520,7 +520,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => signOut({ callbackUrl: '/login' })}
-              className="mt-1 flex w-full items-center justify-center rounded-lg py-2 text-gray-400 transition hover:text-red-500"
+              className="mt-1 flex w-full items-center justify-center rounded-lg py-2 text-white/40 transition hover:text-red-400"
               title={tr('auth.logout')}
             >
               <LogOut className="h-4 w-4" />
