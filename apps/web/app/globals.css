@@ -209,8 +209,25 @@
   color: var(--sys-ink);
 }
 
+/* Closed control stays light-on-dark; native popup is a light OS surface */
+.etholys-system .sys-canvas select,
+.etholys-fundhub select {
+  color-scheme: light;
+  color: var(--sys-ink) !important;
+}
+
+.etholys-system .sys-canvas input[type='date'],
+.etholys-system .sys-canvas input[type='time'],
+.etholys-fundhub input[type='date'],
+.etholys-fundhub input[type='time'] {
+  color-scheme: dark;
+}
+
 .etholys-system .sys-canvas input::placeholder,
 .etholys-system .sys-canvas textarea::placeholder,
+.etholys-system .sys-canvas .placeholder\:text-gray-400::placeholder,
+.etholys-system .sys-canvas .placeholder\:text-gray-500::placeholder,
+.etholys-system .sys-canvas .placeholder\:text-slate-400::placeholder,
 .etholys-fundhub input::placeholder,
 .etholys-fundhub textarea::placeholder,
 .etholys-fundhub .placeholder\:text-gray-400::placeholder,
@@ -272,7 +289,10 @@
 .etholys-system .sys-canvas .text-gray-500,
 .etholys-system .sys-canvas .text-gray-400,
 .etholys-system .sys-canvas .text-slate-500,
-.etholys-system .sys-canvas .text-slate-400,
+.etholys-system .sys-canvas .text-slate-400 {
+  color: var(--sys-muted) !important;
+}
+
 .etholys-fundhub .text-gray-500,
 .etholys-fundhub .text-gray-400,
 .etholys-fundhub .text-slate-500,
@@ -289,6 +309,7 @@
 .etholys-system .sys-canvas .border-gray-200,
 .etholys-system .sys-canvas .border-gray-300,
 .etholys-system .sys-canvas .border-slate-200,
+.etholys-system .sys-canvas .border-slate-300,
 .etholys-system .sys-canvas .ring-gray-200,
 .etholys-fundhub .border-gray-100,
 .etholys-fundhub .border-gray-200,
@@ -491,6 +512,20 @@
   border-top-color: #fbbf24 !important;
 }
 
+.etholys-system .sys-canvas .border-slate-300\/40,
+.etholys-system .sys-canvas .border-slate-300 {
+  border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+.etholys-system .sys-canvas .border-t-slate-600,
+.etholys-system .sys-canvas .border-t-slate-800,
+.etholys-system .sys-canvas .border-t-teal-700,
+.etholys-system .sys-canvas .border-t-teal-600,
+.etholys-system .sys-canvas .border-t-violet-600,
+.etholys-system .sys-canvas .border-t-indigo-600 {
+  border-top-color: #5eead4 !important;
+}
+
 .etholys-system .sys-canvas .shadow-sm,
 .etholys-system .sys-canvas .shadow-lg,
 .etholys-fundhub .shadow-sm,
@@ -506,8 +541,20 @@
 
 /* Native <select> popup no Windows é claro — options nunca herdam tinta do canvas */
 .etholys-system .sys-canvas select option,
-.etholys-fundhub select option {
+.etholys-system .sys-canvas select option:checked,
+.etholys-system .sys-canvas select option:hover,
+.etholys-system .sys-canvas select option:focus,
+.etholys-fundhub select option,
+.etholys-fundhub select option:checked,
+.etholys-fundhub select option:hover,
+.etholys-fundhub select option:focus {
   background-color: #ffffff;
+  color: #0f172a;
+}
+
+.etholys-system .sys-canvas select option:checked,
+.etholys-fundhub select option:checked {
+  background-color: #dbeafe;
   color: #0f172a;
 }
 
@@ -605,7 +652,7 @@
 
 /* NEXUS / sistemas — catch-all: chips, badges, títulos e corpo no canvas escuro */
 .etholys-system .sys-canvas [class*="text-gray-"],
-.etholys-system .sys-canvas [class*="text-slate-"]:not([class*="text-slate-50"]):not([class*="text-slate-100"]):not([class*="text-slate-200"]):not([class*="text-slate-300"]) {
+.etholys-system .sys-canvas [class*="text-slate-"] {
   color: #f1f5f9 !important;
 }
 
@@ -674,6 +721,85 @@
 .etholys-system .sys-canvas [class*="from-white"] {
   background-image: none !important;
   background-color: var(--sys-panel) !important;
+}
+
+.etholys-system .sys-canvas [class*="text-indigo-9"],
+.etholys-system .sys-canvas [class*="text-sky-9"] {
+  color: #c7d2fe !important;
+}
+
+.etholys-system .sys-canvas [class*="bg-indigo-50"],
+.etholys-system .sys-canvas [class*="bg-sky-50"] {
+  background-color: rgba(129, 140, 248, 0.2) !important;
+}
+
+.etholys-system .sys-canvas .bg-\[\#fafbfc\],
+.etholys-system .sys-canvas .bg-\[\#f5f3ff\] {
+  background-color: var(--sys-panel) !important;
+}
+
+/* Chips de filtro (carteira por setor, etc.) — nunca tinta slate fraca */
+.etholys-system .nx-filter-chip {
+  color: #f8fafc !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+.etholys-system .nx-filter-chip:hover {
+  background-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+.etholys-system .nx-filter-chip-on {
+  color: #042f2e !important;
+  background-color: #2dd4bf !important;
+  border-color: rgba(94, 234, 212, 0.75) !important;
+}
+
+.etholys-system .nx-filter-chip-on-neutral {
+  color: #07111a !important;
+  background-color: #f8fafc !important;
+  border-color: rgba(248, 250, 252, 0.55) !important;
+}
+
+/*
+ * Sidebar + rail do NEXUS ficam FORA de .sys-canvas.
+ * Remapes de texto/fundo claros (sem misturar teal com âmbar FundHub).
+ */
+.etholys-system aside .bg-white,
+.etholys-system aside .bg-\[\#fafbfc\],
+.etholys-system aside .bg-gray-50,
+.etholys-system aside .bg-slate-50 {
+  background-color: #0c1822 !important;
+}
+
+.etholys-system aside .bg-teal-50,
+.etholys-system aside .bg-teal-50\/80,
+.etholys-system aside .hover\:bg-teal-50:hover {
+  background-color: rgba(45, 212, 191, 0.16) !important;
+}
+
+.etholys-system aside [class*="text-gray-"],
+.etholys-system aside [class*="text-slate-"]:not([class*="text-slate-50"]):not([class*="text-slate-100"]):not([class*="text-slate-200"]):not([class*="text-slate-300"]) {
+  color: #f1f5f9 !important;
+}
+
+.etholys-system aside [class*="text-teal-6"],
+.etholys-system aside [class*="text-teal-7"],
+.etholys-system aside [class*="text-teal-8"],
+.etholys-system aside [class*="text-teal-9"] {
+  color: #5eead4 !important;
+}
+
+.etholys-system aside .hover\:bg-gray-50:hover,
+.etholys-system aside .hover\:bg-slate-50:hover,
+.etholys-system aside .hover\:bg-slate-100:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.etholys-system aside .border-slate-200,
+.etholys-system aside .border-slate-100,
+.etholys-system aside .border-gray-200 {
+  border-color: rgba(255, 255, 255, 0.12) !important;
 }
 
 .etholys-fundhub .fh-count-chip {

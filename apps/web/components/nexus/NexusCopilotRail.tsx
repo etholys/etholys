@@ -102,18 +102,18 @@ export function NexusCopilotRail() {
 
   if (collapsed) {
     return (
-      <aside className="hidden w-12 shrink-0 flex-col border-l border-slate-200 bg-[#fafbfc] lg:flex">
+      <aside className="hidden w-12 shrink-0 flex-col border-l border-white/10 bg-[#07111A]/88 lg:flex">
         <button
           type="button"
           onClick={toggle}
-          className="flex h-12 w-full items-center justify-center text-teal-800 hover:bg-teal-50"
+          className="flex h-12 w-full items-center justify-center text-teal-200 hover:bg-white/5"
           title={L === 'es' ? 'Abrir panel' : L === 'en' ? 'Open panel' : 'Abrir painel'}
         >
           <PanelRightOpen className="h-5 w-5" />
         </button>
         <Link
           href={coachHref}
-          className="mx-auto mt-2 flex h-9 w-9 items-center justify-center rounded-lg bg-[#0c1222] text-teal-200 hover:bg-slate-800"
+          className="mx-auto mt-2 flex h-9 w-9 items-center justify-center rounded-lg bg-teal-500/15 text-teal-100 hover:bg-teal-500/25"
           title={L === 'es' || L === 'pt' ? 'Copiloto' : 'Copilot'}
         >
           <Sparkles className="h-4 w-4" />
@@ -123,16 +123,16 @@ export function NexusCopilotRail() {
   }
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-l border-slate-200 bg-[#fafbfc] lg:flex xl:w-72">
-      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-          <Sparkles className="h-4 w-4 text-teal-700" />
+    <aside className="hidden w-64 shrink-0 flex-col border-l border-white/10 bg-[#07111A]/88 lg:flex xl:w-72">
+      <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
+        <div className="flex items-center gap-2 text-sm font-semibold text-white">
+          <Sparkles className="h-4 w-4 text-teal-300" />
           {L === 'es' || L === 'pt' ? 'Copiloto' : 'Copilot'}
         </div>
         <button
           type="button"
           onClick={toggle}
-          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-50 hover:text-gray-700"
+          className="rounded-lg p-1.5 text-white/50 hover:bg-white/5 hover:text-white"
           title={L === 'es' ? 'Minimizar' : L === 'en' ? 'Collapse' : 'Minimizar'}
         >
           <PanelRightClose className="h-4 w-4" />
@@ -141,22 +141,22 @@ export function NexusCopilotRail() {
 
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-3">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-white/50">
             {L === 'es' ? 'Fase' : L === 'en' ? 'Phase' : 'Fase'}
           </p>
-          <p className="mt-1 text-sm font-medium text-slate-900">{stageName}</p>
+          <p className="mt-1 text-sm font-medium text-white">{stageName}</p>
         </div>
 
         <Link
           href={coachHref}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0c1222] px-3 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-500/15 px-3 py-2.5 text-sm font-medium text-teal-100 hover:bg-teal-500/25"
         >
           <MessageCircle className="h-4 w-4 text-teal-300" />
           {L === 'es' || L === 'pt' ? 'Abrir chat' : 'Open chat'}
         </Link>
 
         <div>
-          <div className="mb-2 flex items-center justify-between text-[11px] text-slate-500">
+          <div className="mb-2 flex items-center justify-between text-[11px] text-white/60">
             <span className="font-medium uppercase tracking-wide">
               {L === 'es' ? 'Progreso' : L === 'en' ? 'Progress' : 'Progresso'}
             </span>
@@ -164,8 +164,8 @@ export function NexusCopilotRail() {
               {done}/{total} · {percent}%
             </span>
           </div>
-          <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-slate-200/80">
-            <div className="h-full rounded-full bg-teal-600 transition-all" style={{ width: `${percent}%` }} />
+          <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-teal-400 transition-all" style={{ width: `${percent}%` }} />
           </div>
           <ul className="space-y-1">
             {NEXUS_RUNWAY_CHAPTERS.map((c) => {
@@ -177,13 +177,13 @@ export function NexusCopilotRail() {
                     href={withNetworkPath(c.path, networkId)}
                     className={cn(
                       'flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition',
-                      on ? 'bg-teal-50 font-medium text-teal-950' : 'text-slate-600 hover:bg-slate-50'
+                      on ? 'bg-teal-500/15 font-medium text-teal-100' : 'text-white/70 hover:bg-white/5 hover:text-white'
                     )}
                   >
                     <span
                       className={cn(
                         'h-1.5 w-1.5 shrink-0 rounded-full',
-                        complete ? 'bg-emerald-500' : on ? 'bg-teal-600' : 'bg-slate-300'
+                        complete ? 'bg-emerald-400' : on ? 'bg-teal-400' : 'bg-white/25'
                       )}
                     />
                     {runwayChapterLabel(c, L)}

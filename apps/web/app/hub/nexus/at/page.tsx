@@ -391,10 +391,8 @@ export default function NexusAtPage() {
               <button
                 type="button"
                 onClick={() => setSectorFilter('all')}
-                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                  sectorFilter === 'all'
-                    ? 'border-white/25 bg-[#f8fafc] text-[#07111A]'
-                    : 'border-white/20 bg-white/10 text-slate-100 hover:bg-white/15'
+                className={`nx-filter-chip rounded-full border px-2.5 py-1 text-xs font-medium ${
+                  sectorFilter === 'all' ? 'nx-filter-chip-on-neutral' : ''
                 }`}
               >
                 {es ? 'Todos' : 'Todos'}
@@ -404,10 +402,8 @@ export default function NexusAtPage() {
                   key={row.sectorId}
                   type="button"
                   onClick={() => setSectorFilter(row.sectorId)}
-                  className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                    sectorFilter === row.sectorId
-                      ? 'border-teal-300/60 bg-teal-400 text-[#042f2e]'
-                      : 'border-white/20 bg-white/10 text-slate-100 hover:bg-white/15'
+                  className={`nx-filter-chip rounded-full border px-2.5 py-1 text-xs font-medium ${
+                    sectorFilter === row.sectorId ? 'nx-filter-chip-on' : ''
                   }`}
                 >
                   {sectorBadgeLabel(row.sectorId, loc) || row.sectorId} · {row.companies}
@@ -714,7 +710,7 @@ export default function NexusAtPage() {
 
       {loading ? (
         <div className="flex min-h-[24vh] items-center justify-center">
-          <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-300 border-t-slate-800" />
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-teal-400/25 border-t-teal-400" />
         </div>
       ) : (
         <>

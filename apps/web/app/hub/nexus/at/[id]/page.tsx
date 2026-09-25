@@ -613,7 +613,7 @@ export default function NexusAtServicePage() {
   if (loading) {
     return (
       <div className="flex min-h-[30vh] items-center justify-center">
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-300 border-t-slate-800" />
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-teal-400/25 border-t-teal-400" />
       </div>
     );
   }

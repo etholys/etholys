@@ -80,7 +80,7 @@ export function NexusSectorMultiSelect({
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-left text-sm text-slate-900 outline-none hover:border-slate-300 focus:border-slate-400 disabled:opacity-40"
       >
-        <span className={`min-w-0 truncate ${selectedLabels.length === 0 ? 'text-slate-400' : ''}`}>
+        <span className={`min-w-0 truncate ${selectedLabels.length === 0 ? 'text-slate-400' : 'text-slate-900'}`}>
           {summary}
         </span>
         <span className="flex shrink-0 items-center gap-1">
@@ -119,7 +119,7 @@ export function NexusSectorMultiSelect({
                     type="button"
                     onClick={() => toggle(o.id)}
                     className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 ${
-                      on ? 'bg-teal-50/80 text-teal-950' : 'text-slate-800'
+                      on ? 'bg-teal-50/80 font-medium text-teal-100' : 'text-slate-800'
                     }`}
                   >
                     <span

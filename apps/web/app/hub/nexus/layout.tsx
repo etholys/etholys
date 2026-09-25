@@ -434,9 +434,9 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
                 )}
               </button>
               {notifOpen && (
-                <div className="absolute bottom-full left-0 z-[60] mb-1 w-80 overflow-hidden rounded-xl border bg-white shadow-lg">
-                  <div className="flex items-center justify-between border-b px-4 py-3">
-                    <span className="text-sm font-semibold text-gray-900">
+                <div className="absolute bottom-full left-0 z-[60] mb-1 w-80 overflow-hidden rounded-xl border border-white/10 bg-[#0C1822] shadow-[0_24px_80px_-40px_rgba(0,0,0,0.9)]">
+                  <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                    <span className="text-sm font-semibold text-white">
                       {locale === 'es' ? 'Notificaciones' : locale === 'pt' ? 'Notificações' : 'Notifications'}
                     </span>
                     {notifCount > 0 && (
@@ -445,9 +445,9 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
                       </button>
                     )}
                   </div>
-                  <div className="max-h-72 divide-y overflow-y-auto">
+                  <div className="max-h-72 divide-y divide-white/[0.06] overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <div className="px-4 py-6 text-center text-sm text-gray-400">
+                      <div className="px-4 py-6 text-center text-sm text-white/70">
                         {locale === 'es' ? 'Sin notificaciones' : locale === 'pt' ? 'Sem notificações' : 'No notifications'}
                       </div>
                     ) : (
@@ -481,11 +481,11 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
                             }
                             setNotifOpen(false);
                           }}
-                          className={cn('cursor-pointer px-4 py-3 transition hover:bg-gray-50', !n.read && nx.notifUnread)}
+                          className={cn('cursor-pointer px-4 py-3 transition hover:bg-white/[0.04]', !n.read && nx.notifUnread)}
                         >
-                          <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                          <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">{n.message}</p>
-                          <p className="mt-1 text-[10px] text-gray-400">
+                          <p className="text-sm font-medium text-white">{n.title}</p>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-white/70">{n.message}</p>
+                          <p className="mt-1 text-[10px] text-white/55">
                             {new Date(n.createdAt).toLocaleDateString('es-UY')}
                           </p>
                         </div>
@@ -539,13 +539,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
           {activeCompany && (
-            <div
-              className="flex min-w-0 items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
-              style={{
-                backgroundColor: `${activeCompany?.color ?? nx.companyFallback}15`,
-                color: activeCompany?.color ?? nx.companyFallback,
-              }}
-            >
+            <div className="flex min-w-0 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-white">
               <div
                 className="h-2 w-2 flex-shrink-0 rounded-full"
                 style={{ backgroundColor: activeCompany?.color ?? nx.companyFallback }}

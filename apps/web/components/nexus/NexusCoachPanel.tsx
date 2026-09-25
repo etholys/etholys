@@ -386,7 +386,7 @@ export function NexusCoachPanel({
           immersiveChrome &&
             'min-h-[min(72vh,calc(100vh-12rem))] shadow-[0_28px_70px_-20px_rgba(91,33,182,0.28)] ring-1 ring-violet-400/35',
           immersiveChrome &&
-            'bg-[radial-gradient(90%_100%_at_50%_-10%,rgba(124,58,237,0.16),transparent_50%),linear-gradient(180deg,rgba(124,58,237,0.06),transparent_35%),linear-gradient(to_bottom,#f5f3ff,white)]',
+            'bg-[radial-gradient(90%_100%_at_50%_-10%,rgba(124,58,237,0.22),transparent_50%),linear-gradient(180deg,rgba(124,58,237,0.1),transparent_35%),linear-gradient(165deg,#0b1420_0%,#0c1822_100%)]',
           !immersiveChrome && 'border border-violet-200/85 bg-white',
         )}
       >
