@@ -66,10 +66,26 @@ export function NexusAtClientDossier({
           </p>
         )}
 
-        {program && (
+        {!lastDx && (
+          <p className="mt-3 text-xs leading-relaxed text-slate-600">
+            {es
+              ? 'El sector ya está. El plan, el cuaderno y las líneas de trabajo salen del diagnóstico 360 — todavía no hay nada que cumplir.'
+              : 'O setor já está. O plano, o caderno e as linhas de trabalho saem do diagnóstico 360 — ainda não há nada a cumprir.'}
+          </p>
+        )}
+
+        {lastDx && (
+          <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-xs text-indigo-950">
+            <p className="font-medium">
+              {es ? 'Último diagnóstico' : 'Último diagnóstico'} · {lastDx.overallScore}/100
+            </p>
+          </div>
+        )}
+
+        {lastDx && program && (
           <div className="mt-3">
             <p className="text-[11px] font-medium uppercase text-slate-500">
-              {es ? 'Líneas de intervención AT' : 'Linhas de intervenção AT'}
+              {es ? 'Líneas del plan (tras el 360)' : 'Linhas do plano (após o 360)'}
             </p>
             <ul className="mt-1.5 space-y-1">
               {program.focusAreas.map((line, i) => (
@@ -83,16 +99,10 @@ export function NexusAtClientDossier({
         )}
 
         {lastDx && (
-          <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-xs text-indigo-950">
-            <p className="font-medium">
-              {es ? 'Último diagnóstico (local)' : 'Último diagnóstico (local)'} · {lastDx.overallScore}/100
-            </p>
+          <div className="mt-3">
+            <NexusModulePulse companyId={companyId} engagementId={engagementId} locale={locale} />
           </div>
         )}
-
-        <div className="mt-3">
-          <NexusModulePulse companyId={companyId} engagementId={engagementId} locale={locale} />
-        </div>
 
         {!hideDiagnosisCta && (
           <div className="mt-3 flex flex-wrap gap-2">
@@ -102,34 +112,33 @@ export function NexusAtClientDossier({
             >
               {lastDx
                 ? es
-                  ? 'Repetir diagnóstico CMM'
-                  : 'Repetir diagnóstico CMM'
-                : deepMatrix
-                  ? es
-                    ? 'Diagnóstico matriz sectorial (1–5)'
-                    : 'Diagnóstico matriz setorial (1–5)'
-                  : es
-                    ? 'Correr diagnóstico'
-                    : 'Correr diagnóstico'}
+                  ? 'Reabrir diagnóstico'
+                  : 'Reabrir diagnóstico'
+                : es
+                  ? 'Iniciar diagnóstico 360'
+                  : 'Iniciar diagnóstico 360'}
             </Link>
           </div>
         )}
-        {deepMatrix && (
+        {lastDx && deepMatrix && (
           <p className="mt-2 text-[11px] text-slate-500">
             {es
-              ? 'En profundidad (deep/exhaustive) se añade matriz CMM. El diagnóstico estándar usa capas: negocio, nivel, comercialización y sector.'
-              : 'Em profundidade (deep/exhaustive) acrescenta-se matriz CMM. O diagnóstico standard usa camadas: negócio, nível, comercialização e setor.'}
+              ? 'En profundidad se añade matriz CMM. El 360 estándar usa capas: negocio, gestión, producción y comercial.'
+              : 'Em profundidade acrescenta-se matriz CMM. O 360 padrão usa camadas: negócio, gestão, produção e comercial.'}
           </p>
         )}
       </div>
 
-      <NexusIncubationProcessPanel
-        companyId={companyId}
-        networkId={networkId}
-        locale={locale}
-        compact
-        engagementId={engagementId}
-      />
+      {lastDx ? (
+        <NexusIncubationProcessPanel
+          companyId={companyId}
+          networkId={networkId}
+          locale={locale}
+          compact
+          engagementId={engagementId}
+          hideWhenEmpty
+        />
+      ) : null}
     </div>
   );
 }

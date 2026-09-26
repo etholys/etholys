@@ -1117,17 +1117,19 @@ return (
                 hideDiagnosisCta
               />
 
-              <NexusAtSectorPlaybook
-                sectorId={playbookSectorId}
-                locale={loc}
-                compact
-                onSuggestCaseKind={
-                  isOperator && selectedProjectId && selectedCompanyId ? suggestCaseKind : undefined
-                }
-                onSuggestFocusArea={
-                  isOperator && selectedProjectId && selectedCompanyId ? suggestFocusArea : undefined
-                }
-              />
+              {hasLocalDx ? (
+                <NexusAtSectorPlaybook
+                  sectorId={playbookSectorId}
+                  locale={loc}
+                  compact
+                  onSuggestCaseKind={
+                    isOperator && selectedProjectId && selectedCompanyId ? suggestCaseKind : undefined
+                  }
+                  onSuggestFocusArea={
+                    isOperator && selectedProjectId && selectedCompanyId ? suggestFocusArea : undefined
+                  }
+                />
+              ) : null}
 
               {showNewCase && (
                 <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
