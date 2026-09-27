@@ -45,8 +45,25 @@ export function NexusSectorMultiSelect({
 
   useEffect(() => {
     if (!open) return;
+    const isScrollbarClick = (e: MouseEvent) => {
+      const t = e.target;
+      if (!(t instanceof HTMLElement)) return false;
+      const style = getComputedStyle(t);
+      const yScroll =
+        (style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+        t.scrollHeight > t.clientHeight;
+      const xScroll =
+        (style.overflowX === 'auto' || style.overflowX === 'scroll') &&
+        t.scrollWidth > t.clientWidth;
+      if (yScroll && e.offsetX >= t.clientWidth) return true;
+      if (xScroll && e.offsetY >= t.clientHeight) return true;
+      return false;
+    };
     const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      if (rootRef.current?.contains(e.target as Node)) return;
+      // Page/canvas scrollbar is not an outside click — keep the list open.
+      if (isScrollbarClick(e)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
@@ -72,11 +89,14 @@ export function NexusSectorMultiSelect({
     onChange(next);
   };
 
+  const selectedOptions = options.filter((o) => value.includes(o.id));
+
   return (
-    <div ref={rootRef} className={`relative ${className}`}>
+    <div ref={rootRef} className={className}>
       <button
         type="button"
         disabled={disabled}
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-left text-sm text-slate-900 outline-none hover:border-slate-300 focus:border-slate-400 disabled:opacity-40"
       >
@@ -93,8 +113,31 @@ export function NexusSectorMultiSelect({
         </span>
       </button>
 
+      {selectedOptions.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {selectedOptions.map((o) => (
+            <span
+              key={o.id}
+              className="inline-flex max-w-full items-center gap-1 rounded-md bg-teal-50 px-1.5 py-0.5 text-[11px] font-medium text-teal-900"
+            >
+              <span className="min-w-0 truncate">{o.label}</span>
+              {!disabled && (
+                <button
+                  type="button"
+                  onClick={() => toggle(o.id)}
+                  className="shrink-0 text-teal-700 hover:text-teal-950"
+                  aria-label={o.label}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+
       {open && (
-        <div className="absolute z-30 mt-1 w-full min-w-[16rem] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+        <div className="mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
             <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
               {placeholder}
@@ -110,7 +153,11 @@ export function NexusSectorMultiSelect({
               </button>
             )}
           </div>
-          <ul className="max-h-56 overflow-y-auto py-1">
+          <ul
+            className="max-h-[min(16rem,40vh)] overflow-y-auto overscroll-contain py-1"
+            onWheel={(e) => e.stopPropagation()}
+            onScroll={(e) => e.stopPropagation()}
+          >
             {options.map((o) => {
               const on = value.includes(o.id);
               return (
@@ -119,7 +166,7 @@ export function NexusSectorMultiSelect({
                     type="button"
                     onClick={() => toggle(o.id)}
                     className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 ${
-                      on ? 'bg-teal-50/80 font-medium text-teal-100' : 'text-slate-800'
+                      on ? 'bg-teal-50/80 font-medium text-teal-900' : 'text-slate-800'
                     }`}
                   >
                     <span
