@@ -1,6 +1,13 @@
 import 'server-only';
 
-import { buildCallEvidence, extractDocumentLinks, normalizeCallDocuments } from '@/lib/opportunity/call-evidence';
+import {
+  buildCallEvidence,
+  extractDocumentLinks,
+  isLikelyCallPageUrl,
+  isLikelyHomepageUrl,
+  isLikelyListingUrl,
+  normalizeCallDocuments,
+} from '@/lib/opportunity/call-evidence';
 import { extractOfficialBases } from '@/lib/opportunity/extract-bases';
 import { llmCompleteWithWebSearch } from '@/lib/llm-client';
 import {
@@ -9,6 +16,13 @@ import {
   siteNameFromHtml,
   titleFromHtml,
 } from '@/lib/opportunity/official-fetch';
+import {
+  alternateLocaleCallUrls,
+  htmlMentionsAnnexes,
+  isBotWallHtml,
+  isThinOfficialHtml,
+} from '@/lib/opportunity/official-html';
+import { recoverOfficialPageViaWebSearch } from '@/lib/opportunity/official-page-recover';
 import type { CallDocument, CallEvidence } from '@/lib/opportunity/scan-types';
 import { fundhubLanguageName, normalizeFundhubLocale, type FundhubLocale } from '@/lib/agents/fundhub-proposal-prompt';
 
@@ -52,11 +66,99 @@ async function supplementWithWebSearch(url: string, seed: string, locale: Fundhu
   }
 }
 
-export async function ingestOfficialEdital(url: string, opts?: { locale?: unknown }): Promise<IngestedEdital> {
+export async function ingestOfficialEdital(
+  url: string,
+  opts?: { locale?: unknown; nameHint?: string; institutionHint?: string; seed?: string },
+): Promise<IngestedEdital> {
   const locale = normalizeFundhubLocale(opts?.locale);
-  const page = await fetchOfficialResource(url);
-  const callUrl = page.finalUrl || url;
-  const documents = page.html ? extractDocumentLinks(page.html, callUrl) : [];
+  let page = await fetchOfficialResource(url);
+  let callUrl = page.finalUrl || url;
+
+  if (!page.ok || isBotWallHtml(page.html)) {
+    for (const alt of alternateLocaleCallUrls(callUrl)) {
+      const retry = await fetchOfficialResource(alt);
+      if (retry.ok && !isBotWallHtml(retry.html)) {
+        page = retry;
+        callUrl = retry.finalUrl || alt;
+        break;
+      }
+    }
+  }
+
+  const htmlOk = page.ok && !isBotWallHtml(page.html);
+  let documents = htmlOk && page.html ? extractDocumentLinks(page.html, callUrl) : [];
+  const excerpt = htmlOk && page.html ? htmlToExcerpt(page.html) : '';
+  const spaThin = isThinOfficialHtml(page.html, excerpt);
+  const listingOrHome = isLikelyHomepageUrl(callUrl) || isLikelyListingUrl(callUrl);
+  const annexGap = htmlMentionsAnnexes(page.html || excerpt) && documents.length === 0;
+  const thin = !htmlOk || spaThin || listingOrHome || annexGap || excerpt.length < 800;
+
+  if (thin) {
+    const recovered = await recoverOfficialPageViaWebSearch(callUrl, {
+      name: opts?.nameHint,
+      institution: opts?.institutionHint,
+      seed: excerpt || opts?.seed,
+    });
+    if (recovered.callUrl && isLikelyCallPageUrl(recovered.callUrl) && recovered.callUrl !== callUrl) {
+      const second = await fetchOfficialResource(recovered.callUrl);
+      if (second.ok && !isBotWallHtml(second.html)) {
+        page = second;
+        callUrl = second.finalUrl || recovered.callUrl;
+        if (page.html) {
+          documents = extractDocumentLinks(page.html, callUrl);
+        }
+      } else {
+        callUrl = recovered.callUrl;
+      }
+    } else if (recovered.callUrl && isLikelyCallPageUrl(recovered.callUrl)) {
+      callUrl = recovered.callUrl;
+    }
+    documents = normalizeCallDocuments([...documents, ...recovered.documents]);
+
+    const htmlOkAfter = page.ok && !isBotWallHtml(page.html);
+    const excerptAfter = htmlOkAfter && page.html ? htmlToExcerpt(page.html) : excerpt;
+    let sourceExcerpt = excerptAfter;
+    if (recovered.excerpt) {
+      sourceExcerpt = excerptAfter
+        ? `${excerptAfter}\n\n${recovered.excerpt}`.slice(0, 12_000)
+        : recovered.excerpt.slice(0, 12_000);
+    }
+    if (sourceExcerpt.length < 400) {
+      const extra = await supplementWithWebSearch(callUrl, sourceExcerpt, locale);
+      if (extra) {
+        sourceExcerpt = sourceExcerpt ? `${sourceExcerpt}\n\n${extra}`.slice(0, 12_000) : extra.slice(0, 12_000);
+      }
+    }
+
+    return finishIngest({
+      page,
+      callUrl,
+      documents,
+      sourceExcerpt,
+      recoveredOk: recovered.reachable,
+      recoveredStatus: recovered.httpStatus,
+    });
+  }
+
+  return finishIngest({
+    page,
+    callUrl,
+    documents,
+    sourceExcerpt: excerpt,
+    recoveredOk: false,
+  });
+}
+
+async function finishIngest(opts: {
+  page: { ok: boolean; status: number; html: string; bytes: Buffer | null; type: string };
+  callUrl: string;
+  documents: CallDocument[];
+  sourceExcerpt: string;
+  recoveredOk: boolean;
+  recoveredStatus?: number;
+}): Promise<IngestedEdital> {
+  const { page, callUrl, sourceExcerpt, recoveredOk, recoveredStatus } = opts;
+  let documents = [...opts.documents];
   if (page.ok && (page.type.includes('pdf') || /\.pdf(?:$|[?#])/i.test(callUrl)) && page.bytes) {
     documents.unshift({
       title: titleFromHtml(page.html) || 'Edital (PDF)',
@@ -65,32 +167,29 @@ export async function ingestOfficialEdital(url: string, opts?: { locale?: unknow
     });
   }
   const uniqueDocs = normalizeCallDocuments(documents);
-  const excerpt = page.html ? htmlToExcerpt(page.html) : '';
   const basesText = uniqueDocs.length ? await extractOfficialBases(uniqueDocs) : '';
-
-  const spaShell =
-    excerpt.length < 500 && /<div id="(?:root|app|__next)"/i.test(page.html || '');
-  const thin = !page.ok || excerpt.length < 800 || spaShell || (!basesText && uniqueDocs.length === 0);
-  let sourceExcerpt = excerpt;
-  if (thin) {
-    const extra = await supplementWithWebSearch(url, excerpt || basesText, locale);
-    if (extra) {
-      sourceExcerpt = excerpt ? `${excerpt}\n\n${extra}`.slice(0, 12_000) : extra.slice(0, 12_000);
-    }
-  }
-
-  const name = titleFromHtml(page.html) || (sourceExcerpt.split('\n')[0] || 'Convocatória').slice(0, 160);
-  const institution = siteNameFromHtml(page.html, callUrl);
-  const recovered = !page.ok && sourceExcerpt.length > 200;
+  const htmlOk = page.ok && !isBotWallHtml(page.html);
+  const officialCall = isLikelyCallPageUrl(callUrl);
+  const verified = (htmlOk && officialCall) || (recoveredOk && officialCall && sourceExcerpt.length >= 80);
+  const botBlocked = isBotWallHtml(page.html) && !htmlOk && !recoveredOk;
   const evidence = buildCallEvidence(
     { callUrl, documents: uniqueDocs, sourceExcerpt },
     {
-      httpOk: page.ok || recovered,
-      verifiedAt: page.ok || recovered ? new Date().toISOString() : undefined,
-      httpStatus: page.ok ? page.status || 200 : recovered ? 200 : page.status,
-      verifiedVia: page.ok ? 'http' : recovered ? 'web_search' : undefined,
+      httpOk: verified,
+      verifiedAt: verified ? new Date().toISOString() : undefined,
+      httpStatus: htmlOk
+        ? page.status || 200
+        : recoveredOk
+          ? recoveredStatus || 200
+          : botBlocked
+            ? 403
+            : page.status,
+      verifiedVia: htmlOk && officialCall ? 'http' : recoveredOk && officialCall ? 'web_search' : undefined,
     },
   );
+
+  const name = titleFromHtml(htmlOk ? page.html : '') || (sourceExcerpt.split('\n')[0] || 'Convocatória').slice(0, 160);
+  const institution = siteNameFromHtml(htmlOk ? page.html : '', callUrl);
 
   return {
     name: name || 'Convocatória',
@@ -101,6 +200,6 @@ export async function ingestOfficialEdital(url: string, opts?: { locale?: unknow
     sourceExcerpt,
     basesText,
     evidence,
-    fetched: page.ok || sourceExcerpt.length > 200,
+    fetched: htmlOk || sourceExcerpt.length > 200,
   };
 }

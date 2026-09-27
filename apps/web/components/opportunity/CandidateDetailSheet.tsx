@@ -10,12 +10,13 @@ import {
   formatDateShort,
 } from '@/lib/opportunity/availability';
 import {
-  buildCallEvidence,
   canOpenProposalBlind,
+  evidenceForDisplay,
   evidenceLine,
   pickInstitutionUrl,
   pickOfficialCallUrl,
 } from '@/lib/opportunity/call-evidence';
+import { normalizeInstrumentType } from '@/lib/opportunity/instrument-type';
 import { buildCandidateWordHtml, downloadBlob } from '@/lib/opportunity/candidate-export';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import type { CandidateFit, FitItemStatus, ScanCandidate } from '@/lib/opportunity/scan-types';
@@ -248,7 +249,7 @@ export function CandidateDetailSheet({
       institution: c.institution,
       bodyMarkdownish: analysis || c.description || '',
       meta: {
-        Tipo: c.type,
+        Tipo: normalizeInstrumentType(c.type),
         Categoria: c.category,
         Montante:
           c.amount != null ? `${c.amount.toLocaleString()} ${c.currency ?? 'USD'}` : undefined,
@@ -270,7 +271,7 @@ export function CandidateDetailSheet({
   const callPage = pickOfficialCallUrl(live);
   const institutionPage = pickInstitutionUrl(live);
   const docs = live.documents ?? [];
-  const ev = live.evidence ?? buildCallEvidence(live);
+  const ev = evidenceForDisplay(live);
   const evLine = evidenceLine(ev, locale);
   const proposalReady = canOpenProposalBlind(live);
 
@@ -323,7 +324,7 @@ export function CandidateDetailSheet({
                 </span>
               )}
               <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-700">
-                {c.type}
+                {normalizeInstrumentType(c.type)}
               </span>
               {c.matchScore != null && (
                 <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">

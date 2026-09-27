@@ -38,9 +38,24 @@ export function isLikelyHomepageUrl(url: string | null | undefined): boolean {
   }
 }
 
+/** Listing index (`/calls-for-proposal`) — not the call slug. */
+export function isLikelyListingUrl(url: string | null | undefined): boolean {
+  if (!url || !isSafePublicHttpUrl(url)) return false;
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.replace(/\/+$/, '').split('/').filter(Boolean);
+    const last = parts[parts.length - 1] || '';
+    return /^(calls-for-proposal|calls|convocatorias?|editais|opportunities|grants|funding|chamadas?)$/i.test(
+      last,
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function isLikelyCallPageUrl(url: string | null | undefined): boolean {
   if (!url || !isSafePublicHttpUrl(url) || isAggregatorFundingUrl(url)) return false;
-  if (isLikelyHomepageUrl(url)) return false;
+  if (isLikelyHomepageUrl(url) || isLikelyListingUrl(url)) return false;
   try {
     const u = new URL(url);
     const hay = `${u.pathname} ${u.search} ${u.hash}`;
@@ -101,7 +116,13 @@ function resolveUrl(href: string, base: string): string | null {
   }
 }
 
-/** Extrai PDFs/Word/Excel e anexos óbvios do HTML da convocatória. */
+const DOC_TEXT =
+  /bases|anexo|annex|formulario|formul[aá]rio|guia|guide|guidelines|applicants|terms of reference|edital|convocator|application\s+pack|descarg|download|concept\s*note|nota\s+conceptual|self-?certif|template|activity-?based\s+budget|grant\s+detailed|documento oficial|eligibility for ifad/i;
+
+const DOC_HREF =
+  /\.(pdf|docx?|xlsx?|zip)(?:$|[?#])|\/documents\/|\/download|\/file\/|annex|anexo|guidelines|concept-?note|viewguidelines|attachment/i;
+
+/** Extrai PDFs/Word/Excel e anexos (Annex, Concept Note, Guidelines) mesmo sem .pdf no href. */
 export function extractDocumentLinks(html: string, pageUrl: string): CallDocument[] {
   const found: CallDocument[] = [];
   const re = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
@@ -111,16 +132,7 @@ export function extractDocumentLinks(html: string, pageUrl: string): CallDocumen
     if (!abs || !isSafePublicHttpUrl(abs) || isAggregatorFundingUrl(abs)) continue;
     const text = (m[2] ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     const isFile = /\.(pdf|docx?|xlsx?|zip)(?:$|[?#])/i.test(abs);
-    const looksDoc =
-      isFile ||
-      /bases|anexo|formulario|guia|guide|guidelines|applicants|terms|edital|convocator|application\s+pack|descarg|grant.?opp/i.test(
-        text,
-      );
-    if (!looksDoc) continue;
-    const namedGuidelines = /guidelines|bases|anexo|guide|applicants/i.test(text);
-    if (!isFile && !/\.(pdf|docx?|xlsx?|zip)(?:$|[?#])/i.test(text) && !namedGuidelines) {
-      if (!/download|documento|attachment|file|pdf/i.test(abs)) continue;
-    }
+    if (!isFile && !DOC_TEXT.test(text) && !DOC_HREF.test(abs) && !DOC_HREF.test(text)) continue;
     found.push({ title: text || abs.split('/').pop() || 'Documento', url: abs });
   }
 
@@ -128,6 +140,14 @@ export function extractDocumentLinks(html: string, pageUrl: string): CallDocumen
   let f: RegExpExecArray | null;
   while ((f = fileRe.exec(html))) {
     const abs = f[0];
+    if (!isSafePublicHttpUrl(abs) || isAggregatorFundingUrl(abs)) continue;
+    found.push({ title: decodeURIComponent(abs.split('/').pop() || 'Documento'), url: abs });
+  }
+
+  const libraryRe = /https?:\/\/[^\s"'<>]+\/documents\/[^\s"'<>]+/gi;
+  let lib: RegExpExecArray | null;
+  while ((lib = libraryRe.exec(html))) {
+    const abs = lib[0].replace(/[),.;]+$/, '');
     if (!isSafePublicHttpUrl(abs) || isAggregatorFundingUrl(abs)) continue;
     found.push({ title: decodeURIComponent(abs.split('/').pop() || 'Documento'), url: abs });
   }
@@ -238,8 +258,20 @@ export function buildCallEvidence(
 }
 
 export function canOpenProposalBlind(c: Pick<ScanCandidate, 'evidence' | 'callUrl' | 'documents' | 'linkOficial' | 'sourceUrl'>): boolean {
+  return evidenceForDisplay(c).status === 'verified';
+}
+
+/** Homepage / listing must never show as verified. */
+export function evidenceForDisplay(
+  c: Pick<ScanCandidate, 'callUrl' | 'linkOficial' | 'sourceUrl' | 'documents' | 'evidence'>,
+): CallEvidence {
   const ev = c.evidence ?? buildCallEvidence(c);
-  return ev.status === 'verified';
+  if (ev.status !== 'verified') return ev;
+  const call = ev.callUrl || pickOfficialCallUrl(c);
+  if (call && isLikelyCallPageUrl(call)) return ev;
+  const docs = ev.documentCount > 0 || (c.documents?.length ?? 0) > 0;
+  if (docs && call && !isLikelyHomepageUrl(call) && !isLikelyListingUrl(call)) return ev;
+  return { ...ev, status: 'unconfirmed' };
 }
 
 export function evidenceLine(
@@ -315,22 +347,42 @@ export function evidenceLine(
         tone: 'bad',
       };
     }
+    if (code && code > 0) {
+      return {
+        label: pt
+          ? `Página oficial HTTP ${code}`
+          : es
+            ? `Página oficial HTTP ${code}`
+            : `Official page HTTP ${code}`,
+        tone: 'bad',
+      };
+    }
     return {
       label: pt
-        ? 'Página oficial inacessível após verificação'
+        ? 'Página oficial sem resposta HTTP (timeout/rede)'
         : es
-          ? 'Página oficial inaccesible tras verificación'
-          : 'Official page inaccessible after verification',
+          ? 'Página oficial sin respuesta HTTP (timeout/red)'
+          : 'Official page no HTTP response (timeout/network)',
       tone: 'bad',
     };
   }
-  if (ev.callUrl) {
+  if (ev.httpStatus && ev.httpStatus > 0) {
     return {
       label: pt
-        ? 'URL oficial citada — falta confirmar no sítio'
+        ? `Página oficial HTTP ${ev.httpStatus}`
         : es
-          ? 'URL oficial citada — falta confirmar en el sitio'
-          : 'Official URL cited — still confirming on the site',
+          ? `Página oficial HTTP ${ev.httpStatus}`
+          : `Official page HTTP ${ev.httpStatus}`,
+      tone: 'warn',
+    };
+  }
+  if (ev.httpOk === false || ev.httpStatus === 0) {
+    return {
+      label: pt
+        ? 'Página oficial sem resposta HTTP (timeout/rede)'
+        : es
+          ? 'Página oficial sin respuesta HTTP (timeout/red)'
+          : 'Official page no HTTP response (timeout/network)',
       tone: 'warn',
     };
   }

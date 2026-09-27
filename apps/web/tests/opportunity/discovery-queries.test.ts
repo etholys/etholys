@@ -104,6 +104,46 @@ test('unrequested IFAD cards are dropped; one per institution kept', () => {
   assert.equal(diverse.some((c) => isIfadCandidate(c)), false);
 });
 
+test('user command is the first required search; IFAD portals when asked', () => {
+  const queries = buildDiscoverySearchQueries({
+    themes: ['AgTech', 'FinTech'],
+    countries: ['América Latina'],
+    kinds: ['grant'],
+    scanName: 'IFAD AgTech',
+    searchFeedback: 'IFAD evidence for scale-up of AgTech and FinTech',
+  });
+  assert.equal(queries[0], 'IFAD evidence for scale-up of AgTech and FinTech');
+  const blob = queries.join('\n');
+  assert.match(blob, /site:ifad\.org/);
+  assert.match(blob, /calls-for-proposal/);
+});
+
+test('requested IFAD keeps more than one IFAD call', () => {
+  const briefing = {
+    themes: ['IFAD rural livelihoods'],
+    countries: ['América Latina'],
+    kinds: ['grant'] as const,
+  };
+  const raw = [
+    {
+      name: 'AgTech PoLG',
+      institution: 'IFAD',
+      matchScore: 80,
+      callUrl:
+        'https://www.ifad.org/en/w/calls-for-proposal/call-for-proposals-selecting-an-implementing-partner-for-the-grant-evidence-for-scale-up-of-agtech-and-fintech-solutions-through-ifad-polg',
+    },
+    {
+      name: 'Safeguarding Rural Livelihoods',
+      institution: 'IFAD',
+      matchScore: 78,
+      callUrl:
+        'https://www.ifad.org/es/w/calls-for-proposal/regional-grant-safeguarding-rural-livelihoods-in-latin-america-and-the-caribbean',
+    },
+  ];
+  const diverse = applyBriefingDiversity(raw, briefing);
+  assert.equal(diverse.length, 2);
+});
+
 test('official fetch looks like Chrome, not Etholys-FundHub', () => {
   assert.match(OFFICIAL_FETCH_UA, /Chrome\/128/);
   assert.equal(OFFICIAL_FETCH_UA.includes('Etholys-FundHub'), false);

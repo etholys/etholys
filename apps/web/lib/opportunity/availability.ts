@@ -100,6 +100,11 @@ export function looksPlaceholderDate(raw: string | null | undefined): boolean {
   if (!raw?.trim()) return false;
   const s = raw.trim();
   if (/^\d{4}-01-01(?:[T\s].*)?$/.test(s)) return true;
+  if (/^(?:0?1)[/.\\-](?:0?1)[/.\\-]20\d{2}$/.test(s)) return true;
+  if (/^20\d{2}[/.\\-](?:0?1)[/.\\-](?:0?1)$/.test(s)) return true;
+  if (/\b(?:0?1)\s+(?:de\s+)?(?:jan(?:eiro|uary)?|ene(?:ro)?)\s+(?:de\s+)?20\d{2}\b/i.test(s)) {
+    return true;
+  }
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return false;
   return d.getUTCMonth() === 0 && d.getUTCDate() === 1;
@@ -147,6 +152,7 @@ export function sanitizeCandidateDates<
     opensAt?: string | null;
     closesAt?: string | null;
     deadline?: string | null;
+    applicationWindow?: string;
     sourceExcerpt?: string;
   },
 >(c: T): T {
@@ -154,5 +160,9 @@ export function sanitizeCandidateDates<
   const opensAt = sanitizeIsoDate(c.opensAt, excerpt);
   const closesAt = sanitizeIsoDate(c.closesAt, excerpt);
   const deadline = sanitizeIsoDate(c.deadline, excerpt);
-  return { ...c, opensAt, closesAt, deadline };
+  let applicationWindow = c.applicationWindow;
+  if (applicationWindow && looksPlaceholderDate(applicationWindow) && !dateAppearsInExcerpt(applicationWindow, excerpt || '')) {
+    applicationWindow = undefined;
+  }
+  return { ...c, opensAt, closesAt, deadline, applicationWindow };
 }

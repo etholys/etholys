@@ -20,6 +20,7 @@ import {
   pickOfficialCallUrl,
 } from '@/lib/opportunity/call-evidence';
 import { parseCandidateFit } from '@/lib/opportunity/fit';
+import { normalizeInstrumentType } from '@/lib/opportunity/instrument-type';
 
 export const SCAN_MEMORY_CATEGORY = 'opportunity_scan';
 
@@ -153,7 +154,7 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
         tempId: typeof o.tempId === 'string' ? o.tempId : randomUUID(),
         name: name.slice(0, 300),
         institution: institution.slice(0, 200),
-        type: typeof o.type === 'string' ? o.type.slice(0, 80) : 'Grant',
+        type: normalizeInstrumentType(typeof o.type === 'string' ? o.type : undefined),
         category: typeof o.category === 'string' ? o.category.slice(0, 120) : undefined,
         description: clip(o.description, 4500),
         whoCanApply: clip(o.whoCanApply, 1200),

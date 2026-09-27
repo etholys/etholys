@@ -1,4 +1,5 @@
 import { looksInventedWithoutEvidence } from '@/lib/opportunity/call-evidence';
+import { normalizeInstrumentType } from '@/lib/opportunity/instrument-type';
 import { isLikelyDuplicateFund, normalizeFundIdentity } from '@/lib/opportunity/scan-filters';
 import type { ScanCandidate, ScanFocus, ScanResultsPayload } from '@/lib/opportunity/scan-types';
 
@@ -84,7 +85,7 @@ export function filterInboxCandidates<T extends ScanCandidate>(
   const q = filter.query?.trim().toLowerCase() ?? '';
   const type = filter.type?.trim();
   return items.filter((c) => {
-    if (type && c.type !== type) return false;
+    if (type && normalizeInstrumentType(c.type) !== normalizeInstrumentType(type)) return false;
     if (filter.dueSoon) {
       const days = daysUntilClose(c, now);
       if (days == null || days < 0 || days > 14) return false;
@@ -102,8 +103,8 @@ export function uniqueCandidateTypes(items: ScanCandidate[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const c of items) {
-    const type = c.type?.trim();
-    if (!type || seen.has(type)) continue;
+    const type = normalizeInstrumentType(c.type);
+    if (seen.has(type)) continue;
     seen.add(type);
     out.push(type);
   }

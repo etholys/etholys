@@ -2,6 +2,7 @@ import 'server-only';
 
 import { isSafePublicHttpUrl } from '@/lib/opportunity/call-evidence';
 import { officialFetchHeaders } from '@/lib/opportunity/official-fetch-headers';
+import { isBotWallHtml } from '@/lib/opportunity/official-html';
 import { isAggregatorFundingUrl } from '@/lib/opportunity/official-url';
 
 export { htmlToExcerpt, siteNameFromHtml, titleFromHtml } from '@/lib/opportunity/official-html';
@@ -60,6 +61,10 @@ export async function fetchOfficialResource(
       }
       const html = (await res.text()).slice(0, MAX_HTML);
       if (html.length < 40 && !type.includes('html')) return { ...last, ok: false, html };
+      if (isBotWallHtml(html)) {
+        last = { ...last, ok: false, html };
+        continue;
+      }
       return { ...last, ok: true, html };
     } catch {
       last = { ...empty, finalUrl: url };

@@ -226,11 +226,15 @@ export async function discoverOpportunitiesOnline(opts: {
     ].join('');
 
     await report(25, 'web_research');
+    const preferOpus =
+      briefingRequestsIfad(opts.briefing) ||
+      Boolean(opts.briefing.searchFeedback?.trim()) ||
+      Boolean(opts.briefing.scanName?.trim());
     const { text: research, searchQueries } = await llmCompleteWithWebSearch(
       RESEARCH_SYSTEM,
       userResearch,
       {
-        model: 'claude-sonnet-4-6',
+        model: preferOpus ? 'claude-opus-4-6' : 'claude-sonnet-4-6',
         maxOutputTokens: 16384,
         temperature: scanFocus === 'open_now' ? 0.15 : 0.25,
         timeoutMs: 180_000,

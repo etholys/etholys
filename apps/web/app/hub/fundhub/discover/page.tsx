@@ -18,7 +18,8 @@ import {
   availabilityLabel,
   formatDateShort,
 } from '@/lib/opportunity/availability';
-import { buildCallEvidence, evidenceLine } from '@/lib/opportunity/call-evidence';
+import { evidenceForDisplay, evidenceLine } from '@/lib/opportunity/call-evidence';
+import { normalizeInstrumentType } from '@/lib/opportunity/instrument-type';
 import {
   deadlineUrgency,
   daysUntilClose,
@@ -1102,7 +1103,7 @@ function CandidateCard({
 
   const countryShort =
     countries && countries.length > 48 ? `${countries.slice(0, 48).trim()}…` : countries;
-  const evLine = evidenceLine(c.evidence ?? buildCallEvidence(c), locale);
+  const evLine = evidenceLine(evidenceForDisplay(c), locale);
 
   return (
     <article className="group rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:border-gray-300 hover:shadow-md">
@@ -1121,7 +1122,7 @@ function CandidateCard({
               </span>
             )}
             <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-700">
-              {c.type}
+              {normalizeInstrumentType(c.type)}
             </span>
             {c.category && (
               <span className="max-w-[14rem] truncate rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-900">

@@ -71,6 +71,19 @@ export function buildDiscoverySearchQueries(briefing: OpportunityBriefing): stri
     out.push(q);
   };
 
+  const command = briefing.searchFeedback?.trim();
+  if (command) push(command.slice(0, 280));
+  if (briefing.scanName?.trim()) {
+    push(`${briefing.scanName.trim()} official call for proposals`);
+  }
+  push(`(${themes}) official "call for proposals" open grant`);
+
+  if (briefingRequestsIfad(briefing)) {
+    push(`site:ifad.org "call for proposals" (${themes})`);
+    push(`site:ifad.org/en/w/calls-for-proposal (${themes})`);
+    push(`site:ifad.org/es/w/calls-for-proposal (${themes})`);
+  }
+
   for (const region of regions) {
     for (const q of PORTAL_BUILDERS[region](themes)) push(q);
   }
@@ -174,7 +187,8 @@ export function applyBriefingDiversity<
     matchScore?: number;
   },
 >(candidates: T[], briefing: OpportunityBriefing): T[] {
-  return capPerInstitution(dropUnrequestedIfad(candidates, briefing), 1);
+  const maxPer = briefingRequestsIfad(briefing) ? 4 : 1;
+  return capPerInstitution(dropUnrequestedIfad(candidates, briefing), maxPer);
 }
 
 /** Demasiado da mesma agência (ex.: 3 IFAD rolling) = pesquisa pobre. */
