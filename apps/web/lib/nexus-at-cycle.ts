@@ -57,33 +57,33 @@ export const AT_CONTRACT_LABELS: Record<
   { es: string; pt: string; en: string; desc: { es: string; pt: string; en: string } }
 > = {
   permanent: {
-    es: 'Cliente directo / permanente',
-    pt: 'Cliente direto / permanente',
-    en: 'Direct / permanent client',
+    es: 'Permanente',
+    pt: 'Permanente',
+    en: 'Permanent',
     desc: {
-      es: 'Cada año: análisis del año + plan anual. De vez en cuando se repite el diagnóstico 360.',
-      pt: 'Cada ano: análise do ano + plano anual. De vez em quando repete-se o diagnóstico 360.',
-      en: 'Each year: year review + annual plan. Periodically repeat the 360 diagnosis.',
+      es: 'Cliente directo. Cada año: análisis del año + plan anual. No hay fecha de cierre del acompañamiento.',
+      pt: 'Cliente direto. Cada ano: análise do ano + plano anual. Não há data de encerramento do acompanhamento.',
+      en: 'Direct client. Each year: year review + annual plan. There is no accompaniment end date.',
     },
   },
   project: {
-    es: 'Proyecto (plazo)',
-    pt: 'Projeto (prazo)',
-    en: 'Project (time-boxed)',
+    es: 'Proyecto',
+    pt: 'Projeto',
+    en: 'Project',
     desc: {
-      es: 'Diagnóstico → documento → plan de desarrollo → entrega. Cierra al cumplir el contrato.',
-      pt: 'Diagnóstico → documento → plano de desenvolvimento → entrega. Fecha ao cumprir o contrato.',
-      en: 'Diagnosis → document → development plan → delivery. Closes when the contract is met.',
+      es: 'Diagnóstico → documento → plan de desarrollo → entrega. Cierra al cumplir el plazo.',
+      pt: 'Diagnóstico → documento → plano de desenvolvimento → entrega. Fecha ao cumprir o prazo.',
+      en: 'Diagnosis → document → development plan → delivery. Closes when the deadline is met.',
     },
   },
   punctual: {
-    es: 'Servicio puntual',
-    pt: 'Serviço pontual',
-    en: 'One-off service',
+    es: 'Puntual',
+    pt: 'Pontual',
+    en: 'One-off',
     desc: {
-      es: 'Una pasada: diagnóstico + plan. No hay loop salvo nuevo contrato.',
-      pt: 'Uma passagem: diagnóstico + plano. Sem loop salvo novo contrato.',
-      en: 'One pass: diagnosis + plan. No loop unless a new contract.',
+      es: 'Una pasada: diagnóstico + plan. Sin loop ni programa de varios años.',
+      pt: 'Uma passagem: diagnóstico + plano. Sem loop nem programa de vários anos.',
+      en: 'One pass: diagnosis + plan. No loop and no multi-year program.',
     },
   },
 };

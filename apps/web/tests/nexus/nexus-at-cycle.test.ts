@@ -23,11 +23,17 @@ test('contract kind decides loop vs close', () => {
   const perm = applyContractKind(defaultIncubationProgram(), 'permanent');
   assert.equal(perm.contractKind, 'permanent');
   assert.equal(perm.mode, 'ongoing');
+  assert.equal(perm.durationMonths, 12);
   assert.equal(programLoopsAnnually(perm), true);
 
   const one = applyContractKind(defaultIncubationProgram(), 'punctual');
   assert.equal(one.contractKind, 'punctual');
+  assert.equal(one.durationMonths, 1);
   assert.equal(programLoopsAnnually(one), false);
+
+  const proj = applyContractKind(perm, 'project');
+  assert.equal(proj.contractKind, 'project');
+  assert.equal(proj.durationMonths, 6);
 });
 
 test('offer kind and 360 quads feed the diagnostic document', () => {

@@ -29,12 +29,10 @@ import {
   depthFromProgram,
   expectedQuestionCount,
   normalizeProgram,
-  PROGRAM_MODE_LABELS,
   type DiagnosticDepth,
   type IncubationProgram,
   applyContractKind,
   programLoopsAnnually,
-  type IncubationProgramMode,
 } from '@/lib/nexus-incubation-program';
 import { AT_CONTRACT_LABELS, AT_QUAD_LABELS, type AtContractKind } from '@/lib/nexus-at-cycle';
 import type { DevelopmentLayer, StrategicPlanOutline, WorkPlanItem } from '@/lib/nexus-incubation-workplan';
@@ -769,7 +767,8 @@ export function NexusSectorDiagnosticWizard() {
     }
   };
 
-  const Lmode = (m: IncubationProgramMode) => PROGRAM_MODE_LABELS[m][loc];
+  const contractKind = program.contractKind || 'project';
+  const contractLabel = AT_CONTRACT_LABELS[contractKind][loc];
 
   const selfSteps = es
     ? ['Enfoque', 'Diagnóstico', 'Análisis', 'Diálogo', 'Estrategia']
@@ -927,9 +926,15 @@ export function NexusSectorDiagnosticWizard() {
       {isAtFlow && phase !== 'program' && phase !== 'summary' && (
         <div className="flex flex-wrap gap-2 text-[11px] text-slate-500">
           <span className="rounded-full bg-slate-100 px-2 py-0.5">
-            {program.totalHours}h · {program.durationMonths}m
+            {contractKind === 'permanent'
+              ? es
+                ? `${program.hoursPerMonth} h/mes · ciclo anual`
+                : `${program.hoursPerMonth} h/mês · ciclo anual`
+              : contractKind === 'punctual'
+                ? `${program.totalHours}h · ${es ? 'una pasada' : 'uma passagem'}`
+                : `${program.totalHours}h · ${program.durationMonths}m`}
           </span>
-          <span className="rounded-full bg-teal-50 px-2 py-0.5 text-teal-900">{Lmode(program.mode)}</span>
+          <span className="rounded-full bg-teal-50 px-2 py-0.5 text-teal-900">{contractLabel}</span>
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-700">{qExpect.label}</span>
         </div>
       )}
@@ -999,7 +1004,7 @@ export function NexusSectorDiagnosticWizard() {
                 type="button"
                 onClick={() => setProgram((p) => applyContractKind({ ...p, deliveryKind: 'at_assisted' }, k))}
                 className={`rounded-xl border p-3 text-left text-sm ${
-                  (program.contractKind || 'project') === k ? 'border-teal-600 bg-teal-50' : 'border-slate-200'
+                  contractKind === k ? 'border-teal-600 bg-teal-50' : 'border-slate-200'
                 }`}
               >
                 <p className="font-medium">{AT_CONTRACT_LABELS[k][loc]}</p>
@@ -1007,45 +1012,50 @@ export function NexusSectorDiagnosticWizard() {
               </button>
             ))}
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {(['intensive', 'ongoing', 'graduate'] as IncubationProgramMode[]).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() =>
-                  setProgram((p) => normalizeProgram({ ...p, deliveryKind: 'at_assisted', mode: m }))
-                }
-                className={`rounded-xl border p-3 text-left text-sm ${
-                  program.mode === m ? 'border-teal-600 bg-teal-50' : 'border-slate-200'
-                }`}
-              >
-                <p className="font-medium">{Lmode(m)}</p>
-                <p className="mt-1 text-xs text-slate-600">{PROGRAM_MODE_LABELS[m].desc[loc]}</p>
-              </button>
-            ))}
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          {contractKind === 'permanent' && (
+            <p className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs text-teal-950">
+              {es
+                ? 'Ciclo anual: análisis del año + plan anual. El acompañamiento no tiene fecha de cierre — las horas/mes son la intensidad de dedicación.'
+                : 'Ciclo anual: análise do ano + plano anual. O acompanhamento não tem data de encerramento — as horas/mês são a intensidade de dedicação.'}
+            </p>
+          )}
+          {contractKind === 'punctual' && (
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              {es
+                ? 'Una pasada (diagnóstico + plan). Sin plazo de acompañamiento ni programa de varios años.'
+                : 'Uma passagem (diagnóstico + plano). Sem prazo de acompanhamento nem programa de vários anos.'}
+            </p>
+          )}
+          <div className={`grid gap-3 ${contractKind === 'project' ? 'sm:grid-cols-2' : ''}`}>
+            {contractKind === 'project' && (
+              <label className="text-sm">
+                {es ? 'Meses de acompañamiento' : 'Meses de acompanhamento'}
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={program.durationMonths}
+                  onChange={(e) =>
+                    setProgram((p) =>
+                      normalizeProgram({
+                        ...p,
+                        deliveryKind: 'at_assisted',
+                        durationMonths: Number(e.target.value),
+                      })
+                    )
+                  }
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                />
+              </label>
+            )}
             <label className="text-sm">
-              {es ? 'Meses de acompañamiento' : 'Meses de acompanhamento'}
-              <input
-                type="number"
-                min={1}
-                max={60}
-                value={program.durationMonths}
-                onChange={(e) =>
-                  setProgram((p) =>
-                    normalizeProgram({
-                      ...p,
-                      deliveryKind: 'at_assisted',
-                      durationMonths: Number(e.target.value),
-                    })
-                  )
-                }
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-              />
-            </label>
-            <label className="text-sm">
-              {es ? 'Horas / mes (dedicación técnica)' : 'Horas / mês (dedicação técnica)'}
+              {contractKind === 'punctual'
+                ? es
+                  ? 'Horas (dedicación de la pasada)'
+                  : 'Horas (dedicação da passagem)'
+                : es
+                  ? 'Horas / mes (intensidad de dedicación)'
+                  : 'Horas / mês (intensidade de dedicação)'}
               <input
                 type="number"
                 min={2}
@@ -1065,9 +1075,23 @@ export function NexusSectorDiagnosticWizard() {
             </label>
           </div>
           <p className="text-sm text-slate-700">
-            {es ? 'Total estimado:' : 'Total estimado:'}{' '}
-            <strong>{program.durationMonths * program.hoursPerMonth} h</strong> — {es ? 'profundidad' : 'profundidade'}{' '}
-            <strong>{depth}</strong> ({qExpect.label})
+            {contractKind === 'permanent' ? (
+              <>
+                {es ? 'Dedicación anual estimada:' : 'Dedicação anual estimada:'}{' '}
+                <strong>{program.hoursPerMonth * 12} h</strong>
+                {es ? ' (ciclo que se renueva cada año)' : ' (ciclo que se renova cada ano)'}
+              </>
+            ) : contractKind === 'punctual' ? (
+              <>
+                {es ? 'Total de la pasada:' : 'Total da passagem:'} <strong>{program.hoursPerMonth} h</strong>
+              </>
+            ) : (
+              <>
+                {es ? 'Total estimado:' : 'Total estimado:'}{' '}
+                <strong>{program.durationMonths * program.hoursPerMonth} h</strong>
+              </>
+            )}{' '}
+            — {es ? 'profundidad' : 'profundidade'} <strong>{depth}</strong> ({qExpect.label})
           </p>
           <label className="block text-sm">
             {es ? 'Profundidad del diagnóstico' : 'Profundidade do diagnóstico'}
@@ -1088,7 +1112,7 @@ export function NexusSectorDiagnosticWizard() {
               <option value="exhaustive">{es ? 'Exaustivo (~45+)' : 'Exaustivo (~45+)'}</option>
             </select>
           </label>
-          {(program.mode === 'graduate' || program.strategicHorizon !== 'none') && (
+          {program.mode === 'graduate' && (
             <label className="block text-sm">
               {es ? 'Horizonte estratégico post-salida' : 'Horizonte estratégico pós-saída'}
               <select

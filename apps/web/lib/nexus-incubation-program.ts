@@ -155,7 +155,8 @@ export function applyContractKind(program: IncubationProgram, kind: AtContractKi
       ...program,
       contractKind: 'permanent',
       mode: 'ongoing',
-      durationMonths: Math.max(12, program.durationMonths),
+      /** Ciclo anual — não é prazo de encerramento do acompanhamento. */
+      durationMonths: 12,
       strategicHorizon: program.strategicHorizon === 'none' ? '12m' : program.strategicHorizon,
     });
   }
@@ -164,7 +165,8 @@ export function applyContractKind(program: IncubationProgram, kind: AtContractKi
       ...program,
       contractKind: 'punctual',
       mode: 'intensive',
-      durationMonths: Math.min(3, program.durationMonths || 2),
+      /** Uma passagem: janela curta, sem programa multi-anual. */
+      durationMonths: 1,
       strategicHorizon: 'none',
     });
   }
@@ -172,7 +174,7 @@ export function applyContractKind(program: IncubationProgram, kind: AtContractKi
     ...program,
     contractKind: 'project',
     mode: 'intensive',
-    durationMonths: program.durationMonths || 6,
+    durationMonths: program.contractKind === 'project' ? program.durationMonths || 6 : 6,
   });
 }
 
