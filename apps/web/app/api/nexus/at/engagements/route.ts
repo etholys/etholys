@@ -148,6 +148,11 @@ export async function POST(req: NextRequest) {
     networkId = null;
   }
 
+  if (deliveryModel === 'SINGLE') {
+    networkId = null;
+    if (clientIds.length > 1) clientIds.splice(1);
+  }
+
   const siepProjectId = body.siepProjectId ? String(body.siepProjectId).trim() : null;
   const allowed = [
     ...new Set([operatorCompanyId, ...(sponsorCompanyId ? [sponsorCompanyId] : []), ...clientIds]),

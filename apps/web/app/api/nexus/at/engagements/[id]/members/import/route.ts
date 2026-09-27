@@ -20,6 +20,12 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   if (!userIsOperator(engagement, tenant.companyIds)) {
     return NextResponse.json({ error: 'Só o operador pode importar empresas.' }, { status: 403 });
   }
+  if (engagement.deliveryModel === 'SINGLE') {
+    return NextResponse.json(
+      { error: 'Importação em massa não se aplica a contratos de uma só MIPYME.' },
+      { status: 400 }
+    );
+  }
 
   let body: Record<string, unknown>;
   try {

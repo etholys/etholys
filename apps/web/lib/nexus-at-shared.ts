@@ -15,13 +15,13 @@ export const AT_DELIVERY_MODEL_LABELS: Record<
   { es: string; pt: string; en: string; hint: { es: string; pt: string; en: string } }
 > = {
   SINGLE: {
-    es: 'Un emprendimiento',
-    pt: 'Um empreendimento',
-    en: 'Single enterprise',
+    es: 'Solo una MIPYME',
+    pt: 'Apenas uma MIPYME',
+    en: 'A single MSME',
     hint: {
-      es: 'Una sola MIPYME atendida; sector y temática se definen en su ficha.',
-      pt: 'Uma só MIPYME atendida; setor e temática definem-se na ficha dela.',
-      en: 'One assisted MSME; sector/theme set on its profile.',
+      es: 'Un solo emprendimiento. Abres su ficha; no hay lista ni importación masiva.',
+      pt: 'Um só empreendimento. Abres a ficha dele; sem lista nem importação em massa.',
+      en: 'One assisted enterprise. Opens its dossier; no roster or bulk import.',
     },
   },
   MULTI: {
@@ -72,6 +72,11 @@ export function isAtEngagementKind(v: string): v is AtEngagementKind {
 
 export function isAtDeliveryModel(v: string): v is AtDeliveryModel {
   return (AT_DELIVERY_MODELS as readonly string[]).includes(v);
+}
+
+/** SINGLE abre ficha direta; MULTI/COLLECTIVE (e legado) usam lista + detalhe. */
+export function usesAtClientRoster(model: string | null | undefined): boolean {
+  return model !== 'SINGLE';
 }
 
 export function isAttendedMemberRole(role: string): boolean {

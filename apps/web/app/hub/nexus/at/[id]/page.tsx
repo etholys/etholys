@@ -12,7 +12,13 @@ import { NexusAtBulkImport } from '@/components/nexus/NexusAtBulkImport';
 import { NexusAtProcessRail } from '@/components/nexus/NexusAtProcessRail';
 import { NexusSectorMultiSelect } from '@/components/nexus/NexusSectorMultiSelect';
 import { loadDiagnosisHistory } from '@/lib/nexus-diagnosis-history';
-import { AT_CASE_KIND_LABELS, AT_DELIVERY_MODEL_LABELS, type AtCaseKind, type AtDeliveryModel } from '@/lib/nexus-at-shared';
+import {
+  AT_CASE_KIND_LABELS,
+  AT_DELIVERY_MODEL_LABELS,
+  usesAtClientRoster,
+  type AtCaseKind,
+  type AtDeliveryModel,
+} from '@/lib/nexus-at-shared';
 import {
   buildAtBriefTemplate,
   buildSectorCaseChecklist,
@@ -144,8 +150,14 @@ export default function NexusAtServicePage() {
   }, [load]);
 
   useEffect(() => {
-    if (searchParams.get('import') === '1') setShowBulkImport(true);
-  }, [searchParams]);
+    if (
+      service &&
+      searchParams.get('import') === '1' &&
+      usesAtClientRoster(service.deliveryModel)
+    ) {
+      setShowBulkImport(true);
+    }
+  }, [searchParams, service]);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,7 +176,12 @@ export default function NexusAtServicePage() {
   }, []);
 
   useEffect(() => {
-    if (!showAddCompany) return;
+    const singleEmpty =
+      service?.deliveryModel === 'SINGLE' &&
+      !(service.members || []).some((m) =>
+        ['client', 'principal', 'affiliate'].includes(m.memberRole)
+      );
+    if (!showAddCompany && !singleEmpty) return;
     const q = addQuery.trim();
     let cancelled = false;
     const t = setTimeout(async () => {
@@ -180,7 +197,7 @@ export default function NexusAtServicePage() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [addQuery, showAddCompany]);
+  }, [addQuery, showAddCompany, service]);
 
   const clients = useMemo(
     () =>
@@ -232,6 +249,9 @@ export default function NexusAtServicePage() {
     : null;
   const continuePlanHref = diagnosisHref ? `${diagnosisHref}&resume=plan` : null;
 
+  const isSingle = service?.deliveryModel === 'SINGLE';
+  const showMultiRoster = usesAtClientRoster(service?.deliveryModel);
+  const showSingleOnboard = Boolean(isSingle && clients.length === 0);
   const isCollective = service?.deliveryModel === 'COLLECTIVE';
 
   const [hasLocalDx, setHasLocalDx] = useState(false);
@@ -292,8 +312,8 @@ export default function NexusAtServicePage() {
   }, [isCollective, service?.members]);
 
   useEffect(() => {
-    if (!loading && isOperator && clients.length === 0) setShowBulkImport(true);
-  }, [loading, isOperator, clients.length]);
+    if (!loading && isOperator && clients.length === 0 && showMultiRoster) setShowBulkImport(true);
+  }, [loading, isOperator, clients.length, showMultiRoster]);
 
   useEffect(() => {
     const allowed = new Set(clients.map((m) => m.companyId));
@@ -674,10 +694,17 @@ return (
         hasOpenCases={cases.some((c) => c.isOpen !== false && !['DONE', 'CANCELLED'].includes(c.status))}
         hasDiagnosisHint={hasLocalDx}
         es={es}
+        singleClient={isSingle}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)] lg:items-start">
-        {/* Lista de MIPYMEs — coluna fixa com scroll */}
+      <div
+        className={
+          showMultiRoster
+            ? 'grid gap-4 lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)] lg:items-start'
+            : 'space-y-4'
+        }
+      >
+        {showMultiRoster && (
         <aside className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white lg:sticky lg:top-3 lg:max-h-[calc(100vh-5.5rem)]">
           <div className="shrink-0 space-y-2 border-b border-slate-100 p-3">
             <div className="flex items-center justify-between gap-2">
@@ -932,22 +959,106 @@ return (
             </div>
           )}
         </aside>
+        )}
 
         {/* Workspace da empresa selecionada */}
         <div className="min-w-0 space-y-4">
           {!selectedCompanyId || !selectedMember ? (
+            isSingle && !isOperator ? (
+              <div className="rounded-xl border border-dashed border-slate-200 px-4 py-16 text-center text-sm text-slate-500">
+                {es
+                  ? 'Aún no hay MIPYME registrada en este contrato.'
+                  : 'Ainda não há MIPYME registada neste contrato.'}
+              </div>
+            ) : showSingleOnboard ? (
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 className="text-base font-semibold text-slate-900">
+                  {es ? 'Registra la MIPYME atendida' : 'Regista a MIPYME atendida'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {es
+                    ? 'Este contrato atiende a una sola empresa. Elige temáticas y busca o crea el emprendimiento.'
+                    : 'Este contrato atende a uma só empresa. Escolhe temáticas e pesquisa ou cria o empreendimento.'}
+                </p>
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <p className="text-[11px] font-medium text-slate-700">
+                      {es ? 'Temáticas (una o varias)' : 'Temáticas (uma ou várias)'}
+                    </p>
+                    <div className="mt-1">
+                      <NexusSectorMultiSelect
+                        options={sectorOptions}
+                        value={addSectorIds}
+                        onChange={setAddSectorIds}
+                        placeholder={es ? 'Elegir temáticas…' : 'Escolher temáticas…'}
+                        emptyLabel={es ? 'Ninguna' : 'Nenhuma'}
+                      />
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <input
+                      value={addQuery}
+                      onChange={(e) => setAddQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (filteredSuggestions[0]) addMemberById(filteredSuggestions[0].id);
+                          else addMemberByName();
+                        }
+                      }}
+                      disabled={addingMember}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400"
+                      placeholder={es ? 'Nombre de la MIPYME…' : 'Nome da MIPYME…'}
+                    />
+                    {addQuery.trim().length > 0 && (
+                      <ul className="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                        {filteredSuggestions.map((c) => (
+                          <li key={c.id}>
+                            <button
+                              type="button"
+                              onClick={() => addMemberById(c.id)}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                            >
+                              {c.name}
+                            </button>
+                          </li>
+                        ))}
+                        {addQuery.trim().length >= 2 && (
+                          <li>
+                            <button
+                              type="button"
+                              onClick={addMemberByName}
+                              className="w-full px-3 py-2 text-left text-sm font-medium text-emerald-800 hover:bg-slate-50"
+                            >
+                              + {es ? 'Crear' : 'Criar'} «{addQuery.trim()}»
+                            </button>
+                          </li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
             <div className="rounded-xl border border-dashed border-slate-200 px-4 py-16 text-center text-sm text-slate-500">
               {es
                 ? 'Selecciona una MIPYME a la izquierda para trabajar su temática y diagnóstico.'
                 : 'Seleciona uma MIPYME à esquerda para trabalhar a temática e o diagnóstico.'}
             </div>
+            )
           ) : (
             <>
               <div className="sticky top-3 z-10 space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                      {es ? 'Empresa seleccionada' : 'Empresa selecionada'}
+                      {isSingle
+                        ? es
+                          ? 'MIPYME atendida'
+                          : 'MIPYME atendida'
+                        : es
+                          ? 'Empresa seleccionada'
+                          : 'Empresa selecionada'}
                     </p>
                     <h2 className="mt-0.5 truncate text-lg font-semibold text-slate-900">
                       {selectedMember.company.name}

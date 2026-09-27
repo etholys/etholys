@@ -94,6 +94,16 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: 'Empresa já está no serviço.' }, { status: 409 });
   }
 
+  if (engagement.deliveryModel === 'SINGLE') {
+    const attended = engagement.members.filter((m) => isAttendedMemberRole(m.memberRole));
+    if (attended.length > 0) {
+      return NextResponse.json(
+        { error: 'Este contrato atende apenas uma MIPYME.' },
+        { status: 400 }
+      );
+    }
+  }
+
   const prev =
     company.contextSetupJson && typeof company.contextSetupJson === 'object'
       ? (company.contextSetupJson as Record<string, unknown>)

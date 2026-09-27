@@ -11,6 +11,14 @@ import {
   parseAtEngagementIdFromTags,
   parseAtProjectIdFromTags,
 } from '../../lib/nexus-at';
+import { usesAtClientRoster } from '../../lib/nexus-at-shared';
+
+test('SINGLE delivery hides the multi-MIPYME roster', () => {
+  assert.equal(usesAtClientRoster('SINGLE'), false);
+  assert.equal(usesAtClientRoster('MULTI'), true);
+  assert.equal(usesAtClientRoster('COLLECTIVE'), true);
+  assert.equal(usesAtClientRoster(null), true);
+});
 
 test('exposes engagement and case kinds', () => {
   assert.ok(AT_ENGAGEMENT_KINDS.includes('CONTRACT'));

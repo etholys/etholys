@@ -116,6 +116,9 @@ export default function NexusAtPage() {
   const [sponsor, setSponsor] = useState<PickedClient | null>(null);
   const [sponsorQuery, setSponsorQuery] = useState('');
   const [sponsorSuggestions, setSponsorSuggestions] = useState<Company[]>([]);
+  const [singleClient, setSingleClient] = useState<PickedClient | null>(null);
+  const [singleClientQuery, setSingleClientQuery] = useState('');
+  const [singleClientSuggestions, setSingleClientSuggestions] = useState<Company[]>([]);
   const [siepProjectId, setSiepProjectId] = useState('');
   const [siepProjects, setSiepProjects] = useState<SiepProject[]>([]);
   const [loadingSiep, setLoadingSiep] = useState(false);
@@ -190,6 +193,25 @@ export default function NexusAtPage() {
   }, [sponsorQuery, showForm]);
 
   useEffect(() => {
+    if (!showForm || deliveryModel !== 'SINGLE') return;
+    const q = singleClientQuery.trim();
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/nexus/at/client-companies?q=${encodeURIComponent(q)}&take=20`);
+        const d = await r.json();
+        if (!cancelled && r.ok) setSingleClientSuggestions(d.companies || []);
+      } catch {
+        if (!cancelled) setSingleClientSuggestions([]);
+      }
+    }, 220);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [singleClientQuery, showForm, deliveryModel]);
+
+  useEffect(() => {
     const ids = [...new Set([sponsor?.id, operatorCompanyId].filter(Boolean) as string[])];
     if (ids.length === 0) {
       setSiepProjects([]);
@@ -220,6 +242,19 @@ export default function NexusAtPage() {
     if (c.id === operatorCompanyId) return;
     setSponsor({ key: c.id, id: c.id, name: c.name, shortName: c.shortName });
     setSponsorQuery('');
+  };
+
+  const pickSingleClient = (c: Company) => {
+    if (c.id === operatorCompanyId) return;
+    setSingleClient({ key: c.id, id: c.id, name: c.name, shortName: c.shortName });
+    setSingleClientQuery('');
+  };
+
+  const createSingleClientByName = async () => {
+    const name = singleClientQuery.trim();
+    if (name.length < 2) return;
+    setSingleClient({ key: `new:${name}`, name });
+    setSingleClientQuery('');
   };
 
   const primarySectorId = selectedSectorIds[0] || '';
@@ -279,8 +314,18 @@ export default function NexusAtPage() {
           operatorCompanyId,
           primarySectorId: primarySectorId || undefined,
           sectorIds: selectedSectorIds,
-          clientCompanyIds: [],
-          newClients: [],
+          clientCompanyIds:
+            deliveryModel === 'SINGLE' && singleClient?.id ? [singleClient.id] : [],
+          newClients:
+            deliveryModel === 'SINGLE' && singleClient && !singleClient.id
+              ? [
+                  {
+                    name: singleClient.name,
+                    shortName: singleClient.shortName,
+                    sectorId: primarySectorId || undefined,
+                  },
+                ]
+              : [],
           contractRef: contractRef.trim() || undefined,
           sponsorCompanyId: sponsor?.id || undefined,
           newSponsor: sponsor && !sponsor.id ? { name: sponsor.name, shortName: sponsor.shortName } : undefined,
@@ -308,10 +353,16 @@ export default function NexusAtPage() {
       setTitle('');
       setContractRef('');
       setSponsor(null);
+      setSingleClient(null);
+      setSingleClientQuery('');
       setSiepProjectId('');
       setSelectedSectorIds([]);
       setDeliveryModel('MULTI');
-      router.push(`/hub/nexus/at/${d.engagement.id}?import=1`);
+      router.push(
+        deliveryModel === 'SINGLE'
+          ? `/hub/nexus/at/${d.engagement.id}`
+          : `/hub/nexus/at/${d.engagement.id}?import=1`
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
     } finally {
@@ -476,7 +527,13 @@ export default function NexusAtPage() {
                       <button
                         key={id}
                         type="button"
-                        onClick={() => setDeliveryModel(id)}
+                        onClick={() => {
+                          setDeliveryModel(id);
+                          if (id !== 'SINGLE') {
+                            setSingleClient(null);
+                            setSingleClientQuery('');
+                          }
+                        }}
                         className={`w-full rounded-xl border px-3 py-2.5 text-left ${
                           on ? 'border-teal-700 bg-teal-50' : 'border-slate-200 hover:border-slate-300'
                         }`}
@@ -490,6 +547,86 @@ export default function NexusAtPage() {
                   })}
                 </div>
               </div>
+
+              {deliveryModel === 'SINGLE' && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                  <p className="text-sm font-medium text-slate-800">
+                    {es ? 'MIPYME atendida' : 'MIPYME atendida'}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    {es
+                      ? 'Opcional ahora: si no la eliges, la registras en la ficha del contrato.'
+                      : 'Opcional agora: se não a escolheres, registas na ficha do contrato.'}
+                  </p>
+                  {singleClient ? (
+                    <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm">
+                      <span className="font-medium text-slate-900">
+                        {singleClient.shortName || singleClient.name}
+                        {!singleClient.id && (
+                          <span className="ml-2 text-[10px] uppercase text-emerald-700">
+                            {es ? 'nueva' : 'nova'}
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSingleClient(null)}
+                        className="text-slate-400 hover:text-slate-700"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative mt-2">
+                      <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                      <input
+                        value={singleClientQuery}
+                        onChange={(e) => setSingleClientQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const first = singleClientSuggestions.find((c) => c.id !== operatorCompanyId);
+                            if (first) pickSingleClient(first);
+                            else createSingleClientByName();
+                          }
+                        }}
+                        className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-8 pr-3 text-sm outline-none focus:border-slate-400"
+                        placeholder={
+                          es ? 'Buscar o crear el emprendimiento…' : 'Pesquisar ou criar o empreendimento…'
+                        }
+                      />
+                      {singleClientQuery.trim().length > 0 && (
+                        <ul className="absolute z-10 mt-1 max-h-36 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                          {singleClientSuggestions
+                            .filter((c) => c.id !== operatorCompanyId)
+                            .map((c) => (
+                              <li key={c.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => pickSingleClient(c)}
+                                  className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                                >
+                                  {c.shortName || c.name}
+                                </button>
+                              </li>
+                            ))}
+                          {singleClientQuery.trim().length >= 2 && (
+                            <li>
+                              <button
+                                type="button"
+                                onClick={createSingleClientByName}
+                                className="w-full px-3 py-2 text-left text-sm font-medium text-emerald-800 hover:bg-slate-50"
+                              >
+                                + {es ? 'Crear' : 'Criar'} «{singleClientQuery.trim()}»
+                              </button>
+                            </li>
+                          )}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <p className="text-sm font-medium text-slate-700">
@@ -673,9 +810,13 @@ export default function NexusAtPage() {
               </div>
 
               <div className="rounded-lg border border-teal-100 bg-teal-50/60 px-3 py-2.5 text-xs text-teal-950">
-                {es
-                  ? 'Primero defines el marco legal (contrato, contratante, sectores). Después importas las MIPYMEs beneficiarias — cada una tendrá su proceso individual.'
-                  : 'Primeiro defines o marco legal (contrato, contratante, setores). Depois importas as MIPYMEs beneficiárias — cada uma terá o seu processo individual.'}
+                {deliveryModel === 'SINGLE'
+                  ? es
+                    ? 'Después abres la ficha de esa MIPYME (temática, diagnóstico y plan). No se importa una lista.'
+                    : 'Depois abres a ficha dessa MIPYME (temática, diagnóstico e plano). Não se importa uma lista.'
+                  : es
+                    ? 'Primero defines el marco legal (contrato, contratante, sectores). Después importas las MIPYMEs beneficiarias — cada una tendrá su proceso individual.'
+                    : 'Primeiro defines o marco legal (contrato, contratante, setores). Depois importas as MIPYMEs beneficiárias — cada uma terá o seu processo individual.'}
               </div>
 
               {error && <p className="text-sm text-red-600">{error}</p>}

@@ -10,6 +10,7 @@ type Props = {
   hasOpenCases: boolean;
   hasDiagnosisHint: boolean;
   es: boolean;
+  singleClient?: boolean;
 };
 
 /**
@@ -23,6 +24,7 @@ export function NexusAtProcessRail({
   hasOpenCases,
   hasDiagnosisHint,
   es,
+  singleClient,
 }: Props) {
   const dxBase = selectedCompanyId
     ? `/hub/nexus/diagnosis?company=${encodeURIComponent(selectedCompanyId)}&engagement=${encodeURIComponent(engagementId)}`
@@ -105,7 +107,7 @@ export function NexusAtProcessRail({
           );
         })}
       </ol>
-      {clientCount > 0 && !selectedCompanyId && (
+      {clientCount > 0 && !selectedCompanyId && !singleClient && (
         <p className="mt-2 text-xs text-amber-800">
           {es
             ? 'Selecciona una MIPYME en la lista para continuar.'
