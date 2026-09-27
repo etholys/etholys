@@ -127,6 +127,7 @@ model User {
   taskApprovalsToDecide         TaskApprovalRequest[]        @relation("TaskApprovalApprover")
   nexusDiagnosesCreated         NexusDiagnosis[]             @relation("NexusDiagnosisCreator")
   nexusFieldEntriesAuthored     NexusFieldEntry[]            @relation("NexusFieldEntryAuthor")
+  meetContacts                  MeetContact[]                @relation("MeetContactOwner")
 }
 
 model Account {
@@ -220,6 +221,8 @@ model Company {
   nexusFieldEntries           NexusFieldEntry[]
   nexusSensors                NexusSensor[]
   nexusReadings               NexusReading[]
+  nexusWhatsappLinks          NexusWhatsappLink[]
+  nexusOpsRules               NexusOpsRule[]
   /// Quem pode usar o Centro de trabalho integrado nesta empresa (não duplica lógica dos sistemas; só espelha APIs).
   integratedWorkspaceAccesses  IntegratedWorkspaceAccess[]
   products                    Product[]
@@ -260,6 +263,7 @@ model Company {
   billingEntitlements         CompanyEntitlement[]
   platformInvoices            PlatformInvoice[]
   commissionEvents            BillingCommissionEvent[]
+  meetContacts                MeetContact[]
 }
 
 /// Plano comercial Etholys (catálogo; Stripe price opcional).
@@ -1956,17 +1960,57 @@ model NexusFieldEntry {
   kind         String
   occurredAt   DateTime
   payloadJson  Json
-  authorUserId String
+  authorUserId String?
+  /// app | whatsapp | sensor
+  channel      String        @default("app")
+  fromPhone    String?
   engagementId String?
   taskId       String?
   createdAt    DateTime      @default(now())
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   unit         NexusOpsUnit? @relation(fields: [unitId], references: [id], onDelete: SetNull)
-  author       User          @relation("NexusFieldEntryAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  author       User?         @relation("NexusFieldEntryAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
 
   @@index([companyId, occurredAt])
   @@index([unitId, occurredAt])
   @@index([engagementId])
+  @@index([channel, createdAt])
+}
+
+/// WhatsApp do produtor — entra dado, sai alerta e pedido de comando.
+model NexusWhatsappLink {
+  id                 String    @id @default(cuid())
+  companyId          String
+  phoneE164          String    @unique
+  displayName        String?
+  alertsEnabled      Boolean   @default(true)
+  lastAlertHash      String?
+  pendingCommandKind String?
+  pendingCommandAt   DateTime?
+  lastInboundAt      DateTime?
+  lastOutboundAt     DateTime?
+  linkedAt           DateTime  @default(now())
+  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+/// Automação da exploração (irrigação, ventilação) + alerta WhatsApp.
+model NexusOpsRule {
+  id             String    @id @default(cuid())
+  companyId      String
+  /// irrigation | ventilation | whatsapp_alerts
+  kind           String
+  label          String
+  enabled        Boolean   @default(false)
+  configJson     Json?
+  lastCommandAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, kind])
+  @@index([companyId])
 }
 
 /// Sensor registado na exploração (token de ingest em hash).
@@ -3023,6 +3067,23 @@ model MeetParticipant {
   @@index([sessionId])
   @@index([userId])
   @@index([email])
+}
+
+/// Contactos CHORUS do utilizador (autocomplete de convites, estilo Google).
+model MeetContact {
+  id        String   @id @default(cuid())
+  companyId String
+  ownerId   String
+  email     String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner     User     @relation("MeetContactOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, companyId, email])
+  @@index([ownerId, companyId])
+  @@index([companyId, email])
 }
 
 /// Trecho de transcrição ao vivo enviado pelo Jigasi/Jitsi, atribuído ao participante.

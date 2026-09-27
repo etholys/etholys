@@ -23,7 +23,7 @@ export function NexusModeChooser({ withNet, openAtCases }: Props) {
           brand: 'NEXUS',
           line: 'Elegí el camino',
           mine: 'Autodesarrollo',
-          mineHint: 'Diagnóstico, plan y cuaderno',
+            mineHint: 'Diagnóstico, plan y central de mando',
           deliver: 'Asistencia técnica',
           deliverHint: 'Contratos con MIPYMEs',
         }
@@ -32,7 +32,7 @@ export function NexusModeChooser({ withNet, openAtCases }: Props) {
             brand: 'NEXUS',
             line: 'Choose your path',
             mine: 'Self-development',
-            mineHint: 'Diagnosis, plan and field book',
+            mineHint: 'Diagnosis, plan and command center',
             deliver: 'Technical assistance',
             deliverHint: 'MSME contracts',
           }
@@ -40,7 +40,7 @@ export function NexusModeChooser({ withNet, openAtCases }: Props) {
             brand: 'NEXUS',
             line: 'Escolhe o caminho',
             mine: 'Autodesenvolvimento',
-            mineHint: 'Diagnóstico, plano e caderno',
+            mineHint: 'Diagnóstico, plano e central de comando',
             deliver: 'Assistência técnica',
             deliverHint: 'Contratos com MIPYMEs',
           };

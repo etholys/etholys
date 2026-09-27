@@ -1723,14 +1723,14 @@ export function NexusSectorDiagnosticWizard() {
             <p className="rounded-xl border border-teal-200 bg-teal-50/70 px-3 py-2 text-sm text-teal-950">
               {moduleL(getSectorModule(sectorId).intro, loc)}{' '}
               <span className="text-xs text-teal-800">
-                · {moduleL(getSectorModule(sectorId).bookLabel, loc)} / {moduleL(getSectorModule(sectorId).monitorLabel, loc)}
+                · {es ? 'Central de mando' : 'Central de comando'}
               </span>
             </p>
           ) : null}
           <p className="text-sm text-slate-600">
             {es
-              ? 'Cada brecha del diagnóstico abre una acción en el módulo (cuaderno, unidad o sensor) — no un texto genérico de AT.'
-              : 'Cada lacuna do diagnóstico abre uma ação no módulo (caderno, unidade ou sensor) — não um texto genérico de AT.'}
+              ? 'Cada brecha del diagnóstico abre una acción en la central de mando — no un texto genérico de AT.'
+              : 'Cada lacuna do diagnóstico abre uma ação na central de comando — não um texto genérico de AT.'}
           </p>
           {layers.map((layer) => (
             <div key={layer.index} className="rounded-xl border bg-white p-4">

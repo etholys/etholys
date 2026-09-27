@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { canAccessNexusOpsCompany, isFieldEntryKind } from '@/lib/nexus-ops';
+import { maybeNotifyWhatsappAlerts } from '@/lib/nexus-ops-command';
 
 export async function GET(req: NextRequest) {
   const tenant = await getUserCompanyIds();
@@ -71,6 +72,7 @@ export async function POST(req: NextRequest) {
       occurredAt,
       payloadJson: payload as object,
       authorUserId: tenant.userId,
+      channel: 'app',
       engagementId,
       taskId: String(body.taskId || '').trim() || null,
     },
@@ -108,6 +110,8 @@ export async function POST(req: NextRequest) {
       },
     });
   }
+
+  void maybeNotifyWhatsappAlerts(companyId).catch(() => undefined);
 
   return NextResponse.json({ ok: true, entry });
 }

@@ -20,7 +20,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Headphones,
-  Sparkles,
+  Radio,
   GraduationCap,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
@@ -188,9 +188,9 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
     {
       key: 'mine',
       href: withNet('/hub/nexus/campo'),
-      icon: Sparkles,
+      icon: Radio,
       label:
-        locale === 'es' ? 'Mi módulo' : locale === 'pt' ? 'O meu módulo' : 'My module',
+        locale === 'es' ? 'Central de mando' : locale === 'pt' ? 'Central de comando' : 'Command center',
       active: !isAtClientDiagnosis && pathIn(NEXUS_MINE_PATHS),
       tone: 'mine' as const,
     },

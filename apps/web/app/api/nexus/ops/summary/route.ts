@@ -4,7 +4,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { canAccessNexusOpsCompany, deriveOpsAlerts, loadCompanySectors } from '@/lib/nexus-ops';
+import { ensureOpsRules } from '@/lib/nexus-ops-command';
 import { resolveSectorModule } from '@/lib/nexus-sector-modules';
+import { whatsappConfigured } from '@/lib/nexus-whatsapp';
 
 export async function GET(req: NextRequest) {
   const tenant = await getUserCompanyIds();
@@ -19,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   const sectors = await loadCompanySectors(companyId);
   const mod = resolveSectorModule(sectors);
-  const [units, entries, sensors, readings, latestDx, alerts] = await Promise.all([
+  const [units, entries, sensors, readings, latestDx, alerts, whatsapp, rules] = await Promise.all([
     prisma.nexusOpsUnit.findMany({
       where: { companyId, isActive: true },
       orderBy: { createdAt: 'asc' },
@@ -29,7 +31,7 @@ export async function GET(req: NextRequest) {
       where: { companyId },
       orderBy: { occurredAt: 'desc' },
       take: 8,
-      include: { unit: { select: { id: true, name: true } } },
+      include: { unit: { select: { id: true, name: true } }, author: { select: { id: true, name: true } } },
     }),
     prisma.nexusSensor.findMany({
       where: { companyId, isActive: true },
@@ -49,6 +51,18 @@ export async function GET(req: NextRequest) {
       select: { id: true, overall: true, sectorIds: true, createdAt: true },
     }),
     deriveOpsAlerts(companyId),
+    prisma.nexusWhatsappLink.findFirst({
+      where: { companyId },
+      select: {
+        phoneE164: true,
+        displayName: true,
+        alertsEnabled: true,
+        lastInboundAt: true,
+        lastOutboundAt: true,
+        pendingCommandKind: true,
+      },
+    }),
+    ensureOpsRules(companyId),
   ]);
 
   return NextResponse.json({
@@ -80,5 +94,10 @@ export async function GET(req: NextRequest) {
     readings: readings.map(({ opsUnit, ...r }) => ({ ...r, unit: opsUnit })),
     latestDiagnosis: latestDx,
     alerts,
+    whatsapp: {
+      configured: whatsappConfigured(),
+      link: whatsapp,
+    },
+    rules,
   });
 }

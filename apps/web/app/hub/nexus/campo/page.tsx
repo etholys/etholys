@@ -13,7 +13,7 @@ export default function NexusCampoPage() {
         </div>
       }
     >
-      <NexusOpsWorkspace view="campo" />
+      <NexusOpsWorkspace />
     </Suspense>
   );
 }

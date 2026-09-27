@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hashSensorToken, ingestCompanyForSensor } from '@/lib/nexus-ops';
+import { maybeNotifyWhatsappAlerts } from '@/lib/nexus-ops-command';
 
 /**
  * Ingest HTTP sem sessão — Authorization: Bearer nxsens_… ou body.token.
@@ -56,6 +57,8 @@ export async function POST(req: NextRequest) {
       data: { lastSeenAt: new Date() },
     }),
   ]);
+
+  void maybeNotifyWhatsappAlerts(sensor.companyId).catch(() => undefined);
 
   return NextResponse.json({ ok: true, reading, companyId: sensor.companyId });
 }

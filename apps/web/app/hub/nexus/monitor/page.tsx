@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { NexusOpsWorkspace } from '@/components/nexus/NexusOpsWorkspace';
 
+/** Alias: eficiência/monitor agora é a mesma central de comando. */
 export default function NexusMonitorPage() {
   return (
     <Suspense
@@ -13,7 +14,7 @@ export default function NexusMonitorPage() {
         </div>
       }
     >
-      <NexusOpsWorkspace view="monitor" />
+      <NexusOpsWorkspace />
     </Suspense>
   );
 }
