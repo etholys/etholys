@@ -48,6 +48,7 @@ type Phase =
   | 'program'
   | 'sector'
   | 'base'
+  | 'tech'
   | 'analyzing'
   | 'extension'
   | 'analysis'
@@ -186,6 +187,7 @@ export function NexusSectorDiagnosticWizard() {
   const [sectorIds, setSectorIds] = useState<string[]>([]);
   const sectorId = sectorIds[0] || '';
   const [baseIdx, setBaseIdx] = useState(0);
+  const [techIdx, setTechIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [customQuestions, setCustomQuestions] = useState<DxCustomQuestion[]>([]);
   const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
@@ -236,9 +238,10 @@ export function NexusSectorDiagnosticWizard() {
     [customQuestions]
   );
 
-  const allSteps = useMemo(() => [...scoredQuestions, ...customAsQuestions], [scoredQuestions, customAsQuestions]);
-  const current = allSteps[baseIdx] || null;
-  const progressPct = allSteps.length ? Math.round(((baseIdx + 1) / allSteps.length) * 100) : 0;
+  const catalogSteps = scoredQuestions;
+  const current = catalogSteps[baseIdx] || null;
+  const currentTech = customAsQuestions[techIdx] || null;
+  const progressPct = catalogSteps.length ? Math.round(((baseIdx + 1) / catalogSteps.length) * 100) : 0;
 
   const withNet = (href: string) => {
     if (!networkId) return href;
@@ -332,9 +335,9 @@ export function NexusSectorDiagnosticWizard() {
   ]);
 
   useEffect(() => {
-    if (!draftReady || allSteps.length === 0) return;
-    if (baseIdx >= allSteps.length) setBaseIdx(allSteps.length - 1);
-  }, [draftReady, allSteps.length, baseIdx]);
+    if (!draftReady || catalogSteps.length === 0) return;
+    if (baseIdx >= catalogSteps.length) setBaseIdx(catalogSteps.length - 1);
+  }, [draftReady, catalogSteps.length, baseIdx]);
 
   const resetDraft = useCallback(() => {
     clearDraft(storageKey);
@@ -632,9 +635,89 @@ export function NexusSectorDiagnosticWizard() {
       return;
     }
     setErr(null);
-    if (baseIdx >= allSteps.length - 1) void runAnalyze(false);
-    else setBaseIdx((i) => i + 1);
+    if (baseIdx >= catalogSteps.length - 1) {
+      if (customQuestions.length > 0) {
+        setTechIdx(0);
+        setPhase('tech');
+        return;
+      }
+      void runAnalyze(false);
+      return;
+    }
+    setBaseIdx((i) => i + 1);
   };
+
+  const addTechnicianQuestion = () => {
+    const t = newCustomQ.trim();
+    if (t.length < 8) return;
+    setCustomQuestions((p) => [...p, { id: `c_${Date.now()}`, prompt: t, addedBy: 'technician' }]);
+    setNewCustomQ('');
+  };
+
+  const goNextTech = () => {
+    if (!currentTech) return;
+    if (!customAnswers[currentTech.id]?.trim()) {
+      setErr(es ? 'Resposta obrigatória.' : 'Resposta obrigatória.');
+      return;
+    }
+    setErr(null);
+    if (techIdx >= customAsQuestions.length - 1) {
+      void runAnalyze(false);
+      return;
+    }
+    setTechIdx((i) => i + 1);
+  };
+
+  const technicianPad = (
+    <div className="rounded-2xl border border-amber-200/80 bg-amber-50/40 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">
+        {isAtFlow
+          ? es
+            ? 'Preguntas del técnico'
+            : 'Perguntas do técnico'
+          : es
+            ? 'Tus preguntas'
+            : 'As tuas perguntas'}
+      </p>
+      <p className="mt-1 text-xs text-amber-900/80">
+        {es
+          ? 'Van aparte del 360. Se responden después del cuestionario, no dentro de cada ítem.'
+          : 'Ficam à parte do 360. Respondem-se depois do questionário, não dentro de cada item.'}
+      </p>
+      {customQuestions.length > 0 && (
+        <ol className="mt-3 list-decimal space-y-1 pl-4 text-sm text-slate-800">
+          {customQuestions.map((q) => (
+            <li key={q.id}>{q.prompt}</li>
+          ))}
+        </ol>
+      )}
+      <div className="mt-3 flex gap-2">
+        <input
+          value={newCustomQ}
+          onChange={(e) => setNewCustomQ(e.target.value)}
+          placeholder={
+            isAtFlow
+              ? es
+                ? 'Nueva pregunta del técnico…'
+                : 'Nova pergunta do técnico…'
+              : es
+                ? 'Agregar pregunta…'
+                : 'Adicionar pergunta…'
+          }
+          className="flex-1 rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-sm"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addTechnicianQuestion();
+            }
+          }}
+        />
+        <button type="button" onClick={addTechnicianQuestion} className="rounded-lg bg-amber-700 px-3 text-white">
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
 
   const finishExtension = (skip: boolean) => {
     if (!skip) {
@@ -1120,9 +1203,14 @@ export function NexusSectorDiagnosticWizard() {
               emptyLabel={es ? 'Ninguna' : 'Nenhuma'}
             />
           </div>
-          {allSteps.length > 0 && (
+          {catalogSteps.length > 0 && (
             <p className="text-xs text-slate-500">
-              {allSteps.length} {es ? 'preguntas en este recorrido' : 'perguntas neste percurso'}
+              {catalogSteps.length} {es ? 'preguntas del 360' : 'perguntas do 360'}
+              {customQuestions.length
+                ? es
+                  ? ` · ${customQuestions.length} del técnico (aparte)`
+                  : ` · ${customQuestions.length} do técnico (à parte)`
+                : ''}
             </p>
           )}
           <div className="flex flex-wrap gap-2">
@@ -1149,12 +1237,13 @@ export function NexusSectorDiagnosticWizard() {
       )}
 
       {phase === 'base' && current && (
+        <div className="space-y-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-2 h-1.5 rounded-full bg-slate-100">
             <div className="h-full rounded-full bg-teal-600 transition-all" style={{ width: `${progressPct}%` }} />
           </div>
           <p className="text-xs text-slate-500">
-            {baseIdx + 1}/{allSteps.length} · {sectionLabel(current.section, loc)}
+            {baseIdx + 1}/{catalogSteps.length} · {sectionLabel(current.section, loc)}
           </p>
           <h2 className="mt-2 text-lg font-semibold">{questionLabel(current, loc)}</h2>
           {current.help && (
@@ -1212,38 +1301,64 @@ export function NexusSectorDiagnosticWizard() {
               <ChevronLeft className="h-4 w-4" /> {es ? 'Atrás' : 'Atrás'}
             </button>
             <button type="button" onClick={goNextBase} className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">
-              {baseIdx >= allSteps.length - 1 ? (es ? 'Analisar' : 'Analisar') : es ? 'Siguiente' : 'Seguinte'}
+              {baseIdx >= catalogSteps.length - 1
+                ? customQuestions.length
+                  ? es
+                    ? 'Preguntas del técnico'
+                    : 'Perguntas do técnico'
+                  : es
+                    ? 'Analisar'
+                    : 'Analisar'
+                : es
+                  ? 'Siguiente'
+                  : 'Seguinte'}
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
-          <div className="mt-3 flex gap-2">
-            <input
-              value={newCustomQ}
-              onChange={(e) => setNewCustomQ(e.target.value)}
-              placeholder={
-                isAtFlow
-                  ? es
-                    ? 'Pregunta del técnico…'
-                    : 'Pergunta do técnico…'
-                  : es
-                    ? 'Agregar pregunta…'
-                    : 'Adicionar pergunta…'
-              }
-              className="flex-1 rounded-lg border px-2 py-1.5 text-sm"
+        </div>
+        {technicianPad}
+        </div>
+      )}
+
+      {phase === 'tech' && currentTech && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-amber-800">
+              {es ? 'Pregunta del técnico' : 'Pergunta do técnico'} · {techIdx + 1}/{customAsQuestions.length}
+            </p>
+            <h2 className="mt-2 text-lg font-semibold">{currentTech.prompt.es}</h2>
+            <textarea
+              value={customAnswers[currentTech.id] || ''}
+              onChange={(e) => setCustomAnswers((p) => ({ ...p, [currentTech.id]: e.target.value }))}
+              rows={4}
+              className="mt-4 w-full rounded-xl border px-3 py-2 text-sm"
             />
-            <button
-              type="button"
-              onClick={() => {
-                const t = newCustomQ.trim();
-                if (t.length < 8) return;
-                setCustomQuestions((p) => [...p, { id: `c_${Date.now()}`, prompt: t, addedBy: 'technician' }]);
-                setNewCustomQ('');
-              }}
-              className="rounded-lg bg-amber-700 px-3 text-white"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
+            <div className="mt-4 flex justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  if (techIdx === 0) {
+                    setPhase('base');
+                    setBaseIdx(Math.max(0, catalogSteps.length - 1));
+                    return;
+                  }
+                  setTechIdx((i) => i - 1);
+                }}
+                className="inline-flex items-center gap-1 text-sm"
+              >
+                <ChevronLeft className="h-4 w-4" /> {es ? 'Atrás' : 'Atrás'}
+              </button>
+              <button
+                type="button"
+                onClick={goNextTech}
+                className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
+              >
+                {techIdx >= customAsQuestions.length - 1 ? (es ? 'Analisar' : 'Analisar') : es ? 'Siguiente' : 'Seguinte'}
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
+          {technicianPad}
         </div>
       )}
 
