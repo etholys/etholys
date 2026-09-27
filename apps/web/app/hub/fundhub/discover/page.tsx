@@ -147,9 +147,11 @@ export default function OpportunityDiscoverPage() {
   const [scanning, setScanning] = useState(false);
   const [scanPercent, setScanPercent] = useState(0);
   const [scanUi, setScanUi] = useState<'idle' | 'running' | 'error' | 'done'>('idle');
+  const [scanningShortcutId, setScanningShortcutId] = useState<string | null>(null);
   const [lastScanArgs, setLastScanArgs] = useState<{
     focus: ScanFocus;
     briefing?: Briefing;
+    shortcutId?: string | null;
   } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -273,14 +275,16 @@ export default function OpportunityDiscoverPage() {
   const startScan = async (
     focus: ScanFocus = discoveryFocus,
     briefingOverride?: Briefing,
+    shortcutId: string | null = null,
   ) => {
     setScanning(true);
+    setScanningShortcutId(shortcutId);
     setScanUi('running');
     setScanPercent(3);
     setMsg(null);
     setDiscoveryFocus(focus);
     const briefingToUse = briefingOverride ?? briefing;
-    setLastScanArgs({ focus, briefing: briefingOverride });
+    setLastScanArgs({ focus, briefing: briefingOverride, shortcutId });
     const startedAt = Date.now();
     try {
       const r = await fetch(q('/api/opportunity/scans'), {
@@ -432,6 +436,7 @@ export default function OpportunityDiscoverPage() {
       setMsg(e instanceof Error ? e.message : 'Erro');
     } finally {
       setScanning(false);
+      setScanningShortcutId(null);
     }
   };
 
@@ -440,7 +445,7 @@ export default function OpportunityDiscoverPage() {
       void startScan(discoveryFocus);
       return;
     }
-    void startScan(lastScanArgs.focus, lastScanArgs.briefing);
+    void startScan(lastScanArgs.focus, lastScanArgs.briefing, lastScanArgs.shortcutId ?? null);
   };
 
   const validate = async (
@@ -889,6 +894,7 @@ export default function OpportunityDiscoverPage() {
             scanning={scanning}
             scanPercent={scanPercent}
             scanUi={scanUi}
+            scanningShortcutId={scanningShortcutId}
             onRetryScan={retryLastScan}
             onSaved={(next) =>
               setBriefing({
@@ -904,7 +910,7 @@ export default function OpportunityDiscoverPage() {
                 reimbursable: next.reimbursable,
               })
             }
-            onRunShortcut={(next, focus) => {
+            onRunShortcut={(next, focus, profileId) => {
               const mapped: Briefing = {
                 themes: next.themes ?? [],
                 countries: next.countries ?? [],
@@ -918,7 +924,7 @@ export default function OpportunityDiscoverPage() {
                 reimbursable: next.reimbursable,
               };
               setBriefing(mapped);
-              void startScan(focus, mapped);
+              void startScan(focus, mapped, profileId);
             }}
           />
           <KnownFundsPanel onAdded={() => void loadCatalog()} />

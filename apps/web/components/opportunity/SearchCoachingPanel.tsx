@@ -45,6 +45,7 @@ export function SearchCoachingPanel({
   scanning,
   scanPercent = 0,
   scanUi = 'idle',
+  scanningShortcutId = null,
   onRetryScan,
   onSaved,
   onRunShortcut,
@@ -53,10 +54,12 @@ export function SearchCoachingPanel({
   scanning?: boolean;
   scanPercent?: number;
   scanUi?: 'idle' | 'running' | 'error' | 'done';
+  /** Only this shortcut card shows the ring; page-level scans leave cards idle. */
+  scanningShortcutId?: string | null;
   onRetryScan?: () => void;
   onSaved?: (next: Briefing) => void;
   /** Activa o atalho e dispara a varredura. */
-  onRunShortcut?: (briefing: Briefing, focus: ScanFocus) => void;
+  onRunShortcut?: (briefing: Briefing, focus: ScanFocus, profileId: string) => void;
 }) {
   const { locale, activeCompanyId } = useApp();
   const companyId = useMemo(() => {
@@ -173,7 +176,7 @@ export function SearchCoachingPanel({
       const next = d.briefing ?? { ...p.briefing, scanName: p.name, classifications: p.classifications };
       onSaved?.(next);
       setActiveId(p.id);
-      onRunShortcut?.(next, focus);
+      onRunShortcut?.(next, focus, p.id);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -245,6 +248,7 @@ export function SearchCoachingPanel({
       <ul className="mt-3 space-y-2">
         {profiles.map((p) => {
           const isActive = activeId === p.id || briefing.scanName === p.name;
+          const cardScanning = Boolean(scanning && scanningShortcutId === p.id);
           return (
             <li
               key={p.id}
@@ -279,11 +283,11 @@ export function SearchCoachingPanel({
               <div className="mt-2.5 flex flex-wrap gap-1.5">
                 <button
                   type="button"
-                  disabled={busy || scanning}
+                  disabled={busy || cardScanning}
                   onClick={() => void runShortcut(p, 'open_now')}
                   className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-gray-900 px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
                 >
-                  {scanning ? (
+                  {cardScanning ? (
                     <ScanProgressRing
                       percent={scanPercent}
                       state={scanUi === 'done' ? 'done' : 'running'}
