@@ -405,14 +405,8 @@ export default function OpportunityDiscoverPage() {
             ),
           );
         }
-        if (attempts % 5 === 0) {
-          setMsg(
-            t(
-              `A pesquisar… ${estimateScanPercent(Date.now() - startedAt, pd.run?.progressPct ?? null)}%`,
-              `Buscando… ${estimateScanPercent(Date.now() - startedAt, pd.run?.progressPct ?? null)}%`,
-              `Searching… ${estimateScanPercent(Date.now() - startedAt, pd.run?.progressPct ?? null)}%`,
-            ),
-          );
+        if (attempts === 1 || attempts % 5 === 0) {
+          setMsg(t('A pesquisar…', 'Buscando…', 'Searching…'));
         }
       }
 
@@ -656,7 +650,11 @@ export default function OpportunityDiscoverPage() {
               onRetry={scanUi === 'error' ? retryLastScan : undefined}
             />
           )}
-          <p className="min-w-0 flex-1">{msg}</p>
+          <p className="min-w-0 flex-1">
+            {scanning && scanUi === 'running'
+              ? t(`A pesquisar… ${scanPercent}%`, `Buscando… ${scanPercent}%`, `Searching… ${scanPercent}%`)
+              : msg}
+          </p>
         </div>
       )}
 
