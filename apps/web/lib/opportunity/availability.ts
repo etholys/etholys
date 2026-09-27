@@ -79,3 +79,80 @@ export function formatDateShort(iso: string | null | undefined, locale: string):
     { day: 'numeric', month: 'short', year: 'numeric' },
   );
 }
+
+const MONTH_TOKENS = [
+  ['january', 'jan', 'enero', 'ene', 'janeiro'],
+  ['february', 'feb', 'febrero', 'fev', 'fevereiro'],
+  ['march', 'mar', 'marzo', 'março', 'marco'],
+  ['april', 'apr', 'abril', 'abr'],
+  ['may', 'mayo', 'mai', 'maio'],
+  ['june', 'jun', 'junio', 'junho'],
+  ['july', 'jul', 'julio', 'julho'],
+  ['august', 'aug', 'agosto', 'ago'],
+  ['september', 'sep', 'sept', 'septiembre', 'setembro', 'set'],
+  ['october', 'oct', 'octubre', 'outubro', 'out', 'oct'],
+  ['november', 'nov', 'noviembre', 'novembro'],
+  ['december', 'dec', 'diciembre', 'dic', 'dezembro', 'dez'],
+];
+
+/** 1 Jan / 2026-01-01 — padrão clássico de prazo inventado pelo modelo. */
+export function looksPlaceholderDate(raw: string | null | undefined): boolean {
+  if (!raw?.trim()) return false;
+  const s = raw.trim();
+  if (/^\d{4}-01-01(?:[T\s].*)?$/.test(s)) return true;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return false;
+  return d.getUTCMonth() === 0 && d.getUTCDate() === 1;
+}
+
+export function dateAppearsInExcerpt(raw: string, excerpt: string): boolean {
+  if (!raw?.trim() || !excerpt?.trim()) return false;
+  const hay = excerpt.toLowerCase();
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) {
+    return hay.includes(raw.trim().toLowerCase().slice(0, 12));
+  }
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth();
+  const day = d.getUTCDate();
+  const yyyy = String(year);
+  const mm = String(month + 1).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  if (hay.includes(`${year}-${mm}-${dd}`)) return true;
+  if (hay.includes(`${dd}/${mm}/${year}`) || hay.includes(`${dd}.${mm}.${year}`)) return true;
+  if (hay.includes(`${mm}/${dd}/${year}`)) return true;
+  for (const token of MONTH_TOKENS[month] ?? []) {
+    if (hay.includes(yyyy) && (hay.includes(`${day} ${token}`) || hay.includes(`${token} ${day}`))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function sanitizeIsoDate(
+  raw: string | null | undefined,
+  excerpt?: string,
+): string | null {
+  if (!raw?.trim()) return null;
+  const value = raw.trim();
+  const text = excerpt?.trim() || '';
+  if (text && dateAppearsInExcerpt(value, text)) return value;
+  if (looksPlaceholderDate(value)) return null;
+  if (text.length >= 400 && !dateAppearsInExcerpt(value, text)) return null;
+  return value;
+}
+
+export function sanitizeCandidateDates<
+  T extends {
+    opensAt?: string | null;
+    closesAt?: string | null;
+    deadline?: string | null;
+    sourceExcerpt?: string;
+  },
+>(c: T): T {
+  const excerpt = c.sourceExcerpt;
+  const opensAt = sanitizeIsoDate(c.opensAt, excerpt);
+  const closesAt = sanitizeIsoDate(c.closesAt, excerpt);
+  const deadline = sanitizeIsoDate(c.deadline, excerpt);
+  return { ...c, opensAt, closesAt, deadline };
+}

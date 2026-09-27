@@ -56,6 +56,10 @@ export type CallEvidence = {
   callUrl?: string;
   documentCount: number;
   httpOk?: boolean;
+  /** Status HTTP real (401/403/404 só depois de retries + web_search). */
+  httpStatus?: number;
+  /** Como a página foi confirmada. */
+  verifiedVia?: 'http' | 'web_search';
 };
 
 export const FIT_ITEM_STATUSES = ['go', 'caution', 'no_go', 'unknown'] as const;

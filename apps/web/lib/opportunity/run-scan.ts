@@ -5,7 +5,7 @@ import { readOpportunityBriefing } from '@/lib/opportunity/briefing';
 import { readCompanyScanInbox, writeScanResults } from '@/lib/opportunity/candidate-store';
 import { buildLearningContext } from '@/lib/opportunity/scan-context';
 import { fetchSourceSnippets, snippetsToPromptBlock } from '@/lib/opportunity/fetch-sources';
-import { listUserMonitoredUrls } from '@/lib/opportunity/source-catalog';
+import { listEtholysCatalogHints, listUserMonitoredUrls } from '@/lib/opportunity/source-catalog';
 import { discoverOpportunitiesOnline } from '@/lib/opportunity/web-discovery';
 import { dropDuplicateFunds } from '@/lib/opportunity/scan-filters';
 import type { OpportunityBriefing, ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
@@ -43,7 +43,7 @@ export async function runOpportunityScan(opts: {
   const started = Date.now();
   const briefing = opts.briefing ?? (await readOpportunityBriefing(opts.companyId));
 
-  const [existingFunds, learningContext, optionalUrls, inbox] = await Promise.all([
+  const [existingFunds, learningContext, optionalUrls, catalogHints, inbox] = await Promise.all([
     prisma.fund.findMany({
       where: { companyId: opts.companyId, isActive: true },
       select: { name: true, institution: true },
@@ -51,6 +51,7 @@ export async function runOpportunityScan(opts: {
     }),
     buildLearningContext(opts.companyId),
     listUserMonitoredUrls(opts.companyId),
+    listEtholysCatalogHints(),
     readCompanyScanInbox(opts.companyId),
   ]);
 
@@ -71,11 +72,17 @@ export async function runOpportunityScan(opts: {
         });
 
   let optionalExtraContext = '';
+  if (catalogHints.length > 0) {
+    optionalExtraContext = catalogHints
+      .map((h) => `- ${h.name}: ${h.url}${h.tags ? ` (${h.tags})` : ''}`)
+      .join('\n');
+  }
   if (optionalUrls.length > 0) {
     try {
       await setScanProgress(run.id, 12, 'fetching_portals');
       const { snippets } = await fetchSourceSnippets(optionalUrls);
-      optionalExtraContext = snippetsToPromptBlock(snippets);
+      const block = snippetsToPromptBlock(snippets);
+      optionalExtraContext = [optionalExtraContext, block].filter(Boolean).join('\n');
     } catch {
       // portais opcionais — ignorar falhas
     }

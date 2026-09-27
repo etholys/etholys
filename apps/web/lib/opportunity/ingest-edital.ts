@@ -38,7 +38,13 @@ async function supplementWithWebSearch(url: string, seed: string, locale: Fundhu
     const { text } = await llmCompleteWithWebSearch(
       `You analyse official grant calls. Open the official page and linked PDFs. Do not invent. Quote what the page says. Write the summary in ${lang} (Hub UI locale: ${locale}).`,
       `Read this official call and return a factual summary in ${lang}:\n${url}\n\nAlready extracted (may be incomplete):\n${seed.slice(0, 2500)}\n\nInclude: fund name, funder, who can apply, countries, amount, deadline, annexes with URL if visible, and key requirements. If the page is public, do NOT say it needs a login.`,
-      { maxOutputTokens: 3500, temperature: 0.1, timeoutMs: 90_000 },
+      {
+        model: 'claude-opus-4-6',
+        maxOutputTokens: 3500,
+        temperature: 0.1,
+        timeoutMs: 90_000,
+        webSearchMaxUses: 4,
+      },
     );
     return text.trim();
   } catch {
@@ -75,9 +81,15 @@ export async function ingestOfficialEdital(url: string, opts?: { locale?: unknow
 
   const name = titleFromHtml(page.html) || (sourceExcerpt.split('\n')[0] || 'Convocatória').slice(0, 160);
   const institution = siteNameFromHtml(page.html, callUrl);
+  const recovered = !page.ok && sourceExcerpt.length > 200;
   const evidence = buildCallEvidence(
     { callUrl, documents: uniqueDocs, sourceExcerpt },
-    { httpOk: page.ok, verifiedAt: page.ok ? new Date().toISOString() : undefined },
+    {
+      httpOk: page.ok || recovered,
+      verifiedAt: page.ok || recovered ? new Date().toISOString() : undefined,
+      httpStatus: page.ok ? page.status || 200 : recovered ? 200 : page.status,
+      verifiedVia: page.ok ? 'http' : recovered ? 'web_search' : undefined,
+    },
   );
 
   return {

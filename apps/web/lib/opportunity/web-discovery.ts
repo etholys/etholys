@@ -2,7 +2,12 @@ import 'server-only';
 
 import { randomUUID } from 'crypto';
 import { llmCompleteJsonText, llmCompleteWithWebSearch } from '@/lib/llm-client';
+import { sanitizeCandidateDates } from '@/lib/opportunity/availability';
 import { normalizeCandidates } from '@/lib/opportunity/candidate-store';
+import {
+  buildDiscoverySearchQueries,
+  isHomogeneousInstitutionSet,
+} from '@/lib/opportunity/discovery-queries';
 import { enrichAndFilterCandidates } from '@/lib/opportunity/enrich-call';
 import { OFFICIAL_LINK_PROMPT_RULES } from '@/lib/opportunity/official-url';
 import { dropDuplicateFunds, isOpenNowCandidate } from '@/lib/opportunity/scan-filters';
@@ -67,7 +72,8 @@ Each candidate MUST fill these fields (Portuguese preferred unless briefing is i
 - requirements: mandatory docs, consortium rules, language, match funding, reporting burdens if known.
 - howToApply: portal/steps/next actions if known from the source; otherwise say to verify on the official page.
 - risksCaveats: co-financing burden, short windows, restricted beneficiaries, or unknowns.
-- Also: closesAt, opensAt, amount, currency, eligibleCountries, applicationWindow when known.`;
+- Also: closesAt, opensAt, amount, currency, eligibleCountries, applicationWindow when known.
+DATES: Never invent opensAt/closesAt/deadline. If the official page does not state a calendar date, leave null. NEVER use 1 January / 2026-01-01 as a placeholder. Prefer availabilityNote "prazo a confirmar na página oficial".`;
 
 function promptsForFocus(scanFocus: ScanFocus) {
   const today = todayIso();
@@ -83,8 +89,9 @@ CRITICAL RULES:
 - If you cannot cite a live official call page, skip the item. Invented agencies (e.g. fake "ANDEDE") are forbidden.
 - EXCLUDE: expired calls, closed windows, generic program homepages WITHOUT an active open call.
 - For each item gather: closesAt, opensAt, eligibleCountries, classification (direct|client_bridge|joint), classificationNote, PLUS full operational content (what it funds, who can apply, eligibility, requirements, how to apply, risks).
-- Search broadly AND with site: filters for official portals.
-- Minimum 6 opportunities when possible; fewer is OK if strict quality.
+- Search broadly AND with the REQUIRED official site: queries provided in the user message. Cover EVERY requested region (Brazil, United States, Latin America, Europe) when an official open grant exists — not three windows from the same agency.
+- Prefer REAL current call/edital/RFA pages (Horizon, LIFE, grants.gov, Finep, BNDES, IDB, CAF, GCF, GEF, USDA/NIFA, national ministries). Do not recycle generic IFAD rolling blurbs unless that exact call page is uniquely relevant AND you also found other funders.
+- Minimum 10 distinct official calls from at least 5 different institutions when possible.
 
 ${CANDIDATE_CONTENT_RULES}
 
@@ -197,16 +204,18 @@ export async function discoverOpportunitiesOnline(opts: {
         ? `\nMODE: OPEN NOW ONLY — reject anything without a verifiable active submission window as of ${todayIso()}.`
         : `\nMODE: REFERENCE INTELLIGENCE — map programs for future tracking, include seasonal and closed.`;
 
+    const requiredQueries = buildDiscoverySearchQueries(opts.briefing);
     const userResearch = [
       `BRIEFING:\n${briefingLines(opts.briefing)}`,
       `\nLEARNING:\n${opts.learningContext}`,
-      `\nEXISTING (do not repeat):\n${existingBlock}`,
+      `\nEXISTING (do not repeat — find OTHER official calls):\n${existingBlock}`,
       opts.optionalExtraContext?.trim()
-        ? `\nOPTIONAL PORTALS:\n${opts.optionalExtraContext.trim()}`
+        ? `\nOPTIONAL / CATALOGUE PORTALS:\n${opts.optionalExtraContext.trim()}`
         : '',
       focusHint,
+      `\nREQUIRED OFFICIAL SEARCHES (run these site: queries; official portals only, never aggregators):\n${requiredQueries.map((q, i) => `${i + 1}. ${q}`).join('\n')}`,
       `\n${OFFICIAL_LINK_PROMPT_RULES}`,
-      `\nSearch the web broadly (generic queries OK). Prefer official domains for linkOficial; never put aggregator URLs in linkOficial.`,
+      `\nSearch official domains for callUrl; never put aggregator URLs in linkOficial.`,
     ].join('');
 
     await report(25, 'web_research');
@@ -214,9 +223,11 @@ export async function discoverOpportunitiesOnline(opts: {
       RESEARCH_SYSTEM,
       userResearch,
       {
+        model: 'claude-sonnet-4-6',
         maxOutputTokens: 16384,
         temperature: scanFocus === 'open_now' ? 0.15 : 0.25,
         timeoutMs: 180_000,
+        webSearchMaxUses: 14,
       },
     );
 
@@ -232,11 +243,13 @@ export async function discoverOpportunitiesOnline(opts: {
       maxOutputTokens: 16384,
     });
     const parsed = JSON.parse(jsonText) as { candidates?: unknown[] };
-    let candidates = normalizeCandidates(parsed.candidates ?? [], scanFocus).map((c) => ({
-      ...c,
-      tempId: c.tempId || randomUUID(),
-      scanFocus,
-    }));
+    let candidates = normalizeCandidates(parsed.candidates ?? [], scanFocus).map((c) =>
+      sanitizeCandidateDates({
+        ...c,
+        tempId: c.tempId || randomUUID(),
+        scanFocus,
+      }),
+    );
     candidates = dropDuplicateFunds(candidates, opts.existingFunds);
 
     if (scanFocus === 'open_now') {
@@ -247,6 +260,30 @@ export async function discoverOpportunitiesOnline(opts: {
 
     await report(78, 'verifying_official_pages');
     candidates = await enrichAndFilterCandidates(candidates, scanFocus);
+    candidates = candidates.map((c) => sanitizeCandidateDates(c));
+
+    const needSecondPass =
+      scanFocus === 'open_now' &&
+      (candidates.length < 6 || isHomogeneousInstitutionSet(candidates));
+
+    if (needSecondPass) {
+      await report(82, 'web_research_opus');
+      const extra = await secondPassOpusDiscovery({
+        briefing: opts.briefing,
+        learningContext: opts.learningContext,
+        existingBlock,
+        existingFunds: [...opts.existingFunds, ...candidates],
+        optionalExtraContext: opts.optionalExtraContext,
+        alreadyFound: candidates,
+        requiredQueries,
+      });
+      if (extra.length > 0) {
+        const extraEnriched = (await enrichAndFilterCandidates(extra, scanFocus)).map((c) =>
+          sanitizeCandidateDates(c),
+        );
+        candidates = dropDuplicateFunds([...candidates, ...extraEnriched], opts.existingFunds);
+      }
+    }
 
     await report(88, 'filtering');
     if (candidates.length > 0) {
@@ -292,6 +329,62 @@ export async function discoverOpportunitiesOnline(opts: {
   };
 }
 
+async function secondPassOpusDiscovery(opts: {
+  briefing: OpportunityBriefing;
+  learningContext: string;
+  existingBlock: string;
+  existingFunds: Array<{ name: string; institution: string }>;
+  optionalExtraContext?: string;
+  alreadyFound: ScanCandidate[];
+  requiredQueries: string[];
+}): Promise<ScanCandidate[]> {
+  const found = opts.alreadyFound
+    .map((c) => `${c.name} (${c.institution})`)
+    .join('\n') || '(none)';
+  const { research: RESEARCH_SYSTEM, structure: STRUCTURE_SYSTEM } = promptsForFocus('open_now');
+  try {
+    const { text: research } = await llmCompleteWithWebSearch(
+      RESEARCH_SYSTEM,
+      [
+        `BRIEFING:\n${briefingLines(opts.briefing)}`,
+        `\nThe first pass returned too few or too similar results (same agency). Find NEW official open grant calls.`,
+        `\nALREADY FOUND (do not repeat):\n${found}`,
+        `\nEXISTING INBOX:\n${opts.existingBlock}`,
+        `\nREQUIRED OFFICIAL SEARCHES:\n${opts.requiredQueries.map((q, i) => `${i + 1}. ${q}`).join('\n')}`,
+        opts.optionalExtraContext?.trim()
+          ? `\nPORTALS:\n${opts.optionalExtraContext.trim()}`
+          : '',
+        `\nCover missing regions and themes. Official call pages only.`,
+      ].join(''),
+      {
+        model: 'claude-opus-4-6',
+        maxOutputTokens: 12288,
+        temperature: 0.2,
+        timeoutMs: 150_000,
+        webSearchMaxUses: 10,
+      },
+    );
+    const jsonText = await llmCompleteJsonText(
+      STRUCTURE_SYSTEM,
+      `RESEARCH REPORT:\n${research}\n\nBRIEFING:\n${briefingLines(opts.briefing)}\n\nSkip ALREADY FOUND and EXISTING.`,
+      { maxOutputTokens: 12288 },
+    );
+    const parsed = JSON.parse(jsonText) as { candidates?: unknown[] };
+    let extra = normalizeCandidates(parsed.candidates ?? [], 'open_now').map((c) =>
+      sanitizeCandidateDates({
+        ...c,
+        tempId: c.tempId || randomUUID(),
+        scanFocus: 'open_now' as const,
+      }),
+    );
+    extra = dropDuplicateFunds(extra, opts.existingFunds);
+    return extra.filter(isOpenNowCandidate);
+  } catch (e) {
+    console.warn('[opportunity/web-discovery] opus second pass failed:', e);
+    return [];
+  }
+}
+
 async function knowledgeOnlyDiscovery(
   briefing: OpportunityBriefing,
   learningContext: string,
@@ -311,11 +404,13 @@ async function knowledgeOnlyDiscovery(
   ].join('');
   const jsonText = await llmCompleteJsonText(system, user, { maxOutputTokens: 16384 });
   const parsed = JSON.parse(jsonText) as { candidates?: unknown[] };
-  let candidates = normalizeCandidates(parsed.candidates ?? [], scanFocus).map((c) => ({
-    ...c,
-    tempId: c.tempId || randomUUID(),
-    scanFocus,
-  }));
+  let candidates = normalizeCandidates(parsed.candidates ?? [], scanFocus).map((c) =>
+    sanitizeCandidateDates({
+      ...c,
+      tempId: c.tempId || randomUUID(),
+      scanFocus,
+    }),
+  );
   candidates = dropDuplicateFunds(candidates, existingFunds);
   if (scanFocus === 'open_now') {
     const open = candidates.filter(isOpenNowCandidate);

@@ -211,6 +211,8 @@ export type LlmGenerateOptions = {
   responseMimeType?: 'application/json' | 'text/plain';
   /** Pesquisa web via tool do provider (web_search). */
   webSearch?: boolean;
+  /** Máximo de pesquisas web por pedido (Anthropic web_search max_uses). */
+  webSearchMaxUses?: number;
   /** Força um modelo específico (ex.: claude-opus-4-6 para redacção SIEP). */
   model?: string;
   /** Timeout do fetch (web search precisa de mais do que o default 90s). */
@@ -414,11 +416,12 @@ async function llmGenerateContentWithModel(
   };
 
   if (opts.webSearch) {
+    const maxUses = Math.min(20, Math.max(1, opts.webSearchMaxUses ?? 8));
     body.tools = [
       {
         type: 'web_search_20250305',
         name: 'web_search',
-        max_uses: 8,
+        max_uses: maxUses,
       },
     ];
   }
@@ -542,9 +545,17 @@ export async function llmCompleteJsonText(
 export async function llmCompleteWithWebSearch(
   systemInstruction: string,
   userText: string,
-  options?: { maxOutputTokens?: number; temperature?: number; timeoutMs?: number },
+  options?: {
+    maxOutputTokens?: number;
+    temperature?: number;
+    timeoutMs?: number;
+    model?: string;
+    webSearchMaxUses?: number;
+  },
 ): Promise<{ text: string; searchQueries: string[] }> {
-  const models = getLlmModelCandidates();
+  const preferred = options?.model?.trim();
+  const pool = getLlmModelCandidates();
+  const models = preferred ? [preferred, ...pool.filter((m) => m !== preferred)] : pool;
   let lastError: Error | null = null;
   const timeoutMs = options?.timeoutMs ?? 180_000;
   let timedOut = false;
@@ -558,6 +569,7 @@ export async function llmCompleteWithWebSearch(
           maxOutputTokens: options?.maxOutputTokens ?? 16384,
           temperature: options?.temperature ?? 0.2,
           webSearch: true,
+          webSearchMaxUses: options?.webSearchMaxUses,
           timeoutMs,
         },
         model,

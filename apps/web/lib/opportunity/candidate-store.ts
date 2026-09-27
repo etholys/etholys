@@ -3,7 +3,7 @@ import 'server-only';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import type { ScanCandidate, ScanFocus, ScanResultsPayload } from '@/lib/opportunity/scan-types';
-import { normalizeAvailabilityStatus } from '@/lib/opportunity/availability';
+import { normalizeAvailabilityStatus, sanitizeCandidateDates } from '@/lib/opportunity/availability';
 import { coerceOpenAvailability } from '@/lib/opportunity/scan-filters';
 import { sanitizeFundingLinks } from '@/lib/opportunity/official-url';
 import {
@@ -148,56 +148,58 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
       continue;
     }
 
-    out.push({
-      tempId: typeof o.tempId === 'string' ? o.tempId : randomUUID(),
-      name: name.slice(0, 300),
-      institution: institution.slice(0, 200),
-      type: typeof o.type === 'string' ? o.type.slice(0, 80) : 'Grant',
-      category: typeof o.category === 'string' ? o.category.slice(0, 120) : undefined,
-      description: clip(o.description, 4500),
-      whoCanApply: clip(o.whoCanApply, 1200),
-      eligibility: clip(o.eligibility, 1500),
-      requirements: clip(o.requirements, 1500),
-      howToApply: clip(o.howToApply, 1200),
-      risksCaveats: clip(o.risksCaveats, 1200),
-      linkOficial: callUrl || links.linkOficial,
-      callUrl,
-      institutionUrl,
-      documents,
-      sourceExcerpt: clip(o.sourceExcerpt, 8000),
-      basesText: clip(o.basesText, 20000),
-      evidence:
-        parseCallEvidence(o.evidence) ??
-        buildCallEvidence({ callUrl, linkOficial: links.linkOficial, sourceUrl: links.sourceUrl, documents }),
-      fit: parseCandidateFit(o.fit),
-      amount: typeof o.amount === 'number' ? o.amount : undefined,
-      currency: typeof o.currency === 'string' ? o.currency.slice(0, 8) : 'USD',
-      deadline: closesAt,
-      countries: eligibleCountries,
-      sectors: typeof o.sectors === 'string' ? o.sectors.slice(0, 300) : undefined,
-      matchScore: typeof o.matchScore === 'number' ? Math.min(100, Math.max(0, o.matchScore)) : undefined,
-      matchJustification:
-        typeof o.matchJustification === 'string' ? o.matchJustification.slice(0, 500) : undefined,
-      sourceUrl: links.sourceUrl,
-      availabilityStatus,
-      opensAt,
-      closesAt,
-      applicationWindow:
-        typeof o.applicationWindow === 'string' ? o.applicationWindow.slice(0, 200) : undefined,
-      eligibleCountries,
-      availabilityNote,
-      scanFocus,
-      classification:
-        o.classification === 'direct' ||
-        o.classification === 'client_bridge' ||
-        o.classification === 'joint'
-          ? o.classification
-          : undefined,
-      classificationNote:
-        typeof o.classificationNote === 'string' ? o.classificationNote.slice(0, 300) : undefined,
-    });
+    out.push(
+      sanitizeCandidateDates({
+        tempId: typeof o.tempId === 'string' ? o.tempId : randomUUID(),
+        name: name.slice(0, 300),
+        institution: institution.slice(0, 200),
+        type: typeof o.type === 'string' ? o.type.slice(0, 80) : 'Grant',
+        category: typeof o.category === 'string' ? o.category.slice(0, 120) : undefined,
+        description: clip(o.description, 4500),
+        whoCanApply: clip(o.whoCanApply, 1200),
+        eligibility: clip(o.eligibility, 1500),
+        requirements: clip(o.requirements, 1500),
+        howToApply: clip(o.howToApply, 1200),
+        risksCaveats: clip(o.risksCaveats, 1200),
+        linkOficial: callUrl || links.linkOficial,
+        callUrl,
+        institutionUrl,
+        documents,
+        sourceExcerpt: clip(o.sourceExcerpt, 8000),
+        basesText: clip(o.basesText, 20000),
+        evidence:
+          parseCallEvidence(o.evidence) ??
+          buildCallEvidence({ callUrl, linkOficial: links.linkOficial, sourceUrl: links.sourceUrl, documents }),
+        fit: parseCandidateFit(o.fit),
+        amount: typeof o.amount === 'number' ? o.amount : undefined,
+        currency: typeof o.currency === 'string' ? o.currency.slice(0, 8) : 'USD',
+        deadline: closesAt,
+        countries: eligibleCountries,
+        sectors: typeof o.sectors === 'string' ? o.sectors.slice(0, 300) : undefined,
+        matchScore: typeof o.matchScore === 'number' ? Math.min(100, Math.max(0, o.matchScore)) : undefined,
+        matchJustification:
+          typeof o.matchJustification === 'string' ? o.matchJustification.slice(0, 500) : undefined,
+        sourceUrl: links.sourceUrl,
+        availabilityStatus,
+        opensAt,
+        closesAt,
+        applicationWindow:
+          typeof o.applicationWindow === 'string' ? o.applicationWindow.slice(0, 200) : undefined,
+        eligibleCountries,
+        availabilityNote,
+        scanFocus,
+        classification:
+          o.classification === 'direct' ||
+          o.classification === 'client_bridge' ||
+          o.classification === 'joint'
+            ? o.classification
+            : undefined,
+        classificationNote:
+          typeof o.classificationNote === 'string' ? o.classificationNote.slice(0, 300) : undefined,
+      }),
+    );
   }
-  return out.slice(0, 20);
+  return out.slice(0, 24);
 }
 
 export async function patchScanCandidate(

@@ -171,6 +171,10 @@ export function hasOfficialCallEvidence(
   return false;
 }
 
+export function isHardOfficialHttpFailure(status: number | undefined): boolean {
+  return status === 401 || status === 403 || status === 404;
+}
+
 export function parseCallEvidence(raw: unknown): CallEvidence | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const o = raw as Record<string, unknown>;
@@ -181,23 +185,33 @@ export function parseCallEvidence(raw: unknown): CallEvidence | undefined {
     callUrl: typeof o.callUrl === 'string' ? o.callUrl : undefined,
     documentCount: typeof o.documentCount === 'number' ? o.documentCount : 0,
     httpOk: typeof o.httpOk === 'boolean' ? o.httpOk : undefined,
+    httpStatus: typeof o.httpStatus === 'number' ? o.httpStatus : undefined,
+    verifiedVia: o.verifiedVia === 'http' || o.verifiedVia === 'web_search' ? o.verifiedVia : undefined,
   };
 }
 
 export function buildCallEvidence(
   c: Pick<ScanCandidate, 'callUrl' | 'linkOficial' | 'sourceUrl' | 'documents' | 'evidence'>,
-  opts?: { httpOk?: boolean; verifiedAt?: string },
+  opts?: {
+    httpOk?: boolean;
+    verifiedAt?: string;
+    httpStatus?: number;
+    verifiedVia?: 'http' | 'web_search';
+  },
 ): CallEvidence {
   const call = pickOfficialCallUrl(c);
   const documentCount = c.documents?.length ?? 0;
   const httpOk = opts?.httpOk ?? c.evidence?.httpOk;
+  const httpStatus = opts?.httpStatus ?? c.evidence?.httpStatus;
+  const verifiedVia = opts?.verifiedVia ?? c.evidence?.verifiedVia;
   const official = hasOfficialCallEvidence(c);
-  if (httpOk === false && (call || official)) {
+  if (httpOk === false && isHardOfficialHttpFailure(httpStatus) && (call || official)) {
     return {
       status: 'failed',
       callUrl: call,
       documentCount,
       httpOk: false,
+      httpStatus,
       verifiedAt: opts?.verifiedAt ?? c.evidence?.verifiedAt,
     };
   }
@@ -207,6 +221,8 @@ export function buildCallEvidence(
       callUrl: call,
       documentCount,
       httpOk: true,
+      httpStatus: httpStatus ?? 200,
+      verifiedVia,
       verifiedAt: opts?.verifiedAt ?? c.evidence?.verifiedAt ?? new Date().toISOString(),
     };
   }
@@ -215,6 +231,8 @@ export function buildCallEvidence(
     callUrl: call,
     documentCount,
     httpOk,
+    httpStatus,
+    verifiedVia,
     verifiedAt: c.evidence?.verifiedAt,
   };
 }
@@ -266,13 +284,54 @@ export function evidenceLine(
     };
   }
   if (ev.status === 'failed') {
+    const code = ev.httpStatus;
+    if (code === 401) {
+      return {
+        label: pt
+          ? 'Página oficial exige autenticação (401)'
+          : es
+            ? 'La página oficial exige autenticación (401)'
+            : 'Official page requires authentication (401)',
+        tone: 'bad',
+      };
+    }
+    if (code === 403) {
+      return {
+        label: pt
+          ? 'Página oficial bloqueou o acesso (403)'
+          : es
+            ? 'La página oficial bloqueó el acceso (403)'
+            : 'Official page blocked access (403)',
+        tone: 'bad',
+      };
+    }
+    if (code === 404) {
+      return {
+        label: pt
+          ? 'Página oficial não existe (404)'
+          : es
+            ? 'La página oficial no existe (404)'
+            : 'Official page not found (404)',
+        tone: 'bad',
+      };
+    }
     return {
       label: pt
-        ? 'Página oficial não respondeu'
+        ? 'Página oficial inacessível após verificação'
         : es
-          ? 'La página oficial no respondió'
-          : 'Official page did not respond',
+          ? 'Página oficial inaccesible tras verificación'
+          : 'Official page inaccessible after verification',
       tone: 'bad',
+    };
+  }
+  if (ev.callUrl) {
+    return {
+      label: pt
+        ? 'URL oficial citada — falta confirmar no sítio'
+        : es
+          ? 'URL oficial citada — falta confirmar en el sitio'
+          : 'Official URL cited — still confirming on the site',
+      tone: 'warn',
     };
   }
   return {

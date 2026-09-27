@@ -184,4 +184,5 @@ LINK + REALITY RULES (MANDATORY — invented programmes are forbidden):
 - If the call exists only on an aggregator and you cannot find the official page, OMIT the candidate.
 - documents[]: only URLs of official PDFs/Word/Excel you actually saw (bases, anexos, formularios). Do not invent files.
 - sourceUrl must also be official.
+- Never invent deadlines. If the official page does not state a date, leave opensAt/closesAt null. Do not use 1 January as a placeholder.
 `.trim();

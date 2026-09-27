@@ -100,10 +100,17 @@ test('evidence is verified only after HTTP OK on an official call page', () => {
   assert.match(evidenceLine(verified, 'pt').label, /Verificado/);
   assert.match(evidenceLine(verified, 'pt').label, /página oficial/);
 
-  const failed = buildCallEvidence(call, { httpOk: false });
+  const failed = buildCallEvidence(call, { httpOk: false, httpStatus: 404 });
   assert.equal(failed.status, 'failed');
   assert.equal(canOpenProposalBlind({ ...call, evidence: failed }), false);
   assert.equal(evidenceLine(failed, 'pt').tone, 'bad');
+  assert.match(evidenceLine(failed, 'es').label, /404/);
+  assert.equal(evidenceLine(failed, 'es').label.includes('no respondió'), false);
+
+  const networkMiss = buildCallEvidence(call, { httpOk: false, httpStatus: 0 });
+  assert.equal(networkMiss.status, 'unconfirmed');
+  assert.match(evidenceLine(networkMiss, 'es').label, /URL oficial citada/);
+  assert.equal(evidenceLine(networkMiss, 'es').label.includes('no respondió'), false);
 });
 
 test('homepage-only stays unconfirmed even if the site responds', () => {
