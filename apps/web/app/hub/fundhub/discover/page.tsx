@@ -283,8 +283,13 @@ export default function OpportunityDiscoverPage() {
     setScanPercent(3);
     setMsg(null);
     setDiscoveryFocus(focus);
-    const briefingToUse = briefingOverride ?? briefing;
-    setLastScanArgs({ focus, briefing: briefingOverride, shortcutId });
+    const briefingToUse = briefingOverride ?? {
+      ...briefing,
+      themes: themesInput.split(',').map((s) => s.trim()).filter(Boolean),
+      countries: countriesInput.split(',').map((s) => s.trim()).filter(Boolean),
+      notes: notesInput.trim() || briefing.notes,
+    };
+    setLastScanArgs({ focus, briefing: briefingToUse, shortcutId });
     const startedAt = Date.now();
     try {
       const r = await fetch(q('/api/opportunity/scans'), {

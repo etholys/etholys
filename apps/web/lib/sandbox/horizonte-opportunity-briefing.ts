@@ -8,7 +8,7 @@ export const HORIZONTE_OPEN_SCAN_NAME = 'Rural Uruguay — abertos agora';
 
 export const HORIZONTE_SEARCH_FEEDBACK = `Buscar convocatorias OFICIALES ABIERTAS HOY (no catálogo demo) para Uruguay y Cono Sur:
 temas agro, agricultura familiar, rural, clima, juventud rural, educación rural, economía circular, bioeconomía.
-Portales: gub.uy (MGAP, ANDE, ANII, INIA, OPP), bidlab.org, iadb.org, fonplata.org, caf.com, fao.org, ifad.org, ec.europa.eu, funding-tenders.europa.eu.
+Portales: gub.uy (MGAP, ANDE, ANII, INIA, OPP), bidlab.org, iadb.org, fonplata.org, caf.com, fao.org, ec.europa.eu, funding-tenders.europa.eu.
 Elegibles: ONG, cooperativas, consorcios; empresa privada OK si el llamado lo permite.
 Nunca devolver fondos ficticios del sandbox (Agencia Demo, Fundación Horizonte, Municipio Sierra Norte).
 Preferir URL oficial del financiador; si solo hay agregador, incluir la oportunidad con linkOficial vacío.`;

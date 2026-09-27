@@ -121,8 +121,8 @@ export async function buildFeedbackLearningBlock(companyId: string): Promise<str
   // not_now intencionalmente fora — não ensina a evitar o tipo
 
   const lines: string[] = [
-    'APRENDIZAGEM DO UTILIZADOR (respeitar com prioridade):',
-    '- «like» = procurar mais oportunidades SEMELHANTES.',
+    'APRENDIZAGEM DO UTILIZADOR (o briefing actual prevalece — likes antigos não fixam a agência):',
+    '- «like» = procurar mais oportunidades SEMELHANTES ao briefing, não copiar a mesma instituição.',
     '- «reject_type» = evitar este TIPO de fundo (instrumento/tema/geografia/elegibilidade).',
     '- Descartes «não agora» NÃO entram aqui — são só timing/estratégia pontual.',
   ];

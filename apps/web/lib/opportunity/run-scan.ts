@@ -7,6 +7,7 @@ import { buildLearningContext } from '@/lib/opportunity/scan-context';
 import { fetchSourceSnippets, snippetsToPromptBlock } from '@/lib/opportunity/fetch-sources';
 import { listEtholysCatalogHints, listUserMonitoredUrls } from '@/lib/opportunity/source-catalog';
 import { discoverOpportunitiesOnline } from '@/lib/opportunity/web-discovery';
+import { applyBriefingDiversity } from '@/lib/opportunity/discovery-queries';
 import { dropDuplicateFunds } from '@/lib/opportunity/scan-filters';
 import type { OpportunityBriefing, ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
 
@@ -100,10 +101,16 @@ export async function runOpportunityScan(opts: {
   });
 
   const alreadyInInbox = [...inbox.pending, ...inbox.later];
-  let candidates = dropDuplicateFunds(discovery.candidates, [...existingFunds, ...alreadyInInbox]);
+  let candidates = applyBriefingDiversity(
+    dropDuplicateFunds(discovery.candidates, [...existingFunds, ...alreadyInInbox]),
+    briefing,
+  );
   if (candidates.length === 0) {
-    candidates = dropDuplicateFunds(discovery.candidates, existingFunds).filter(
-      (c) => !existingSet.has(`${c.name.toLowerCase()}|${c.institution.toLowerCase()}`),
+    candidates = applyBriefingDiversity(
+      dropDuplicateFunds(discovery.candidates, existingFunds).filter(
+        (c) => !existingSet.has(`${c.name.toLowerCase()}|${c.institution.toLowerCase()}`),
+      ),
+      briefing,
     );
     candidates = dropDuplicateFunds(candidates, alreadyInInbox);
   }

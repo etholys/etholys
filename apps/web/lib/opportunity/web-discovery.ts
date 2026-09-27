@@ -5,6 +5,8 @@ import { llmCompleteJsonText, llmCompleteWithWebSearch } from '@/lib/llm-client'
 import { sanitizeCandidateDates } from '@/lib/opportunity/availability';
 import { normalizeCandidates } from '@/lib/opportunity/candidate-store';
 import {
+  applyBriefingDiversity,
+  briefingRequestsIfad,
   buildDiscoverySearchQueries,
   isHomogeneousInstitutionSet,
 } from '@/lib/opportunity/discovery-queries';
@@ -89,8 +91,9 @@ CRITICAL RULES:
 - If you cannot cite a live official call page, skip the item. Invented agencies (e.g. fake "ANDEDE") are forbidden.
 - EXCLUDE: expired calls, closed windows, generic program homepages WITHOUT an active open call.
 - For each item gather: closesAt, opensAt, eligibleCountries, classification (direct|client_bridge|joint), classificationNote, PLUS full operational content (what it funds, who can apply, eligibility, requirements, how to apply, risks).
-- Search broadly AND with the REQUIRED official site: queries provided in the user message. Cover EVERY requested region (Brazil, United States, Latin America, Europe) when an official open grant exists — not three windows from the same agency.
-- Prefer REAL current call/edital/RFA pages (Horizon, LIFE, grants.gov, Finep, BNDES, IDB, CAF, GCF, GEF, USDA/NIFA, national ministries). Do not recycle generic IFAD rolling blurbs unless that exact call page is uniquely relevant AND you also found other funders.
+- The BRIEFING (themes, countries, type, command) is the ONLY search query. Do not default to a favourite multilateral. Never return more than ONE result from the same institution.
+- Search the REQUIRED official site: queries first. Cover every requested region when an official open grant exists.
+- Prefer current call/edital/RFA pages on Horizon, LIFE, grants.gov, Finep, BNDES, IDB, CAF, GCF, GEF, USDA/NIFA and national ministries.
 - Minimum 10 distinct official calls from at least 5 different institutions when possible.
 
 ${CANDIDATE_CONTENT_RULES}
@@ -205,14 +208,18 @@ export async function discoverOpportunitiesOnline(opts: {
         : `\nMODE: REFERENCE INTELLIGENCE — map programs for future tracking, include seasonal and closed.`;
 
     const requiredQueries = buildDiscoverySearchQueries(opts.briefing);
+    const ifadBan = briefingRequestsIfad(opts.briefing)
+      ? ''
+      : `\nFORBIDDEN AGENCY: do not return IFAD / FIDA / ifad.org calls. A leftover portal list is not a request for that agency. Search the briefing themes and countries instead.`;
     const userResearch = [
-      `BRIEFING:\n${briefingLines(opts.briefing)}`,
-      `\nLEARNING:\n${opts.learningContext}`,
+      `BRIEFING (this is the search query — obey it):\n${briefingLines(opts.briefing)}`,
+      `\nLEARNING (skip-list only — do not copy catalog institutions as the theme):\n${opts.learningContext}`,
       `\nEXISTING (do not repeat — find OTHER official calls):\n${existingBlock}`,
       opts.optionalExtraContext?.trim()
         ? `\nOPTIONAL / CATALOGUE PORTALS:\n${opts.optionalExtraContext.trim()}`
         : '',
       focusHint,
+      ifadBan,
       `\nREQUIRED OFFICIAL SEARCHES (run these site: queries; official portals only, never aggregators):\n${requiredQueries.map((q, i) => `${i + 1}. ${q}`).join('\n')}`,
       `\n${OFFICIAL_LINK_PROMPT_RULES}`,
       `\nSearch official domains for callUrl; never put aggregator URLs in linkOficial.`,
@@ -251,6 +258,7 @@ export async function discoverOpportunitiesOnline(opts: {
       }),
     );
     candidates = dropDuplicateFunds(candidates, opts.existingFunds);
+    candidates = applyBriefingDiversity(candidates, opts.briefing);
 
     if (scanFocus === 'open_now') {
       const open = candidates.filter(isOpenNowCandidate);
@@ -260,7 +268,10 @@ export async function discoverOpportunitiesOnline(opts: {
 
     await report(78, 'verifying_official_pages');
     candidates = await enrichAndFilterCandidates(candidates, scanFocus);
-    candidates = candidates.map((c) => sanitizeCandidateDates(c));
+    candidates = applyBriefingDiversity(
+      candidates.map((c) => sanitizeCandidateDates(c)),
+      opts.briefing,
+    );
 
     const needSecondPass =
       scanFocus === 'open_now' &&
@@ -281,7 +292,10 @@ export async function discoverOpportunitiesOnline(opts: {
         const extraEnriched = (await enrichAndFilterCandidates(extra, scanFocus)).map((c) =>
           sanitizeCandidateDates(c),
         );
-        candidates = dropDuplicateFunds([...candidates, ...extraEnriched], opts.existingFunds);
+        candidates = applyBriefingDiversity(
+          dropDuplicateFunds([...candidates, ...extraEnriched], opts.existingFunds),
+          opts.briefing,
+        );
       }
     }
 
@@ -347,7 +361,8 @@ async function secondPassOpusDiscovery(opts: {
       RESEARCH_SYSTEM,
       [
         `BRIEFING:\n${briefingLines(opts.briefing)}`,
-        `\nThe first pass returned too few or too similar results (same agency). Find NEW official open grant calls.`,
+        `\nThe first pass collapsed onto one agency or was too thin. Find NEW official open grant calls that match the BRIEFING.`,
+        briefingRequestsIfad(opts.briefing) ? '' : `\nFORBIDDEN: do not include IFAD / FIDA / ifad.org.`,
         `\nALREADY FOUND (do not repeat):\n${found}`,
         `\nEXISTING INBOX:\n${opts.existingBlock}`,
         `\nREQUIRED OFFICIAL SEARCHES:\n${opts.requiredQueries.map((q, i) => `${i + 1}. ${q}`).join('\n')}`,
@@ -377,7 +392,7 @@ async function secondPassOpusDiscovery(opts: {
         scanFocus: 'open_now' as const,
       }),
     );
-    extra = dropDuplicateFunds(extra, opts.existingFunds);
+    extra = applyBriefingDiversity(dropDuplicateFunds(extra, opts.existingFunds), opts.briefing);
     return extra.filter(isOpenNowCandidate);
   } catch (e) {
     console.warn('[opportunity/web-discovery] opus second pass failed:', e);
@@ -411,7 +426,7 @@ async function knowledgeOnlyDiscovery(
       scanFocus,
     }),
   );
-  candidates = dropDuplicateFunds(candidates, existingFunds);
+  candidates = applyBriefingDiversity(dropDuplicateFunds(candidates, existingFunds), briefing);
   if (scanFocus === 'open_now') {
     const open = candidates.filter(isOpenNowCandidate);
     candidates = open.length > 0 ? open : candidates;

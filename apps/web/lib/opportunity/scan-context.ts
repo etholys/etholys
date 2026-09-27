@@ -19,7 +19,9 @@ export async function buildLearningContext(companyId: string): Promise<string> {
   const lines: string[] = [];
 
   if (validated.length > 0) {
-    lines.push('Catálogo guardado (sinais positivos implícitos):');
+    lines.push(
+      'Já no catálogo (skip-list — NÃO copiar; NÃO usar a agência do catálogo como tema da pesquisa. O briefing actual manda):',
+    );
     for (const f of validated.slice(0, 15)) {
       lines.push(
         `- ${f.name} (${f.institution}) · ${f.type}${f.sectors ? ` · ${f.sectors}` : ''}${f.countries ? ` · ${f.countries}` : ''}`,
@@ -49,21 +51,6 @@ export async function buildLearningContext(companyId: string): Promise<string> {
     lines.push(
       `Não repetir estes nomes já vistos (timing/ocasião — NÃO generalizar o tipo): ${[...new Set(softSkip)].slice(0, 12).join('; ')}`,
     );
-  }
-
-  const profile = await prisma.fundingCaptureProfile.findUnique({
-    where: { companyId },
-    select: { preferencesJson: true },
-  });
-  if (profile?.preferencesJson) {
-    try {
-      const prefs = JSON.parse(profile.preferencesJson) as { searchFeedback?: string };
-      if (prefs.searchFeedback?.trim()) {
-        lines.push(`Orientação do atalho activo:\n${prefs.searchFeedback.trim()}`);
-      }
-    } catch {
-      // ignore
-    }
   }
 
   return lines.length > 0 ? lines.join('\n') : '(sem histórico — primeira varredura ou catálogo vazio)';

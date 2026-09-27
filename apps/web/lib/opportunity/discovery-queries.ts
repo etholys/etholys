@@ -99,6 +99,84 @@ function sameInstitution(a: string, b: string): boolean {
   return shorter.length >= 4 && longer.includes(shorter);
 }
 
+export function isIfadCandidate(c: {
+  name?: string;
+  institution?: string;
+  callUrl?: string;
+  linkOficial?: string;
+  sourceUrl?: string;
+}): boolean {
+  const hay = fold(
+    [c.name, c.institution, c.callUrl, c.linkOficial, c.sourceUrl].filter(Boolean).join(' '),
+  );
+  return /\bifad\b|\bfida\b|ifad\.org/.test(hay);
+}
+
+/**
+ * Listas de portais (seed Horizonte, etc.) que citam ifad.org NÃO pedem IFAD.
+ * Só conta se o briefing/comando for sobre IFAD em si.
+ */
+export function briefingRequestsIfad(briefing: OpportunityBriefing): boolean {
+  const primary = fold(
+    [...(briefing.themes ?? []), briefing.notes, briefing.scanName].filter(Boolean).join(' '),
+  );
+  if (/\bifad\b|\bfida\b/.test(primary)) return true;
+  const command = fold(briefing.searchFeedback || '');
+  if (!command) return false;
+  const hits = command.match(/\bifad\b|\bfida\b|ifad\.org/g)?.length ?? 0;
+  if (hits === 0) return false;
+  const laundryList = /europa\.eu|grants\.gov|finep|iadb|horizon|usda|gub\.uy|fontagro|caf\.com/.test(
+    command,
+  );
+  return !laundryList;
+}
+
+export function dropUnrequestedIfad<
+  T extends {
+    name?: string;
+    institution?: string;
+    callUrl?: string;
+    linkOficial?: string;
+    sourceUrl?: string;
+  },
+>(candidates: T[], briefing: OpportunityBriefing): T[] {
+  if (briefingRequestsIfad(briefing)) return candidates;
+  return candidates.filter((c) => !isIfadCandidate(c));
+}
+
+export function capPerInstitution<T extends { institution?: string; matchScore?: number }>(
+  candidates: T[],
+  max = 1,
+): T[] {
+  const ranked = [...candidates].sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
+  const used: string[] = [];
+  const out: T[] = [];
+  for (const c of ranked) {
+    const key = institutionKey(c.institution || '');
+    const cluster = used.find((u) => sameInstitution(u, key));
+    const count = cluster
+      ? out.filter((x) => sameInstitution(institutionKey(x.institution || ''), key)).length
+      : 0;
+    if (count >= max) continue;
+    out.push(c);
+    if (!cluster && key) used.push(key);
+  }
+  return out;
+}
+
+export function applyBriefingDiversity<
+  T extends {
+    name?: string;
+    institution?: string;
+    callUrl?: string;
+    linkOficial?: string;
+    sourceUrl?: string;
+    matchScore?: number;
+  },
+>(candidates: T[], briefing: OpportunityBriefing): T[] {
+  return capPerInstitution(dropUnrequestedIfad(candidates, briefing), 1);
+}
+
 /** Demasiado da mesma agência (ex.: 3 IFAD rolling) = pesquisa pobre. */
 export function isHomogeneousInstitutionSet(
   candidates: Array<{ institution?: string }>,
