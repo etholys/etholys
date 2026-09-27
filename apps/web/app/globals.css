@@ -645,8 +645,8 @@
   background-color: rgba(12, 24, 34, 0.94) !important;
 }
 
-.etholys-fundhub .fh-canvas [class*="bg-amber-50"],
-.etholys-fundhub .fh-canvas [class*="bg-orange-50"] {
+.etholys-fundhub .fh-canvas [class*="bg-amber-50"]:not([class*="bg-amber-500"]),
+.etholys-fundhub .fh-canvas [class*="bg-orange-50"]:not([class*="bg-orange-500"]) {
   background-color: rgba(245, 158, 11, 0.16) !important;
 }
 
@@ -695,25 +695,25 @@
   color: #fca5a5 !important;
 }
 
-.etholys-system .sys-canvas [class*="bg-teal-50"],
+.etholys-system .sys-canvas [class*="bg-teal-50"]:not([class*="bg-teal-500"]),
 .etholys-system .sys-canvas [class*="bg-teal-100"] {
   background-color: rgba(45, 212, 191, 0.2) !important;
 }
 
-.etholys-system .sys-canvas [class*="bg-violet-50"],
-.etholys-system .sys-canvas [class*="bg-indigo-50"],
-.etholys-system .sys-canvas [class*="bg-sky-50"],
-.etholys-system .sys-canvas [class*="bg-purple-50"],
+.etholys-system .sys-canvas [class*="bg-violet-50"]:not([class*="bg-violet-500"]),
+.etholys-system .sys-canvas [class*="bg-indigo-50"]:not([class*="bg-indigo-500"]),
+.etholys-system .sys-canvas [class*="bg-sky-50"]:not([class*="bg-sky-500"]),
+.etholys-system .sys-canvas [class*="bg-purple-50"]:not([class*="bg-purple-500"]),
 .etholys-system .sys-canvas [class*="bg-violet-100"] {
   background-color: rgba(167, 139, 250, 0.18) !important;
 }
 
-.etholys-system .sys-canvas [class*="bg-amber-50"],
-.etholys-system .sys-canvas [class*="bg-orange-50"] {
+.etholys-system .sys-canvas [class*="bg-amber-50"]:not([class*="bg-amber-500"]),
+.etholys-system .sys-canvas [class*="bg-orange-50"]:not([class*="bg-orange-500"]) {
   background-color: rgba(251, 146, 60, 0.18) !important;
 }
 
-.etholys-system .sys-canvas [class*="bg-emerald-50"] {
+.etholys-system .sys-canvas [class*="bg-emerald-50"]:not([class*="bg-emerald-500"]) {
   background-color: rgba(16, 185, 129, 0.18) !important;
 }
 
@@ -728,14 +728,189 @@
   color: #c7d2fe !important;
 }
 
-.etholys-system .sys-canvas [class*="bg-indigo-50"],
-.etholys-system .sys-canvas [class*="bg-sky-50"] {
+.etholys-system .sys-canvas [class*="bg-indigo-50"]:not([class*="bg-indigo-500"]),
+.etholys-system .sys-canvas [class*="bg-sky-50"]:not([class*="bg-sky-500"]) {
   background-color: rgba(129, 140, 248, 0.2) !important;
 }
 
 .etholys-system .sys-canvas .bg-\[\#fafbfc\],
-.etholys-system .sys-canvas .bg-\[\#f5f3ff\] {
+.etholys-system .sys-canvas .bg-\[\#f5f3ff\],
+.etholys-system .sys-canvas .bg-\[\#fafafa\],
+.etholys-system .sys-canvas .bg-\[\#fffafa\],
+.etholys-system .sys-canvas .bg-\[\#ffffff\] {
   background-color: var(--sys-panel) !important;
+}
+
+/*
+ * Pastéis / superfícies claras que o catch-all de tinta NÃO pode deixar sem remap.
+ * Sem isto, [class*="text-gray-"] / text-slate-* viram #f1f5f9 em cima de rose-50, stone-50, white/80, etc.
+ */
+.etholys-system .sys-canvas [class*="bg-rose-50"]:not([class*="bg-rose-500"]),
+.etholys-system .sys-canvas [class*="bg-rose-100"],
+.etholys-system .sys-canvas [class*="bg-pink-50"]:not([class*="bg-pink-500"]),
+.etholys-system .sys-canvas [class*="bg-pink-100"],
+.etholys-system .sys-canvas [class*="bg-fuchsia-50"]:not([class*="bg-fuchsia-500"]),
+.etholys-system .sys-canvas [class*="bg-fuchsia-100"] {
+  background-color: rgba(244, 63, 94, 0.16) !important;
+}
+
+.etholys-system .sys-canvas [class*="bg-stone-50"]:not([class*="bg-stone-500"]),
+.etholys-system .sys-canvas [class*="bg-stone-100"],
+.etholys-system .sys-canvas [class*="bg-zinc-50"]:not([class*="bg-zinc-500"]),
+.etholys-system .sys-canvas [class*="bg-zinc-100"],
+.etholys-system .sys-canvas [class*="bg-neutral-50"]:not([class*="bg-neutral-500"]),
+.etholys-system .sys-canvas [class*="bg-neutral-100"] {
+  background-color: var(--sys-panel-soft) !important;
+}
+
+.etholys-system .sys-canvas [class*="bg-cyan-50"]:not([class*="bg-cyan-500"]),
+.etholys-system .sys-canvas [class*="bg-cyan-100"],
+.etholys-system .sys-canvas [class*="bg-lime-50"]:not([class*="bg-lime-500"]),
+.etholys-system .sys-canvas [class*="bg-lime-100"] {
+  background-color: rgba(45, 212, 191, 0.16) !important;
+}
+
+.etholys-system .sys-canvas [class*="bg-yellow-50"]:not([class*="bg-yellow-500"]),
+.etholys-system .sys-canvas [class*="bg-yellow-100"] {
+  background-color: rgba(234, 179, 8, 0.18) !important;
+}
+
+.etholys-system .sys-canvas [class*="bg-red-50"]:not([class*="bg-red-500"]),
+.etholys-system .sys-canvas [class*="bg-red-100"] {
+  background-color: rgba(239, 68, 68, 0.18) !important;
+}
+
+.etholys-system .sys-canvas [class*="bg-emerald-100"] {
+  background-color: rgba(16, 185, 129, 0.18) !important;
+}
+
+.etholys-system .sys-canvas [class*="bg-amber-100"],
+.etholys-system .sys-canvas [class*="bg-orange-100"] {
+  background-color: rgba(251, 146, 60, 0.18) !important;
+}
+
+.etholys-system .sys-canvas [class*="bg-blue-50"]:not([class*="bg-blue-500"]),
+.etholys-system .sys-canvas [class*="bg-blue-100"] {
+  background-color: rgba(129, 140, 248, 0.2) !important;
+}
+
+.etholys-system .sys-canvas .bg-white\/40,
+.etholys-system .sys-canvas .bg-white\/50,
+.etholys-system .sys-canvas .bg-slate-50\/50,
+.etholys-system .sys-canvas .bg-slate-50\/60,
+.etholys-system .sys-canvas .bg-gray-50\/50,
+.etholys-system .sys-canvas .bg-gray-50\/80 {
+  background-color: var(--sys-panel) !important;
+}
+
+.etholys-system .sys-canvas [class*="from-rose-50"],
+.etholys-system .sys-canvas [class*="to-rose-50"],
+.etholys-system .sys-canvas [class*="from-pink-50"],
+.etholys-system .sys-canvas [class*="to-pink-50"],
+.etholys-system .sys-canvas [class*="from-stone-50"],
+.etholys-system .sys-canvas [class*="to-stone-50"] {
+  background-image: none !important;
+  background-color: var(--sys-panel) !important;
+}
+
+.etholys-system .sys-canvas [class*="text-rose-"],
+.etholys-system .sys-canvas [class*="text-pink-"],
+.etholys-system .sys-canvas [class*="text-fuchsia-"] {
+  color: #fda4af !important;
+}
+
+.etholys-system .sys-canvas [class*="text-stone-"],
+.etholys-system .sys-canvas [class*="text-zinc-"],
+.etholys-system .sys-canvas [class*="text-neutral-"] {
+  color: #f1f5f9 !important;
+}
+
+.etholys-system .sys-canvas [class*="text-cyan-"],
+.etholys-system .sys-canvas [class*="text-lime-"] {
+  color: #5eead4 !important;
+}
+
+.etholys-system .sys-canvas [class*="text-yellow-"] {
+  color: #fde68a !important;
+}
+
+.etholys-system .sys-canvas [class*="border-rose-"],
+.etholys-system .sys-canvas [class*="border-pink-"],
+.etholys-system .sys-canvas [class*="border-fuchsia-"] {
+  border-color: rgba(251, 113, 133, 0.35) !important;
+}
+
+.etholys-system .sys-canvas [class*="border-stone-"],
+.etholys-system .sys-canvas [class*="border-zinc-"],
+.etholys-system .sys-canvas [class*="border-neutral-"] {
+  border-color: var(--sys-line) !important;
+}
+
+.etholys-system .sys-canvas [class*="border-cyan-"],
+.etholys-system .sys-canvas [class*="border-lime-"] {
+  border-color: rgba(45, 212, 191, 0.35) !important;
+}
+
+.etholys-fundhub [class*="bg-rose-50"]:not([class*="bg-rose-500"]),
+.etholys-fundhub [class*="bg-rose-100"],
+.etholys-fundhub [class*="bg-pink-50"]:not([class*="bg-pink-500"]),
+.etholys-fundhub [class*="bg-pink-100"],
+.etholys-fundhub [class*="bg-fuchsia-50"]:not([class*="bg-fuchsia-500"]),
+.etholys-fundhub [class*="bg-fuchsia-100"] {
+  background-color: rgba(244, 63, 94, 0.16) !important;
+}
+
+.etholys-fundhub [class*="bg-stone-50"]:not([class*="bg-stone-500"]),
+.etholys-fundhub [class*="bg-stone-100"],
+.etholys-fundhub [class*="bg-zinc-50"]:not([class*="bg-zinc-500"]),
+.etholys-fundhub [class*="bg-zinc-100"],
+.etholys-fundhub [class*="bg-neutral-50"]:not([class*="bg-neutral-500"]),
+.etholys-fundhub [class*="bg-neutral-100"] {
+  background-color: var(--sys-panel-soft) !important;
+}
+
+.etholys-fundhub [class*="bg-cyan-50"]:not([class*="bg-cyan-500"]),
+.etholys-fundhub [class*="bg-cyan-100"],
+.etholys-fundhub [class*="bg-lime-50"]:not([class*="bg-lime-500"]),
+.etholys-fundhub [class*="bg-lime-100"] {
+  background-color: rgba(45, 212, 191, 0.16) !important;
+}
+
+.etholys-fundhub [class*="bg-yellow-50"]:not([class*="bg-yellow-500"]),
+.etholys-fundhub .bg-white\/40,
+.etholys-fundhub .bg-white\/50,
+.etholys-fundhub .bg-white\/60,
+.etholys-fundhub .bg-white\/70,
+.etholys-fundhub .bg-white\/80,
+.etholys-fundhub .bg-white\/90,
+.etholys-fundhub .bg-white\/95,
+.etholys-fundhub .bg-slate-50\/50,
+.etholys-fundhub .bg-slate-50\/60,
+.etholys-fundhub .bg-gray-50\/80 {
+  background-color: var(--sys-panel) !important;
+}
+
+.etholys-fundhub [class*="text-rose-"],
+.etholys-fundhub [class*="text-pink-"],
+.etholys-fundhub [class*="text-fuchsia-"] {
+  color: #fda4af !important;
+}
+
+.etholys-fundhub [class*="text-stone-"],
+.etholys-fundhub [class*="text-zinc-"],
+.etholys-fundhub [class*="text-neutral-"] {
+  color: #f1f5f9 !important;
+}
+
+.etholys-fundhub [class*="text-cyan-"],
+.etholys-fundhub [class*="text-lime-"] {
+  color: #5eead4 !important;
+}
+
+.etholys-fundhub [class*="border-rose-"],
+.etholys-fundhub [class*="border-pink-"],
+.etholys-fundhub [class*="border-fuchsia-"] {
+  border-color: rgba(251, 113, 133, 0.35) !important;
 }
 
 /* Chips de filtro (carteira por setor, etc.) — nunca tinta slate fraca */

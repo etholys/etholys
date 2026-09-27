@@ -259,12 +259,16 @@ export function NexusIncubationProcessPanel({
 }
 
 function MiniList({ title, items, tone }: { title: string; items: string[]; tone: 'emerald' | 'rose' | 'amber' }) {
-  const border =
-    tone === 'emerald' ? 'border-emerald-100' : tone === 'rose' ? 'border-rose-100' : 'border-amber-100';
+  const toneCls =
+    tone === 'emerald'
+      ? 'border-emerald-400/30 bg-emerald-950/80'
+      : tone === 'rose'
+        ? 'border-rose-400/30 bg-rose-950/80'
+        : 'border-amber-400/30 bg-amber-950/80';
   return (
-    <div className={`rounded-md border ${border} p-2`}>
-      <p className="font-semibold text-slate-700">{title}</p>
-      <ul className="mt-1 space-y-0.5 text-slate-600">
+    <div className={`rounded-md border ${toneCls} p-2 text-slate-100`}>
+      <p className="font-semibold uppercase tracking-wide text-slate-100">{title}</p>
+      <ul className="mt-1 space-y-0.5 text-slate-200">
         {items.length === 0 ? (
           <li>—</li>
         ) : (

@@ -1898,11 +1898,16 @@ function MapColumn({
   items: string[];
   tone: 'emerald' | 'rose' | 'amber';
 }) {
-  const bg = tone === 'emerald' ? 'bg-emerald-50' : tone === 'rose' ? 'bg-rose-50' : 'bg-amber-50';
+  const toneCls =
+    tone === 'emerald'
+      ? 'border-emerald-400/30 bg-emerald-950/80'
+      : tone === 'rose'
+        ? 'border-rose-400/30 bg-rose-950/80'
+        : 'border-amber-400/30 bg-amber-950/80';
   return (
-    <div className={`rounded-xl border p-3 ${bg}`}>
-      <p className="text-xs font-semibold uppercase">{title}</p>
-      <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-xs">
+    <div className={`rounded-xl border p-3 ${toneCls} text-slate-100`}>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-100">{title}</p>
+      <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-xs text-slate-200">
         {items.length === 0 ? (
           <li className="text-slate-400">—</li>
         ) : (
