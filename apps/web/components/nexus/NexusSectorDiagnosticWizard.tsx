@@ -679,8 +679,8 @@ export function NexusSectorDiagnosticWizard() {
       </p>
       <p className="mt-1 text-xs text-amber-900/80">
         {es
-          ? 'Van aparte del 360. Se responden después del cuestionario, no dentro de cada ítem.'
-          : 'Ficam à parte do 360. Respondem-se depois do questionário, não dentro de cada item.'}
+          ? 'Opcional. Se anotan ahora y se responden al terminar el 360 — no aparecen en cada pregunta.'
+          : 'Opcional. Anotam-se agora e respondem-se no fim do 360 — não aparecem em cada pergunta.'}
       </p>
       {customQuestions.length > 0 && (
         <ol className="mt-3 list-decimal space-y-1 pl-4 text-sm text-slate-800">
@@ -790,22 +790,22 @@ export function NexusSectorDiagnosticWizard() {
     {
       id: 'screening',
       label: es ? 'Rápido' : 'Rápido',
-      hint: es ? '~6 preguntas' : '~6 perguntas',
+      hint: es ? 'Lo esencial' : 'O essencial',
     },
     {
       id: 'standard',
       label: 'Standard',
-      hint: es ? '~20 preguntas' : '~20 perguntas',
+      hint: es ? '360 del negocio' : '360 do negócio',
     },
     {
       id: 'deep',
       label: es ? 'Profundo' : 'Profundo',
-      hint: es ? '~30 preguntas' : '~30 perguntas',
+      hint: es ? 'Todas las del sector' : 'Todas as do setor',
     },
     {
       id: 'exhaustive',
       label: es ? 'Completo' : 'Completo',
-      hint: es ? '~45+ preguntas' : '~45+ perguntas',
+      hint: es ? '360 + detalle de campo' : '360 + detalhe de campo',
     },
   ];
   const currentDepth = (program.diagnosticDepth || depth) as DiagnosticDepth;
@@ -1106,10 +1106,10 @@ export function NexusSectorDiagnosticWizard() {
               }
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
             >
-              <option value="screening">{es ? 'Triagem (~6)' : 'Triagem (~6)'}</option>
-              <option value="standard">{es ? 'Standard (~20)' : 'Standard (~20)'}</option>
-              <option value="deep">{es ? 'Profundo (~30)' : 'Profundo (~30)'}</option>
-              <option value="exhaustive">{es ? 'Exaustivo (~45+)' : 'Exaustivo (~45+)'}</option>
+              <option value="screening">{es ? 'Rápido' : 'Rápido'}</option>
+              <option value="standard">Standard</option>
+              <option value="deep">{es ? 'Profundo' : 'Profundo'}</option>
+              <option value="exhaustive">{es ? 'Completo' : 'Completo'}</option>
             </select>
           </label>
           {program.mode === 'graduate' && (
@@ -1237,6 +1237,7 @@ export function NexusSectorDiagnosticWizard() {
                 : ''}
             </p>
           )}
+          {technicianPad}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -1340,7 +1341,6 @@ export function NexusSectorDiagnosticWizard() {
             </button>
           </div>
         </div>
-        {technicianPad}
         </div>
       )}
 

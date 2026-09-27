@@ -72,7 +72,7 @@ export const DX_CORE: LayerQuestion[] = [
     options: opts([
       { id: 'solo', es: 'Trabajo solo / casi solo', pt: 'Trabalho sozinho / quase sozinho', en: 'Solo / nearly solo', score: 62 },
       { id: 'family', es: 'Yo + familia o 1–2 personas que ayudan', pt: 'Eu + família ou 1–2 pessoas que ajudam', en: 'Me + family or 1–2 helpers', score: 65 },
-      { id: 'micro', es: 'Micro con algunos colaboradores (hasta ~10)', pt: 'Micro com alguns colaboradores (até ~10)', en: 'Micro with a few collaborators (~10)', score: 70 },
+      { id: 'micro', es: 'Micro con algunos colaboradores (hasta 10)', pt: 'Micro com alguns colaboradores (até 10)', en: 'Micro with a few collaborators (up to 10)', score: 70 },
       { id: 'small', es: 'Pequeña empresa con roles más definidos', pt: 'Pequena empresa com papéis mais definidos', en: 'Small business with clearer roles', score: 78 },
       { id: 'structured', es: 'Empresa con equipos y procesos más formales', pt: 'Empresa com equipas e processos mais formais', en: 'Company with teams and formal processes', score: 85 },
     ]),
@@ -98,6 +98,32 @@ export const DX_CORE: LayerQuestion[] = [
       { id: 'both', es: 'Ambos: vendo un bien y un servicio', pt: 'Ambos: vendo um bem e um serviço', en: 'Both: I sell a good and a service', score: 78 },
     ]),
     weight: 1.05,
+  }),
+  q({
+    id: 'core_money',
+    section: 'core',
+    areaName: 'Dinero',
+    prompt: t(
+      'Hoy, ¿de dónde entra el dinero de este negocio?',
+      'Hoje, de onde entra o dinheiro deste negócio?',
+      'Today, where does this business’s money come from?'
+    ),
+    help: t(
+      'Puede marcar más de uno. Sirve para no preguntar como si todos vendieran al mismo tipo de cliente.',
+      'Pode marcar mais de um. Serve para não perguntar como se todos vendessem ao mesmo tipo de cliente.',
+      'Select all that apply. Stops us treating every firm as if it sold to the same kind of customer.'
+    ),
+    options: opts([
+      { id: 'sales', es: 'Venta de productos o servicios a clientes', pt: 'Venda de produtos ou serviços a clientes', en: 'Selling products or services to customers', score: 72 },
+      { id: 'projects', es: 'Proyectos / contratos por encargo', pt: 'Projetos / contratos por encomenda', en: 'Projects / commissioned contracts', score: 70 },
+      { id: 'funds', es: 'Fondos, convocatorias o donantes', pt: 'Fundos, editais ou doadores', en: 'Funds, calls or donors', score: 68 },
+      { id: 'public', es: 'Contrato público / gobierno', pt: 'Contrato público / governo', en: 'Public / government contract', score: 70 },
+      { id: 'mix', es: 'Mezcla de varias fuentes', pt: 'Mistura de várias fontes', en: 'A mix of sources', score: 75 },
+      { id: 'unclear', es: 'Aún no está claro / es irregular', pt: 'Ainda não está claro / é irregular', en: 'Still unclear / irregular', score: 30 },
+    ]),
+    weight: 1.2,
+    multi: true,
+    exclusiveOptionId: 'unclear',
   }),
   q({
     id: 'core_model',
@@ -349,7 +375,7 @@ export const DX_LEVEL: LayerQuestion[] = [
   }),
 ];
 
-/** 3 — Comercialização (qualquer negócio que vende) */
+/** 3 — Comercialização para quem vende produto / comércio */
 export const DX_COMMERCIAL: LayerQuestion[] = [
   q({
     id: 'com_channels',
@@ -445,6 +471,126 @@ export const DX_COMMERCIAL: LayerQuestion[] = [
       { id: 'routine', es: 'Sí, con una rutina (mensaje, visita, pedido)', pt: 'Sim, com uma rotina (mensagem, visita, pedido)', en: 'Yes, with a routine (message, visit, order)', score: 88 },
     ]),
     weight: 0.95,
+  }),
+];
+
+/** Comercial para serviços / B2B / captação — não assume cliente recorrente de loja */
+export const DX_COMMERCIAL_SERVICE: LayerQuestion[] = [
+  q({
+    id: 'com_svc_source',
+    section: 'commercial',
+    pillarSlug: 'commercial',
+    areaName: 'Origen del trabajo',
+    prompt: t(
+      'Hoy, ¿cómo llega el trabajo a esta empresa?',
+      'Hoje, como chega o trabalho a esta empresa?',
+      'Today, how does work reach this company?'
+    ),
+    help: t('Marque todos los que aplican.', 'Marque todos os que aplicam.', 'Select all that apply.'),
+    options: opts([
+      { id: 'funds', es: 'Convocatorias, fondos o donantes', pt: 'Editais, fundos ou doadores', en: 'Calls, funds or donors', score: 70 },
+      { id: 'institution', es: 'Contratos con instituciones o empresas', pt: 'Contratos com instituições ou empresas', en: 'Contracts with institutions or firms', score: 75 },
+      { id: 'referral', es: 'Recomendaciones / red de confianza', pt: 'Recomendações / rede de confiança', en: 'Referrals / trusted network', score: 72 },
+      { id: 'seek', es: 'Clientes que nos buscan', pt: 'Clientes que nos procuram', en: 'Clients who find us', score: 70 },
+      { id: 'hunt', es: 'Nosotros salimos a buscar (visitas, propuestas)', pt: 'Nós saímos a procurar (visitas, propostas)', en: 'We go out and look (visits, proposals)', score: 68 },
+      { id: 'unstable', es: 'Aún no hay un camino estable', pt: 'Ainda não há um caminho estável', en: 'No stable path yet', score: 28 },
+    ]),
+    weight: 1.2,
+    multi: true,
+    exclusiveOptionId: 'unstable',
+  }),
+  q({
+    id: 'com_svc_payer',
+    section: 'commercial',
+    pillarSlug: 'commercial',
+    areaName: 'Quién paga',
+    prompt: t(
+      'Cuando entra dinero, ¿quién lo paga?',
+      'Quando entra dinheiro, quem o paga?',
+      'When money comes in, who pays it?'
+    ),
+    options: opts([
+      { id: 'client', es: 'El cliente que recibe el servicio', pt: 'O cliente que recebe o serviço', en: 'The client who receives the service', score: 72 },
+      { id: 'fund', es: 'Un fondo, convocatoria o donante', pt: 'Um fundo, edital ou doador', en: 'A fund, call or donor', score: 70 },
+      { id: 'public', es: 'Gobierno / contrato público', pt: 'Governo / contrato público', en: 'Government / public contract', score: 70 },
+      { id: 'mix', es: 'Mezcla (cliente + fondo u otro)', pt: 'Mistura (cliente + fundo ou outro)', en: 'A mix (client + fund or other)', score: 74 },
+      { id: 'unclear', es: 'Cambia mucho / no está claro', pt: 'Muda muito / não está claro', en: 'It changes a lot / not clear', score: 32 },
+    ]),
+    weight: 1.15,
+  }),
+  q({
+    id: 'com_svc_charge',
+    section: 'commercial',
+    pillarSlug: 'commercial',
+    areaName: 'Cómo cobra',
+    prompt: t(
+      '¿Cómo cobra hoy por el trabajo?',
+      'Como cobra hoje pelo trabalho?',
+      'How do you charge for the work today?'
+    ),
+    options: opts([
+      { id: 'project', es: 'Por proyecto o entrega (cuando se cierra)', pt: 'Por projeto ou entrega (quando fecha)', en: 'By project or delivery (when it closes)', score: 70 },
+      { id: 'hours', es: 'Por horas, días o honorarios', pt: 'Por horas, dias ou honorários', en: 'By hours, days or fees', score: 70 },
+      { id: 'monthly', es: 'Mensual / acuerdo fijo', pt: 'Mensal / acordo fixo', en: 'Monthly / fixed agreement', score: 75 },
+      { id: 'grant', es: 'Según el convenio del fondo', pt: 'Segundo o convénio do fundo', en: 'According to the fund agreement', score: 68 },
+      { id: 'improv', es: 'Cada vez se improvisa', pt: 'Cada vez se improvisa', en: 'Improvised each time', score: 30 },
+    ]),
+    weight: 1.15,
+  }),
+  q({
+    id: 'com_svc_price',
+    section: 'commercial',
+    pillarSlug: 'commercial',
+    areaName: 'Precio',
+    prompt: t(
+      '¿Cómo decide cuánto cobrar (o cuánto pedir en una propuesta)?',
+      'Como decide quanto cobrar (ou quanto pedir numa proposta)?',
+      'How do you decide how much to charge (or ask in a proposal)?'
+    ),
+    options: opts([
+      { id: 'guess', es: 'Por intuición / «lo que acepten»', pt: 'Por intuição / «o que aceitarem»', en: 'By intuition / “what they’ll accept”', score: 28 },
+      { id: 'copy', es: 'Copio lo que vi en el mercado', pt: 'Copio o que vi no mercado', en: 'I copy what I saw in the market', score: 45 },
+      { id: 'cost', es: 'Parto de mis costos + un margen', pt: 'Parto dos meus custos + uma margem', en: 'From my costs + a margin', score: 72 },
+      { id: 'budget', es: 'Me ajusto al presupuesto del fondo o cliente', pt: 'Ajusto-me ao orçamento do fundo ou cliente', en: 'I fit the fund or client budget', score: 62 },
+      { id: 'value', es: 'Costos + lo que el trabajo vale para quien paga', pt: 'Custos + o que o trabalho vale para quem paga', en: 'Costs + what the work is worth to the payer', score: 90 },
+    ]),
+    weight: 1.1,
+  }),
+  q({
+    id: 'com_svc_pipeline',
+    section: 'commercial',
+    pillarSlug: 'commercial',
+    areaName: 'Próximo trabajo',
+    prompt: t(
+      '¿Sabe de dónde puede salir el próximo trabajo (3–6 meses)?',
+      'Sabe de onde pode sair o próximo trabalho (3–6 meses)?',
+      'Do you know where the next work might come from (3–6 months)?'
+    ),
+    options: opts([
+      { id: 'no', es: 'No lo tengo claro', pt: 'Não tenho claro', en: 'Not clear', score: 25 },
+      { id: 'hope', es: 'Espero que aparezca (un fondo, un llamado)', pt: 'Espero que apareça (um fundo, um convite)', en: 'I hope something appears (a fund, a call)', score: 42 },
+      { id: 'list', es: 'Tengo 2–3 caminos posibles (propuestas, contactos)', pt: 'Tenho 2–3 caminhos possíveis (propostas, contactos)', en: 'I have 2–3 possible paths (proposals, contacts)', score: 70 },
+      { id: 'confirmed', es: 'Hay trabajo ya comprometido o en firma', pt: 'Há trabalho já comprometido ou em assinatura', en: 'Work is already committed or being signed', score: 90 },
+    ]),
+    weight: 1.15,
+  }),
+  q({
+    id: 'com_svc_after',
+    section: 'commercial',
+    pillarSlug: 'commercial',
+    areaName: 'Después',
+    prompt: t(
+      'Cuando termina un trabajo, ¿qué suele pasar?',
+      'Quando termina um trabalho, o que costuma acontecer?',
+      'When a job ends, what usually happens?'
+    ),
+    options: opts([
+      { id: 'end', es: 'Se acaba: cada trabajo es nuevo', pt: 'Acaba: cada trabalho é novo', en: 'It ends: each job is new', score: 40 },
+      { id: 'sometimes', es: 'A veces vuelve el mismo cliente o fondo', pt: 'Às vezes volta o mesmo cliente ou fundo', en: 'Sometimes the same client or fund returns', score: 62 },
+      { id: 'often', es: 'Suele haber otro encargo o continuidad', pt: 'Costuma haver outro encargo ou continuidade', en: 'There is often another assignment or continuity', score: 80 },
+      { id: 'follow', es: 'Hacemos seguimiento a propósito (informe, visita, nueva propuesta)', pt: 'Fazemos acompanhamento de propósito (relatório, visita, nova proposta)', en: 'We follow up on purpose (report, visit, new proposal)', score: 90 },
+    ]),
+    weight: 1,
   }),
 ];
 
@@ -1067,36 +1213,246 @@ const SECTOR_PACKS: Record<string, LayerQuestion[]> = {
       weight: 1.15,
     }),
   ]),
+  professional_services: sectorPack('professional_services', [
+    q({
+      id: 'sec_ps_deliver',
+      section: 'sector',
+      areaName: 'Entrega',
+      prompt: t(
+        'Con la gente que tiene hoy, ¿alcanza a entregar lo que ya prometió?',
+        'Com as pessoas que tem hoje, consegue entregar o que já prometeu?',
+        'With the people you have today, can you deliver what you already promised?'
+      ),
+      options: opts([
+        { id: 'no', es: 'No: hay atraso o trabajo sin cerrar', pt: 'Não: há atraso ou trabalho por fechar', en: 'No: there is delay or unfinished work', score: 28 },
+        { id: 'tight', es: 'Al límite: cualquier cosa nueva atrasa lo demás', pt: 'No limite: qualquer coisa nova atrasa o resto', en: 'At the limit: anything new delays the rest', score: 48 },
+        { id: 'ok', es: 'Sí, lo comprometido se entrega', pt: 'Sim, o comprometido entrega-se', en: 'Yes, committed work is delivered', score: 75 },
+        { id: 'spare', es: 'Sí, y todavía puedo tomar algo más', pt: 'Sim, e ainda posso aceitar mais alguma coisa', en: 'Yes, and I can still take a bit more', score: 88 },
+      ]),
+      weight: 1.2,
+    }),
+    q({
+      id: 'sec_ps_help',
+      section: 'sector',
+      areaName: 'Apoyo',
+      prompt: t(
+        'Cuando no alcanzan las manos, ¿qué hace?',
+        'Quando as mãos não chegam, o que faz?',
+        'When there are not enough hands, what do you do?'
+      ),
+      options: opts([
+        { id: 'refuse', es: 'No tomo el trabajo', pt: 'Não aceito o trabalho', en: 'I don’t take the work', score: 50 },
+        { id: 'delay', es: 'Lo tomo y se atrasa', pt: 'Aceito e atrasa', en: 'I take it and it slips', score: 32 },
+        { id: 'informal', es: 'Pido ayuda informal (conocido, freelance suelto)', pt: 'Peço ajuda informal (conhecido, freelancer solto)', en: 'I ask informal help (someone I know, a freelancer)', score: 58 },
+        { id: 'trusted', es: 'Tengo personas o empresas a las que puedo encargar parte', pt: 'Tenho pessoas ou empresas a quem posso encarregar parte', en: 'I have people or firms I can hand part of the work to', score: 82 },
+        { id: 'na', es: 'Casi no me pasa: el equipo alcanza', pt: 'Quase não acontece: a equipa chega', en: 'It rarely happens: the team is enough', score: 78 },
+      ]),
+      weight: 1.1,
+    }),
+    q({
+      id: 'sec_ps_quality',
+      section: 'sector',
+      areaName: 'Calidad',
+      prompt: t(
+        '¿Cómo sabe que un trabajo quedó bien (para el cliente o el fondo)?',
+        'Como sabe que um trabalho ficou bem (para o cliente ou o fundo)?',
+        'How do you know a job was done well (for the client or the fund)?'
+      ),
+      options: opts([
+        { id: 'feel', es: 'Por sensación / si no se quejan', pt: 'Por sensação / se não se queixam', en: 'By feel / if they don’t complain', score: 35 },
+        { id: 'talk', es: 'Hablo al final y ajusto', pt: 'Falo no fim e ajusto', en: 'I talk at the end and adjust', score: 58 },
+        { id: 'check', es: 'Hay una revisión antes de entregar', pt: 'Há uma revisão antes de entregar', en: 'There is a review before delivery', score: 75 },
+        { id: 'evidence', es: 'Dejo evidencia (informe, fotos, indicadores) de lo entregado', pt: 'Deixo evidência (relatório, fotos, indicadores) do que foi entregue', en: 'I leave evidence (report, photos, indicators) of what was delivered', score: 90 },
+      ]),
+      weight: 1.15,
+    }),
+    q({
+      id: 'sec_ps_pay',
+      section: 'sector',
+      areaName: 'Cobro',
+      prompt: t(
+        '¿El cobro llega a tiempo respecto al trabajo hecho?',
+        'O cobro chega a tempo em relação ao trabalho feito?',
+        'Does payment arrive on time relative to the work done?'
+      ),
+      options: opts([
+        { id: 'late', es: 'A menudo tarde o incierto', pt: 'Muitas vezes tarde ou incerto', en: 'Often late or uncertain', score: 28 },
+        { id: 'end', es: 'Al cerrar el proyecto, con espera normal', pt: 'Ao fechar o projeto, com espera normal', en: 'When the project closes, with normal wait', score: 58 },
+        { id: 'split', es: 'Anticipo + cierre, o según hitos', pt: 'Adiantamento + fecho, ou por etapas', en: 'Advance + close, or by milestones', score: 78 },
+        { id: 'schedule', es: 'Hay fechas claras y se cumplen', pt: 'Há datas claras e cumprem-se', en: 'Clear dates and they are met', score: 90 },
+      ]),
+      weight: 1.1,
+    }),
+    q({
+      id: 'sec_ps_scope',
+      section: 'sector',
+      areaName: 'Alcance',
+      prompt: t(
+        'Cuando acepta un trabajo, ¿queda claro qué entra y qué no?',
+        'Quando aceita um trabalho, fica claro o que entra e o que não entra?',
+        'When you accept a job, is it clear what is in and what is out?'
+      ),
+      options: opts([
+        { id: 'no', es: 'Casi nunca: se va ampliando', pt: 'Quase nunca: vai-se alargando', en: 'Almost never: it keeps growing', score: 28 },
+        { id: 'oral', es: 'De palabra, sin dejarlo escrito', pt: 'De palavra, sem deixar escrito', en: 'Verbally, not written down', score: 48 },
+        { id: 'note', es: 'Una nota o propuesta simple', pt: 'Uma nota ou proposta simples', en: 'A simple note or proposal', score: 72 },
+        { id: 'agreed', es: 'Escrito y acordado con quien paga', pt: 'Escrito e acordado com quem paga', en: 'Written and agreed with the payer', score: 90 },
+      ]),
+      weight: 1.1,
+    }),
+    q({
+      id: 'sec_ps_team',
+      section: 'sector',
+      areaName: 'Equipo',
+      prompt: t(
+        '¿Quién puede llevar un trabajo si usted no está?',
+        'Quem pode levar um trabalho se você não estiver?',
+        'Who can carry a job if you are not there?'
+      ),
+      options: opts([
+        { id: 'nobody', es: 'Nadie: depende de mí', pt: 'Ninguém: depende de mim', en: 'Nobody: it depends on me', score: 25 },
+        { id: 'partial', es: 'Alguien cubre partes, no el conjunto', pt: 'Alguém cobre partes, não o conjunto', en: 'Someone covers parts, not the whole', score: 50 },
+        { id: 'shared', es: 'Hay otra persona que puede cerrar lo esencial', pt: 'Há outra pessoa que pode fechar o essencial', en: 'Someone else can close the essentials', score: 75 },
+        { id: 'ready', es: 'El equipo sabe qué hacer sin consultarme cada paso', pt: 'A equipa sabe o que fazer sem me consultar a cada passo', en: 'The team knows what to do without asking me every step', score: 90 },
+      ]),
+      weight: 1.05,
+    }),
+  ]),
+  technology: sectorPack('technology', [
+    q({
+      id: 'sec_tech_offer',
+      section: 'sector',
+      areaName: 'Oferta',
+      prompt: t(
+        '¿Qué ofrece hoy esta empresa, en palabras simples?',
+        'O que oferece hoje esta empresa, em palavras simples?',
+        'What does this company offer today, in simple words?'
+      ),
+      options: opts([
+        { id: 'custom', es: 'Trabajo a medida (cada encargo es distinto)', pt: 'Trabalho à medida (cada encargo é distinto)', en: 'Custom work (each assignment is different)', score: 68 },
+        { id: 'repeat', es: 'Un servicio o herramienta que repetimos', pt: 'Um serviço ou ferramenta que repetimos', en: 'A service or tool we repeat', score: 75 },
+        { id: 'both', es: 'Las dos cosas', pt: 'As duas coisas', en: 'Both', score: 78 },
+        { id: 'undef', es: 'Todavía lo estamos definiendo', pt: 'Ainda estamos a definir', en: 'We are still defining it', score: 32 },
+      ]),
+      weight: 1.15,
+    }),
+    q({
+      id: 'sec_tech_money',
+      section: 'sector',
+      areaName: 'Ingreso',
+      prompt: t(
+        'Hoy, ¿el dinero entra más por proyectos, por un pago recurrente, o por fondos?',
+        'Hoje, o dinheiro entra mais por projetos, por um pagamento recorrente, ou por fundos?',
+        'Today, does money come more from projects, a recurring fee, or funds?'
+      ),
+      options: opts([
+        { id: 'project', es: 'Por proyectos / encargos', pt: 'Por projetos / encargos', en: 'From projects / assignments', score: 68 },
+        { id: 'recurring', es: 'Por un pago que se repite (mensual u otro)', pt: 'Por um pagamento que se repete (mensal ou outro)', en: 'From a repeating payment (monthly or other)', score: 78 },
+        { id: 'funds', es: 'Por fondos o convocatorias', pt: 'Por fundos ou editais', en: 'From funds or calls', score: 68 },
+        { id: 'mix', es: 'Mezcla de esas formas', pt: 'Mistura dessas formas', en: 'A mix of those', score: 75 },
+        { id: 'search', es: 'Todavía estamos buscando cómo sostenerlo', pt: 'Ainda estamos a procurar como sustentá-lo', en: 'We are still looking for how to sustain it', score: 30 },
+      ]),
+      weight: 1.2,
+    }),
+    q({
+      id: 'sec_tech_repeat',
+      section: 'sector',
+      areaName: 'Continuidad',
+      prompt: t(
+        'Después de entregar, ¿el mismo cliente o fondo vuelve, o cada trabajo es nuevo?',
+        'Depois de entregar, o mesmo cliente ou fundo volta, ou cada trabalho é novo?',
+        'After delivery, does the same client or fund come back, or is each job new?'
+      ),
+      options: opts([
+        { id: 'new', es: 'Casi siempre es nuevo', pt: 'Quase sempre é novo', en: 'Almost always new', score: 40 },
+        { id: 'some', es: 'Algunos vuelven', pt: 'Alguns voltam', en: 'Some come back', score: 62 },
+        { id: 'most', es: 'La mayoría vuelve o continúa', pt: 'A maioria volta ou continua', en: 'Most come back or continue', score: 82 },
+        { id: 'unknown', es: 'No lo tenemos claro', pt: 'Não temos claro', en: 'We don’t have it clear', score: 35 },
+      ]),
+      weight: 1.1,
+    }),
+    q({
+      id: 'sec_tech_plan',
+      section: 'sector',
+      areaName: 'Próximos meses',
+      prompt: t(
+        'Para los próximos 6 meses, ¿está escrito qué van a construir o vender?',
+        'Para os próximos 6 meses, está escrito o que vão construir ou vender?',
+        'For the next 6 months, is it written down what you will build or sell?'
+      ),
+      options: opts([
+        { id: 'no', es: 'No: vamos viendo', pt: 'Não: vamos vendo', en: 'No: we take it as it comes', score: 28 },
+        { id: 'head', es: 'Está en la cabeza de una o dos personas', pt: 'Está na cabeça de uma ou duas pessoas', en: 'It’s in one or two people’s heads', score: 48 },
+        { id: 'written', es: 'Hay una lista escrita (aunque simple)', pt: 'Há uma lista escrita (ainda que simples)', en: 'There is a written list (even if simple)', score: 75 },
+        { id: 'shared', es: 'Está escrito y el equipo lo conoce', pt: 'Está escrito e a equipa conhece', en: 'It’s written and the team knows it', score: 90 },
+      ]),
+      weight: 1.1,
+    }),
+    q({
+      id: 'sec_tech_contract',
+      section: 'sector',
+      areaName: 'Acuerdo',
+      prompt: t(
+        'Cuando entregan un trabajo, ¿queda claro qué se entrega y de quién es?',
+        'Quando entregam um trabalho, fica claro o que se entrega e de quem é?',
+        'When you deliver work, is it clear what is delivered and who it belongs to?'
+      ),
+      options: opts([
+        { id: 'oral', es: 'De palabra', pt: 'De palavra', en: 'Verbally', score: 32 },
+        { id: 'simple', es: 'Un acuerdo simple (mail, nota)', pt: 'Um acordo simples (mail, nota)', en: 'A simple agreement (email, note)', score: 58 },
+        { id: 'clear', es: 'Contrato o convenio: entregables y plazos', pt: 'Contrato ou convénio: entregáveis e prazos', en: 'Contract or agreement: deliverables and dates', score: 80 },
+        { id: 'full', es: 'Además queda claro quién usa / es dueño del resultado', pt: 'Além disso fica claro quem usa / é dono do resultado', en: 'It is also clear who uses / owns the result', score: 90 },
+      ]),
+      weight: 1.1,
+    }),
+    q({
+      id: 'sec_tech_evidence',
+      section: 'sector',
+      areaName: 'Evidencia',
+      prompt: t(
+        'Si un fondo o un cliente pide prueba de lo hecho, ¿qué pueden mostrar?',
+        'Se um fundo ou um cliente pede prova do que foi feito, o que podem mostrar?',
+        'If a fund or client asks for proof of what was done, what can you show?'
+      ),
+      options: opts([
+        { id: 'none', es: 'Poco o nada ordenado', pt: 'Pouco ou nada organizado', en: 'Little or nothing organized', score: 25 },
+        { id: 'files', es: 'Archivos sueltos (capturas, carpetas)', pt: 'Ficheiros soltos (capturas, pastas)', en: 'Loose files (screenshots, folders)', score: 50 },
+        { id: 'report', es: 'Un informe o entrega por trabajo', pt: 'Um relatório ou entrega por trabalho', en: 'A report or delivery per job', score: 75 },
+        { id: 'pack', es: 'Evidencia lista (qué se hizo, para quién, con qué resultado)', pt: 'Evidência pronta (o que se fez, para quem, com que resultado)', en: 'Evidence ready (what was done, for whom, with what result)', score: 90 },
+      ]),
+      weight: 1.15,
+    }),
+  ]),
 };
 
 function genericSectorPack(sectorId: string): LayerQuestion[] {
   const sector = getEconomicSector(sectorId);
   const areas = sector?.focusAreas || getEconomicSector('other')!.focusAreas;
-  return areas.slice(0, 4).map((area, i) =>
+  return areas.slice(0, 3).map((area, i) =>
     q({
       id: `sec_gen_${sectorId}_${i}`,
       section: 'sector',
       sectorId,
-      areaName: area.es.slice(0, 40),
+      areaName: area.es.slice(0, 48),
       prompt: t(
-        `En su actividad — ${area.es.charAt(0).toLowerCase()}${area.es.slice(1)}: ¿cuál es la situación hoy?`,
-        `Na sua atividade — ${area.pt.charAt(0).toLowerCase()}${area.pt.slice(1)}: qual é a situação hoje?`,
-        `In your activity — ${area.en.charAt(0).toLowerCase()}${area.en.slice(1)}: what is the situation today?`
-      ),
-      help: t(
-        'Elija el estado real, no el ideal.',
-        'Escolha o estado real, não o ideal.',
-        'Pick the real state, not the ideal.'
+        `Sobre ${area.es.charAt(0).toLowerCase()}${area.es.slice(1)}: ¿cómo lo manejan hoy?`,
+        `Sobre ${area.pt.charAt(0).toLowerCase()}${area.pt.slice(1)}: como tratam isso hoje?`,
+        `On ${area.en.charAt(0).toLowerCase()}${area.en.slice(1)}: how do you handle it today?`
       ),
       options: opts([
-        { id: 'weak', es: 'No existe o es muy débil', pt: 'Não existe ou é muito fraco', en: 'Missing or very weak', score: 25 },
-        { id: 'partial', es: 'Existe de forma informal / irregular', pt: 'Existe de forma informal / irregular', en: 'Exists informally / irregularly', score: 50 },
-        { id: 'ok', es: 'Funciona de forma aceptable', pt: 'Funciona de forma aceitável', en: 'Works adequately', score: 72 },
-        { id: 'strong', es: 'Está sólido y lo puedo demostrar', pt: 'Está sólido e consigo demonstrar', en: 'Solid and I can demonstrate it', score: 90 },
+        { id: 'none', es: 'No lo trabajamos / no aplica bien', pt: 'Não trabalhamos isso / não se aplica bem', en: 'We don’t work on it / it doesn’t fit', score: 28 },
+        { id: 'ad_hoc', es: 'Lo resolvemos caso a caso', pt: 'Resolvemos caso a caso', en: 'We handle it case by case', score: 48 },
+        { id: 'habit', es: 'Hay una forma habitual, no escrita', pt: 'Há uma forma habitual, não escrita', en: 'There is a habitual way, not written', score: 70 },
+        { id: 'clear', es: 'Está claro y lo podemos explicar o mostrar', pt: 'Está claro e podemos explicar ou mostrar', en: 'It’s clear and we can explain or show it', score: 88 },
       ]),
       weight: 1.05,
     })
   );
+}
+
+export function sectorUsesServiceCommercial(sectorId: string): boolean {
+  const s = getEconomicSector(sectorId);
+  return s?.groupId === 'services' || s?.groupId === 'institutional';
 }
 
 export function getSectorDiagnosticPack(sectorId: string): LayerQuestion[] {
@@ -1123,11 +1479,11 @@ export function layerCaps(depth: DiagnosticDepth): {
 } {
   switch (depth) {
     case 'screening':
-      return { core: 4, level: 3, commercial: 2, sector: 2, production: 0 };
+      return { core: 5, level: 3, commercial: 2, sector: 2, production: 0 };
     case 'standard':
-      return { core: 5, level: 6, commercial: 5, sector: 5, production: 3 };
+      return { core: 6, level: 6, commercial: 4, sector: 4, production: 3 };
     case 'deep':
-      return { core: 5, level: 8, commercial: 5, sector: 5, production: 4 };
+      return { core: 99, level: 99, commercial: 99, sector: 99, production: 99 };
     case 'exhaustive':
       return { core: 99, level: 99, commercial: 99, sector: 99, production: 99 };
   }
@@ -1140,11 +1496,12 @@ export function buildLayeredDiagnosticQuestions(
   const caps = layerCaps(depth);
   const sectorQs = getSectorDiagnosticPack(sectorId);
   const productionQs = sectorNeedsProductionLayer(sectorId) ? DX_PRODUCTION : [];
+  const commercialQs = sectorUsesServiceCommercial(sectorId) ? DX_COMMERCIAL_SERVICE : DX_COMMERCIAL;
 
   const parts: LayerQuestion[] = [
     ...cap(DX_CORE, caps.core),
     ...cap(DX_LEVEL, caps.level),
-    ...cap(DX_COMMERCIAL, caps.commercial),
+    ...cap(commercialQs, caps.commercial),
     ...cap(sectorQs, caps.sector),
     ...cap(productionQs, caps.production),
   ];

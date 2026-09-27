@@ -4,10 +4,11 @@ import { defaultIncubationProgram, depthFromProgram, workItemBudget } from '../.
 import {
   computeFullDiagnosticResult,
   listDiagnosticQuestions,
+  listDiagnosticQuestionsForSectors,
   sectionLabel,
   toggleQuestionAnswer,
 } from '../../lib/nexus-sector-diagnostic';
-import { getSectorDiagnosticPack } from '../../lib/nexus-diagnostic-layers';
+import { getSectorDiagnosticPack, sectorUsesServiceCommercial } from '../../lib/nexus-diagnostic-layers';
 import { buildIncubationWorkPlan } from '../../lib/nexus-incubation-workplan';
 import { fallbackAnalyze } from '../../lib/nexus-diagnostic-analyze';
 import { normalizeEconomicSectorId, getEconomicSector } from '../../lib/nexus-economic-sectors';
@@ -141,4 +142,40 @@ test('fallback analyze returns up to 12 priorities', () => {
   });
   assert.ok(r.priorities.length <= 12);
   assert.ok(r.weaknesses.length > 0);
+});
+
+test('service sectors do not get shop-frequency commercial questions', () => {
+  assert.equal(sectorUsesServiceCommercial('professional_services'), true);
+  assert.equal(sectorUsesServiceCommercial('technology'), true);
+  assert.equal(sectorUsesServiceCommercial('agriculture'), false);
+
+  const program = defaultIncubationProgram();
+  program.diagnosticDepth = 'deep';
+  const qs = listDiagnosticQuestionsForSectors(['professional_services', 'technology'], program);
+  assert.ok(qs.some((q) => q.id === 'com_svc_source'));
+  assert.ok(qs.some((q) => q.id === 'com_svc_payer'));
+  assert.ok(!qs.some((q) => q.id === 'com_demand'));
+  assert.ok(!qs.some((q) => /quién compra más/i.test(q.prompt.es)));
+  assert.ok(!qs.some((q) => /roadmap/i.test(q.prompt.es)));
+  assert.ok(!qs.some((q) => /SaaS/i.test(q.prompt.es)));
+  assert.ok(!qs.some((q) => /situación hoy/i.test(q.prompt.es)));
+  assert.ok(qs.some((q) => q.id === 'sec_ps_deliver'));
+  assert.ok(qs.some((q) => q.id === 'sec_ps_help'));
+  assert.ok(qs.some((q) => q.id === 'sec_tech_money'));
+  assert.ok(qs.length >= 28);
+});
+
+test('professional services pack splits delivery from subcontracting', () => {
+  const pack = getSectorDiagnosticPack('professional_services');
+  const text = pack.map((q) => q.prompt.es).join(' | ');
+  assert.match(text, /entregar lo que ya prometió/i);
+  assert.match(text, /no alcanzan las manos/i);
+  assert.doesNotMatch(text, /entrega y subcontratación/i);
+});
+
+test('core scale option has no tilde approximation marks', () => {
+  const qs = listDiagnosticQuestions('retail_shop', null);
+  const scale = qs.find((q) => q.id === 'core_scale');
+  assert.ok(scale);
+  assert.ok(!scale!.options.some((o) => o.label.es.includes('~') || o.label.pt.includes('~')));
 });

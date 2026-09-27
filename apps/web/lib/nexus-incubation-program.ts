@@ -195,13 +195,13 @@ export function depthFromProgram(program: IncubationProgram): DiagnosticDepth {
 export function expectedQuestionCount(depth: DiagnosticDepth): { min: number; max: number; label: string } {
   switch (depth) {
     case 'screening':
-      return { min: 8, max: 12, label: '~10 (triagem em camadas)' };
+      return { min: 8, max: 14, label: 'rápido — lo esencial' };
     case 'standard':
-      return { min: 16, max: 26, label: '~20–24 (360: estrutura · gestão · produção · comercial)' };
+      return { min: 16, max: 26, label: 'estándar — 360 del negocio' };
     case 'deep':
-      return { min: 24, max: 40, label: '~30 (camadas + matriz setorial)' };
+      return { min: 28, max: 50, label: 'profundo — todas las preguntas del sector' };
     case 'exhaustive':
-      return { min: 35, max: 60, label: '~45+ (mapa completo)' };
+      return { min: 35, max: 70, label: 'completo — 360 + detalle de campo (si aplica)' };
   }
 }
 
