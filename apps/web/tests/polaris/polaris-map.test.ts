@@ -88,18 +88,20 @@ test('selectNewBets respects the open cap and skips duplicates', () => {
   assert.equal(selectNewBets(['Pasta de evidência'], proposed, 4).length, 0);
 });
 
-test('polaris opening is this week, not a diagnosis beat', () => {
-  assert.match(polarisOpening('pt'), /semana/);
+test('polaris opening is consultant loading, not a diagnosis dump', () => {
+  assert.match(polarisOpening('pt'), /Etholys|ler/i);
+  assert.doesNotMatch(polarisOpening('es'), /no puede quedar así/i);
   assert.equal(isCatalogPortrait('Diagnóstico NEXUS: 42/100.\nAtividade: hortas'), true);
   assert.equal(isCatalogPortrait('Assistimos cooperativas com editais e uma rede de confiança.'), false);
 });
 
-test('polaris prompt refuses diagnosis catalogs and unused questions', () => {
+test('polaris prompt is a permanent consultant, not a blank weekly quiz', () => {
   const prompt = polarisSystemPrompt('pt');
+  assert.match(prompt, /consultor permanente/i);
   assert.match(prompt, /Likert/);
-  assert.match(prompt, /sensores/);
-  assert.match(prompt, /Não és um diagnóstico/);
-  assert.match(prompt, /segunda-feira/);
+  assert.match(prompt, /Etholys/);
+  assert.match(prompt, /Propor uma forma de avançar/);
+  assert.match(prompt, /Devolver a bola/);
   const parsed = parsePolarisModelJson('```json\n{"reply":"ok","ready":false}\n```');
   assert.equal((parsed as { reply: string }).reply, 'ok');
 });

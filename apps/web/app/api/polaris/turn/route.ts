@@ -5,7 +5,7 @@ import { getUserCompanyIds } from '@/lib/tenant';
 import { canAccessNexusOpsCompany } from '@/lib/nexus-ops';
 import { loadDossier } from '@/lib/business-dossier';
 import { publicLlmErrorMessage } from '@/lib/llm-client';
-import { materializePolarisSuggestions, runPolarisTurn } from '@/lib/polaris-turn';
+import { materializePolarisSuggestions, runPolarisOrient, runPolarisTurn } from '@/lib/polaris-turn';
 import type { PolarisLocale } from '@/lib/polaris-map';
 
 function localeOf(value: unknown): PolarisLocale {
@@ -34,6 +34,20 @@ export async function POST(req: NextRequest) {
     if (!data.dossier?.hypothesisAccepted) return NextResponse.json({ ok: true, created: 0 });
     const created = await materializePolarisSuggestions(companyId, data.dossier.interviewJson);
     return NextResponse.json({ ok: true, created, ...(await loadDossier(companyId)) });
+  }
+
+  if (body.orient === true) {
+    try {
+      const result = await runPolarisOrient({
+        companyId,
+        userId: tenant.userId,
+        locale: localeOf(body.locale),
+      });
+      return NextResponse.json(result);
+    } catch (e) {
+      console.error('[polaris] orient route', e);
+      return NextResponse.json({ error: publicLlmErrorMessage(e) }, { status: 503 });
+    }
   }
 
   const message = String(body.message || '').trim();

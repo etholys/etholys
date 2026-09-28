@@ -77,15 +77,20 @@ export function PolarisMapWorkspace() {
       }
       if (!quiet) setLoading(true);
       try {
-        const q = new URLSearchParams({ companyId, skipHydrate: '1' });
+        const q = new URLSearchParams({ companyId });
         if (engagementId) q.set('engagementId', engagementId);
         const r = await fetch(`/api/business-dossier?${q}`);
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || 'Falha');
         applyDossier(d);
         setErr(null);
+        return d as {
+          messages?: PolarisMessage[];
+          dossier?: { interviewJson?: unknown } | null;
+        };
       } catch (e) {
         setErr(e instanceof Error ? e.message : 'Erro');
+        return null;
       } finally {
         if (!quiet) setLoading(false);
       }
@@ -94,8 +99,36 @@ export function PolarisMapWorkspace() {
   );
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    (async () => {
+      const d = await load();
+      if (cancelled || !companyId) return;
+      const existing = Array.isArray(d?.messages)
+        ? d.messages
+        : readPolarisThread(d?.dossier?.interviewJson);
+      if (existing.length > 0) return;
+      setBusy(true);
+      try {
+        const r = await fetch('/api/polaris/turn', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyId, engagementId, orient: true, locale: loc }),
+        });
+        const od = await r.json();
+        if (!r.ok) throw new Error(od.error || 'Falha');
+        if (cancelled) return;
+        applyDossier(od);
+        if (Array.isArray(od.messages)) setThread(od.messages);
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : 'Erro');
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [load, companyId, engagementId, loc]);
 
   useEffect(() => {
     const el = scroller.current;
@@ -208,10 +241,10 @@ export function PolarisMapWorkspace() {
     loc === 'es'
       ? {
           send: 'Enviar',
-          placeholder: 'Una frase. Lo de esta semana.',
-          kicker: 'Esta semana',
+          placeholder: 'Corregí, completá o contá qué cambió.',
+          kicker: 'Consultor permanente',
           thatsIt: 'Es esto',
-          keep: 'Esta semana',
+          keep: 'Próximo paso',
           log: 'Anotar',
           active: 'en curso',
           done: 'hecha',
@@ -219,20 +252,20 @@ export function PolarisMapWorkspace() {
       : loc === 'en'
         ? {
             send: 'Send',
-            placeholder: 'One sentence. This week.',
-            kicker: 'This week',
+            placeholder: 'Correct, complete, or say what changed.',
+            kicker: 'Standing consultant',
             thatsIt: "That's it",
-            keep: 'This week',
+            keep: 'Next step',
             log: 'Log it',
             active: 'on',
             done: 'done',
           }
         : {
             send: 'Enviar',
-            placeholder: 'Uma frase. O desta semana.',
-            kicker: 'Esta semana',
+            placeholder: 'Corrige, completa ou conta o que mudou.',
+            kicker: 'Consultor permanente',
             thatsIt: 'É isto',
-            keep: 'Esta semana',
+            keep: 'Próximo passo',
             log: 'Anotar',
             active: 'a andar',
             done: 'feita',
@@ -248,6 +281,7 @@ export function PolarisMapWorkspace() {
 
   const openingOnly = thread.length === 0;
   const showMap = Boolean(portrait) || proposed.length > 0 || liveBets.length > 0;
+  const firstIsOrient = shown.length === 1 && shown[0]?.role === 'assistant';
 
   return (
     <div className={`mx-auto grid max-w-3xl gap-8 ${showMap ? 'lg:max-w-6xl lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]' : ''}`}>
@@ -261,9 +295,11 @@ export function PolarisMapWorkspace() {
               key={`${m.role}-${i}`}
               className={
                 m.role === 'assistant'
-                  ? openingOnly
-                    ? 'max-w-xl font-[family-name:var(--font-etholys-display)] text-3xl leading-tight text-white sm:text-4xl'
-                    : 'max-w-[92%] text-lg leading-snug text-white'
+                  ? firstIsOrient && i === 0
+                    ? 'max-w-xl text-lg leading-relaxed text-white sm:text-xl'
+                    : openingOnly
+                      ? 'max-w-xl font-[family-name:var(--font-etholys-display)] text-2xl leading-tight text-white sm:text-3xl'
+                      : 'max-w-[92%] text-lg leading-snug text-white'
                   : 'ml-auto max-w-[80%] rounded-2xl bg-white/10 px-4 py-2 text-sm text-white'
               }
             >

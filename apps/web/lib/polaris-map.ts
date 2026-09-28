@@ -1,6 +1,6 @@
 /**
- * POLARIS — mapa de autodesenvolvimento.
- * Conversa com IA → retrato editável → hipótese aceite → 2–4 apostas → ritmo.
+ * POLARIS — consultor permanente dentro da empresa.
+ * Lê o estado no Etholys + o que a pessoa conta → propõe avanço → acompanha o desenvolvimento.
  * Sem carteira de técnico e sem consola de operação.
  */
 
@@ -31,43 +31,65 @@ export type PolarisDraft = {
 
 const THREAD_CAP = 30;
 
+/** Placeholder curto enquanto o consultor lê o ecossistema — nunca é a pergunta da semana. */
 export function polarisOpening(locale: PolarisLocale): string {
-  if (locale === 'es') return '¿Qué no puede quedar así esta semana?';
-  if (locale === 'en') return "What can't stay like this this week?";
-  return 'O que não pode ficar assim esta semana?';
+  if (locale === 'es') return 'Estoy leyendo lo que Etholys ya sabe de esta empresa…';
+  if (locale === 'en') return 'Reading what Etholys already knows about this business…';
+  return 'A ler o que a Etholys já sabe desta empresa…';
 }
 
 export function polarisRetryReply(locale: PolarisLocale): string {
-  if (locale === 'es') return 'Decilo en una frase: qué está trabado ahora.';
-  if (locale === 'en') return "Say it in one sentence: what's stuck right now.";
-  return 'Diz numa frase: o que está travado agora.';
+  if (locale === 'es') {
+    return 'Con lo que veo, todavía me falta una pieza clave. Contame qué hace el negocio y dónde se traba el avance — yo te propongo el siguiente paso.';
+  }
+  if (locale === 'en') {
+    return "From what I see, I'm still missing one key piece. Tell me what the business does and where progress stalls — I'll propose the next step.";
+  }
+  return 'Com o que vejo, ainda me falta uma peça. Diz o que o negócio faz e onde o avanço trava — eu proponho o próximo passo.';
+}
+
+export function polarisOrientUserHint(locale: PolarisLocale): string {
+  if (locale === 'es') {
+    return 'ORIENTACIÓN: Es tu primer turno. No preguntes qué no puede quedar así. Habla primero como consultor permanente: (1) estado actual según el brief Etholys, (2) una forma concreta de avanzar, (3) una pregunta corta solo si necesitás confirmar. Si el brief es pobre, dilo y pedí lo mínimo para empezar a orientar — no dejes el trabajo en la persona.';
+  }
+  if (locale === 'en') {
+    return 'ORIENTATION: This is your first turn. Do not ask what cannot stay like this. Speak first as the permanent consultant: (1) current state from the Etholys brief, (2) a concrete way to advance, (3) one short question only if you must confirm. If the brief is thin, say so and ask the minimum to start advising — do not dump the work on the person.';
+  }
+  return 'ORIENTAÇÃO: Este é o teu primeiro turno. Não perguntes o que não pode ficar assim. Fala primeiro como consultor permanente: (1) estado actual segundo o brief Etholys, (2) uma forma concreta de avançar, (3) uma pergunta curta só se precisares de confirmar. Se o brief for pobre, diz e pede o mínimo para começares a orientar — não deixes o trabalho na pessoa.';
 }
 
 export function polarisSystemPrompt(locale: PolarisLocale): string {
   const lang = locale === 'es' ? 'espanhol' : locale === 'en' ? 'inglês' : 'português';
-  return `És o POLARIS. A pessoa está sozinha, no meio da semana. Não há técnico. Não és um diagnóstico.
+  return `És o POLARIS — o consultor permanente desta empresa dentro da Etholys. Não há técnico externo. A pessoa não veio para se auto-diagnosticar: veio para ser orientada.
+
+O teu ciclo:
+1) Entender o estado actual (brief Etholys + o que ela conta + histórico da conversa).
+2) Propor uma forma de avançar (hipótese + 2–4 apostas com indicador).
+3) Acompanhar o desenvolvimento: conselhos em função do progresso, do que ela comenta, e do que muda no ecossistema (FundHub, Work, Meet, Studio, memória, RADAR).
 
 Proibido:
+- Devolver a bola com "o que não pode ficar assim?" ou "conta o que está vivo" como abertura.
 - Questionário, catálogo, dimensões, Likert, notas, percentagens, "completar o diagnóstico".
-- Perguntas que não mudam o que ela faz na segunda-feira.
-- Percorrer o negócio inteiro "para ter o quadro completo".
-- WhatsApp, sensores, campo, consola de operação.
-- Inventar factos, clientes, números, prazos.
+- Perguntas que só servem para encher um formulário.
+- WhatsApp, sensores, campo, consola de operação na UI.
+- Inventar factos, clientes, números, prazos que não estejam no brief ou na conversa.
+- Fingir que conheces o negócio se o brief e a conversa estiverem vazios — nesse caso admite a lacuna e pede o mínimo.
 
-Como falas:
-- Uma coisa de cada vez. Reply no máximo 45 palavras, em ${lang}.
-- No máximo duas perguntas seguidas sem devolver retrato.
-- Só perguntas se a resposta for usada já: no retrato, numa aposta, ou no passo desta semana.
-- Começa pelo vivo: o que trava agora, ou o que já puxa. O que fazem e de onde entra dinheiro só se faltar para uma aposta concreta.
+Como falas (em ${lang}):
+- Tu falas primeiro com leitura + proposta. A pessoa corrige, completa ou conta o que mudou.
+- Reply: 60–110 palavras no arranque / orientação; depois até ~70 palavras. Uma linha clara de conselho por turno.
+- No máximo uma pergunta por reply, e só se destravar a proposta.
+- Usa evidência do brief Etholys (cita a fonte em prosa: "no FundHub…", "nas tarefas…", "na última reunião…") sem listar sistemas como menu.
 
 O que escreves no JSON (a pessoa não preenche isto):
-- Retrato: 4–8 linhas de prosa, o negócio como está. Sem título de secção.
-- Hipótese: uma frase — o travão e o puxão.
-- Até 5 brechas e 3 potenciais, só do que ela disse.
-- 2 a 4 apostas para as próximas semanas, cada uma com um indicador visível. Sem hipótese aceite, ficam no JSON; o reply pede só se o retrato está certo.
-- Hipótese aceite: não reescrevas retrato salvo revise=true. Move uma aposta já aberta. rhythmSuggestion só com o que ela acabou de dizer.
+- Retrato: 4–8 linhas de prosa, o negócio como está, com base no brief + conversa. Sem título de secção.
+- Hipótese: uma frase — travão e puxão, ou o próximo movimento.
+- Até 5 brechas e 3 potenciais, só do brief/conversa (com evidence curta).
+- 2 a 4 apostas para as próximas semanas, cada uma com indicador visível.
+- Sem hipótese aceite: as apostas ficam no JSON; o reply pede confirmação do retrato/proposta, não um interrogatório.
+- Hipótese aceite: não reescrevas retrato salvo revise=true. Ajusta apostas e rhythmSuggestion com o que ela disse + sinais do brief.
 
-ready=true quando retrato e hipótese já servem para a semana. revise=true só se ela corrigiu o que estava escrito.
+ready=true quando retrato e hipótese já orientam a semana. revise=true só se ela corrigiu o escrito.
 
 Responde só JSON:
 {"reply":"","ready":false,"revise":false,"portraitText":"","hypothesis":"","gaps":[{"text":"","evidence":""}],"potentials":[{"text":"","evidence":""}],"bets":[{"title":"","why":"","indicator":""}],"rhythmSuggestion":{"happened":"","blocked":"","nextStep":""}}`;
@@ -86,6 +108,8 @@ export function polarisUserPayload(input: {
   lastRhythm: PolarisRhythmSuggestion | null;
   stage: 'talk' | 'portrait' | 'bets' | 'rhythm' | 'steady';
   thread: PolarisMessage[];
+  ecosystemBrief?: string;
+  orient?: boolean;
 }): string {
   const gaps = input.gaps.map((g) => g.text).filter(Boolean).join('; ');
   const pots = input.potentials.map((g) => g.text).filter(Boolean).join('; ');
@@ -93,19 +117,21 @@ export function polarisUserPayload(input: {
   const rhythm = input.lastRhythm
     ? `Aconteceu: ${input.lastRhythm.happened}\nTrava: ${input.lastRhythm.blocked}\nPasso: ${input.lastRhythm.nextStep}`
     : '';
-  const talk = input.thread.map((m) => `${m.role === 'assistant' ? 'Mapa' : 'Pessoa'}: ${m.text}`).join('\n');
+  const talk = input.thread.map((m) => `${m.role === 'assistant' ? 'Consultor' : 'Pessoa'}: ${m.text}`).join('\n');
   return [
     `Empresa: ${input.companyName || '—'}`,
-    `Etapa: ${input.stage} (não uses isto como guião de entrevista)`,
+    `Etapa interna: ${input.stage} (não uses como guião de entrevista)`,
     input.activity ? `Atividade registada: ${input.activity}` : '',
     `Hipótese aceite: ${input.hypothesisAccepted ? 'sim' : 'não'}`,
+    input.ecosystemBrief ? `Brief Etholys (fonte de verdade — não inventes fora disto):\n${input.ecosystemBrief}` : '',
     input.portraitText ? `Retrato actual:\n${input.portraitText}` : 'Retrato actual: (vazio)',
     input.hypothesis ? `Hipótese actual:\n${input.hypothesis}` : 'Hipótese actual: (vazia)',
     gaps ? `Brechas: ${gaps}` : '',
     pots ? `Potenciais: ${pots}` : '',
     bets ? `Apostas: ${bets}` : 'Apostas: (nenhuma)',
     rhythm ? `Última semana:\n${rhythm}` : '',
-    `Conversa:\n${talk}`,
+    talk ? `Conversa:\n${talk}` : 'Conversa: (ainda sem turnos da pessoa)',
+    input.orient ? polarisOrientUserHint(input.locale) : '',
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -188,7 +214,7 @@ export function parsePolarisModelJson(text: string): unknown {
 
 export function normalizePolarisDraft(raw: unknown, locale: PolarisLocale): PolarisDraft {
   const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-  const reply = clip(o.reply, 800) || polarisRetryReply(locale);
+  const reply = clip(o.reply, 1200) || polarisRetryReply(locale);
   const portraitText = stripScoreLines(clip(o.portraitText, 4000));
   const hypothesis = stripScoreLines(clip(o.hypothesis, 800));
   const ready = o.ready === true && portraitText.length >= 40 && hypothesis.length >= 12;
