@@ -237,30 +237,34 @@ export function PolarisMapWorkspace() {
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-teal-700" />
+        <Loader2 className="h-8 w-8 animate-spin text-teal-300" />
       </div>
     );
   }
 
+  const openingOnly = thread.length === 0;
+
   return (
-    <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-      <section className="flex min-h-[70vh] flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto pr-1">
+    <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+      <section className="flex min-h-[70vh] flex-col">
+        <div ref={scroller} className="flex-1 space-y-4 overflow-y-auto pr-1">
           {shown.map((m, i) => (
             <p
               key={`${m.role}-${i}`}
               className={
                 m.role === 'assistant'
-                  ? 'max-w-[92%] font-serif text-lg leading-snug text-slate-900'
-                  : 'ml-auto max-w-[80%] rounded-2xl bg-slate-100 px-4 py-2 text-sm text-slate-800'
+                  ? openingOnly
+                    ? 'max-w-xl font-[family-name:var(--font-etholys-display)] text-3xl leading-tight text-white sm:text-4xl'
+                    : 'max-w-[92%] text-lg leading-snug text-white'
+                  : 'ml-auto max-w-[80%] rounded-2xl bg-white/10 px-4 py-2 text-sm text-white'
               }
             >
               {m.text}
             </p>
           ))}
-          {busy && <p className="text-sm text-slate-400">…</p>}
+          {busy && <p className="text-sm text-teal-200/80">…</p>}
         </div>
-        {err && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">{err}</p>}
+        {err && <p className="mt-3 rounded-lg border border-rose-400/30 bg-rose-500/15 px-3 py-2 text-sm text-rose-100">{err}</p>}
         <textarea
           value={talk}
           onChange={(e) => setTalk(e.target.value)}
@@ -272,36 +276,36 @@ export function PolarisMapWorkspace() {
           }}
           rows={3}
           placeholder={t.placeholder}
-          className="mt-4 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+          className="mt-6 w-full rounded-xl border border-white/25 bg-white/10 px-4 py-3 text-base text-white outline-none ring-0 placeholder:text-white/45 focus:border-teal-300/60"
         />
-        <div className="mt-2 flex justify-end">
+        <div className="mt-3 flex justify-end">
           <button
             type="button"
             disabled={busy || !talk.trim()}
             onClick={() => void sendTurn()}
-            className="rounded-lg bg-teal-800 px-4 py-2 text-sm text-white disabled:opacity-40"
+            className="rounded-lg bg-teal-300 px-5 py-2 text-sm font-medium text-[#041018] disabled:opacity-50"
           >
             {t.send}
           </button>
         </div>
       </section>
 
-      <aside className="space-y-4">
+      <aside className="space-y-4 lg:pt-2">
         {!portrait ? (
-          <p className="px-1 font-serif text-xl leading-snug text-slate-500">{t.empty}</p>
+          <p className="max-w-sm text-base leading-relaxed text-white/55">{t.empty}</p>
         ) : (
           <>
-            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="whitespace-pre-wrap font-serif text-base leading-relaxed text-slate-900">{portrait}</p>
+            <article className="rounded-2xl border border-white/15 bg-white/[0.07] p-5">
+              <p className="whitespace-pre-wrap text-base leading-relaxed text-white">{portrait}</p>
               {hypothesis ? (
-                <div className="mt-4 border-t border-slate-100 pt-4">
-                  <p className="text-sm text-slate-700">{hypothesis}</p>
+                <div className="mt-4 border-t border-white/10 pt-4">
+                  <p className="text-sm text-white/80">{hypothesis}</p>
                   {!accepted ? (
                     <button
                       type="button"
                       disabled={busy}
                       onClick={() => void acceptHypothesis()}
-                      className="mt-3 rounded-lg bg-slate-900 px-3 py-1.5 text-sm text-white"
+                      className="mt-3 rounded-lg bg-teal-300 px-3 py-1.5 text-sm font-medium text-[#041018]"
                     >
                       {t.thatsIt}
                     </button>
@@ -313,26 +317,26 @@ export function PolarisMapWorkspace() {
             {(proposed.length > 0 || liveBets.length > 0) && (
               <ul className="space-y-2">
                 {proposed.map((s) => (
-                  <li key={s.title} className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-3 text-sm">
-                    <p className="font-medium text-slate-900">{s.title}</p>
-                    {s.indicator ? <p className="mt-1 text-xs text-slate-500">{s.indicator}</p> : null}
+                  <li key={s.title} className="rounded-xl border border-dashed border-white/20 bg-white/[0.04] px-4 py-3 text-sm">
+                    <p className="font-medium text-white">{s.title}</p>
+                    {s.indicator ? <p className="mt-1 text-xs text-white/50">{s.indicator}</p> : null}
                   </li>
                 ))}
                 {liveBets.map((b) => (
-                  <li key={b.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
-                    <p className="font-medium text-slate-900">{b.title}</p>
-                    {b.why ? <p className="mt-1 text-xs text-slate-500">{b.why}</p> : null}
+                  <li key={b.id} className="rounded-xl border border-white/15 bg-white/[0.07] px-4 py-3 text-sm">
+                    <p className="font-medium text-white">{b.title}</p>
+                    {b.why ? <p className="mt-1 text-xs text-white/50">{b.why}</p> : null}
                     {accepted ? (
-                      <div className="mt-2 flex gap-2">
+                      <div className="mt-2 flex gap-3">
                         {b.status !== 'done' ? (
-                          <button type="button" className="text-xs text-teal-800" onClick={() => void setBetStatus(b.id, 'done')}>
+                          <button type="button" className="text-xs text-teal-200" onClick={() => void setBetStatus(b.id, 'done')}>
                             {t.done}
                           </button>
                         ) : (
-                          <span className="text-xs text-slate-400">{t.done}</span>
+                          <span className="text-xs text-white/40">{t.done}</span>
                         )}
                         {b.status !== 'active' && b.status !== 'done' ? (
-                          <button type="button" className="text-xs text-slate-600" onClick={() => void setBetStatus(b.id, 'active')}>
+                          <button type="button" className="text-xs text-white/60" onClick={() => void setBetStatus(b.id, 'active')}>
                             {t.active}
                           </button>
                         ) : null}
@@ -344,9 +348,9 @@ export function PolarisMapWorkspace() {
             )}
 
             {accepted && (
-              <div className="rounded-2xl bg-[#0c1222] p-4 text-white">
-                <p className="text-xs uppercase tracking-wide text-white/40">{t.keep}</p>
-                <p className="mt-2 font-serif text-lg leading-snug">
+              <div className="rounded-2xl border border-teal-300/25 bg-teal-400/10 p-4">
+                <p className="text-xs uppercase tracking-wide text-teal-200/70">{t.keep}</p>
+                <p className="mt-2 text-lg leading-snug text-white">
                   {weekHint || lastWeek?.nextStep || lastWeek?.happened || gaps[0]?.text || hypothesis}
                 </p>
                 {weekHint ? (
