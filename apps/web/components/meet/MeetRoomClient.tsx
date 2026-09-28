@@ -1255,9 +1255,9 @@ export function MeetRoomClient({ sessionId }: Props) {
       )}
 
       <div className="flex min-h-0 flex-1">
-        <main className="relative min-w-0 flex-1 px-3 pb-3 pt-14 sm:px-4 sm:pb-4">
+        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col px-3 pb-3 pt-14 sm:px-4 sm:pb-4">
           {error && (
-            <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-red-400/30 bg-red-950/80 px-4 py-3 text-xs text-red-100">
+            <div className="mb-3 flex shrink-0 items-start justify-between gap-3 rounded-xl border border-red-400/30 bg-red-950/80 px-4 py-3 text-xs text-red-100">
               <p className="min-w-0 flex-1 leading-relaxed">{error}</p>
               <button
                 type="button"
@@ -1270,7 +1270,7 @@ export function MeetRoomClient({ sessionId }: Props) {
             </div>
           )}
           {pipActive && (
-            <div className="mb-3 rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-xs text-white/60">
+            <div className="mb-3 shrink-0 rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-xs text-white/60">
               {pipMode === 'document'
                 ? t(
                     'Sala na janela flutuante do sistema. Volta a este separador para repor o ecrã completo.',
@@ -1301,8 +1301,8 @@ export function MeetRoomClient({ sessionId }: Props) {
             ref={stageSlotRef}
             className={
               pipMode === 'document' && pipActive
-                ? 'relative flex min-h-[min(70vh,640px)] w-full items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/15 bg-slate-950/80'
-                : 'relative min-h-[min(70vh,640px)] w-full'
+                ? 'relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/15 bg-slate-950/80'
+                : 'relative min-h-0 w-full flex-1'
             }
           >
             {pipMode === 'document' && pipActive && (
@@ -1321,10 +1321,10 @@ export function MeetRoomClient({ sessionId }: Props) {
                   ? `fixed bottom-4 z-50 h-[220px] w-[min(92vw,360px)] overflow-hidden rounded-2xl bg-slate-950 shadow-2xl ring-2 ring-teal-400/50 ${
                       panelOpen ? 'right-[23.5rem]' : 'right-14'
                     }`
-                  : 'relative h-full min-h-[min(70vh,640px)] w-full overflow-hidden rounded-2xl bg-slate-950'
+                  : 'relative h-full min-h-0 w-full overflow-hidden rounded-2xl bg-slate-950'
               }
             >
-            <div ref={stageRef} className="relative h-full w-full">
+            <div ref={stageRef} className="relative h-full min-h-0 w-full">
               {session.meetingUrl && canEmbedChorusRoom(session.meetingUrl) ? (
                 <MeetConferenceFrame
                   ref={conferenceRef}

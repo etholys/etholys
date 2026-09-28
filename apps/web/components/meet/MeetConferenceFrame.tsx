@@ -172,12 +172,20 @@ function readParticipantCount(api: JitsiApi, opts?: { assumeLocalJoined?: boolea
 
 function sizeMeetIframe(parent: HTMLElement, iframe: HTMLIFrameElement) {
   const rect = parent.getBoundingClientRect();
-  const w = Math.max(Math.floor(rect.width), 320);
-  const h = Math.max(Math.floor(rect.height), 360);
-  iframe.style.width = `${w}px`;
-  iframe.style.height = `${h}px`;
+  // Preferir a altura real do contentor (não o teto antigo de 640px).
+  const w = Math.max(Math.floor(rect.width || parent.clientWidth), 320);
+  const h = Math.max(Math.floor(rect.height || parent.clientHeight), 240);
+  iframe.style.width = '100%';
+  iframe.style.height = '100%';
   iframe.style.minWidth = '100%';
   iframe.style.minHeight = '100%';
+  iframe.style.maxWidth = '100%';
+  iframe.style.maxHeight = '100%';
+  // Jitsi External API também lê width/height em px no mount — manter valores úteis.
+  if (w > 0 && h > 0) {
+    iframe.setAttribute('width', String(w));
+    iframe.setAttribute('height', String(h));
+  }
   iframe.style.display = 'block';
 }
 
@@ -749,10 +757,10 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
     }, [meetingUrl, title, locale, displayName, transcriptionLanguage]);
 
     return (
-      <div className="relative h-full min-h-[min(70vh,640px)] w-full overflow-hidden rounded-2xl bg-[#202124]">
+      <div className="relative h-full min-h-0 w-full overflow-hidden rounded-2xl bg-[#202124]">
         <div
           ref={parentRef}
-          className="absolute inset-0 overflow-hidden rounded-2xl [&_iframe]:h-full [&_iframe]:w-full [&_iframe]:border-0"
+          className="absolute inset-0 h-full w-full overflow-hidden rounded-2xl [&_iframe]:h-full [&_iframe]:w-full [&_iframe]:border-0"
         />
         {loading && !joinError && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-[#202124]">
