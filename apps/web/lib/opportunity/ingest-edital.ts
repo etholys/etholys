@@ -55,10 +55,10 @@ async function supplementWithWebSearch(url: string, seed: string, locale: Fundhu
       `Read this official call and return a factual summary in ${lang}:\n${url}\n\nAlready extracted (may be incomplete):\n${seed.slice(0, 2500)}\n\nInclude: fund name, funder, who can apply, countries, amount, deadline, annexes with URL if visible, and key requirements. If the page is public, do NOT say it needs a login.`,
       {
         model: FUNDHUB_DISCOVERY_MODEL,
-        maxOutputTokens: 3500,
+        maxOutputTokens: 2500,
         temperature: 0.1,
-        timeoutMs: 90_000,
-        webSearchMaxUses: 4,
+        timeoutMs: 60_000,
+        webSearchMaxUses: 2,
       },
     );
     return text.trim();

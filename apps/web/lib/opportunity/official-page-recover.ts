@@ -59,10 +59,10 @@ Return JSON only.`,
         .join('\n'),
       {
         model: FUNDHUB_DISCOVERY_MODEL,
-        maxOutputTokens: 5000,
+        maxOutputTokens: 3500,
         temperature: 0.05,
-        timeoutMs: 90_000,
-        webSearchMaxUses: 6,
+        timeoutMs: 60_000,
+        webSearchMaxUses: 3,
       },
     );
     const raw = stripJsonFences(text);

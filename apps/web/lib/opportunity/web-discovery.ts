@@ -11,7 +11,7 @@ import {
   isHomogeneousInstitutionSet,
   type DiscoveryQueryPack,
 } from '@/lib/opportunity/discovery-queries';
-import { FUNDHUB_DISCOVERY_MODEL, FUNDHUB_SCAN_FALLBACK_MODEL } from '@/lib/opportunity/fundhub-llm';
+import { FUNDHUB_DISCOVERY_MODEL, fundhubScoutModel } from '@/lib/opportunity/fundhub-llm';
 import { formatOpportunityScoutBrief } from '@/lib/opportunity/scout-brief';
 import { enrichAndFilterCandidates } from '@/lib/opportunity/enrich-call';
 import { OFFICIAL_LINK_PROMPT_RULES } from '@/lib/opportunity/official-url';
@@ -193,17 +193,19 @@ export async function discoverOpportunitiesOnline(opts: {
     ].join('');
 
     await report(22, 'web_research');
-    const packSlice = packs.slice(0, 3);
-    const packResults = await Promise.all(
-      packSlice.map((pack) =>
-        runPackWebSearch({
+    // Um pack de cada vez: 3 em paralelo triplicava web_search + tokens sem melhorar o yield.
+    const packSlice = packs.slice(0, 2);
+    const packResults: Array<{ text: string; searchQueries: string[] }> = [];
+    for (const pack of packSlice) {
+      packResults.push(
+        await runPackWebSearch({
           pack,
           researchSystem: RESEARCH_SYSTEM,
           sharedBrief,
           scanFocus,
         }),
-      ),
-    );
+      );
+    }
     const research = packResults
       .map((r, i) => `## PASS ${packSlice[i]?.label ?? i}\n${r.text}`)
       .join('\n\n');
@@ -218,8 +220,8 @@ export async function discoverOpportunitiesOnline(opts: {
     ].join('');
 
     const jsonText = await llmCompleteJsonText(STRUCTURE_SYSTEM, structureUser, {
-      maxOutputTokens: 16384,
-      model: FUNDHUB_SCAN_FALLBACK_MODEL,
+      maxOutputTokens: 12288,
+      model: FUNDHUB_DISCOVERY_MODEL,
     });
     const parsed = JSON.parse(jsonText) as { candidates?: unknown[] };
     let candidates = normalizeCandidates(parsed.candidates ?? [], scanFocus).map((c) =>
@@ -247,7 +249,8 @@ export async function discoverOpportunitiesOnline(opts: {
 
     const needSecondPass =
       scanFocus === 'open_now' &&
-      (candidates.length < 6 || isHomogeneousInstitutionSet(candidates));
+      candidates.length < 4 &&
+      isHomogeneousInstitutionSet(candidates);
 
     if (needSecondPass) {
       await report(82, 'web_research_fable');
@@ -331,10 +334,10 @@ async function runPackWebSearch(opts: {
   ].join('');
   try {
     const { text, searchQueries } = await llmCompleteWithWebSearch(opts.researchSystem, user, {
-      model: opts.pack.id === 'open_web' ? FUNDHUB_DISCOVERY_MODEL : FUNDHUB_SCAN_FALLBACK_MODEL,
-      maxOutputTokens: 12288,
-      timeoutMs: 180_000,
-      webSearchMaxUses: opts.pack.id === 'open_web' ? 10 : 8,
+      model: opts.pack.id === 'open_web' ? fundhubScoutModel() : FUNDHUB_DISCOVERY_MODEL,
+      maxOutputTokens: 8192,
+      timeoutMs: 150_000,
+      webSearchMaxUses: opts.pack.id === 'open_web' ? 6 : 4,
     });
     return { text, searchQueries };
   } catch (e) {
@@ -373,16 +376,16 @@ async function secondPassOpusDiscovery(opts: {
         `\nCover missing regions, themes, and instrument types. callUrl must be official.`,
       ].join(''),
       {
-        model: FUNDHUB_SCAN_FALLBACK_MODEL,
-        maxOutputTokens: 12288,
-        timeoutMs: 180_000,
-        webSearchMaxUses: 10,
+        model: FUNDHUB_DISCOVERY_MODEL,
+        maxOutputTokens: 8192,
+        timeoutMs: 150_000,
+        webSearchMaxUses: 6,
       },
     );
     const jsonText = await llmCompleteJsonText(
       STRUCTURE_SYSTEM,
       `RESEARCH REPORT:\n${research}\n\nBRIEFING:\n${briefingLines(opts.briefing)}\n\nSkip ALREADY FOUND and EXISTING.`,
-      { maxOutputTokens: 16384, model: FUNDHUB_SCAN_FALLBACK_MODEL },
+      { maxOutputTokens: 12288, model: FUNDHUB_DISCOVERY_MODEL },
     );
     const parsed = JSON.parse(jsonText) as { candidates?: unknown[] };
     let extra = normalizeCandidates(parsed.candidates ?? [], 'open_now').map((c) =>
