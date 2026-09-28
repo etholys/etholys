@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useApp } from '@/app/providers';
+import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import {
   isCatalogPortrait,
   polarisOpening,
@@ -19,9 +20,12 @@ type Note = { id: string; happened: string; blocked: string; nextStep: string; c
 
 export function PolarisMapWorkspace() {
   const { locale, activeCompanyId } = useApp();
+  const { companies } = useEnsureActiveCompany();
   const search = useSearchParams();
   const loc = locale === 'es' || locale === 'en' ? locale : 'pt';
   const companyId = search.get('company') || activeCompanyId || '';
+  const companyName =
+    companies.find((c) => c.id === companyId)?.name || companies.find((c) => c.id === companyId)?.shortName || '';
   const engagementId = search.get('engagement');
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -205,7 +209,7 @@ export function PolarisMapWorkspace() {
       ? {
           send: 'Enviar',
           placeholder: 'Una frase. Lo de esta semana.',
-          empty: 'No hay formulario. Decí lo que está vivo — el mapa se escribe solo.',
+          kicker: 'Esta semana',
           thatsIt: 'Es esto',
           keep: 'Esta semana',
           log: 'Anotar',
@@ -216,7 +220,7 @@ export function PolarisMapWorkspace() {
         ? {
             send: 'Send',
             placeholder: 'One sentence. This week.',
-            empty: 'There is no form. Say what is alive — the map writes itself.',
+            kicker: 'This week',
             thatsIt: "That's it",
             keep: 'This week',
             log: 'Log it',
@@ -226,7 +230,7 @@ export function PolarisMapWorkspace() {
         : {
             send: 'Enviar',
             placeholder: 'Uma frase. O desta semana.',
-            empty: 'Não há formulário. Diz o que está vivo — o mapa escreve-se.',
+            kicker: 'Esta semana',
             thatsIt: 'É isto',
             keep: 'Esta semana',
             log: 'Anotar',
@@ -243,11 +247,15 @@ export function PolarisMapWorkspace() {
   }
 
   const openingOnly = thread.length === 0;
+  const showMap = Boolean(portrait) || proposed.length > 0 || liveBets.length > 0;
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-      <section className="flex min-h-[70vh] flex-col">
-        <div ref={scroller} className="flex-1 space-y-4 overflow-y-auto pr-1">
+    <div className={`mx-auto grid max-w-3xl gap-8 ${showMap ? 'lg:max-w-6xl lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]' : ''}`}>
+      <section className="flex flex-col">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-200/80">
+          {companyName ? `${companyName} · ${t.kicker}` : t.kicker}
+        </p>
+        <div ref={scroller} className="mt-4 max-h-[46vh] space-y-4 overflow-y-auto pr-1">
           {shown.map((m, i) => (
             <p
               key={`${m.role}-${i}`}
@@ -290,10 +298,9 @@ export function PolarisMapWorkspace() {
         </div>
       </section>
 
+      {showMap ? (
       <aside className="space-y-4 lg:pt-2">
-        {!portrait ? (
-          <p className="max-w-sm text-base leading-relaxed text-white/55">{t.empty}</p>
-        ) : (
+        {!portrait ? null : (
           <>
             <article className="rounded-2xl border border-white/15 bg-white/[0.07] p-5">
               <p className="whitespace-pre-wrap text-base leading-relaxed text-white">{portrait}</p>
@@ -363,6 +370,7 @@ export function PolarisMapWorkspace() {
           </>
         )}
       </aside>
+      ) : null}
     </div>
   );
 }
