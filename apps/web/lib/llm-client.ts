@@ -14,7 +14,13 @@ export const LLM_FALLBACK_MODELS = [
   'claude-sonnet-4-6',
   'claude-haiku-4-5',
   'claude-opus-4-6',
+  'claude-fable-5-1',
 ] as const;
+
+/** Fable/Mythos/Opus 5: thinking adaptativo sempre ligado — temperature devolve 400. */
+export function usesAdaptiveThinking(model: string): boolean {
+  return /claude-fable|claude-mythos|claude-opus-5|claude-sonnet-5/i.test(model);
+}
 
 export function getLlmModelCandidates(): string[] {
   const preferred = getLlmModel();
@@ -410,13 +416,16 @@ async function llmGenerateContentWithModel(
   const body: Record<string, unknown> = {
     model,
     max_tokens: maxOut,
-    temperature: opts.temperature ?? 0.1,
     system,
     messages: anthropicMessages,
   };
 
+  if (!usesAdaptiveThinking(model)) {
+    body.temperature = opts.temperature ?? 0.1;
+  }
+
   if (opts.webSearch) {
-    const maxUses = Math.min(20, Math.max(1, opts.webSearchMaxUses ?? 8));
+    const maxUses = Math.min(25, Math.max(1, opts.webSearchMaxUses ?? 8));
     body.tools = [
       {
         type: 'web_search_20250305',
@@ -524,7 +533,7 @@ export async function llmCompleteText(
 export async function llmCompleteJsonText(
   systemInstruction: string,
   userText: string,
-  options?: { maxOutputTokens?: number },
+  options?: { maxOutputTokens?: number; model?: string },
 ): Promise<string> {
   const { text, finishReason } = await llmGenerateContent({
     systemInstruction,
@@ -532,6 +541,7 @@ export async function llmCompleteJsonText(
     maxOutputTokens: options?.maxOutputTokens ?? getLlmMaxOutputTokens(),
     temperature: 0.1,
     responseMimeType: 'application/json',
+    model: options?.model,
   });
   if (finishReason === 'MAX_TOKENS') {
     throw new Error(

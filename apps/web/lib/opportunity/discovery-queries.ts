@@ -286,7 +286,7 @@ export function applyBriefingDiversity<
     matchScore?: number;
   },
 >(candidates: T[], briefing: OpportunityBriefing): T[] {
-  const maxPer = briefingRequestsIfad(briefing) ? 5 : 3;
+  const maxPer = briefingRequestsIfad(briefing) ? 5 : 4;
   return capPerInstitution(candidates, maxPer);
 }
 

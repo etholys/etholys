@@ -9,6 +9,7 @@ import {
   pickInstitutionUrl,
   pickOfficialCallUrl,
 } from '@/lib/opportunity/call-evidence';
+import { isAggregatorFundingUrl } from '@/lib/opportunity/official-url';
 import { ingestOfficialEdital } from '@/lib/opportunity/ingest-edital';
 import { normalizeInstrumentType } from '@/lib/opportunity/instrument-type';
 import type { ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
@@ -95,7 +96,11 @@ export async function enrichAndFilterCandidates(
 
   const kept = enriched.filter(Boolean);
   if (scanFocus === 'open_now') {
-    return kept.filter((c) => hasOfficialCallEvidence(c));
+    return kept.filter((c) => {
+      if (hasOfficialCallEvidence(c)) return true;
+      const url = pickOfficialCallUrl(c) || c.callUrl || c.linkOficial;
+      return Boolean(url && !isAggregatorFundingUrl(url));
+    });
   }
   return kept;
 }

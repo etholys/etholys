@@ -2,6 +2,7 @@ import 'server-only';
 
 import { llmCompleteWithWebSearch } from '@/lib/llm-client';
 import { isLikelyCallPageUrl, normalizeCallDocuments } from '@/lib/opportunity/call-evidence';
+import { FUNDHUB_DISCOVERY_MODEL } from '@/lib/opportunity/fundhub-llm';
 import type { CallDocument } from '@/lib/opportunity/scan-types';
 
 export type OfficialPageRecovery = {
@@ -57,7 +58,7 @@ Return JSON only.`,
         .filter(Boolean)
         .join('\n'),
       {
-        model: 'claude-opus-4-6',
+        model: FUNDHUB_DISCOVERY_MODEL,
         maxOutputTokens: 5000,
         temperature: 0.05,
         timeoutMs: 90_000,

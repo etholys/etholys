@@ -9,6 +9,7 @@ import {
   normalizeCallDocuments,
 } from '@/lib/opportunity/call-evidence';
 import { extractOfficialBases } from '@/lib/opportunity/extract-bases';
+import { FUNDHUB_DISCOVERY_MODEL } from '@/lib/opportunity/fundhub-llm';
 import { llmCompleteWithWebSearch } from '@/lib/llm-client';
 import {
   fetchOfficialResource,
@@ -53,7 +54,7 @@ async function supplementWithWebSearch(url: string, seed: string, locale: Fundhu
       `You analyse official grant calls. Open the official page and linked PDFs. Do not invent. Quote what the page says. Write the summary in ${lang} (Hub UI locale: ${locale}).`,
       `Read this official call and return a factual summary in ${lang}:\n${url}\n\nAlready extracted (may be incomplete):\n${seed.slice(0, 2500)}\n\nInclude: fund name, funder, who can apply, countries, amount, deadline, annexes with URL if visible, and key requirements. If the page is public, do NOT say it needs a login.`,
       {
-        model: 'claude-opus-4-6',
+        model: FUNDHUB_DISCOVERY_MODEL,
         maxOutputTokens: 3500,
         temperature: 0.1,
         timeoutMs: 90_000,

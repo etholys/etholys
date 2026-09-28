@@ -5,6 +5,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { llmGenerateContent, publicLlmErrorMessage } from '@/lib/llm-client';
 import { prisma } from '@/lib/prisma';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
+import { FUNDHUB_DISCOVERY_MODEL } from '@/lib/opportunity/fundhub-llm';
 import {
   buildFundhubProposalSystemPrompt,
   buildFundhubProposalUserPrompt,
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest) {
       maxOutputTokens,
       temperature,
       webSearch: wantSearch,
-      model: thin && mode === 'understand' ? 'claude-opus-4-6' : undefined,
+      model: thin && mode === 'understand' ? FUNDHUB_DISCOVERY_MODEL : undefined,
       timeoutMs: wantSearch ? 90_000 : undefined,
     });
 

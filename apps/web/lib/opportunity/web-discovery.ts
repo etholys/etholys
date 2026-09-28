@@ -11,6 +11,7 @@ import {
   isHomogeneousInstitutionSet,
   type DiscoveryQueryPack,
 } from '@/lib/opportunity/discovery-queries';
+import { FUNDHUB_DISCOVERY_MODEL } from '@/lib/opportunity/fundhub-llm';
 import { enrichAndFilterCandidates } from '@/lib/opportunity/enrich-call';
 import { OFFICIAL_LINK_PROMPT_RULES } from '@/lib/opportunity/official-url';
 import { dropDuplicateFunds, isOpenNowCandidate } from '@/lib/opportunity/scan-filters';
@@ -83,22 +84,19 @@ function promptsForFocus(scanFocus: ScanFocus) {
 
   if (scanFocus === 'open_now') {
     return {
-      research: `You are an opportunity scout. Search the OPEN WEB to find funding calls that are ACCEPTING APPLICATIONS RIGHT NOW.
+      research: `You are a funding scout. Search the LIVE WEB and list every real open call you can verify.
 
 TODAY'S DATE: ${today}
 
-CRITICAL RULES:
-- Search the whole internet. Do NOT limit yourself to a pre-recorded portal list. News, ministry bulletins, foundation pages, LinkedIn, and even aggregators are valid STARTING points.
-- When you find a call off the funder's site, you MUST run a follow-up search for the funder's OWN convocatoria / edital / RFA page and put THAT URL in callUrl. Aggregators are breadcrumbs only.
-- ONLY keep calls you found in live search results. Invented agencies (e.g. fake "ANDEDE") are forbidden.
-- EXCLUDE: expired calls, closed windows, generic program homepages WITHOUT an active open call.
-- For each item gather: closesAt, opensAt, eligibleCountries, classification (direct|client_bridge|joint), classificationNote, PLUS full operational content (what it funds, who can apply, eligibility, requirements, how to apply, risks).
-- The BRIEFING (themes, countries, type, command) is the search intent. Do not default to a favourite multilateral. Never return more than THREE results from the same institution.
-- You MUST run every numbered query in THIS pass. They are discovery phrases, not a closed site: list.
-- Cover many kinds when they match the briefing: local/municipal public funds, national public calls, private and corporate foundations, multilaterals, UN/organisms, and technical-cooperation windows (GIZ, AFD, AECID, JICA, USAID, etc.).
-- Minimum 10 distinct official calls from at least 6 different institutions in this pass when they exist.
-
-${CANDIDATE_CONTENT_RULES}
+Hunt like an operator — wide first, official URL second:
+- Search the whole internet. News, ministry bulletins, foundation pages, LinkedIn and aggregators are valid STARTING points.
+- When you find a call off-site, search again for the funder's OWN convocatoria / edital / RFA page and put THAT in callUrl.
+- Never invent a fund, agency, name or URL. If you did not see it in a live result, skip it.
+- Skip expired or closed windows. Skip homepages with no open call.
+- Cover local/municipal public funds, national public calls, private and corporate foundations, multilaterals, organisms and technical-cooperation windows (GIZ, AFD, AECID, JICA, USAID, etc.).
+- For each hit keep it short: official name, funder, official call URL, deadline if seen, who can apply, what it funds (a few lines each). Do not write essays in this pass.
+- At least 15 distinct open calls from at least 8 institutions when they exist. At most 4 from the same funder.
+- Run every numbered query in THIS pass. They are discovery phrases, not a closed portal list.
 
 ${OFFICIAL_LINK_PROMPT_RULES}`,
       structure: `Convert the research into JSON only. Return { "candidates": [ ... ] }
@@ -114,9 +112,9 @@ amount, currency,
 opensAt, closesAt, applicationWindow, eligibleCountries,
 availabilityStatus ("open_now" or "rolling"),
 availabilityNote, classification (direct|client_bridge|joint), classificationNote,
-matchScore (0-100), matchJustification, sourceUrl (official only if present).
+matchScore (0-100), matchJustification, sourceUrl (page where you first saw it).
 
-Return 12–20 candidates from DISTINCT institutions covering ALL research passes (open web, instruments, official follow-through). Do not collapse onto one agency.
+Return 16–28 candidates from DISTINCT institutions. Prefer volume of real official calls over a short perfect list.
 
 ${CANDIDATE_CONTENT_RULES}
 ${OFFICIAL_LINK_PROMPT_RULES}
@@ -248,7 +246,8 @@ export async function discoverOpportunitiesOnline(opts: {
     ].join('');
 
     const jsonText = await llmCompleteJsonText(STRUCTURE_SYSTEM, structureUser, {
-      maxOutputTokens: 16384,
+      maxOutputTokens: 24000,
+      model: FUNDHUB_DISCOVERY_MODEL,
     });
     const parsed = JSON.parse(jsonText) as { candidates?: unknown[] };
     let candidates = normalizeCandidates(parsed.candidates ?? [], scanFocus).map((c) =>
@@ -279,7 +278,7 @@ export async function discoverOpportunitiesOnline(opts: {
       (candidates.length < 6 || isHomogeneousInstitutionSet(candidates));
 
     if (needSecondPass) {
-      await report(82, 'web_research_opus');
+      await report(82, 'web_research_fable');
       const extra = await secondPassOpusDiscovery({
         briefing: opts.briefing,
         learningContext: opts.learningContext,
@@ -350,7 +349,6 @@ async function runPackWebSearch(opts: {
   sharedBrief: string;
   scanFocus: ScanFocus;
 }): Promise<{ text: string; searchQueries: string[] }> {
-  const openWeb = opts.pack.id === 'open_web';
   const user = [
     opts.sharedBrief,
     `\nTHIS PASS: ${opts.pack.label}`,
@@ -361,11 +359,10 @@ async function runPackWebSearch(opts: {
   ].join('');
   try {
     const { text, searchQueries } = await llmCompleteWithWebSearch(opts.researchSystem, user, {
-      model: openWeb ? 'claude-opus-4-6' : 'claude-sonnet-4-6',
-      maxOutputTokens: openWeb ? 12288 : 8192,
-      temperature: opts.scanFocus === 'open_now' ? 0.2 : 0.3,
-      timeoutMs: openWeb ? 180_000 : 150_000,
-      webSearchMaxUses: openWeb ? 16 : Math.min(12, Math.max(6, opts.pack.queries.length)),
+      model: FUNDHUB_DISCOVERY_MODEL,
+      maxOutputTokens: 32000,
+      timeoutMs: 240_000,
+      webSearchMaxUses: opts.pack.id === 'open_web' ? 20 : 16,
     });
     return { text, searchQueries };
   } catch (e) {
@@ -404,17 +401,16 @@ async function secondPassOpusDiscovery(opts: {
         `\nCover missing regions, themes, and instrument types. callUrl must be official.`,
       ].join(''),
       {
-        model: 'claude-opus-4-6',
-        maxOutputTokens: 12288,
-        temperature: 0.2,
-        timeoutMs: 150_000,
-        webSearchMaxUses: 16,
+        model: FUNDHUB_DISCOVERY_MODEL,
+        maxOutputTokens: 32000,
+        timeoutMs: 240_000,
+        webSearchMaxUses: 20,
       },
     );
     const jsonText = await llmCompleteJsonText(
       STRUCTURE_SYSTEM,
       `RESEARCH REPORT:\n${research}\n\nBRIEFING:\n${briefingLines(opts.briefing)}\n\nSkip ALREADY FOUND and EXISTING.`,
-      { maxOutputTokens: 12288 },
+      { maxOutputTokens: 24000, model: FUNDHUB_DISCOVERY_MODEL },
     );
     const parsed = JSON.parse(jsonText) as { candidates?: unknown[] };
     let extra = normalizeCandidates(parsed.candidates ?? [], 'open_now').map((c) =>
