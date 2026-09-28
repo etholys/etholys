@@ -1,13 +1,20 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { Suspense } from 'react';
-import { Loader2 } from 'lucide-react';
-import { BusinessDossierWorkspace } from '@/components/etholys/BusinessDossierWorkspace';
+function queryString(searchParams: Record<string, string | string[] | undefined>) {
+  const q = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams || {})) {
+    if (typeof value === 'string') q.set(key, value);
+    else if (Array.isArray(value)) for (const item of value) q.append(key, item);
+  }
+  const qs = q.toString();
+  return qs ? `?${qs}` : '';
+}
 
-export default function PolarisPortraitPage() {
-  return (
-    <Suspense fallback={<Loader2 className="mx-auto mt-20 h-8 w-8 animate-spin text-teal-700" />}>
-      <BusinessDossierWorkspace mode="polaris" />
-    </Suspense>
-  );
+/** O retrato vive no mapa. */
+export default function PolarisPortraitRedirect({
+  searchParams,
+}: {
+  searchParams: Record<string, string | string[] | undefined>;
+}) {
+  redirect(`/hub/polaris${queryString(searchParams)}`);
 }

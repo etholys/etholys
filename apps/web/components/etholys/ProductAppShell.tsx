@@ -39,11 +39,12 @@ export function ProductAppShell({
 
   useEffect(() => {
     if (!companiesReady || !companyId || hydrated.current) return;
+    if (product === 'polaris') return;
     hydrated.current = true;
     void fetch(`/api/business-dossier?companyId=${encodeURIComponent(companyId)}&hydrateAll=1`, {
       cache: 'no-store',
     }).catch(() => {});
-  }, [companiesReady, companyId]);
+  }, [companiesReady, companyId, product]);
 
   if (status === 'loading' || status === 'unauthenticated' || !companiesReady) {
     return (
@@ -60,7 +61,9 @@ export function ProductAppShell({
         <aside className={cn(sysTheme.aside, 'w-60 translate-x-0')}>
           <div className="border-b border-white/10 p-4">
             <p className={sysTheme.brand}>{meta.name}</p>
-            <p className="mt-1 text-[11px] leading-snug text-white/45">{meta.tagline[loc]}</p>
+            {meta.tagline[loc] ? (
+              <p className="mt-1 text-[11px] leading-snug text-white/45">{meta.tagline[loc]}</p>
+            ) : null}
             <div className="mt-3">
               <CompanyPicker
                 companies={companies}

@@ -150,9 +150,9 @@ const systems: HubEntry[] = [
     id: 'polaris',
     name: 'POLARIS',
     tagline: {
-      es: 'Mapa de autodesarrollo del negocio — retrato, apuestas y ritmo, con IA',
-      pt: 'Mapa de autodesenvolvimento do negócio — retrato, apostas e ritmo, com IA',
-      en: 'Self-development map — portrait, bets and weekly rhythm, with AI',
+      es: 'Esta semana del negocio',
+      pt: 'Esta semana do negócio',
+      en: 'This week of the business',
     },
     icon: Navigation,
     href: '/hub/polaris',

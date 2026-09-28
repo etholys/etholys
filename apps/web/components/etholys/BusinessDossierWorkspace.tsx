@@ -66,7 +66,7 @@ export function BusinessDossierWorkspace({ mode }: { mode: Mode }) {
     void load();
   }, [load]);
 
-  const saveDossier = async (extra?: Record<string, unknown>) => {
+  const saveDossier = async () => {
     setBusy(true);
     try {
       const r = await fetch('/api/business-dossier', {
@@ -80,7 +80,6 @@ export function BusinessDossierWorkspace({ mode }: { mode: Mode }) {
           hypothesisAccepted: accepted,
           gaps,
           potentials,
-          ...extra,
         }),
       });
       const d = await r.json();
@@ -166,10 +165,7 @@ export function BusinessDossierWorkspace({ mode }: { mode: Mode }) {
     loc === 'es'
       ? {
           title: mode === 'aurora' ? 'Dossier del negocio' : 'Mapa del negocio',
-          line:
-            mode === 'aurora'
-              ? 'El técnico escucha, corrige el retrato y acepta la hipótesis. Sin eso no hay apuestas.'
-              : 'Conversá, leé el retrato, aceptá la hipótesis y mové 2 a 4 apuestas.',
+          line: 'El técnico escucha, corrige el retrato y acepta la hipótesis. Sin eso no hay apuestas.',
           talk: 'Conversación',
           portrait: 'Retrato',
           hypo: 'Hipótesis',
@@ -183,10 +179,7 @@ export function BusinessDossierWorkspace({ mode }: { mode: Mode }) {
       : loc === 'en'
         ? {
             title: mode === 'aurora' ? 'Business dossier' : 'Business map',
-            line:
-              mode === 'aurora'
-                ? 'The technician listens, corrects the portrait and accepts the hypothesis. No bets without that.'
-                : 'Talk, read the portrait, accept the hypothesis, and move 2 to 4 bets.',
+            line: 'The technician listens, corrects the portrait and accepts the hypothesis. No bets without that.',
             talk: 'Conversation',
             portrait: 'Portrait',
             hypo: 'Hypothesis',
@@ -199,10 +192,7 @@ export function BusinessDossierWorkspace({ mode }: { mode: Mode }) {
           }
         : {
             title: mode === 'aurora' ? 'Dossiê do negócio' : 'Mapa do negócio',
-            line:
-              mode === 'aurora'
-                ? 'O técnico escuta, corrige o retrato e aceita a hipótese. Sem isso não há apostas.'
-                : 'Conversa, lê o retrato, aceita a hipótese e move 2 a 4 apostas.',
+            line: 'O técnico escuta, corrige o retrato e aceita a hipótese. Sem isso não há apostas.',
             talk: 'Conversa',
             portrait: 'Retrato',
             hypo: 'Hipótese',

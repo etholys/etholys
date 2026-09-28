@@ -21,9 +21,9 @@ export const ETHOLYS_PRODUCTS = {
     href: '/hub/polaris',
     license: 'NEXUS' as const,
     tagline: {
-      es: 'Mapa de autodesarrollo — el negocio se entiende y se mueve solo, con IA.',
-      pt: 'Mapa de autodesenvolvimento — o negócio entende-se e move-se sozinho, com IA.',
-      en: 'Self-development map — the business understands itself and moves with AI.',
+      es: '',
+      pt: '',
+      en: '',
     },
   },
   radar: {

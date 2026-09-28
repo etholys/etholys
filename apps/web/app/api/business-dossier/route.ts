@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     const fresh = await loadDossier(companyId);
     return NextResponse.json({ ...fresh, hydrated: n });
   }
-  if (!data.dossier?.portraitText) {
+  if (url.searchParams.get('skipHydrate') !== '1' && !data.dossier?.portraitText) {
     await hydrateDossierFromNexus(companyId, gate.tenant!.userId);
     return NextResponse.json(await loadDossier(companyId));
   }

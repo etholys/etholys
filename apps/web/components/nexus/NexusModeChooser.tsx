@@ -30,7 +30,7 @@ export function NexusModeChooser() {
             >
               <div>
                 <span className="text-sm font-semibold">{p.name}</span>
-                <span className="mt-2 block text-xs text-slate-400">{p.tagline[L]}</span>
+                {p.tagline[L] ? <span className="mt-2 block text-xs text-slate-400">{p.tagline[L]}</span> : null}
               </div>
               <ArrowRight className="mt-4 h-4 w-4 text-teal-300 transition group-hover:translate-x-1" />
             </Link>
