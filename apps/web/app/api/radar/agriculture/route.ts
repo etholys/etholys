@@ -33,6 +33,8 @@ export async function GET(req: NextRequest) {
   const auth = await authorize(companyId, engagementId);
   if ('error' in auth && auth.error) return auth.error;
 
+  await ensureFarm(companyId);
+
   const [units, entries, readings, sensors, rules, whatsapp] = await Promise.all([
     prisma.nexusOpsUnit.findMany({
       where: { companyId, isActive: true, kind: 'parcel' },
@@ -305,6 +307,27 @@ async function setRule(companyId: string, body: Record<string, unknown>) {
     command = await requestAutomationCommand(companyId, kind);
   }
   return NextResponse.json({ ok: true, rule, command });
+}
+
+async function ensureFarm(companyId: string) {
+  const existing = await prisma.nexusOpsUnit.findFirst({
+    where: { companyId, isActive: true, kind: 'parcel' },
+    select: { id: true },
+  });
+  if (existing) return;
+  const company = await prisma.company.findFirst({
+    where: { id: companyId },
+    select: { shortName: true, name: true },
+  });
+  const name = String(company?.shortName || company?.name || 'Finca').trim().slice(0, 120) || 'Finca';
+  await prisma.nexusOpsUnit.create({
+    data: {
+      companyId,
+      sectorId: 'agriculture',
+      kind: 'parcel',
+      name,
+    },
+  });
 }
 
 async function askCommand(companyId: string, body: Record<string, unknown>) {

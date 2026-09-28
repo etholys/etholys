@@ -86,7 +86,7 @@ Alertas no ecrã seguem sempre os protocolos de agricultura. A mensagem automát
 
 ## Roadmap
 
-1. **Agricultura** — parcelas, caderno, humidade, irrigação, PHI, alertas, sensor, WhatsApp. Este ciclo.
+1. **Agricultura** — a exploração abre sozinha. O ecrã diz o que fazer hoje (irrigar, não colher, ouvir o campo). WhatsApp é o canal. Este ciclo.
 2. **Pecuária** — o mesmo laço com rebanho, sanidade, alimento e mortalidade.
 3. **Agroindústria** — lotes, perda e qualidade.
 4. **Carbono** — primeira leitura de práticas a partir do caderno dos três módulos. Sem UI de dossiê.

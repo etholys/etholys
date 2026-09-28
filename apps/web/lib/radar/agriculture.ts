@@ -23,7 +23,7 @@ export type AgricultureLineKind = (typeof AGRICULTURE_LINE_KINDS)[number];
 export const AGRICULTURE_RULE_KINDS = ['irrigation', 'whatsapp_alerts'] as const;
 export type AgricultureRuleKind = (typeof AGRICULTURE_RULE_KINDS)[number];
 
-export type ParcelAction = 'irrigate' | 'hold_harvest' | 'scout' | 'ok';
+export type ParcelAction = 'irrigate' | 'hold_harvest' | 'scout' | 'await_signal' | 'ok';
 export type FarmDecisionCode = 'open_farm' | ParcelAction;
 
 const MOISTURE_METRIC = 'soil_moisture';
@@ -136,6 +136,7 @@ function parcelAction(input: {
 }): ParcelAction {
   if (input.harvestBlocked) return 'hold_harvest';
   if (typeof input.moisture === 'number' && input.moisture < MOISTURE_THRESHOLD) return 'irrigate';
+  if (input.moisture == null && !input.lastEntryAt) return 'await_signal';
   if (!input.lastEntryAt) return 'scout';
   const days = (input.now.getTime() - input.lastEntryAt.getTime()) / MS_DAY;
   if (days >= 14) return 'scout';
@@ -220,6 +221,26 @@ export function decideAgricultureNow(parcels: AgricultureParcelCard[]): Agricult
         es: `Humedad ${p.moisture}% — umbral ${MOISTURE_THRESHOLD}%. El campo riega por criterio, no por turno.`,
         pt: `Humidade ${p.moisture}% — limiar ${MOISTURE_THRESHOLD}%. A exploração irriga por critério, não por turno.`,
         en: `Moisture ${p.moisture}% — threshold ${MOISTURE_THRESHOLD}%. Irrigate by criterion, not by turn.`,
+      },
+    };
+  }
+
+  const listening = parcels.find((p) => p.nextAction === 'await_signal');
+  if (listening) {
+    return {
+      code: 'await_signal',
+      severity: 'warning',
+      parcelId: listening.id,
+      parcelName: listening.name,
+      title: {
+        es: 'Hoy: el Radar está escuchando',
+        pt: 'Hoje: o Radar está a ouvir',
+        en: 'Today: Radar is listening',
+      },
+      detail: {
+        es: 'Sin humedad todavía. El campo escribe humedad 18 o riego 12 mm por WhatsApp — el Hub decide irrigar o esperar.',
+        pt: 'Sem humidade ainda. O campo escreve humidade 18 ou irrigação 12 mm no WhatsApp — o Hub decide irrigar ou esperar.',
+        en: 'No moisture yet. The field texts moisture 18 or irrigation 12 mm on WhatsApp — the Hub decides irrigate or wait.',
       },
     };
   }

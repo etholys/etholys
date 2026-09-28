@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAgricultureBoard, decideAgricultureNow, isRadarParcel } from '../../lib/radar/agriculture';
+import { buildAgricultureBoard, isRadarParcel } from '../../lib/radar/agriculture';
 
 const now = new Date('2026-09-27T12:00:00.000Z');
 
@@ -106,7 +106,13 @@ test('PHI blocks harvest even if the soil is wet', () => {
   assert.equal(board.parcels[0].phiProduct, 'cobre');
 });
 
-test('an empty farm asks to open, not to fill a form', () => {
-  const decision = decideAgricultureNow([]);
-  assert.equal(decision.code, 'open_farm');
+test('a live farm with no signal is listening, not a signup form', () => {
+  const board = buildAgricultureBoard({
+    now,
+    units: [{ id: 'p1', name: 'RC LLC', areaHa: null, crop: null, kind: 'parcel' }],
+    entries: [],
+    readings: [],
+  });
+  assert.equal(board.decision.code, 'await_signal');
+  assert.equal(board.parcels[0].nextAction, 'await_signal');
 });
