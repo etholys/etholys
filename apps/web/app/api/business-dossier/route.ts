@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { canAccessNexusOpsCompany } from '@/lib/nexus-ops';
-import { draftPortraitFromInterview, loadDossier, upsertDossier } from '@/lib/business-dossier';
+import { draftPortraitFromInterview, hydrateDossierFromNexus, hydrateDossiersForCompanies, loadDossier, upsertDossier } from '@/lib/business-dossier';
 
 async function companyOk(req: NextRequest, companyId: string, engagementId?: string | null) {
   const tenant = await getUserCompanyIds();
@@ -22,6 +22,15 @@ export async function GET(req: NextRequest) {
   const gate = await companyOk(req, companyId, engagementId);
   if (gate.error) return gate.error;
   const data = await loadDossier(companyId);
+  if (url.searchParams.get('hydrateAll') === '1') {
+    const n = await hydrateDossiersForCompanies(gate.tenant!.companyIds, gate.tenant!.userId);
+    const fresh = await loadDossier(companyId);
+    return NextResponse.json({ ...fresh, hydrated: n });
+  }
+  if (!data.dossier?.portraitText) {
+    await hydrateDossierFromNexus(companyId, gate.tenant!.userId);
+    return NextResponse.json(await loadDossier(companyId));
+  }
   return NextResponse.json(data);
 }
 

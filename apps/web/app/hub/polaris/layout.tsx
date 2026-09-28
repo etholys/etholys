@@ -13,6 +13,10 @@ export default function PolarisLayout({ children }: { children: React.ReactNode 
       accent="teal"
       nav={[
         { href: '/hub/polaris', label: es ? 'Mapa' : en ? 'Map' : 'Mapa' },
+        { href: '/hub/polaris/diagnosis', label: es ? 'Diagnóstico' : en ? 'Diagnosis' : 'Diagnóstico' },
+        { href: '/hub/polaris/roadmap', label: 'Roadmap' },
+        { href: '/hub/polaris/coach', label: 'Coach' },
+        { href: '/hub/polaris/portrait', label: es ? 'Retrato' : en ? 'Portrait' : 'Retrato' },
         { href: '/hub/radar', label: 'RADAR' },
       ]}
     >

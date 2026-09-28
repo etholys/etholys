@@ -245,7 +245,7 @@ export default function NexusAtServicePage() {
   }, [selectedCompanyId, selectedSectorIds.join('|')]);
 
   const diagnosisHref = selectedCompanyId
-    ? `/hub/nexus/diagnosis?company=${encodeURIComponent(selectedCompanyId)}&engagement=${encodeURIComponent(id)}`
+    ? `/hub/aurora/diagnosis?company=${encodeURIComponent(selectedCompanyId)}&engagement=${encodeURIComponent(id)}`
     : null;
   const continuePlanHref = diagnosisHref ? `${diagnosisHref}&resume=plan` : null;
 
@@ -641,7 +641,7 @@ export default function NexusAtServicePage() {
   if (!service) {
     return (
       <div className="space-y-3">
-        <Link href="/hub/nexus/at" className="inline-flex items-center gap-1 text-sm text-slate-600">
+        <Link href="/hub/aurora" className="inline-flex items-center gap-1 text-sm text-slate-600">
           <ArrowLeft className="h-4 w-4" /> {es ? 'Volver' : 'Voltar'}
         </Link>
         <p className="text-sm text-red-600">{error || (es ? 'No encontrado' : 'Não encontrado')}</p>
@@ -652,7 +652,7 @@ export default function NexusAtServicePage() {
 return (
     <div className="mx-auto max-w-6xl space-y-4">
       <div>
-        <Link href="/hub/nexus/at" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
+        <Link href="/hub/aurora" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
           <ArrowLeft className="h-4 w-4" /> {es ? 'Contratos' : 'Contratos'}
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-3">

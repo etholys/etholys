@@ -360,8 +360,8 @@ export default function NexusAtPage() {
       setDeliveryModel('MULTI');
       router.push(
         deliveryModel === 'SINGLE'
-          ? `/hub/nexus/at/${d.engagement.id}`
-          : `/hub/nexus/at/${d.engagement.id}?import=1`
+          ? `/hub/aurora/at/${d.engagement.id}`
+          : `/hub/aurora/at/${d.engagement.id}?import=1`
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
@@ -933,7 +933,7 @@ export default function NexusAtPage() {
                   return (
                     <li key={s.id}>
                       <Link
-                        href={`/hub/nexus/at/${s.id}`}
+                        href={`/hub/aurora/at/${s.id}`}
                         className="flex flex-wrap items-center justify-between gap-2 px-4 py-3.5 transition hover:bg-slate-50"
                       >
                         <div className="min-w-0">

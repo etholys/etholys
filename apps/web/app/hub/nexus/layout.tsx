@@ -187,15 +187,15 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
     },
     {
       key: 'mine',
-      href: withNet('/hub/radar'),
+      href: withNet('/hub/polaris'),
       icon: Radio,
-      label: 'RADAR',
+      label: 'POLARIS',
       active: !isAtClientDiagnosis && pathIn(NEXUS_MINE_PATHS),
       tone: 'mine' as const,
     },
     {
       key: 'deliver',
-      href: withNet('/hub/nexus/at'),
+      href: withNet('/hub/aurora'),
       icon: Headphones,
       label:
         locale === 'es'
@@ -339,7 +339,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
                 </p>
                 {atEngagementId && (
                   <Link
-                    href={`/hub/nexus/at/${encodeURIComponent(atEngagementId)}`}
+                    href={`/hub/aurora/at/${encodeURIComponent(atEngagementId)}`}
                     className="mt-1 inline-block text-[11px] font-medium text-teal-200 underline"
                     onClick={() => setSidebarOpen(false)}
                   >

@@ -1,12 +1,15 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useApp } from '@/app/providers';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
+import { CompanyPicker } from '@/components/hub/CompanyPicker';
+import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { cn } from '@/lib/utils';
 import { sysTheme } from '@/lib/system-shell';
 import { ETHOLYS_PRODUCTS, type EtholysProductId } from '@/lib/etholys-products';
@@ -25,12 +28,24 @@ export function ProductAppShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const { locale } = useApp();
+  const { locale, activeCompanyId, setActiveCompanyId } = useApp();
   const { status } = useSession();
+  const { companies, companiesReady, companiesLoadError, reloadCompanies, companyId: ensuredId } =
+    useEnsureActiveCompany();
   const meta = ETHOLYS_PRODUCTS[product];
   const loc = locale === 'es' || locale === 'en' ? locale : 'pt';
+  const companyId = ensuredId || (activeCompanyId ? String(activeCompanyId) : '');
+  const hydrated = useRef(false);
 
-  if (status === 'loading' || status === 'unauthenticated') {
+  useEffect(() => {
+    if (!companiesReady || !companyId || hydrated.current) return;
+    hydrated.current = true;
+    void fetch(`/api/business-dossier?companyId=${encodeURIComponent(companyId)}&hydrateAll=1`, {
+      cache: 'no-store',
+    }).catch(() => {});
+  }, [companiesReady, companyId]);
+
+  if (status === 'loading' || status === 'unauthenticated' || !companiesReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#07111A]">
         <div className={cn('h-8 w-8 animate-spin rounded-full border-2', sysTheme.spin[accent])} />
@@ -46,6 +61,19 @@ export function ProductAppShell({
           <div className="border-b border-white/10 p-4">
             <p className={sysTheme.brand}>{meta.name}</p>
             <p className="mt-1 text-[11px] leading-snug text-white/45">{meta.tagline[loc]}</p>
+            <div className="mt-3">
+              <CompanyPicker
+                companies={companies}
+                activeCompanyId={companyId}
+                onSelect={setActiveCompanyId}
+                ready={companiesReady}
+                error={companiesLoadError}
+                onRetry={() => void reloadCompanies()}
+                locale={loc}
+                compact
+                className="w-full border-white/15 bg-white/5 text-white"
+              />
+            </div>
             <Link href="/hub" className="mt-3 block text-[11px] text-white/40 hover:text-white">
               {loc === 'es' ? 'Volver al Hub' : loc === 'en' ? 'Back to Hub' : 'Voltar ao Hub'}
             </Link>

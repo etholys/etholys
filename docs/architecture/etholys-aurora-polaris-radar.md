@@ -14,4 +14,6 @@ Método partilhado (AURORA e POLARIS): conversa → retrato editável → hipót
 
 RADAR começa com quatro módulos: agricultura, agroindústria, pecuária, carbono. Liga-se a AURORA/POLARIS por `GET /api/radar/bridge` (`/api/pulso/bridge` continua como alias).
 
-Contratos AT antigos ficam em `/hub/nexus/at` até a carteira AURORA os absorver. `/hub/nexus/campo` redireciona para RADAR.
+Contratos AT em `/hub/aurora` (lista) e `/hub/aurora/at/[id]`. POLARIS reusa jornada, diagnóstico, roadmap e coach. RADAR reusa a central de comando (`NexusOpsWorkspace`). Os dossiês hidratam-se a partir de `NexusDiagnosis`, jornada, roadmap e unidades ops — sem apagar retrato já escrito.
+
+`/hub/nexus/campo` redireciona para RADAR. Rotas NEXUS antigas continuam a funcionar.
