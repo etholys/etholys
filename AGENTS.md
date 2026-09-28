@@ -14,6 +14,7 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 | **Etholys Studio — documentos com IA (ferramenta)** | [docs/architecture/etholys-studio.md](./docs/architecture/etholys-studio.md) | `/hub/studio`, pastas, templates, canvas+chat, agente com consentimento, atalho hot |
 | **FundHub — captação de fundos** | [docs/architecture/etholys-fundhub.md](./docs/architecture/etholys-fundhub.md) | Qualquer trabalho em `/hub/fundhub`, APIs `opportunity`/`fundhub`; evidência oficial, pipeline, proposta |
 | **AURORA / POLARIS / RADAR** | [docs/architecture/etholys-aurora-polaris-radar.md](./docs/architecture/etholys-aurora-polaris-radar.md) | Incubadora virtual, mapa de autodesenvolvimento, digitalização produtiva — **não** juntar num só menu NEXUS |
+| **RADAR — digitalização produtiva** | [docs/architecture/etholys-radar.md](./docs/architecture/etholys-radar.md) | `/hub/radar`: agricultura fechada; agroindústria, pecuária e carbono no mesmo laço. Sem dossiê na UI |
 | **Lab MUSE — inovação / I+D+i interno** | [docs/architecture/lab-muse.md](./docs/architecture/lab-muse.md) | `/lab/muse` — sugestões estratégicas, observatório; pipeline → ANVIL (não fundir) |
 | **Lab ANVIL — agente de engenharia interno** | [docs/architecture/lab-anvil.md](./docs/architecture/lab-anvil.md) | `/lab/anvil` — 1 agente/projeto, OSS vs Etholys, deploy targets, owners+convites |
 | **System admin vs empresa** | [docs/architecture/system-admin.md](./docs/architecture/system-admin.md) | Master Etholys (`ETHOLYS_PLATFORM_ADMIN_EMAILS`) ≠ admin de cliente |

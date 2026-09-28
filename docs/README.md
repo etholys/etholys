@@ -18,6 +18,7 @@
 | **[architecture/etholys-billing.md](./architecture/etholys-billing.md)** | **Billing — licenças, faturas Etholys, Stripe Checkout/Invoicing** |
 | **[architecture/etholys-fundhub.md](./architecture/etholys-fundhub.md)** | **FundHub — captação: evidência oficial, pipeline, proposta** |
 | **[architecture/etholys-aurora-polaris-radar.md](./architecture/etholys-aurora-polaris-radar.md)** | **AURORA / POLARIS / RADAR — incubadora, mapa, digitalização produtiva** |
+| **[architecture/etholys-radar.md](./architecture/etholys-radar.md)** | **RADAR — arquitetura, roadmap e módulo agricultura** |
 | **[MEET-JITSI-CONTABO.md](./MEET-JITSI-CONTABO.md)** | **Subir Jitsi no Contabo (`meet.etholys.com`)** |
 | **[MEET-VPS-JIBRI.md](./MEET-VPS-JIBRI.md)** | **VPS dedicado + Jibri → R2 / webhook** |
 

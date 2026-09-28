@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useApp } from '@/app/providers';
-import { NexusOpsWorkspace } from '@/components/nexus/NexusOpsWorkspace';
+import { RadarAgricultureBoard } from '@/components/radar/RadarAgricultureBoard';
 import { RADAR_MODULES } from '@/lib/etholys-products';
 
 function RadarInner() {
@@ -12,18 +12,15 @@ function RadarInner() {
   const search = useSearchParams();
   const loc = locale === 'es' || locale === 'en' ? locale : 'pt';
   const companyId = search.get('company') || activeCompanyId || '';
+  const engagementId = search.get('engagement');
   const [moduleId, setModuleId] = useState<string | null>(null);
-  const [bridge, setBridge] = useState<{ hasPortrait?: boolean; openBets?: number } | null>(null);
 
   useEffect(() => {
     if (!companyId) return;
     fetch(`/api/radar/bridge?companyId=${encodeURIComponent(companyId)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d) {
-          setBridge(d);
-          if (d.radarModule || d.pulsoModule) setModuleId(d.radarModule || d.pulsoModule);
-        }
+        if (d?.radarModule || d?.pulsoModule) setModuleId(d.radarModule || d.pulsoModule);
       })
       .catch(() => {});
   }, [companyId]);
@@ -38,6 +35,13 @@ function RadarInner() {
     });
   };
 
+  const waiting =
+    loc === 'es'
+      ? 'Este módulo abre con el mismo lazo — unidad, lectura, alerta, WhatsApp — después de agricultura.'
+      : loc === 'en'
+        ? 'This module opens on the same loop — unit, reading, alert, WhatsApp — after agriculture.'
+        : 'Este módulo abre no mesmo laço — unidade, leitura, alerta, WhatsApp — depois da agricultura.';
+
   return (
     <div className="space-y-5">
       <header>
@@ -47,17 +51,11 @@ function RadarInner() {
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-600">
           {loc === 'es'
-            ? 'Datos, WhatsApp, alertas y automatización. Se conecta a AURORA o POLARIS por API interna — no es la incubadora.'
+            ? 'Datos, WhatsApp, alertas y automatización. Se conecta a AURORA o POLARIS por API interna.'
             : loc === 'en'
-              ? 'Data, WhatsApp, alerts and automation. Connects to AURORA or POLARIS via internal API — it is not the incubator.'
-              : 'Dados, WhatsApp, alertas e automatização. Liga-se ao AURORA ou ao POLARIS por API interna — não é a incubadora.'}
+              ? 'Data, WhatsApp, alerts and automation. Connects to AURORA or POLARIS via internal API.'
+              : 'Dados, WhatsApp, alertas e automatização. Liga-se ao AURORA ou ao POLARIS por API interna.'}
         </p>
-        {bridge?.hasPortrait && (
-          <p className="mt-2 text-xs text-violet-900">
-            {loc === 'es' ? 'Hay retrato en el mapa/incubadora' : 'Há retrato no mapa/incubadora'}
-            {bridge.openBets ? ` · ${bridge.openBets} ${loc === 'es' ? 'apuestas abiertas' : 'apostas abertas'}` : ''}
-          </p>
-        )}
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -76,7 +74,12 @@ function RadarInner() {
         ))}
       </div>
 
-      <NexusOpsWorkspace />
+      {moduleId === 'agriculture' && (
+        <RadarAgricultureBoard companyId={companyId} engagementId={engagementId} locale={loc} />
+      )}
+      {moduleId && moduleId !== 'agriculture' && (
+        <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">{waiting}</p>
+      )}
     </div>
   );
 }
