@@ -78,6 +78,12 @@ export async function claimAuroraBusiness(opts: {
   return tech;
 }
 
+export async function releaseAuroraBusiness(opts: { companyId: string; userId: string }) {
+  await upsertDossier(opts.companyId, opts.userId, {
+    interviewJson: auroraInterviewPatch({ tech: null }),
+  });
+}
+
 export async function applyAuroraDraft(opts: { companyId: string; userId: string }) {
   const loaded = await loadDossier(opts.companyId);
   const draft = readAuroraDraft(loaded.dossier?.interviewJson);
@@ -164,6 +170,7 @@ export async function runAuroraTurn(opts: {
           ? { happened: last.happened, blocked: last.blocked, nextStep: last.nextStep }
           : null,
         thread,
+        locale: opts.locale,
       }),
       { maxOutputTokens: 2048 },
     );

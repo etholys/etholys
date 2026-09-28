@@ -56,6 +56,7 @@ O técnico está à frente da pessoa (ou no telefone). Cola o que ouviu. Tu:
 - 2 a 4 apostas só quando já há retrato e hipótese úteis. Cada aposta: título, porquê, indicador visível esta semana.
 - Não inventes clientes, números, prazos.
 - ready=true quando o técnico já pode ler o retrato em voz alta e aceitar a hipótese. Até lá ready=false e retrato pode ir incompleto.
+- A etapa manda: talk = o que fazem → dinheiro → entrega → trava → puxão (UMA pergunta). portrait = fecha retrato e hipótese. bets = 2–4 apostas com indicador desta semana, sem reabrir o retrato. rhythm/steady = a última semana: aconteceu o próximo passo? o que trava agora?
 
 JSON só:
 {"reply":"","ready":false,"portraitText":"","hypothesis":"","gaps":[{"text":"","evidence":""}],"potentials":[{"text":"","evidence":""}],"bets":[{"title":"","why":"","indicator":""}]}`;
@@ -69,6 +70,7 @@ export function auroraUserPayload(input: {
   portraitText: string;
   hypothesis: string;
   stage: string;
+  locale?: AuroraLocale;
   gaps: AuroraGap[];
   potentials: AuroraGap[];
   bets: { title: string; status: string }[];
@@ -95,6 +97,7 @@ export function auroraUserPayload(input: {
       ? `Apostas: ${input.bets.map((b) => `${b.title} [${b.status}]`).join('; ')}`
       : 'Apostas: (nenhuma)',
     rhythm ? `Última semana:\n${rhythm}` : '',
+    auroraStageHint(input.stage, input.locale || 'pt'),
     `Conversa:\n${talk}`,
   ]
     .filter(Boolean)
@@ -203,6 +206,27 @@ export function readAuroraSuggestions(interviewJson: unknown): AuroraBetDraft[] 
   return asBets((interviewJson as Record<string, unknown>)[AURORA_SUGGESTIONS_KEY]);
 }
 
+export function auroraStageHint(stage: string, locale: AuroraLocale): string {
+  if (stage === 'portrait') {
+    if (locale === 'es') return 'Esta vuelta: retrato para leer en voz alta + hipótesis (freno y empuje).';
+    if (locale === 'en') return 'This turn: a portrait to read aloud + hypothesis (brake and pull).';
+    return 'Esta volta: retrato para ler em voz alta + hipótese (travão e puxão).';
+  }
+  if (stage === 'bets') {
+    if (locale === 'es') return 'Esta vuelta: cerrar 2 a 4 apuestas con indicador de esta semana. No reabras el retrato.';
+    if (locale === 'en') return 'This turn: close 2 to 4 bets with a this-week indicator. Do not reopen the portrait.';
+    return 'Esta volta: fechar 2 a 4 apostas com indicador desta semana. Não reabras o retrato.';
+  }
+  if (stage === 'rhythm' || stage === 'steady') {
+    if (locale === 'es') return 'Esta vuelta: ¿pasó el próximo paso de la semana pasada? ¿Qué traba ahora?';
+    if (locale === 'en') return "This turn: did last week's next step happen? What is stuck now?";
+    return 'Esta volta: o próximo passo da semana passada aconteceu? O que trava agora?';
+  }
+  if (locale === 'es') return 'Esta vuelta: una pregunta, en sus palabras — qué hacen, dinero, entrega, traba o empuje.';
+  if (locale === 'en') return 'This turn: one question, in their words — what they do, money, delivery, stuck or pull.';
+  return 'Esta volta: uma pergunta, nas palavras deles — o que fazem, dinheiro, entrega, trava ou puxão.';
+}
+
 export function auroraInterviewPatch(input: {
   messages?: AuroraMessage[];
   draft?: AuroraDraft | null;
@@ -213,7 +237,7 @@ export function auroraInterviewPatch(input: {
   if (input.messages) patch[AURORA_THREAD_KEY] = input.messages.slice(-THREAD_CAP);
   if (input.draft) patch[AURORA_DRAFT_KEY] = input.draft;
   if (input.suggestions) patch[AURORA_SUGGESTIONS_KEY] = input.suggestions.slice(0, 4);
-  if (input.tech) patch[AURORA_TECH_KEY] = input.tech;
+  if (input.tech !== undefined) patch[AURORA_TECH_KEY] = input.tech;
   return patch;
 }
 

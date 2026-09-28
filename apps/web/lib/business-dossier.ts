@@ -9,6 +9,7 @@ import {
   type AuroraPortfolioItem,
 } from './aurora-portfolio';
 import { readAuroraTech } from './aurora-interview';
+import { auroraDueSoon } from './aurora-week';
 
 export {
   AURORA_RHYTHM_STALE_MS,
@@ -282,7 +283,7 @@ export async function loadAuroraPortfolio(
     }),
     prisma.businessBet.findMany({
       where: { companyId: { in: ids }, status: { notIn: ['done', 'dropped'] } },
-      select: { companyId: true, title: true },
+      select: { companyId: true, title: true, dueAt: true },
       orderBy: { sortOrder: 'asc' },
     }),
     prisma.businessRhythmNote.findMany({
@@ -294,11 +295,18 @@ export async function loadAuroraPortfolio(
   ]);
 
   const dossierByCompany = new Map(dossiers.map((d) => [d.companyId, d]));
+  const now = new Date();
   const betsByCompany = new Map<string, string[]>();
+  const dueByCompany = new Map<string, string[]>();
   for (const bet of bets) {
     const list = betsByCompany.get(bet.companyId) || [];
     if (list.length < 4) list.push(bet.title);
     betsByCompany.set(bet.companyId, list);
+    if (auroraDueSoon(bet.dueAt, now)) {
+      const due = dueByCompany.get(bet.companyId) || [];
+      if (due.length < 4) due.push(bet.title);
+      dueByCompany.set(bet.companyId, due);
+    }
   }
   const rhythmByCompany = new Map<
     string,
@@ -308,7 +316,6 @@ export async function loadAuroraPortfolio(
     if (!rhythmByCompany.has(note.companyId)) rhythmByCompany.set(note.companyId, note);
   }
 
-  const now = new Date();
   const items: AuroraPortfolioItem[] = businesses.map((b) => {
     const dossier = dossierByCompany.get(b.companyId);
     const portraitText = dossier?.portraitText?.trim() || '';
@@ -333,6 +340,7 @@ export async function loadAuroraPortfolio(
       technicianName: tech?.name || '',
       technicianUserId,
       mine: Boolean(viewerUserId && technicianUserId === viewerUserId),
+      dueBetTitles: dueByCompany.get(b.companyId) || [],
       stage: auroraMethodStage({
         hasPortrait,
         hypothesisAccepted,

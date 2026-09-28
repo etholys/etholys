@@ -18,8 +18,19 @@ import {
   type AuroraMessage,
   type AuroraTech,
 } from '@/lib/aurora-interview';
+import { auroraMethodStage } from '@/lib/aurora-portfolio';
+import { auroraNextAction } from '@/lib/aurora-week';
+import { AuroraMethodRail } from '@/components/etholys/AuroraMethodRail';
 
-type Bet = { id: string; title: string; why: string; indicator: string | null; status: string };
+type Bet = {
+  id: string;
+  title: string;
+  why: string;
+  indicator: string | null;
+  status: string;
+  dueAt?: string | null;
+  ownerLabel?: string | null;
+};
 type Note = { id: string; happened: string; blocked: string; nextStep: string; createdAt: string };
 
 export function AuroraDossierWorkspace() {
@@ -47,7 +58,7 @@ export function AuroraDossierWorkspace() {
   const [tech, setTech] = useState<AuroraTech | null>(null);
   const [talk, setTalk] = useState('');
   const [week, setWeek] = useState({ happened: '', blocked: '', nextStep: '' });
-  const [betForm, setBetForm] = useState({ title: '', why: '', indicator: '' });
+  const [betForm, setBetForm] = useState({ title: '', why: '', indicator: '', dueWeek: true });
 
   const applyPayload = (d: Record<string, unknown>) => {
     const wrapped = d.dossier as
@@ -202,17 +213,17 @@ export function AuroraDossierWorkspace() {
     }
   };
 
-  const claim = async () => {
+  const claim = async (release = false) => {
     setBusy(true);
     try {
       const r = await fetch('/api/business-dossier/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, engagementId }),
+        body: JSON.stringify({ companyId, engagementId, release }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha');
-      if (d.tech) setTech(d.tech);
+      setTech(release ? null : d.tech || null);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -227,11 +238,19 @@ export function AuroraDossierWorkspace() {
       const r = await fetch('/api/business-dossier/bets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, engagementId, ...betForm }),
+        body: JSON.stringify({
+          companyId,
+          engagementId,
+          title: betForm.title,
+          why: betForm.why,
+          indicator: betForm.indicator,
+          ownerLabel: tech?.name || undefined,
+          dueAt: betForm.dueWeek ? 'week' : undefined,
+        }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha');
-      setBetForm({ title: '', why: '', indicator: '' });
+      setBetForm({ title: '', why: '', indicator: '', dueWeek: true });
       await load(true);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erro');
@@ -247,6 +266,35 @@ export function AuroraDossierWorkspace() {
       body: JSON.stringify({ companyId, engagementId, id, status }),
     });
     await load(true);
+  };
+
+  const setBetDueWeek = async (id: string) => {
+    await fetch('/api/business-dossier/bets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, engagementId, id, dueAt: 'week' }),
+    });
+    await load(true);
+  };
+
+  const adoptBet = async (bet: AuroraBetDraft) => {
+    if (!accepted || busy) return;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/business-dossier/interview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId, engagementId, adoptBet: bet }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Falha');
+      applyPayload(d);
+      await load(true);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const addRhythm = async () => {
@@ -270,7 +318,7 @@ export function AuroraDossierWorkspace() {
       ? {
           back: 'Cartera',
           listen: 'Conversación',
-          hint: 'Pegá lo que dijeron. AURORA te da la próxima pregunta. Vos corregís el retrato y aceptás la hipótesis.',
+          hint: 'Pegá lo que dijeron. AURORA te da la próxima pregunta. Vos corregís el retrato, aceptás la hipótesis, abrís 2 a 4 apuestas y anotás la semana.',
           placeholder: 'Lo que acaban de decir, en sus palabras…',
           send: 'Enviar',
           draft: 'Rascunho de la conversa',
@@ -278,6 +326,7 @@ export function AuroraDossierWorkspace() {
           portrait: 'Retrato',
           hypo: 'Hipótesis',
           accept: 'Aceptar hipótesis',
+          accepted: 'Hipótesis aceptada',
           save: 'Guardar',
           gaps: 'Brechas (máx. 5)',
           pots: 'Potenciales (máx. 3)',
@@ -285,20 +334,34 @@ export function AuroraDossierWorkspace() {
           why: 'Por qué',
           ind: 'Indicador',
           add: 'Abrir apuesta',
+          adopt: 'Abrir esta',
           week: 'Esta semana',
           happened: 'Qué pasó',
           blocked: 'Qué traba',
           next: 'Próximo paso',
           log: 'Anotar semana',
+          history: 'Semanas anteriores',
           claim: 'Yo acompaño',
+          reclaim: 'Pasar a mí',
+          release: 'Dejar de acompañar',
           claimed: 'Técnico',
           needAccept: 'Aceptá la hipótesis para tratar las apuestas como plan.',
+          nextQ: 'Próxima pregunta',
+          dueWeek: 'Vence esta semana',
+          markWeek: 'Esta semana',
+          ready: 'Ya se puede leer en voz alta.',
+          talk: 'Conversación',
+          portraitS: 'Retrato',
+          betsS: 'Apuestas',
+          rhythmS: 'Ritmo',
+          steadyS: 'En ritmo',
+          now: 'Ahora',
         }
       : loc === 'en'
         ? {
             back: 'Portfolio',
             listen: 'Conversation',
-            hint: 'Paste what they said. AURORA gives you the next question. You correct the portrait and accept the hypothesis.',
+            hint: 'Paste what they said. AURORA gives the next question. You correct the portrait, accept the hypothesis, open 2 to 4 bets, log the week.',
             placeholder: 'What they just said, in their words…',
             send: 'Send',
             draft: 'Draft from the talk',
@@ -306,6 +369,7 @@ export function AuroraDossierWorkspace() {
             portrait: 'Portrait',
             hypo: 'Hypothesis',
             accept: 'Accept hypothesis',
+            accepted: 'Hypothesis accepted',
             save: 'Save',
             gaps: 'Gaps (max 5)',
             pots: 'Potentials (max 3)',
@@ -313,19 +377,33 @@ export function AuroraDossierWorkspace() {
             why: 'Why',
             ind: 'Indicator',
             add: 'Open bet',
+            adopt: 'Open this',
             week: 'This week',
             happened: 'What happened',
             blocked: 'What is stuck',
             next: 'Next step',
             log: 'Log week',
+            history: 'Earlier weeks',
             claim: 'I accompany this',
+            reclaim: 'Take over',
+            release: 'Stop accompanying',
             claimed: 'Technician',
             needAccept: 'Accept the hypothesis before treating bets as the plan.',
+            nextQ: 'Next question',
+            dueWeek: 'Due this week',
+            markWeek: 'This week',
+            ready: 'Ready to read aloud.',
+            talk: 'Conversation',
+            portraitS: 'Portrait',
+            betsS: 'Bets',
+            rhythmS: 'Rhythm',
+            steadyS: 'On rhythm',
+            now: 'Now',
           }
         : {
             back: 'Carteira',
             listen: 'Conversa',
-            hint: 'Cola o que disseram. O AURORA dá-te a próxima pergunta. Tu corrijes o retrato e aceitas a hipótese.',
+            hint: 'Cola o que disseram. O AURORA dá-te a próxima pergunta. Tu corrijes o retrato, aceitas a hipótese, abres 2 a 4 apostas e anotas a semana.',
             placeholder: 'O que acabaram de dizer, nas palavras deles…',
             send: 'Enviar',
             draft: 'Rascunho da conversa',
@@ -333,6 +411,7 @@ export function AuroraDossierWorkspace() {
             portrait: 'Retrato',
             hypo: 'Hipótese',
             accept: 'Aceitar hipótese',
+            accepted: 'Hipótese aceite',
             save: 'Guardar',
             gaps: 'Brechas (máx. 5)',
             pots: 'Potenciais (máx. 3)',
@@ -340,14 +419,28 @@ export function AuroraDossierWorkspace() {
             why: 'Porquê',
             ind: 'Indicador',
             add: 'Abrir aposta',
+            adopt: 'Abrir esta',
             week: 'Esta semana',
             happened: 'O que aconteceu',
             blocked: 'O que trava',
             next: 'Próximo passo',
             log: 'Anotar semana',
+            history: 'Semanas anteriores',
             claim: 'Eu acompanho',
+            reclaim: 'Passar para mim',
+            release: 'Deixar de acompanhar',
             claimed: 'Técnico',
             needAccept: 'Aceita a hipótese antes de tratar as apostas como plano.',
+            nextQ: 'Próxima pergunta',
+            dueWeek: 'Vence esta semana',
+            markWeek: 'Esta semana',
+            ready: 'Já se pode ler em voz alta.',
+            talk: 'Conversa',
+            portraitS: 'Retrato',
+            betsS: 'Apostas',
+            rhythmS: 'Ritmo',
+            steadyS: 'Em ritmo',
+            now: 'Agora',
           };
 
   if (loading) {
@@ -362,22 +455,73 @@ export function AuroraDossierWorkspace() {
   const openBets = bets.filter((b) => b.status !== 'done' && b.status !== 'dropped');
   const lastWeek = rhythm[0];
   const showDraft = Boolean(draft?.portraitText && draft.portraitText !== portrait);
+  const stage = auroraMethodStage({
+    hasPortrait: Boolean(portrait.trim()),
+    hypothesisAccepted: accepted,
+    openBetCount: openBets.length,
+    lastRhythmAt: lastWeek?.createdAt ?? null,
+  });
+  const nextQuestion = [...shown].reverse().find((m) => m.role === 'assistant')?.text || '';
+  const pendingSuggestions = suggestions.filter(
+    (s) => !openBets.some((b) => b.title.trim().toLowerCase() === s.title.trim().toLowerCase()),
+  );
+  const stageLabel = {
+    talk: t.talk,
+    portrait: t.portraitS,
+    bets: t.betsS,
+    rhythm: t.rhythmS,
+    steady: t.steadyS,
+  };
+  const nowLine = auroraNextAction(
+    {
+      companyId,
+      name: companyName,
+      shortName: companyName,
+      engagementId: engagementId || '',
+      engagementTitle: '',
+      hasPortrait: Boolean(portrait.trim()),
+      hypothesisAccepted: accepted,
+      hypothesis,
+      openBetCount: openBets.length,
+      betTitles: openBets.map((b) => b.title),
+      lastRhythmAt: lastWeek?.createdAt ?? null,
+      lastRhythmHappened: lastWeek?.happened || '',
+      lastRhythmBlocked: lastWeek?.blocked || '',
+      lastRhythmNext: lastWeek?.nextStep || '',
+      portraitPreview: portrait.slice(0, 180),
+      technicianName: tech?.name || '',
+      technicianUserId: tech?.userId || '',
+      mine: true,
+      stage,
+      dueBetTitles: [],
+    },
+    loc,
+  );
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-2">
           <Link href="/hub/aurora" className="text-xs text-slate-500 hover:text-slate-800">
             ← {t.back}
           </Link>
           <h1 className="font-serif text-3xl text-slate-900">{companyName || t.listen}</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-600">{t.hint}</p>
+          <p className="max-w-2xl text-sm text-slate-600">{t.hint}</p>
+          <AuroraMethodRail stage={stage} labels={stageLabel} />
+          <p className="text-sm font-medium text-amber-950">
+            {t.now}: {nowLine}
+          </p>
         </div>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           {tech?.name ? (
-            <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-900">
-              {t.claimed}: {tech.name}
-            </span>
+            <>
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-900">
+                {t.claimed}: {tech.name}
+              </span>
+              <button type="button" disabled={busy} onClick={() => void claim(true)} className="text-xs text-slate-500 hover:underline">
+                {t.release}
+              </button>
+            </>
           ) : (
             <button type="button" disabled={busy} onClick={() => void claim()} className="rounded-lg bg-amber-800 px-3 py-1.5 text-white">
               {t.claim}
@@ -391,6 +535,12 @@ export function AuroraDossierWorkspace() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <section className="flex min-h-[62vh] flex-col rounded-2xl border border-slate-200 bg-white p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t.listen}</p>
+          {nextQuestion ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">{t.nextQ}</p>
+              <p className="mt-1 text-sm text-slate-900">{nextQuestion}</p>
+            </div>
+          ) : null}
           <div ref={scroller} className="mt-3 flex-1 space-y-3 overflow-y-auto pr-1">
             {shown.map((m, i) => (
               <div key={`${m.role}${i}`} className={m.role === 'assistant' ? 'text-sm text-slate-800' : 'rounded-lg bg-amber-50 px-3 py-2 text-sm text-slate-900'}>
@@ -421,6 +571,7 @@ export function AuroraDossierWorkspace() {
           {showDraft && (
             <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">{t.draft}</p>
+              {draft?.ready ? <p className="mt-1 text-xs font-medium text-emerald-800">{t.ready}</p> : null}
               <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">{draft?.portraitText}</p>
               {draft?.hypothesis ? <p className="mt-2 text-sm font-medium text-slate-900">{draft.hypothesis}</p> : null}
               <button type="button" disabled={busy} onClick={() => void applyDraft()} className="mt-3 rounded-lg bg-amber-800 px-3 py-1.5 text-sm text-white">
@@ -438,23 +589,29 @@ export function AuroraDossierWorkspace() {
               <button type="button" disabled={busy} onClick={() => void savePortrait(false)} className="rounded-lg border px-3 py-1.5 text-sm">
                 {t.save}
               </button>
-              <button
-                type="button"
-                disabled={busy || !hypothesis.trim() || accepted}
-                onClick={() => void savePortrait(true)}
-                className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-40"
-              >
-                {t.accept}
-              </button>
+              {accepted ? (
+                <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm text-emerald-800">{t.accepted}</span>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy || !hypothesis.trim()}
+                  onClick={() => void savePortrait(true)}
+                  className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-40"
+                >
+                  {t.accept}
+                </button>
+              )}
             </div>
             <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">{t.gaps}</p>
             {gaps.map((g, i) => (
-              <input
-                key={`g${i}`}
-                value={g.text}
-                onChange={(e) => setGaps((p) => p.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
-                className="mt-2 w-full rounded-lg border px-3 py-1.5 text-sm"
-              />
+              <div key={`g${i}`} className="mt-2">
+                <input
+                  value={g.text}
+                  onChange={(e) => setGaps((p) => p.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
+                  className="w-full rounded-lg border px-3 py-1.5 text-sm"
+                />
+                {g.evidence ? <p className="mt-0.5 text-[11px] text-slate-500">{g.evidence}</p> : null}
+              </div>
             ))}
             {gaps.length < 5 && (
               <button type="button" className="mt-2 text-xs text-amber-900" onClick={() => setGaps((p) => [...p, { text: '' }])}>
@@ -463,12 +620,14 @@ export function AuroraDossierWorkspace() {
             )}
             <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">{t.pots}</p>
             {potentials.map((g, i) => (
-              <input
-                key={`p${i}`}
-                value={g.text}
-                onChange={(e) => setPotentials((p) => p.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
-                className="mt-2 w-full rounded-lg border px-3 py-1.5 text-sm"
-              />
+              <div key={`p${i}`} className="mt-2">
+                <input
+                  value={g.text}
+                  onChange={(e) => setPotentials((p) => p.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
+                  className="w-full rounded-lg border px-3 py-1.5 text-sm"
+                />
+                {g.evidence ? <p className="mt-0.5 text-[11px] text-slate-500">{g.evidence}</p> : null}
+              </div>
             ))}
             {potentials.length < 3 && (
               <button type="button" className="mt-2 text-xs text-amber-900" onClick={() => setPotentials((p) => [...p, { text: '' }])}>
@@ -487,6 +646,13 @@ export function AuroraDossierWorkspace() {
                     <p className="font-medium">{b.title}</p>
                     {b.why ? <p className="text-xs text-slate-500">{b.why}</p> : null}
                     {b.indicator ? <p className="text-xs text-slate-500">{b.indicator}</p> : null}
+                    {b.dueAt ? (
+                      <p className="text-[11px] text-amber-900">{t.dueWeek}</p>
+                    ) : (
+                      <button type="button" className="text-[11px] text-amber-900 hover:underline" onClick={() => void setBetDueWeek(b.id)}>
+                        {t.markWeek}
+                      </button>
+                    )}
                   </div>
                   <select value={b.status} onChange={(e) => void setBetStatus(b.id, e.target.value)} className="text-xs">
                     <option value="proposed">proposta</option>
@@ -498,10 +664,17 @@ export function AuroraDossierWorkspace() {
                 </div>
               </div>
             ))}
-            {accepted && suggestions.length > 0 && openBets.length < 2 && (
-              <ul className="mt-2 list-disc pl-4 text-xs text-slate-600">
-                {suggestions.map((s) => (
-                  <li key={s.title}>{s.title}</li>
+            {accepted && pendingSuggestions.length > 0 && openBets.length < 4 && (
+              <ul className="mt-3 space-y-2">
+                {pendingSuggestions.map((s) => (
+                  <li key={s.title} className="rounded-lg border border-dashed border-slate-200 px-3 py-2 text-xs">
+                    <p className="font-medium text-slate-800">{s.title}</p>
+                    {s.why ? <p className="text-slate-500">{s.why}</p> : null}
+                    {s.indicator ? <p className="text-slate-500">{s.indicator}</p> : null}
+                    <button type="button" disabled={busy} onClick={() => void adoptBet(s)} className="mt-1 text-amber-900 hover:underline">
+                      {t.adopt}
+                    </button>
+                  </li>
                 ))}
               </ul>
             )}
@@ -510,6 +683,10 @@ export function AuroraDossierWorkspace() {
                 <input value={betForm.title} onChange={(e) => setBetForm((f) => ({ ...f, title: e.target.value }))} placeholder={t.bets} className="w-full rounded-lg border px-3 py-1.5 text-sm" />
                 <input value={betForm.why} onChange={(e) => setBetForm((f) => ({ ...f, why: e.target.value }))} placeholder={t.why} className="w-full rounded-lg border px-3 py-1.5 text-sm" />
                 <input value={betForm.indicator} onChange={(e) => setBetForm((f) => ({ ...f, indicator: e.target.value }))} placeholder={t.ind} className="w-full rounded-lg border px-3 py-1.5 text-sm" />
+                <label className="flex items-center gap-2 text-xs text-slate-600">
+                  <input type="checkbox" checked={betForm.dueWeek} onChange={(e) => setBetForm((f) => ({ ...f, dueWeek: e.target.checked }))} />
+                  {t.dueWeek}
+                </label>
                 <button type="button" disabled={busy} onClick={() => void addBet()} className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm text-white">
                   {t.add}
                 </button>
@@ -533,6 +710,19 @@ export function AuroraDossierWorkspace() {
             <button type="button" disabled={busy} onClick={() => void addRhythm()} className="mt-3 rounded-lg border px-3 py-1.5 text-sm">
               {t.log}
             </button>
+            {rhythm.length > 1 ? (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t.history}</p>
+                {rhythm.slice(1, 6).map((n) => (
+                  <div key={n.id} className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    <p className="text-[11px] text-slate-400">{new Date(n.createdAt).toLocaleDateString(loc === 'en' ? 'en' : loc === 'es' ? 'es' : 'pt')}</p>
+                    <p>{n.happened || n.nextStep}</p>
+                    {n.blocked ? <p className="text-rose-700">{n.blocked}</p> : null}
+                    {n.nextStep && n.happened ? <p>{n.nextStep}</p> : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </section>
         </div>
       </div>

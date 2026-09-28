@@ -9,6 +9,15 @@ import {
   readAuroraTech,
   selectAuroraBets,
 } from '../../lib/aurora-interview';
+import {
+  auroraAttention,
+  auroraNextAction,
+  auroraPortfolioCounts,
+  auroraWeekBriefing,
+  auroraWeekBuckets,
+  groupAuroraByProgram,
+  type AuroraPortfolioItem,
+} from '../../lib/aurora-week';
 
 test('interview draft keeps stuck and works as gap and potential', () => {
   const d = draftPortraitFromInterview(
@@ -149,4 +158,82 @@ test('AURORA keeps at most four open bets without repeating titles', () => {
   );
   assert.equal(picks.length, 1);
   assert.equal(picks[0]?.title, 'Caderno de encomendas');
+});
+
+test('AURORA release patch clears technician and keeps POLARIS thread', () => {
+  const merged = mergeInterviewJson(
+    {
+      __auroraTech: { userId: 'u1', name: 'Ana', claimedAt: '2026-09-28' },
+      __polarisThread: [{ role: 'assistant', text: 'hola' }],
+    },
+    auroraInterviewPatch({ tech: null }),
+  );
+  assert.equal(merged.__auroraTech, null);
+  assert.equal(readAuroraTech(merged), null);
+  assert.equal((merged.__polarisThread as { text: string }[])[0].text, 'hola');
+});
+
+function item(partial: Partial<AuroraPortfolioItem> & Pick<AuroraPortfolioItem, 'companyId' | 'name' | 'stage'>): AuroraPortfolioItem {
+  return {
+    shortName: partial.name,
+    engagementId: 'eng-a',
+    engagementTitle: 'Programa A',
+    hasPortrait: partial.stage !== 'talk',
+    hypothesisAccepted: partial.stage !== 'talk' && partial.stage !== 'portrait',
+    hypothesis: '',
+    openBetCount: partial.stage === 'bets' ? 1 : partial.stage === 'talk' || partial.stage === 'portrait' ? 0 : 2,
+    betTitles: [],
+    lastRhythmAt: null,
+    lastRhythmHappened: '',
+    lastRhythmBlocked: '',
+    lastRhythmNext: '',
+    portraitPreview: '',
+    technicianName: '',
+    technicianUserId: '',
+    mine: false,
+    dueBetTitles: [],
+    ...partial,
+  };
+}
+
+test('AURORA week buckets split the technician round from blocked and unclaimed', () => {
+  const rows = [
+    item({ companyId: '1', name: 'Horta', stage: 'rhythm', mine: true, technicianUserId: 'u1', technicianName: 'Ana' }),
+    item({
+      companyId: '2',
+      name: 'Queijo',
+      stage: 'steady',
+      mine: true,
+      technicianUserId: 'u1',
+      lastRhythmBlocked: 'falta câmara fria',
+    }),
+    item({ companyId: '3', name: 'Mel', stage: 'talk' }),
+  ];
+  const buckets = auroraWeekBuckets(rows);
+  assert.deepEqual(buckets.round.map((r) => r.companyId), ['1']);
+  assert.deepEqual(buckets.blocked.map((r) => r.companyId), ['2']);
+  assert.deepEqual(buckets.unclaimed.map((r) => r.companyId), ['3']);
+  assert.equal(auroraAttention(rows[2]!), 'unclaimed');
+  assert.equal(auroraAttention(rows[1]!), 'blocked');
+  assert.match(auroraNextAction(rows[1]!, 'pt'), /câmara fria/);
+  const counts = auroraPortfolioCounts(rows);
+  assert.equal(counts.mine, 2);
+  assert.equal(counts.unclaimed, 1);
+  assert.equal(counts.blocked, 1);
+  assert.equal(counts.programs, 1);
+  const briefing = auroraWeekBriefing(rows, 'pt');
+  assert.ok(briefing.some((line) => /ronda/i.test(line)));
+  assert.ok(briefing.some((line) => /Queijo/.test(line) || /câmara/.test(line)));
+});
+
+test('AURORA groups the portfolio by AT program', () => {
+  const groups = groupAuroraByProgram([
+    item({ companyId: '1', name: 'Horta', stage: 'talk', engagementId: 'a', engagementTitle: 'Coorte 1' }),
+    item({ companyId: '2', name: 'Queijo', stage: 'steady', engagementId: 'a', engagementTitle: 'Coorte 1', technicianUserId: 'u' }),
+    item({ companyId: '3', name: 'Mel', stage: 'rhythm', engagementId: 'b', engagementTitle: 'Coorte 2' }),
+  ]);
+  assert.equal(groups[0]?.title, 'Coorte 1');
+  assert.equal(groups[0]?.items.length, 2);
+  assert.equal(groups[0]?.unclaimed, 1);
+  assert.equal(groups.find((g) => g.engagementId === 'b')?.needsAttention, 1);
 });

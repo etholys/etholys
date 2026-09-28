@@ -74,6 +74,22 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  if (body.adoptBet && typeof body.adoptBet === 'object') {
+    const data = await loadDossier(companyId);
+    if (!data.dossier?.hypothesisAccepted) {
+      return NextResponse.json({ error: 'Aceita a hipótese antes de abrir apostas.' }, { status: 400 });
+    }
+    const raw = body.adoptBet as { title?: unknown; why?: unknown; indicator?: unknown };
+    const created = await materializeAuroraBets(companyId, [
+      {
+        title: String(raw.title || '').slice(0, 200),
+        why: String(raw.why || '').slice(0, 800),
+        indicator: String(raw.indicator || '').slice(0, 200),
+      },
+    ]);
+    return NextResponse.json({ ok: true, created, ...(await loadDossier(companyId)) });
+  }
+
   if (body.materialize === true) {
     const data = await loadDossier(companyId);
     if (!data.dossier?.hypothesisAccepted) return NextResponse.json({ ok: true, created: 0, ...data });

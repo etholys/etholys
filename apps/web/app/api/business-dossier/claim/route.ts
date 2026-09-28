@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { canAccessNexusOpsCompany } from '@/lib/nexus-ops';
-import { claimAuroraBusiness } from '@/lib/aurora-turn';
+import { claimAuroraBusiness, releaseAuroraBusiness } from '@/lib/aurora-turn';
 import { loadDossier } from '@/lib/business-dossier';
 import { readAuroraTech } from '@/lib/aurora-interview';
 
@@ -22,6 +22,13 @@ export async function POST(req: NextRequest) {
   if (!companyId || !(await canAccessNexusOpsCompany(tenant.companyIds, companyId, engagementId))) {
     return NextResponse.json({ error: 'Empresa inválida.' }, { status: 403 });
   }
+
+  if (body.release === true) {
+    await releaseAuroraBusiness({ companyId, userId: tenant.userId });
+    const data = await loadDossier(companyId);
+    return NextResponse.json({ ok: true, released: true, tech: null, current: readAuroraTech(data.dossier?.interviewJson) });
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: tenant.userId },
     select: { name: true, email: true },
