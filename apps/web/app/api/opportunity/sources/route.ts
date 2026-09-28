@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { OFFICIAL_PORTALS } from '@/lib/opportunity/official-portals';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import { addMonitoredSource, listMonitoredSources, removeMonitoredSource } from '@/lib/opportunity/sources';
 
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
   if (!ctx) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
   const sources = await listMonitoredSources(ctx.companyId, ctx.userId);
-  return NextResponse.json({ companyId: ctx.companyId, sources });
+  return NextResponse.json({ companyId: ctx.companyId, sources, portals: OFFICIAL_PORTALS });
 }
 
 export async function POST(req: NextRequest) {

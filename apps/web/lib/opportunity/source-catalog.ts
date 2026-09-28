@@ -8,7 +8,7 @@ export async function listUserMonitoredUrls(companyId: string): Promise<FundingS
   const monitored = await prisma.userMonitoredSource.findMany({
     where: { companyId, isActive: true, customUrl: { not: null } },
     orderBy: { createdAt: 'desc' },
-    take: 8,
+    take: 20,
     select: { label: true, customUrl: true },
   });
 

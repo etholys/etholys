@@ -6,17 +6,24 @@ import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
 import { DeadlineAlertsPanel } from '@/components/opportunity/DeadlineAlertsPanel';
 import { StateEmpty, StateLoading } from '@/components/ui/StateBlocks';
+import { formatOriginLine } from '@/lib/opportunity/official-portals';
 import {
   pipelineLabel,
+  type DonorFiche,
+  type FundDrawer,
+  type FundOrigin,
   type PipelineStatus,
 } from '@/lib/opportunity/pipeline';
+import { daysUntilClose, deadlineUrgency } from '@/lib/opportunity/scan-inbox';
 import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Download,
   FileText,
   Radar,
   Search,
+  X,
 } from 'lucide-react';
 
 type Opportunity = {
@@ -31,10 +38,26 @@ type Opportunity = {
   countries?: string | null;
   matchScore?: number | null;
   status: string;
+  linkOficial?: string | null;
   pipelineStatus?: PipelineStatus;
   watchOpen?: boolean;
   ownerUserId?: string | null;
+  origin?: FundOrigin;
+  donor?: DonorFiche;
 };
+
+function csvCell(value: string): string {
+  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
+}
+
+function urgencyDot(deadline?: string | null): { title: string; className: string } | null {
+  const kind = deadlineUrgency(daysUntilClose({ deadline, closesAt: deadline }));
+  if (kind === 'none') return null;
+  if (kind === 'overdue') return { title: 'Prazo passou', className: 'bg-gray-400' };
+  if (kind === 'today' || kind === 'soon') return { title: 'Vence já', className: 'bg-red-500' };
+  return { title: 'Vence em 14 dias', className: 'bg-amber-500' };
+}
 
 export default function OpportunitiesPage() {
   const { locale, activeCompanyId } = useApp();
@@ -53,11 +76,32 @@ export default function OpportunitiesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [pipeline, setPipeline] = useState<'all' | 'decide' | 'prepare' | 'submitted' | 'closed'>('all');
+  const [drawer, setDrawer] = useState<FundDrawer>('all');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [institutionFilter, setInstitutionFilter] = useState('');
+  const [institutions, setInstitutions] = useState<string[]>([]);
+  const [types, setTypes] = useState<string[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [members, setMembers] = useState<Array<{ id: string; name: string | null; email: string | null }>>([]);
+  const [donorFund, setDonorFund] = useState<Opportunity | null>(null);
+  const [donorDraft, setDonorDraft] = useState<DonorFiche>({});
+  const [exporting, setExporting] = useState(false);
 
   const q = (path: string) =>
     `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
+
+  const filterParams = (pageNum: number, extra?: Record<string, string>) => {
+    const params = new URLSearchParams({ page: String(pageNum), limit: '20' });
+    if (search.trim()) params.set('search', search.trim());
+    if (pipeline !== 'all') params.set('pipeline', pipeline);
+    if (drawer !== 'all') params.set('drawer', drawer);
+    if (typeFilter) params.set('type', typeFilter);
+    if (institutionFilter) params.set('institution', institutionFilter);
+    if (extra) {
+      for (const [k, v] of Object.entries(extra)) params.set(k, v);
+    }
+    return params;
+  };
 
   const load = useCallback(
     async (pageNum = 1) => {
@@ -67,16 +111,17 @@ export default function OpportunitiesPage() {
       }
       setLoading(true);
       try {
-        const params = new URLSearchParams({ page: String(pageNum), limit: '12' });
-        if (search.trim()) params.set('search', search.trim());
-        if (pipeline !== 'all') params.set('pipeline', pipeline);
-        const r = await fetch(q(`/api/opportunity/catalog?${params}`), { cache: 'no-store' });
+        const r = await fetch(q(`/api/opportunity/catalog?${filterParams(pageNum)}`), { cache: 'no-store' });
         const d = (await r.json()) as {
           funds?: Opportunity[];
+          institutions?: string[];
+          types?: string[];
           pagination?: { total: number; pages: number; current: number };
         };
         if (r.ok) {
           setItems(d.funds ?? []);
+          setInstitutions(d.institutions ?? []);
+          setTypes(d.types ?? []);
           setTotal(d.pagination?.total ?? 0);
           setPages(d.pagination?.pages ?? 1);
           setPage(d.pagination?.current ?? pageNum);
@@ -85,7 +130,7 @@ export default function OpportunitiesPage() {
         setLoading(false);
       }
     },
-    [companyId, search, pipeline],
+    [companyId, search, pipeline, drawer, typeFilter, institutionFilter],
   );
 
   useEffect(() => {
@@ -102,7 +147,12 @@ export default function OpportunitiesPage() {
 
   const patchFund = async (
     fundId: string,
-    body: { pipelineStatus?: PipelineStatus; watchOpen?: boolean; ownerUserId?: string | null },
+    body: {
+      pipelineStatus?: PipelineStatus;
+      watchOpen?: boolean;
+      ownerUserId?: string | null;
+      donor?: DonorFiche;
+    },
   ) => {
     if (!companyId) return;
     setBusyId(fundId);
@@ -113,15 +163,92 @@ export default function OpportunitiesPage() {
         body: JSON.stringify({ fundId, ...body }),
       });
       if (r.ok) {
-        setItems((prev) => prev.map((item) => (item.id === fundId ? { ...item, ...body } : item)));
+        const d = (await r.json()) as { donor?: DonorFiche | null };
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === fundId ? { ...item, ...body, donor: d.donor ?? body.donor ?? item.donor } : item,
+          ),
+        );
+        if (donorFund?.id === fundId && d.donor) {
+          setDonorFund((cur) => (cur ? { ...cur, donor: d.donor ?? undefined } : cur));
+        }
       }
     } finally {
       setBusyId(null);
     }
   };
 
-  const changePipeline = (fundId: string, pipelineStatus: PipelineStatus) =>
-    patchFund(fundId, { pipelineStatus });
+  const exportCsv = async () => {
+    if (!companyId) return;
+    setExporting(true);
+    try {
+      const r = await fetch(q(`/api/opportunity/catalog?${filterParams(1, { export: '1' })}`), {
+        cache: 'no-store',
+      });
+      const d = (await r.json()) as { funds?: Opportunity[] };
+      const rows = d.funds ?? [];
+      const header = [
+        'nome',
+        'instituicao',
+        'tipo',
+        'prazo',
+        'pipeline',
+        'origem',
+        'url_oficial',
+        'dono',
+        'contactos',
+        'janela_tipica',
+        'paises',
+      ];
+      const lines = [
+        header.join(','),
+        ...rows.map((f) =>
+          [
+            csvCell(f.name),
+            csvCell(f.institution),
+            csvCell(f.type),
+            csvCell(f.deadline ? new Date(f.deadline).toISOString().slice(0, 10) : ''),
+            csvCell(pipelineLabel(f.pipelineStatus ?? 'decide', locale)),
+            csvCell(formatOriginLine(f.origin, locale)),
+            csvCell(f.linkOficial ?? ''),
+            csvCell(members.find((m) => m.id === f.ownerUserId)?.name || members.find((m) => m.id === f.ownerUserId)?.email || ''),
+            csvCell(f.donor?.contacts ?? ''),
+            csvCell(f.donor?.typicalWindow ?? ''),
+            csvCell(f.countries ?? ''),
+          ].join(','),
+        ),
+      ];
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'fundhub-em-curso.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const openDonor = (f: Opportunity) => {
+    setDonorFund(f);
+    setDonorDraft({
+      contacts: f.donor?.contacts ?? '',
+      typicalWindow: f.donor?.typicalWindow ?? '',
+      approach: f.donor?.approach ?? '',
+    });
+  };
+
+  const saveDonor = async () => {
+    if (!donorFund) return;
+    await patchFund(donorFund.id, { donor: donorDraft });
+    setDonorFund(null);
+  };
+
+  const memberLabel = (id?: string | null) => {
+    if (!id) return '';
+    const m = members.find((x) => x.id === id);
+    return m?.name || m?.email || '';
+  };
 
   if (!companyId) {
     return (
@@ -133,7 +260,7 @@ export default function OpportunitiesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <Link href="/hub/fundhub" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
@@ -145,9 +272,9 @@ export default function OpportunitiesPage() {
           </h1>
           <p className="mt-1 text-sm text-gray-600">
             {t(
-              'Fundos que já decidiu acompanhar.',
-              'Fondos que ya decidió seguir.',
-              'Funds you chose to track.',
+              'Mesa de trabalho: prazo, estado e origem na mesma linha.',
+              'Mesa de trabajo: plazo, estado y origen en la misma fila.',
+              'Work desk: deadline, status and origin on one row.',
             )}
           </p>
         </div>
@@ -164,6 +291,28 @@ export default function OpportunitiesPage() {
         {(
           [
             ['all', t('Todos', 'Todos', 'All')],
+            ['work', t('Esta janela', 'Esta ventana', 'This window')],
+            ['watch', t('Relógio', 'Reloj', 'Watch')],
+            ['repo', t('Sem chamada', 'Sin convocatoria', 'No call')],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setDrawer(key)}
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              drawer === key ? 'bg-amber-700 text-white' : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {(
+          [
+            ['all', t('Pipeline', 'Pipeline', 'Pipeline')],
             ['decide', t('Decidir', 'Decidir', 'Decide')],
             ['prepare', t('Preparar', 'Preparar', 'Prepare')],
             ['submitted', t('Submetido', 'Enviado', 'Submitted')],
@@ -173,11 +322,9 @@ export default function OpportunitiesPage() {
           <button
             key={key}
             type="button"
-            onClick={() => setPipeline(key)}
+            onClick={() => setPipeline(key === 'all' ? 'all' : key)}
             className={`rounded-full px-3 py-1 text-xs font-medium ${
-              pipeline === key
-                ? 'bg-gray-900 text-white'
-                : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+              pipeline === key ? 'bg-gray-900 text-white' : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
             {label}
@@ -186,7 +333,7 @@ export default function OpportunitiesPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <div className="relative min-w-[200px] flex-1 max-w-md">
+        <div className="relative min-w-[180px] flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             value={search}
@@ -196,6 +343,43 @@ export default function OpportunitiesPage() {
             className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm"
           />
         </div>
+        {types.length > 1 && (
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs text-gray-800"
+          >
+            <option value="">{t('Tipo', 'Tipo', 'Type')}</option>
+            {types.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        )}
+        {institutions.length > 1 && (
+          <select
+            value={institutionFilter}
+            onChange={(e) => setInstitutionFilter(e.target.value)}
+            className="max-w-[14rem] rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs text-gray-800"
+          >
+            <option value="">{t('Instituição', 'Institución', 'Institution')}</option>
+            {institutions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
+        <button
+          type="button"
+          disabled={exporting || total === 0}
+          onClick={() => void exportCsv()}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          <Download className="h-3.5 w-3.5" />
+          CSV
+        </button>
         <Link
           href="/hub/fundhub/discover"
           className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
@@ -230,113 +414,124 @@ export default function OpportunitiesPage() {
         </div>
       ) : (
         <>
-          <div className="space-y-3">
-            {items.map((f) => (
-              <article
-                key={f.id}
-                className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-200"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap gap-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          f.status === 'open' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        {f.status === 'open' ? t('Aberto', 'Abierto', 'Open') : f.status}
-                      </span>
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
-                        {f.type}
-                      </span>
-                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
-                        {pipelineLabel(f.pipelineStatus ?? 'decide', locale)}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-start gap-2">
-                      {f.ownerUserId && (
-                        <span
-                          title={members.find((m) => m.id === f.ownerUserId)?.name || t('Dono', 'Dueño', 'Owner')}
-                          className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-900 text-[10px] font-bold text-white"
-                        >
-                          {(members.find((m) => m.id === f.ownerUserId)?.name || members.find((m) => m.id === f.ownerUserId)?.email || '?')
-                            .slice(0, 1)
-                            .toUpperCase()}
-                        </span>
-                      )}
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-gray-900">{f.name}</h3>
-                        <p className="text-sm text-gray-600">{f.institution}</p>
-                      </div>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {f.countries || '—'}
-                      {f.deadline
-                        ? ` · ${t('Prazo', 'Plazo', 'Deadline')}: ${new Date(f.deadline).toLocaleDateString()}`
-                        : ''}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    {f.matchScore != null && (
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-bold text-amber-900">
-                        {Math.round(f.matchScore)}%
-                      </span>
-                    )}
-                    <div className="flex gap-2">
-                      <label className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1.5 text-[11px] text-gray-700">
-                        <input
-                          type="checkbox"
-                          disabled={busyId === f.id}
-                          checked={Boolean(f.watchOpen)}
-                          onChange={(e) => void patchFund(f.id, { watchOpen: e.target.checked })}
-                        />
-                        {t('Avisar se abrir', 'Avisar si abre', 'Watch if it opens')}
-                      </label>
-                      {members.length > 0 && (
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <table className="min-w-[920px] w-full text-left text-sm">
+              <thead className="bg-gray-50 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="px-3 py-2 w-8" />
+                  <th className="px-3 py-2">{t('Fundo', 'Fondo', 'Fund')}</th>
+                  <th className="px-3 py-2">{t('Prazo', 'Plazo', 'Deadline')}</th>
+                  <th className="px-3 py-2">{t('Estado', 'Estado', 'Status')}</th>
+                  <th className="px-3 py-2">{t('Origem', 'Origen', 'Origin')}</th>
+                  <th className="px-3 py-2">{t('Dono', 'Dueño', 'Owner')}</th>
+                  <th className="px-3 py-2 text-right">{t('Acções', 'Acciones', 'Actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((f) => {
+                  const urgency = urgencyDot(f.deadline);
+                  const origin = formatOriginLine(f.origin, locale);
+                  return (
+                    <tr key={f.id} className="border-t border-gray-100 hover:bg-amber-50/40">
+                      <td className="px-3 py-2">
+                        {urgency ? (
+                          <span title={urgency.title} className={`inline-block h-2.5 w-2.5 rounded-full ${urgency.className}`} />
+                        ) : (
+                          <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-200" />
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <p className="font-medium text-gray-900">{f.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {f.institution}
+                          {f.type ? ` · ${f.type}` : ''}
+                        </p>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">
+                        {f.deadline ? new Date(f.deadline).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="px-3 py-2">
                         <select
                           disabled={busyId === f.id}
-                          value={f.ownerUserId ?? ''}
-                          onChange={(e) => void patchFund(f.id, { ownerUserId: e.target.value || null })}
-                          className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800"
+                          value={f.pipelineStatus ?? 'decide'}
+                          onChange={(e) => void patchFund(f.id, { pipelineStatus: e.target.value as PipelineStatus })}
+                          className="rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-800"
                         >
-                          <option value="">{t('Sem dono', 'Sin dueño', 'No owner')}</option>
-                          {members.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.name || m.email || m.id.slice(0, 6)}
+                          {(['decide', 'prepare', 'submitted', 'won', 'lost'] as const).map((s) => (
+                            <option key={s} value={s}>
+                              {pipelineLabel(s, locale)}
                             </option>
                           ))}
                         </select>
-                      )}
-                      <select
-                        disabled={busyId === f.id}
-                        value={f.pipelineStatus ?? 'decide'}
-                        onChange={(e) => void changePipeline(f.id, e.target.value as PipelineStatus)}
-                        className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800"
-                      >
-                        {(['decide', 'prepare', 'submitted', 'won', 'lost'] as const).map((s) => (
-                          <option key={s} value={s}>
-                            {pipelineLabel(s, locale)}
-                          </option>
-                        ))}
-                      </select>
-                      <Link
-                        href={`/hub/fundhub/discover/${f.id}`}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                      >
-                        {t('Detalhe', 'Detalle', 'Detail')}
-                      </Link>
-                      <Link
-                        href={`/hub/fundhub/proposals?fundId=${encodeURIComponent(f.id)}`}
-                        className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                        {t('Proposta', 'Propuesta', 'Proposal')}
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            ))}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-gray-500">{origin || '—'}</td>
+                      <td className="px-3 py-2">
+                        {members.length > 0 ? (
+                          <select
+                            disabled={busyId === f.id}
+                            value={f.ownerUserId ?? ''}
+                            onChange={(e) => void patchFund(f.id, { ownerUserId: e.target.value || null })}
+                            className="max-w-[8rem] rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-800"
+                          >
+                            <option value="">{t('—', '—', '—')}</option>
+                            {members.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.name || m.email || m.id.slice(0, 6)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs text-gray-400">{memberLabel(f.ownerUserId) || '—'}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          <label className="inline-flex items-center gap-1 text-[10px] text-gray-600">
+                            <input
+                              type="checkbox"
+                              disabled={busyId === f.id}
+                              checked={Boolean(f.watchOpen)}
+                              onChange={(e) => void patchFund(f.id, { watchOpen: e.target.checked })}
+                            />
+                            {t('Relógio', 'Reloj', 'Watch')}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => openDonor(f)}
+                            className="rounded border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+                          >
+                            {t('Ficha', 'Ficha', 'Fiche')}
+                          </button>
+                          {f.linkOficial && (
+                            <a
+                              href={f.linkOficial}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+                            >
+                              URL
+                            </a>
+                          )}
+                          <Link
+                            href={`/hub/fundhub/discover/${f.id}`}
+                            className="rounded border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+                          >
+                            {t('Detalhe', 'Detalle', 'Detail')}
+                          </Link>
+                          <Link
+                            href={`/hub/fundhub/proposals?fundId=${encodeURIComponent(f.id)}`}
+                            className="inline-flex items-center gap-1 rounded bg-gray-900 px-2 py-1 text-[11px] font-medium text-white hover:bg-gray-800"
+                          >
+                            <FileText className="h-3 w-3" />
+                            {t('Proposta', 'Propuesta', 'Proposal')}
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
           {pages > 1 && (
@@ -368,6 +563,70 @@ export default function OpportunitiesPage() {
             </div>
           )}
         </>
+      )}
+
+      {donorFund && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">
+                  {t('Ficha do financiador', 'Ficha del financiador', 'Funder fiche')}
+                </h2>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  {donorFund.institution} · {donorFund.name}
+                </p>
+              </div>
+              <button type="button" onClick={() => setDonorFund(null)} className="rounded p-1 text-gray-400 hover:bg-gray-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <label className="mt-4 block text-xs font-medium text-gray-600">
+              {t('Contactos', 'Contactos', 'Contacts')}
+              <textarea
+                value={donorDraft.contacts ?? ''}
+                onChange={(e) => setDonorDraft((d) => ({ ...d, contacts: e.target.value }))}
+                rows={2}
+                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="mt-3 block text-xs font-medium text-gray-600">
+              {t('Janela típica', 'Ventana típica', 'Typical window')}
+              <input
+                value={donorDraft.typicalWindow ?? ''}
+                onChange={(e) => setDonorDraft((d) => ({ ...d, typicalWindow: e.target.value }))}
+                placeholder={t('ex.: março–maio', 'ej.: marzo–mayo', 'e.g. March–May')}
+                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="mt-3 block text-xs font-medium text-gray-600">
+              {t('Como abordar', 'Cómo abordar', 'How to approach')}
+              <textarea
+                value={donorDraft.approach ?? ''}
+                onChange={(e) => setDonorDraft((d) => ({ ...d, approach: e.target.value }))}
+                rows={3}
+                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              />
+            </label>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDonorFund(null)}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-700"
+              >
+                {t('Cancelar', 'Cancelar', 'Cancel')}
+              </button>
+              <button
+                type="button"
+                disabled={busyId === donorFund.id}
+                onClick={() => void saveDonor()}
+                className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+              >
+                {t('Guardar ficha', 'Guardar ficha', 'Save fiche')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

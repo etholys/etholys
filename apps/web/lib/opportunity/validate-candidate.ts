@@ -172,6 +172,11 @@ async function upsertFundFromCandidate(
       pipelineStatus: existing ? pipelineOf(existing.notes) : 'decide',
       ownerUserId: existing ? undefined : ownerUserId,
       dossier: dossierFromCandidate(c),
+      origin: {
+        runId,
+        scanFocus: c.scanFocus,
+        savedAt: new Date().toISOString(),
+      },
     }),
     lastReviewedAt: new Date(),
   };
@@ -187,7 +192,15 @@ async function upsertFundFromCandidate(
       ...data,
       notes: writeFundHubMeta(
         [`Descoberto na varredura ${runId}`, ...noteParts].filter(Boolean).join(' · '),
-        { pipelineStatus: 'decide', dossier: dossierFromCandidate(c) },
+        {
+          pipelineStatus: 'decide',
+          dossier: dossierFromCandidate(c),
+          origin: {
+            runId,
+            scanFocus: c.scanFocus,
+            savedAt: new Date().toISOString(),
+          },
+        },
       ),
     },
   });

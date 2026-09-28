@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
+import { OFFICIAL_PORTALS, type OfficialPortal } from '@/lib/opportunity/official-portals';
 import { Link2, Loader2, Plus, Trash2 } from 'lucide-react';
 
 type Source = {
@@ -11,6 +12,14 @@ type Source = {
   url: string;
   languages: string;
 };
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return url.toLowerCase();
+  }
+}
 
 export function MonitoredSourcesPanel({ compact }: { compact?: boolean }) {
   const { locale, activeCompanyId } = useApp();
@@ -82,6 +91,29 @@ export function MonitoredSourcesPanel({ compact }: { compact?: boolean }) {
     }
   };
 
+  const togglePortal = async (portal: OfficialPortal, watching?: Source) => {
+    if (watching) {
+      await remove(watching.id);
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await fetch(q('/api/opportunity/sources'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: portal.name, url: portal.url }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Erro');
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!companyId) return null;
 
   return (
@@ -89,12 +121,37 @@ export function MonitoredSourcesPanel({ compact }: { compact?: boolean }) {
       <div className="flex items-center gap-2">
         <Link2 className="h-4 w-4 text-amber-600" />
         <h3 className="text-sm font-semibold text-gray-900">
-          {t('Portais extra', 'Portales extra', 'Extra portals')}
+          {t('Portais oficiais', 'Portales oficiales', 'Official portals')}
         </h3>
       </div>
       <p className="mt-1 text-xs text-gray-500">
-        {t('Opcional. A busca principal vem dos critérios.', 'Opcional. La búsqueda principal viene de los criterios.', 'Optional. Main search comes from criteria.')}
+        {t(
+          'Opcional. Cruzam a próxima busca — nunca agregadores.',
+          'Opcional. Cruzan la próxima búsqueda — nunca agregadores.',
+          'Optional. Cross the next search — never aggregators.',
+        )}
       </p>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {OFFICIAL_PORTALS.map((p) => {
+          const watching = sources.find((s) => hostOf(s.url) === hostOf(p.url));
+          return (
+            <button
+              key={p.id}
+              type="button"
+              disabled={busy}
+              onClick={() => void togglePortal(p, watching)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                watching
+                  ? 'bg-gray-900 text-white'
+                  : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {p.name}
+            </button>
+          );
+        })}
+      </div>
 
       <div className={`mt-3 flex gap-2 ${compact ? 'flex-col' : 'flex-col sm:flex-row'}`}>
         <input

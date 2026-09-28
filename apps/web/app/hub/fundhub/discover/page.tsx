@@ -8,6 +8,7 @@ import { StateEmpty, StateLoading } from '@/components/ui/StateBlocks';
 import { CandidateDetailSheet } from '@/components/opportunity/CandidateDetailSheet';
 import { DeadlineAlertsPanel } from '@/components/opportunity/DeadlineAlertsPanel';
 import { KnownFundsPanel } from '@/components/opportunity/KnownFundsPanel';
+import { MonitoredSourcesPanel } from '@/components/opportunity/MonitoredSourcesPanel';
 import {
   estimateScanPercent,
   ScanProgressRing,
@@ -19,6 +20,7 @@ import {
   formatDateShort,
 } from '@/lib/opportunity/availability';
 import { evidenceForDisplay, evidenceLine } from '@/lib/opportunity/call-evidence';
+import { formatOriginLine } from '@/lib/opportunity/official-portals';
 import { normalizeInstrumentType } from '@/lib/opportunity/instrument-type';
 import {
   deadlineUrgency,
@@ -868,6 +870,13 @@ export default function OpportunityDiscoverPage() {
                 key={`${c.runId ?? 'run'}-${c.tempId}`}
                 candidate={c}
                 locale={locale}
+                originLine={formatOriginLine(
+                  {
+                    scanFocus: c.scanFocus ?? recentRuns.find((r) => r.id === c.runId)?.scanFocus ?? undefined,
+                    savedAt: recentRuns.find((r) => r.id === c.runId)?.startedAt,
+                  },
+                  locale,
+                )}
                 onOpen={(openTab) => openDetail(c, openTab)}
                 t={t}
               />
@@ -886,6 +895,13 @@ export default function OpportunityDiscoverPage() {
                   key={`${c.runId ?? 'run'}-${c.tempId}`}
                   candidate={c}
                   locale={locale}
+                  originLine={formatOriginLine(
+                    {
+                      scanFocus: c.scanFocus ?? recentRuns.find((r) => r.id === c.runId)?.scanFocus ?? undefined,
+                      savedAt: recentRuns.find((r) => r.id === c.runId)?.startedAt,
+                    },
+                    locale,
+                  )}
                   onOpen={(openTab) => openDetail(c, openTab)}
                   t={t}
                 />
@@ -934,6 +950,7 @@ export default function OpportunityDiscoverPage() {
             }}
           />
           <KnownFundsPanel onAdded={() => void loadCatalog()} />
+          <MonitoredSourcesPanel compact />
         </aside>
       </div>
 
@@ -1051,11 +1068,13 @@ export default function OpportunityDiscoverPage() {
 function CandidateCard({
   candidate: c,
   locale,
+  originLine,
   onOpen,
   t,
 }: {
   candidate: ScanCandidate;
   locale: string;
+  originLine?: string;
   onOpen: (tab?: 'overview' | 'analyze') => void;
   t: (pt: string, es: string, en: string) => string;
 }) {
@@ -1143,6 +1162,7 @@ function CandidateCard({
             {c.name}
           </h3>
           <p className="line-clamp-1 text-xs text-gray-600">{c.institution}</p>
+          {originLine && <p className="mt-0.5 text-[10px] text-gray-400">{originLine}</p>}
           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
             {urgency && (
               <span

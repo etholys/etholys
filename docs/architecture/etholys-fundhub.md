@@ -2,7 +2,7 @@
 
 **Versão:** 1.0  
 **Data:** 2026-09-24  
-**Status:** F0–F9 em produção; avulsa lê o edital oficial antes da postulação  
+**Status:** F0–F9 em produção; mesa de operador (tabela Em curso, ficha do doador, origem, CSV, portais oficiais)  
 **Público:** product, desenvolvedores, agentes de IA  
 **Licença interna:** `FUNDHUB` (`sys.FUNDHUB`)  
 **Entrada para agentes:** [AGENTS.md](../../AGENTS.md) → este ficheiro.
@@ -41,7 +41,7 @@ Perfil da org ──► Buscar (inbox) ──► Evidência ──► Go/no-go �
 1. **Buscar** — IA pesquisa; humano decide. Inbox **não apaga** varreduras anteriores.
 2. **Evidência (F1)** — página da convocatória verificada, N documentos, data. Sem isto, não há proposta às cegas.
 3. **Go/no-go (F2)** — critérios do perfil (país, tipo de org, privado, teto) no mesmo popup.
-4. **Em curso (F3)** — estados: Decidir → Preparar → Submetido → Ganho/Perdido.
+4. **Em curso (F3)** — tabela densa: Decidir → Preparar → Submetido → Ganho/Perdido; gavetas Esta janela / Relógio / Sem chamada; ficha do financiador.
 5. **Proposta (F4)** — secções a partir do texto das bases; chat com citação.
 6. **Relógio (F5)** — programas mapeados avisam quando a janela abre.
 
@@ -88,6 +88,8 @@ Já existem: `callUrl`, `institutionUrl`, `documents[]`, `sourceExcerpt`, `runId
 | `pipelineStatus` | F3 | Coluna Prisma ou JSON em `notes` até migração |
 | `ownerUserId` | F6 | Coluna + índice `(companyId, ownerUserId)` |
 | `watchOpen` | F5 | Boolean; alerta quando `availability` passa a aberto |
+| `origin` | mesa | `{ runId, scanFocus, savedAt }` no JSON `<!--fh:-->` |
+| `donor` | mesa | contactos, janela típica, como abordar |
 | `documentsJson` | F4 | Quando o texto das bases for extraído de verdade |
 
 ### 4.3 Relógio / alerta
@@ -110,6 +112,8 @@ Reutilizar `FundhubAlert` + `syncDeadlineNotifications`. F5 adiciona tipo `oppor
 | POST | `/api/opportunity/watch` | F5 | Ligar/desligar relógio |
 | GET/PUT | `/api/fundhub/profile` | F0 | Perfil (F2 lê isto) |
 | GET | `/api/opportunity/alerts` | F0/F5 | Prazos + janelas |
+| GET/POST/DELETE | `/api/opportunity/sources` | mesa | Portais oficiais + extras do utilizador |
+| GET | `/api/opportunity/catalog?drawer=&export=1` | mesa | Gavetas + CSV |
 
 **Regra:** `open_now` **nunca** cai no fallback de conhecimento (inventa agências). Sem página oficial verificável → zero candidatos, não lixo.
 
@@ -143,7 +147,7 @@ Verde / âmbar / vermelho. «Não somos elegíveis» → `not_now` + aprendizage
 
 ### F3 — Pipeline em Em curso (feito)
 
-Filtro ou colunas: **Decidir / Preparar / Submetido / Fechado**. Prazo no card. Default ao guardar: `decide`. Sem menu novo.
+Tabela densa (não cards): prazo, estado na linha, origem da busca, dono, URL oficial. Gavetas **Esta janela / Relógio / Sem chamada**. Ficha do financiador (contactos, janela típica, como abordar). Export CSV. Default ao guardar: `decide`. Sem menu novo.
 
 ### F4 — Proposta a partir das bases (feito)
 
@@ -157,7 +161,7 @@ Em **Mapear programas**, toggle «Avisar quando abrir». Digest / notificação 
 
 ### F6 — Equipa (feito)
 
-`ownerUserId` no fundo + avatar no card Em curso. Lista de membros da empresa (já existe no Hub). Sem módulo de RH.
+`ownerUserId` no fundo + select na linha da tabela. Lista de membros da empresa (já existe no Hub). Sem módulo de RH.
 
 ### F7 — Coligação na proposta (feito)
 
@@ -212,4 +216,4 @@ SKU actual `sys.FUNDHUB` = USD 129/mês, 15 seats — chão, não lista do produ
 
 ---
 
-Última actualização: **24 set 2026**.
+Última actualização: **27 set 2026**.

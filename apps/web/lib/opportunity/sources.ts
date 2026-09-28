@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
+import { isAggregatorFundingUrl } from '@/lib/opportunity/official-url';
 
 export type MonitoredSourceDto = {
   id: string;
@@ -48,17 +49,28 @@ export async function addMonitoredSource(opts: {
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     throw new Error('URL inválida — use http:// ou https://');
   }
+  if (isAggregatorFundingUrl(url)) {
+    throw new Error('URL rejeitada — só portais oficiais, não agregadores.');
+  }
 
-  const row = await prisma.userMonitoredSource.create({
-    data: {
-      companyId: opts.companyId,
-      userId: opts.userId,
-      label,
-      customUrl: url,
-      languages: opts.languages?.trim().slice(0, 40) || 'pt',
-      isActive: true,
-    },
+  const existing = await prisma.userMonitoredSource.findFirst({
+    where: { companyId: opts.companyId, userId: opts.userId, customUrl: url },
   });
+  const row = existing
+    ? await prisma.userMonitoredSource.update({
+        where: { id: existing.id },
+        data: { isActive: true, label },
+      })
+    : await prisma.userMonitoredSource.create({
+        data: {
+          companyId: opts.companyId,
+          userId: opts.userId,
+          label,
+          customUrl: url,
+          languages: opts.languages?.trim().slice(0, 40) || 'pt',
+          isActive: true,
+        },
+      });
 
   return {
     id: row.id,
