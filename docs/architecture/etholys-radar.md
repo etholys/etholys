@@ -17,7 +17,7 @@ RADAR é a operação: dados, eficiência, automação, WhatsApp in/out, alertas
 
 ## Arquitetura
 
-Cinco camadas. Os quatro módulos de entrada (agricultura, agroindústria, pecuária, carbono) mudam o vocabulário e as regras. O laço é o mesmo.
+Seis camadas. Os quatro módulos de entrada (agricultura, agroindústria, pecuária, carbono) mudam o vocabulário e as regras. O laço é o mesmo.
 
 ```
 Escolha do módulo (pulsoModule)
@@ -33,6 +33,9 @@ Núcleo operativo   unidades · caderno · leituras · regras
         └── canal sensor     token nxsens_ · POST /api/nexus/ingest/readings
         │
         ▼
+Cadeia produtiva   RadarLot · colheita → transformação → transporte → venda
+        │           Hub autentica · /radar/lote/[token] partilha pública
+        ▼
 Alertas do módulo  (protocolos em código, sem dossiê)
         │
         ▼
@@ -41,9 +44,7 @@ Saída              ecrã do módulo · WhatsApp (alerta e pedido de comando)
 
 A ponte `GET /api/radar/bridge` lê o vínculo (módulo gravado, se existe retrato, quantas apostas abertas) para outros produtos. A UI do RADAR não renderiza esse conteúdo.
 
-### Dados (modelos já existentes)
-
-Sem tabelas novas neste ciclo.
+### Dados
 
 | Peça | Modelo | Uso no RADAR |
 |------|--------|----------------|
@@ -54,8 +55,23 @@ Sem tabelas novas neste ciclo.
 | Sensor | `NexusSensor` | token em hash; o claro só na criação |
 | WhatsApp | `NexusWhatsappLink` | um telefone por empresa |
 | Regra | `NexusOpsRule` | `irrigation`, `whatsapp_alerts` (ventilação fica fora da agricultura) |
+| Lote (cadeia) | `RadarLot` | código humano + `publicToken`; estágio atual |
+| Evento de lote | `RadarLotEvent` | colheita / transformação / transporte / venda |
 
-Protocolos e limiares vivem em código (`lib/nexus-sector-modules/`), não em score de diagnóstico.
+Protocolos e limiares vivem em código (`lib/nexus-sector-modules/`, `lib/radar/`), não em score de diagnóstico.
+
+### Cadeia produtiva (traçabilidade)
+
+Pergunta do ecrã: **onde está este lote, agora?**
+
+O lote nasce na **colheita** (não é um 5.º módulo na nav). Fluxo: colheita → transformação → transporte → comercialização. Avanço só para a etapa seguinte (ou evento extra na mesma).
+
+- Hub: secção **Cadeia** em Agricultura — abrir lote, avançar, copiar link.
+- APIs: `GET/POST /api/radar/lots`, `GET /api/radar/lots/[id]`, `GET /api/radar/lots/public/[token]`.
+- Partilha: `/radar/lote/[token]` — comprador/auditor sem login; sem telefones, tokens de sensor nem IDs internos.
+- Fora deste ciclo: QR gráfico, blockchain, SKU próprio.
+
+Lib: `lib/radar/trace.ts`.
 
 ### Módulos
 
@@ -86,16 +102,18 @@ Alertas no ecrã seguem sempre os protocolos de agricultura. A mensagem automát
 
 ## Roadmap
 
-1. **Agricultura** — a exploração abre sozinha. O ecrã diz o que fazer hoje (irrigar, não colher, ouvir o campo). WhatsApp é o canal. Este ciclo.
-2. **Pecuária** — o mesmo laço com rebanho, sanidade, alimento e mortalidade.
-3. **Agroindústria** — lotes, perda e qualidade.
-4. **Carbono** — primeira leitura de práticas a partir do caderno dos três módulos. Sem UI de dossiê.
-5. **IA** — ler o caderno e propor um comando (irrigar ou não). A saída pede confirmação no WhatsApp; não actua sozinha.
-6. **SKU RADAR** — licença própria. Fora deste ciclo. Até lá, `NEXUS`.
+1. **Agricultura** — a exploração abre sozinha. O ecrã diz o que fazer hoje (irrigar, não colher, ouvir o campo). WhatsApp é o canal. Fechado.
+2. **Traçabilidade (cadeia)** — lote na colheita → transformação → transporte → venda; link público. Fechado neste ciclo.
+3. **Pecuária** — o mesmo laço com rebanho, sanidade, alimento e mortalidade.
+4. **Agroindústria** — lotes industriais, perda e qualidade (além da cadeia agrícola).
+5. **Carbono** — primeira leitura de práticas a partir do caderno dos três módulos. Sem UI de dossiê.
+6. **IA** — ler o caderno e propor um comando (irrigar ou não). A saída pede confirmação no WhatsApp; não actua sozinha.
+7. **SKU RADAR** — licença própria. Fora deste ciclo. Até lá, `NEXUS`.
 
 ## Fora de âmbito
 
 - Retrato, brechas, potenciais e apostas na UI do RADAR.
 - Menu ou fluxo partilhado com AURORA ou POLARIS.
 - Migration para renomear `pulsoModule`.
+- QR gráfico, blockchain ou SKU próprio só para traçabilidade.
 - Rebuild de Postgres, Caddy ou Jitsi. Deploy de UI é só `etholys-web`.

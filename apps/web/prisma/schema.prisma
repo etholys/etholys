@@ -127,6 +127,7 @@ model User {
   taskApprovalsToDecide         TaskApprovalRequest[]        @relation("TaskApprovalApprover")
   nexusDiagnosesCreated         NexusDiagnosis[]             @relation("NexusDiagnosisCreator")
   nexusFieldEntriesAuthored     NexusFieldEntry[]            @relation("NexusFieldEntryAuthor")
+  radarLotEventsAuthored        RadarLotEvent[]              @relation("RadarLotEventAuthor")
   meetContacts                  MeetContact[]                @relation("MeetContactOwner")
 }
 
@@ -223,6 +224,7 @@ model Company {
   nexusReadings               NexusReading[]
   nexusWhatsappLinks          NexusWhatsappLink[]
   nexusOpsRules               NexusOpsRule[]
+  radarLots                   RadarLot[]
   businessDossier             BusinessDossier?
   businessBets                BusinessBet[]
   businessRhythmNotes         BusinessRhythmNote[]
@@ -1999,6 +2001,7 @@ model NexusOpsUnit {
   entries   NexusFieldEntry[]
   sensors   NexusSensor[]
   readings  NexusReading[]
+  radarLots RadarLot[]
 
   @@index([companyId, isActive])
   @@index([companyId, sectorId])
@@ -2106,6 +2109,49 @@ model NexusReading {
   @@index([companyId, recordedAt])
   @@index([sensorId, recordedAt])
   @@index([unitId, recordedAt])
+}
+
+/// Lote de traçabilidade RADAR — nasce na colheita, segue até a venda.
+model RadarLot {
+  id             String          @id @default(cuid())
+  companyId      String
+  code           String
+  publicToken    String          @unique
+  unitId         String?
+  crop           String?
+  qty            Float?
+  unitLabel      String?
+  /// open | closed
+  status         String          @default("open")
+  /// harvest | transform | transport | sale
+  currentStage   String          @default("harvest")
+  harvestEntryId String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  unit           NexusOpsUnit?   @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  events         RadarLotEvent[]
+
+  @@unique([companyId, code])
+  @@index([companyId, createdAt])
+  @@index([companyId, status])
+}
+
+model RadarLotEvent {
+  id           String   @id @default(cuid())
+  lotId        String
+  /// harvest | transform | transport | sale
+  stage        String
+  occurredAt   DateTime
+  payloadJson  Json
+  /// app | whatsapp
+  channel      String   @default("app")
+  authorUserId String?
+  createdAt    DateTime @default(now())
+  lot          RadarLot @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  author       User?    @relation("RadarLotEventAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([lotId, occurredAt])
 }
 
 model MuseSuggestion {

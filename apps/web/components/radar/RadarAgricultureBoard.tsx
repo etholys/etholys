@@ -9,6 +9,7 @@ import {
   type AgricultureLineKind,
   type ParcelAction,
 } from '@/lib/radar/agriculture';
+import { RadarChainBoard } from '@/components/radar/RadarChainBoard';
 
 type Loc = 'pt' | 'es' | 'en';
 
@@ -351,6 +352,15 @@ export function RadarAgricultureBoard({
           )}
         </section>
       )}
+
+      <RadarChainBoard
+        companyId={companyId}
+        engagementId={engagementId}
+        locale={locale}
+        unitId={focus?.id || null}
+        unitCrop={focus?.crop || null}
+        harvestBlocked={Boolean(focus?.harvestBlocked)}
+      />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
