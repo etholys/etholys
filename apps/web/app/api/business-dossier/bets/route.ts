@@ -41,6 +41,13 @@ export async function POST(req: NextRequest) {
 
   const title = String(body.title || '').trim();
   if (title.length < 3) return NextResponse.json({ error: 'Aposta precisa de título.' }, { status: 400 });
+  const dossier = await prisma.businessDossier.findUnique({
+    where: { companyId },
+    select: { hypothesisAccepted: true },
+  });
+  if (!dossier?.hypothesisAccepted) {
+    return NextResponse.json({ error: 'Aceita a hipótese antes de abrir apostas.' }, { status: 400 });
+  }
   const count = await prisma.businessBet.count({
     where: { companyId, status: { notIn: ['done', 'dropped'] } },
   });

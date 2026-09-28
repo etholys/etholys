@@ -8,7 +8,7 @@ import { loadAuroraPortfolio } from '@/lib/business-dossier';
 export async function GET() {
   const tenant = await getUserCompanyIds();
   if (!tenant) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const businesses = await loadAuroraPortfolio(tenant.companyIds);
+  const businesses = await loadAuroraPortfolio(tenant.companyIds, tenant.userId);
   const needsAttention = businesses.filter((b) => b.stage !== 'steady').length;
   return NextResponse.json({
     businesses,

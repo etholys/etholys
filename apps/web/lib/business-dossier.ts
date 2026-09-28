@@ -8,6 +8,7 @@ import {
   collectAttendedBusinesses,
   type AuroraPortfolioItem,
 } from './aurora-portfolio';
+import { readAuroraTech } from './aurora-interview';
 
 export {
   AURORA_RHYTHM_STALE_MS,
@@ -69,34 +70,17 @@ function emptyDossier(row: { portraitText: string; gapsJson: unknown; potentials
   return !row.portraitText.trim() && asList(row.gapsJson).length === 0 && asList(row.potentialsJson).length === 0 && !row.pulsoModule;
 }
 
-/** Preenche o dossiê a partir de diagnóstico, jornada, tarefas e ops do NEXUS — sem apagar retrato já escrito. */
+/** Preenche o dossiê a partir de diagnóstico, jornada e ops — sem apagar retrato já escrito e sem colar quiz. */
 export async function hydrateDossierFromNexus(companyId: string, userId: string) {
-  const [existing, betsCount] = await Promise.all([
-    prisma.businessDossier.findUnique({ where: { companyId } }),
-    prisma.businessBet.count({ where: { companyId } }),
-  ]);
+  const existing = await prisma.businessDossier.findUnique({ where: { companyId } });
   const needsDossier = emptyDossier(existing);
-  const needsBets = betsCount === 0;
-  if (!needsDossier && !needsBets && existing?.pulsoModule) return existing;
+  if (!needsDossier && existing?.pulsoModule) return existing;
 
-  const [dx, venture, unit, company, roadmap] = await Promise.all([
+  const [dx, venture, unit, company] = await Promise.all([
     prisma.nexusDiagnosis.findFirst({ where: { companyId }, orderBy: { createdAt: 'desc' } }),
     prisma.nexusVentureState.findFirst({ where: { companyId } }),
     prisma.nexusOpsUnit.findFirst({ where: { companyId, isActive: true }, orderBy: { updatedAt: 'desc' } }),
-    prisma.company.findUnique({ where: { id: companyId }, select: { contextSetupJson: true, businessActivity: true, name: true } }),
-    needsBets
-      ? prisma.task.findMany({
-          where: {
-            companyId,
-            isActive: true,
-            tags: { contains: 'nexus:roadmap' },
-            status: { not: 'DONE' },
-          },
-          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-          take: 4,
-          select: { title: true, description: true },
-        })
-      : Promise.resolve([]),
+    prisma.company.findUnique({ where: { id: companyId }, select: { contextSetupJson: true } }),
   ]);
 
   const sectorIds = [
@@ -110,24 +94,11 @@ export async function hydrateDossierFromNexus(companyId: string, userId: string)
   const gapsFromDx = labelsFromScores(scores.weaknesses ?? scores.weakAreas, 'diagnóstico NEXUS').slice(0, 5);
   const potsFromDx = labelsFromScores(scores.potentials, 'diagnóstico NEXUS').slice(0, 3);
   const notes = String(venture?.incubatorNotes || '').trim();
-  const activity = String(company?.businessActivity || '').trim();
 
   let portrait = existing?.portraitText?.trim() || '';
-  if (!portrait) {
-    const parts = [
-      dx ? `Diagnóstico NEXUS: ${dx.overall}/100.` : '',
-      activity ? `Atividade: ${activity}` : '',
-      gapsFromDx[0] ? `Travão: ${gapsFromDx[0].text}` : '',
-      potsFromDx[0] ? `Puxão: ${potsFromDx[0].text}` : '',
-      notes,
-    ].filter(Boolean);
-    portrait = parts.join('\n\n');
-  }
+  if (!portrait && notes) portrait = notes;
 
-  let hypothesis = existing?.hypothesis?.trim() || '';
-  if (!hypothesis && gapsFromDx[0]) {
-    hypothesis = `O travão principal parece ser: ${gapsFromDx[0].text}.${potsFromDx[0] ? ` O puxão está em: ${potsFromDx[0].text}` : ''}`;
-  }
+  const hypothesis = existing?.hypothesis?.trim() || '';
 
   if (needsDossier || !existing?.pulsoModule) {
     await upsertDossier(companyId, userId, {
@@ -136,18 +107,6 @@ export async function hydrateDossierFromNexus(companyId: string, userId: string)
       gaps: asList(existing?.gapsJson).length ? asList(existing?.gapsJson) : gapsFromDx,
       potentials: asList(existing?.potentialsJson).length ? asList(existing?.potentialsJson) : potsFromDx,
       pulsoModule: radarModule,
-    });
-  }
-
-  if (needsBets && roadmap.length > 0) {
-    await prisma.businessBet.createMany({
-      data: roadmap.map((t, i) => ({
-        companyId,
-        title: t.title.slice(0, 200),
-        why: String(t.description || 'Roadmap NEXUS').slice(0, 500),
-        status: 'proposed' as const,
-        sortOrder: i,
-      })),
     });
   }
 
@@ -301,7 +260,10 @@ export function draftPortraitFromInterview(answers: Record<string, string>, loca
   };
 }
 
-export async function loadAuroraPortfolio(tenantCompanyIds: string[]): Promise<AuroraPortfolioItem[]> {
+export async function loadAuroraPortfolio(
+  tenantCompanyIds: string[],
+  viewerUserId?: string,
+): Promise<AuroraPortfolioItem[]> {
   const engagements = await listEngagementsForTenant(tenantCompanyIds);
   const businesses = collectAttendedBusinesses(engagements).slice(0, 80);
   const ids = businesses.map((b) => b.companyId);
@@ -310,26 +272,38 @@ export async function loadAuroraPortfolio(tenantCompanyIds: string[]): Promise<A
   const [dossiers, bets, notes] = await Promise.all([
     prisma.businessDossier.findMany({
       where: { companyId: { in: ids } },
-      select: { companyId: true, portraitText: true, hypothesisAccepted: true },
+      select: {
+        companyId: true,
+        portraitText: true,
+        hypothesis: true,
+        hypothesisAccepted: true,
+        interviewJson: true,
+      },
     }),
     prisma.businessBet.findMany({
       where: { companyId: { in: ids }, status: { notIn: ['done', 'dropped'] } },
-      select: { companyId: true },
+      select: { companyId: true, title: true },
+      orderBy: { sortOrder: 'asc' },
     }),
     prisma.businessRhythmNote.findMany({
       where: { companyId: { in: ids } },
       orderBy: { createdAt: 'desc' },
       take: 400,
-      select: { companyId: true, createdAt: true, nextStep: true, happened: true },
+      select: { companyId: true, createdAt: true, nextStep: true, happened: true, blocked: true },
     }),
   ]);
 
   const dossierByCompany = new Map(dossiers.map((d) => [d.companyId, d]));
-  const openBetsByCompany = new Map<string, number>();
+  const betsByCompany = new Map<string, string[]>();
   for (const bet of bets) {
-    openBetsByCompany.set(bet.companyId, (openBetsByCompany.get(bet.companyId) || 0) + 1);
+    const list = betsByCompany.get(bet.companyId) || [];
+    if (list.length < 4) list.push(bet.title);
+    betsByCompany.set(bet.companyId, list);
   }
-  const rhythmByCompany = new Map<string, { createdAt: Date; nextStep: string; happened: string }>();
+  const rhythmByCompany = new Map<
+    string,
+    { createdAt: Date; nextStep: string; happened: string; blocked: string }
+  >();
   for (const note of notes) {
     if (!rhythmByCompany.has(note.companyId)) rhythmByCompany.set(note.companyId, note);
   }
@@ -339,21 +313,30 @@ export async function loadAuroraPortfolio(tenantCompanyIds: string[]): Promise<A
     const dossier = dossierByCompany.get(b.companyId);
     const portraitText = dossier?.portraitText?.trim() || '';
     const last = rhythmByCompany.get(b.companyId);
-    const openBetCount = openBetsByCompany.get(b.companyId) || 0;
+    const betTitles = betsByCompany.get(b.companyId) || [];
     const hasPortrait = Boolean(portraitText);
     const hypothesisAccepted = Boolean(dossier?.hypothesisAccepted);
+    const tech = readAuroraTech(dossier?.interviewJson);
+    const technicianUserId = tech?.userId || '';
     return {
       ...b,
       hasPortrait,
       hypothesisAccepted,
-      openBetCount,
+      hypothesis: String(dossier?.hypothesis || '').slice(0, 280),
+      openBetCount: betTitles.length,
+      betTitles,
       lastRhythmAt: last?.createdAt.toISOString() ?? null,
+      lastRhythmHappened: (last?.happened || '').trim(),
+      lastRhythmBlocked: (last?.blocked || '').trim(),
       lastRhythmNext: (last?.nextStep || last?.happened || '').trim(),
       portraitPreview: portraitText.slice(0, 180),
+      technicianName: tech?.name || '',
+      technicianUserId,
+      mine: Boolean(viewerUserId && technicianUserId === viewerUserId),
       stage: auroraMethodStage({
         hasPortrait,
         hypothesisAccepted,
-        openBetCount,
+        openBetCount: betTitles.length,
         lastRhythmAt: last?.createdAt ?? null,
         now,
       }),

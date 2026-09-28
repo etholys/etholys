@@ -66,10 +66,17 @@ export function collectAttendedBusinesses(
 export type AuroraPortfolioItem = AuroraAttendedBusiness & {
   hasPortrait: boolean;
   hypothesisAccepted: boolean;
+  hypothesis: string;
   openBetCount: number;
+  betTitles: string[];
   lastRhythmAt: string | null;
+  lastRhythmHappened: string;
+  lastRhythmBlocked: string;
   lastRhythmNext: string;
   portraitPreview: string;
+  technicianName: string;
+  technicianUserId: string;
+  mine: boolean;
   stage: AuroraMethodStage;
 };
 
