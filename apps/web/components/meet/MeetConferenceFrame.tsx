@@ -106,6 +106,8 @@ type Props = {
   meetingUrl: string;
   title: string;
   locale: string;
+  /** Nome visível na sala (evita «Participante» / slug técnico). */
+  displayName?: string;
   /** Idioma da transcrição ao vivo (pt/es/en) — independente do idioma da UI */
   transcriptionLanguage?: string;
   onReady?: () => void;
@@ -120,6 +122,8 @@ type Props = {
   onTranscriptToolbarClick?: () => void;
   onError?: (message: string) => void;
 };
+
+const JOIN_TIMEOUT_MS = 25_000;
 
 let externalApiLoader: Promise<void> | null = null;
 
@@ -149,14 +153,32 @@ function loadExternalApi(origin: string): Promise<void> {
   return externalApiLoader;
 }
 
-function readParticipantCount(api: JitsiApi): number {
+function readParticipantCount(api: JitsiApi, opts?: { assumeLocalJoined?: boolean }): number {
   try {
-    const n = api.getNumberOfParticipants?.();
-    if (typeof n === 'number' && n >= 0) return n;
+    const info = api.getParticipantsInfo?.();
+    if (Array.isArray(info) && info.length > 0) return info.length;
   } catch {
     /* ignore */
   }
-  return 0;
+  try {
+    const n = api.getNumberOfParticipants?.();
+    if (typeof n === 'number' && n > 0) return n;
+  } catch {
+    /* ignore */
+  }
+  // Alguns builds devolvem 0 até o roster estabilizar — após join há pelo menos o local.
+  return opts?.assumeLocalJoined ? 1 : 0;
+}
+
+function sizeMeetIframe(parent: HTMLElement, iframe: HTMLIFrameElement) {
+  const rect = parent.getBoundingClientRect();
+  const w = Math.max(Math.floor(rect.width), 320);
+  const h = Math.max(Math.floor(rect.height), 360);
+  iframe.style.width = `${w}px`;
+  iframe.style.height = `${h}px`;
+  iframe.style.minWidth = '100%';
+  iframe.style.minHeight = '100%';
+  iframe.style.display = 'block';
 }
 
 export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
@@ -165,6 +187,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       meetingUrl,
       title,
       locale,
+      displayName,
       transcriptionLanguage,
       onReady,
       onTranscriptionChunk,
@@ -182,6 +205,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
     const parentRef = useRef<HTMLDivElement>(null);
     const apiRef = useRef<JitsiApi | null>(null);
     const filmstripHiddenRef = useRef(false);
+    const joinedRef = useRef(false);
     const callbacksRef = useRef({
       onReady,
       onTranscriptionChunk,
@@ -195,6 +219,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       onError,
     });
     const [loading, setLoading] = useState(true);
+    const [joinError, setJoinError] = useState<string | null>(null);
 
     callbacksRef.current = {
       onReady,
@@ -230,9 +255,12 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             }
           }
           try {
+            // Só o transcritor (Jigasi). Nunca gravação de ficheiro nem ecrã.
             api.executeCommand('startRecording', {
               mode: 'file',
               transcription: true,
+              onlyTranscribe: true,
+              onlyTranscription: true,
             });
           } catch {
             /* STT ao vivo pode falhar se o serviço não estiver activo */
@@ -253,16 +281,15 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
           }
         },
         startRecording(_destination) {
-          // Gravação local fiável é feita no Etholys (MediaRecorder top-level).
-          // Fallback legado da toolbar — preferir MeetRoomClient.
+          // Só gravação da chamada no Jitsi (Jibri). Nunca getDisplayMedia.
           apiRef.current?.executeCommand('startRecording', {
-            mode: 'local',
-            onlySelf: false,
+            mode: 'file',
+            transcription: false,
           });
         },
         stopRecording(_destination) {
           try {
-            apiRef.current?.executeCommand('stopRecording', 'local');
+            apiRef.current?.executeCommand('stopRecording', 'file');
           } catch {
             /* ignore */
           }
@@ -323,35 +350,68 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
     useEffect(() => {
       let disposed = false;
       let api: JitsiApi | null = null;
+      let joinTimer: number | undefined;
+      let countTimer: number | undefined;
+      let resizeObserver: ResizeObserver | null = null;
+      joinedRef.current = false;
+      setLoading(true);
+      setJoinError(null);
+
+      const failJoin = (message: string) => {
+        if (disposed) return;
+        setLoading(false);
+        setJoinError(message);
+        callbacksRef.current.onError?.(message);
+      };
 
       const emitCount = () => {
         if (!api) return;
-        callbacksRef.current.onParticipantCountChange?.(readParticipantCount(api));
+        callbacksRef.current.onParticipantCountChange?.(
+          readParticipantCount(api, { assumeLocalJoined: joinedRef.current }),
+        );
       };
 
       async function mount() {
         try {
           const url = new URL(meetingUrl);
-          const roomName = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+          const roomName = decodeURIComponent(url.pathname.replace(/^\/+/, '')).split('/')[0];
           if (!roomName || !parentRef.current) throw new Error('Sala Meet inválida');
 
           await loadExternalApi(url.origin);
           if (disposed || !parentRef.current || !window.JitsiMeetExternalAPI) return;
 
+          // Limpar restos de um mount anterior (Strict Mode / remount).
+          parentRef.current.replaceChildren();
+
+          const parent = parentRef.current;
+          const initialRect = parent.getBoundingClientRect();
+          const initialW = Math.max(Math.floor(initialRect.width), 320);
+          const initialH = Math.max(Math.floor(initialRect.height), 360);
+
+          const userName = (displayName || '').trim().slice(0, 80);
+
           api = new window.JitsiMeetExternalAPI(url.host, {
             roomName,
-            parentNode: parentRef.current,
-            width: '100%',
-            height: '100%',
+            parentNode: parent,
+            width: initialW,
+            height: initialH,
             lang: locale === 'pt' ? 'ptBR' : locale === 'en' ? 'en' : 'es',
+            ...(userName
+              ? {
+                  userInfo: {
+                    displayName: userName,
+                  },
+                }
+              : {}),
             configOverwrite: {
               subject: title,
               disableDeepLinking: true,
+              // Hub já tem MeetJoinSetupDialog — pré-sala Jitsi deixa 0 participantes
+              // e ecrã preto se o utilizador nunca clica «Entrar» / UI falha.
               prejoinConfig: {
-                enabled: true,
-                // Força ecrã de dispositivos antes de entrar — menos “mic morto” na call
-                hideDisplayName: false,
+                enabled: false,
               },
+              prejoinPageEnabled: false,
               breakoutRooms: { hideAddRoomButton: false },
               startWithAudioMuted: false,
               startWithVideoMuted: false,
@@ -366,15 +426,15 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               defaultLogoUrl: 'https://app.etholys.com/meet-brand/etholys-mark.svg',
               defaultRemoteDisplayName: 'Participante',
               fileRecordingsEnabled: true,
-              // Gravação CHORUS: no browser → nuvem (não depende de gravador no servidor)
               recordingService: {
                 enabled: false,
                 hideStorageWarning: true,
               },
+              // Local recording = getDisplayMedia da aba → ecrã preto no Chrome.
               localRecording: {
-                disable: false,
-                notifyAllParticipants: true,
-                disableSelfRecording: false,
+                disable: true,
+                disableSelfRecording: true,
+                notifyAllParticipants: false,
               },
               liveStreamingEnabled: false,
               transcription: {
@@ -460,12 +520,6 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
                 'notify.raisedHand',
                 'notify.startSilentTitle',
                 'notify.unmutedTitle',
-                'prejoin.errorDialOut',
-                'prejoin.errorDialOutDisconnected',
-                'prejoin.errorDialOutFailed',
-                'prejoin.errorDialOutStatus',
-                'prejoin.errorStatusCode',
-                'prejoin.errorValidation',
                 'toolbar.noAudioSignalTitle',
                 'toolbar.noisyAudioInputTitle',
                 'toolbar.talkWhileMutedPopup',
@@ -510,11 +564,21 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
           apiRef.current = api;
           const iframe = api.getIFrame();
           applyMeetIframeMediaPermissions(iframe);
-          // Cantos arredondados no iframe (chrome Etholys à volta).
           iframe.style.border = '0';
           iframe.style.borderRadius = '16px';
           iframe.style.background = '#202124';
-          // Reaplicar se o External API recriar atributos ao carregar.
+          sizeMeetIframe(parent, iframe);
+
+          resizeObserver = new ResizeObserver(() => {
+            if (disposed || !apiRef.current || !parentRef.current) return;
+            try {
+              sizeMeetIframe(parentRef.current, apiRef.current.getIFrame());
+            } catch {
+              /* ignore */
+            }
+          });
+          resizeObserver.observe(parent);
+
           const allowWatch = window.setInterval(() => {
             if (disposed || !apiRef.current) {
               window.clearInterval(allowWatch);
@@ -545,11 +609,25 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             }
           };
 
-          api.addListener('videoConferenceJoined', () => {
+          const markJoined = () => {
+            if (disposed || joinedRef.current) return;
+            joinedRef.current = true;
+            if (joinTimer) window.clearTimeout(joinTimer);
             setLoading(false);
+            setJoinError(null);
             emitCount();
+            // Roster pode atrasar — reforçar contagem local.
+            window.setTimeout(emitCount, 400);
+            window.setTimeout(emitCount, 1500);
             callbacksRef.current.onReady?.();
+            countTimer = window.setInterval(emitCount, 4000);
+          };
+
+          api.addListener('videoConferenceJoined', markJoined);
+          api.addListener('videoAvailabilityChanged', () => {
+            if (joinedRef.current) emitCount();
           });
+
           const emitTranscript = (raw: unknown) => {
             const chunk = normalizeChorusLiveTranscript(raw);
             if (!chunk) return;
@@ -578,7 +656,6 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             });
           });
           api.addListener('recordingStatusChanged', (state: RecordingState) => {
-            // Ignorar “file” usado só para convidar o transcriber — não é gravação no PC.
             callbacksRef.current.onRecordingStatus?.({
               on: Boolean(state?.on),
               mode: state?.mode || 'file',
@@ -608,6 +685,22 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               callbacksRef.current.onTranscriptToolbarClick?.();
             }
           });
+
+          const onFatal = (payload?: { error?: { message?: string; name?: string }; message?: string }) => {
+            if (joinedRef.current) return;
+            const detail =
+              payload?.error?.message ||
+              payload?.error?.name ||
+              payload?.message ||
+              'Falha ao ligar à sala de vídeo';
+            failJoin(detail);
+          };
+          api.addListener('conferenceFailed', onFatal);
+          api.addListener('connectionFailed', onFatal);
+          api.addListener('errorOccurred', (payload: { error?: { message?: string; isFatal?: boolean } }) => {
+            if (payload?.error?.isFatal) onFatal(payload);
+          });
+
           let leftEmitted = false;
           const emitLeft = () => {
             if (leftEmitted || disposed) return;
@@ -617,13 +710,18 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
           api.addListener('videoConferenceLeft', emitLeft);
           api.addListener('readyToClose', emitLeft);
 
-          // A pré-sala pode ficar aberta antes de videoConferenceJoined.
-          window.setTimeout(() => {
-            if (!disposed) setLoading(false);
-          }, 2500);
+          joinTimer = window.setTimeout(() => {
+            if (disposed || joinedRef.current) return;
+            failJoin(
+              locale === 'pt'
+                ? 'A sala de vídeo não entrou a tempo. Atualiza a página ou abre numa nova janela.'
+                : locale === 'en'
+                  ? 'The video room did not join in time. Refresh or open in a new window.'
+                  : 'La sala de vídeo no entró a tiempo. Actualiza la página o ábrela en una ventana nueva.',
+            );
+          }, JOIN_TIMEOUT_MS);
         } catch (error) {
-          setLoading(false);
-          callbacksRef.current.onError?.(
+          failJoin(
             error instanceof Error ? error.message : 'Erro ao abrir videoconferência',
           );
         }
@@ -632,27 +730,66 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       void mount();
       return () => {
         disposed = true;
-        const api = apiRef.current;
+        if (joinTimer) window.clearTimeout(joinTimer);
+        if (countTimer) window.clearInterval(countTimer);
+        resizeObserver?.disconnect();
+        const current = apiRef.current;
         apiRef.current = null;
         try {
-          api?.executeCommand('hangup');
+          current?.executeCommand('hangup');
         } catch {
           /* ignore */
         }
         try {
-          api?.dispose();
+          current?.dispose();
         } catch {
           /* ignore */
         }
       };
-    }, [meetingUrl, title, locale]);
+    }, [meetingUrl, title, locale, displayName, transcriptionLanguage]);
 
     return (
-      <div className="relative h-full w-full overflow-hidden rounded-2xl bg-[#202124]">
-        <div ref={parentRef} className="absolute inset-0 overflow-hidden rounded-2xl" />
-        {loading && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-[#202124]">
+      <div className="relative h-full min-h-[min(70vh,640px)] w-full overflow-hidden rounded-2xl bg-[#202124]">
+        <div
+          ref={parentRef}
+          className="absolute inset-0 overflow-hidden rounded-2xl [&_iframe]:h-full [&_iframe]:w-full [&_iframe]:border-0"
+        />
+        {loading && !joinError && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-[#202124]">
             <Loader2 className="h-8 w-8 animate-spin text-white/70" />
+            <p className="text-xs text-white/50">
+              {locale === 'pt'
+                ? 'A entrar na sala…'
+                : locale === 'en'
+                  ? 'Joining the room…'
+                  : 'Entrando a la sala…'}
+            </p>
+          </div>
+        )}
+        {joinError && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 rounded-2xl bg-slate-950/95 px-6 text-center">
+            <p className="max-w-md text-sm text-red-200">{joinError}</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="rounded-full bg-teal-400 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-teal-300"
+              >
+                {locale === 'pt' ? 'Atualizar' : locale === 'en' ? 'Refresh' : 'Actualizar'}
+              </button>
+              <a
+                href={meetingUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full bg-white/10 px-4 py-2 text-xs font-medium text-white hover:bg-white/15"
+              >
+                {locale === 'pt'
+                  ? 'Abrir numa nova janela'
+                  : locale === 'en'
+                    ? 'Open in new window'
+                    : 'Abrir en ventana nueva'}
+              </a>
+            </div>
           </div>
         )}
       </div>

@@ -6,7 +6,9 @@ import { meetSpeechLanguageLabel } from '@/lib/meet/language';
 
 export type MeetJoinSetupPrefs = {
   language: MeetSpeechLanguage;
+  /** Vídeo da chamada (requer Jibri no servidor; sem Jibri não há gravação automática da sala) */
   enableCloudRecording: boolean;
+  /** Transcrição da reunião (Jigasi/Vosk ao vivo) — caminho normal, sem partilhar ecrã */
   enableLiveTranscript: boolean;
 };
 
@@ -17,6 +19,8 @@ type Props = {
   cloudStorageReady: boolean;
   whisperAvailable: boolean;
   liveTranscriptionAvailable: boolean;
+  /** true se gravação de vídeo da sala (Jibri) estiver operacional */
+  callVideoRecordingAvailable?: boolean;
   prefs: MeetJoinSetupPrefs;
   onChange: (prefs: MeetJoinSetupPrefs) => void;
   onConfirm: () => void;
@@ -29,13 +33,14 @@ export function MeetJoinSetupDialog({
   cloudStorageReady,
   whisperAvailable,
   liveTranscriptionAvailable,
+  callVideoRecordingAvailable = false,
   prefs,
   onChange,
   onConfirm,
 }: Props) {
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
 
-  const canCloud = cloudStorageReady;
+  const canVideo = cloudStorageReady && callVideoRecordingAvailable;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
@@ -75,56 +80,8 @@ export function MeetJoinSetupDialog({
           </select>
         </label>
 
-        {isHost && (
-          <div className="mt-4 space-y-2">
-            <label
-              className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 ${
-                canCloud
-                  ? 'border-teal-200 bg-teal-50/60 hover:bg-teal-50'
-                  : 'border-slate-200 bg-slate-50 opacity-70'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={prefs.enableCloudRecording && canCloud}
-                disabled={!canCloud}
-                onChange={(e) =>
-                  onChange({ ...prefs, enableCloudRecording: e.target.checked })
-                }
-                className="mt-0.5 rounded border-slate-300 text-teal-700"
-              />
-              <span className="min-w-0">
-                <span className="flex items-center gap-1.5 text-sm font-semibold text-teal-900">
-                  <Cloud className="h-4 w-4" />
-                  {t(
-                    'Gravar e transcrever na nuvem',
-                    'Grabar y transcribir en la nube',
-                    'Record & transcribe in the cloud',
-                  )}
-                </span>
-                <span className="mt-0.5 block text-xs text-teal-900/80">
-                  {t(
-                    'Automático — grava ao entrar, envia para o CHORUS e gera transcrição ao sair (encerrar, fechar ou sair da sala).',
-                    'Automático — graba al entrar, sube a CHORUS y transcribe al salir (finalizar, cerrar o salir de la sala).',
-                    'Automatic — records when you join, uploads to CHORUS, and transcribes when you leave (end, close tab, or leave room).',
-                  )}
-                </span>
-              </span>
-            </label>
-            {!canCloud && (
-              <p className="text-xs text-amber-800">
-                {t(
-                  'Armazenamento na nuvem indisponível. Contacte o administrador.',
-                  'Almacenamiento en la nube no disponible. Contacte al administrador.',
-                  'Cloud storage unavailable. Contact your administrator.',
-                )}
-              </p>
-            )}
-          </div>
-        )}
-
-        {liveTranscriptionAvailable && (
-          <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-3 py-3 hover:bg-slate-50">
+        {liveTranscriptionAvailable ? (
+          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-teal-200 bg-teal-50/60 px-3 py-3 hover:bg-teal-50">
             <input
               type="checkbox"
               checked={prefs.enableLiveTranscript}
@@ -134,19 +91,81 @@ export function MeetJoinSetupDialog({
               className="mt-0.5 rounded border-slate-300 text-teal-700"
             />
             <span className="min-w-0">
-              <span className="flex items-center gap-1.5 text-sm font-medium text-slate-800">
-                <Mic className="h-4 w-4 text-slate-500" />
-                {t('Transcrição ao vivo (opcional)', 'Transcripción en vivo (opcional)', 'Live transcript (optional)')}
+              <span className="flex items-center gap-1.5 text-sm font-semibold text-teal-900">
+                <Mic className="h-4 w-4" />
+                {t('Transcrever a reunião', 'Transcribir la reunión', 'Transcribe the meeting')}
               </span>
-              <span className="mt-0.5 block text-xs text-amber-700">
+              <span className="mt-0.5 block text-xs text-teal-900/80">
                 {t(
-                  'Qualidade inferior — só se precisar de texto em tempo real.',
-                  'Calidad inferior — solo si necesita texto en tiempo real.',
-                  'Lower quality — only if you need real-time text.',
+                  'Recomendado. Texto ao vivo com nomes dos participantes — sem partilhar ecrã nem gravar vídeo. Ao sair, o CHORUS guarda a transcrição e pode gerar o resumo.',
+                  'Recomendado. Texto en vivo con nombres de participantes — sin compartir pantalla ni grabar vídeo. Al salir, CHORUS guarda la transcripción y puede generar el resumen.',
+                  'Recommended. Live text with participant names — no screen share or video file. When you leave, CHORUS keeps the transcript and can build the summary.',
                 )}
               </span>
             </span>
           </label>
+        ) : (
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {t(
+              'Transcrição ao vivo indisponível neste momento.',
+              'Transcripción en vivo no disponible en este momento.',
+              'Live transcription is unavailable right now.',
+            )}
+          </p>
+        )}
+
+        {isHost && (
+          <div className="mt-3 space-y-2">
+            <label
+              className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 ${
+                canVideo
+                  ? 'border-slate-200 hover:bg-slate-50'
+                  : 'border-slate-200 bg-slate-50 opacity-80'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={prefs.enableCloudRecording && canVideo}
+                disabled={!canVideo}
+                onChange={(e) =>
+                  onChange({ ...prefs, enableCloudRecording: e.target.checked })
+                }
+                className="mt-0.5 rounded border-slate-300 text-teal-700"
+              />
+              <span className="min-w-0">
+                <span className="flex items-center gap-1.5 text-sm font-medium text-slate-800">
+                  <Cloud className="h-4 w-4 text-slate-500" />
+                  {t(
+                    'Gravar vídeo da chamada (opcional)',
+                    'Grabar vídeo de la llamada (opcional)',
+                    'Record call video (optional)',
+                  )}
+                </span>
+                <span className="mt-0.5 block text-xs text-slate-600">
+                  {canVideo
+                    ? t(
+                        'Grava a sala no servidor (pessoas + partilhas) e depois pode transcrever.',
+                        'Graba la sala en el servidor (personas + compartidos) y luego puede transcribir.',
+                        'Records the room on the server (people + shares), then can transcribe.',
+                      )
+                    : t(
+                        'Ainda não disponível: a gravação de vídeo da própria chamada (como no Meet) precisa do Jibri no servidor. Por agora use «Transcrever» — não é preciso escolher ecrã.',
+                        'Aún no disponible: grabar el vídeo de la propia llamada (como en Meet) requiere Jibri en el servidor. Por ahora use «Transcribir» — no hace falta elegir pantalla.',
+                        'Not available yet: true in-call video recording (Meet-style) needs Jibri on the server. For now use «Transcribe» — no screen picker.',
+                      )}
+                </span>
+              </span>
+            </label>
+            {!cloudStorageReady && whisperAvailable && (
+              <p className="text-xs text-slate-500">
+                {t(
+                  'Pode sempre enviar um áudio/vídeo depois no recap para transcrever.',
+                  'Siempre puede subir un audio/vídeo después en el recap para transcribir.',
+                  'You can always upload audio/video later in the recap to transcribe.',
+                )}
+              </p>
+            )}
+          </div>
         )}
 
         <button

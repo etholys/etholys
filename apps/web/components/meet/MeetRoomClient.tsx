@@ -33,14 +33,8 @@ import {
   type MeetConferenceHandle,
   type MeetLayoutMode,
 } from '@/components/meet/MeetConferenceFrame';
-import {
-  startMeetLocalRecorder,
-  type MeetLocalRecorder,
-} from '@/lib/meet/local-recorder';
-import {
-  MeetJoinSetupDialog,
-  type MeetJoinSetupPrefs,
-} from '@/components/meet/MeetJoinSetupDialog';
+import { type MeetLocalRecorder } from '@/lib/meet/local-recorder';
+import { type MeetJoinSetupPrefs } from '@/components/meet/MeetJoinSetupDialog';
 import { PendingMeetRecordingBanner } from '@/components/meet/PendingMeetRecordingBanner';
 import { resolveMeetSpeechLanguage, type MeetSpeechLanguage } from '@/lib/meet/language';
 import { queueMeetRecordingUpload } from '@/lib/meet/flush-pending-recording';
@@ -170,10 +164,9 @@ export function MeetRoomClient({ sessionId }: Props) {
     whisperTranscriptionEnabled: false,
     cloudStorageReady: false,
   });
-  const [joinSetupDone, setJoinSetupDone] = useState(false);
   const [joinPrefs, setJoinPrefs] = useState<MeetJoinSetupPrefs>(() => ({
     language: 'auto',
-    enableCloudRecording: true,
+    enableCloudRecording: false,
     enableLiveTranscript: false,
   }));
   const joinPrefsRef = useRef(joinPrefs);
@@ -198,10 +191,14 @@ export function MeetRoomClient({ sessionId }: Props) {
   );
 
   const isHost = Boolean(currentUserId && session?.createdById === currentUserId);
+  const displayName =
+    (authSession?.user as { name?: string | null } | undefined)?.name?.trim() ||
+    (authSession?.user as { email?: string | null } | undefined)?.email?.trim() ||
+    '';
   const [pipActive, setPipActive] = useState(false);
   const [pipMode, setPipMode] = useState<'none' | 'document' | 'css'>('none');
   const [conferenceReady, setConferenceReady] = useState(false);
-  const [autoFloat, setAutoFloat] = useState(true);
+  const [autoFloat, setAutoFloat] = useState(false);
   const [layoutMode, setLayoutMode] = useState<MeetLayoutMode>('speaker');
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
   const [transcriptCopied, setTranscriptCopied] = useState(false);
@@ -220,8 +217,10 @@ export function MeetRoomClient({ sessionId }: Props) {
   const pipWindowRef = useRef<Window | null>(null);
   const pipModeRef = useRef<'none' | 'document' | 'css'>('none');
   const conferenceReadyRef = useRef(false);
-  const autoFloatRef = useRef(true);
+  const autoFloatRef = useRef(false);
   const pipEnteringRef = useRef(false);
+  /** Evita encerrar a reunião só porque o utilizador mudou de aba (falsos videoConferenceLeft). */
+  const lastHiddenAtRef = useRef(0);
   const segmentsRef = useRef<TranscriptSegment[]>([]);
   const transcriptionStartedAtRef = useRef<number | null>(null);
 
@@ -278,25 +277,26 @@ export function MeetRoomClient({ sessionId }: Props) {
     return () => window.clearInterval(id);
   }, [locale]);
 
-  useEffect(() => {
-    if (!session || joinSetupDone || !currentUserId) return;
-    if (session.createdById !== currentUserId) {
-      setJoinSetupDone(true);
-    }
-  }, [session, currentUserId, joinSetupDone]);
+  // Entra já na sala (Zoom): sem modal que bloqueia. Transcrição/gravação são botões à parte.
 
   useEffect(() => {
     if (!companyId) return;
     void Promise.all([
       fetch('/api/meet/status')
         .then((r) => r.json())
-        .then((d) =>
+        .then((d) => {
+          const liveOn = Boolean(d.liveTranscriptionEnabled);
           setFeatures({
-            liveTranscriptionEnabled: Boolean(d.liveTranscriptionEnabled),
+            liveTranscriptionEnabled: liveOn,
             whisperTranscriptionEnabled: Boolean(d.whisperTranscriptionEnabled),
             cloudStorageReady: Boolean(d.cloudStorageReady),
-          }),
-        ),
+          });
+          setJoinPrefs((prev) => ({
+            ...prev,
+            enableLiveTranscript: false,
+            enableCloudRecording: false,
+          }));
+        }),
       fetch(
         `/api/meet/sessions/${sessionId}/transcript?companyId=${encodeURIComponent(companyId)}`,
       )
@@ -322,7 +322,9 @@ export function MeetRoomClient({ sessionId }: Props) {
 
   useEffect(() => {
     if (!recordingOn || !joinPrefsRef.current.enableCloudRecording) return;
-    const flush = () => {
+    const flush = (ev: PageTransitionEvent) => {
+      // Só ao sair/fechar de verdade — não ao mudar de aba (visibility).
+      if (ev.persisted) return;
       void stopRecording({ cloudAuto: true, quiet: true });
     };
     window.addEventListener('pagehide', flush);
@@ -333,14 +335,8 @@ export function MeetRoomClient({ sessionId }: Props) {
     if (participantCount > 0) hadParticipantsRef.current = true;
   }, [participantCount]);
 
-  useEffect(() => {
-    if (!recordingOn || !joinPrefs.enableCloudRecording || !conferenceReady) return;
-    if (!hadParticipantsRef.current || participantCount > 0) return;
-    const id = window.setTimeout(() => {
-      void stopRecording({ cloudAuto: true, quiet: true });
-    }, 2000);
-    return () => window.clearTimeout(id);
-  }, [participantCount, recordingOn, joinPrefs.enableCloudRecording, conferenceReady]);
+  // NÃO parar gravação só porque o contador foi a 0 (Chrome/Jitsi falha em background).
+  // A gravação só para: utilizador, pagehide real, ou fim da reunião.
 
   useEffect(() => {
     if (!companyId || !session || session.status === 'live' || session.status === 'ended') return;
@@ -491,6 +487,9 @@ export function MeetRoomClient({ sessionId }: Props) {
 
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
+        lastHiddenAtRef.current = Date.now();
+        // Flutuante automático é OPCIONAL (desligado por omissão).
+        // Nunca encerrar reunião/gravação só por mudar de aba.
         tryAutoFloat();
         return;
       }
@@ -507,7 +506,10 @@ export function MeetRoomClient({ sessionId }: Props) {
 
     const onBlur = () => {
       window.setTimeout(() => {
-        if (document.visibilityState === 'hidden') tryAutoFloat();
+        if (document.visibilityState === 'hidden') {
+          lastHiddenAtRef.current = Date.now();
+          tryAutoFloat();
+        }
       }, 80);
     };
 
@@ -664,26 +666,6 @@ export function MeetRoomClient({ sessionId }: Props) {
     [companyId, sessionId, locale],
   );
 
-  function confirmJoinSetup() {
-    const prefs = joinPrefsRef.current;
-    setJoinSetupDone(true);
-    const cloudReady = features.cloudStorageReady;
-    if (prefs.enableCloudRecording && cloudReady) {
-      window.setTimeout(() => void startCloudRecording(), 400);
-    }
-  }
-
-  function maybeStartLiveTranscription() {
-    if (!joinPrefsRef.current.enableLiveTranscript || !features.liveTranscriptionEnabled) {
-      return;
-    }
-    setPanelOpen(true);
-    transcriptionStartedAtRef.current = Date.now();
-    setTranscriptionWaiting(true);
-    setTranscriptionOn(true);
-    conferenceRef.current?.startTranscription();
-  }
-
   function toggleTranscription() {
     setError(null);
     if (!features.liveTranscriptionEnabled) {
@@ -700,8 +682,10 @@ export function MeetRoomClient({ sessionId }: Props) {
       conferenceRef.current?.stopTranscription();
       setTranscriptionOn(false);
       setTranscriptionWaiting(false);
+      setJoinPrefs((p) => ({ ...p, enableLiveTranscript: false }));
       return;
     }
+    setJoinPrefs((p) => ({ ...p, enableLiveTranscript: true }));
     setPanelOpen(true);
     transcriptionStartedAtRef.current = Date.now();
     setTranscriptionWaiting(true);
@@ -709,33 +693,21 @@ export function MeetRoomClient({ sessionId }: Props) {
     conferenceRef.current?.startTranscription();
   }
 
-  async function startCloudRecording() {
+  function startInRoomVideoRecording() {
     setError(null);
-    if (recordingOn || recordingBusy || recordingFinalizeRef.current) return;
-    setRecordingBusy(true);
+    // Sala interna: NUNCA getDisplayMedia (ecrã preto). Só gravação da chamada no Jitsi.
     try {
-      const { recorder } = await startMeetLocalRecorder({
-        suggestedTitle: session?.title,
-      });
-      localRecorderRef.current = recorder;
+      conferenceRef.current?.startRecording('cloud');
       setRecordingOn(true);
-    } catch (err) {
-      localRecorderRef.current = null;
-      setRecordingOn(false);
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        return;
-      }
+      setJoinPrefs((p) => ({ ...p, enableCloudRecording: true }));
+    } catch {
       setError(
-        err instanceof Error
-          ? err.message
-          : t(
-              'Não foi possível iniciar a gravação na nuvem.',
-              'No se pudo iniciar la grabación en la nube.',
-              'Could not start cloud recording.',
-            ),
+        t(
+          'A gravação de vídeo da chamada ainda não está activa neste servidor. Use Transcrever — não precisa escolher ecrã.',
+          'La grabación de vídeo de la llamada aún no está activa en este servidor. Use Transcribir — no hace falta elegir pantalla.',
+          'In-call video recording is not active on this server yet. Use Transcribe — no screen picker.',
+        ),
       );
-    } finally {
-      setRecordingBusy(false);
     }
   }
 
@@ -1122,6 +1094,55 @@ export function MeetRoomClient({ sessionId }: Props) {
           </div>
           <button
             type="button"
+            onClick={toggleTranscription}
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium shadow-sm ${
+              transcriptionOn
+                ? 'bg-teal-400 text-slate-950 hover:bg-teal-300'
+                : 'bg-slate-800/95 text-white/90 hover:bg-slate-700'
+            }`}
+            title={t(
+              'Transcrever a conversa — sem gravar vídeo nem escolher ecrã',
+              'Transcribir la conversación — sin grabar vídeo ni elegir pantalla',
+              'Transcribe the conversation — no video file, no screen picker',
+            )}
+          >
+            <Mic className="h-3.5 w-3.5" strokeWidth={1.75} />
+            <span className="hidden sm:inline">
+              {transcriptionOn
+                ? t('A transcrever', 'Transcribiendo', 'Transcribing')
+                : t('Transcrever', 'Transcribir', 'Transcribe')}
+            </span>
+          </button>
+          {recordingOn || cloudSyncing ? (
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium shadow-sm ${
+                cloudSyncing ? 'bg-amber-600/90 text-white' : 'bg-rose-600 text-white'
+              }`}
+            >
+              <Cloud className="h-3.5 w-3.5" strokeWidth={1.75} />
+              <span className="hidden sm:inline">
+                {cloudSyncing
+                  ? t('A enviar…', 'Enviando…', 'Uploading…')
+                  : t('A gravar', 'Grabando', 'Recording')}
+              </span>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={startInRoomVideoRecording}
+              className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm hover:bg-slate-700"
+              title={t(
+                'Gravar o vídeo da chamada (pessoas + partilhas). Não pede ecrã do browser.',
+                'Grabar el vídeo de la llamada (personas + compartidos). No pide pantalla del navegador.',
+                'Record the call video (people + shares). Does not ask for a browser screen.',
+              )}
+            >
+              <Cloud className="h-3.5 w-3.5" strokeWidth={1.75} />
+              <span className="hidden sm:inline">{t('Gravar', 'Grabar', 'Record')}</span>
+            </button>
+          )}
+          <button
+            type="button"
             onClick={openFloatingWindow}
             className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium shadow-sm ${
               pipActive
@@ -1149,30 +1170,6 @@ export function MeetRoomClient({ sessionId }: Props) {
                 : t('Flutuante', 'Flotante', 'Float')}
             </span>
           </button>
-          {joinPrefs.enableCloudRecording && (recordingOn || cloudSyncing) ? (
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium shadow-sm ${
-                cloudSyncing
-                  ? 'bg-amber-600/90 text-white'
-                  : 'bg-rose-600 text-white'
-              }`}
-              title={t(
-                'Gravação na nuvem CHORUS — termina automaticamente ao sair',
-                'Grabación en la nube CHORUS — termina al salir',
-                'CHORUS cloud recording — stops automatically when you leave',
-              )}
-            >
-              <Cloud className="h-3.5 w-3.5" strokeWidth={1.75} />
-              <span className="hidden sm:inline">
-                {cloudSyncing
-                  ? t('A enviar…', 'Enviando…', 'Uploading…')
-                  : t('A gravar', 'Grabando', 'Recording')}
-              </span>
-              {recordingOn && !cloudSyncing && (
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-              )}
-            </span>
-          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -1259,6 +1256,19 @@ export function MeetRoomClient({ sessionId }: Props) {
 
       <div className="flex min-h-0 flex-1">
         <main className="relative min-w-0 flex-1 px-3 pb-3 pt-14 sm:px-4 sm:pb-4">
+          {error && (
+            <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-red-400/30 bg-red-950/80 px-4 py-3 text-xs text-red-100">
+              <p className="min-w-0 flex-1 leading-relaxed">{error}</p>
+              <button
+                type="button"
+                onClick={() => setError(null)}
+                className="shrink-0 rounded-full p-1 text-red-200/80 hover:bg-white/10 hover:text-white"
+                aria-label={t('Fechar', 'Cerrar', 'Close')}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
           {pipActive && (
             <div className="mb-3 rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-xs text-white/60">
               {pipMode === 'document'
@@ -1315,24 +1325,16 @@ export function MeetRoomClient({ sessionId }: Props) {
               }
             >
             <div ref={stageRef} className="relative h-full w-full">
-              {!joinSetupDone ? (
-                <div className="flex h-full min-h-[min(70vh,640px)] items-center justify-center p-6 text-center text-sm text-white/50">
-                  {t(
-                    'Configura a reunião para entrar na sala.',
-                    'Configura la reunión para entrar a la sala.',
-                    'Set up the meeting to join the room.',
-                  )}
-                </div>
-              ) : session.meetingUrl && canEmbedChorusRoom(session.meetingUrl) ? (
+              {session.meetingUrl && canEmbedChorusRoom(session.meetingUrl) ? (
                 <MeetConferenceFrame
                   ref={conferenceRef}
                   meetingUrl={session.meetingUrl}
                   title={session.title}
                   locale={locale}
+                  displayName={displayName}
                   transcriptionLanguage={meetingSpeechLang}
                   onReady={() => {
                     setConferenceReady(true);
-                    maybeStartLiveTranscription();
                   }}
                   onTranscriptionChunk={handleTranscriptionChunk}
                   onParticipantCountChange={setParticipantCount}
@@ -1359,15 +1361,36 @@ export function MeetRoomClient({ sessionId }: Props) {
                       leaveQuietRef.current = false;
                       return;
                     }
+                    // Nunca encerrar só por blur/PiP/falsos leaves do Jitsi
+                    if (pipEnteringRef.current || pipModeRef.current !== 'none') return;
+                    if (document.visibilityState === 'hidden') return;
+                    if (Date.now() - lastHiddenAtRef.current < 15_000) return;
+                    // Só encerra se a página está visível e o leave parece deliberado
                     void endMeeting({ skipHangup: true });
                   }}
                   onRecordingStatus={(state) => {
                     if (state.transcription) {
                       setTranscriptionOn(state.on);
                       if (!state.on) setTranscriptionWaiting(false);
+                      return;
                     }
+                    if (state.error) {
+                      setRecordingOn(false);
+                      setError(
+                        t(
+                          'A gravação de vídeo da chamada ainda não está activa neste servidor. Use Transcrever — não precisa escolher ecrã.',
+                          'La grabación de vídeo de la llamada aún no está activa en este servidor. Use Transcribir — no hace falta elegir pantalla.',
+                          'In-call video recording is not active on this server yet. Use Transcribe — no screen picker.',
+                        ),
+                      );
+                      return;
+                    }
+                    setRecordingOn(Boolean(state.on));
                   }}
-                  onError={setError}
+                  onError={(message) => {
+                    setConferenceReady(false);
+                    setError(message);
+                  }}
                 />
               ) : externalRoomUrl ? (
                 <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
@@ -1533,23 +1556,17 @@ export function MeetRoomClient({ sessionId }: Props) {
               </div>
 
               <p className="text-[10px] leading-relaxed text-white/35">
-                {joinPrefs.enableCloudRecording
+                {joinPrefs.enableLiveTranscript
                   ? t(
-                      'Gravação na nuvem activa — ao sair, o áudio é enviado e transcrito automaticamente.',
-                      'Grabación en la nube activa — al salir, el audio se sube y transcribe automáticamente.',
-                      'Cloud recording active — when you leave, audio uploads and transcribes automatically.',
+                      'Transcrição ao vivo activa — ao sair, o texto fica no recap (pode gerar resumo sem vídeo).',
+                      'Transcripción en vivo activa — al salir, el texto queda en el recap (puede generar resumen sin vídeo).',
+                      'Live transcript on — when you leave, text stays in the recap (summary without video).',
                     )
-                  : joinPrefs.enableLiveTranscript
-                    ? t(
-                        'Transcrição ao vivo (qualidade limitada). Para texto fiável, active a gravação na nuvem ao entrar.',
-                        'Transcripción en vivo (calidad limitada). Para texto fiable, active la grabación en la nube al entrar.',
-                        'Live transcript (limited quality). For reliable text, enable cloud recording when joining.',
-                      )
-                    : t(
-                        'Active «Gravar e transcrever na nuvem» ao entrar para um resumo automático após a reunião.',
-                        'Active «Grabar y transcribir en la nube» al entrar para un resumen automático tras la reunión.',
-                        'Enable «Record & transcribe in the cloud» when joining for an automatic post-meeting recap.',
-                      )}
+                  : t(
+                      'Pode activar a transcrição no painel. Gravar vídeo da própria sala ainda requer Jibri no servidor.',
+                      'Puede activar la transcripción en el panel. Grabar vídeo de la propia sala aún requiere Jibri en el servidor.',
+                      'You can turn on transcript in the panel. True in-room video still needs Jibri on the server.',
+                    )}
               </p>
             </div>
           </aside>
@@ -1568,19 +1585,6 @@ export function MeetRoomClient({ sessionId }: Props) {
         </div>
       )}
 
-      {!joinSetupDone && session && (
-        <MeetJoinSetupDialog
-          locale={locale}
-          meetingTitle={session.title}
-          isHost={isHost}
-          cloudStorageReady={features.cloudStorageReady}
-          whisperAvailable={features.whisperTranscriptionEnabled}
-          liveTranscriptionAvailable={features.liveTranscriptionEnabled}
-          prefs={joinPrefs}
-          onChange={setJoinPrefs}
-          onConfirm={confirmJoinSetup}
-        />
-      )}
     </div>
   );
 }
