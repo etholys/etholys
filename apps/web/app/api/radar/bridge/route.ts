@@ -25,10 +25,10 @@ export async function GET(req: NextRequest) {
     hasPortrait: Boolean(data.dossier?.portraitText),
     openBets: data.bets.filter((b) => b.status === 'accepted' || b.status === 'active').length,
     links: {
-      aurora: `${ETHOLYS_PRODUCTS.aurora.href}?company=${q}`,
+      aurora: `${ETHOLYS_PRODUCTS.aurora.href}/dossie?company=${q}`,
       polaris: `${ETHOLYS_PRODUCTS.polaris.href}?company=${q}`,
       radar: `${ETHOLYS_PRODUCTS.radar.href}?company=${q}`,
-      nido: `${ETHOLYS_PRODUCTS.aurora.href}?company=${q}`,
+      nido: `${ETHOLYS_PRODUCTS.aurora.href}/dossie?company=${q}`,
       rumo: `${ETHOLYS_PRODUCTS.polaris.href}?company=${q}`,
       pulso: `${ETHOLYS_PRODUCTS.radar.href}?company=${q}`,
     },

@@ -12,8 +12,8 @@ Nomes anteriores (NIDO / RUMO / PULSO) redirecionam para estas rotas.
 
 Método partilhado (AURORA e POLARIS): conversa → retrato editável → hipótese aceite → 2–4 apostas → ritmo semanal. Brechas máx. 5, potenciais máx. 3. Não é score de quiz.
 
-RADAR começa com quatro módulos: agricultura, agroindústria, pecuária, carbono. Liga-se a AURORA/POLARIS por `GET /api/radar/bridge` (`/api/pulso/bridge` continua como alias).
+RADAR começa com quatro módulos: agricultura, agroindústria, pecuária, carbono. Liga-se a AURORA/POLARIS por `GET /api/radar/bridge` (`/api/pulso/bridge` continua como alias). Arquitetura, roadmap e fachada agrícola: [etholys-radar.md](./etholys-radar.md).
 
-Contratos AT em `/hub/aurora` (lista) e `/hub/aurora/at/[id]`. POLARIS reusa jornada, diagnóstico, roadmap e coach. RADAR reusa a central de comando (`NexusOpsWorkspace`). Os dossiês hidratam-se a partir de `NexusDiagnosis`, jornada, roadmap e unidades ops — sem apagar retrato já escrito.
+Contratos AT em `/hub/aurora/contratos` (lista) e `/hub/aurora/at/[id]`. A carteira em `/hub/aurora` lista os negócios acompanhados (retrato, hipótese, apostas, ritmo). POLARIS reusa jornada, diagnóstico, roadmap e coach. RADAR agricultura usa a fachada `/api/radar/agriculture` por cima das unidades ops; não mostra a central NEXUS nem o retrato. Os dossiês hidratam-se a partir de `NexusDiagnosis`, jornada, roadmap e unidades ops — sem apagar retrato já escrito.
 
 `/hub/nexus/campo` redireciona para RADAR. Rotas NEXUS antigas continuam a funcionar.

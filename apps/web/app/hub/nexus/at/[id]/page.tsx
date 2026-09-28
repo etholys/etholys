@@ -248,6 +248,9 @@ export default function NexusAtServicePage() {
     ? `/hub/aurora/diagnosis?company=${encodeURIComponent(selectedCompanyId)}&engagement=${encodeURIComponent(id)}`
     : null;
   const continuePlanHref = diagnosisHref ? `${diagnosisHref}&resume=plan` : null;
+  const dossierHref = selectedCompanyId
+    ? `/hub/aurora/dossie?company=${encodeURIComponent(selectedCompanyId)}&engagement=${encodeURIComponent(id)}`
+    : null;
 
   const isSingle = service?.deliveryModel === 'SINGLE';
   const showMultiRoster = usesAtClientRoster(service?.deliveryModel);
@@ -641,7 +644,7 @@ export default function NexusAtServicePage() {
   if (!service) {
     return (
       <div className="space-y-3">
-        <Link href="/hub/aurora" className="inline-flex items-center gap-1 text-sm text-slate-600">
+        <Link href="/hub/aurora/contratos" className="inline-flex items-center gap-1 text-sm text-slate-600">
           <ArrowLeft className="h-4 w-4" /> {es ? 'Volver' : 'Voltar'}
         </Link>
         <p className="text-sm text-red-600">{error || (es ? 'No encontrado' : 'Não encontrado')}</p>
@@ -652,7 +655,7 @@ export default function NexusAtServicePage() {
 return (
     <div className="mx-auto max-w-6xl space-y-4">
       <div>
-        <Link href="/hub/aurora" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
+        <Link href="/hub/aurora/contratos" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
           <ArrowLeft className="h-4 w-4" /> {es ? 'Contratos' : 'Contratos'}
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1069,10 +1072,18 @@ return (
                       )}
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    {dossierHref && (
+                      <Link
+                        href={dossierHref}
+                        className="inline-flex items-center rounded-lg bg-amber-800 px-3.5 py-2 text-sm font-medium text-white hover:bg-amber-900"
+                      >
+                        {es ? 'Abrir dossier' : loc === 'en' ? 'Open dossier' : 'Abrir dossiê'}
+                      </Link>
+                    )}
                     {hasLocalPlanDraft && continuePlanHref && (
                       <Link
                         href={continuePlanHref}
-                        className="inline-flex items-center rounded-lg bg-teal-800 px-3.5 py-2 text-sm font-medium text-white hover:bg-teal-900"
+                        className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
                       >
                         {es ? 'Continuar plan' : 'Continuar plano'}
                       </Link>
@@ -1080,11 +1091,7 @@ return (
                     {diagnosisHref && (
                       <Link
                         href={diagnosisHref}
-                        className={`inline-flex items-center rounded-lg px-3.5 py-2 text-sm font-medium ${
-                          hasLocalPlanDraft
-                            ? 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50'
-                            : 'bg-teal-800 text-white hover:bg-teal-900'
-                        }`}
+                        className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
                       >
                         {hasLocalDx || hasLocalPlanDraft
                           ? es

@@ -1,5 +1,21 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import { parseCompanySectorIds, normalizeSectorIdList } from './nexus-economic-sectors';
+import { listEngagementsForTenant } from './nexus-at';
+import {
+  AURORA_STAGE_ORDER,
+  auroraMethodStage,
+  collectAttendedBusinesses,
+  type AuroraPortfolioItem,
+} from './aurora-portfolio';
+
+export {
+  AURORA_RHYTHM_STALE_MS,
+  AURORA_STAGE_ORDER,
+  auroraMethodStage,
+  collectAttendedBusinesses,
+} from './aurora-portfolio';
+export type { AuroraAttendedBusiness, AuroraMethodStage, AuroraPortfolioItem } from './aurora-portfolio';
 
 export type GapOrPotential = { text: string; evidence?: string };
 
@@ -175,6 +191,13 @@ export async function loadDossier(companyId: string) {
   };
 }
 
+/** Junta chaves novas sem apagar beats da conversa nem o fio do POLARIS. */
+export function mergeInterviewJson(prev: unknown, patch: Record<string, unknown>): Record<string, unknown> {
+  const base =
+    prev && typeof prev === 'object' && !Array.isArray(prev) ? { ...(prev as Record<string, unknown>) } : {};
+  return { ...base, ...patch };
+}
+
 export async function upsertDossier(
   companyId: string,
   userId: string,
@@ -184,12 +207,22 @@ export async function upsertDossier(
     hypothesisAccepted?: boolean;
     gaps?: GapOrPotential[];
     potentials?: GapOrPotential[];
-    interviewJson?: Record<string, string>;
+    interviewJson?: Record<string, unknown> | Record<string, string>;
     pulsoModule?: string | null;
   }
 ) {
   const gaps = (body.gaps || []).slice(0, 5);
   const potentials = (body.potentials || []).slice(0, 3);
+  let interviewJson: Prisma.InputJsonValue | undefined;
+  if (body.interviewJson) {
+    const prev = await prisma.businessDossier.findUnique({
+      where: { companyId },
+      select: { interviewJson: true },
+    });
+    interviewJson = JSON.parse(
+      JSON.stringify(mergeInterviewJson(prev?.interviewJson, body.interviewJson as Record<string, unknown>))
+    ) as Prisma.InputJsonValue;
+  }
   return prisma.businessDossier.upsert({
     where: { companyId },
     create: {
@@ -199,7 +232,7 @@ export async function upsertDossier(
       hypothesisAccepted: Boolean(body.hypothesisAccepted),
       gapsJson: gaps,
       potentialsJson: potentials,
-      interviewJson: body.interviewJson || {},
+      interviewJson: interviewJson ?? {},
       pulsoModule: body.pulsoModule || null,
       updatedByUserId: userId,
     },
@@ -209,7 +242,7 @@ export async function upsertDossier(
       hypothesisAccepted: body.hypothesisAccepted,
       gapsJson: body.gaps ? gaps : undefined,
       potentialsJson: body.potentials ? potentials : undefined,
-      interviewJson: body.interviewJson,
+      interviewJson,
       pulsoModule: body.pulsoModule === undefined ? undefined : body.pulsoModule,
       updatedByUserId: userId,
     },
@@ -266,4 +299,73 @@ export function draftPortraitFromInterview(answers: Record<string, string>, loca
     gaps: stuck ? [{ text: stuck, evidence: 'conversa' }] : [],
     potentials: works ? [{ text: works, evidence: 'conversa' }] : [],
   };
+}
+
+export async function loadAuroraPortfolio(tenantCompanyIds: string[]): Promise<AuroraPortfolioItem[]> {
+  const engagements = await listEngagementsForTenant(tenantCompanyIds);
+  const businesses = collectAttendedBusinesses(engagements).slice(0, 80);
+  const ids = businesses.map((b) => b.companyId);
+  if (ids.length === 0) return [];
+
+  const [dossiers, bets, notes] = await Promise.all([
+    prisma.businessDossier.findMany({
+      where: { companyId: { in: ids } },
+      select: { companyId: true, portraitText: true, hypothesisAccepted: true },
+    }),
+    prisma.businessBet.findMany({
+      where: { companyId: { in: ids }, status: { notIn: ['done', 'dropped'] } },
+      select: { companyId: true },
+    }),
+    prisma.businessRhythmNote.findMany({
+      where: { companyId: { in: ids } },
+      orderBy: { createdAt: 'desc' },
+      take: 400,
+      select: { companyId: true, createdAt: true, nextStep: true, happened: true },
+    }),
+  ]);
+
+  const dossierByCompany = new Map(dossiers.map((d) => [d.companyId, d]));
+  const openBetsByCompany = new Map<string, number>();
+  for (const bet of bets) {
+    openBetsByCompany.set(bet.companyId, (openBetsByCompany.get(bet.companyId) || 0) + 1);
+  }
+  const rhythmByCompany = new Map<string, { createdAt: Date; nextStep: string; happened: string }>();
+  for (const note of notes) {
+    if (!rhythmByCompany.has(note.companyId)) rhythmByCompany.set(note.companyId, note);
+  }
+
+  const now = new Date();
+  const items: AuroraPortfolioItem[] = businesses.map((b) => {
+    const dossier = dossierByCompany.get(b.companyId);
+    const portraitText = dossier?.portraitText?.trim() || '';
+    const last = rhythmByCompany.get(b.companyId);
+    const openBetCount = openBetsByCompany.get(b.companyId) || 0;
+    const hasPortrait = Boolean(portraitText);
+    const hypothesisAccepted = Boolean(dossier?.hypothesisAccepted);
+    return {
+      ...b,
+      hasPortrait,
+      hypothesisAccepted,
+      openBetCount,
+      lastRhythmAt: last?.createdAt.toISOString() ?? null,
+      lastRhythmNext: (last?.nextStep || last?.happened || '').trim(),
+      portraitPreview: portraitText.slice(0, 180),
+      stage: auroraMethodStage({
+        hasPortrait,
+        hypothesisAccepted,
+        openBetCount,
+        lastRhythmAt: last?.createdAt ?? null,
+        now,
+      }),
+    };
+  });
+
+  items.sort((a, b) => {
+    const stageDiff = AURORA_STAGE_ORDER[a.stage] - AURORA_STAGE_ORDER[b.stage];
+    if (stageDiff !== 0) return stageDiff;
+    const aTime = a.lastRhythmAt ? new Date(a.lastRhythmAt).getTime() : 0;
+    const bTime = b.lastRhythmAt ? new Date(b.lastRhythmAt).getTime() : 0;
+    return aTime - bTime;
+  });
+  return items;
 }

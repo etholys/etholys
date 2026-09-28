@@ -79,8 +79,12 @@ export function ProductAppShell({
             </Link>
           </div>
           <nav className="flex-1 space-y-1 p-3">
-            {nav.map((item) => {
-              const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            {(() => {
+              const match = nav
+                .filter((n) => pathname === n.href || pathname?.startsWith(`${n.href}/`))
+                .sort((a, b) => b.href.length - a.href.length)[0];
+              return nav.map((item) => {
+              const active = match?.href === item.href;
               return (
                 <Link
                   key={item.href}
@@ -93,7 +97,8 @@ export function ProductAppShell({
                   {item.label}
                 </Link>
               );
-            })}
+              });
+            })()}
           </nav>
         </aside>
         <main className="sys-canvas ml-60 min-h-screen flex-1 overflow-auto p-6">{children}</main>
