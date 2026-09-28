@@ -1,13 +1,13 @@
 /**
  * Família de desenvolvimento Etholys — três produtos, um método.
- * Licença atual: NEXUS cobre NIDO + RUMO + PULSO (SKU próprio do PULSO vem depois).
+ * Licença atual: NEXUS cobre AURORA + POLARIS + RADAR (SKU próprio do RADAR vem depois).
  */
 
 export const ETHOLYS_PRODUCTS = {
-  nido: {
-    id: 'nido' as const,
-    name: 'NIDO',
-    href: '/hub/nido',
+  aurora: {
+    id: 'aurora' as const,
+    name: 'AURORA',
+    href: '/hub/aurora',
     license: 'NEXUS' as const,
     tagline: {
       es: 'Incubadora virtual — técnicos, consultores e programas acompañan negocios.',
@@ -15,10 +15,10 @@ export const ETHOLYS_PRODUCTS = {
       en: 'Virtual incubator — technicians, consultants and programs accompany businesses.',
     },
   },
-  rumo: {
-    id: 'rumo' as const,
-    name: 'RUMO',
-    href: '/hub/rumo',
+  polaris: {
+    id: 'polaris' as const,
+    name: 'POLARIS',
+    href: '/hub/polaris',
     license: 'NEXUS' as const,
     tagline: {
       es: 'Mapa de autodesarrollo — el negocio se entiende y se mueve solo, con IA.',
@@ -26,10 +26,10 @@ export const ETHOLYS_PRODUCTS = {
       en: 'Self-development map — the business understands itself and moves with AI.',
     },
   },
-  pulso: {
-    id: 'pulso' as const,
-    name: 'PULSO',
-    href: '/hub/pulso',
+  radar: {
+    id: 'radar' as const,
+    name: 'RADAR',
+    href: '/hub/radar',
     license: 'NEXUS' as const,
     tagline: {
       es: 'Digitalización productiva — datos, WhatsApp, alertas y automatización.',
@@ -41,7 +41,7 @@ export const ETHOLYS_PRODUCTS = {
 
 export type EtholysProductId = keyof typeof ETHOLYS_PRODUCTS;
 
-export const PULSO_MODULES = [
+export const RADAR_MODULES = [
   {
     id: 'agriculture',
     es: 'Agricultura',
@@ -88,7 +88,11 @@ export const PULSO_MODULES = [
   },
 ] as const;
 
-export type PulsoModuleId = (typeof PULSO_MODULES)[number]['id'];
+export type RadarModuleId = (typeof RADAR_MODULES)[number]['id'];
+/** @deprecated usar RADAR_MODULES */
+export const PULSO_MODULES = RADAR_MODULES;
+/** @deprecated usar RadarModuleId */
+export type PulsoModuleId = RadarModuleId;
 
 export const INTERVIEW_BEATS = [
   {
@@ -124,6 +128,9 @@ export const INTERVIEW_BEATS = [
 ] as const;
 
 export const PRODUCT_HREF_TO_LICENSE: Record<string, 'NEXUS'> = {
+  '/hub/aurora': 'NEXUS',
+  '/hub/polaris': 'NEXUS',
+  '/hub/radar': 'NEXUS',
   '/hub/nido': 'NEXUS',
   '/hub/rumo': 'NEXUS',
   '/hub/pulso': 'NEXUS',

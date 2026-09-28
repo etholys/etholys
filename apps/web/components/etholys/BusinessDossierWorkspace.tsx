@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { INTERVIEW_BEATS } from '@/lib/etholys-products';
 
-type Mode = 'nido' | 'rumo';
+type Mode = 'aurora' | 'polaris';
 type Item = { text: string; evidence?: string };
 type Bet = { id: string; title: string; why: string; indicator: string | null; status: string };
 type Note = { id: string; happened: string; blocked: string; nextStep: string; createdAt: string };
@@ -165,9 +165,9 @@ export function BusinessDossierWorkspace({ mode }: { mode: Mode }) {
   const copy =
     loc === 'es'
       ? {
-          title: mode === 'nido' ? 'Dossier del negocio' : 'Mapa del negocio',
+          title: mode === 'aurora' ? 'Dossier del negocio' : 'Mapa del negocio',
           line:
-            mode === 'nido'
+            mode === 'aurora'
               ? 'El técnico escucha, corrige el retrato y acepta la hipótesis. Sin eso no hay apuestas.'
               : 'Conversá, leé el retrato, aceptá la hipótesis y mové 2 a 4 apuestas.',
           talk: 'Conversación',
@@ -182,9 +182,9 @@ export function BusinessDossierWorkspace({ mode }: { mode: Mode }) {
         }
       : loc === 'en'
         ? {
-            title: mode === 'nido' ? 'Business dossier' : 'Business map',
+            title: mode === 'aurora' ? 'Business dossier' : 'Business map',
             line:
-              mode === 'nido'
+              mode === 'aurora'
                 ? 'The technician listens, corrects the portrait and accepts the hypothesis. No bets without that.'
                 : 'Talk, read the portrait, accept the hypothesis, and move 2 to 4 bets.',
             talk: 'Conversation',
@@ -198,9 +198,9 @@ export function BusinessDossierWorkspace({ mode }: { mode: Mode }) {
             save: 'Save portrait',
           }
         : {
-            title: mode === 'nido' ? 'Dossiê do negócio' : 'Mapa do negócio',
+            title: mode === 'aurora' ? 'Dossiê do negócio' : 'Mapa do negócio',
             line:
-              mode === 'nido'
+              mode === 'aurora'
                 ? 'O técnico escuta, corrige o retrato e aceita a hipótese. Sem isso não há apostas.'
                 : 'Conversa, lê o retrato, aceita a hipótese e move 2 a 4 apostas.',
             talk: 'Conversa',

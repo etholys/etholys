@@ -15,7 +15,8 @@ Documentação detalhada para implementação. O mapa geral do ecossistema está
 | ATLAS | — | Ver `ETHOLYS_Arquitectura_v2.md` |
 | SIEP | — | Ver `ETHOLYS_Arquitectura_v2.md` + `etholys-web/.project_instructions.md` |
 | **FundHub** (captação) | [etholys-fundhub.md](./etholys-fundhub.md) | ✅ v1.0 (set/2026) — F0–F9 no código |
-| NEXUS | — | Ver `ETHOLYS_Arquitectura_v2.md` + código em `apps/web/lib/nexus-*` |
+| **AURORA / POLARIS / RADAR** (desenvolvimento) | [etholys-aurora-polaris-radar.md](./etholys-aurora-polaris-radar.md) | ✅ nomes + dossiê + 4 módulos RADAR (set/2026) |
+| NEXUS | — | Legado: código `apps/web/lib/nexus-*`; AT em `/hub/nexus/at` até AURORA absorver |
 | PRISM | — | Ver `ETHOLYS_Arquitectura_v2.md` |
 
 **Agentes:** para qualquer tarefa FORGE, ler **[forge-ead.md](./forge-ead.md)** na íntegra antes de alterar schema, APIs ou UI.

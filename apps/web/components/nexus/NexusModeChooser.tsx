@@ -8,7 +8,7 @@ import { ETHOLYS_PRODUCTS } from '@/lib/etholys-products';
 export function NexusModeChooser() {
   const { locale } = useApp();
   const L = locale === 'es' || locale === 'en' ? locale : 'pt';
-  const products = [ETHOLYS_PRODUCTS.nido, ETHOLYS_PRODUCTS.rumo, ETHOLYS_PRODUCTS.pulso];
+  const products = [ETHOLYS_PRODUCTS.aurora, ETHOLYS_PRODUCTS.polaris, ETHOLYS_PRODUCTS.radar];
 
   return (
     <section className="relative overflow-hidden rounded-3xl bg-[#0c1222] text-white shadow-xl">

@@ -17,6 +17,7 @@
 | **[architecture/lab-anvil.md](./architecture/lab-anvil.md)** | **Lab ANVIL — agente de engenharia interno (Cursor/Abacus Lab)** |
 | **[architecture/etholys-billing.md](./architecture/etholys-billing.md)** | **Billing — licenças, faturas Etholys, Stripe Checkout/Invoicing** |
 | **[architecture/etholys-fundhub.md](./architecture/etholys-fundhub.md)** | **FundHub — captação: evidência oficial, pipeline, proposta** |
+| **[architecture/etholys-aurora-polaris-radar.md](./architecture/etholys-aurora-polaris-radar.md)** | **AURORA / POLARIS / RADAR — incubadora, mapa, digitalização produtiva** |
 | **[MEET-JITSI-CONTABO.md](./MEET-JITSI-CONTABO.md)** | **Subir Jitsi no Contabo (`meet.etholys.com`)** |
 | **[MEET-VPS-JIBRI.md](./MEET-VPS-JIBRI.md)** | **VPS dedicado + Jibri → R2 / webhook** |
 

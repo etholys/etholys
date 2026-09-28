@@ -187,9 +187,9 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
     },
     {
       key: 'mine',
-      href: withNet('/hub/pulso'),
+      href: withNet('/hub/radar'),
       icon: Radio,
-      label: 'PULSO',
+      label: 'RADAR',
       active: !isAtClientDiagnosis && pathIn(NEXUS_MINE_PATHS),
       tone: 'mine' as const,
     },

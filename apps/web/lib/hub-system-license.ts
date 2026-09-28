@@ -7,6 +7,9 @@ export const HUB_SYSTEM_ID_TO_LICENSE_KEY: Record<string, WorkspaceSystemKey> = 
   SIEP: 'SIEP',
   FUNDHUB: 'FUNDHUB',
   NEXUS: 'NEXUS',
+  AURORA: 'NEXUS',
+  POLARIS: 'NEXUS',
+  RADAR: 'NEXUS',
   NIDO: 'NEXUS',
   RUMO: 'NEXUS',
   PULSO: 'NEXUS',
@@ -18,12 +21,20 @@ export const LICENSE_KEY_TO_HREF: Record<WorkspaceSystemKey, string> = {
   ATLAS: '/hub/atlas',
   SIEP: '/hub/siep',
   FUNDHUB: '/hub/fundhub',
-  NEXUS: '/hub/nido',
+  NEXUS: '/hub/aurora',
   FORGE: '/hub/forge',
   PRISM: '/hub/prism',
 };
 
-const EXTRA_NEXUS_HREFS = ['/hub/nido', '/hub/rumo', '/hub/pulso', '/hub/nexus'];
+const EXTRA_NEXUS_HREFS = [
+  '/hub/aurora',
+  '/hub/polaris',
+  '/hub/radar',
+  '/hub/nido',
+  '/hub/rumo',
+  '/hub/pulso',
+  '/hub/nexus',
+];
 
 export function hubSystemIdToLicenseKey(systemId: string): WorkspaceSystemKey | null {
   return HUB_SYSTEM_ID_TO_LICENSE_KEY[systemId.toUpperCase()] ?? null;

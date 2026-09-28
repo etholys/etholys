@@ -1,13 +1,15 @@
 'use client';
 
-import { Suspense } from 'react';
-import { Loader2 } from 'lucide-react';
-import { BusinessDossierWorkspace } from '@/components/etholys/BusinessDossierWorkspace';
+import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function RumoPage() {
-  return (
-    <Suspense fallback={<Loader2 className="mx-auto mt-20 h-8 w-8 animate-spin text-teal-700" />}>
-      <BusinessDossierWorkspace mode="rumo" />
-    </Suspense>
-  );
+/** Nomes antigos: RUMO → POLARIS */
+export default function RumoRedirect() {
+  const router = useRouter();
+  const search = useSearchParams();
+  useEffect(() => {
+    const q = search.toString();
+    router.replace(`/hub/polaris${q ? `?${q}` : ''}`);
+  }, [router, search]);
+  return null;
 }
