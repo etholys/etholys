@@ -104,7 +104,7 @@ export function ProductAppShell({
             })()}
           </nav>
         </aside>
-        <main className="sys-canvas ml-60 min-h-screen flex-1 overflow-auto p-6">{children}</main>
+        <main className="sys-canvas relative z-10 ml-60 min-h-screen min-w-0 flex-1 overflow-auto p-6">{children}</main>
       </div>
     </SystemLicenseGate>
   );
