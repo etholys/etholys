@@ -1,19 +1,15 @@
 'use client';
 
-import { Suspense } from 'react';
-import { Loader2 } from 'lucide-react';
-import { NexusOpsWorkspace } from '@/components/nexus/NexusOpsWorkspace';
+import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function NexusCampoPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-[40vh] items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-teal-700" />
-        </div>
-      }
-    >
-      <NexusOpsWorkspace />
-    </Suspense>
-  );
+/** A central de comando passou para PULSO. */
+export default function NexusCampoRedirect() {
+  const router = useRouter();
+  const search = useSearchParams();
+  useEffect(() => {
+    const q = search.toString();
+    router.replace(`/hub/pulso${q ? `?${q}` : ''}`);
+  }, [router, search]);
+  return null;
 }

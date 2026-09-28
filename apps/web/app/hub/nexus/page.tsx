@@ -235,7 +235,7 @@ function NexusHomeInner() {
             </div>
           )}
 
-          <NexusModeChooser withNet={withNet} openAtCases={openAtCases} />
+          <NexusModeChooser />
 
           {data.mode === 'company' && data.companyId ? (
             <NexusModulePulse

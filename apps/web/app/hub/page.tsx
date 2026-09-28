@@ -8,9 +8,12 @@ import { useApp } from '@/app/providers';
 import type { Locale } from '@/lib/i18n';
 import Link from 'next/link';
 import {
-  Layers, BarChart3, Sprout, HandCoins, GraduationCap, Cpu, Target, LayoutGrid,
+  Layers, BarChart3, Sprout, HandCoins, Cpu, Target, LayoutGrid,
   LogOut, Globe, ArrowRight, Lock, ExternalLink, BrainCircuit, Video, PenLine, CheckSquare,
   FlaskConical,
+  Egg,
+  Compass,
+  Activity,
 } from 'lucide-react';
 import { isContextSetupMeaningful, type CompanyContextSetup } from '@/lib/company-context-setup';
 import { StateLoading } from '@/components/ui/StateBlocks';
@@ -132,15 +135,39 @@ const systems: HubEntry[] = [
     active: true,
   },
   {
-    id: 'nexus',
-    name: 'NEXUS',
+    id: 'nido',
+    name: 'NIDO',
     tagline: {
-      es: 'Asistencia técnica para el desarrollo de negocios en distintas etapas de madurez',
-      pt: 'Assistência técnica para desenvolvimento de negócios em distintas etapas de maturidade',
-      en: 'Technical assistance for business development across maturity stages',
+      es: 'Incubadora virtual: técnicos y programas acompañan el desarrollo de negocios',
+      pt: 'Incubadora virtual: técnicos e programas acompanham o desenvolvimento de negócios',
+      en: 'Virtual incubator: technicians and programs accompany business development',
     },
-    icon: GraduationCap,
-    href: '/hub/nexus',
+    icon: Egg,
+    href: '/hub/nido',
+    active: true,
+  },
+  {
+    id: 'rumo',
+    name: 'RUMO',
+    tagline: {
+      es: 'Mapa de autodesarrollo del negocio — retrato, apuestas y ritmo, con IA',
+      pt: 'Mapa de autodesenvolvimento do negócio — retrato, apostas e ritmo, com IA',
+      en: 'Self-development map — portrait, bets and weekly rhythm, with AI',
+    },
+    icon: Compass,
+    href: '/hub/rumo',
+    active: true,
+  },
+  {
+    id: 'pulso',
+    name: 'PULSO',
+    tagline: {
+      es: 'Digitalización productiva: datos, WhatsApp, alertas y automatización',
+      pt: 'Digitalização produtiva: dados, WhatsApp, alertas e automatização',
+      en: 'Productive digitalization: data, WhatsApp, alerts and automation',
+    },
+    icon: Activity,
+    href: '/hub/pulso',
     active: true,
   },
   {

@@ -7,6 +7,9 @@ export const HUB_SYSTEM_ID_TO_LICENSE_KEY: Record<string, WorkspaceSystemKey> = 
   SIEP: 'SIEP',
   FUNDHUB: 'FUNDHUB',
   NEXUS: 'NEXUS',
+  NIDO: 'NEXUS',
+  RUMO: 'NEXUS',
+  PULSO: 'NEXUS',
   FORGE: 'FORGE',
   PRISM: 'PRISM',
 };
@@ -15,10 +18,12 @@ export const LICENSE_KEY_TO_HREF: Record<WorkspaceSystemKey, string> = {
   ATLAS: '/hub/atlas',
   SIEP: '/hub/siep',
   FUNDHUB: '/hub/fundhub',
-  NEXUS: '/hub/nexus',
+  NEXUS: '/hub/nido',
   FORGE: '/hub/forge',
   PRISM: '/hub/prism',
 };
+
+const EXTRA_NEXUS_HREFS = ['/hub/nido', '/hub/rumo', '/hub/pulso', '/hub/nexus'];
 
 export function hubSystemIdToLicenseKey(systemId: string): WorkspaceSystemKey | null {
   return HUB_SYSTEM_ID_TO_LICENSE_KEY[systemId.toUpperCase()] ?? null;
@@ -83,6 +88,9 @@ export function userHasLicenseForHref(
   if (opts?.canManage) {
     const catalog = opts.companyLicensedSystems;
     if (catalog === null || catalog === undefined) return true;
+    if (EXTRA_NEXUS_HREFS.some((p) => href === p || href.startsWith(`${p}/`))) {
+      return catalog.includes('NEXUS');
+    }
     for (const [key, keyHref] of Object.entries(LICENSE_KEY_TO_HREF)) {
       if (href === keyHref || href.startsWith(`${keyHref}/`)) {
         return catalog.includes(key as WorkspaceSystemKey);
@@ -91,6 +99,9 @@ export function userHasLicenseForHref(
     return true;
   }
   if (!licensedSystems || licensedSystems.length === 0) return false;
+  if (EXTRA_NEXUS_HREFS.some((p) => href === p || href.startsWith(`${p}/`))) {
+    return licensedSystems.includes('NEXUS');
+  }
   for (const [key, keyHref] of Object.entries(LICENSE_KEY_TO_HREF)) {
     if (href === keyHref || href.startsWith(`${keyHref}/`)) {
       return licensedSystems.includes(key as WorkspaceSystemKey);

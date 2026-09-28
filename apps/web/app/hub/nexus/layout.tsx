@@ -187,10 +187,9 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
     },
     {
       key: 'mine',
-      href: withNet('/hub/nexus/campo'),
+      href: withNet('/hub/pulso'),
       icon: Radio,
-      label:
-        locale === 'es' ? 'Central de mando' : locale === 'pt' ? 'Central de comando' : 'Command center',
+      label: 'PULSO',
       active: !isAtClientDiagnosis && pathIn(NEXUS_MINE_PATHS),
       tone: 'mine' as const,
     },

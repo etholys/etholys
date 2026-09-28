@@ -223,6 +223,9 @@ model Company {
   nexusReadings               NexusReading[]
   nexusWhatsappLinks          NexusWhatsappLink[]
   nexusOpsRules               NexusOpsRule[]
+  businessDossier             BusinessDossier?
+  businessBets                BusinessBet[]
+  businessRhythmNotes         BusinessRhythmNote[]
   /// Quem pode usar o Centro de trabalho integrado nesta empresa (não duplica lógica dos sistemas; só espelha APIs).
   integratedWorkspaceAccesses  IntegratedWorkspaceAccess[]
   products                    Product[]
@@ -1905,6 +1908,56 @@ model NexusNetworkMember {
   @@unique([networkId, companyId])
   @@index([companyId])
   @@index([networkId, memberRole])
+}
+
+/// Retrato vivo do negócio — NIDO e RUMO partilham o mesmo dossiê.
+model BusinessDossier {
+  id                  String   @id @default(cuid())
+  companyId           String   @unique
+  portraitText        String   @default("")
+  hypothesis          String   @default("")
+  hypothesisAccepted  Boolean  @default(false)
+  gapsJson            Json     @default("[]")
+  potentialsJson      Json     @default("[]")
+  interviewJson       Json     @default("{}")
+  pulsoModule         String?
+  updatedByUserId     String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([updatedAt])
+}
+
+model BusinessBet {
+  id          String    @id @default(cuid())
+  companyId   String
+  title       String
+  why         String    @default("")
+  ownerLabel  String?
+  dueAt       DateTime?
+  indicator   String?
+  /// proposed | accepted | active | done | dropped
+  status      String    @default("proposed")
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+}
+
+model BusinessRhythmNote {
+  id        String   @id @default(cuid())
+  companyId String
+  happened  String   @default("")
+  blocked   String   @default("")
+  nextStep  String   @default("")
+  source    String   @default("app")
+  createdAt DateTime @default(now())
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, createdAt])
 }
 
 /// Diagnóstico NEXUS persistido (fonte de verdade — não localStorage).
