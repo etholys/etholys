@@ -12,47 +12,18 @@ import {
   type DiscoveryQueryPack,
 } from '@/lib/opportunity/discovery-queries';
 import { FUNDHUB_DISCOVERY_MODEL } from '@/lib/opportunity/fundhub-llm';
+import { formatOpportunityScoutBrief } from '@/lib/opportunity/scout-brief';
 import { enrichAndFilterCandidates } from '@/lib/opportunity/enrich-call';
 import { OFFICIAL_LINK_PROMPT_RULES } from '@/lib/opportunity/official-url';
 import { dropDuplicateFunds, isOpenNowCandidate } from '@/lib/opportunity/scan-filters';
 import type { OpportunityBriefing, ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
-
-const TYPE_MAP: Record<string, string> = {
-  grant: 'Grant',
-  credit: 'Crédito',
-  alliance: 'Aliança',
-  local_expert: 'Técnico local',
-};
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 function briefingLines(b: OpportunityBriefing): string {
-  const kinds = b.kinds.map((k) => TYPE_MAP[k] ?? k).join(', ');
-  const classLabels: Record<string, string> = {
-    direct: 'candidatura directa pela nossa organização',
-    client_bridge: 'fundos para possíveis clientes (nós somos a ponte)',
-    joint: 'apresentação em conjunto / consórcio',
-  };
-  const classes = (b.classifications ?? ['direct'])
-    .map((c) => classLabels[c] ?? c)
-    .join('; ');
-  return [
-    b.scanName ? `Nome da varredura: ${b.scanName}` : '',
-    `Temas: ${b.themes.join(', ') || 'inferir'}`,
-    `Países elegíveis desejados: ${b.countries.join(', ') || 'inferir'}`,
-    `Tipos: ${kinds}`,
-    b.amountMax != null ? `Montante máximo preferido: ${b.amountMax} USD` : '',
-    b.amountMin != null ? `Montante mínimo: ${b.amountMin} USD` : '',
-    b.privateEligible ? 'Elegibilidade: empresas privadas OK' : '',
-    b.reimbursable === false ? 'Só financiamento NÃO reembolsável (grants). Sem empréstimos.' : '',
-    `Classificações a etiquetar: ${classes}`,
-    b.notes ? `Notas: ${b.notes}` : '',
-    b.searchFeedback ? `ORIENTAÇÃO COMPLETA DO UTILIZADOR:\n${b.searchFeedback}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  return formatOpportunityScoutBrief(b);
 }
 
 function isWebSearchEnabled(): boolean {
@@ -97,6 +68,7 @@ Hunt like an operator — wide first, official URL second:
 - For each hit keep it short: official name, funder, official call URL, deadline if seen, who can apply, what it funds (a few lines each). Do not write essays in this pass.
 - At least 15 distinct open calls from at least 8 institutions when they exist. At most 4 from the same funder.
 - Run every numbered query in THIS pass. They are discovery phrases, not a closed portal list.
+- Ranking notes (Rural Commerce principles, etc.) score matchScore. They must NOT veto a real open call that matches the themes and geography.
 
 ${OFFICIAL_LINK_PROMPT_RULES}`,
       structure: `Convert the research into JSON only. Return { "candidates": [ ... ] }
@@ -215,7 +187,7 @@ export async function discoverOpportunitiesOnline(opts: {
     const sharedBrief = [
       `BRIEFING (this is the search intent — obey it, then search the open web):\n${briefingLines(opts.briefing)}`,
       `\nLEARNING (skip-list only — do not copy catalog institutions as the theme):\n${opts.learningContext}`,
-      `\nEXISTING (do not repeat — find OTHER calls from OTHER institutions):\n${existingBlock}`,
+      `\nALREADY ON THE DESK OR IN CATALOG (do not repeat — find OTHER official calls from OTHER institutions):\n${existingBlock}`,
       extraClean ? `\nOPTIONAL HINTS (not a closed source list):\n${extraClean}` : '',
       focusHint,
     ].join('');

@@ -11,6 +11,23 @@ import { applyBriefingDiversity } from '@/lib/opportunity/discovery-queries';
 import { dropDuplicateFunds } from '@/lib/opportunity/scan-filters';
 import type { OpportunityBriefing, ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
 
+function uniqueNameInstitution(
+  items: Array<{ name: string; institution?: string }>,
+): Array<{ name: string; institution: string }> {
+  const seen = new Set<string>();
+  const out: Array<{ name: string; institution: string }> = [];
+  for (const item of items) {
+    const name = item.name?.trim();
+    if (!name) continue;
+    const institution = (item.institution || '').trim();
+    const key = `${name.toLowerCase()}|${institution.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name, institution });
+  }
+  return out;
+}
+
 async function setScanProgress(runId: string, progressPct: number, phase: string) {
   const pct = Math.max(0, Math.min(99, Math.round(progressPct)));
   await prisma.fundhubDiscoveryRun
@@ -91,20 +108,25 @@ export async function runOpportunityScan(opts: {
     }
   }
 
+  const alreadyInInbox = [...inbox.pending, ...inbox.later];
+  const deskSkip = uniqueNameInstitution([
+    ...existingFunds,
+    ...alreadyInInbox.map((c) => ({ name: c.name, institution: c.institution })),
+  ]);
+
   await setScanProgress(run.id, 18, 'starting_discovery');
 
   const discovery = await discoverOpportunitiesOnline({
     briefing,
     learningContext,
-    existingFunds,
+    existingFunds: deskSkip,
     optionalExtraContext: optionalExtraContext || undefined,
     scanFocus,
     onProgress: (pct, phase) => setScanProgress(run.id, pct, phase),
   });
 
-  const alreadyInInbox = [...inbox.pending, ...inbox.later];
   let candidates = applyBriefingDiversity(
-    dropDuplicateFunds(discovery.candidates, [...existingFunds, ...alreadyInInbox]),
+    dropDuplicateFunds(discovery.candidates, deskSkip),
     briefing,
   );
   if (candidates.length === 0) {

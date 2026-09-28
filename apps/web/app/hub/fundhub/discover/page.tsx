@@ -361,6 +361,7 @@ export default function OpportunityDiscoverPage() {
             errorCount?: number;
             progressPct?: number | null;
             phase?: string | null;
+            errorsJson?: string | null;
           };
           pendingOpen?: ScanCandidate[];
           pendingReference?: ScanCandidate[];
@@ -384,6 +385,13 @@ export default function OpportunityDiscoverPage() {
           setScanPercent(100);
           setScanUi('done');
           const n = pd.run?.created ?? 0;
+          let fallbackReason = '';
+          try {
+            const ej = pd.run?.errorsJson ? JSON.parse(pd.run.errorsJson) as { fallbackReason?: string } : {};
+            fallbackReason = ej.fallbackReason ?? '';
+          } catch {
+            fallbackReason = '';
+          }
           const focusLabel =
             focus === 'open_now'
               ? t('Abertos agora', 'Abiertos ahora', 'Open now')
@@ -399,11 +407,17 @@ export default function OpportunityDiscoverPage() {
                   `${focusLabel}: ${n} candidatos${modeNote}.`,
                   `${focusLabel}: ${n} candidates${modeNote}.`,
                 )
-              : t(
-                  'Pesquisa concluída sem convocatórias novas. Tente alargar temas ou Mapear programas.',
-                  'Búsqueda terminada sin convocatorias nuevas. Amplíe temas o mapee programas.',
-                  'Search finished with no new calls. Widen themes or map programs.',
-                ),
+              : fallbackReason.startsWith('web_failed')
+                ? t(
+                    'A pesquisa web falhou. Tente de novo daqui a um minuto.',
+                    'La búsqueda web falló. Intente de nuevo en un minuto.',
+                    'Web search failed. Try again in a minute.',
+                  )
+                : t(
+                    'Pesquisa concluída sem convocatórias novas — as que já estão na mesa foram ignoradas de propósito. Guarde ou descarte as antigas, ou alargue temas.',
+                    'Búsqueda terminada sin convocatorias nuevas: las que ya están en la mesa se ignoraron a propósito. Guarde o descarte las antiguas, o amplíe temas.',
+                    'Search finished with no new calls — items already on the desk were skipped on purpose. Save or discard the old ones, or widen themes.',
+                  ),
           );
           finished = true;
           break;
