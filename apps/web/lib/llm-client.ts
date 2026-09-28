@@ -318,7 +318,9 @@ function extractTextAndQueries(data: {
 }
 
 export async function llmGenerateContent(opts: LlmGenerateOptions): Promise<LlmGenerateResult> {
-  const models = opts.model ? [opts.model] : getLlmModelCandidates();
+  const preferred = opts.model?.trim();
+  const pool = getLlmModelCandidates();
+  const models = preferred ? [preferred, ...pool.filter((m) => m !== preferred)] : pool;
   const failures: string[] = [];
   let lastError: Error | null = null;
 
@@ -329,11 +331,9 @@ export async function llmGenerateContent(opts: LlmGenerateOptions): Promise<LlmG
       } catch (e: unknown) {
         const err = e instanceof Error ? e : new Error(String(e));
         lastError = err;
-        // Billing / auth: não há fallback útil — propaga (mensagem já pública).
-        if (err instanceof LlmProviderError && (err.code === 'billing' || err.code === 'auth')) {
+        if (err instanceof LlmProviderError && err.code === 'auth') {
           throw err;
         }
-        if (isLlmBillingError(err)) throw err;
         if (/API key|authentication_error|invalid.?api.?key/i.test(err.message)) throw err;
 
         const detail =
@@ -342,7 +342,11 @@ export async function llmGenerateContent(opts: LlmGenerateOptions): Promise<LlmG
             : err.message.slice(0, 200);
         failures.push(`${model}: ${detail}`);
 
-        if (isModelNotFoundError(err.message) || isModelNotFoundError(detail)) break;
+        const billing =
+          (err instanceof LlmProviderError && err.code === 'billing') || isLlmBillingError(err);
+        if (billing || isModelNotFoundError(err.message) || isModelNotFoundError(detail)) {
+          break;
+        }
 
         if (shouldRetrySameModel(0, err.message) && attempt < 2) {
           await sleep(1500 * (attempt + 1));
@@ -587,7 +591,7 @@ export async function llmCompleteWithWebSearch(
       return { text, searchQueries: searchQueries ?? [] };
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
-      if (lastError instanceof LlmProviderError && (lastError.code === 'billing' || lastError.code === 'auth')) {
+      if (lastError instanceof LlmProviderError && lastError.code === 'auth') {
         throw lastError;
       }
       if (/API key|authentication_error|invalid.?api.?key/i.test(lastError.message)) throw lastError;

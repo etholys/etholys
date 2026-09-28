@@ -115,7 +115,7 @@ Reutilizar `FundhubAlert` + `syncDeadlineNotifications`. F5 adiciona tipo `oppor
 | GET/POST/DELETE | `/api/opportunity/sources` | mesa | Portais oficiais + extras do utilizador |
 | GET | `/api/opportunity/catalog?drawer=&export=1` | mesa | Gavetas + CSV |
 
-**Modelo de descoberta:** Claude Fable 5.1 (`claude-fable-5-1`) na varredura, ingestão do edital e follow-through da página oficial. Mythos 5.1 não se usa (acesso Glasswing; o FundHub não precisa).
+**Modelo de descoberta:** Claude Fable 5.1 na varredura aberta, com fallback automático para Claude Sonnet 4.6 se a conta Anthropic recusar o Fable (créditos). Ingestão/estrutura usam Sonnet quando o Fable não está disponível. Mythos 5.1 não se usa.
 
 **Regra:** `open_now` **nunca** cai no fallback de conhecimento (inventa agências). Sem URL oficial da convocatória → o candidato não entra. A varredura corre **pacotes paralelos**: internet aberta → instrumentos → follow-through oficial. Agregadores e notícias servem para descobrir; `callUrl` tem de ser a página do financiador. O que já está na mesa/catálogo entra como skip-list: a IA tem de ir buscar **outras** instituições. Notas de briefing (ex. princípios Rural Commerce) pontuam o fit; não vetam a busca.
 
