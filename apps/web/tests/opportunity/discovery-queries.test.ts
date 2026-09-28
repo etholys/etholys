@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   applyBriefingDiversity,
   briefingRequestsIfad,
+  buildDiscoveryQueryPacks,
   buildDiscoverySearchQueries,
   detectDiscoveryRegions,
   dropUnrequestedIfad,
@@ -20,7 +21,7 @@ test('regions from the screenshot briefing', () => {
   assert.ok(regions.includes('eu'));
 });
 
-test('open-now queries hit official portals, not aggregators', () => {
+test('open-now queries search the open web first, then official portals', () => {
   const queries = buildDiscoverySearchQueries({
     themes: ['desenvolvimento rural', 'economia verde', 'economia circular', 'digitalização'],
     countries: ['Brasil', 'Estados Unidos', 'América Latina', 'Europa'],
@@ -28,6 +29,9 @@ test('open-now queries hit official portals, not aggregators', () => {
   });
   assert.ok(queries.length >= 8);
   const blob = queries.join('\n');
+  assert.match(blob, /convocatoria abierta/);
+  assert.match(blob, /private foundation|fundação privada/);
+  assert.match(blob, /cooperación técnica|technical cooperation/);
   assert.match(blob, /funding-tenders\.europa\.eu/);
   assert.match(blob, /grants\.gov/);
   assert.match(blob, /finep\.gov\.br/);
@@ -81,6 +85,20 @@ test('Horizonte-style portal list is not a request for IFAD', () => {
   );
 });
 
+test('open-web pack is first and is not a closed site: list', () => {
+  const packs = buildDiscoveryQueryPacks({
+    themes: ['economia circular'],
+    countries: ['Brasil', 'América Latina'],
+    kinds: ['grant'],
+  });
+  assert.equal(packs[0]?.id, 'open_web');
+  assert.equal(packs.some((p) => p.id === 'instruments'), true);
+  assert.equal(packs.some((p) => p.id === 'official'), true);
+  const openBlob = packs[0]?.queries.join('\n') ?? '';
+  assert.match(openBlob, /convocatoria abierta/);
+  assert.equal(/^site:/m.test(openBlob), false);
+});
+
 test('Brazil-only rural briefing still searches LATAM portals and foundations', () => {
   const regions = detectDiscoveryRegions(['Brasil'], ['desenvolvimento rural']);
   assert.ok(regions.includes('br'));
@@ -98,7 +116,7 @@ test('Brazil-only rural briefing still searches LATAM portals and foundations', 
   assert.equal(/ifad\.org/.test(blob), false);
 });
 
-test('unrequested IFAD cards are dropped; two per institution kept', () => {
+test('diversity caps per institution but keeps unrequested IFAD', () => {
   const briefing = {
     themes: ['economia circular', 'digitalização'],
     countries: ['Europa', 'Brasil'],
@@ -115,11 +133,11 @@ test('unrequested IFAD cards are dropped; two per institution kept', () => {
   const dropped = dropUnrequestedIfad(raw, briefing);
   assert.equal(dropped.some((c) => isIfadCandidate(c)), false);
   const diverse = applyBriefingDiversity(raw, briefing);
-  assert.equal(diverse.length, 3);
+  assert.equal(diverse.length, 5);
   assert.equal(diverse.some((c) => c.name === 'LIFE circular'), true);
   assert.equal(diverse.some((c) => c.name === 'LIFE climate'), true);
   assert.equal(diverse.some((c) => c.name === 'FINEP digital'), true);
-  assert.equal(diverse.some((c) => isIfadCandidate(c)), false);
+  assert.equal(diverse.filter((c) => isIfadCandidate(c)).length, 2);
 });
 
 test('user command is the first required search; IFAD portals when asked', () => {

@@ -7,7 +7,7 @@ import { buildLearningContext } from '@/lib/opportunity/scan-context';
 import { fetchSourceSnippets, snippetsToPromptBlock } from '@/lib/opportunity/fetch-sources';
 import { listEtholysCatalogHints, listUserMonitoredUrls } from '@/lib/opportunity/source-catalog';
 import { discoverOpportunitiesOnline } from '@/lib/opportunity/web-discovery';
-import { applyBriefingDiversity, briefingRequestsIfad, isIfadSourceUrl } from '@/lib/opportunity/discovery-queries';
+import { applyBriefingDiversity } from '@/lib/opportunity/discovery-queries';
 import { dropDuplicateFunds } from '@/lib/opportunity/scan-filters';
 import type { OpportunityBriefing, ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
 
@@ -72,15 +72,11 @@ export async function runOpportunityScan(opts: {
           },
         });
 
-  let extraUrls = optionalUrls;
-  if (!briefingRequestsIfad(briefing)) {
-    extraUrls = optionalUrls.filter((u) => !isIfadSourceUrl(u.url));
-  }
+  const extraUrls = optionalUrls;
 
   let optionalExtraContext = '';
   if (catalogHints.length > 0) {
     optionalExtraContext = catalogHints
-      .filter((h) => briefingRequestsIfad(briefing) || !isIfadSourceUrl(h.url))
       .map((h) => `- ${h.name}: ${h.url}${h.tags ? ` (${h.tags})` : ''}`)
       .join('\n');
   }

@@ -71,7 +71,7 @@ export async function enrichAndFilterCandidates(
   scanFocus: ScanFocus,
 ): Promise<ScanCandidate[]> {
   const enriched: ScanCandidate[] = [];
-  const queue = candidates.slice(0, 18);
+  const queue = candidates.slice(0, 24);
   const concurrency = 3;
   let i = 0;
   async function worker() {

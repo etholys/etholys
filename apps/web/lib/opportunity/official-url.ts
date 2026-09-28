@@ -176,13 +176,16 @@ export function candidateHasAcceptableOfficialLink(
 
 export const OFFICIAL_LINK_PROMPT_RULES = `
 LINK + REALITY RULES (MANDATORY — invented programmes are forbidden):
+- Search the OPEN WEB first. Do not limit yourself to a pre-recorded portal list.
+- You MAY discover a call via news, a ministry bulletin, LinkedIn, or even an aggregator. Then you MUST follow through with another search to the FUNDER'S OWN convocatoria / edital page and put THAT URL in callUrl.
 - NEVER invent a fund, agency, programme name, or URL. If you did not see it in a live web-search result, OMIT it.
 - Generic "Programa de apoio a empreendimentos rurais" style names without a cited official call page are invalid.
-- callUrl MUST be the official CONVOCATORIA / call / edital page (the page with deadlines, bases, apply button) — not the institution homepage.
+- callUrl MUST be the official CONVOCATORIA / call / edital page (deadlines, bases, apply) — not the institution homepage, not an aggregator.
 - linkOficial / institutionUrl may be the funder homepage. That is NOT enough by itself for an "open now" result.
 - NEVER use third-party grant aggregators as callUrl or linkOficial (grantbite, fundsforngos, grantwatch, instrumentl, grantstation, opengrants, proposalsforngos).
-- If the call exists only on an aggregator and you cannot find the official page, OMIT the candidate.
-- documents[]: only URLs of official PDFs/Word/Excel you actually saw (bases, anexos, formularios). Do not invent files.
-- sourceUrl must also be official.
+- If you only found an aggregator URL and cannot locate the official page after searching, OMIT the candidate.
+- documents[]: only URLs of official PDFs/Word/Excel you actually saw. Do not invent files.
+- sourceUrl can be the page where you first saw the call; callUrl must still be official.
 - Never invent deadlines. If the official page does not state a date, leave opensAt/closesAt null. Do not use 1 January as a placeholder.
+- Cover many kinds when they match the briefing: local/municipal public funds, national public calls, private foundations, corporate foundations, multilaterals, and technical-cooperation windows.
 `.trim();

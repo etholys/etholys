@@ -9,10 +9,15 @@ function fold(s: string): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
-/** Temas compactos para queries site: — sem inventar sectores. */
+/** Temas compactos para queries — sem inventar sectores. */
 export function themeQueryBlob(themes: string[]): string {
   const parts = themes.map((t) => t.trim()).filter(Boolean).slice(0, 6);
   return parts.join(' OR ') || 'rural OR green OR circular OR digital';
+}
+
+export function countryQueryBlob(countries: string[]): string {
+  const parts = countries.map((c) => c.trim()).filter(Boolean).slice(0, 8);
+  return parts.join(' OR ') || 'América Latina OR Brasil OR global';
 }
 
 export function detectDiscoveryRegions(
@@ -110,71 +115,79 @@ function uniqueQueries(items: string[]): string[] {
   return out;
 }
 
-/** Pacotes regionais — cada um vira uma pesquisa web própria. */
+/** Pacotes: internet aberta primeiro; portais oficiais só para fechar o URL. */
 export function buildDiscoveryQueryPacks(briefing: OpportunityBriefing): DiscoveryQueryPack[] {
   const themes = themeQueryBlob(briefing.themes);
+  const places = countryQueryBlob(briefing.countries);
+  const year = new Date().getFullYear();
   const regions = detectDiscoveryRegions(briefing.countries, briefing.themes);
   const grantHint = briefing.kinds.includes('grant') || briefing.kinds.length === 0;
   const packs: DiscoveryQueryPack[] = [];
 
-  const nationalQueries: string[] = [];
+  const openWeb: string[] = [];
   if (briefing.searchFeedback?.trim()) {
-    nationalQueries.push(briefing.searchFeedback.trim().slice(0, 280));
+    openWeb.push(briefing.searchFeedback.trim().slice(0, 280));
   }
   if (briefing.scanName?.trim()) {
-    nationalQueries.push(`${briefing.scanName.trim()} official call for proposals`);
+    openWeb.push(`${briefing.scanName.trim()} convocatoria abierta OR open call ${year}`);
   }
-  for (const region of ['br', 'us', 'eu'] as const) {
-    if (!regions.includes(region)) continue;
-    nationalQueries.push(...PORTAL_BUILDERS[region](themes).slice(0, 3));
-  }
-  if (nationalQueries.length) {
-    packs.push({
-      id: 'national',
-      label: 'National and EU/US official portals',
-      queries: uniqueQueries(nationalQueries).slice(0, 12),
-    });
-  }
-
-  if (regions.includes('latam')) {
-    packs.push({
-      id: 'latam',
-      label: 'Latin America regional and national official calls',
-      queries: uniqueQueries(PORTAL_BUILDERS.latam(themes)).slice(0, 10),
-    });
-  }
-
-  const globalQ = [
-    ...PORTAL_BUILDERS.global(themes),
-    ...(grantHint ? FOUNDATION_QUERIES(themes) : []),
-    grantHint
-      ? `open grant convocatoria (${themes}) official site:.gov OR site:.gob OR site:europa.eu`
-      : '',
-  ].filter(Boolean);
+  openWeb.push(
+    `${themes} convocatoria abierta ${year} ${places}`,
+    `${themes} edital aberto OR chamada pública prazo ${year} ${places}`,
+    `${themes} open grant "call for proposals" deadline ${year} ${places}`,
+    `${themes} foundation grant OR "private foundation" RFP open ${year} ${places}`,
+    `${themes} cooperación técnica OR "technical cooperation" convocatoria ${year} ${places}`,
+    `${themes} fundo municipal OR estadual OR provincial convocatoria ${places} ${year}`,
+    `${themes} "now open" OR "currently open" grant ${places} ${year}`,
+  );
   packs.push({
-    id: 'global',
-    label: 'Multilateral climate funds and international foundations',
-    queries: uniqueQueries(globalQ).slice(0, 10),
+    id: 'open_web',
+    label: 'Open-web discovery across the whole internet',
+    queries: uniqueQueries(openWeb).slice(0, 10),
   });
 
-  if (briefingRequestsIfad(briefing)) {
-    packs.push({
-      id: 'ifad',
-      label: 'IFAD official calls (requested)',
-      queries: uniqueQueries([
-        `site:ifad.org "call for proposals" (${themes})`,
-        `site:ifad.org/en/w/calls-for-proposal (${themes})`,
-        `site:ifad.org/es/w/calls-for-proposal (${themes})`,
-      ]),
-    });
+  const instruments: string[] = [
+    `public ministry OR gobierno OR "chamada pública" grant ${themes} ${places} ${year}`,
+    `fundação privada OR "corporate foundation" convocatoria ${themes} ${places}`,
+    `GIZ OR AFD OR AECID OR USAID OR JICA convocatoria OR call ${themes} ${year}`,
+    `IDB OR CAF OR FONTAGRO OR "Green Climate Fund" call for proposals ${themes} ${year}`,
+    `cooperativa OR ONG OR "smallholder" grant open ${themes} ${places}`,
+  ];
+  if (grantHint) {
+    instruments.push(`rolling grant OR "always open" funding ${themes} ${places}`);
   }
+  packs.push({
+    id: 'instruments',
+    label: 'Public, private, foundation and cooperation windows',
+    queries: uniqueQueries(instruments).slice(0, 8),
+  });
+
+  const official: string[] = [];
+  for (const region of ['br', 'us', 'eu'] as const) {
+    if (!regions.includes(region)) continue;
+    official.push(...PORTAL_BUILDERS[region](themes).slice(0, 2));
+  }
+  if (regions.includes('latam')) {
+    official.push(...PORTAL_BUILDERS.latam(themes).slice(0, 6));
+  }
+  official.push(...PORTAL_BUILDERS.global(themes).slice(0, 4));
+  if (grantHint) official.push(...FOUNDATION_QUERIES(themes).slice(0, 3));
+  if (briefingRequestsIfad(briefing)) {
+    official.push(`site:ifad.org "call for proposals" (${themes})`);
+    official.push(`site:ifad.org/en/w/calls-for-proposal (${themes})`);
+  }
+  packs.push({
+    id: 'official',
+    label: 'Follow through on official funder domains',
+    queries: uniqueQueries(official).slice(0, 16),
+  });
 
   return packs.filter((p) => p.queries.length > 0);
 }
 
-/** Queries oficiais que o scout DEVE correr — portais, não agregadores. */
+/** Queries que o scout DEVE correr — internet aberta primeiro, portais para fechar o URL. */
 export function buildDiscoverySearchQueries(briefing: OpportunityBriefing): string[] {
-  return uniqueQueries(buildDiscoveryQueryPacks(briefing).flatMap((p) => p.queries)).slice(0, 36);
+  return uniqueQueries(buildDiscoveryQueryPacks(briefing).flatMap((p) => p.queries)).slice(0, 48);
 }
 
 export function isIfadSourceUrl(url: string | null | undefined): boolean {
@@ -273,8 +286,8 @@ export function applyBriefingDiversity<
     matchScore?: number;
   },
 >(candidates: T[], briefing: OpportunityBriefing): T[] {
-  const maxPer = briefingRequestsIfad(briefing) ? 4 : 2;
-  return capPerInstitution(dropUnrequestedIfad(candidates, briefing), maxPer);
+  const maxPer = briefingRequestsIfad(briefing) ? 5 : 3;
+  return capPerInstitution(candidates, maxPer);
 }
 
 /** Demasiado da mesma agência (ex.: 3 IFAD rolling) = pesquisa pobre. */

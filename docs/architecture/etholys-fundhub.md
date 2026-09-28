@@ -1,7 +1,7 @@
 # Etholys FundHub — captação de fundos
 
 **Versão:** 1.0  
-**Data:** 2026-09-24  
+**Data:** 2026-09-27  
 **Status:** F0–F9 em produção; mesa de operador (tabela Em curso, ficha do doador, origem, CSV, portais oficiais)  
 **Público:** product, desenvolvedores, agentes de IA  
 **Licença interna:** `FUNDHUB` (`sys.FUNDHUB`)  
@@ -13,9 +13,9 @@
 
 ## 1. Princípio
 
-> **Menos fundos. Todos oficiais. Cada um com prazo, elegibilidade e caminho até à proposta.**
+> **Muitos fundos reais. Todos com página oficial da convocatória. Cada um com prazo, elegibilidade e caminho até à proposta.**
 
-FundHub não é um agregador tipo GrantWatch nem um GMS de doador tipo Fluxx. É o trabalho institucional de **encontrar convocatórias em fontes oficiais, decidir em equipa e escrever a candidatura** — no mesmo expediente.
+FundHub não é um agregador tipo GrantWatch nem um GMS de doador tipo Fluxx. É o trabalho institucional de **pesquisar a internet aberta, resolver o URL oficial da convocatória, decidir em equipa e escrever a candidatura** — no mesmo expediente.
 
 | Não é | É |
 |-------|---|
@@ -115,7 +115,7 @@ Reutilizar `FundhubAlert` + `syncDeadlineNotifications`. F5 adiciona tipo `oppor
 | GET/POST/DELETE | `/api/opportunity/sources` | mesa | Portais oficiais + extras do utilizador |
 | GET | `/api/opportunity/catalog?drawer=&export=1` | mesa | Gavetas + CSV |
 
-**Regra:** `open_now` **nunca** cai no fallback de conhecimento (inventa agências). Sem página oficial verificável → zero candidatos, não lixo. A varredura corre **pacotes paralelos** (nacional, LATAM, clima/fundações) — não uma única busca que colapsa no IFAD.
+**Regra:** `open_now` **nunca** cai no fallback de conhecimento (inventa agências). Sem página oficial verificável → zero candidatos, não lixo. A varredura corre **pacotes paralelos**: internet aberta → instrumentos (público/privado/fundações/cooperação) → follow-through em portais oficiais. Agregadores e notícias servem para descobrir; `callUrl` tem de ser a convocatória do financiador.
 
 ---
 
