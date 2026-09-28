@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAgricultureBoard, isRadarParcel } from '../../lib/radar/agriculture';
+import { buildAgricultureBoard, decideAgricultureNow, isRadarParcel } from '../../lib/radar/agriculture';
 
 const now = new Date('2026-09-27T12:00:00.000Z');
 
@@ -67,4 +67,46 @@ test('latest irrigation millimetres win over an older reading', () => {
   });
   assert.equal(board.parcels[0].irrigationMm, 12);
   assert.equal(board.parcels[0].alerts.some((a) => a.code === 'stale_book'), false);
+});
+
+test('today decides irrigate before a stale book when moisture is low', () => {
+  const board = buildAgricultureBoard({
+    now,
+    units: [{ id: 'p1', name: 'Norte', areaHa: 2, crop: 'milho', kind: 'parcel' }],
+    entries: [],
+    readings: [
+      { unitId: 'p1', metric: 'soil_moisture', value: 18, recordedAt: new Date('2026-09-27T08:00:00.000Z'), source: 'sensor' },
+    ],
+  });
+  assert.equal(board.decision.code, 'irrigate');
+  assert.equal(board.decision.parcelName, 'Norte');
+  assert.equal(board.parcels[0].nextAction, 'irrigate');
+  assert.equal(board.parcels[0].moistureSource, 'sensor');
+});
+
+test('PHI blocks harvest even if the soil is wet', () => {
+  const board = buildAgricultureBoard({
+    now,
+    units: [{ id: 'p1', name: 'Sur', areaHa: null, crop: null, kind: 'parcel' }],
+    entries: [
+      {
+        unitId: 'p1',
+        kind: 'input',
+        occurredAt: new Date('2026-09-25T12:00:00.000Z'),
+        payloadJson: { product: 'cobre', phiDays: 7 },
+      },
+    ],
+    readings: [
+      { unitId: 'p1', metric: 'soil_moisture', value: 40, recordedAt: now, source: 'manual' },
+    ],
+  });
+  assert.equal(board.decision.code, 'hold_harvest');
+  assert.equal(board.parcels[0].harvestBlocked, true);
+  assert.equal(board.parcels[0].phiDaysLeft, 5);
+  assert.equal(board.parcels[0].phiProduct, 'cobre');
+});
+
+test('an empty farm asks to open, not to fill a form', () => {
+  const decision = decideAgricultureNow([]);
+  assert.equal(decision.code, 'open_farm');
 });

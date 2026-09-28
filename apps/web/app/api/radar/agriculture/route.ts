@@ -5,10 +5,10 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { canAccessNexusOpsCompany, generateSensorToken } from '@/lib/nexus-ops';
 import { ensureOpsRules, maybeNotifyWhatsappAlerts, requestAutomationCommand } from '@/lib/nexus-ops-command';
+import { AGRICULTURE_MODULE } from '@/lib/nexus-sector-modules';
+import { whatsappConfigured } from '@/lib/nexus-whatsapp';
 import {
-  AGRICULTURE_MODULE,
-} from '@/lib/nexus-sector-modules';
-import {
+  DEFAULT_IRRIGATION_MM,
   buildAgricultureBoard,
   isAgricultureLineKind,
   isAgricultureRuleKind,
@@ -81,6 +81,7 @@ export async function GET(req: NextRequest) {
         metric: r.metric,
         value: r.value,
         recordedAt: r.recordedAt,
+        source: r.source,
       })),
   });
 
@@ -94,15 +95,32 @@ export async function GET(req: NextRequest) {
       unitName: e.unit?.name || null,
     }));
 
+  const liveSensors = sensors
+    .filter((s) => !s.unitId || parcelIds.has(s.unitId))
+    .map((s) => {
+      const last = readings.find((r) => r.sensorId === s.id || (r.unitId === s.unitId && r.metric === s.metric));
+      return {
+        ...s,
+        lastValue: last?.value ?? null,
+        lastRecordedAt: last?.recordedAt
+          ? last.recordedAt.toISOString()
+          : s.lastSeenAt
+            ? new Date(s.lastSeenAt).toISOString()
+            : null,
+      };
+    });
+
   return NextResponse.json({
     companyId,
     moduleId: 'agriculture',
+    decision: board.decision,
     parcels: board.parcels,
-    alerts: board.alerts,
+    alerts: board.alerts.filter((a) => a.code !== 'no_parcels'),
     lines,
-    sensors: sensors.filter((s) => !s.unitId || parcelIds.has(s.unitId)),
+    sensors: liveSensors,
     rules: rules.filter((r) => isAgricultureRuleKind(r.kind)),
     whatsapp,
+    whatsappConfigured: whatsappConfigured(),
   });
 }
 
@@ -131,15 +149,16 @@ export async function POST(req: NextRequest) {
   if (!tenant) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const action = String(body.action || '').trim();
-  if (action === 'parcel') return createParcel(companyId, body);
+  if (action === 'parcel' || action === 'open') return createParcel(companyId, body);
   if (action === 'line') return createLine(companyId, engagementId, tenant.userId, body);
   if (action === 'sensor') return createSensor(companyId, body);
   if (action === 'rule') return setRule(companyId, body);
+  if (action === 'command') return askCommand(companyId, body);
   return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 });
 }
 
 async function createParcel(companyId: string, body: Record<string, unknown>) {
-  const name = String(body.name || '').trim();
+  const name = String(body.name || '').trim() || 'Parcela 1';
   if (name.length < 2) return NextResponse.json({ error: 'Nome da parcela obrigatório.' }, { status: 400 });
   const areaHa = body.areaHa == null || body.areaHa === '' ? null : Number(body.areaHa);
   const unit = await prisma.nexusOpsUnit.create({
@@ -167,7 +186,12 @@ async function createLine(companyId: string, engagementId: string | null, userId
   if (!unit) return NextResponse.json({ error: 'Parcela inválida.' }, { status: 400 });
 
   const note = String(body.note || '').trim().slice(0, 2000);
-  const mm = body.mm == null || body.mm === '' ? null : Number(body.mm);
+  const mm =
+    body.mm == null || body.mm === ''
+      ? kind === 'irrigation'
+        ? DEFAULT_IRRIGATION_MM
+        : null
+      : Number(body.mm);
   const moisture = body.moisture == null || body.moisture === '' ? null : Number(body.moisture);
   const phiDays = body.phiDays == null || body.phiDays === '' ? null : Number(body.phiDays);
   const product = String(body.product || '').trim().slice(0, 80);
@@ -281,4 +305,13 @@ async function setRule(companyId: string, body: Record<string, unknown>) {
     command = await requestAutomationCommand(companyId, kind);
   }
   return NextResponse.json({ ok: true, rule, command });
+}
+
+async function askCommand(companyId: string, body: Record<string, unknown>) {
+  const kind = String(body.kind || 'irrigation').trim();
+  if (!isAgricultureRuleKind(kind) || kind === 'whatsapp_alerts') {
+    return NextResponse.json({ error: 'Comando inválido.' }, { status: 400 });
+  }
+  const command = await requestAutomationCommand(companyId, kind);
+  return NextResponse.json({ ok: true, command });
 }

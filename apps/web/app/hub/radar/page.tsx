@@ -37,48 +37,48 @@ function RadarInner() {
 
   const waiting =
     loc === 'es'
-      ? 'Este módulo abre con el mismo lazo — unidad, lectura, alerta, WhatsApp — después de agricultura.'
+      ? 'Mismo lazo que agricultura: unidad, lectura, alerta, WhatsApp. Aún no está cerrado.'
       : loc === 'en'
-        ? 'This module opens on the same loop — unit, reading, alert, WhatsApp — after agriculture.'
-        : 'Este módulo abre no mesmo laço — unidade, leitura, alerta, WhatsApp — depois da agricultura.';
+        ? 'Same loop as agriculture: unit, reading, alert, WhatsApp. Not closed yet.'
+        : 'O mesmo laço da agricultura: unidade, leitura, alerta, WhatsApp. Ainda não está fechado.';
 
   return (
     <div className="space-y-5">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-800">RADAR</p>
-        <h1 className="mt-1 font-serif text-3xl text-slate-900">
-          {loc === 'es' ? 'Digitalización productiva' : loc === 'en' ? 'Productive digitalization' : 'Digitalização produtiva'}
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-600">
-          {loc === 'es'
-            ? 'Datos, WhatsApp, alertas y automatización. Se conecta a AURORA o POLARIS por API interna.'
-            : loc === 'en'
-              ? 'Data, WhatsApp, alerts and automation. Connects to AURORA or POLARIS via internal API.'
-              : 'Dados, WhatsApp, alertas e automatização. Liga-se ao AURORA ou ao POLARIS por API interna.'}
-        </p>
-      </header>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="flex flex-wrap gap-2">
         {RADAR_MODULES.map((m) => (
           <button
             key={m.id}
             type="button"
             onClick={() => void pick(m.id)}
-            className={`rounded-2xl border px-4 py-3 text-left ${
-              moduleId === m.id ? 'border-violet-600 bg-violet-50' : 'border-slate-200 bg-white'
+            className={`rounded-full border px-3 py-1.5 text-sm ${
+              moduleId === m.id ? 'border-violet-400/50 bg-violet-500/20 text-white' : 'border-white/15 text-white/55 hover:text-white'
             }`}
           >
-            <p className="text-sm font-semibold text-slate-900">{m[loc]}</p>
-            <p className="mt-1 text-xs text-slate-500">{m.hint[loc]}</p>
+            {m[loc]}
           </button>
         ))}
       </div>
+
+      {!moduleId && (
+        <header>
+          <h1 className="font-serif text-3xl text-white">
+            {loc === 'es' ? 'Qué está pasando en la finca, ahora' : loc === 'en' ? 'What is happening on the farm, now' : 'O que está a acontecer na exploração, agora'}
+          </h1>
+          <p className="mt-2 max-w-xl text-sm text-white/60">
+            {loc === 'es'
+              ? 'Elige el módulo. Agricultura ya lee humedad, riego, carencia y WhatsApp.'
+              : loc === 'en'
+                ? 'Pick the module. Agriculture already reads moisture, irrigation, PHI and WhatsApp.'
+                : 'Escolhe o módulo. Agricultura já lê humidade, irrigação, carência e WhatsApp.'}
+          </p>
+        </header>
+      )}
 
       {moduleId === 'agriculture' && (
         <RadarAgricultureBoard companyId={companyId} engagementId={engagementId} locale={loc} />
       )}
       {moduleId && moduleId !== 'agriculture' && (
-        <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">{waiting}</p>
+        <p className="max-w-xl text-sm text-white/60">{waiting}</p>
       )}
     </div>
   );
@@ -86,7 +86,7 @@ function RadarInner() {
 
 export default function RadarPage() {
   return (
-    <Suspense fallback={<Loader2 className="mx-auto mt-20 h-8 w-8 animate-spin text-violet-700" />}>
+    <Suspense fallback={<Loader2 className="mx-auto mt-20 h-8 w-8 animate-spin text-violet-300" />}>
       <RadarInner />
     </Suspense>
   );

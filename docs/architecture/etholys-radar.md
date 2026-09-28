@@ -70,14 +70,15 @@ Carbono não abre caderno próprio. Lê práticas já registadas.
 
 ### O que a fachada agrícola faz
 
-`GET/POST /api/radar/agriculture`
+A pergunta do ecrã: **o que fazer hoje**. Não é um cadastro.
 
-- Lista só unidades `kind = parcel`.
-- Calcula alertas com os protocolos de agricultura (humidade &lt; 25%, carência do último insumo, caderno parado), por parcela.
-- Cria parcela (`sectorId = agriculture`, `kind = parcel`) sem depender do setor gravado na empresa.
-- Grava linha do caderno e, quando há número, a leitura (`soil_moisture`, `irrigation_mm`).
-- Regista sensor de humidade e devolve o token uma vez.
-- Liga ou desliga as regras `irrigation` e `whatsapp_alerts`.
+`GET /api/radar/agriculture` devolve `decision` (`open_farm` | `irrigate` | `hold_harvest` | `scout` | `ok`) e parcelas com humidade, última irrigação, carência e `nextAction`.
+
+`POST` abre a exploração com uma parcela, regista irrigação (10 mm se não disser), pede confirmação no WhatsApp, liga o telemóvel e emite token de sensor só quando o canal ainda não lê.
+
+Prioridade da decisão: não colher (PHI) → irrigar (humidade &lt; 25%) → percorrer (caderno parado) → em critério.
+
+O Hub é o monitor. O WhatsApp é o canal do campo.
 
 O vínculo do telefone continua em `/api/nexus/whatsapp/link`. O ingest HTTP continua em `/api/nexus/ingest/readings`. São canais partilhados; a fachada é que os mostra dentro do módulo.
 
