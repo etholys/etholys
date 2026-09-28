@@ -7,8 +7,11 @@ import { normalizeCandidates } from '@/lib/opportunity/candidate-store';
 import {
   applyBriefingDiversity,
   briefingRequestsIfad,
+  buildDiscoveryQueryPacks,
   buildDiscoverySearchQueries,
   isHomogeneousInstitutionSet,
+  isIfadSourceUrl,
+  type DiscoveryQueryPack,
 } from '@/lib/opportunity/discovery-queries';
 import { enrichAndFilterCandidates } from '@/lib/opportunity/enrich-call';
 import { OFFICIAL_LINK_PROMPT_RULES } from '@/lib/opportunity/official-url';
@@ -91,10 +94,11 @@ CRITICAL RULES:
 - If you cannot cite a live official call page, skip the item. Invented agencies (e.g. fake "ANDEDE") are forbidden.
 - EXCLUDE: expired calls, closed windows, generic program homepages WITHOUT an active open call.
 - For each item gather: closesAt, opensAt, eligibleCountries, classification (direct|client_bridge|joint), classificationNote, PLUS full operational content (what it funds, who can apply, eligibility, requirements, how to apply, risks).
-- The BRIEFING (themes, countries, type, command) is the ONLY search query. Do not default to a favourite multilateral. Never return more than ONE result from the same institution.
-- Search the REQUIRED official site: queries first. Cover every requested region when an official open grant exists.
-- Prefer current call/edital/RFA pages on Horizon, LIFE, grants.gov, Finep, BNDES, IDB, CAF, GCF, GEF, USDA/NIFA and national ministries.
-- Minimum 10 distinct official calls from at least 5 different institutions when possible.
+- The BRIEFING (themes, countries, type, command) is the ONLY search query. Do not default to a favourite multilateral. Never return more than TWO results from the same institution.
+- You MUST run every numbered site: query in THIS pass. Do not skip a portal because another agency is more familiar.
+- Cover every requested region when an official open grant exists. Prefer IDB, CAF, FONTAGRO, Finep, BNDES, GCF, GEF, Adaptation Fund, FAO, IAF, Ford, Kellogg, Avina, ANID, CORFO, AECID — not a single UN agriculture fund.
+- Prefer current call/edital/RFA pages on Horizon, LIFE, grants.gov, Finep, BNDES, IDB, CAF, GCF, GEF, USDA/NIFA, national ministries and foundation grant pages.
+- Minimum 8 distinct official calls from at least 5 different institutions in this pass when they exist.
 
 ${CANDIDATE_CONTENT_RULES}
 
@@ -113,6 +117,8 @@ opensAt, closesAt, applicationWindow, eligibleCountries,
 availabilityStatus ("open_now" or "rolling"),
 availabilityNote, classification (direct|client_bridge|joint), classificationNote,
 matchScore (0-100), matchJustification, sourceUrl (official only if present).
+
+Return 10–16 candidates from DISTINCT institutions covering ALL research passes (national, LATAM, climate/foundations). Do not collapse onto one agency.
 
 ${CANDIDATE_CONTENT_RULES}
 ${OFFICIAL_LINK_PROMPT_RULES}
@@ -207,40 +213,37 @@ export async function discoverOpportunitiesOnline(opts: {
         ? `\nMODE: OPEN NOW ONLY — reject anything without a verifiable active submission window as of ${todayIso()}.`
         : `\nMODE: REFERENCE INTELLIGENCE — map programs for future tracking, include seasonal and closed.`;
 
+    const packs = buildDiscoveryQueryPacks(opts.briefing);
     const requiredQueries = buildDiscoverySearchQueries(opts.briefing);
+    const extraClean = stripUnrequestedIfadContext(opts.optionalExtraContext, opts.briefing);
     const ifadBan = briefingRequestsIfad(opts.briefing)
       ? ''
-      : `\nFORBIDDEN AGENCY: do not return IFAD / FIDA / ifad.org calls. A leftover portal list is not a request for that agency. Search the briefing themes and countries instead.`;
-    const userResearch = [
+      : `\nFORBIDDEN AGENCY: do not return IFAD / FIDA / ifad.org calls. Search national LATAM portals, climate funds and foundations instead.`;
+    const sharedBrief = [
       `BRIEFING (this is the search query — obey it):\n${briefingLines(opts.briefing)}`,
       `\nLEARNING (skip-list only — do not copy catalog institutions as the theme):\n${opts.learningContext}`,
-      `\nEXISTING (do not repeat — find OTHER official calls):\n${existingBlock}`,
-      opts.optionalExtraContext?.trim()
-        ? `\nOPTIONAL / CATALOGUE PORTALS:\n${opts.optionalExtraContext.trim()}`
-        : '',
+      `\nEXISTING (do not repeat — find OTHER official calls from OTHER institutions):\n${existingBlock}`,
+      extraClean ? `\nOPTIONAL PORTALS (cross-check only, never the whole search):\n${extraClean}` : '',
       focusHint,
       ifadBan,
-      `\nREQUIRED OFFICIAL SEARCHES (run these site: queries; official portals only, never aggregators):\n${requiredQueries.map((q, i) => `${i + 1}. ${q}`).join('\n')}`,
-      `\n${OFFICIAL_LINK_PROMPT_RULES}`,
-      `\nSearch official domains for callUrl; never put aggregator URLs in linkOficial.`,
     ].join('');
 
-    await report(25, 'web_research');
-    const preferOpus =
-      briefingRequestsIfad(opts.briefing) ||
-      Boolean(opts.briefing.searchFeedback?.trim()) ||
-      Boolean(opts.briefing.scanName?.trim());
-    const { text: research, searchQueries } = await llmCompleteWithWebSearch(
-      RESEARCH_SYSTEM,
-      userResearch,
-      {
-        model: preferOpus ? 'claude-opus-4-6' : 'claude-sonnet-4-6',
-        maxOutputTokens: 16384,
-        temperature: scanFocus === 'open_now' ? 0.15 : 0.25,
-        timeoutMs: 180_000,
-        webSearchMaxUses: 14,
-      },
+    await report(22, 'web_research');
+    const packSlice = packs.slice(0, 3);
+    const packResults = await Promise.all(
+      packSlice.map((pack) =>
+        runPackWebSearch({
+          pack,
+          researchSystem: RESEARCH_SYSTEM,
+          sharedBrief,
+          scanFocus,
+        }),
+      ),
     );
+    const research = packResults
+      .map((r, i) => `## PASS ${packSlice[i]?.label ?? i}\n${r.text}`)
+      .join('\n\n');
+    const searchQueries = packResults.flatMap((r) => r.searchQueries);
 
     await report(65, 'structuring');
     const structureUser = [
@@ -288,7 +291,7 @@ export async function discoverOpportunitiesOnline(opts: {
         learningContext: opts.learningContext,
         existingBlock,
         existingFunds: [...opts.existingFunds, ...candidates],
-        optionalExtraContext: opts.optionalExtraContext,
+        optionalExtraContext: extraClean,
         alreadyFound: candidates,
         requiredQueries,
       });
@@ -347,6 +350,52 @@ export async function discoverOpportunitiesOnline(opts: {
   };
 }
 
+function stripUnrequestedIfadContext(
+  extra: string | undefined,
+  briefing: OpportunityBriefing,
+): string {
+  const raw = extra?.trim() ?? '';
+  if (!raw || briefingRequestsIfad(briefing)) return raw;
+  return raw
+    .split('\n')
+    .filter((line) => !isIfadSourceUrl(line) && !/\bifad\b|\bfida\b/i.test(line))
+    .join('\n')
+    .trim();
+}
+
+async function runPackWebSearch(opts: {
+  pack: DiscoveryQueryPack;
+  researchSystem: string;
+  sharedBrief: string;
+  scanFocus: ScanFocus;
+}): Promise<{ text: string; searchQueries: string[] }> {
+  const packBan =
+    opts.pack.id === 'ifad'
+      ? ''
+      : `\nThis pass MUST NOT search or return IFAD / FIDA / ifad.org.`;
+  const user = [
+    opts.sharedBrief,
+    `\nTHIS PASS: ${opts.pack.label}`,
+    packBan,
+    `\nREQUIRED OFFICIAL SEARCHES for this pass only (run each site: query; never aggregators):\n${opts.pack.queries.map((q, i) => `${i + 1}. ${q}`).join('\n')}`,
+    `\n${OFFICIAL_LINK_PROMPT_RULES}`,
+    `\nSearch official domains for callUrl; never put aggregator URLs in linkOficial.`,
+  ].join('');
+  try {
+    const { text, searchQueries } = await llmCompleteWithWebSearch(opts.researchSystem, user, {
+      model: 'claude-sonnet-4-6',
+      maxOutputTokens: 8192,
+      temperature: opts.scanFocus === 'open_now' ? 0.15 : 0.25,
+      timeoutMs: 150_000,
+      webSearchMaxUses: Math.min(10, Math.max(4, opts.pack.queries.length)),
+    });
+    return { text, searchQueries };
+  } catch (e) {
+    console.warn(`[opportunity/web-discovery] pack ${opts.pack.id} failed:`, e);
+    return { text: `(pass ${opts.pack.id} failed)`, searchQueries: opts.pack.queries };
+  }
+}
+
 async function secondPassOpusDiscovery(opts: {
   briefing: OpportunityBriefing;
   learningContext: string;
@@ -367,6 +416,7 @@ async function secondPassOpusDiscovery(opts: {
         `BRIEFING:\n${briefingLines(opts.briefing)}`,
         `\nThe first pass collapsed onto one agency or was too thin. Find NEW official open grant calls that match the BRIEFING.`,
         briefingRequestsIfad(opts.briefing) ? '' : `\nFORBIDDEN: do not include IFAD / FIDA / ifad.org.`,
+        `\nThe previous pass repeated the same agencies or found too few. Search IDB, CAF, FONTAGRO, Finep, GCF, GEF, IAF, Ford, Kellogg, Avina, ANID, CORFO, AECID, FAO — different institutions from ALREADY FOUND.`,
         `\nALREADY FOUND (do not repeat):\n${found}`,
         `\nEXISTING INBOX:\n${opts.existingBlock}`,
         `\nREQUIRED OFFICIAL SEARCHES:\n${opts.requiredQueries.map((q, i) => `${i + 1}. ${q}`).join('\n')}`,

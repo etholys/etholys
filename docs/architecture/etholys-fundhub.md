@@ -115,7 +115,7 @@ Reutilizar `FundhubAlert` + `syncDeadlineNotifications`. F5 adiciona tipo `oppor
 | GET/POST/DELETE | `/api/opportunity/sources` | mesa | Portais oficiais + extras do utilizador |
 | GET | `/api/opportunity/catalog?drawer=&export=1` | mesa | Gavetas + CSV |
 
-**Regra:** `open_now` **nunca** cai no fallback de conhecimento (inventa agências). Sem página oficial verificável → zero candidatos, não lixo.
+**Regra:** `open_now` **nunca** cai no fallback de conhecimento (inventa agências). Sem página oficial verificável → zero candidatos, não lixo. A varredura corre **pacotes paralelos** (nacional, LATAM, clima/fundações) — não uma única busca que colapsa no IFAD.
 
 ---
 

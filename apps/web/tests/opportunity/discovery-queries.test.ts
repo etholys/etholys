@@ -81,7 +81,24 @@ test('Horizonte-style portal list is not a request for IFAD', () => {
   );
 });
 
-test('unrequested IFAD cards are dropped; one per institution kept', () => {
+test('Brazil-only rural briefing still searches LATAM portals and foundations', () => {
+  const regions = detectDiscoveryRegions(['Brasil'], ['desenvolvimento rural']);
+  assert.ok(regions.includes('br'));
+  assert.ok(regions.includes('latam'));
+  const queries = buildDiscoverySearchQueries({
+    themes: ['desenvolvimento rural', 'agricultura familiar'],
+    countries: ['Brasil'],
+    kinds: ['grant'],
+  });
+  const blob = queries.join('\n');
+  assert.match(blob, /finep\.gov\.br/);
+  assert.match(blob, /iadb\.org/);
+  assert.match(blob, /iaf\.gov/);
+  assert.match(blob, /fordfoundation\.org/);
+  assert.equal(/ifad\.org/.test(blob), false);
+});
+
+test('unrequested IFAD cards are dropped; two per institution kept', () => {
   const briefing = {
     themes: ['economia circular', 'digitalização'],
     countries: ['Europa', 'Brasil'],
@@ -98,8 +115,9 @@ test('unrequested IFAD cards are dropped; one per institution kept', () => {
   const dropped = dropUnrequestedIfad(raw, briefing);
   assert.equal(dropped.some((c) => isIfadCandidate(c)), false);
   const diverse = applyBriefingDiversity(raw, briefing);
-  assert.equal(diverse.length, 2);
+  assert.equal(diverse.length, 3);
   assert.equal(diverse.some((c) => c.name === 'LIFE circular'), true);
+  assert.equal(diverse.some((c) => c.name === 'LIFE climate'), true);
   assert.equal(diverse.some((c) => c.name === 'FINEP digital'), true);
   assert.equal(diverse.some((c) => isIfadCandidate(c)), false);
 });

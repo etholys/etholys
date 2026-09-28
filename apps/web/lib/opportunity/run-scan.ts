@@ -7,7 +7,7 @@ import { buildLearningContext } from '@/lib/opportunity/scan-context';
 import { fetchSourceSnippets, snippetsToPromptBlock } from '@/lib/opportunity/fetch-sources';
 import { listEtholysCatalogHints, listUserMonitoredUrls } from '@/lib/opportunity/source-catalog';
 import { discoverOpportunitiesOnline } from '@/lib/opportunity/web-discovery';
-import { applyBriefingDiversity } from '@/lib/opportunity/discovery-queries';
+import { applyBriefingDiversity, briefingRequestsIfad, isIfadSourceUrl } from '@/lib/opportunity/discovery-queries';
 import { dropDuplicateFunds } from '@/lib/opportunity/scan-filters';
 import type { OpportunityBriefing, ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
 
@@ -72,16 +72,22 @@ export async function runOpportunityScan(opts: {
           },
         });
 
+  let extraUrls = optionalUrls;
+  if (!briefingRequestsIfad(briefing)) {
+    extraUrls = optionalUrls.filter((u) => !isIfadSourceUrl(u.url));
+  }
+
   let optionalExtraContext = '';
   if (catalogHints.length > 0) {
     optionalExtraContext = catalogHints
+      .filter((h) => briefingRequestsIfad(briefing) || !isIfadSourceUrl(h.url))
       .map((h) => `- ${h.name}: ${h.url}${h.tags ? ` (${h.tags})` : ''}`)
       .join('\n');
   }
-  if (optionalUrls.length > 0) {
+  if (extraUrls.length > 0) {
     try {
       await setScanProgress(run.id, 12, 'fetching_portals');
-      const { snippets } = await fetchSourceSnippets(optionalUrls);
+      const { snippets } = await fetchSourceSnippets(extraUrls);
       const block = snippetsToPromptBlock(snippets);
       optionalExtraContext = [optionalExtraContext, block].filter(Boolean).join('\n');
     } catch {

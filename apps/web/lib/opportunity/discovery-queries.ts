@@ -15,13 +15,26 @@ export function themeQueryBlob(themes: string[]): string {
   return parts.join(' OR ') || 'rural OR green OR circular OR digital';
 }
 
-export function detectDiscoveryRegions(countries: string[]): DiscoveryRegion[] {
+export function detectDiscoveryRegions(
+  countries: string[],
+  themes: string[] = [],
+): DiscoveryRegion[] {
   const blob = fold(countries.join(' '));
+  const themeBlob = fold(themes.join(' '));
   const out = new Set<DiscoveryRegion>();
+  const latamCountry =
+    /america latina|latin america|latam|latinoameric|brasil|brazil|argentina|chile|colombia|mexico|peru|uruguay|paraguay|bolivia|ecuador|costa rica|panama|guatemala|honduras|salvador|nicaragua|dominic|venezuela|cuba|haiti/.test(
+      blob,
+    );
   if (/brasil|brazil/.test(blob)) out.add('br');
-  if (/estados unidos|united states|\beua\b|\busa\b|eua\b/.test(blob)) out.add('us');
-  if (/america latina|latin america|latam|latinoameric/.test(blob)) out.add('latam');
+  if (/estados unidos|united states|\beua\b|\busa\b/.test(blob)) out.add('us');
+  if (latamCountry) out.add('latam');
   if (/europa|europe|europeia|europea|\bue\b|\beu\b/.test(blob)) out.add('eu');
+  const ruralTheme =
+    /rural|agricul|aliment|food|clima|verde|circular|pecu|forest|campes|smallholder|bioeconom/.test(
+      themeBlob,
+    );
+  if (ruralTheme && !out.has('eu') && !out.has('us')) out.add('latam');
   if (out.size === 0) out.add('global');
   out.add('global');
   return [...out];
@@ -32,6 +45,9 @@ const PORTAL_BUILDERS: Record<DiscoveryRegion, (themes: string) => string[]> = {
     `site:finep.gov.br (chamada OR edital) (${t})`,
     `site:gov.br (chamada pública OR edital) (${t}) 2026`,
     `site:bndes.gov.br (chamada OR edital) (${t})`,
+    `site:cnpq.br (chamada OR edital) (${t})`,
+    `site:fapesp.br (chamada OR edital)`,
+    `site:mapa.gov.br (chamada OR edital) (${t})`,
   ],
   us: (t) => [
     `site:grants.gov (${t}) (forecast OR posted) grant`,
@@ -40,8 +56,18 @@ const PORTAL_BUILDERS: Record<DiscoveryRegion, (themes: string) => string[]> = {
   ],
   latam: (t) => [
     `site:iadb.org "call for proposals" (${t})`,
+    `site:bidlab.org (call OR convocatoria) (${t})`,
     `site:caf.com (convocatoria OR "call for") (${t})`,
     `site:fontagro.org convocatoria`,
+    `site:fonplata.org convocatoria`,
+    `site:iaf.gov (grant OR rfp) (${t})`,
+    `site:gob.mx (convocatoria OR "call for proposals") (${t})`,
+    `site:anid.cl (concurso OR convocatoria)`,
+    `site:corfo.cl convocatoria`,
+    `site:argentina.gob.ar (convocatoria OR llamado) (${t})`,
+    `site:minciencias.gov.co convocatoria`,
+    `site:anii.org.uy convocatoria`,
+    `site:aecid.es convocatoria (${t})`,
   ],
   eu: (t) => [
     `site:funding-tenders.europa.eu (${t}) call`,
@@ -52,47 +78,107 @@ const PORTAL_BUILDERS: Record<DiscoveryRegion, (themes: string) => string[]> = {
     `site:greenclimate.fund (RFP OR RFA OR "call for") (${t})`,
     `site:thegef.org "call for proposals"`,
     `site:adaptation-fund.org (grant OR proposal) open`,
+    `site:fao.org "call for proposals" (${t})`,
+    `site:undp.org "call for proposals" (${t})`,
     `(${t}) official "call for proposals" open grant 2026`,
   ],
 };
 
-/** Queries oficiais que o scout DEVE correr — portais, não agregadores. */
-export function buildDiscoverySearchQueries(briefing: OpportunityBriefing): string[] {
-  const themes = themeQueryBlob(briefing.themes);
-  const regions = detectDiscoveryRegions(briefing.countries);
-  const grantHint = briefing.kinds.includes('grant') || briefing.kinds.length === 0;
-  const out: string[] = [];
-  const seen = new Set<string>();
+const FOUNDATION_QUERIES = (t: string) => [
+  `site:fordfoundation.org (grant OR proposal) open (${t})`,
+  `site:wkkf.org (grant OR rfp) (${t})`,
+  `site:rockefellerfoundation.org (grant OR rfp)`,
+  `site:avina.net convocatoria`,
+  `site:opensocietyfoundations.org grants (${t})`,
+];
 
-  const push = (q: string) => {
+export type DiscoveryQueryPack = {
+  id: string;
+  label: string;
+  queries: string[];
+};
+
+function uniqueQueries(items: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const q of items) {
     const key = q.toLowerCase();
-    if (seen.has(key)) return;
+    if (!q.trim() || seen.has(key)) continue;
     seen.add(key);
     out.push(q);
-  };
-
-  const command = briefing.searchFeedback?.trim();
-  if (command) push(command.slice(0, 280));
-  if (briefing.scanName?.trim()) {
-    push(`${briefing.scanName.trim()} official call for proposals`);
   }
-  push(`(${themes}) official "call for proposals" open grant`);
+  return out;
+}
+
+/** Pacotes regionais — cada um vira uma pesquisa web própria. */
+export function buildDiscoveryQueryPacks(briefing: OpportunityBriefing): DiscoveryQueryPack[] {
+  const themes = themeQueryBlob(briefing.themes);
+  const regions = detectDiscoveryRegions(briefing.countries, briefing.themes);
+  const grantHint = briefing.kinds.includes('grant') || briefing.kinds.length === 0;
+  const packs: DiscoveryQueryPack[] = [];
+
+  const nationalQueries: string[] = [];
+  if (briefing.searchFeedback?.trim()) {
+    nationalQueries.push(briefing.searchFeedback.trim().slice(0, 280));
+  }
+  if (briefing.scanName?.trim()) {
+    nationalQueries.push(`${briefing.scanName.trim()} official call for proposals`);
+  }
+  for (const region of ['br', 'us', 'eu'] as const) {
+    if (!regions.includes(region)) continue;
+    nationalQueries.push(...PORTAL_BUILDERS[region](themes).slice(0, 3));
+  }
+  if (nationalQueries.length) {
+    packs.push({
+      id: 'national',
+      label: 'National and EU/US official portals',
+      queries: uniqueQueries(nationalQueries).slice(0, 12),
+    });
+  }
+
+  if (regions.includes('latam')) {
+    packs.push({
+      id: 'latam',
+      label: 'Latin America regional and national official calls',
+      queries: uniqueQueries(PORTAL_BUILDERS.latam(themes)).slice(0, 10),
+    });
+  }
+
+  const globalQ = [
+    ...PORTAL_BUILDERS.global(themes),
+    ...(grantHint ? FOUNDATION_QUERIES(themes) : []),
+    grantHint
+      ? `open grant convocatoria (${themes}) official site:.gov OR site:.gob OR site:europa.eu`
+      : '',
+  ].filter(Boolean);
+  packs.push({
+    id: 'global',
+    label: 'Multilateral climate funds and international foundations',
+    queries: uniqueQueries(globalQ).slice(0, 10),
+  });
 
   if (briefingRequestsIfad(briefing)) {
-    push(`site:ifad.org "call for proposals" (${themes})`);
-    push(`site:ifad.org/en/w/calls-for-proposal (${themes})`);
-    push(`site:ifad.org/es/w/calls-for-proposal (${themes})`);
+    packs.push({
+      id: 'ifad',
+      label: 'IFAD official calls (requested)',
+      queries: uniqueQueries([
+        `site:ifad.org "call for proposals" (${themes})`,
+        `site:ifad.org/en/w/calls-for-proposal (${themes})`,
+        `site:ifad.org/es/w/calls-for-proposal (${themes})`,
+      ]),
+    });
   }
 
-  for (const region of regions) {
-    for (const q of PORTAL_BUILDERS[region](themes)) push(q);
-  }
+  return packs.filter((p) => p.queries.length > 0);
+}
 
-  if (grantHint) {
-    push(`open grant convocatoria (${themes}) official site:.gov OR site:.gob OR site:europa.eu`);
-  }
+/** Queries oficiais que o scout DEVE correr — portais, não agregadores. */
+export function buildDiscoverySearchQueries(briefing: OpportunityBriefing): string[] {
+  return uniqueQueries(buildDiscoveryQueryPacks(briefing).flatMap((p) => p.queries)).slice(0, 36);
+}
 
-  return out.slice(0, 14);
+export function isIfadSourceUrl(url: string | null | undefined): boolean {
+  return /ifad\.org/i.test(url ?? '');
 }
 
 export function institutionKey(name: string): string {
@@ -159,7 +245,7 @@ export function dropUnrequestedIfad<
 
 export function capPerInstitution<T extends { institution?: string; matchScore?: number }>(
   candidates: T[],
-  max = 1,
+  max = 2,
 ): T[] {
   const ranked = [...candidates].sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
   const used: string[] = [];
@@ -187,7 +273,7 @@ export function applyBriefingDiversity<
     matchScore?: number;
   },
 >(candidates: T[], briefing: OpportunityBriefing): T[] {
-  const maxPer = briefingRequestsIfad(briefing) ? 4 : 1;
+  const maxPer = briefingRequestsIfad(briefing) ? 4 : 2;
   return capPerInstitution(dropUnrequestedIfad(candidates, briefing), maxPer);
 }
 
