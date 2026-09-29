@@ -117,7 +117,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       icon: DollarSign,
       items: [
         { href: '/finance', icon: DollarSign, label: tr('nav.finance') },
-        { href: '/finance/tax', icon: FileText, label: locale === 'es' ? 'Impuestos IRS' : locale === 'pt' ? 'Impostos IRS' : 'IRS Taxes' },
+        { href: '/finance/tax', icon: FileText, label: locale === 'es' ? 'Impuestos' : locale === 'pt' ? 'Impostos' : 'Taxes' },
         { href: '/invoices', icon: FileText, label: tr('nav.invoices') },
         { href: '/suppliers', icon: Truck, label: tr('nav.suppliers') },
         { href: '/calculator', icon: Calculator, label: locale === 'es' ? 'Calculadora' : locale === 'pt' ? 'Calculadora' : 'Calculator' },

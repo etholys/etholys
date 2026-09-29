@@ -700,6 +700,51 @@ function generate5472HTML(d: Record<string, any>, taxYear: number, companyName: 
 </body></html>`;
 }
 
+function generateYearPackHTML(d: Record<string, any>, taxYear: number, companyName: string) {
+  const cats: { category: string; income: number; expense: number; count: number }[] =
+    Array.isArray(d._byCategory) ? d._byCategory : [];
+  const n = (v: any) => {
+    const x = typeof v === 'string' ? parseFloat(v) : Number(v || 0);
+    return isNaN(x) ? '0.00' : x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+  const catRows = cats
+    .map(
+      (c) =>
+        `<tr><td>${c.category}</td><td class="amt">${n(c.income)}</td><td class="amt">${n(c.expense)}</td><td class="amt">${c.count}</td></tr>`,
+    )
+    .join('');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    .muted { color: #555; font-size: 10px; margin-bottom: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    th, td { border: 1px solid #ccc; padding: 5px 6px; text-align: left; }
+    th { background: #f3f4f6; }
+    .amt { text-align: right; font-family: 'Courier New', monospace; }
+    .note { font-size: 9px; color: #666; margin-top: 18px; }
+  </style></head><body>
+    <h1>${companyName || d.legalName || ''} — ${taxYear}</h1>
+    <p class="muted">Etholys ATLAS tax pack · ${d.taxCountry || ''} · ${d.entityType || ''} · ${d.taxIdLabel || 'Tax ID'}: ${d.taxId || d.ein || ''}</p>
+    <table>
+      <tr><th>Cash income</th><th>Cash expenses</th><th>Result</th><th>Output tax (invoices)</th><th>Input tax (invoices)</th></tr>
+      <tr>
+        <td class="amt">${n(d.cashIncome)}</td>
+        <td class="amt">${n(d.cashExpense)}</td>
+        <td class="amt">${n(d.cashResult)}</td>
+        <td class="amt">${n(d.invoiceOutputTax)}</td>
+        <td class="amt">${n(d.invoiceInputTax)}</td>
+      </tr>
+    </table>
+    <h2 style="font-size:13px;">Books by category (executed)</h2>
+    <table>
+      <tr><th>Category</th><th>Income</th><th>Expense</th><th>Lines</th></tr>
+      ${catRows || '<tr><td colspan="4">No categorized movements</td></tr>'}
+    </table>
+    ${d._notes ? `<p><b>Notes</b><br>${String(d._notes).replace(/</g, '&lt;')}</p>` : ''}
+    <p class="note">This pack organizes ATLAS books for the accountant. It is not an official filing and does not replace a licensed advisor or the tax authority of the country of tax residence.</p>
+  </body></html>`;
+}
+
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -708,9 +753,11 @@ export async function POST(req: Request) {
     const { formType, taxYear, formData: fd, companyName } = await req.json();
     if (!formType || !fd) return NextResponse.json({ error: 'Missing data' }, { status: 400 });
 
-    const html = formType === '5472'
-      ? generate5472HTML(fd, taxYear, companyName)
-      : generate1120HTML(fd, taxYear, companyName);
+    const html = formType === 'YEAR'
+      ? generateYearPackHTML(fd, taxYear, companyName)
+      : formType === '5472'
+        ? generate5472HTML(fd, taxYear, companyName)
+        : generate1120HTML(fd, taxYear, companyName);
 
     const apiKey = process.env.ABACUSAI_API_KEY;
     if (!apiKey) return NextResponse.json({ error: 'PDF API not configured' }, { status: 500 });

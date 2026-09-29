@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/app/providers';
-import type { Locale } from '@/lib/i18n';
 import {
   FileText, Plus, Upload, Download, Save, Trash2,
   CheckCircle2, Clock, AlertCircle, Building2, User, DollarSign, ArrowLeft,
   Sparkles, X, Loader2, Eye, Edit3, ChevronDown, ChevronUp
 } from 'lucide-react';
+import { filingLabel, isUsOfficialForm } from '@/lib/atlas/tax-workspace';
+import { TaxYearPanel } from './tax-year-panel';
 
 type TaxFiling = {
   id: string;
@@ -39,8 +40,9 @@ const STATUS_MAP: Record<string, { labels: ML; color: string; bg: string; icon: 
 };
 
 const FORM_TYPES = [
-  { value: '1120', label: 'Form 1120 — U.S. Corporation Income Tax Return' },
-  { value: '5472', label: 'Form 5472 — Information Return (25% Foreign-Owned U.S. Corp.)' },
+  { value: 'YEAR', labels: ml('Fiscal year pack (any country)', 'Expediente del ejercicio (cualquier país)', 'Dossiê do exercício (qualquer país)') },
+  { value: '1120', labels: ml('US Form 1120 — corporation income tax (optional pack)', 'EE.UU. Form 1120 — renta de corporación (paquete opcional)', 'EUA Form 1120 — imposto de renda corporativo (pacote opcional)') },
+  { value: '5472', labels: ml('US Form 5472 — 25% foreign-owned corp. (optional pack)', 'EE.UU. Form 5472 — dueño extranjero ≥25% (paquete opcional)', 'EUA Form 5472 — sócio estrangeiro ≥25% (pacote opcional)') },
 ];
 
 const FORM_1120_SECTIONS: SectionDef[] = [
@@ -511,16 +513,16 @@ const FORM_5472_SECTIONS: SectionDef[] = [
 ];
 
 const UI = {
-  taxFilings: ml('Tax Filings', 'Declaraciones de Impuestos', 'Declarações de Impostos'),
-  taxSubtitle: ml('IRS Forms 1120 and 5472 for foreign-owned U.S. LLCs', 'Formularios IRS 1120 y 5472 para LLC con propietario extranjero', 'Formulários IRS 1120 e 5472 para LLC com proprietário estrangeiro'),
-  newFiling: ml('New Filing', 'Nueva Declaración', 'Nova Declaração'),
-  createNewFiling: ml('Create New Filing', 'Crear Nueva Declaración', 'Criar Nova Declaração'),
-  formType: ml('Form Type', 'Tipo de Formulario', 'Tipo de Formulário'),
+  taxFilings: ml('Taxes', 'Impuestos', 'Impostos'),
+  taxSubtitle: ml('Books, VAT on invoices and a country checklist for any company. Official US 1120/5472 forms remain an optional pack.', 'Libros, IVA en facturas y lista por país para cualquier empresa. Los formularios oficiales 1120/5472 de EE.UU. quedan como paquete opcional.', 'Livros, IVA nas faturas e lista por país para qualquer empresa. Os formulários oficiais 1120/5472 dos EUA ficam como pacote opcional.'),
+  newFiling: ml('Add year pack or form', 'Añadir expediente o formulario', 'Adicionar dossiê ou formulário'),
+  createNewFiling: ml('New tax workspace or official form', 'Nuevo expediente fiscal o formulario oficial', 'Novo dossiê fiscal ou formulário oficial'),
+  formType: ml('What to open', 'Qué abrir', 'O que abrir'),
   taxYear: ml('Tax Year', 'Año Fiscal', 'Ano Fiscal'),
   createBtn: ml('Create', 'Crear', 'Criar'),
   cancelBtn: ml('Cancel', 'Cancelar', 'Cancelar'),
-  noFilings: ml('No tax filings yet.', 'No hay declaraciones de impuestos.', 'Não há declarações de impostos.'),
-  noFilingsHint: ml('Create a new filing to get started.', 'Crea una nueva declaración para comenzar.', 'Crie uma nova declaração para começar.'),
+  noFilings: ml('No saved year packs yet — the books below already come from ATLAS.', 'Aún no hay expedientes guardados — los libros de abajo ya salen de ATLAS.', 'Ainda não há dossiês gravados — os livros abaixo já vêm do ATLAS.'),
+  noFilingsHint: ml('Save a fiscal year pack for your accountant, or add an optional official form.', 'Guarda un expediente del ejercicio para tu contador, o añade un formulario oficial opcional.', 'Guarde um dossiê do exercício para o contabilista, ou adicione um formulário oficial opcional.'),
   form: ml('Form', 'Formulario', 'Formulário'),
   company: ml('Company', 'Empresa', 'Empresa'),
   year: ml('Year', 'Año', 'Ano'),
@@ -540,14 +542,14 @@ const UI = {
   income: ml('income', 'ingresos', 'receitas'),
   expenses: ml('expenses', 'gastos', 'despesas'),
   extractionCompleted: ml('Extraction completed', 'Extracción completada', 'Extração concluída'),
-  irsCategorySummary: ml('IRS Category Summary:', 'Resumen por Categoría IRS:', 'Resumo por Categoria IRS:'),
+  irsCategorySummary: ml('Category summary:', 'Resumen por categoría:', 'Resumo por categoria:'),
   hide: ml('Hide', 'Ocultar', 'Ocultar'),
   view: ml('View', 'Ver', 'Ver'),
   extractedTxns: ml('extracted transactions', 'transacciones extraídas', 'transações extraídas'),
   txnDate: ml('Date', 'Fecha', 'Data'),
   txnDesc: ml('Description', 'Descripción', 'Descrição'),
   txnAmount: ml('Amount', 'Monto', 'Valor'),
-  txnCategory: ml('IRS Category', 'Categoría IRS', 'Categoria IRS'),
+  txnCategory: ml('Tax category', 'Categoría fiscal', 'Categoria fiscal'),
   txnConf: ml('Conf.', 'Conf.', 'Conf.'),
   select: ml('— Select —', '— Seleccionar —', '— Selecionar —'),
   noCompanyError: ml('You must have at least one company to create a filing. Go to Settings to create one.', 'Debes tener al menos una empresa para crear una declaración. Ve a Configuración para crear una.', 'Você deve ter pelo menos uma empresa para criar uma declaração. Vá para Configurações para criar uma.'),
@@ -578,7 +580,10 @@ export default function TaxFilingPage() {
   const [extractedTransactions, setExtractedTransactions] = useState<any[] | null>(null);
   const [showTransactions, setShowTransactions] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [newFormType, setNewFormType] = useState('1120');
+  const [newFormType, setNewFormType] = useState('YEAR');
+  const [listYear, setListYear] = useState(new Date().getFullYear());
+  const [listForm, setListForm] = useState<Record<string, any>>({});
+  const [listFyMonth, setListFyMonth] = useState(1);
   const [newTaxYear, setNewTaxYear] = useState(new Date().getFullYear().toString());
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
@@ -603,6 +608,17 @@ export default function TaxFilingPage() {
   useEffect(() => { fetchFilings(); }, [fetchFilings]);
 
   const sections = activeFiling?.formType === '5472' ? FORM_5472_SECTIONS : FORM_1120_SECTIONS;
+  const yearFiling = filings.find((f) => f.formType === 'YEAR' && f.taxYear === listYear);
+
+  useEffect(() => {
+    if (yearFiling?.formData) {
+      setListForm(yearFiling.formData);
+      if (yearFiling.formData.fiscalStartMonth) setListFyMonth(Number(yearFiling.formData.fiscalStartMonth) || 1);
+    } else {
+      setListForm({});
+      setListFyMonth(1);
+    }
+  }, [yearFiling?.id, listYear]);
 
   const handleCreate = async () => {
     const compId = activeCompanyId || companies[0]?.id;
@@ -615,7 +631,12 @@ export default function TaxFilingPage() {
       const res = await fetch('/api/tax-filings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId: compId, formType: newFormType, taxYear: newTaxYear }),
+        body: JSON.stringify({
+          companyId: compId,
+          formType: newFormType,
+          taxYear: newTaxYear,
+          formData: newFormType === 'YEAR' ? { ...listForm, fiscalStartMonth: listFyMonth } : {},
+        }),
       });
       const data = await res.json();
       if (data.error) { setErrorMsg(data.error); return; }
@@ -635,7 +656,7 @@ export default function TaxFilingPage() {
     setAutoData(filing.autoData || {});
     setExtractionNotes('');
     const sects = filing.formType === '5472' ? FORM_5472_SECTIONS : FORM_1120_SECTIONS;
-    setExpandedSections({ [sects[0].id]: true });
+    setExpandedSections(isUsOfficialForm(filing.formType) ? { [sects[0].id]: true } : {});
     setView('form');
   };
 
@@ -650,6 +671,7 @@ export default function TaxFilingPage() {
           companyId: activeFiling.companyId,
           formType: activeFiling.formType,
           taxYear: activeFiling.taxYear,
+          fiscalStartMonth: formData.fiscalStartMonth || 1,
         }),
       });
       const data = await res.json();
@@ -657,7 +679,8 @@ export default function TaxFilingPage() {
         setAutoData(data.autoData);
         const merged = { ...formData };
         for (const [k, v] of Object.entries(data.autoData)) {
-          if (k.startsWith('_')) continue;
+          if (k.startsWith('_') && k !== '_byCategory') continue;
+          if (k === '_byCategory') { merged._byCategory = v; continue; }
           if (!merged[k] && merged[k] !== 0) merged[k] = v;
         }
         setFormData(merged);
@@ -778,7 +801,7 @@ export default function TaxFilingPage() {
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `Form_${activeFiling.formType}_${activeFiling.taxYear}.pdf`;
+          a.download = `${activeFiling.formType === 'YEAR' ? 'tax-pack' : 'Form_' + activeFiling.formType}_${activeFiling.taxYear}.pdf`;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -788,7 +811,7 @@ export default function TaxFilingPage() {
           if (data.pdfUrl) {
             const a = document.createElement('a');
             a.href = data.pdfUrl;
-            a.download = `Form_${activeFiling.formType}_${activeFiling.taxYear}.pdf`;
+            a.download = `${activeFiling.formType === 'YEAR' ? 'tax-pack' : 'Form_' + activeFiling.formType}_${activeFiling.taxYear}.pdf`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -810,7 +833,7 @@ export default function TaxFilingPage() {
   const isAutoField = (key: string) => autoData && key in autoData && !key.startsWith('_');
 
   useEffect(() => {
-    if (!activeFiling) return;
+    if (!activeFiling || activeFiling.formType === 'YEAR') return;
     const d = { ...formData };
     let changed = false;
     const num = (key: string) => parseFloat(d[key]) || 0;
@@ -930,6 +953,38 @@ export default function TaxFilingPage() {
     if (changed) setFormData(d);
   }, [formData, activeFiling]);
 
+  const saveListYearPack = async () => {
+    const compId = activeCompanyId || companies[0]?.id;
+    if (!compId) {
+      setErrorMsg(L(UI.noCompanyError));
+      return;
+    }
+    setSaving(true);
+    setErrorMsg('');
+    try {
+      const formPayload = { ...listForm, fiscalStartMonth: listFyMonth };
+      if (yearFiling) {
+        await fetch('/api/tax-filings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: yearFiling.id, formData: formPayload }),
+        });
+      } else {
+        const res = await fetch('/api/tax-filings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyId: compId, formType: 'YEAR', taxYear: listYear, formData: formPayload }),
+        });
+        const data = await res.json();
+        if (data.error) setErrorMsg(data.error);
+      }
+      await fetchFilings();
+    } catch (e: any) {
+      setErrorMsg(L(UI.errorCreating) + ' ' + (e.message || ''));
+    }
+    setSaving(false);
+  };
+
   if (view === 'list') {
     return (
       <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
@@ -960,7 +1015,7 @@ export default function TaxFilingPage() {
                 <label className="text-sm font-medium text-gray-700 mb-1 block">{L(UI.formType)}</label>
                 <select value={newFormType} onChange={e => setNewFormType(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
-                  {FORM_TYPES.map(ft => (<option key={ft.value} value={ft.value}>{ft.label}</option>))}
+                  {FORM_TYPES.map(ft => (<option key={ft.value} value={ft.value}>{L(ft.labels)}</option>))}
                 </select>
               </div>
               <div>
@@ -976,13 +1031,41 @@ export default function TaxFilingPage() {
           </div>
         )}
 
+        {activeCompanyId && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">{L(UI.taxYear)}</label>
+                <input type="number" value={listYear} min={2000} max={2035}
+                  onChange={e => setListYear(parseInt(e.target.value, 10) || new Date().getFullYear())}
+                  className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <button onClick={saveListYearPack} disabled={saving}
+                className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium disabled:opacity-50">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} {L(UI.save)}
+              </button>
+            </div>
+            <TaxYearPanel
+              locale={locale}
+              companyId={activeCompanyId}
+              taxYear={listYear}
+              fiscalStartMonth={listFyMonth}
+              formData={listForm}
+              obligationStatus={listForm._obligations || {}}
+              onFormChange={(key, value) => setListForm(prev => ({ ...prev, [key]: value }))}
+              onObligationChange={(id, status) => setListForm(prev => ({ ...prev, _obligations: { ...(prev._obligations || {}), [id]: status } }))}
+              onFiscalMonthChange={(month) => { setListFyMonth(month); setListForm(prev => ({ ...prev, fiscalStartMonth: month })); }}
+            />
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
           </div>
         ) : filings.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <FileText className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+            <FileText className="w-10 h-10 mx-auto text-gray-300 mb-3" />
             <p className="text-gray-500">{L(UI.noFilings)}</p>
             <p className="text-gray-400 text-sm mt-1">{L(UI.noFilingsHint)}</p>
           </div>
@@ -1006,7 +1089,7 @@ export default function TaxFilingPage() {
                     const StIcon = st.icon;
                     return (
                       <tr key={f.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openFiling(f)}>
-                        <td className="px-4 py-3"><span className="font-medium text-gray-900">Form {f.formType}</span></td>
+                        <td className="px-4 py-3"><span className="font-medium text-gray-900">{filingLabel(f.formType, locale)}</span></td>
                         <td className="px-4 py-3 text-sm text-gray-600">{f.company?.shortName || f.company?.name}</td>
                         <td className="px-4 py-3 text-sm text-gray-900 font-medium">{f.taxYear}</td>
                         <td className="px-4 py-3">
@@ -1041,7 +1124,7 @@ export default function TaxFilingPage() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Form {activeFiling?.formType} — {activeFiling?.taxYear}</h1>
+            <h1 className="text-xl font-bold text-gray-900">{activeFiling ? filingLabel(activeFiling.formType, locale) : ''} — {activeFiling?.taxYear}</h1>
             <p className="text-sm text-gray-500">{activeFiling?.company?.name}</p>
           </div>
           {activeFiling && (() => {
@@ -1163,6 +1246,21 @@ export default function TaxFilingPage() {
       </div>
 
       {/* Form Sections - Accordion */}
+      {activeFiling?.formType === 'YEAR' && (
+        <TaxYearPanel
+          locale={locale}
+          companyId={activeFiling.companyId}
+          taxYear={activeFiling.taxYear}
+          fiscalStartMonth={Number(formData.fiscalStartMonth) || 1}
+          formData={formData}
+          obligationStatus={formData._obligations || {}}
+          onFormChange={updateField}
+          onObligationChange={(id, status) => updateField('_obligations', { ...(formData._obligations || {}), [id]: status })}
+          onFiscalMonthChange={(month) => updateField('fiscalStartMonth', month)}
+        />
+      )}
+
+      {isUsOfficialForm(activeFiling?.formType) && (
       <div className="space-y-3">
         {sections.map((section) => {
           const SIcon = section.icon;
@@ -1231,6 +1329,7 @@ export default function TaxFilingPage() {
           );
         })}
       </div>
+      )}
 
       {/* Notes */}
       <div className="bg-white border border-gray-200 rounded-xl p-5">

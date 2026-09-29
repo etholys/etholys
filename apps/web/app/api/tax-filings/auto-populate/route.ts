@@ -1,58 +1,94 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { getUserCompanyIds } from '@/lib/tenant';
+import { countryPack, fiscalRange, summarizeTaxYear } from '@/lib/atlas/tax-workspace';
 
 /**
- * Auto-populate tax form fields from system data.
- * POST body: { companyId, formType, taxYear }
- * Returns: { autoData } with mapped fields
+ * Auto-populate tax workspace / official form fields from ATLAS books.
+ * POST body: { companyId, formType, taxYear, fiscalStartMonth? }
  */
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    const { companyId, formType, taxYear } = await req.json();
+    const tenant = await getUserCompanyIds();
+    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    const { companyId, formType, taxYear, fiscalStartMonth } = await req.json();
     if (!companyId || !formType || !taxYear) {
       return NextResponse.json({ error: 'Parámetros requeridos' }, { status: 400 });
+    }
+    if (!tenant.companyIds.includes(companyId)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
     const company = await prisma.company.findUnique({ where: { id: companyId } });
     if (!company) return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
 
-    // Fetch transactions for the tax year
-    const yearStart = new Date(`${taxYear}-01-01`);
-    const yearEnd = new Date(`${parseInt(taxYear) + 1}-01-01`);
-    const transactions = await prisma.transaction.findMany({
-      where: {
-        companyId,
-        date: { gte: yearStart, lt: yearEnd },
-      },
-      orderBy: { date: 'asc' },
+    const startMonth = parseInt(String(fiscalStartMonth || 1), 10) || 1;
+    const { start, end } = fiscalRange(parseInt(String(taxYear), 10), startMonth);
+    const [transactions, invoices] = await Promise.all([
+      prisma.transaction.findMany({
+        where: { companyId, date: { gte: start, lt: end } },
+        orderBy: { date: 'asc' },
+      }),
+      prisma.invoice.findMany({
+        where: { companyId, isActive: true, issueDate: { gte: start, lt: end } },
+        select: { type: true, status: true, taxAmount: true, total: true, subtotal: true, issueDate: true },
+      }),
+    ]);
+
+    const summary = summarizeTaxYear(transactions, invoices, {
+      taxYear: parseInt(String(taxYear), 10),
+      currency: company.currency || 'USD',
+      fiscalStartMonth: startMonth,
     });
+    const pack = countryPack(company.incorporationCountry);
 
-    // Calculate totals
-    const income = transactions.filter(t => t.type === 'INCOME').reduce((s, t) => s + (t.amount || 0), 0);
-    const expenses = transactions.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + (t.amount || 0), 0);
-    const salaries = transactions.filter(t => t.type === 'EXPENSE' && (t.category || '').toLowerCase().includes('salar')).reduce((s, t) => s + (t.amount || 0), 0);
-    const rent = transactions.filter(t => t.type === 'EXPENSE' && (t.category || '').toLowerCase().includes('rent')).reduce((s, t) => s + (t.amount || 0), 0);
-    const taxes = transactions.filter(t => t.type === 'EXPENSE' && (t.category || '').toLowerCase().includes('tax')).reduce((s, t) => s + (t.amount || 0), 0);
-    const interest = transactions.filter(t => t.type === 'EXPENSE' && (t.category || '').toLowerCase().includes('inter')).reduce((s, t) => s + (t.amount || 0), 0);
+    const catOf = (needle: string) =>
+      summary.byCategory
+        .filter((c) => c.category.toLowerCase().includes(needle))
+        .reduce((s, c) => s + c.expense, 0);
 
-    // Fetch foreign owner info (company users with role ADMIN from outside US)
+    const salaries = catOf('salar');
+    const rent = catOf('rent') + catOf('alquil') + catOf('alug');
+    const taxes = catOf('tax') + catOf('impuest') + catOf('impost');
+    const interest = catOf('inter') + catOf('juro');
+
     const companyUsers = await prisma.companyUser.findMany({
       where: { companyId },
       include: { user: true },
     });
-    const owners = companyUsers.filter(cu => cu.role === 'ADMIN');
+    const owners = companyUsers.filter((cu) => cu.role === 'ADMIN');
 
-    let autoData: any = {};
+    let autoData: Record<string, unknown> = {
+      legalName: company.name,
+      taxCountry: company.incorporationCountry || pack.code,
+      entityType: company.entityType || '',
+      taxId: company.ein || '',
+      taxIdLabel: pack.taxIdLabel,
+      address: company.taxAddress || '',
+      cashIncome: summary.cashIncome,
+      cashExpense: summary.cashExpense,
+      cashResult: summary.cashResult,
+      invoiceOutputTax: summary.invoiceOutputTax,
+      invoiceInputTax: summary.invoiceInputTax,
+      vatName: pack.vatName,
+      _transactionCount: summary.executedCount,
+      _incomeTransactions: transactions.filter((t) => t.type === 'INCOME').length,
+      _expenseTransactions: transactions.filter((t) => t.type === 'EXPENSE').length,
+      _byCategory: summary.byCategory,
+      _summary: summary,
+    };
 
-    if (formType === '1120') {
+    if (formType === 'YEAR') {
       autoData = {
-        // Header
+        ...autoData,
+        dateIncorporated: company.incorporationDate ? new Date(company.incorporationDate).toISOString().slice(0, 10) : '',
+        businessActivity: company.businessActivity || '',
+      };
+    } else if (formType === '1120') {
+      autoData = {
+        ...autoData,
         corporationName: company.name,
         ein: company.ein || '',
         address: company.taxAddress || '',
@@ -60,29 +96,21 @@ export async function POST(req: Request) {
         totalAssets: 0,
         businessActivityCode: company.businessActivityCode || '',
         businessActivity: company.businessActivity || '',
-        // Income
-        grossReceipts: income,
-        totalIncome: income,
-        // Deductions
+        grossReceipts: summary.cashIncome,
+        totalIncome: summary.cashIncome,
         salariesAndWages: salaries,
         rents: rent,
         taxesAndLicenses: taxes,
         interestExpense: interest,
-        otherDeductions: expenses - salaries - rent - taxes - interest,
-        totalDeductions: expenses,
-        // Computed
-        taxableIncome: income - expenses,
-        // Schedule K question 7
+        otherDeductions: Math.max(0, summary.cashExpense - salaries - rent - taxes - interest),
+        totalDeductions: summary.cashExpense,
+        taxableIncome: summary.cashResult,
         foreignOwnership: owners.length > 0 ? 'Yes' : 'No',
-        // Data source info
-        _transactionCount: transactions.length,
-        _incomeTransactions: transactions.filter(t => t.type === 'INCOME').length,
-        _expenseTransactions: transactions.filter(t => t.type === 'EXPENSE').length,
       };
     } else if (formType === '5472') {
       const owner = owners[0];
       autoData = {
-        // Part I - Reporting Corporation
+        ...autoData,
         reportingCorpName: company.name,
         reportingCorpEIN: company.ein || '',
         reportingCorpAddress: company.taxAddress || '',
@@ -91,18 +119,14 @@ export async function POST(req: Request) {
         principalBusinessActivityCode: company.businessActivityCode || '',
         countryOfIncorporation: company.incorporationCountry || 'US',
         dateOfIncorporation: company.incorporationDate ? new Date(company.incorporationDate).toISOString().slice(0, 10) : '',
-        // Part II - 25% Foreign Shareholder
         foreignShareholderName: owner?.user?.name || '',
         foreignShareholderAddress: '',
-        // Part IV - Monetary Transactions (summary)
-        totalAmountsReceived: income,
-        totalAmountsPaid: expenses,
-        // Data source
-        _transactionCount: transactions.length,
+        totalAmountsReceived: summary.cashIncome,
+        totalAmountsPaid: summary.cashExpense,
       };
     }
 
-    return NextResponse.json({ autoData });
+    return NextResponse.json({ autoData, summary, pack: { code: pack.code, taxIdLabel: pack.taxIdLabel, vatName: pack.vatName } });
   } catch (error: any) {
     console.error('Auto-populate error:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
