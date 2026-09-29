@@ -10,9 +10,9 @@ export const ETHOLYS_PRODUCTS = {
     href: '/hub/aurora',
     license: 'NEXUS' as const,
     tagline: {
-      es: 'Incubadora virtual — técnicos, consultores e programas acompañan negocios.',
-      pt: 'Incubadora virtual — técnicos, consultores e programas acompanham negócios.',
-      en: 'Virtual incubator — technicians, consultants and programs accompany businesses.',
+      es: '',
+      pt: '',
+      en: '',
     },
   },
   polaris: {
