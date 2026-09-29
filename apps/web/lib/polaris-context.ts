@@ -6,7 +6,7 @@ import { isCatalogPortrait } from './polaris-map';
 import { isContextSetupMeaningful, type CompanyContextSetup } from './company-context-setup';
 
 /**
- * Leitura leve do ecossistema Etholys para o POLARIS (consultor permanente).
+ * Leitura leve do ecossistema Etholys para o POLARIS (guia de autodesenvolvimento / IA do sistema).
  * Sem scores Likert, sem consola de operação, sem inventar factos.
  */
 export async function loadPolarisEcosystemBrief(companyId: string): Promise<string> {

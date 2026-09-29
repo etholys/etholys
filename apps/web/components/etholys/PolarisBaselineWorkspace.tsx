@@ -21,7 +21,7 @@ function levelTone(level: AuroraMaturity | null | undefined) {
   return 'border-teal-400/40 bg-teal-500/15 text-teal-50';
 }
 
-/** Linha de base POLARIS — maturidade 1–5 por bloco + situação real. Alimenta o consultor permanente. */
+/** Linha de base POLARIS — maturidade 1–5 por bloco + situação real. Alimenta o guia de autodesenvolvimento (IA). */
 export function PolarisBaselineWorkspace({ embedded = false }: { embedded?: boolean }) {
   const { locale, activeCompanyId } = useApp();
   const search = useSearchParams();
@@ -71,10 +71,10 @@ export function PolarisBaselineWorkspace({ embedded = false }: { embedded?: bool
           level: 'Madurez',
           done: 'listos',
           of: 'de',
-          map: 'Abrir consultor permanente',
+          map: 'Abrir guía de autodesarrollo',
           needCompany: 'Elegí una empresa.',
           next: 'Seguir',
-          complete: 'Línea base completa. El consultor ya tiene de dónde partir.',
+          complete: 'Línea base completa. La IA del sistema ya tiene de dónde partir.',
         }
       : loc === 'en'
         ? {
@@ -90,10 +90,10 @@ export function PolarisBaselineWorkspace({ embedded = false }: { embedded?: bool
             level: 'Maturity',
             done: 'done',
             of: 'of',
-            map: 'Open standing consultant',
+            map: 'Open self-development guide',
             needCompany: 'Pick a company.',
             next: 'Continue',
-            complete: 'Baseline complete. The consultant has somewhere to start from.',
+            complete: 'Baseline complete. The system AI has somewhere to start from.',
           }
         : {
             title: 'Linha base',
@@ -108,10 +108,10 @@ export function PolarisBaselineWorkspace({ embedded = false }: { embedded?: bool
             level: 'Maturidade',
             done: 'feitos',
             of: 'de',
-            map: 'Abrir consultor permanente',
+            map: 'Abrir guia de autodesenvolvimento',
             needCompany: 'Escolhe uma empresa.',
             next: 'Seguir',
-            complete: 'Linha base completa. O consultor já tem de onde partir.',
+            complete: 'Linha base completa. A IA do sistema já tem de onde partir.',
           };
 
   const apply = (d: {

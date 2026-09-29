@@ -7,10 +7,10 @@ Nomes anteriores (NIDO / RUMO / PULSO) redirecionam para estas rotas.
 | Produto | Para quem | O que é | Rota |
 |---------|-----------|---------|------|
 | **AURORA** | técnicos, consultores, incubadoras | Incubadora virtual: mesmo método, carteira humana | `/hub/aurora` |
-| **POLARIS** | o negócio sozinho | Linha base de maturidade + consultor permanente (ecossistema Etholys) | `/hub/polaris` |
+| **POLARIS** | o negócio sozinho | Mapa de autodesenvolvimento: linha base de maturidade + acompanhamento com IA do sistema (ecossistema Etholys) | `/hub/polaris` |
 | **RADAR** | operação | Digitalização produtiva (dados, WhatsApp, alertas, automações) | `/hub/radar` |
 
-Método partilhado (AURORA e POLARIS): conversa → retrato editável → hipótese aceite → 2–4 apostas → ritmo semanal. Brechas máx. 5, potenciais máx. 3. Não é score de quiz Likert. Em POLARIS a **linha base** (`/hub/polaris/diagnosis`) radiografa maturidade 1–5 por blocos (mesmo motor do diagnóstico AURORA) antes do consultor permanente; o consultor junta essa linha base ao brief do ecossistema (FundHub, Work, Meet, Studio, memória, RADAR) e só então propõe avanço.
+Método partilhado (AURORA e POLARIS): conversa → retrato editável → hipótese aceite → 2–4 apostas → ritmo semanal. Brechas máx. 5, potenciais máx. 3. Não é score de quiz Likert. Em POLARIS a **linha base** (`/hub/polaris/diagnosis`) radiografa maturidade 1–5 por blocos (mesmo motor do diagnóstico AURORA) antes do guia de autodesenvolvimento; a **IA do sistema** (não há consultor humano externo) junta essa linha base ao brief do ecossistema (FundHub, Work, Meet, Studio, memória, RADAR) e só então propõe avanço.
 
 RADAR começa com quatro módulos: agricultura, agroindústria, pecuária, carbono. Liga-se a AURORA/POLARIS por `GET /api/radar/bridge` (`/api/pulso/bridge` continua como alias). Arquitetura, roadmap e fachada agrícola: [etholys-radar.md](./etholys-radar.md).
 

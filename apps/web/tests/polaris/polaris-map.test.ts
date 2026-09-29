@@ -88,16 +88,19 @@ test('selectNewBets respects the open cap and skips duplicates', () => {
   assert.equal(selectNewBets(['Pasta de evidência'], proposed, 4).length, 0);
 });
 
-test('polaris opening is consultant loading, not a diagnosis dump', () => {
+test('polaris opening is system AI loading, not a diagnosis dump', () => {
   assert.match(polarisOpening('pt'), /Etholys|ler/i);
   assert.doesNotMatch(polarisOpening('es'), /no puede quedar así/i);
   assert.equal(isCatalogPortrait('Diagnóstico NEXUS: 42/100.\nAtividade: hortas'), true);
   assert.equal(isCatalogPortrait('Assistimos cooperativas com editais e uma rede de confiança.'), false);
 });
 
-test('polaris prompt is a permanent consultant anchored on baseline maturity', () => {
+test('polaris prompt is system AI self-development guide anchored on baseline maturity', () => {
   const prompt = polarisSystemPrompt('pt');
-  assert.match(prompt, /consultor permanente/i);
+  assert.match(prompt, /IA do sistema/i);
+  assert.match(prompt, /autodesenvolvimento/i);
+  assert.doesNotMatch(prompt, /consultor permanente/i);
+  assert.match(prompt, /Não há consultor humano externo/i);
   assert.match(prompt, /LINHA BASE/i);
   assert.match(prompt, /maturidade/i);
   assert.match(prompt, /Etholys/);

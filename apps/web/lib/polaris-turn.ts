@@ -152,7 +152,7 @@ async function persistPolarisDraft(opts: {
   };
 }
 
-/** Primeiro turno: o consultor fala com base no ecossistema — a pessoa ainda não escreveu. */
+/** Primeiro turno: a IA do sistema fala com base no ecossistema — a pessoa ainda não escreveu. */
 export async function runPolarisOrient(opts: { companyId: string; userId: string; locale: PolarisLocale }) {
   await hydrateDossierFromNexus(opts.companyId, opts.userId);
   const [company, loaded, ecosystemBrief] = await Promise.all([

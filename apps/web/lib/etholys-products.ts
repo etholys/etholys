@@ -21,9 +21,9 @@ export const ETHOLYS_PRODUCTS = {
     href: '/hub/polaris',
     license: 'NEXUS' as const,
     tagline: {
-      es: '',
-      pt: '',
-      en: '',
+      es: 'Mapa de autodesarrollo — línea base de madurez y acompañamiento con IA del sistema.',
+      pt: 'Mapa de autodesenvolvimento — linha base de maturidade e acompanhamento com IA do sistema.',
+      en: 'Self-development map — maturity baseline and guidance with system AI.',
     },
   },
   radar: {

@@ -277,41 +277,41 @@ export function PolarisMapWorkspace() {
       ? {
           send: 'Enviar',
           placeholder: 'Corregí, completá o contá qué cambió.',
-          kicker: 'Consultor permanente',
+          kicker: 'Guía de autodesarrollo',
           thatsIt: 'Es esto',
           keep: 'Próximo paso',
           log: 'Anotar',
           active: 'en curso',
           done: 'hecha',
           needBaseline: 'Primero la línea base',
-          needBaselineLine: `Faltan áreas de madurez (${baselineDone}/${baselineTotal}). Sin eso el consultor no sabe de dónde partís.`,
+          needBaselineLine: `Faltan áreas de madurez (${baselineDone}/${baselineTotal}). Sin eso la IA del sistema no sabe de dónde partís.`,
           openBaseline: 'Construir línea base',
         }
       : loc === 'en'
         ? {
             send: 'Send',
             placeholder: 'Correct, complete, or say what changed.',
-            kicker: 'Standing consultant',
+            kicker: 'Self-development guide',
             thatsIt: "That's it",
             keep: 'Next step',
             log: 'Log it',
             active: 'on',
             done: 'done',
             needBaseline: 'Baseline first',
-            needBaselineLine: `Maturity areas still missing (${baselineDone}/${baselineTotal}). Without that the consultant has nowhere to start.`,
+            needBaselineLine: `Maturity areas still missing (${baselineDone}/${baselineTotal}). Without that the system AI has nowhere to start.`,
             openBaseline: 'Build baseline',
           }
         : {
             send: 'Enviar',
             placeholder: 'Corrige, completa ou conta o que mudou.',
-            kicker: 'Consultor permanente',
+            kicker: 'Guia de autodesenvolvimento',
             thatsIt: 'É isto',
             keep: 'Próximo passo',
             log: 'Anotar',
             active: 'a andar',
             done: 'feita',
             needBaseline: 'Primeiro a linha base',
-            needBaselineLine: `Ainda faltam áreas de maturidade (${baselineDone}/${baselineTotal}). Sem isso o consultor não sabe de onde partes.`,
+            needBaselineLine: `Ainda faltam áreas de maturidade (${baselineDone}/${baselineTotal}). Sem isso a IA do sistema não sabe de onde partes.`,
             openBaseline: 'Construir linha base',
           };
 
