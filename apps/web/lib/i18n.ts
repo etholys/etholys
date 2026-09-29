@@ -418,7 +418,32 @@ export function useTranslations(locale: Locale = 'es') {
   return (key: string) => t(key, locale);
 }
 
+/** Normalize app locale. Product default = Spanish (LATAM). */
+export function normalizeLocale(locale: string | null | undefined): Locale {
+  if (locale === 'pt' || locale === 'en' || locale === 'es') return locale;
+  return 'es';
+}
+
+/**
+ * Hub UI copy — always pass all three languages.
+ * Arg order: Spanish, Portuguese, English (matches product priority).
+ * Prefer this over ad-hoc `es ? … : …` (which drops English → Portuguese).
+ */
+export function ui(
+  locale: string | null | undefined,
+  es: string,
+  pt: string,
+  en: string,
+): string {
+  const L = normalizeLocale(locale);
+  if (L === 'pt') return pt;
+  if (L === 'en') return en;
+  return es;
+}
+
 /* Multilingual label helpers — used by pages that have many inline strings */
 export type ML = { es: string; pt: string; en: string };
+/** @deprecated Prefer `ui(locale, es, pt, en)` — ml() arg order is (en, es, pt) and is easy to swap. */
 export const ml = (en: string, es: string, pt: string): ML => ({ en, es, pt });
-export const getML = (m: ML, locale: Locale): string => m[locale] || m.en;
+/** Resolve ML object; fallback Spanish then English (never silently invent Portuguese). */
+export const getML = (m: ML, locale: Locale): string => m[locale] || m.es || m.en;
