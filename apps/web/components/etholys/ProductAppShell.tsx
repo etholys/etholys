@@ -159,7 +159,8 @@ export function ProductAppShell({
                 onRetry={() => void reloadCompanies()}
                 locale={loc}
                 compact
-                className="w-full border-white/15 bg-white/5 text-white"
+                tone="dark"
+                className="w-full"
               />
               {sidebarAfterCompany}
             </div>
