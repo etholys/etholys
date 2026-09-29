@@ -5,6 +5,7 @@ import { readOpportunityBriefing } from '@/lib/opportunity/briefing';
 import { patchScanCandidate } from '@/lib/opportunity/candidate-store';
 import { evaluateFit } from '@/lib/opportunity/fit';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
+import { prisma } from '@/lib/prisma';
 import type { ScanCandidate } from '@/lib/opportunity/scan-types';
 
 export async function POST(req: NextRequest) {
@@ -23,13 +24,29 @@ export async function POST(req: NextRequest) {
 
   const locale =
     body.locale === 'pt' || body.locale === 'en' || body.locale === 'es' ? body.locale : 'es';
-  const briefing = await readOpportunityBriefing(ctx.companyId);
-  const fit = evaluateFit(body.candidate, briefing, { locale });
+  const [briefing, partners] = await Promise.all([
+    readOpportunityBriefing(ctx.companyId),
+    prisma.fundhubPartner.findMany({
+      where: { companyId: ctx.companyId, isActive: true },
+      select: { id: true, name: true, country: true, role: true },
+      take: 40,
+      orderBy: { updatedAt: 'desc' },
+    }),
+  ]);
+  const fit = evaluateFit(body.candidate, briefing, { locale, partners });
   const runId = body.runId || body.candidate.runId;
   const tempId = body.tempId || body.candidate.tempId;
   if (runId && tempId) {
     await patchScanCandidate(ctx.companyId, runId, tempId, { fit });
   }
 
-  return NextResponse.json({ fit, briefing: { countries: briefing.countries, kinds: briefing.kinds } });
+  return NextResponse.json({
+    fit,
+    briefing: {
+      countries: briefing.countries,
+      kinds: briefing.kinds,
+      orgKind: briefing.orgKind,
+      legalCountries: briefing.legalCountries,
+    },
+  });
 }

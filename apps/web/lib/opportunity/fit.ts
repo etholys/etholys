@@ -59,7 +59,19 @@ const PRIVATE_ONLY =
   /solo empresas|somente empresas|only (private )?compan|exclusivamente (empresas|privad)/i;
 
 const NGO_OK =
-  /ong\b|ngo\b|nonprofit|nao governamental|organizacoes? da sociedade|sociedad civil|fundac/i;
+  /ong\b|ngo\b|nonprofit|nao governamental|organizacoes? da sociedade|sociedad civil|fundac|osc\b|cso\b/i;
+
+const OSC_OR_NGO_ONLY =
+  /solo (osc|ong|ong'?s|csos?)|somente (osc|ong)|only (ngos?|non[- ]profits?|csos?)|exclusivamente (ong|osc|sociedad civil)/i;
+
+const REQUIRES_LOCAL_REGISTRATION =
+  /registro (juridico|legal) (en|no|no pais|en el pais)|registered (in|within) (the )?country|establecida? (en|no)|sede (en|no)|constitui[dt]a (en|no)|personeria juridica (en|local)/i;
+
+const REQUIRES_AUDIT =
+  /auditoria (externa|independente|de los ultimos)|audited financial|estados financieros auditados|ultimos (3|5) anos audit/i;
+
+const REQUIRES_MIN_YEARS =
+  /minimo de (\d+)\s*anos|al menos (\d+)\s*anos|at least (\d+)\s*years|minimum (\d+)\s*years/i;
 
 function fold(value: string): string {
   return value
@@ -161,7 +173,11 @@ export function parseCandidateFit(raw: unknown): CandidateFit | undefined {
 export function evaluateFit(
   candidate: ScanCandidate,
   briefing: OpportunityBriefing,
-  opts?: { now?: number; locale?: string },
+  opts?: {
+    now?: number;
+    locale?: string;
+    partners?: Array<{ id?: string; name: string; country?: string | null; role?: string | null }>;
+  },
 ): CandidateFit {
   const locale = opts?.locale ?? 'es';
   const pt = locale === 'pt';
@@ -169,8 +185,9 @@ export function evaluateFit(
   const t = (a: string, b: string, c: string) => (pt ? a : es ? b : c);
   const text = haystack(candidate);
   const items: FitItem[] = [];
+  const callCountries = countryBlob(candidate);
 
-  const countryStatus = countriesOverlap(briefing.countries, countryBlob(candidate));
+  const countryStatus = countriesOverlap(briefing.countries, callCountries);
   items.push({
     id: 'country',
     label: t('País', 'País', 'Country'),
@@ -183,11 +200,25 @@ export function evaluateFit(
           : t('País do perfil ou da convocatória em falta.', 'Falta el país del perfil o de la convocatoria.', 'Country on the profile or call is missing.'),
   });
 
-  const ours = orgBucket(briefing.entityType || briefing.notes);
+  const mappedKind =
+    briefing.orgKind === 'osc' || briefing.orgKind === 'ngo' || briefing.orgKind === 'foundation'
+      ? 'ngo'
+      : briefing.orgKind === 'private'
+        ? 'private'
+        : briefing.orgKind === 'public'
+          ? 'public'
+          : briefing.orgKind === 'coop'
+            ? 'coop'
+            : orgBucket(briefing.entityType || briefing.notes);
+  const ours = mappedKind === 'coop' ? 'ngo' : mappedKind;
+
   let orgStatus: FitItemStatus = 'unknown';
   let orgNote = t('Tipo de organização ainda não está no perfil.', 'El tipo de organización aún no está en el perfil.', 'Organization type is not on the profile yet.');
   if (ours !== 'unknown') {
-    if (ours === 'private' && PUBLIC_ONLY.test(text) && !PRIVATE_OK.test(text)) {
+    if (OSC_OR_NGO_ONLY.test(text) && ours === 'private') {
+      orgStatus = 'no_go';
+      orgNote = t('Edital parece só para OSC/ONG — a org é privada.', 'El edicto parece solo para OSC/ONG — la org es privada.', 'Call looks OSC/NGO-only — org is private.');
+    } else if (ours === 'private' && PUBLIC_ONLY.test(text) && !PRIVATE_OK.test(text)) {
       orgStatus = 'no_go';
       orgNote = t('A convocatória parece só para entidades públicas.', 'La convocatoria parece solo para entidades públicas.', 'The call looks public-sector only.');
     } else if (ours === 'public' && PRIVATE_ONLY.test(text) && !NGO_OK.test(text)) {
@@ -201,12 +232,75 @@ export function evaluateFit(
       orgNote = t('Nada no texto exclui o tipo da organização.', 'Nada en el texto excluye el tipo de organización.', 'Nothing in the text excludes this organization type.');
     }
   }
-  items.push({
-    id: 'org_type',
-    label: t('Tipo de organização', 'Tipo de organización', 'Organization type'),
-    status: orgStatus,
-    note: orgNote,
-  });
+  items.push({ id: 'org_type', label: t('Tipo de organização', 'Tipo de organización', 'Organization type'), status: orgStatus, note: orgNote });
+
+  let legalStatus: FitItemStatus = 'unknown';
+  let legalNote = t('Registo jurídico por país ainda não está no perfil.', 'Registro jurídico por país aún no está en el perfil.', 'Legal registration by country is not on the profile yet.');
+  if (REQUIRES_LOCAL_REGISTRATION.test(text) || countryStatus === 'go') {
+    const legal = briefing.legalCountries ?? [];
+    if (!legal.length) {
+      legalStatus = REQUIRES_LOCAL_REGISTRATION.test(text) ? 'caution' : 'unknown';
+      legalNote = t('Complete os países de registo jurídico no perfil.', 'Complete los países de registro jurídico en el perfil.', 'Complete legal-registration countries on the profile.');
+    } else if (callCountries && countriesOverlap(legal, callCountries) === 'no_go') {
+      legalStatus = 'caution';
+      legalNote = t('Pode faltar registo jurídico no país da convocatória — considere um sócio local.', 'Puede faltar registro jurídico en el país de la convocatoria — considere un socio local.', 'You may lack legal registration in the call country — consider a local partner.');
+    } else if (countriesOverlap(legal, callCountries) === 'go') {
+      legalStatus = 'go';
+      legalNote = t('Há registo jurídico alinhado com a geografia da call.', 'Hay registro jurídico alineado con la geografía de la call.', 'Legal registration aligns with the call geography.');
+    }
+  }
+  items.push({ id: 'legal_registration', label: t('Registo jurídico', 'Registro jurídico', 'Legal registration'), status: legalStatus, note: legalNote });
+
+  let auditStatus: FitItemStatus = 'unknown';
+  let auditNote = t('Auditoria ainda não está no perfil.', 'Auditoría aún no está en el perfil.', 'Audit status is not on the profile yet.');
+  if (REQUIRES_AUDIT.test(text)) {
+    if (briefing.hasAuditLast5Years === true) {
+      auditStatus = 'go';
+      auditNote = t('Perfil indica auditoria nos últimos 5 anos.', 'El perfil indica auditoría en los últimos 5 años.', 'Profile indicates an audit in the last 5 years.');
+    } else if (briefing.hasAuditLast5Years === false) {
+      auditStatus = 'no_go';
+      auditNote = t('A call pede auditoria e o perfil diz que não há.', 'La call pide auditoría y el perfil dice que no hay.', 'The call asks for an audit and the profile says there is none.');
+    } else {
+      auditStatus = 'caution';
+      auditNote = t('A call menciona auditoria — complete o perfil.', 'La call menciona auditoría — complete el perfil.', 'The call mentions an audit — complete the profile.');
+    }
+  } else if (briefing.hasAuditLast5Years === true) {
+    auditStatus = 'go';
+    auditNote = t('Auditoria registada no perfil.', 'Auditoría registrada en el perfil.', 'Audit recorded on the profile.');
+  }
+  items.push({ id: 'audit', label: t('Auditoria', 'Auditoría', 'Audit'), status: auditStatus, note: auditNote });
+
+  let maturityStatus: FitItemStatus = 'unknown';
+  let maturityNote = t('Anos de operação / maturidade ainda não estão no perfil.', 'Años de operación / madurez aún no están en el perfil.', 'Years operating / maturity are not on the profile yet.');
+  const yearsMatch = text.match(REQUIRES_MIN_YEARS);
+  const requiredYears = yearsMatch ? Number(yearsMatch[1] || yearsMatch[2] || yearsMatch[3] || yearsMatch[4]) : null;
+  if (requiredYears != null && Number.isFinite(requiredYears)) {
+    if (briefing.yearsOperating == null) {
+      maturityStatus = 'caution';
+      maturityNote = t(`A call pede ~${requiredYears} anos — complete o perfil.`, `La call pide ~${requiredYears} años — complete el perfil.`, `The call asks for ~${requiredYears} years — complete the profile.`);
+    } else if (briefing.yearsOperating < requiredYears) {
+      maturityStatus = 'no_go';
+      maturityNote = t(`Perfil tem ${briefing.yearsOperating} anos; a call pede ~${requiredYears}.`, `El perfil tiene ${briefing.yearsOperating} años; la call pide ~${requiredYears}.`, `Profile has ${briefing.yearsOperating} years; the call asks for ~${requiredYears}.`);
+    } else {
+      maturityStatus = 'go';
+      maturityNote = t('Anos de operação suficientes vs. texto da call.', 'Años de operación suficientes vs. texto de la call.', 'Years operating look sufficient vs. the call text.');
+    }
+  } else if (briefing.yearsOperating != null || briefing.maturityLevel) {
+    maturityStatus = 'go';
+    maturityNote = t(`Maturidade: ${briefing.maturityLevel ?? '—'}; anos: ${briefing.yearsOperating ?? '—'}`, `Madurez: ${briefing.maturityLevel ?? '—'}; años: ${briefing.yearsOperating ?? '—'}`, `Maturity: ${briefing.maturityLevel ?? '—'}; years: ${briefing.yearsOperating ?? '—'}`);
+  }
+  items.push({ id: 'maturity', label: t('Maturidade', 'Madurez', 'Maturity'), status: maturityStatus, note: maturityNote });
+
+  let revenueStatus: FitItemStatus = 'unknown';
+  let revenueNote = t('Faturamento por ano ainda não está no perfil.', 'Facturación por año aún no está en el perfil.', 'Yearly revenue is not on the profile yet.');
+  if (briefing.revenueByYear?.length) {
+    revenueStatus = 'go';
+    revenueNote = t(`${briefing.revenueByYear.length} ano(s) de faturamento no perfil.`, `${briefing.revenueByYear.length} año(s) de facturación en el perfil.`, `${briefing.revenueByYear.length} year(s) of revenue on the profile.`);
+  } else if (/facturacion|revenue|ingresos|faturamento|turnover/i.test(text)) {
+    revenueStatus = 'caution';
+    revenueNote = t('A call fala de receita/faturamento — complete o perfil.', 'La call habla de ingresos/facturación — complete el perfil.', 'The call mentions revenue — complete the profile.');
+  }
+  items.push({ id: 'revenue', label: t('Faturamento', 'Facturación', 'Revenue'), status: revenueStatus, note: revenueNote });
 
   let privateStatus: FitItemStatus = 'unknown';
   let privateNote = t('Preferência de privado não está no briefing.', 'La preferencia de privado no está en el briefing.', 'Private-company preference is not in the briefing.');
@@ -223,17 +317,11 @@ export function evaluateFit(
     }
   } else if (briefing.privateEligible === false) {
     privateStatus = PRIVATE_ONLY.test(text) ? 'caution' : 'go';
-    privateNote =
-      privateStatus === 'caution'
-        ? t('Edital parece só para empresas privadas.', 'El edicto parece solo para empresas privadas.', 'The call looks private-company only.')
-        : t('Não exige empresa privada.', 'No exige empresa privada.', 'Does not require a private company.');
+    privateNote = privateStatus === 'caution'
+      ? t('Edital parece só para empresas privadas.', 'El edicto parece solo para empresas privadas.', 'The call looks private-company only.')
+      : t('Não exige empresa privada.', 'No exige empresa privada.', 'Does not require a private company.');
   }
-  items.push({
-    id: 'private',
-    label: t('Privado elegível', 'Privado elegible', 'Private eligible'),
-    status: privateStatus,
-    note: privateNote,
-  });
+  items.push({ id: 'private', label: t('Privado elegível', 'Privado elegible', 'Private eligible'), status: privateStatus, note: privateNote });
 
   let ceiling: FitItemStatus = 'unknown';
   let ceilingNote = t('Sem teto no perfil ou sem montante na convocatória.', 'Sin techo en el perfil o sin monto en la convocatoria.', 'No ceiling on the profile or no amount on the call.');
@@ -252,12 +340,7 @@ export function evaluateFit(
     ceiling = 'caution';
     ceilingNote = t('Montante abaixo do mínimo preferido.', 'Monto por debajo del mínimo preferido.', 'Amount is below the preferred minimum.');
   }
-  items.push({
-    id: 'ceiling',
-    label: t('Teto', 'Techo', 'Ceiling'),
-    status: ceiling,
-    note: ceilingNote,
-  });
+  items.push({ id: 'ceiling', label: t('Teto', 'Techo', 'Ceiling'), status: ceiling, note: ceilingNote });
 
   const kind = mapKind(candidate.type);
   const wantedKinds = briefing.kinds?.length ? briefing.kinds : undefined;
@@ -265,21 +348,15 @@ export function evaluateFit(
   let kindNote = t('Tipo da oportunidade pouco claro.', 'Tipo de la oportunidad poco claro.', 'Opportunity type is unclear.');
   if (kind && wantedKinds) {
     kindStatus = wantedKinds.includes(kind) ? 'go' : 'no_go';
-    kindNote =
-      kindStatus === 'go'
-        ? t('O tipo bate com o briefing (grant / crédito / aliança).', 'El tipo coincide con el briefing.', 'Type matches the briefing (grant / credit / alliance).')
-        : t('O tipo não está no que pediu no briefing.', 'El tipo no está en lo pedido en el briefing.', 'Type is not what the briefing asked for.');
+    kindNote = kindStatus === 'go'
+      ? t('O tipo bate com o briefing (grant / crédito / aliança).', 'El tipo coincide con el briefing.', 'Type matches the briefing (grant / credit / alliance).')
+      : t('O tipo não está no que pediu no briefing.', 'El tipo no está en lo pedido en el briefing.', 'Type is not what the briefing asked for.');
   }
   if (briefing.reimbursable === false && kind === 'credit') {
     kindStatus = kindStatus === 'go' ? 'caution' : kindStatus;
     kindNote = t('Preferiu não reembolsável, mas isto parece crédito.', 'Prefirió no reembolsable, pero esto parece crédito.', 'You preferred non-reimbursable, but this looks like credit.');
   }
-  items.push({
-    id: 'kind',
-    label: t('Grant vs crédito', 'Grant vs crédito', 'Grant vs credit'),
-    status: kindStatus,
-    note: kindNote,
-  });
+  items.push({ id: 'kind', label: t('Grant vs crédito', 'Grant vs crédito', 'Grant vs credit'), status: kindStatus, note: kindNote });
 
   const days = daysUntilClose(candidate, opts?.now);
   let deadline: FitItemStatus = 'unknown';
@@ -294,16 +371,34 @@ export function evaluateFit(
     deadline = 'go';
     deadlineNote = t('Prazo ainda aberto.', 'Plazo aún abierto.', 'Deadline is still open.');
   }
-  items.push({
-    id: 'deadline',
-    label: t('Prazo aberto', 'Plazo abierto', 'Deadline open'),
-    status: deadline,
-    note: deadlineNote,
-  });
+  items.push({ id: 'deadline', label: t('Prazo aberto', 'Plazo abierto', 'Deadline open'), status: deadline, note: deadlineNote });
+
+  const needsPartner = legalStatus === 'caution' || legalStatus === 'no_go' || orgStatus === 'no_go' || countryStatus === 'no_go';
+  const suggestedPartners =
+    needsPartner && opts?.partners?.length
+      ? opts.partners
+          .filter((p) => {
+            if (!p.country?.trim() || !callCountries) return true;
+            return countriesOverlap([p.country], callCountries) !== 'no_go';
+          })
+          .slice(0, 4)
+          .map((p) => ({
+            id: p.id,
+            name: p.name,
+            country: p.country,
+            role: p.role,
+            reason: t(
+              'Pode reforçar elegibilidade local / tipo de org nesta call.',
+              'Puede reforzar elegibilidad local / tipo de org en esta call.',
+              'May strengthen local eligibility / org type on this call.',
+            ),
+          }))
+      : undefined;
 
   return {
     verdict: worst(items),
     items,
     evaluatedAt: new Date(opts?.now ?? Date.now()).toISOString(),
+    suggestedPartners: suggestedPartners?.length ? suggestedPartners : undefined,
   };
 }

@@ -484,6 +484,29 @@ export function CandidateDetailSheet({
                       ))}
                     </ul>
                   )}
+                  {fit?.suggestedPartners && fit.suggestedPartners.length > 0 && (
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                        {t('Sócios sugeridos', 'Socios sugeridos', 'Suggested partners')}
+                      </p>
+                      <ul className="mt-1 space-y-1">
+                        {fit.suggestedPartners.map((p) => (
+                          <li key={`${p.name}-${p.country ?? ''}`} className="text-xs text-amber-950">
+                            <span className="font-medium">{p.name}</span>
+                            {p.country ? ` · ${p.country}` : ''}
+                            {p.role ? ` · ${p.role}` : ''}
+                            <span className="block text-amber-800/80">{p.reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <a
+                        href="/hub/fundhub/partners"
+                        className="mt-1 inline-block text-[11px] font-medium text-amber-900 underline"
+                      >
+                        {t('Gerir sócios', 'Gestionar socios', 'Manage partners')}
+                      </a>
+                    </div>
+                  )}
                   {fit?.verdict === 'no_go' && onFeedback && (
                     <button
                       type="button"

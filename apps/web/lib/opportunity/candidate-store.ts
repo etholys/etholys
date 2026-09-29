@@ -200,7 +200,7 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
       }),
     );
   }
-  return out.slice(0, 24);
+  return out.slice(0, 48);
 }
 
 export async function patchScanCandidate(

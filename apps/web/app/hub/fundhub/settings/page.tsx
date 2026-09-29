@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Settings2, ShieldCheck, Building2, ArrowRight, Radar } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Building2, ArrowRight, Radar, Network } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { MonitoredSourcesPanel } from '@/components/opportunity/MonitoredSourcesPanel';
+import { EligibilityProfileForm } from '@/components/fundhub/EligibilityProfileForm';
 
 export default function FundHubSettingsPage() {
   const { locale } = useApp();
@@ -13,23 +14,29 @@ export default function FundHubSettingsPage() {
   return (
     <div className="space-y-6">
       <main>
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Link href="/hub/fundhub" className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
-              <ArrowLeft className="w-4 h-4" />
-              FundHub
-            </Link>
-            <h1 className="mt-3 text-3xl font-bold text-gray-900">
-              {t('Definições', 'Ajustes', 'Settings')}
-            </h1>
-            <p className="text-sm text-gray-600 mt-2">
-              {t('Fontes extra, acesso e perfil.', 'Fuentes extra, acceso y perfil.', 'Extra sources, access, and profile.')}
-            </p>
-          </div>
-          <div className="inline-flex items-center gap-3 rounded-3xl bg-white px-4 py-3 text-sm text-gray-700 shadow-sm ring-1 ring-gray-200">
-            <Settings2 className="w-5 h-5 text-amber-600" />
-            {t('Ajustes', 'Ajustes', 'Settings')}
-          </div>
+        <div className="mb-8">
+          <Link href="/hub/fundhub" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
+            <ArrowLeft className="h-4 w-4" />
+            FundHub
+          </Link>
+          <h1 className="mt-3 text-3xl font-bold text-gray-900">
+            {t('Definições', 'Ajustes', 'Settings')}
+          </h1>
+          <p className="mt-2 text-sm text-gray-600">
+            {t('Elegibilidade, fontes e acesso.', 'Elegibilidad, fuentes y acceso.', 'Eligibility, sources, and access.')}
+          </p>
+        </div>
+
+        <div className="mb-8">
+          <EligibilityProfileForm />
+          <Link
+            href="/hub/fundhub/crm"
+            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-amber-800 hover:underline"
+          >
+            <Network className="h-4 w-4" />
+            {t('Abrir CRM de captação', 'Abrir CRM de captación', 'Open capture CRM')}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
 
         <section className="space-y-2">
@@ -55,10 +62,6 @@ export default function FundHubSettingsPage() {
                 'Who can open FundHub and other systems.',
               )}
             </p>
-            <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-amber-700 group-hover:underline">
-              {t('Gerir', 'Gestionar', 'Manage')}
-              <ArrowRight className="h-4 w-4" />
-            </span>
           </Link>
 
           <Link
@@ -72,10 +75,6 @@ export default function FundHubSettingsPage() {
             <p className="mt-2 text-sm text-gray-600">
               {t('Critérios e atalhos de busca.', 'Criterios y atajos de búsqueda.', 'Search criteria and shortcuts.')}
             </p>
-            <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-amber-700 group-hover:underline">
-              {t('Abrir Buscar', 'Abrir Buscar', 'Open Search')}
-              <ArrowRight className="h-4 w-4" />
-            </span>
           </Link>
 
           <Link
@@ -84,22 +83,12 @@ export default function FundHubSettingsPage() {
           >
             <div className="flex items-center gap-2 text-slate-800">
               <Building2 className="h-5 w-5" />
-              <span className="font-semibold">{t('Administração Etholys', 'Administración Etholys', 'Etholys administration')}</span>
+              <span className="font-semibold">
+                {t('Administração Etholys', 'Administración Etholys', 'Etholys administration')}
+              </span>
             </div>
-            <p className="mt-2 text-sm text-gray-600">
-              {t(
-                'Empresas, convites, perfil e licenças de sistemas.',
-                'Empresas, invitaciones, perfil y licencias de sistemas.',
-                'Companies, invitations, profile, and system licenses.',
-              )}
-            </p>
-            <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-slate-700 group-hover:underline">
-              {t('Abrir', 'Abrir', 'Open')}
-              <ArrowRight className="h-4 w-4" />
-            </span>
           </Link>
         </section>
-
       </main>
     </div>
   );

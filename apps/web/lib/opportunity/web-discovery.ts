@@ -11,7 +11,7 @@ import {
   isHomogeneousInstitutionSet,
   type DiscoveryQueryPack,
 } from '@/lib/opportunity/discovery-queries';
-import { FUNDHUB_DISCOVERY_MODEL, fundhubScoutModel } from '@/lib/opportunity/fundhub-llm';
+import { FUNDHUB_DISCOVERY_MODEL, fundhubScoutModel, fundhubStructureJsonText } from '@/lib/opportunity/fundhub-llm';
 import { salvageJsonText, truncateForStructure } from '@/lib/opportunity/json-salvage';
 import { formatOpportunityScoutBrief } from '@/lib/opportunity/scout-brief';
 import { enrichAndFilterCandidates } from '@/lib/opportunity/enrich-call';
@@ -86,7 +86,7 @@ availabilityStatus ("open_now" or "rolling"),
 matchScore (0-100), matchJustification (1 line), sourceUrl,
 classification (direct|client_bridge|joint).
 
-Return 8–14 candidates from DISTINCT institutions. Prefer complete JSON over long essays.
+Return 12–24 candidates from DISTINCT institutions when they exist. Prefer complete JSON over long essays.
 Skip EXISTING duplicates. Never invent URLs.
 
 ${OFFICIAL_LINK_PROMPT_RULES}`,
@@ -215,34 +215,33 @@ export async function discoverOpportunitiesOnline(opts: {
       `\nEXISTING (skip duplicates):\n${existingBlock.slice(0, 4000)}`,
       `\nBRIEFING:\n${briefingLines(opts.briefing)}`,
       focusHint,
-      `\nKeep each description under 400 characters. Prefer 8–14 complete candidates over a truncated dump.`,
+      `\nKeep each description under 400 characters. Prefer 12–24 complete candidates over a truncated dump.`,
     ].join('');
 
-    const jsonText = await llmCompleteJsonText(STRUCTURE_SYSTEM, structureUser, {
-      maxOutputTokens: 16000,
-      model: FUNDHUB_DISCOVERY_MODEL,
+    const structured = await fundhubStructureJsonText(STRUCTURE_SYSTEM, structureUser, {
+      maxOutputTokens: 20000,
       allowTruncated: true,
     });
+    console.info('[opportunity/web-discovery] structure via', structured.via);
     let parsed: { candidates?: unknown[] } = { candidates: [] };
     try {
-      parsed = JSON.parse(salvageJsonText(jsonText)) as { candidates?: unknown[] };
+      parsed = JSON.parse(salvageJsonText(structured.text)) as { candidates?: unknown[] };
     } catch (e) {
       console.warn('[opportunity/web-discovery] structure JSON parse failed, retry compact:', e);
-      const retryText = await llmCompleteJsonText(
+      const retry = await fundhubStructureJsonText(
         STRUCTURE_SYSTEM,
         [
           `RESEARCH REPORT (compact):\n${truncateForStructure(research, 14_000)}`,
           `\nEXISTING:\n${existingBlock.slice(0, 2000)}`,
           `\nBRIEFING:\n${briefingLines(opts.briefing)}`,
-          `\nReturn at most 8 candidates. Very short fields. Valid JSON only.`,
+          `\nReturn at most 12 candidates. Very short fields. Valid JSON only.`,
         ].join(''),
         {
-          maxOutputTokens: 8000,
-          model: FUNDHUB_DISCOVERY_MODEL,
+          maxOutputTokens: 10000,
           allowTruncated: true,
         },
       );
-      parsed = JSON.parse(salvageJsonText(retryText)) as { candidates?: unknown[] };
+      parsed = JSON.parse(salvageJsonText(retry.text)) as { candidates?: unknown[] };
     }
     let candidates = normalizeCandidates(parsed.candidates ?? [], scanFocus).map((c) =>
       sanitizeCandidateDates({

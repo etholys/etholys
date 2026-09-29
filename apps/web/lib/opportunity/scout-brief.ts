@@ -27,6 +27,20 @@ export function formatOpportunityScoutBrief(b: OpportunityBriefing): string {
     b.amountMin != null ? `Montante mínimo: ${b.amountMin} USD` : '',
     b.privateEligible ? 'Elegibilidade: empresas privadas OK' : '',
     b.reimbursable === false ? 'Só financiamento NÃO reembolsável (grants). Sem empréstimos.' : '',
+    b.orgKind ? `Tipo de organização (perfil): ${b.orgKind}` : '',
+    b.legalCountries?.length
+      ? `Registo jurídico / filiais em: ${b.legalCountries.join(', ')}`
+      : '',
+    b.yearsOperating != null ? `Anos de operação: ${b.yearsOperating}` : '',
+    b.maturityLevel ? `Maturidade: ${b.maturityLevel}` : '',
+    b.hasAuditLast5Years === true
+      ? 'Auditoria externa nos últimos 5 anos: sim'
+      : b.hasAuditLast5Years === false
+        ? 'Auditoria externa nos últimos 5 anos: não'
+        : '',
+    b.revenueByYear?.length
+      ? `Faturamento (USD): ${b.revenueByYear.map((r) => `${r.year}=${r.amountUsd}`).join('; ')}`
+      : '',
     `Classificações a etiquetar: ${classes}`,
     b.notes
       ? `CRITÉRIOS DE PRIORIDADE (só para matchScore / justificação — NÃO excluir uma convocatória aberta real se coincidir só com parte disto):\n${b.notes}`

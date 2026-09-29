@@ -11,6 +11,17 @@ export type AvailabilityStatus = (typeof AVAILABILITY_STATUSES)[number];
 export const OPPORTUNITY_CLASSIFICATIONS = ['direct', 'client_bridge', 'joint'] as const;
 export type OpportunityClassification = (typeof OPPORTUNITY_CLASSIFICATIONS)[number];
 
+export type OrgKindForFunding =
+  | 'ngo'
+  | 'osc'
+  | 'private'
+  | 'public'
+  | 'coop'
+  | 'foundation'
+  | 'other';
+
+export type RevenueYear = { year: number; amountUsd: number };
+
 export type OpportunityBriefing = {
   themes: string[];
   countries: string[];
@@ -30,6 +41,18 @@ export type OpportunityBriefing = {
   reimbursable?: boolean;
   /** Tipo societário da empresa (Company.entityType). */
   entityType?: string;
+  /** Camada B — elegibilidade institucional. */
+  orgKind?: OrgKindForFunding;
+  /** Países onde a org tem registo jurídico / filial. */
+  legalCountries?: string[];
+  /** Anos de operação / maturidade aproximada. */
+  yearsOperating?: number;
+  maturityLevel?: 'early' | 'growing' | 'established';
+  /** Auditoria externa nos últimos 5 anos. */
+  hasAuditLast5Years?: boolean;
+  auditYears?: number[];
+  /** Faturamento (USD) por ano — até 5 anos. */
+  revenueByYear?: RevenueYear[];
 };
 
 export type ScanProfile = {
@@ -79,6 +102,14 @@ export type CandidateFit = {
   verdict: FitVerdict;
   items: FitItem[];
   evaluatedAt: string;
+  /** Sócios da rede que podem desbloquear elegibilidade (país / tipo). */
+  suggestedPartners?: Array<{
+    id?: string;
+    name: string;
+    country?: string | null;
+    role?: string | null;
+    reason: string;
+  }>;
 };
 
 export type ScanCandidate = {

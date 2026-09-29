@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '@/app/providers';
+import { ui } from '@/lib/i18n';
 import Link from 'next/link';
 import {
   LayoutDashboard,
@@ -26,9 +27,11 @@ import {
   HandCoins,
   MapPin,
   Handshake,
+  Network,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
+import { FundHubAssistantDock } from '@/components/fundhub/FundHubAssistantDock';
 
 export default function FundHubLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -127,12 +130,17 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
     {
       href: '/hub/fundhub/compliance',
       icon: ShieldCheck,
-      label: 'Compliance',
+      label: ui(locale, 'Cumplimiento', 'Compliance', 'Compliance'),
     },
     {
       href: '/hub/fundhub/coalition',
       icon: Users,
       label: locale === 'es' ? 'Coalición' : locale === 'pt' ? 'Coalizão' : 'Coalition',
+    },
+    {
+      href: '/hub/fundhub/crm',
+      icon: Network,
+      label: locale === 'es' ? 'CRM' : locale === 'pt' ? 'CRM' : 'CRM',
     },
     {
       href: '/hub/fundhub/partners',
@@ -142,7 +150,12 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
   ];
 
   const bottomItems = [
-    { href: '/chat', icon: MessageCircle, label: 'Chat', badge: chatUnread > 0 ? chatUnread : undefined },
+    {
+      href: '/chat',
+      icon: MessageCircle,
+      label: ui(locale, 'Chat', 'Chat', 'Chat'),
+      badge: chatUnread > 0 ? chatUnread : undefined,
+    },
     { href: '/hub/fundhub/settings', icon: Settings, label: tr('nav.settings') },
   ];
 
@@ -523,7 +536,10 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
 
         <main className={cn('fh-canvas min-w-0 flex-1 overflow-auto', pathname?.includes('/fundhub/proposals/editor') ? 'p-3 md:p-4' : 'p-4 md:p-6')}>
           <div className={cn('mx-auto', pathname?.includes('/fundhub/proposals/editor') ? 'max-w-[1400px]' : 'max-w-6xl')}>
-            <SystemLicenseGate system="FUNDHUB">{children}</SystemLicenseGate>
+            <SystemLicenseGate system="FUNDHUB">
+              {children}
+              <FundHubAssistantDock />
+            </SystemLicenseGate>
           </div>
         </main>
       </div>
