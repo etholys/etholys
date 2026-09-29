@@ -173,27 +173,39 @@ export async function POST(req: Request) {
         projectName: invitation.project?.name,
         code: invitation.code,
         loginUrl,
-        expiresDays: 7,
+        expiresDays: 14,
+        accessMonths: 6,
         includeRikoltoCatalog: companyName.toLowerCase().includes('rikolto'),
       });
-      if (process.env.ABACUSAI_API_KEY) {
-        await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deployment_token: process.env.ABACUSAI_API_KEY,
-            app_id: process.env.WEB_APP_ID,
-            notification_id: process.env.NOTIF_ID_INVITACIN_A_EMPRESA,
-            subject,
-            body: htmlBody,
-            is_html: true,
-            recipient_email: data.email,
-            sender_email: 'noreply@etholys.abacusai.app',
-            sender_alias: 'ETHOLYS',
-          }),
-        });
-      } else {
-        await sendAuthHtmlEmail({ to: data.email, subject, html: htmlBody });
+
+      // Prefer Resend — Abacus notification API is often expired/hanging and breaks the UI ("Failed to fetch").
+      const resend = await sendAuthHtmlEmail({ to: data.email, subject, html: htmlBody });
+      if (!resend.sent && process.env.ABACUSAI_API_KEY) {
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), 8_000);
+        try {
+          await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: ac.signal,
+            body: JSON.stringify({
+              deployment_token: process.env.ABACUSAI_API_KEY,
+              app_id: process.env.WEB_APP_ID,
+              notification_id: process.env.NOTIF_ID_INVITACIN_A_EMPRESA,
+              subject,
+              body: htmlBody,
+              is_html: true,
+              recipient_email: data.email,
+              sender_email: 'noreply@etholys.abacusai.app',
+              sender_alias: 'ETHOLYS',
+            }),
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+      if (!resend.sent && resend.error) {
+        console.warn('[invitations] email not sent:', resend.error);
       }
     } catch (emailErr) {
       console.error('Error sending invitation email:', emailErr);

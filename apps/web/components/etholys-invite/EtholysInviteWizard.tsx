@@ -265,7 +265,18 @@ export function EtholysInviteWizard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const d = await r.json();
+      let d: { error?: string; invitation?: { code?: string; alreadyAccepted?: boolean } } = {};
+      try {
+        d = (await r.json()) as typeof d;
+      } catch {
+        throw new Error(
+          t(
+            'Sem resposta do servidor. Tente novamente.',
+            'Sin respuesta del servidor. Intente de nuevo.',
+            'No server response. Please try again.',
+          ),
+        );
+      }
       if (!r.ok) throw new Error(d.error || 'Error');
       onSuccess?.({
         code: d.invitation?.code,
@@ -273,7 +284,16 @@ export function EtholysInviteWizard({
         email: email.trim().toLowerCase(),
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error');
+      const msg = e instanceof Error ? e.message : 'Error';
+      setError(
+        msg === 'Failed to fetch'
+          ? t(
+              'Falha de rede ao enviar. Tente novamente.',
+              'Fallo de red al enviar. Intente de nuevo.',
+              'Network error while sending. Please try again.',
+            )
+          : msg,
+      );
     } finally {
       setBusy(false);
     }
