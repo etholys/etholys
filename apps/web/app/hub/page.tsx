@@ -447,26 +447,12 @@ export default function HubPage() {
             </button>
             {canManage && (
               <Link
-                href="/hub/setup"
+                href="/hub/admin"
                 className="hidden rounded-md px-2 py-1.5 text-xs text-white/50 transition hover:bg-white/5 hover:text-white sm:inline-flex"
               >
-                {t(locale, 'Organización', 'Organização', 'Organization')}
+                {t(locale, 'Administración', 'Administração', 'Administration')}
               </Link>
             )}
-            {canManage && (
-              <Link
-                href="/hub/billing"
-                className="hidden rounded-md px-2 py-1.5 text-xs text-white/50 transition hover:bg-white/5 hover:text-white sm:inline-flex"
-              >
-                {t(locale, 'Licencias', 'Licenças', 'Billing')}
-              </Link>
-            )}
-            <Link
-              href="/hub/admin"
-              className="hidden rounded-md px-2 py-1.5 text-xs text-white/50 transition hover:bg-white/5 hover:text-white sm:inline-flex"
-            >
-              Admin
-            </Link>
             <Link
               href="https://etholys.com"
               className="hidden items-center gap-1 rounded-md px-2 py-1.5 text-xs text-white/50 transition hover:bg-white/5 hover:text-white sm:inline-flex"
@@ -510,7 +496,7 @@ export default function HubPage() {
           <div className="mt-6 flex flex-wrap items-center gap-2">
             {canManage && setupNudge && (
               <Link
-                href="/hub/setup"
+                href="/hub/admin?s=org-profile"
                 className="rounded-md bg-teal-500 px-3.5 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-teal-400"
               >
                 {setupNudge === 'currency-mismatch'

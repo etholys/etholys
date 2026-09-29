@@ -147,6 +147,7 @@ export function AdminSetupGuide({ companyId, onGoToStep }: Props) {
         'Create or edit the active company.',
       ),
       done: status.organization,
+      href: '/hub/admin?s=companies',
     },
     {
       id: 'team',
@@ -158,6 +159,7 @@ export function AdminSetupGuide({ companyId, onGoToStep }: Props) {
         'Send invites so colleagues can join the organization.',
       ),
       done: status.team,
+      href: '/hub/admin?s=users',
     },
     {
       id: 'systems',
@@ -169,7 +171,7 @@ export function AdminSetupGuide({ companyId, onGoToStep }: Props) {
         'Choose which modules each person can open.',
       ),
       done: status.systems,
-      href: '/hub/workspace/team',
+      href: '/hub/admin?s=access',
     },
     {
       id: 'billing',
@@ -181,7 +183,7 @@ export function AdminSetupGuide({ companyId, onGoToStep }: Props) {
         'Subscribe to products and review the company plan.',
       ),
       done: status.billing,
-      href: '/hub/billing',
+      href: '/hub/admin?s=billing',
     },
   ];
 
