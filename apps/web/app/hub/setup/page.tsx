@@ -8,8 +8,11 @@ import { useApp } from '@/app/providers';
 import { useSession } from 'next-auth/react';
 import {
   COMPANY_SECTORS,
+  MODULE_HINT_LABEL,
+  deriveModuleHints,
   emptyContextSetup,
   type CompanyContextSetup,
+  type ModuleHintCode,
 } from '@/lib/company-context-setup';
 import { isLikelyDbId } from '@/lib/utils';
 import { StateEmpty, StateError, StateLoading } from '@/components/ui/StateBlocks';
