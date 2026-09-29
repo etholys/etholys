@@ -47,6 +47,7 @@ export function RadarProviderHome({
   const selectedClientId = clientScope === RADAR_CLIENT_ALL ? null : clientScope;
   const setCreateOpen = scope?.setCreateOpen;
   const setClientScope = scope?.setClientScope;
+  const listRevision = scope?.listRevision ?? 0;
 
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [properties, setProperties] = useState<PropRow[]>([]);
@@ -60,7 +61,7 @@ export function RadarProviderHome({
       const base = new URLSearchParams({ companyId });
       if (engagementId) base.set('engagementId', engagementId);
 
-      const clientsRes = await fetch(`/api/radar/clients?${base}`);
+      const clientsRes = await fetch(`/api/radar/clients?${base}`, { cache: 'no-store' });
       const clientsData = await clientsRes.json();
       if (!clientsRes.ok) throw new Error(clientsData.error || 'Falha');
       setClients(clientsData.clients || []);
@@ -68,7 +69,7 @@ export function RadarProviderHome({
       const pq = new URLSearchParams(base);
       if (selectedClientId) pq.set('clientId', selectedClientId);
       else pq.set('all', '1');
-      const propsRes = await fetch(`/api/radar/properties?${pq}`);
+      const propsRes = await fetch(`/api/radar/properties?${pq}`, { cache: 'no-store' });
       const propsData = await propsRes.json();
       if (!propsRes.ok) throw new Error(propsData.error || 'Falha');
       setProperties(propsData.properties || []);
@@ -81,7 +82,7 @@ export function RadarProviderHome({
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, listRevision]);
 
   const companyQ = engagementId
     ? `company=${companyId}&engagement=${engagementId}`

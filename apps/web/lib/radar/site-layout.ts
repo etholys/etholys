@@ -21,11 +21,47 @@ export type RadarSensorPin = {
   y: number;
 };
 
+export type RadarCrop = {
+  id: string;
+  name: string;
+  variety: string | null;
+  season: string | null;
+};
+
 export type RadarSiteLayoutDoc = {
   version: typeof RADAR_LAYOUT_VERSION;
   spaces: RadarSpaceRect[];
   sensors: RadarSensorPin[];
+  /** Cultivos da propriedade — persistidos com a planta (sem migration). */
+  crops?: RadarCrop[];
 };
+
+export function parseCrops(raw: unknown): RadarCrop[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RadarCrop[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue;
+    const r = row as Record<string, unknown>;
+    const id = String(r.id || '').trim();
+    const name = String(r.name || '').trim();
+    if (!id || name.length < 2) continue;
+    out.push({
+      id,
+      name: name.slice(0, 80),
+      variety: String(r.variety || '').trim().slice(0, 80) || null,
+      season: String(r.season || '').trim().slice(0, 80) || null,
+    });
+  }
+  return out;
+}
+
+export function cropsFromLayout(layout: RadarSiteLayoutDoc | null | undefined): RadarCrop[] {
+  return parseCrops(layout?.crops);
+}
+
+export function withCrops(layout: RadarSiteLayoutDoc, crops: RadarCrop[]): RadarSiteLayoutDoc {
+  return { ...layout, crops };
+}
 
 const CLAMP = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
@@ -35,7 +71,7 @@ function num(v: unknown, fallback: number): number {
 }
 
 export function emptyRadarLayout(): RadarSiteLayoutDoc {
-  return { version: RADAR_LAYOUT_VERSION, spaces: [], sensors: [] };
+  return { version: RADAR_LAYOUT_VERSION, spaces: [], sensors: [], crops: [] };
 }
 
 /** Grelha automática quando ainda não há layout guardado. */
@@ -72,7 +108,7 @@ export function autoLayoutSpaces(
 
 export function parseRadarLayout(raw: unknown): RadarSiteLayoutDoc | null {
   if (!raw || typeof raw !== 'object') return null;
-  const row = raw as { version?: unknown; spaces?: unknown; sensors?: unknown };
+  const row = raw as { version?: unknown; spaces?: unknown; sensors?: unknown; crops?: unknown };
   if (!Array.isArray(row.spaces)) return null;
   const spaces: RadarSpaceRect[] = [];
   for (const s of row.spaces) {
@@ -104,7 +140,12 @@ export function parseRadarLayout(raw: unknown): RadarSiteLayoutDoc | null {
       });
     }
   }
-  return { version: RADAR_LAYOUT_VERSION, spaces, sensors };
+  return {
+    version: RADAR_LAYOUT_VERSION,
+    spaces,
+    sensors,
+    crops: parseCrops(row.crops),
+  };
 }
 
 export function mergeLayoutWithSpaces(
@@ -136,7 +177,12 @@ export function mergeLayoutWithSpaces(
         y: 40 + Math.floor(offset / 3),
       };
     });
-  return { version: RADAR_LAYOUT_VERSION, spaces, sensors };
+  return {
+    version: RADAR_LAYOUT_VERSION,
+    spaces,
+    sensors,
+    crops: cropsFromLayout(saved),
+  };
 }
 
 export function sanitizeLayoutPatch(
@@ -163,5 +209,10 @@ export function sanitizeLayoutPatch(
       x: CLAMP(s.x, 0, 100),
       y: CLAMP(s.y, 0, 100),
     }));
-  return { version: RADAR_LAYOUT_VERSION, spaces, sensors };
+  return {
+    version: RADAR_LAYOUT_VERSION,
+    spaces,
+    sensors,
+    crops: parseCrops((body as { crops?: unknown })?.crops ?? parsed.crops),
+  };
 }

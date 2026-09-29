@@ -119,6 +119,11 @@ export async function PATCH(req: NextRequest) {
     if (!patch || patch.spaces.length === 0) {
       return NextResponse.json({ error: 'Layout inválido.' }, { status: 400 });
     }
+    // Preserve crop catalog if client omitted it
+    const existing = parseRadarLayout(property.layoutJson);
+    if ((!patch.crops || patch.crops.length === 0) && existing?.crops?.length) {
+      patch.crops = existing.crops;
+    }
     const row = await prisma.radarProperty.update({
       where: { id: propertyId },
       data: { layoutJson: patch as object },

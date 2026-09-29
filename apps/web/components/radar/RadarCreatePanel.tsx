@@ -26,6 +26,7 @@ export function RadarCreatePanel({ locale = 'pt' }: { locale?: string }) {
     setCreateOpen,
     setClientScope,
     refreshClients,
+    bumpListRevision,
   } = useRadarClientScope();
 
   const [name, setName] = useState('');
@@ -75,12 +76,13 @@ export function RadarCreatePanel({ locale = 'pt' }: { locale?: string }) {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha');
       await refreshClients();
+      bumpListRevision();
       setClientScope(d.client.id);
       close();
-      const q = companyQs();
-      q.set('client', d.client.id);
-      q.set('new', 'property');
-      router.push(`/hub/radar/provider?${q}`);
+      // Re-open farm form under the new client without full remount flicker
+      window.setTimeout(() => {
+        setCreateOpen('property');
+      }, 50);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -111,6 +113,7 @@ export function RadarCreatePanel({ locale = 'pt' }: { locale?: string }) {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha');
       await refreshClients();
+      bumpListRevision();
       if (clientScope === RADAR_CLIENT_ALL) setClientScope(effectiveClientId);
       close();
       const q = companyQs();

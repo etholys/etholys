@@ -42,6 +42,9 @@ type RadarClientScopeValue = {
   refreshRole: () => Promise<void>;
   createOpen: 'client' | 'property' | null;
   setCreateOpen: (v: 'client' | 'property' | null) => void;
+  /** Bumps when clients/properties change so home lists refresh. */
+  listRevision: number;
+  bumpListRevision: () => void;
 };
 
 const Ctx = createContext<RadarClientScopeValue | null>(null);
@@ -71,6 +74,8 @@ export function RadarClientScopeProvider({ children }: { children: ReactNode }) 
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientScope, setClientScopeState] = useState<RadarClientScopeId>(RADAR_CLIENT_ALL);
   const [createOpen, setCreateOpen] = useState<'client' | 'property' | null>(null);
+  const [listRevision, setListRevision] = useState(0);
+  const bumpListRevision = useCallback(() => setListRevision((n) => n + 1), []);
 
   const refreshRole = useCallback(async () => {
     if (!companyId) {
@@ -185,6 +190,8 @@ export function RadarClientScopeProvider({ children }: { children: ReactNode }) 
       refreshRole,
       createOpen,
       setCreateOpen,
+      listRevision,
+      bumpListRevision,
     }),
     [
       companyId,
@@ -200,6 +207,8 @@ export function RadarClientScopeProvider({ children }: { children: ReactNode }) 
       refreshClients,
       refreshRole,
       createOpen,
+      listRevision,
+      bumpListRevision,
     ],
   );
 

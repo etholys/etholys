@@ -32,14 +32,21 @@ RADAR é a operação: dados, eficiência, automação, WhatsApp in/out, alertas
 
 Espelho do CompanyPicker do Hub, **sempre visível** na sidebar RADAR (`ProductAppShell.sidebarAfterCompany`):
 
-| Peça | Onde |
-|------|------|
-| UI | `RadarClientPicker` — «Todos os clientes» \| cada `RadarClient` \| `+ Novo cliente` \| `+ Nova fazenda` |
-| Estado | `RadarClientScopeProvider` — URL `?client=` + `localStorage` `radar.clientScope.{companyId}` |
-| Cadastro | `RadarCreatePanel` — cliente (nome + contacto) ou fazenda (nome + módulo + cliente); cria e abre o funil da propriedade |
-| Home | `RadarProviderHome` — dashboard de alertas + CTAs + lista filtrada |
+| Peça | UI / API |
+|------|----------|
+| Seletor | `RadarClientPicker` — Todos \| cliente \| `+ Novo cliente` \| `+ Nova fazenda` |
+| Estado | `?client=` + `localStorage` `radar.clientScope.{companyId}` |
+| Cadastro | `RadarCreatePanel` — lista atualiza de imediato (`listRevision`) |
+| Home | `RadarProviderHome` — alertas + CTAs + clientes/fazendas filtrados |
 
-Produtor: picker de cliente oculto; home com alertas das próprias propriedades.
+### Cultivos e parcelas (planta 2D)
+
+| Peça | Como |
+|------|------|
+| Cultivos | `RadarCropsPanel` — nome + variedade/época; persistidos em `RadarProperty.layoutJson.crops` |
+| Nova parcela | `RadarAddParcelForm` + botão no `RadarSiteMap` → `PATCH …/properties/[id]` `action: parcel` |
+| Mapa | Arrastar + redimensionar (canto); Guardar planta |
+| Associar cultivo | selector na parcela focada (`action: parcel_update`) |
 
 ### Funil da propriedade (progress rail)
 

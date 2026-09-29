@@ -18,6 +18,8 @@ import {
   mergeLayoutWithSpaces,
   parseRadarLayout,
   sanitizeLayoutPatch,
+  cropsFromLayout,
+  withCrops,
 } from '@/lib/radar/site-layout';
 import { isRadarParcel } from '@/lib/radar/agriculture';
 import { AGRICULTURE_MODULE } from '@/lib/nexus-sector-modules';
@@ -105,6 +107,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       })),
       sensors,
       layout,
+      crops: cropsFromLayout(parseRadarLayout(property.layoutJson)),
       steps: buildPropertyProgress(progressInput),
       nextStep: nextIncompleteStep(progressInput),
       progressPercent: progressPercent(progressInput),
@@ -171,6 +174,24 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
           areaHa: updated.areaHa,
         },
       });
+    }
+
+    // Seed crop catalog from characterize crop
+    if (crop) {
+      const layout = parseRadarLayout(property.layoutJson) || emptyRadarLayout();
+      const crops = cropsFromLayout(layout);
+      if (!crops.some((c) => c.name.toLowerCase() === crop.toLowerCase())) {
+        crops.push({
+          id: `crop_${Date.now().toString(36)}`,
+          name: crop,
+          variety: null,
+          season: null,
+        });
+        await prisma.radarProperty.update({
+          where: { id },
+          data: { layoutJson: withCrops(layout, crops) as object },
+        });
+      }
     }
 
     return NextResponse.json({ ok: true, propertyId: id });
@@ -241,6 +262,133 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       sensor: { id: sensor.id, name: sensor.name, metric: sensor.metric, unitId: sensor.unitId },
       token,
       ingestPath: '/api/nexus/ingest/readings',
+    });
+  }
+
+  // generic rename / crop catalog
+  if (action === 'crop_add') {
+    const cropName = String(body.name || '').trim();
+    if (cropName.length < 2) return NextResponse.json({ error: 'Nome do cultivo obrigatório.' }, { status: 400 });
+    const layout = parseRadarLayout(property.layoutJson) || emptyRadarLayout();
+    const crops = cropsFromLayout(layout);
+    const id = `crop_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    crops.push({
+      id,
+      name: cropName.slice(0, 80),
+      variety: String(body.variety || '').trim().slice(0, 80) || null,
+      season: String(body.season || '').trim().slice(0, 80) || null,
+    });
+    const next = withCrops(layout, crops);
+    await prisma.radarProperty.update({
+      where: { id },
+      data: {
+        layoutJson: next as object,
+        crop: property.crop || cropName.slice(0, 80),
+      },
+    });
+    return NextResponse.json({ ok: true, crops, crop: crops[crops.length - 1] });
+  }
+
+  if (action === 'crop_remove') {
+    const cropId = String(body.cropId || '').trim();
+    if (!cropId) return NextResponse.json({ error: 'cropId obrigatório.' }, { status: 400 });
+    const layout = parseRadarLayout(property.layoutJson) || emptyRadarLayout();
+    const crops = cropsFromLayout(layout).filter((c) => c.id !== cropId);
+    const next = withCrops(layout, crops);
+    await prisma.radarProperty.update({
+      where: { id },
+      data: { layoutJson: next as object },
+    });
+    return NextResponse.json({ ok: true, crops });
+  }
+
+  if (action === 'parcel') {
+    const name = String(body.name || '').trim();
+    if (name.length < 2) return NextResponse.json({ error: 'Nome da parcela obrigatório.' }, { status: 400 });
+    const moduleId = normalizeModuleId(property.moduleId) || normalizeModuleId(body.moduleId) || 'agriculture';
+    const kind = RADAR_SPACE_KINDS[moduleId].unitKind;
+    const crop = String(body.crop || '').trim().slice(0, 80) || null;
+    const areaHa = body.areaHa == null || body.areaHa === '' ? null : Number(body.areaHa);
+    const unit = await prisma.nexusOpsUnit.create({
+      data: {
+        companyId,
+        propertyId: id,
+        sectorId: moduleId,
+        kind,
+        name: name.slice(0, 120),
+        crop,
+        areaHa: Number.isFinite(areaHa as number) && (areaHa as number) > 0 ? (areaHa as number) : null,
+      },
+    });
+
+    // Ensure crop catalog entry exists when crop assigned
+    const layout = parseRadarLayout(property.layoutJson) || emptyRadarLayout();
+    let crops = cropsFromLayout(layout);
+    if (crop && !crops.some((c) => c.name.toLowerCase() === crop.toLowerCase())) {
+      crops = [
+        ...crops,
+        {
+          id: `crop_${Date.now().toString(36)}`,
+          name: crop,
+          variety: null,
+          season: null,
+        },
+      ];
+    }
+    const units = await prisma.nexusOpsUnit.findMany({
+      where: { propertyId: id, companyId, isActive: true },
+      select: { id: true, kind: true },
+    });
+    const spaceIds = units.filter(isRadarParcel).map((u) => u.id);
+    const merged = withCrops(mergeLayoutWithSpaces(layout, spaceIds, []), crops);
+    await prisma.radarProperty.update({
+      where: { id },
+      data: { layoutJson: merged as object, crop: property.crop || crop },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      unit: {
+        id: unit.id,
+        name: unit.name,
+        kind: unit.kind,
+        crop: unit.crop,
+        areaHa: unit.areaHa,
+      },
+      crops,
+      layout: merged,
+    });
+  }
+
+  if (action === 'parcel_update') {
+    const unitId = String(body.unitId || '').trim();
+    if (!unitId) return NextResponse.json({ error: 'unitId obrigatório.' }, { status: 400 });
+    const unit = await prisma.nexusOpsUnit.findFirst({
+      where: { id: unitId, propertyId: id, companyId, isActive: true },
+    });
+    if (!unit) return NextResponse.json({ error: 'Parcela inválida.' }, { status: 404 });
+    const data: { name?: string; crop?: string | null; areaHa?: number | null } = {};
+    if (body.name != null) {
+      const n = String(body.name).trim();
+      if (n.length >= 2) data.name = n.slice(0, 120);
+    }
+    if (body.crop !== undefined) {
+      data.crop = String(body.crop || '').trim().slice(0, 80) || null;
+    }
+    if (body.areaHa !== undefined) {
+      const areaHa = body.areaHa == null || body.areaHa === '' ? null : Number(body.areaHa);
+      data.areaHa = Number.isFinite(areaHa as number) && (areaHa as number) > 0 ? (areaHa as number) : null;
+    }
+    const updated = await prisma.nexusOpsUnit.update({ where: { id: unitId }, data });
+    return NextResponse.json({
+      ok: true,
+      unit: {
+        id: updated.id,
+        name: updated.name,
+        kind: updated.kind,
+        crop: updated.crop,
+        areaHa: updated.areaHa,
+      },
     });
   }
 

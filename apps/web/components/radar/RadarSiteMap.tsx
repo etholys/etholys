@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Leaf, MapPinned, Radio } from 'lucide-react';
+import { Leaf, MapPinned, Plus, Radio } from 'lucide-react';
 import { MOISTURE_THRESHOLD, type ParcelAction } from '@/lib/radar/agriculture';
 import {
   emptyRadarLayout,
@@ -33,39 +33,42 @@ export type MapSensor = {
 const COPY = {
   pt: {
     plant: 'Planta',
-    arrange: 'Arrastar para organizar',
+    arrange: 'Arrastar para organizar · canto para redimensionar',
     save: 'Guardar planta',
     saving: 'A guardar…',
     saved: 'Planta guardada',
-    emptyTitle: 'Ainda sem planta operacional',
-    emptyBody: 'Regista espaços de medição para ver parcelas, sensores e estado ao vivo nesta vista.',
-    emptyCta: 'Os espaços aparecem aqui automaticamente',
+    emptyTitle: 'Ainda sem parcelas no mapa',
+    emptyBody: 'Cria a primeira parcela — um pedaço de terra para cultivar — e ela aparece aqui.',
+    emptyCta: 'Nova parcela',
+    addParcel: 'Nova parcela',
     focus: 'Em foco',
     moisture: 'Humidade',
     sensor: 'Sensor',
   },
   es: {
     plant: 'Planta',
-    arrange: 'Arrastrar para organizar',
+    arrange: 'Arrastrar para organizar · esquina para redimensionar',
     save: 'Guardar planta',
     saving: 'Guardando…',
     saved: 'Planta guardada',
-    emptyTitle: 'Aún sin planta operativa',
-    emptyBody: 'Registrá espacios de medición para ver parcelas, sensores y estado en vivo en esta vista.',
-    emptyCta: 'Los espacios aparecen aquí automáticamente',
+    emptyTitle: 'Aún sin parcelas en el mapa',
+    emptyBody: 'Creá la primera parcela — un pedazo de tierra para cultivar — y aparece aquí.',
+    emptyCta: 'Nueva parcela',
+    addParcel: 'Nueva parcela',
     focus: 'En foco',
     moisture: 'Humedad',
     sensor: 'Sensor',
   },
   en: {
     plant: 'Plant map',
-    arrange: 'Drag to arrange',
+    arrange: 'Drag to arrange · corner to resize',
     save: 'Save layout',
     saving: 'Saving…',
     saved: 'Layout saved',
-    emptyTitle: 'No operative plant yet',
-    emptyBody: 'Register measurement spaces to see parcels, sensors and live state on this map.',
-    emptyCta: 'Spaces appear here automatically',
+    emptyTitle: 'No parcels on the map yet',
+    emptyBody: 'Create the first parcel — a piece of land to cultivate — and it appears here.',
+    emptyCta: 'New parcel',
+    addParcel: 'New parcel',
     focus: 'Focused',
     moisture: 'Moisture',
     sensor: 'Sensor',
@@ -111,6 +114,8 @@ type Props = {
   /** Full plant + metrics surface (single ops UI for all roles). */
   mode?: 'ops' | 'empresa';
   onSaved?: () => void;
+  /** Show CTA to create a new parcel (parent owns the form). */
+  onRequestAddParcel?: () => void;
 };
 
 export function RadarSiteMap({
@@ -124,6 +129,7 @@ export function RadarSiteMap({
   onFocus,
   mode = 'ops',
   onSaved,
+  onRequestAddParcel,
 }: Props) {
   const loc: Loc = locale === 'es' || locale === 'en' ? locale : 'pt';
   const canEdit = mode === 'ops' || mode === 'empresa';
@@ -133,8 +139,10 @@ export function RadarSiteMap({
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [dragging, setDragging] = useState<string | null>(null);
+  const [resizing, setResizing] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const dragOrigin = useRef<{ id: string; ox: number; oy: number; sx: number; sy: number } | null>(null);
+  const resizeOrigin = useRef<{ id: string; startX: number; startY: number; w: number; h: number } | null>(null);
 
   const spaceKey = parcels.map((p) => p.id).join('|');
   const sensorKey = sensors.map((s) => `${s.id}:${s.unitId || ''}`).join('|');
@@ -210,12 +218,31 @@ export function RadarSiteMap({
   };
 
   const onPointerMove = (e: ReactPointerEvent) => {
-    if (!dragging || !dragOrigin.current || !canEdit) return;
+    if (!canEdit) return;
     const board = boardRef.current;
     if (!board) return;
     const box = board.getBoundingClientRect();
     const pctX = ((e.clientX - box.left) / box.width) * 100;
     const pctY = ((e.clientY - box.top) / box.height) * 100;
+
+    if (resizing && resizeOrigin.current) {
+      const space = layout.spaces.find((s) => s.id === resizeOrigin.current!.id);
+      if (!space) return;
+      const dw = pctX - resizeOrigin.current.startX;
+      const dh = pctY - resizeOrigin.current.startY;
+      const nw = Math.min(100 - space.x, Math.max(12, resizeOrigin.current.w + dw));
+      const nh = Math.min(100 - space.y, Math.max(12, resizeOrigin.current.h + dh));
+      setLayout((prev) => ({
+        ...prev,
+        spaces: prev.spaces.map((s) =>
+          s.id === space.id ? { ...s, w: Math.round(nw * 10) / 10, h: Math.round(nh * 10) / 10 } : s,
+        ),
+      }));
+      setDirty(true);
+      return;
+    }
+
+    if (!dragging || !dragOrigin.current) return;
     const space = layout.spaces.find((s) => s.id === dragOrigin.current!.id);
     if (!space) return;
     const nx = Math.min(100 - space.w, Math.max(0, pctX - dragOrigin.current.ox));
@@ -229,7 +256,28 @@ export function RadarSiteMap({
 
   const onPointerUp = () => {
     setDragging(null);
+    setResizing(null);
     dragOrigin.current = null;
+    resizeOrigin.current = null;
+  };
+
+  const onResizeDown = (e: ReactPointerEvent, rect: RadarSpaceRect) => {
+    if (!canEdit) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onFocus(rect.id);
+    const board = boardRef.current;
+    if (!board) return;
+    const box = board.getBoundingClientRect();
+    resizeOrigin.current = {
+      id: rect.id,
+      startX: ((e.clientX - box.left) / box.width) * 100,
+      startY: ((e.clientY - box.top) / box.height) * 100,
+      w: rect.w,
+      h: rect.h,
+    };
+    setResizing(rect.id);
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   };
 
   if (parcels.length === 0) {
@@ -240,7 +288,16 @@ export function RadarSiteMap({
           <MapPinned className="mx-auto h-8 w-8 text-emerald-300/80" />
           <h3 className="mt-3 font-serif text-2xl text-white">{copy.emptyTitle}</h3>
           <p className="mt-2 text-sm text-white/55">{copy.emptyBody}</p>
-          <p className="mt-4 text-xs uppercase tracking-[0.16em] text-emerald-200/50">{copy.emptyCta}</p>
+          {onRequestAddParcel && (
+            <button
+              type="button"
+              onClick={onRequestAddParcel}
+              className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-[#04110c]"
+            >
+              <Plus className="h-4 w-4" />
+              {copy.emptyCta}
+            </button>
+          )}
         </div>
       </section>
     );
@@ -260,6 +317,16 @@ export function RadarSiteMap({
         </div>
         {canEdit && (
           <div className="flex items-center gap-2">
+            {onRequestAddParcel && (
+              <button
+                type="button"
+                onClick={onRequestAddParcel}
+                className="inline-flex items-center gap-1 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {copy.addParcel}
+              </button>
+            )}
             {savedFlash && <span className="text-[11px] text-emerald-200/80">{copy.saved}</span>}
             <button
               type="button"
@@ -311,7 +378,7 @@ export function RadarSiteMap({
               onClick={() => onFocus(parcel.id)}
               onPointerDown={(e) => onPointerDown(e, rect)}
               className={`absolute overflow-hidden rounded-2xl border text-left transition-all duration-300 ease-out ${tileClasses(tone, focused, dimmed)} ${
-                dragging === rect.id ? 'z-20 cursor-grabbing' : canEdit ? 'cursor-grab' : 'cursor-pointer'
+                dragging === rect.id || resizing === rect.id ? 'z-20 cursor-grabbing' : canEdit ? 'cursor-grab' : 'cursor-pointer'
               }`}
               style={{
                 left: `${rect.x}%`,
@@ -358,6 +425,14 @@ export function RadarSiteMap({
                   );
                 })}
               </div>
+              {canEdit && focused && (
+                <span
+                  role="presentation"
+                  onPointerDown={(e) => onResizeDown(e, rect)}
+                  className="absolute bottom-1 right-1 z-30 h-4 w-4 cursor-se-resize rounded-sm border border-emerald-200/60 bg-emerald-400/80"
+                  title={loc === 'en' ? 'Resize' : 'Redimensionar'}
+                />
+              )}
             </button>
           );
         })}

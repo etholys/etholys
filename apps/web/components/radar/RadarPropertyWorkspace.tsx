@@ -10,6 +10,9 @@ import { RadarProgressRail } from '@/components/radar/RadarProgressRail';
 import { RadarGeoPin } from '@/components/radar/RadarGeoPin';
 import { RadarSiteMap } from '@/components/radar/RadarSiteMap';
 import { RadarOpsView } from '@/components/radar/RadarViews';
+import { RadarCropsPanel } from '@/components/radar/RadarCropsPanel';
+import { RadarAddParcelForm } from '@/components/radar/RadarAddParcelForm';
+import type { RadarCrop } from '@/lib/radar/site-layout';
 
 type Loc = 'pt' | 'es' | 'en';
 
@@ -25,6 +28,7 @@ type PropertyDetail = {
   clientName: string | null;
   units: Array<{ id: string; name: string; kind: string; crop: string | null; areaHa: number | null }>;
   sensors: Array<{ id: string; name: string; metric: string; unitId: string | null }>;
+  crops?: RadarCrop[];
   steps: PropertyStepState[];
   nextStep: PropertyStepId;
   progressPercent: number;
@@ -58,6 +62,7 @@ export function RadarPropertyWorkspace({
   const [area, setArea] = useState('');
   const [sensorName, setSensorName] = useState('');
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [addingParcel, setAddingParcel] = useState(false);
 
   const load = useCallback(async () => {
     if (!companyId || !propertyId) return;
@@ -70,6 +75,7 @@ export function RadarPropertyWorkspace({
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha');
       const p = d.property as PropertyDetail;
+      p.crops = Array.isArray(p.crops) ? p.crops : [];
       setData(p);
       setName(p.name);
       setModuleId(p.moduleId && isRadarModuleId(p.moduleId) ? p.moduleId : null);
@@ -77,6 +83,7 @@ export function RadarPropertyWorkspace({
       setArea(p.areaHa != null ? String(p.areaHa) : '');
       setStep((prev) => (p.steps.some((s) => s.id === prev) ? prev : p.nextStep));
       setFocusedId(p.units[0]?.id || null);
+      if (!Array.isArray(p.crops)) (p as PropertyDetail).crops = [];
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -251,10 +258,10 @@ export function RadarPropertyWorkspace({
               </h2>
               <p className="mt-1 text-sm text-white/55">
                 {loc === 'es'
-                  ? 'Organizá los espacios en el mapa 2D y guardá la planta.'
+                  ? 'Agregá parcelas (pedazos de tierra), asigná cultivos, arrastrá y redimensioná.'
                   : loc === 'en'
-                    ? 'Arrange spaces on the 2D map and save the plant.'
-                    : 'Organiza os espaços no mapa 2D e guarda a planta.'}
+                    ? 'Add parcels (plots), assign crops, drag and resize.'
+                    : 'Adiciona parcelas (pedaços de terra), associa cultivos, arrasta e redimensiona.'}
               </p>
             </div>
             {!characterized ? (
@@ -267,30 +274,69 @@ export function RadarPropertyWorkspace({
                 }
                 onClick={() => setStep('characterize')}
               />
-            ) : mapParcels.length === 0 ? (
-              <EmptyHint
-                locale={loc}
-                text={loc === 'en' ? 'No spaces yet — re-save characterize.' : 'Ainda sem espaços — volta a caracterizar.'}
-                onClick={() => setStep('characterize')}
-              />
             ) : (
-              <RadarSiteMap
-                companyId={companyId}
-                engagementId={engagementId}
-                propertyId={propertyId}
-                locale={loc}
-                mode="empresa"
-                parcels={mapParcels}
-                sensors={data.sensors.map((s) => ({
-                  id: s.id,
-                  name: s.name,
-                  unitId: s.unitId,
-                  lastValue: null,
-                }))}
-                focusedId={focusedId}
-                onFocus={setFocusedId}
-                onSaved={() => void load()}
-              />
+              <>
+                <RadarCropsPanel
+                  locale={loc}
+                  crops={data.crops || []}
+                  busy={busy}
+                  onAdd={async (input) => {
+                    await patch({ action: 'crop_add', ...input });
+                    await load();
+                  }}
+                  onRemove={async (cropId) => {
+                    await patch({ action: 'crop_remove', cropId });
+                    await load();
+                  }}
+                />
+
+                {addingParcel || mapParcels.length === 0 ? (
+                  <RadarAddParcelForm
+                    locale={loc}
+                    crops={data.crops || []}
+                    busy={busy}
+                    onCancel={mapParcels.length > 0 ? () => setAddingParcel(false) : undefined}
+                    onSubmit={async (input) => {
+                      const d = await patch({ action: 'parcel', ...input });
+                      setAddingParcel(false);
+                      await load();
+                      if (d?.unit?.id) setFocusedId(d.unit.id as string);
+                    }}
+                  />
+                ) : null}
+
+                <RadarSiteMap
+                  companyId={companyId}
+                  engagementId={engagementId}
+                  propertyId={propertyId}
+                  locale={loc}
+                  mode="empresa"
+                  parcels={mapParcels}
+                  sensors={data.sensors.map((s) => ({
+                    id: s.id,
+                    name: s.name,
+                    unitId: s.unitId,
+                    lastValue: null,
+                  }))}
+                  focusedId={focusedId}
+                  onFocus={setFocusedId}
+                  onSaved={() => void load()}
+                  onRequestAddParcel={() => setAddingParcel(true)}
+                />
+
+                {focusedId && mapParcels.length > 0 && (
+                  <ParcelAssignCrop
+                    locale={loc}
+                    unit={data.units.find((u) => u.id === focusedId)}
+                    crops={data.crops || []}
+                    busy={busy}
+                    onSave={async (cropName) => {
+                      await patch({ action: 'parcel_update', unitId: focusedId, crop: cropName });
+                      await load();
+                    }}
+                  />
+                )}
+              </>
             )}
             {characterized && (
               <button
@@ -424,6 +470,64 @@ function EmptyHint({ locale, text, onClick }: { locale: Loc; text: string; onCli
         className="mt-4 rounded-xl bg-emerald-500/90 px-4 py-2 text-sm font-semibold text-[#04110c]"
       >
         {locale === 'en' ? 'Go' : 'Ir'}
+      </button>
+    </div>
+  );
+}
+
+function ParcelAssignCrop({
+  locale,
+  unit,
+  crops,
+  busy,
+  onSave,
+}: {
+  locale: Loc;
+  unit?: { id: string; name: string; crop: string | null };
+  crops: RadarCrop[];
+  busy?: boolean;
+  onSave: (crop: string) => Promise<void>;
+}) {
+  const [crop, setCrop] = useState(unit?.crop || '');
+  useEffect(() => {
+    setCrop(unit?.crop || '');
+  }, [unit?.id, unit?.crop]);
+  if (!unit) return null;
+  return (
+    <div className="flex flex-wrap items-end gap-2 rounded-xl border border-white/10 bg-black/20 px-4 py-3">
+      <div className="min-w-[10rem] flex-1">
+        <p className="text-[10px] uppercase tracking-wide text-white/40">
+          {locale === 'en' ? 'Crop on' : 'Cultivo em'} {unit.name}
+        </p>
+        {crops.length > 0 ? (
+          <select
+            value={crop}
+            onChange={(e) => setCrop(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
+          >
+            <option value="">{locale === 'en' ? 'None' : 'Nenhum'}</option>
+            {crops.map((c) => (
+              <option key={c.id} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            value={crop}
+            onChange={(e) => setCrop(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
+            placeholder={locale === 'en' ? 'Crop name' : 'Nome do cultivo'}
+          />
+        )}
+      </div>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => void onSave(crop)}
+        className="rounded-lg bg-emerald-500/90 px-3 py-2 text-xs font-semibold text-[#04110c] disabled:opacity-40"
+      >
+        {locale === 'en' ? 'Assign' : 'Associar'}
       </button>
     </div>
   );
