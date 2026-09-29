@@ -12,6 +12,7 @@ import {
   type DiscoveryQueryPack,
 } from '@/lib/opportunity/discovery-queries';
 import { FUNDHUB_DISCOVERY_MODEL, fundhubScoutModel } from '@/lib/opportunity/fundhub-llm';
+import { salvageJsonText, truncateForStructure } from '@/lib/opportunity/json-salvage';
 import { formatOpportunityScoutBrief } from '@/lib/opportunity/scout-brief';
 import { enrichAndFilterCandidates } from '@/lib/opportunity/enrich-call';
 import { OFFICIAL_LINK_PROMPT_RULES } from '@/lib/opportunity/official-url';
@@ -72,26 +73,21 @@ Hunt like an operator — wide first, official URL second:
 
 ${OFFICIAL_LINK_PROMPT_RULES}`,
       structure: `Convert the research into JSON only. Return { "candidates": [ ... ] }
-Each item MUST include:
-name, institution, type (Grant|Crédito|Aliança|Técnico local), category,
-description (2–4 substantive paragraphs — see content rules),
-whoCanApply, eligibility, requirements, howToApply, risksCaveats,
-callUrl (official convocatoria / edital PAGE — required for open_now),
-institutionUrl (funder homepage if different),
-linkOficial (same as callUrl if only one official page),
-documents (array of {title,url} official PDFs/docs you saw — omit if none),
-amount, currency,
-opensAt, closesAt, applicationWindow, eligibleCountries,
+Each item needs compact fields (Portuguese OK):
+name, institution, type (Grant|Crédito|Aliança|Técnico local),
+description (1 short paragraph, max ~400 chars),
+whoCanApply, eligibility (1–2 lines each),
+callUrl (official convocatoria page — required),
+institutionUrl, linkOficial, documents (only if seen),
+amount, currency, opensAt, closesAt, eligibleCountries,
 availabilityStatus ("open_now" or "rolling"),
-availabilityNote, classification (direct|client_bridge|joint), classificationNote,
-matchScore (0-100), matchJustification, sourceUrl (page where you first saw it).
+matchScore (0-100), matchJustification (1 line), sourceUrl,
+classification (direct|client_bridge|joint).
 
-Return 16–28 candidates from DISTINCT institutions. Prefer volume of real official calls over a short perfect list.
+Return 8–14 candidates from DISTINCT institutions. Prefer complete JSON over long essays.
+Skip EXISTING duplicates. Never invent URLs.
 
-${CANDIDATE_CONTENT_RULES}
-${OFFICIAL_LINK_PROMPT_RULES}
-Respect ORIENTAÇÃO COMPLETA (amount caps, grant-only, private eligibility, countries).
-Skip EXISTING duplicates.`,
+${OFFICIAL_LINK_PROMPT_RULES}`,
     };
   }
 
@@ -213,17 +209,39 @@ export async function discoverOpportunitiesOnline(opts: {
 
     await report(65, 'structuring');
     const structureUser = [
-      `RESEARCH REPORT:\n${research}`,
-      `\nEXISTING (skip duplicates):\n${existingBlock}`,
+      `RESEARCH REPORT:\n${truncateForStructure(research)}`,
+      `\nEXISTING (skip duplicates):\n${existingBlock.slice(0, 4000)}`,
       `\nBRIEFING:\n${briefingLines(opts.briefing)}`,
       focusHint,
+      `\nKeep each description under 400 characters. Prefer 8–14 complete candidates over a truncated dump.`,
     ].join('');
 
     const jsonText = await llmCompleteJsonText(STRUCTURE_SYSTEM, structureUser, {
-      maxOutputTokens: 12288,
+      maxOutputTokens: 16000,
       model: FUNDHUB_DISCOVERY_MODEL,
+      allowTruncated: true,
     });
-    const parsed = JSON.parse(jsonText) as { candidates?: unknown[] };
+    let parsed: { candidates?: unknown[] } = { candidates: [] };
+    try {
+      parsed = JSON.parse(salvageJsonText(jsonText)) as { candidates?: unknown[] };
+    } catch (e) {
+      console.warn('[opportunity/web-discovery] structure JSON parse failed, retry compact:', e);
+      const retryText = await llmCompleteJsonText(
+        STRUCTURE_SYSTEM,
+        [
+          `RESEARCH REPORT (compact):\n${truncateForStructure(research, 14_000)}`,
+          `\nEXISTING:\n${existingBlock.slice(0, 2000)}`,
+          `\nBRIEFING:\n${briefingLines(opts.briefing)}`,
+          `\nReturn at most 8 candidates. Very short fields. Valid JSON only.`,
+        ].join(''),
+        {
+          maxOutputTokens: 8000,
+          model: FUNDHUB_DISCOVERY_MODEL,
+          allowTruncated: true,
+        },
+      );
+      parsed = JSON.parse(salvageJsonText(retryText)) as { candidates?: unknown[] };
+    }
     let candidates = normalizeCandidates(parsed.candidates ?? [], scanFocus).map((c) =>
       sanitizeCandidateDates({
         ...c,
@@ -384,10 +402,10 @@ async function secondPassOpusDiscovery(opts: {
     );
     const jsonText = await llmCompleteJsonText(
       STRUCTURE_SYSTEM,
-      `RESEARCH REPORT:\n${research}\n\nBRIEFING:\n${briefingLines(opts.briefing)}\n\nSkip ALREADY FOUND and EXISTING.`,
-      { maxOutputTokens: 12288, model: FUNDHUB_DISCOVERY_MODEL },
+      `RESEARCH REPORT:\n${truncateForStructure(research, 14_000)}\n\nBRIEFING:\n${briefingLines(opts.briefing)}\n\nSkip ALREADY FOUND and EXISTING. Max 8 candidates, short fields.`,
+      { maxOutputTokens: 8000, model: FUNDHUB_DISCOVERY_MODEL, allowTruncated: true },
     );
-    const parsed = JSON.parse(jsonText) as { candidates?: unknown[] };
+    const parsed = JSON.parse(salvageJsonText(jsonText)) as { candidates?: unknown[] };
     let extra = normalizeCandidates(parsed.candidates ?? [], 'open_now').map((c) =>
       sanitizeCandidateDates({
         ...c,

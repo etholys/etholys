@@ -537,7 +537,7 @@ export async function llmCompleteText(
 export async function llmCompleteJsonText(
   systemInstruction: string,
   userText: string,
-  options?: { maxOutputTokens?: number; model?: string },
+  options?: { maxOutputTokens?: number; model?: string; allowTruncated?: boolean },
 ): Promise<string> {
   const { text, finishReason } = await llmGenerateContent({
     systemInstruction,
@@ -547,7 +547,7 @@ export async function llmCompleteJsonText(
     responseMimeType: 'application/json',
     model: options?.model,
   });
-  if (finishReason === 'MAX_TOKENS') {
+  if (finishReason === 'MAX_TOKENS' && !options?.allowTruncated) {
     throw new Error(
       'A IA cortou a resposta. Tente um documento mais curto, ou divida o ficheiro em partes menores.',
     );
