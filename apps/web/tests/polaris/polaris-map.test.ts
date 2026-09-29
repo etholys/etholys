@@ -95,13 +95,13 @@ test('polaris opening is consultant loading, not a diagnosis dump', () => {
   assert.equal(isCatalogPortrait('Assistimos cooperativas com editais e uma rede de confiança.'), false);
 });
 
-test('polaris prompt is a permanent consultant, not a blank weekly quiz', () => {
+test('polaris prompt is a permanent consultant anchored on baseline maturity', () => {
   const prompt = polarisSystemPrompt('pt');
   assert.match(prompt, /consultor permanente/i);
-  assert.match(prompt, /Likert/);
+  assert.match(prompt, /LINHA BASE/i);
+  assert.match(prompt, /maturidade/i);
   assert.match(prompt, /Etholys/);
   assert.match(prompt, /Propor uma forma de avançar/);
-  assert.match(prompt, /Devolver a bola/);
   const parsed = parsePolarisModelJson('```json\n{"reply":"ok","ready":false}\n```');
   assert.equal((parsed as { reply: string }).reply, 'ok');
 });

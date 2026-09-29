@@ -150,9 +150,9 @@ const systems: HubEntry[] = [
     id: 'polaris',
     name: 'POLARIS',
     tagline: {
-      es: 'Consultor permanente del negocio',
-      pt: 'Consultor permanente do negócio',
-      en: 'Standing consultant for the business',
+      es: 'Línea base + consultor permanente',
+      pt: 'Linha base + consultor permanente',
+      en: 'Baseline + standing consultant',
     },
     icon: Navigation,
     href: '/hub/polaris',

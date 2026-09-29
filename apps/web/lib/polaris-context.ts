@@ -1,7 +1,9 @@
 import { prisma } from './prisma';
 import { parseCompanySectorIds } from './nexus-economic-sectors';
 import { loadDossier } from './business-dossier';
+import { AURORA_DIAG_BLOCKS, AURORA_MATURITY, diagProgress, readAuroraDiagnostic } from './aurora-diagnostic';
 import { isCatalogPortrait } from './polaris-map';
+import { isContextSetupMeaningful, type CompanyContextSetup } from './company-context-setup';
 
 /**
  * Leitura leve do ecossistema Etholys para o POLARIS (consultor permanente).
@@ -79,8 +81,14 @@ export async function loadPolarisEcosystemBrief(companyId: string): Promise<stri
     ]);
 
   const sectors = parseCompanySectorIds(company?.contextSetupJson);
+  const ctx =
+    company?.contextSetupJson && typeof company.contextSetupJson === 'object'
+      ? (company.contextSetupJson as CompanyContextSetup)
+      : null;
   const portrait = dossierPack.dossier?.portraitText || '';
   const catalog = isCatalogPortrait(portrait);
+  const diagnostic = readAuroraDiagnostic(dossierPack.dossier?.interviewJson);
+  const progress = diagProgress(diagnostic);
   const lines: string[] = [];
 
   lines.push(`Empresa: ${company?.name || '—'}${company?.shortName ? ` (${company.shortName})` : ''}`);
@@ -89,11 +97,36 @@ export async function loadPolarisEcosystemBrief(companyId: string): Promise<stri
   if (company?.incorporationCountry) lines.push(`País: ${company.incorporationCountry}`);
   if (company?.entityType) lines.push(`Tipo: ${company.entityType}`);
   if (sectors.length) lines.push(`Sectores (contexto): ${sectors.slice(0, 6).join(', ')}`);
+  if (ctx && isContextSetupMeaningful(ctx)) {
+    if (ctx.entityKind) lines.push(`Tipo de entidade (setup): ${ctx.entityKind}`);
+    if (ctx.primaryGoals?.length) lines.push(`Metas (setup): ${ctx.primaryGoals.join(', ')}`);
+    if (ctx.notesForAdvisor?.trim()) lines.push(`Notas do setup: ${ctx.notesForAdvisor.trim().slice(0, 400)}`);
+    if (ctx.tradesInternationally != null) {
+      lines.push(`Comércio internacional: ${ctx.tradesInternationally ? 'sim' : 'não'}`);
+    }
+  }
+
+  lines.push(
+    `Linha base / diagnóstico de maturidade: ${progress.done}/${progress.total} blocos${
+      progress.avgLevel != null ? `; média ${progress.avgLevel}/5` : ''
+    }${progress.complete ? ' (completa)' : ' (INCOMPLETA — orientar a completar)'}`,
+  );
+  for (const def of AURORA_DIAG_BLOCKS) {
+    const b = diagnostic.blocks[def.id];
+    if (!b || b.status !== 'done' || !b.level) continue;
+    const label = def.label.pt;
+    const mat = AURORA_MATURITY[b.level].short.pt;
+    lines.push(
+      `Bloco ${label}: maturidade ${b.level} (${mat}). Situação: ${b.situation.slice(0, 280)}${
+        b.gap ? ` | Brecha: ${b.gap.slice(0, 120)}` : ''
+      }${b.potential ? ` | Potencial: ${b.potential.slice(0, 120)}` : ''}`,
+    );
+  }
 
   if (!catalog && portrait.trim()) {
     lines.push(`Retrato guardado:\n${portrait.slice(0, 1200)}`);
   } else {
-    lines.push('Retrato guardado: (ainda sem retrato útil — não uses scores de diagnóstico)');
+    lines.push('Retrato guardado: (ainda sem retrato útil — não uses scores de diagnóstico Likert)');
   }
   if (dossierPack.dossier?.hypothesis?.trim() && !catalog) {
     lines.push(`Hipótese: ${dossierPack.dossier.hypothesis.slice(0, 400)}`);

@@ -1,20 +1,14 @@
-import { redirect } from 'next/navigation';
+'use client';
 
-function queryString(searchParams: Record<string, string | string[] | undefined>) {
-  const q = new URLSearchParams();
-  for (const [key, value] of Object.entries(searchParams || {})) {
-    if (typeof value === 'string') q.set(key, value);
-    else if (Array.isArray(value)) for (const item of value) q.append(key, item);
-  }
-  const qs = q.toString();
-  return qs ? `?${qs}` : '';
-}
+import { Suspense } from 'react';
+import { Loader2 } from 'lucide-react';
+import { PolarisBaselineWorkspace } from '@/components/etholys/PolarisBaselineWorkspace';
 
-/** O mapa não é o questionário Likert. */
-export default function PolarisDiagnosisRedirect({
-  searchParams,
-}: {
-  searchParams: Record<string, string | string[] | undefined>;
-}) {
-  redirect(`/hub/polaris${queryString(searchParams)}`);
+/** Linha de base: maturidade 1–5 por bloco — ponto de partida do consultor permanente. */
+export default function PolarisDiagnosisPage() {
+  return (
+    <Suspense fallback={<Loader2 className="mx-auto mt-20 h-8 w-8 animate-spin text-teal-300" />}>
+      <PolarisBaselineWorkspace />
+    </Suspense>
+  );
 }

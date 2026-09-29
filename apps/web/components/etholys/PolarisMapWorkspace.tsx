@@ -1,10 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
+import { PolarisBaselineWorkspace } from '@/components/etholys/PolarisBaselineWorkspace';
 import {
   isCatalogPortrait,
   polarisOpening,
@@ -32,6 +34,9 @@ export function PolarisMapWorkspace() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [baselineReady, setBaselineReady] = useState<boolean | null>(null);
+  const [baselineDone, setBaselineDone] = useState(0);
+  const [baselineTotal, setBaselineTotal] = useState(6);
   const [portrait, setPortrait] = useState('');
   const [hypothesis, setHypothesis] = useState('');
   const [accepted, setAccepted] = useState(false);
@@ -68,12 +73,36 @@ export function PolarisMapWorkspace() {
     setRhythm((d.rhythm as Note[]) || []);
   };
 
+  const loadBaseline = useCallback(async () => {
+    if (!companyId) {
+      setBaselineReady(false);
+      return false;
+    }
+    try {
+      const q = new URLSearchParams({ companyId });
+      if (engagementId) q.set('engagementId', engagementId);
+      const r = await fetch(`/api/business-dossier/diagnostic?${q}`, { cache: 'no-store' });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Falha');
+      const done = Number(d.progress?.done || 0);
+      const total = Number(d.progress?.total || 6);
+      const complete = Boolean(d.progress?.complete);
+      setBaselineDone(done);
+      setBaselineTotal(total);
+      setBaselineReady(complete);
+      return complete;
+    } catch {
+      setBaselineReady(false);
+      return false;
+    }
+  }, [companyId, engagementId]);
+
   const load = useCallback(
     async (quiet = false) => {
       if (!companyId) {
         setLoading(false);
         setErr(loc === 'es' ? 'Elegí una empresa.' : loc === 'en' ? 'Pick a company.' : 'Escolhe uma empresa.');
-        return;
+        return null;
       }
       if (!quiet) setLoading(true);
       try {
@@ -101,6 +130,12 @@ export function PolarisMapWorkspace() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const ready = await loadBaseline();
+      if (cancelled) return;
+      if (!ready) {
+        setLoading(false);
+        return;
+      }
       const d = await load();
       if (cancelled || !companyId) return;
       const existing = Array.isArray(d?.messages)
@@ -128,7 +163,7 @@ export function PolarisMapWorkspace() {
     return () => {
       cancelled = true;
     };
-  }, [load, companyId, engagementId, loc]);
+  }, [load, loadBaseline, companyId, engagementId, loc]);
 
   useEffect(() => {
     const el = scroller.current;
@@ -248,6 +283,9 @@ export function PolarisMapWorkspace() {
           log: 'Anotar',
           active: 'en curso',
           done: 'hecha',
+          needBaseline: 'Primero la línea base',
+          needBaselineLine: `Faltan áreas de madurez (${baselineDone}/${baselineTotal}). Sin eso el consultor no sabe de dónde partís.`,
+          openBaseline: 'Construir línea base',
         }
       : loc === 'en'
         ? {
@@ -259,6 +297,9 @@ export function PolarisMapWorkspace() {
             log: 'Log it',
             active: 'on',
             done: 'done',
+            needBaseline: 'Baseline first',
+            needBaselineLine: `Maturity areas still missing (${baselineDone}/${baselineTotal}). Without that the consultant has nowhere to start.`,
+            openBaseline: 'Build baseline',
           }
         : {
             send: 'Enviar',
@@ -269,12 +310,36 @@ export function PolarisMapWorkspace() {
             log: 'Anotar',
             active: 'a andar',
             done: 'feita',
+            needBaseline: 'Primeiro a linha base',
+            needBaselineLine: `Ainda faltam áreas de maturidade (${baselineDone}/${baselineTotal}). Sem isso o consultor não sabe de onde partes.`,
+            openBaseline: 'Construir linha base',
           };
 
-  if (loading) {
+  if (loading || baselineReady === null) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-teal-300" />
+      </div>
+    );
+  }
+
+  if (!baselineReady) {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-teal-300/30 bg-teal-400/10 px-4 py-3">
+          <p className="text-sm font-semibold text-teal-50">{t.needBaseline}</p>
+          <p className="mt-1 text-sm text-white/75">{t.needBaselineLine}</p>
+          <Link
+            href={`/hub/polaris/diagnosis?${new URLSearchParams({
+              ...(companyId ? { company: companyId } : {}),
+              ...(engagementId ? { engagement: engagementId } : {}),
+            })}`}
+            className="mt-2 inline-block text-sm text-teal-200 hover:underline"
+          >
+            {t.openBaseline}
+          </Link>
+        </div>
+        <PolarisBaselineWorkspace embedded />
       </div>
     );
   }
@@ -335,77 +400,77 @@ export function PolarisMapWorkspace() {
       </section>
 
       {showMap ? (
-      <aside className="space-y-4 lg:pt-2">
-        {!portrait ? null : (
-          <>
-            <article className="rounded-2xl border border-white/15 bg-white/[0.07] p-5">
-              <p className="whitespace-pre-wrap text-base leading-relaxed text-white">{portrait}</p>
-              {hypothesis ? (
-                <div className="mt-4 border-t border-white/10 pt-4">
-                  <p className="text-sm text-white/80">{hypothesis}</p>
-                  {!accepted ? (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void acceptHypothesis()}
-                      className="mt-3 rounded-lg bg-teal-300 px-3 py-1.5 text-sm font-medium text-[#041018]"
-                    >
-                      {t.thatsIt}
+        <aside className="space-y-4 lg:pt-2">
+          {!portrait ? null : (
+            <>
+              <article className="rounded-2xl border border-white/15 bg-white/[0.07] p-5">
+                <p className="whitespace-pre-wrap text-base leading-relaxed text-white">{portrait}</p>
+                {hypothesis ? (
+                  <div className="mt-4 border-t border-white/10 pt-4">
+                    <p className="text-sm text-white/80">{hypothesis}</p>
+                    {!accepted ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void acceptHypothesis()}
+                        className="mt-3 rounded-lg bg-teal-300 px-3 py-1.5 text-sm font-medium text-[#041018]"
+                      >
+                        {t.thatsIt}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </article>
+
+              {(proposed.length > 0 || liveBets.length > 0) && (
+                <ul className="space-y-2">
+                  {proposed.map((s) => (
+                    <li key={s.title} className="rounded-xl border border-dashed border-white/20 bg-white/[0.04] px-4 py-3 text-sm">
+                      <p className="font-medium text-white">{s.title}</p>
+                      {s.indicator ? <p className="mt-1 text-xs text-white/50">{s.indicator}</p> : null}
+                    </li>
+                  ))}
+                  {liveBets.map((b) => (
+                    <li key={b.id} className="rounded-xl border border-white/15 bg-white/[0.07] px-4 py-3 text-sm">
+                      <p className="font-medium text-white">{b.title}</p>
+                      {b.why ? <p className="mt-1 text-xs text-white/50">{b.why}</p> : null}
+                      {accepted ? (
+                        <div className="mt-2 flex gap-3">
+                          {b.status !== 'done' ? (
+                            <button type="button" className="text-xs text-teal-200" onClick={() => void setBetStatus(b.id, 'done')}>
+                              {t.done}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-white/40">{t.done}</span>
+                          )}
+                          {b.status !== 'active' && b.status !== 'done' ? (
+                            <button type="button" className="text-xs text-white/60" onClick={() => void setBetStatus(b.id, 'active')}>
+                              {t.active}
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {accepted && (
+                <div className="rounded-2xl border border-teal-300/25 bg-teal-400/10 p-4">
+                  <p className="text-xs uppercase tracking-wide text-teal-200/70">{t.keep}</p>
+                  <p className="mt-2 text-lg leading-snug text-white">
+                    {weekHint || lastWeek?.nextStep || lastWeek?.happened || gaps[0]?.text || hypothesis}
+                  </p>
+                  {weekHint ? (
+                    <button type="button" disabled={busy} onClick={() => void logWeek()} className="mt-3 text-sm text-teal-200">
+                      {t.log}
                     </button>
                   ) : null}
                 </div>
-              ) : null}
-            </article>
-
-            {(proposed.length > 0 || liveBets.length > 0) && (
-              <ul className="space-y-2">
-                {proposed.map((s) => (
-                  <li key={s.title} className="rounded-xl border border-dashed border-white/20 bg-white/[0.04] px-4 py-3 text-sm">
-                    <p className="font-medium text-white">{s.title}</p>
-                    {s.indicator ? <p className="mt-1 text-xs text-white/50">{s.indicator}</p> : null}
-                  </li>
-                ))}
-                {liveBets.map((b) => (
-                  <li key={b.id} className="rounded-xl border border-white/15 bg-white/[0.07] px-4 py-3 text-sm">
-                    <p className="font-medium text-white">{b.title}</p>
-                    {b.why ? <p className="mt-1 text-xs text-white/50">{b.why}</p> : null}
-                    {accepted ? (
-                      <div className="mt-2 flex gap-3">
-                        {b.status !== 'done' ? (
-                          <button type="button" className="text-xs text-teal-200" onClick={() => void setBetStatus(b.id, 'done')}>
-                            {t.done}
-                          </button>
-                        ) : (
-                          <span className="text-xs text-white/40">{t.done}</span>
-                        )}
-                        {b.status !== 'active' && b.status !== 'done' ? (
-                          <button type="button" className="text-xs text-white/60" onClick={() => void setBetStatus(b.id, 'active')}>
-                            {t.active}
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {accepted && (
-              <div className="rounded-2xl border border-teal-300/25 bg-teal-400/10 p-4">
-                <p className="text-xs uppercase tracking-wide text-teal-200/70">{t.keep}</p>
-                <p className="mt-2 text-lg leading-snug text-white">
-                  {weekHint || lastWeek?.nextStep || lastWeek?.happened || gaps[0]?.text || hypothesis}
-                </p>
-                {weekHint ? (
-                  <button type="button" disabled={busy} onClick={() => void logWeek()} className="mt-3 text-sm text-teal-200">
-                    {t.log}
-                  </button>
-                ) : null}
-              </div>
-            )}
-          </>
-        )}
-      </aside>
+              )}
+            </>
+          )}
+        </aside>
       ) : null}
     </div>
   );
