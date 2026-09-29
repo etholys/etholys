@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
@@ -42,6 +42,7 @@ import {
   MeetEventDetailPopup,
   type MeetEventDetail,
 } from '@/components/meet/MeetEventDetailPopup';
+import { MeetExternalJoinPrompt } from '@/components/meet/MeetExternalJoinPrompt';
 import { meetHubJoinPath, meetJoinTargetId, meetRecapPath, meetRecapsPath, meetCapturePath, isGoogleImportedMeetSession } from '@/lib/meet/types';
 
 type MeetSessionRow = MeetEventDetail & {
@@ -149,6 +150,13 @@ function MeetHubContent() {
   const [mainView, setMainView] = useState<'agenda' | 'calendar'>('agenda');
   const [calendarScale, setCalendarScale] = useState<MeetCalendarScale>('month');
   const [googleImportBusy, setGoogleImportBusy] = useState(false);
+  const googleImportBusyRef = useRef(false);
+  const googleFullSyncDoneRef = useRef(false);
+  const [externalJoin, setExternalJoin] = useState<{
+    id: string;
+    title: string;
+    meetingUrl: string;
+  } | null>(null);
 
   useEffect(() => {
     const post = searchParams.get('post')?.trim();
@@ -181,7 +189,7 @@ function MeetHubContent() {
     setError(null);
     try {
       const r = await fetch(
-        `/api/meet/sessions?companyId=${encodeURIComponent(companyId)}&limit=200`,
+        `/api/meet/sessions?companyId=${encodeURIComponent(companyId)}&limit=400`,
       );
       const d = (await r.json()) as { sessions?: MeetSessionRow[]; error?: string };
       if (!r.ok) throw new Error(d.error || 'Error');
@@ -460,37 +468,78 @@ function MeetHubContent() {
     }
   }
 
+  const runGoogleCalendarImport = useCallback(
+    async (opts?: { silent?: boolean; forceFull?: boolean }) => {
+      if (!companyId || googleImportBusyRef.current) return;
+      googleImportBusyRef.current = true;
+      setGoogleImportBusy(true);
+      if (!opts?.silent) setError(null);
+      const forceFull = opts?.forceFull ?? !opts?.silent;
+      try {
+        const r = await fetch('/api/meet/calendar/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyId, forceFull }),
+        });
+        const d = (await r.json()) as {
+          error?: string;
+          imported?: number;
+          updated?: number;
+          cancelled?: number;
+          skipped?: number;
+          mode?: string;
+        };
+        if (!r.ok) throw new Error(d.error || 'Error');
+        if (forceFull) googleFullSyncDoneRef.current = true;
+        await load();
+        if (!opts?.silent) {
+          setInfo(
+            locale === 'pt'
+              ? `Google sincronizado (${d.mode || 'full'}): ${d.imported ?? 0} novas, ${d.updated ?? 0} actualizadas, ${d.cancelled ?? 0} canceladas.`
+              : locale === 'es'
+                ? `Google sincronizado (${d.mode || 'full'}): ${d.imported ?? 0} nuevas, ${d.updated ?? 0} actualizadas, ${d.cancelled ?? 0} canceladas.`
+                : `Google synced (${d.mode || 'full'}): ${d.imported ?? 0} new, ${d.updated ?? 0} updated, ${d.cancelled ?? 0} cancelled.`,
+          );
+        }
+      } catch (err) {
+        if (!opts?.silent) setError(err instanceof Error ? err.message : 'Error');
+      } finally {
+        googleImportBusyRef.current = false;
+        setGoogleImportBusy(false);
+      }
+    },
+    [companyId, load, locale],
+  );
+
   async function importFromGoogleCalendar() {
-    if (!companyId || googleImportBusy) return;
-    setGoogleImportBusy(true);
-    setError(null);
-    try {
-      const r = await fetch('/api/meet/calendar/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, daysBack: 7, daysForward: 21 }),
-      });
-      const d = (await r.json()) as {
-        error?: string;
-        imported?: number;
-        updated?: number;
-        skipped?: number;
-      };
-      if (!r.ok) throw new Error(d.error || 'Error');
-      await load();
-      setInfo(
-        t(
-          `Google: ${d.imported ?? 0} novas, ${d.updated ?? 0} actualizadas${(d.skipped ?? 0) > 0 ? `, ${d.skipped} Etholys ignoradas` : ''}.`,
-          `Google: ${d.imported ?? 0} nuevas, ${d.updated ?? 0} actualizadas${(d.skipped ?? 0) > 0 ? `, ${d.skipped} Etholys ignoradas` : ''}.`,
-          `Google: ${d.imported ?? 0} new, ${d.updated ?? 0} updated${(d.skipped ?? 0) > 0 ? `, ${d.skipped} Etholys skipped` : ''}.`,
-        ),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error');
-    } finally {
-      setGoogleImportBusy(false);
-    }
+    await runGoogleCalendarImport({ silent: false, forceFull: true });
   }
+
+  // Sync automática: ao abrir o hub e ao voltar ao separador (máx. 1×/min)
+  useEffect(() => {
+    if (!companyId || !connections?.google.ready) return;
+    let cancelled = false;
+    let last = 0;
+    const run = () => {
+      const now = Date.now();
+      if (now - last < 60_000) return;
+      last = now;
+      if (!cancelled) {
+        const forceFull = !googleFullSyncDoneRef.current;
+        void runGoogleCalendarImport({ silent: true, forceFull });
+      }
+    };
+    const timer = window.setTimeout(run, 600);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') run();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [companyId, connections?.google.ready, runGoogleCalendarImport]);
 
   const headerDate = new Intl.DateTimeFormat(intlLocale, {
     weekday: 'short',
@@ -835,9 +884,9 @@ function MeetHubContent() {
                   onClick={() => void importFromGoogleCalendar()}
                   className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 font-medium text-teal-900 hover:bg-teal-100 disabled:opacity-50"
                   title={t(
-                    'Trazer eventos do Google (7 dias atrás → 21 à frente)',
-                    'Traer eventos de Google (7 días atrás → 21 adelante)',
-                    'Pull Google events (7 days back → 21 ahead)',
+                    'Sincronizar agora com Google Calendar (bidirecional, automático)',
+                    'Sincronizar ahora con Google Calendar (bidireccional, automático)',
+                    'Sync now with Google Calendar (bidirectional, automatic)',
                   )}
                 >
                   {googleImportBusy ? (
@@ -845,7 +894,7 @@ function MeetHubContent() {
                   ) : (
                     <MonitorUp className="h-3.5 w-3.5" />
                   )}
-                  {t('Puxar do Google', 'Traer de Google', 'Pull from Google')}
+                  {t('Sincronizar Google', 'Sincronizar Google', 'Sync Google')}
                 </button>
               </>
             ) : connections?.google.configured ? (
@@ -973,6 +1022,10 @@ function MeetHubContent() {
                   copiedId={copiedId}
                   calBusyId={calBusyId}
                   onOpen={openSessionDetail}
+                  onOpenExternal={(s) => {
+                    if (!s.meetingUrl) return;
+                    setExternalJoin({ id: s.id, title: s.title, meetingUrl: s.meetingUrl });
+                  }}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
                   t={t}
@@ -988,6 +1041,10 @@ function MeetHubContent() {
                   copiedId={copiedId}
                   calBusyId={calBusyId}
                   onOpen={openSessionDetail}
+                  onOpenExternal={(s) => {
+                    if (!s.meetingUrl) return;
+                    setExternalJoin({ id: s.id, title: s.title, meetingUrl: s.meetingUrl });
+                  }}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
                   t={t}
@@ -1002,6 +1059,10 @@ function MeetHubContent() {
                   copiedId={copiedId}
                   calBusyId={calBusyId}
                   onOpen={openSessionDetail}
+                  onOpenExternal={(s) => {
+                    if (!s.meetingUrl) return;
+                    setExternalJoin({ id: s.id, title: s.title, meetingUrl: s.meetingUrl });
+                  }}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
                   t={t}
@@ -1016,6 +1077,10 @@ function MeetHubContent() {
                   copiedId={copiedId}
                   calBusyId={calBusyId}
                   onOpen={openSessionDetail}
+                  onOpenExternal={(s) => {
+                    if (!s.meetingUrl) return;
+                    setExternalJoin({ id: s.id, title: s.title, meetingUrl: s.meetingUrl });
+                  }}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
                   t={t}
@@ -1030,6 +1095,10 @@ function MeetHubContent() {
                   copiedId={copiedId}
                   calBusyId={calBusyId}
                   onOpen={openSessionDetail}
+                  onOpenExternal={(s) => {
+                    if (!s.meetingUrl) return;
+                    setExternalJoin({ id: s.id, title: s.title, meetingUrl: s.meetingUrl });
+                  }}
                   onCopy={copyUrl}
                   onCalendar={syncCalendar}
                   t={t}
@@ -1074,11 +1143,37 @@ function MeetHubContent() {
           </div>
         )}
 
+        <MeetExternalJoinPrompt
+          open={Boolean(externalJoin)}
+          meetingTitle={externalJoin?.title}
+          onClose={() => setExternalJoin(null)}
+          onRecordAndOpen={() => {
+            if (!companyId || !externalJoin) return;
+            const target = externalJoin;
+            setExternalJoin(null);
+            window.open(target.meetingUrl, '_blank', 'noopener,noreferrer');
+            router.push(
+              meetCapturePath({
+                companyId,
+                sessionId: target.id,
+                openMeetingUrl: target.meetingUrl,
+                autoRecord: true,
+              }),
+            );
+          }}
+          onOpenOnly={() => {
+            if (!externalJoin?.meetingUrl) return;
+            window.open(externalJoin.meetingUrl, '_blank', 'noopener,noreferrer');
+            setExternalJoin(null);
+          }}
+        />
+
       </main>
 
-      {scheduleOpen && (
+      {scheduleOpen && companyId && (
         <MeetScheduleDialog
           locale={locale}
+          companyId={companyId}
           projects={projects}
           connections={connections}
           saving={saving}
@@ -1158,6 +1253,7 @@ type GroupProps = {
   copiedId: string | null;
   calBusyId: string | null;
   onOpen: (sessionId: string) => void;
+  onOpenExternal: (session: MeetSessionRow) => void;
   onCopy: (url: string, id: string) => void;
   onCalendar: (sessionId: string, provider: 'google' | 'outlook') => void;
   t: (pt: string, es: string, en: string) => string;
@@ -1172,6 +1268,7 @@ function MeetingGroup({
   copiedId,
   calBusyId,
   onOpen,
+  onOpenExternal,
   onCopy,
   onCalendar,
   t,
@@ -1268,14 +1365,13 @@ function MeetingGroup({
                     </Link>
                   )}
                   {s.meetingUrl && isGoogleImportedMeetSession(s) && (
-                    <a
-                      href={s.meetingUrl}
-                      target="_blank"
-                      rel="noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => onOpenExternal(s)}
                       className="rounded-full bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-teal-800"
                     >
                       {t('Abrir call', 'Abrir call', 'Open call')}
-                    </a>
+                    </button>
                   )}
                   {companyId && (
                     <Link

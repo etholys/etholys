@@ -2,43 +2,37 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { importGoogleCalendarIntoMeet } from '@/lib/meet/calendar-google-import';
+import { syncGoogleCalendarBidirectional } from '@/lib/meet/calendar-google-sync';
 
 /**
- * Puxa eventos do Google Calendar do utilizador para MeetSession (captura/transcrição).
- * POST { companyId, daysBack?: number, daysForward?: number }
+ * Sync Google Calendar primary ↔ CHORUS (incremental; sem janela curta).
+ * POST { companyId }
  */
 export async function POST(req: Request) {
   try {
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const body = (await req.json()) as {
-      companyId?: string;
-      daysBack?: number;
-      daysForward?: number;
-    };
+    const body = (await req.json()) as { companyId?: string; forceFull?: boolean };
     const companyId = body.companyId?.trim();
     if (!companyId || !tenant.companyIds.includes(companyId)) {
       return NextResponse.json({ error: 'companyId inválido' }, { status: 400 });
     }
 
-    const daysBack = Math.min(30, Math.max(0, Number(body.daysBack ?? 7) || 7));
-    const daysForward = Math.min(60, Math.max(1, Number(body.daysForward ?? 21) || 21));
-    const timeMin = new Date(Date.now() - daysBack * 86_400_000);
-    const timeMax = new Date(Date.now() + daysForward * 86_400_000);
-
-    const result = await importGoogleCalendarIntoMeet({
+    const result = await syncGoogleCalendarBidirectional({
       companyId,
       userId: tenant.userId,
-      timeMin,
-      timeMax,
+      // forceFull: apanha convites meet.etholys.com que o incremental já tinha saltado
+      forceFull: body.forceFull !== false,
     });
 
     return NextResponse.json({
       ok: true,
-      ...result,
-      window: { timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString() },
+      imported: result.imported,
+      updated: result.updated,
+      cancelled: result.cancelled,
+      skipped: result.skipped,
+      mode: result.mode,
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Error interno';
