@@ -117,6 +117,8 @@ Reutilizar `FundhubAlert` + `syncDeadlineNotifications`. F5 adiciona tipo `oppor
 
 **Modelo de descoberta (custo):** Claude Sonnet 4.6 por defeito. Fable 5.1 só com `FUNDHUB_USE_FABLE=1`. Varredura: 2 packs em série, poucas web_searches; enrich limitado a 12 candidatos. Mythos não se usa.
 
+**Medição de custo (system admin):** cada `FundhubDiscoveryRun` grava tokens, web_search e `estimatedCostUsd` (tabela Anthropic em `lib/llm-usage.ts`). Consola interna: `/lab/costs` + `GET /api/platform/ai-costs` — só `ETHOLYS_PLATFORM_ADMIN_EMAILS`. Serve para ver $/varredura e $/candidato por empresa (rentabilidade), não para facturar ao cliente.
+
 **Regra:** `open_now` **nunca** cai no fallback de conhecimento (inventa agências). Sem URL oficial da convocatória → o candidato não entra. A varredura corre **pacotes paralelos**: internet aberta → instrumentos → follow-through oficial. Agregadores e notícias servem para descobrir; `callUrl` tem de ser a página do financiador. O que já está na mesa/catálogo entra como skip-list: a IA tem de ir buscar **outras** instituições. Notas de briefing (ex. princípios Rural Commerce) pontuam o fit; não vetam a busca.
 
 ---

@@ -9,6 +9,12 @@ import { listEtholysCatalogHints, listUserMonitoredUrls } from '@/lib/opportunit
 import { discoverOpportunitiesOnline } from '@/lib/opportunity/web-discovery';
 import { applyBriefingDiversity } from '@/lib/opportunity/discovery-queries';
 import { dropDuplicateFunds } from '@/lib/opportunity/scan-filters';
+import {
+  emptyLlmUsageTotals,
+  llmUsageForPersistence,
+  withLlmUsageTracking,
+  type LlmUsageTotals,
+} from '@/lib/llm-usage';
 import type { OpportunityBriefing, ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
 
 function uniqueNameInstitution(
@@ -41,6 +47,16 @@ async function setScanProgress(runId: string, progressPct: number, phase: string
     .catch(() => {});
 }
 
+function costColumns(usage: LlmUsageTotals) {
+  return {
+    estimatedCostUsd: usage.estimatedCostUsd,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    webSearchRequests: usage.webSearchRequests,
+    llmCalls: usage.llmCalls,
+  };
+}
+
 export async function runOpportunityScan(opts: {
   companyId: string;
   userId: string;
@@ -56,6 +72,7 @@ export async function runOpportunityScan(opts: {
   discoveryMode: 'web' | 'knowledge';
   searchQueries: string[];
   scanFocus: ScanFocus;
+  aiCost: LlmUsageTotals;
 }> {
   const scanFocus = opts.scanFocus ?? 'open_now';
   const started = Date.now();
@@ -89,102 +106,132 @@ export async function runOpportunityScan(opts: {
           },
         });
 
-  const extraUrls = optionalUrls;
+  let usage: LlmUsageTotals = emptyLlmUsageTotals();
 
-  let optionalExtraContext = '';
-  if (catalogHints.length > 0) {
-    optionalExtraContext = catalogHints
-      .map((h) => `- ${h.name}: ${h.url}${h.tags ? ` (${h.tags})` : ''}`)
-      .join('\n');
-  }
-  if (extraUrls.length > 0) {
-    try {
-      await setScanProgress(run.id, 12, 'fetching_portals');
-      const { snippets } = await fetchSourceSnippets(extraUrls);
-      const block = snippetsToPromptBlock(snippets);
-      optionalExtraContext = [optionalExtraContext, block].filter(Boolean).join('\n');
-    } catch {
-      // portais opcionais — ignorar falhas
+  try {
+    const extraUrls = optionalUrls;
+
+    let optionalExtraContext = '';
+    if (catalogHints.length > 0) {
+      optionalExtraContext = catalogHints
+        .map((h) => `- ${h.name}: ${h.url}${h.tags ? ` (${h.tags})` : ''}`)
+        .join('\n');
     }
-  }
+    if (extraUrls.length > 0) {
+      try {
+        await setScanProgress(run.id, 12, 'fetching_portals');
+        const { snippets } = await fetchSourceSnippets(extraUrls);
+        const block = snippetsToPromptBlock(snippets);
+        optionalExtraContext = [optionalExtraContext, block].filter(Boolean).join('\n');
+      } catch {
+        // portais opcionais — ignorar falhas
+      }
+    }
 
-  const alreadyInInbox = [...inbox.pending, ...inbox.later];
-  const deskSkip = uniqueNameInstitution([
-    ...existingFunds,
-    ...alreadyInInbox.map((c) => ({ name: c.name, institution: c.institution })),
-  ]);
+    const alreadyInInbox = [...inbox.pending, ...inbox.later];
+    const deskSkip = uniqueNameInstitution([
+      ...existingFunds,
+      ...alreadyInInbox.map((c) => ({ name: c.name, institution: c.institution })),
+    ]);
 
-  await setScanProgress(run.id, 18, 'starting_discovery');
+    await setScanProgress(run.id, 18, 'starting_discovery');
 
-  const discovery = await discoverOpportunitiesOnline({
-    briefing,
-    learningContext,
-    existingFunds: deskSkip,
-    optionalExtraContext: optionalExtraContext || undefined,
-    scanFocus,
-    onProgress: (pct, phase) => setScanProgress(run.id, pct, phase),
-  });
+    const tracked = await withLlmUsageTracking(() =>
+      discoverOpportunitiesOnline({
+        briefing,
+        learningContext,
+        existingFunds: deskSkip,
+        optionalExtraContext: optionalExtraContext || undefined,
+        scanFocus,
+        onProgress: (pct, phase) => setScanProgress(run.id, pct, phase),
+      }),
+    );
+    usage = tracked.usage;
+    const discovery = tracked.result;
 
-  let candidates = applyBriefingDiversity(
-    dropDuplicateFunds(discovery.candidates, deskSkip),
-    briefing,
-  );
-  if (candidates.length === 0) {
-    candidates = applyBriefingDiversity(
-      dropDuplicateFunds(discovery.candidates, existingFunds).filter(
-        (c) => !existingSet.has(`${c.name.toLowerCase()}|${c.institution.toLowerCase()}`),
-      ),
+    let candidates = applyBriefingDiversity(
+      dropDuplicateFunds(discovery.candidates, deskSkip),
       briefing,
     );
-    candidates = dropDuplicateFunds(candidates, alreadyInInbox);
-  }
+    if (candidates.length === 0) {
+      candidates = applyBriefingDiversity(
+        dropDuplicateFunds(discovery.candidates, existingFunds).filter(
+          (c) => !existingSet.has(`${c.name.toLowerCase()}|${c.institution.toLowerCase()}`),
+        ),
+        briefing,
+      );
+      candidates = dropDuplicateFunds(candidates, alreadyInInbox);
+    }
 
-  await writeScanResults(
-    opts.companyId,
-    {
+    await writeScanResults(
+      opts.companyId,
+      {
+        runId: run.id,
+        candidates: candidates.map((c) => ({ ...c, scanFocus, runId: run.id })),
+        savedTempIds: [],
+        discardedTempIds: [],
+        laterTempIds: [],
+        discoveryMode: discovery.discoveryMode,
+        searchQueries: discovery.searchQueries,
+        scanFocus,
+        scanProfileName: briefing.scanName,
+      },
+      `discovery:${opts.userId}`,
+    );
+
+    const durationMs = Date.now() - started;
+    const searchCount = discovery.searchQueries.length;
+
+    await prisma.fundhubDiscoveryRun.update({
+      where: { id: run.id },
+      data: {
+        status: 'completed',
+        scanned: Math.max(1, searchCount),
+        created: candidates.length,
+        updated: 0,
+        errorCount: 0,
+        ...costColumns(usage),
+        errorsJson: JSON.stringify({
+          searchQueries: discovery.searchQueries,
+          mode: discovery.discoveryMode,
+          scanFocus,
+          scanName: briefing.scanName ?? null,
+          fallbackReason: discovery.fallbackReason ?? null,
+          aiCost: llmUsageForPersistence(usage),
+        }),
+        finishedAt: new Date(),
+        durationMs,
+      },
+    });
+
+    return {
       runId: run.id,
-      candidates: candidates.map((c) => ({ ...c, scanFocus, runId: run.id })),
-      savedTempIds: [],
-      discardedTempIds: [],
-      laterTempIds: [],
+      candidates,
+      scanned: Math.max(1, searchCount),
+      created: candidates.length,
       discoveryMode: discovery.discoveryMode,
       searchQueries: discovery.searchQueries,
       scanFocus,
-      scanProfileName: briefing.scanName,
-    },
-    `discovery:${opts.userId}`,
-  );
-
-  const durationMs = Date.now() - started;
-  const searchCount = discovery.searchQueries.length;
-
-  await prisma.fundhubDiscoveryRun.update({
-    where: { id: run.id },
-    data: {
-      status: 'completed',
-      scanned: Math.max(1, searchCount),
-      created: candidates.length,
-      updated: 0,
-      errorCount: 0,
-      errorsJson: JSON.stringify({
-        searchQueries: discovery.searchQueries,
-        mode: discovery.discoveryMode,
-        scanFocus,
-        scanName: briefing.scanName ?? null,
-        fallbackReason: discovery.fallbackReason ?? null,
-      }),
-      finishedAt: new Date(),
-      durationMs,
-    },
-  });
-
-  return {
-    runId: run.id,
-    candidates,
-    scanned: Math.max(1, searchCount),
-    created: candidates.length,
-    discoveryMode: discovery.discoveryMode,
-    searchQueries: discovery.searchQueries,
-    scanFocus,
-  };
+      aiCost: usage,
+    };
+  } catch (e) {
+    const durationMs = Date.now() - started;
+    await prisma.fundhubDiscoveryRun
+      .update({
+        where: { id: run.id },
+        data: {
+          status: 'failed',
+          errorCount: 1,
+          ...costColumns(usage),
+          errorsJson: JSON.stringify({
+            error: e instanceof Error ? e.message : String(e),
+            aiCost: llmUsageForPersistence(usage),
+          }),
+          finishedAt: new Date(),
+          durationMs,
+        },
+      })
+      .catch(() => {});
+    throw e;
+  }
 }

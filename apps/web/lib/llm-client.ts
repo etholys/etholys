@@ -2,6 +2,9 @@
  * Cliente LLM — único provider de modelo na aplicação Next.js.
  */
 
+import { recordLlmUsage, usageFromAnthropicResponse } from '@/lib/llm-usage';
+import type { LlmUsageSnapshot } from '@/lib/llm-usage';
+
 const ANTHROPIC_API_ROOT = 'https://api.anthropic.com/v1';
 const ANTHROPIC_VERSION = '2023-06-01';
 /** Evita pedidos pendurados que o proxy fecha com HTML 502. */
@@ -229,6 +232,8 @@ export type LlmGenerateResult = {
   text: string;
   finishReason?: string;
   searchQueries?: string[];
+  /** Usage Anthropic + estimativa USD (quando o provider devolve usage). */
+  usage?: LlmUsageSnapshot;
 };
 
 type AnthropicContentBlock =
@@ -479,6 +484,13 @@ async function llmGenerateContentWithModel(
   let data: {
     content?: Array<Record<string, unknown>>;
     stop_reason?: string;
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_read_input_tokens?: number;
+      cache_creation_input_tokens?: number;
+      server_tool_use?: { web_search_requests?: number };
+    };
     error?: { message?: string; type?: string };
   };
   try {
@@ -513,10 +525,14 @@ async function llmGenerateContentWithModel(
     text = stripJsonFences(text);
   }
 
+  const usage = usageFromAnthropicResponse(model, data.usage, searchQueries.length);
+  recordLlmUsage(usage);
+
   return {
     text,
     finishReason: mapStopReason(data.stop_reason),
     searchQueries: searchQueries.length ? searchQueries : undefined,
+    usage,
   };
 }
 

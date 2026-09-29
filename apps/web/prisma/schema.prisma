@@ -1702,6 +1702,12 @@ model FundhubDiscoveryRun {
   errorCount        Int       @default(0)
   rematchUpdated    Int?
   errorsJson        String?
+  /// Custo estimado Anthropic (USD) desta varredura — system admin / rentabilidade.
+  estimatedCostUsd  Float?
+  inputTokens       Int?
+  outputTokens      Int?
+  webSearchRequests Int?
+  llmCalls          Int?
   startedAt         DateTime  @default(now())
   finishedAt        DateTime?
   durationMs        Int?
@@ -1712,6 +1718,7 @@ model FundhubDiscoveryRun {
 
   @@index([companyId, startedAt])
   @@index([companyId, status])
+  @@index([startedAt])
 }
 
 model FundhubAlert {

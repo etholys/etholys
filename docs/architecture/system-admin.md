@@ -24,6 +24,7 @@
 | Lab gate | `lib/lab/access.ts` → `hasLabAccess` (system admin **ou** LabInvite) |
 | Card Lab no Hub | `app/hub/page.tsx` → `GET /api/lab/access` → só se `isSystemAdmin` |
 | ANVIL owners | `lib/lab-anvil/access.ts` → `isSystemAdmin` |
+| Custos IA FundHub | `/lab/costs` + `GET /api/platform/ai-costs` → só `isSystemAdmin` |
 
 ## Produção / local
 

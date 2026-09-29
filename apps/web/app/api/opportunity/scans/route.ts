@@ -192,21 +192,9 @@ export async function POST(req: NextRequest) {
     briefing: briefingSnapshot,
     scanFocus,
     existingRunId: run.id,
-  }).catch(async (e) => {
+  }).catch((e) => {
+    // runOpportunityScan already persists status=failed + aiCost
     console.error('[POST /api/opportunity/scans] background', e);
-    await prisma.fundhubDiscoveryRun
-      .update({
-        where: { id: run.id },
-        data: {
-          status: 'failed',
-          finishedAt: new Date(),
-          errorCount: 1,
-          errorsJson: JSON.stringify({
-            error: e instanceof Error ? e.message : String(e),
-          }),
-        },
-      })
-      .catch(() => {});
   });
 
   return NextResponse.json({

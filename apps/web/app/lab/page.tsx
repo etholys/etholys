@@ -4,7 +4,7 @@ import { useApp } from '@/app/providers';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { Sparkles, ArrowRight, FlaskConical, Users, Plus, Copy, Check, Trash2, Mail, Hammer } from 'lucide-react';
+import { Sparkles, ArrowRight, FlaskConical, Users, Plus, Copy, Check, Trash2, Mail, Hammer, DollarSign } from 'lucide-react';
 
 const tools = [
   {
@@ -42,6 +42,25 @@ const tools = [
     color: 'from-amber-500 to-orange-700',
     href: '/lab/anvil',
     active: true,
+  },
+  {
+    id: 'costs',
+    name: 'Costos IA',
+    tagline: {
+      es: 'Rentabilidad FundHub (Anthropic)',
+      pt: 'Rentabilidade FundHub (Anthropic)',
+      en: 'FundHub profitability (Anthropic)',
+    },
+    description: {
+      es: 'Gasto estimado por empresa y por barrido: tokens, web search y $/candidato. Solo system admin.',
+      pt: 'Gasto estimado por empresa e por varredura: tokens, web search e $/candidato. Só system admin.',
+      en: 'Estimated spend per company and scan: tokens, web search, and $/candidate. System admin only.',
+    },
+    icon: DollarSign,
+    color: 'from-emerald-500 to-teal-700',
+    href: '/lab/costs',
+    active: true,
+    systemAdminOnly: true,
   },
 ];
 
@@ -193,7 +212,9 @@ export default function LabPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {tools.map((tool) => {
+        {tools
+          .filter((tool) => !('systemAdminOnly' in tool && tool.systemAdminOnly) || isSystemAdmin)
+          .map((tool) => {
           const Icon = tool.icon;
           return (
             <Link
