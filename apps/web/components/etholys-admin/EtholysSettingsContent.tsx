@@ -42,6 +42,10 @@ type Props = {
   title: string;
   subtitle?: string;
   accent?: 'teal' | 'slate';
+  /** Hide the page title block when the parent already provides headings. */
+  hideHeader?: boolean;
+  /** Soft highlight for guided-setup scroll targets. */
+  highlight?: boolean;
 };
 
 export function EtholysSettingsContent({
@@ -49,6 +53,8 @@ export function EtholysSettingsContent({
   title,
   subtitle,
   accent = 'teal',
+  hideHeader = false,
+  highlight = false,
 }: Props) {
   const { tr, locale, setLocale } = useApp();
   const { data: session } = useSession() || {};
@@ -341,21 +347,28 @@ export function EtholysSettingsContent({
             cta: 'Manage team & licenses',
           };
 
+  const panel = (extra = '') =>
+    `bg-white rounded-xl p-5 shadow-sm border transition ${
+      highlight ? 'border-teal-400/50 ring-1 ring-teal-400/30' : 'border-transparent'
+    } ${extra}`.trim();
+
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-        {subtitle && <p className="text-gray-500 text-sm mt-1">{subtitle}</p>}
-        {session?.user?.email && (
-          <p className="text-xs text-gray-400 mt-1">{session.user.email}</p>
-        )}
-      </div>
+      {!hideHeader && (
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+          {subtitle && <p className="text-gray-500 text-sm mt-1">{subtitle}</p>}
+          {session?.user?.email && (
+            <p className="text-xs text-gray-400 mt-1">{session.user.email}</p>
+          )}
+        </div>
+      )}
 
       {show('profile') && (
-        <div className="bg-white rounded-xl p-5 shadow-sm">
+        <div className={panel()}>
           <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <User className={`w-4 h-4 ${icon}`} />
-            Mi Perfil
+            {locale === 'pt' ? 'O meu perfil' : locale === 'es' ? 'Mi perfil' : 'My profile'}
           </h3>
           <form onSubmit={handleSaveProfile} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -415,10 +428,10 @@ export function EtholysSettingsContent({
       )}
 
       {show('language') && (
-        <div className="bg-white rounded-xl p-5 shadow-sm">
+        <div className={panel()}>
           <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Globe className={`w-4 h-4 ${icon}`} />
-            Idioma
+            {locale === 'pt' ? 'Idioma' : locale === 'es' ? 'Idioma' : 'Language'}
           </h3>
           <div className="flex gap-3">
             {(['es', 'pt', 'en'] as const).map((loc) => (
@@ -438,7 +451,7 @@ export function EtholysSettingsContent({
       )}
 
       {show('systems') && (
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+        <div className={panel('border-slate-200')}>
           <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
             <LayoutGrid className={`w-4 h-4 ${icon}`} />
             {systemsCopy.title}
@@ -455,7 +468,7 @@ export function EtholysSettingsContent({
       )}
 
       {show('companies') && (
-        <div className="bg-white rounded-xl p-5 shadow-sm">
+        <div className={panel()}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
               <Building2 className={`w-4 h-4 ${icon}`} />
@@ -538,12 +551,28 @@ export function EtholysSettingsContent({
         </div>
       )}
 
+      {show('invitations') && companies.length === 0 && (
+        <div className={panel()}>
+          <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+            <UserPlus className={`w-4 h-4 ${icon}`} />
+            {locale === 'pt' ? 'Convites' : locale === 'es' ? 'Invitaciones' : 'Invitations'}
+          </h3>
+          <p className="text-sm text-gray-500">
+            {locale === 'pt'
+              ? 'Crie uma empresa primeiro para poder convidar a equipa.'
+              : locale === 'es'
+                ? 'Cree una empresa primero para poder invitar al equipo.'
+                : 'Create a company first so you can invite the team.'}
+          </p>
+        </div>
+      )}
+
       {show('invitations') && companies.length > 0 && (
-        <div className="bg-white rounded-xl p-5 shadow-sm">
+        <div className={panel()}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
               <UserPlus className={`w-4 h-4 ${icon}`} />
-              Invitaciones
+              {locale === 'pt' ? 'Convites' : locale === 'es' ? 'Invitaciones' : 'Invitations'}
             </h3>
             <button
               type="button"
@@ -623,7 +652,7 @@ export function EtholysSettingsContent({
       )}
 
       {show('departments') && companies.length > 0 && (
-        <div className="bg-white rounded-xl p-5 shadow-sm">
+        <div className={panel()}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
               <Layers className={`w-4 h-4 ${icon}`} />
@@ -682,7 +711,7 @@ export function EtholysSettingsContent({
       )}
 
       {show('roles') && (
-        <div className="bg-white rounded-xl p-5 shadow-sm">
+        <div className={panel()}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
               <Shield className={`w-4 h-4 ${icon}`} />
@@ -725,10 +754,10 @@ export function EtholysSettingsContent({
       )}
 
       {show('danger') && (
-        <div className="bg-white rounded-xl p-5 shadow-sm border-2 border-red-100">
+        <div className={`${panel('border-2 border-red-100')}`}>
           <h3 className="font-semibold text-red-600 mb-2 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" />
-            Zona de peligro
+            {locale === 'pt' ? 'Zona de perigo' : locale === 'es' ? 'Zona de peligro' : 'Danger zone'}
           </h3>
           {!showDeleteConfirm ? (
             <button type="button" onClick={() => setShowDeleteConfirm(true)} className="px-4 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 flex items-center gap-2">

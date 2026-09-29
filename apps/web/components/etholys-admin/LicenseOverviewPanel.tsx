@@ -71,11 +71,17 @@ export function LicenseOverviewPanel() {
       }
       setGrants(Array.isArray(d.grants) ? d.grants : []);
     } catch {
-      setErr(t('Falha ao carregar licenças.', 'Error al cargar licencias.', 'Failed to load licenses.'));
+      setErr(
+        locale === 'pt'
+          ? 'Falha ao carregar licenças.'
+          : locale === 'es'
+            ? 'Error al cargar licencias.'
+            : 'Failed to load licenses.',
+      );
     } finally {
       setLoading(false);
     }
-  }, [companyId, t]);
+  }, [companyId, locale]);
 
   useEffect(() => {
     void load();

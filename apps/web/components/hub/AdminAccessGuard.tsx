@@ -10,7 +10,10 @@ type Props = {
   companyId: string | null;
 };
 
-/** Só administradores da empresa acedem a /hub/admin. */
+/**
+ * Só administradores da empresa acedem a /hub/admin (e billing).
+ * Sem empresa activa: permite entrada para criar a primeira organização (onboarding).
+ */
 export function AdminAccessGuard({ children, companyId }: Props) {
   const { locale } = useApp();
   const router = useRouter();
@@ -18,7 +21,7 @@ export function AdminAccessGuard({ children, companyId }: Props) {
 
   useEffect(() => {
     if (!companyId) {
-      setState('denied');
+      setState('allowed');
       return;
     }
     let cancelled = false;
@@ -46,7 +49,7 @@ export function AdminAccessGuard({ children, companyId }: Props) {
   if (state === 'loading') {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
       </div>
     );
   }
