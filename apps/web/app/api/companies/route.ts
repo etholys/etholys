@@ -35,16 +35,34 @@ export async function POST(req: Request) {
       if (!userByEmail) return NextResponse.json({ error: 'Usuario no encontrado. Por favor cierra sesión e inicia de nuevo.' }, { status: 401 });
       // Use the real DB user id
       const body = await req.json();
+      const radarOrgRole =
+        body.radarOrgRole === 'producer' || body.radarOrgRole === 'provider' ? body.radarOrgRole : null;
       const company = await prisma.company.create({
-        data: { name: body.name, shortName: body.shortName, description: body.description || null, color: body.color || '#0D9488', currency: body.currency || 'USD' },
+        data: {
+          name: body.name,
+          shortName: body.shortName,
+          description: body.description || null,
+          color: body.color || '#0D9488',
+          currency: body.currency || 'USD',
+          radarOrgRole,
+        },
       });
       await prisma.companyUser.create({ data: { userId: userByEmail.id, companyId: company.id, role: 'ADMIN', isDefault: false } });
       return NextResponse.json({ company });
     }
 
     const body = await req.json();
+    const radarOrgRole =
+      body.radarOrgRole === 'producer' || body.radarOrgRole === 'provider' ? body.radarOrgRole : null;
     const company = await prisma.company.create({
-      data: { name: body.name, shortName: body.shortName, description: body.description || null, color: body.color || '#0D9488', currency: body.currency || 'USD' },
+      data: {
+        name: body.name,
+        shortName: body.shortName,
+        description: body.description || null,
+        color: body.color || '#0D9488',
+        currency: body.currency || 'USD',
+        radarOrgRole,
+      },
     });
     await prisma.companyUser.create({ data: { userId: session.user.id, companyId: company.id, role: 'ADMIN', isDefault: false } });
     return NextResponse.json({ company });

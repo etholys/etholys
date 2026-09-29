@@ -5,14 +5,18 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { canAccessNexusOpsCompany } from '@/lib/nexus-ops';
 import {
+  buildCheckInPayload,
   canAdvanceStage,
+  clampTraceCoord,
   generateLotCode,
   generatePublicToken,
   isTraceStage,
   nextStage,
+  parseCheckInEvidence,
   sharePath,
   type TraceStage,
 } from '@/lib/radar/trace';
+import { decodeEvidenceImage, storeCheckInPhoto } from '@/lib/radar/evidence-upload';
 
 async function authorize(companyId: string, engagementId: string | null) {
   const tenant = await getUserCompanyIds();
@@ -35,9 +39,11 @@ function summarizeLot(lot: {
   unitId: string | null;
   createdAt: Date;
   unit?: { id: string; name: string } | null;
-  events?: Array<{ id: string; stage: string; occurredAt: Date }>;
+  events?: Array<{ id: string; stage: string; occurredAt: Date; payloadJson?: unknown }>;
 }) {
   const stage = isTraceStage(lot.currentStage) ? lot.currentStage : 'harvest';
+  const last = lot.events?.[lot.events.length - 1];
+  const evidence = last ? parseCheckInEvidence(last.payloadJson) : null;
   return {
     id: lot.id,
     code: lot.code,
@@ -52,6 +58,14 @@ function summarizeLot(lot: {
     createdAt: lot.createdAt.toISOString(),
     sharePath: sharePath(lot.publicToken),
     eventCount: lot.events?.length ?? 0,
+    lastCheckIn: evidence
+      ? {
+          lat: evidence.lat,
+          lng: evidence.lng,
+          hasPhoto: Boolean(evidence.photoUrl),
+          checkedInAt: evidence.checkedInAt,
+        }
+      : null,
   };
 }
 
@@ -68,7 +82,10 @@ export async function GET(req: NextRequest) {
     take: 40,
     include: {
       unit: { select: { id: true, name: true } },
-      events: { select: { id: true, stage: true, occurredAt: true }, orderBy: { occurredAt: 'asc' } },
+      events: {
+        select: { id: true, stage: true, occurredAt: true, payloadJson: true },
+        orderBy: { occurredAt: 'asc' },
+      },
     },
   });
 
@@ -94,8 +111,30 @@ export async function POST(req: NextRequest) {
 
   const action = String(body.action || '').trim();
   if (action === 'open_from_harvest') return openFromHarvest(companyId, engagementId, tenant.userId, body);
-  if (action === 'advance') return advanceLot(companyId, tenant.userId, body);
+  if (action === 'advance' || action === 'checkin') return advanceLot(companyId, tenant.userId, body);
   return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 });
+}
+
+async function resolvePhoto(
+  companyId: string,
+  lotId: string,
+  body: Record<string, unknown>
+): Promise<{ photoUrl: string | null; photoKey: string | null; error?: string }> {
+  if (typeof body.photoDataUrl === 'string' && body.photoDataUrl.trim()) {
+    const decoded = decodeEvidenceImage(body.photoDataUrl);
+    if (!decoded) return { photoUrl: null, photoKey: null, error: 'Foto inválida (JPEG/PNG/WebP, máx. 4MB).' };
+    const stored = await storeCheckInPhoto({
+      companyId,
+      lotId,
+      buffer: decoded.buffer,
+      contentType: decoded.contentType,
+    });
+    return { photoUrl: stored.photoUrl, photoKey: stored.photoKey };
+  }
+  const photoUrl = typeof body.photoUrl === 'string' ? body.photoUrl.trim().slice(0, 500) : '';
+  const photoKey = typeof body.photoKey === 'string' ? body.photoKey.trim().slice(0, 400) : '';
+  if (photoUrl && photoUrl.startsWith('http')) return { photoUrl, photoKey: photoKey || null };
+  return { photoUrl: null, photoKey: null };
 }
 
 async function openFromHarvest(
@@ -110,6 +149,14 @@ async function openFromHarvest(
     where: { id: unitId, companyId, isActive: true, kind: 'parcel' },
   });
   if (!unit) return NextResponse.json({ error: 'Parcela inválida.' }, { status: 400 });
+
+  const coords = clampTraceCoord(body.lat, body.lng);
+  if (!coords) {
+    return NextResponse.json(
+      { error: 'Check-in de colheita exige geolocalização (lat/lng).' },
+      { status: 400 }
+    );
+  }
 
   const lastInput = await prisma.nexusFieldEntry.findFirst({
     where: { companyId, unitId, kind: 'input' },
@@ -135,19 +182,7 @@ async function openFromHarvest(
   const unitLabel = String(body.unitLabel || 'kg').trim().slice(0, 12) || 'kg';
   const occurredAt = new Date();
 
-  const entry = await prisma.nexusFieldEntry.create({
-    data: {
-      companyId,
-      unitId,
-      kind: 'harvest',
-      occurredAt,
-      payloadJson: { note, qty, crop, unitLabel, source: 'radar_lot' },
-      authorUserId: userId,
-      channel: 'app',
-      engagementId,
-    },
-  });
-
+  // Temporary lot id placeholder for photo path — create lot first without photo, then update if needed
   let code = generateLotCode(occurredAt);
   for (let i = 0; i < 4; i++) {
     const clash = await prisma.radarLot.findFirst({ where: { companyId, code }, select: { id: true } });
@@ -155,11 +190,25 @@ async function openFromHarvest(
     code = generateLotCode(occurredAt);
   }
 
+  const publicToken = generatePublicToken();
+  const entry = await prisma.nexusFieldEntry.create({
+    data: {
+      companyId,
+      unitId,
+      kind: 'harvest',
+      occurredAt,
+      payloadJson: { note, qty, crop, unitLabel, source: 'radar_lot', lat: coords.lat, lng: coords.lng },
+      authorUserId: userId,
+      channel: 'app',
+      engagementId,
+    },
+  });
+
   const lot = await prisma.radarLot.create({
     data: {
       companyId,
       code,
-      publicToken: generatePublicToken(),
+      publicToken,
       unitId,
       crop,
       qty,
@@ -167,23 +216,48 @@ async function openFromHarvest(
       status: 'open',
       currentStage: 'harvest',
       harvestEntryId: entry.id,
-      events: {
-        create: {
-          stage: 'harvest',
-          occurredAt,
-          payloadJson: { note, qty, crop, unitLabel, parcel: unit.name },
-          channel: 'app',
-          authorUserId: userId,
-        },
-      },
-    },
-    include: {
-      unit: { select: { id: true, name: true } },
-      events: { select: { id: true, stage: true, occurredAt: true }, orderBy: { occurredAt: 'asc' } },
     },
   });
 
-  return NextResponse.json({ ok: true, lot: summarizeLot(lot) });
+  const photo = await resolvePhoto(companyId, lot.id, body);
+  if (photo.error) {
+    await prisma.radarLot.delete({ where: { id: lot.id } }).catch(() => undefined);
+    return NextResponse.json({ error: photo.error }, { status: 400 });
+  }
+
+  const payload = buildCheckInPayload({
+    note,
+    lat: coords.lat,
+    lng: coords.lng,
+    photoUrl: photo.photoUrl,
+    photoKey: photo.photoKey,
+    checkedInAt: occurredAt,
+    extra: { qty, crop, unitLabel, parcel: unit.name },
+  });
+
+  await prisma.radarLotEvent.create({
+    data: {
+      lotId: lot.id,
+      stage: 'harvest',
+      occurredAt,
+      payloadJson: payload,
+      channel: 'app',
+      authorUserId: userId,
+    },
+  });
+
+  const full = await prisma.radarLot.findFirst({
+    where: { id: lot.id },
+    include: {
+      unit: { select: { id: true, name: true } },
+      events: {
+        select: { id: true, stage: true, occurredAt: true, payloadJson: true },
+        orderBy: { occurredAt: 'asc' },
+      },
+    },
+  });
+
+  return NextResponse.json({ ok: true, lot: summarizeLot(full!) });
 }
 
 async function advanceLot(companyId: string, userId: string, body: Record<string, unknown>) {
@@ -206,15 +280,29 @@ async function advanceLot(companyId: string, userId: string, body: Record<string
     );
   }
 
-  const note = String(body.note || '').trim().slice(0, 2000);
-  const destination = String(body.destination || '').trim().slice(0, 200);
-  const buyer = String(body.buyer || '').trim().slice(0, 200);
-  const carrier = String(body.carrier || '').trim().slice(0, 200);
+  const coords = clampTraceCoord(body.lat, body.lng);
+  if (!coords) {
+    return NextResponse.json(
+      { error: 'Check-in exige geolocalização (lat/lng) nesta etapa.' },
+      { status: 400 }
+    );
+  }
+
+  const photo = await resolvePhoto(companyId, lotId, body);
+  if (photo.error) return NextResponse.json({ error: photo.error }, { status: 400 });
+
   const occurredAt = new Date();
-  const payload: Record<string, unknown> = { note };
-  if (destination) payload.destination = destination;
-  if (buyer) payload.buyer = buyer;
-  if (carrier) payload.carrier = carrier;
+  const payload = buildCheckInPayload({
+    note: String(body.note || ''),
+    destination: String(body.destination || ''),
+    buyer: String(body.buyer || ''),
+    carrier: String(body.carrier || ''),
+    lat: coords.lat,
+    lng: coords.lng,
+    photoUrl: photo.photoUrl,
+    photoKey: photo.photoKey,
+    checkedInAt: occurredAt,
+  });
 
   const updated = await prisma.$transaction(async (tx) => {
     await tx.radarLotEvent.create({
@@ -235,7 +323,10 @@ async function advanceLot(companyId: string, userId: string, body: Record<string
       },
       include: {
         unit: { select: { id: true, name: true } },
-        events: { select: { id: true, stage: true, occurredAt: true }, orderBy: { occurredAt: 'asc' } },
+        events: {
+          select: { id: true, stage: true, occurredAt: true, payloadJson: true },
+          orderBy: { occurredAt: 'asc' },
+        },
       },
     });
   });

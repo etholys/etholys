@@ -202,7 +202,7 @@ export function useRadarAgriculture(companyId: string, engagementId?: string | n
   return { board, lots, loading, err, setErr, busy, load, post };
 }
 
-export function RadarEmpresaView({
+export function RadarOpsView({
   companyId,
   engagementId,
   locale,
@@ -331,7 +331,7 @@ export function RadarEmpresaView({
         companyId={companyId}
         engagementId={engagementId}
         locale={loc}
-        mode="empresa"
+        mode="ops"
         parcels={parcels}
         sensors={mapSensors}
         focusedId={focus?.id || null}
@@ -575,169 +575,8 @@ export function RadarEmpresaView({
   );
 }
 
-export function RadarTecnicoView({
-  companyId,
-  engagementId,
-  locale,
-}: {
-  companyId: string;
-  engagementId?: string | null;
-  locale: string;
-}) {
-  const loc: Loc = locale === 'es' || locale === 'en' ? locale : 'pt';
-  const copy = COPY[loc];
-  const { board, lots, loading, err, setErr, busy, load, post } = useRadarAgriculture(companyId, engagementId, loc);
-  const [note, setNote] = useState('');
-  const [mm, setMm] = useState(String(DEFAULT_IRRIGATION_MM));
-  const [focusedId, setFocusedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!board?.parcels?.length) return;
-    const preferred = board.decision?.parcelId || board.parcels[0]?.id || null;
-    setFocusedId((prev) => (prev && board.parcels.some((p) => p.id === prev) ? prev : preferred));
-  }, [board?.parcels, board?.decision?.parcelId]);
-
-  if (loading && !board) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader2 className="h-7 w-7 animate-spin text-emerald-300" />
-      </div>
-    );
-  }
-
-  const decision = board?.decision;
-  const parcels = board?.parcels || [];
-  const focus = parcels.find((p) => p.id === focusedId) || parcels.find((p) => p.id === decision?.parcelId) || parcels[0];
-  const openLot = lots.find((l) => l.status === 'open');
-  const mapSensors = (board?.sensors || []).map((s) => ({
-    id: s.id,
-    name: s.name,
-    unitId: s.unitId ?? null,
-    lastValue: s.lastValue,
-  }));
-
-  return (
-    <div className="mx-auto max-w-lg space-y-5">
-      {err && <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">{err}</p>}
-
-      <RadarSiteMap
-        companyId={companyId}
-        engagementId={engagementId}
-        locale={loc}
-        mode="tecnico"
-        parcels={parcels}
-        sensors={mapSensors}
-        focusedId={focus?.id || null}
-        onFocus={setFocusedId}
-      />
-
-      <section className="rounded-[1.75rem] border border-white/10 bg-gradient-to-b from-emerald-500/15 to-white/[0.03] px-5 py-8 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200/70">{focus?.name || 'RADAR'}</p>
-        <h2 className="mt-3 font-serif text-3xl text-white">{decision?.title[loc] || copy.listening}</h2>
-        <p className="mx-auto mt-2 max-w-sm text-sm text-white/60">{decision?.detail[loc]}</p>
-
-        <div className="mt-6 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-2xl bg-black/25 px-2 py-3">
-            <p className="text-[10px] uppercase text-white/40">{copy.moisture}</p>
-            <p className="mt-1 font-serif text-2xl text-white">{focus?.moisture == null ? '—' : `${focus.moisture}`}</p>
-          </div>
-          <div className="rounded-2xl bg-black/25 px-2 py-3">
-            <p className="text-[10px] uppercase text-white/40">{copy.irrigLabel}</p>
-            <p className="mt-1 font-serif text-2xl text-white">{focus?.irrigationMm == null ? '—' : focus.irrigationMm}</p>
-          </div>
-          <div className="rounded-2xl bg-black/25 px-2 py-3">
-            <p className="text-[10px] uppercase text-white/40">{copy.phi}</p>
-            <p className="mt-1 font-serif text-2xl text-white">
-              {focus?.harvestBlocked && focus.phiDaysLeft != null ? focus.phiDaysLeft : '✓'}
-            </p>
-          </div>
-        </div>
-
-        {decision?.code === 'irrigate' && (
-          <div className="mt-6 flex flex-col gap-2">
-            <div className="flex justify-center gap-2">
-              <input
-                value={mm}
-                onChange={(e) => setMm(e.target.value)}
-                className="w-24 rounded-xl border border-white/15 bg-black/30 px-3 py-3 text-center text-lg text-white"
-              />
-              <span className="self-center text-sm text-white/50">{copy.mm}</span>
-            </div>
-            <button
-              type="button"
-              disabled={busy || !focus}
-              onClick={() =>
-                void post({ action: 'line', kind: 'irrigation', unitId: focus?.id, mm: Number(mm) || DEFAULT_IRRIGATION_MM })
-                  .then(() => load())
-                  .catch((e) => setErr(e.message))
-              }
-              className="w-full rounded-2xl bg-emerald-500 py-4 text-base font-semibold text-[#04110c] disabled:opacity-50"
-            >
-              {copy.irrig}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void post({ action: 'command', kind: 'irrigation' }).then(() => load()).catch((e) => setErr(e.message))}
-              className="w-full rounded-2xl border border-white/20 py-3 text-sm text-white/80"
-            >
-              {copy.askWa}
-            </button>
-          </div>
-        )}
-
-        {(decision?.code === 'scout' || decision?.code === 'await_signal' || decision?.code === 'ok') && (
-          <div className="mt-6 space-y-2">
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={copy.notePh}
-              className="w-full rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white"
-            />
-            <button
-              type="button"
-              disabled={busy || !note.trim() || !focus}
-              onClick={() =>
-                void post({ action: 'line', kind: 'observation', unitId: focus?.id, note: note.trim() })
-                  .then(() => {
-                    setNote('');
-                    return load();
-                  })
-                  .catch((e) => setErr(e.message))
-              }
-              className="w-full rounded-2xl bg-emerald-500 py-4 text-base font-semibold text-[#04110c] disabled:opacity-50"
-            >
-              {copy.walked}
-            </button>
-          </div>
-        )}
-
-        {decision?.code === 'hold_harvest' && (
-          <p className="mt-6 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-            {decision.detail[loc]}
-          </p>
-        )}
-      </section>
-
-      {openLot && (
-        <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4">
-          <p className="text-[11px] uppercase tracking-wide text-white/40">{copy.chain}</p>
-          <p className="mt-1 font-serif text-xl text-white">{openLot.code}</p>
-          <p className="text-xs text-white/50">{TRACE_STAGE_LABEL[openLot.currentStage][loc]}</p>
-        </section>
-      )}
-
-      <RadarChainBoard
-        companyId={companyId}
-        engagementId={engagementId}
-        locale={locale}
-        unitId={focus?.id || null}
-        unitCrop={focus?.crop || null}
-        harvestBlocked={Boolean(focus?.harvestBlocked)}
-      />
-    </div>
-  );
-}
+/** @deprecated use RadarOpsView — single operational surface for all roles. */
+export const RadarEmpresaView = RadarOpsView;
 
 function Metric({
   icon,

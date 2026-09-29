@@ -1,7 +1,5 @@
 import { RADAR_MODULES, type RadarModuleId } from '@/lib/etholys-products';
 
-export type RadarView = 'empresa' | 'tecnico';
-
 export const RADAR_SPACE_KINDS: Record<
   RadarModuleId,
   { unitKind: string; unitLabel: { pt: string; es: string; en: string } }

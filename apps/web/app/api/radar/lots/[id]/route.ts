@@ -51,6 +51,8 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       events: lot.events.map((e) => {
         const st = isTraceStage(e.stage) ? e.stage : 'harvest';
         const payload = (e.payloadJson || {}) as Record<string, unknown>;
+        const lat = payload.lat != null ? Number(payload.lat) : null;
+        const lng = payload.lng != null ? Number(payload.lng) : null;
         return {
           id: e.id,
           stage: st,
@@ -61,6 +63,10 @@ export async function GET(req: NextRequest, ctx: Ctx) {
           destination: payload.destination ? String(payload.destination) : null,
           buyer: payload.buyer ? String(payload.buyer) : null,
           carrier: payload.carrier ? String(payload.carrier) : null,
+          lat: Number.isFinite(lat as number) ? lat : null,
+          lng: Number.isFinite(lng as number) ? lng : null,
+          photoUrl: typeof payload.photoUrl === 'string' ? payload.photoUrl : null,
+          checkedInAt: typeof payload.checkedInAt === 'string' ? payload.checkedInAt : e.occurredAt.toISOString(),
         };
       }),
     },

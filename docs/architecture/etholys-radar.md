@@ -15,15 +15,45 @@ RADAR é a operação: dados, eficiência, automação, WhatsApp in/out, alertas
 
 `/hub/nexus/campo` e `/hub/pulso` redirecionam para `/hub/radar`.
 
+## Personas (prestador vs produtor)
+
+`Company.radarOrgRole`: `producer` | `provider` | `null`.
+
+| Persona | Espaço | Hierarquia |
+|---------|--------|------------|
+| **Produtor** | `/hub/radar/producer` | Propriedades próprias |
+| **Prestador** | `/hub/radar/provider` | Clientes → propriedades de cada cliente |
+
+- Sem papel → ecrã forçado em `/hub/radar` (escolha prestador vs produtor). Não é toggle Empresa|Técnico.
+- Criação de empresa pode gravar `radarOrgRole` (`POST /api/companies`). Signup global completo fica para depois; o gate RADAR é a fonte de verdade neste ciclo.
+- Modelos: `RadarClient` (prestador), `RadarProperty` (fazenda/unidade), `NexusOpsUnit.propertyId`.
+
+### Funil da propriedade (progress rail)
+
+1. **Caracterizar** — módulo (`pulsoModule` / `moduleId`), cultura, área  
+2. **Desenhar planta** — `RadarSiteMap` + `layoutJson` na propriedade  
+3. **Geolocalizar** — lat/lng + pin OSM  
+4. **Conectar sensores** — token `nxsens_` (fluxo existente)
+
+Depois de caracterizada (agricultura), a **mesma UI operativa forte** (planta + métricas + canais + cadeia) vive dentro da propriedade. Não há vista Técnico fraca em paralelo.
+
+Rotas: `/hub/radar/properties/[id]`. APIs: `/api/radar/org-role`, `/api/radar/clients`, `/api/radar/properties`, `/api/radar/properties/[id]`.
+
 ## Arquitetura
 
 Seis camadas. Os quatro módulos de entrada (agricultura, agroindústria, pecuária, carbono) mudam o vocabulário e as regras. O laço é o mesmo.
 
 ```
-Escolha do módulo (pulsoModule)
+Escolha de persona (radarOrgRole)
         │
-        ▼
-Fachada do módulo  (/hub/radar + /api/radar/<módulo>)
+        ├── provider → clientes → propriedades
+        └── producer → propriedades
+                │
+                ▼
+        Funil da propriedade (caracterizar → planta → geo → sensores)
+                │
+                ▼
+Fachada do módulo  (ops UI única + /api/radar/<módulo>)
         │
         ▼
 Núcleo operativo   unidades · caderno · leituras · regras
@@ -33,7 +63,7 @@ Núcleo operativo   unidades · caderno · leituras · regras
         └── canal sensor     token nxsens_ · POST /api/nexus/ingest/readings
         │
         ▼
-Cadeia produtiva   RadarLot · colheita → transformação → transporte → venda
+Cadeia de custódia  RadarLot · check-in por etapa (geo + foto + QR)
         │           Hub autentica · /radar/lote/[token] partilha pública
         ▼
 Alertas do módulo  (protocolos em código, sem dossiê)
@@ -48,31 +78,36 @@ A ponte `GET /api/radar/bridge` lê o vínculo (módulo gravado, se existe retra
 
 | Peça | Modelo | Uso no RADAR |
 |------|--------|----------------|
+| Persona | `Company.radarOrgRole` | `producer` \| `provider` |
+| Cliente (prestador) | `RadarClient` | carteira sob `providerCompanyId` |
+| Propriedade | `RadarProperty` | fazenda; `layoutJson`, lat/lng, `moduleId` |
 | Módulo escolhido | dossiê `pulsoModule` | `agriculture` \| `agroindustry` \| `livestock` \| `carbon` |
-| Unidade | `NexusOpsUnit` | parcela, lote, rebanho |
+| Unidade | `NexusOpsUnit` | parcela sob `propertyId` |
 | Caderno | `NexusFieldEntry` | linha com `channel` app \| whatsapp \| sensor |
 | Leitura | `NexusReading` | manual, sensor ou HTTP |
 | Sensor | `NexusSensor` | token em hash; o claro só na criação |
 | WhatsApp | `NexusWhatsappLink` | um telefone por empresa |
-| Regra | `NexusOpsRule` | `irrigation`, `whatsapp_alerts` (ventilação fica fora da agricultura) |
-| Lote (cadeia) | `RadarLot` | código humano + `publicToken`; estágio atual |
-| Evento de lote | `RadarLotEvent` | colheita / transformação / transporte / venda |
-| Planta 2D | `RadarSiteLayout` | posições dos espaços/sensores no mapa |
+| Regra | `NexusOpsRule` | `irrigation`, `whatsapp_alerts` |
+| Lote (cadeia) | `RadarLot` | código humano + `publicToken` |
+| Check-in | `RadarLotEvent.payloadJson` | `lat`, `lng`, `photoUrl`, `checkedInAt`, nota |
+| Planta 2D (legado empresa) | `RadarSiteLayout` | fallback; preferir `RadarProperty.layoutJson` |
 
 Protocolos e limiares vivem em código (`lib/nexus-sector-modules/`, `lib/radar/`), não em score de diagnóstico.
 
-### Cadeia produtiva (traçabilidade)
+### Cadeia de custódia (traçabilidade)
 
-Pergunta do ecrã: **onde está este lote, agora?**
+Não é “onde está o lote?” em texto livre. É **check-in por etapa** com evidência:
 
-O lote nasce na **colheita** (não é um 5.º módulo na nav). Fluxo: colheita → transformação → transporte → comercialização. Avanço só para a etapa seguinte (ou evento extra na mesma).
+| Etapa | Evidência mínima |
+|-------|------------------|
+| colheita → transformação → transporte → venda | timestamp + **lat/lng** (+ foto recomendada) |
 
-- Hub: secção **Cadeia** em Agricultura — abrir lote, avançar, copiar link.
-- APIs: `GET/POST /api/radar/lots`, `GET /api/radar/lots/[id]`, `GET /api/radar/lots/public/[token]`.
-- Partilha: `/radar/lote/[token]` — comprador/auditor sem login; sem telefones, tokens de sensor nem IDs internos.
-- Fora deste ciclo: QR gráfico, blockchain, SKU próprio.
+- Avançar etapa = `action: checkin` em `POST /api/radar/lots` (geo obrigatória; foto via `photoDataUrl` → R2/local).
+- Abrir lote na colheita também exige geo (primeiro check-in).
+- QR + link público: `/radar/lote/[token]` mostra timeline com hora, GPS, thumbs de foto e QR de verificação.
+- Fora deste ciclo: blockchain, SKU próprio, OCR de etiqueta.
 
-Lib: `lib/radar/trace.ts`.
+Lib: `lib/radar/trace.ts`, `lib/radar/evidence-upload.ts`.
 
 ### Módulos
 
@@ -85,18 +120,11 @@ Lib: `lib/radar/trace.ts`.
 
 Carbono não abre caderno próprio. Lê práticas já registadas.
 
-### O que a fachada agrícola faz
+### UI operativa (uma só)
 
-Duas vistas no Hub:
+Uma superfície forte (`RadarOpsView`, ex-Empresa): planta 2D, métricas, canais, cadeia com check-in. Técnico de campo usa a **mesma** UI — não há toggle Empresa|Técnico nem vista alternativa fraca.
 
-| Vista | Para quem | Pergunta |
-|-------|-----------|----------|
-| **Empresa** | gestão | Onde está cada espaço e canal, agora? |
-| **Técnico** | campo | Qual é a única ação a fazer agora? |
-
-O tipo (agricultura / agroindústria / pecuária / carbono) **não** é um interruptor solto no topo. Entra no fluxo **Registar espaço de medição**: nome → tipo → continuar.
-
-`GET /api/radar/agriculture` devolve `decision`, `parcels`, `spaces` / `hasSpaces`. Sem espaço, a UI abre o setup — não inventa finca sozinha.
+`GET /api/radar/agriculture` devolve `decision`, `parcels`, `spaces` / `hasSpaces`.
 
 Prioridade da decisão: não colher (PHI) → irrigar (humidade &lt; 25%) → percorrer (caderno parado) → em critério.
 
@@ -104,36 +132,33 @@ O Hub é o monitor. O WhatsApp é o canal do campo.
 
 ### Planta 2D (mapa operativo)
 
-Camada visual agregada às vistas Empresa / Técnico — não as substitui.
-
 | Peça | Onde |
 |------|------|
-| Layout | `RadarSiteLayout.layoutJson` — coords 0–100 por espaço (`x/y/w/h`) e pins de sensor |
-| API | `GET/PATCH /api/radar/layout` (auth `canAccessNexusOpsCompany`) |
-| UI | `RadarSiteMap` — tiles com estado (humidade / PHI / nextAction), sensores, foco no painel textual |
-| Empresa | mapa proeminente + arrastar para organizar + guardar |
-| Técnico | mapa compacto focado no espaço activo |
+| Layout (propriedade) | `RadarProperty.layoutJson` |
+| Layout (legado) | `RadarSiteLayout.layoutJson` |
+| API | `GET/PATCH /api/radar/layout` (`propertyId` opcional) |
+| UI | `RadarSiteMap` — tiles com estado, sensores, arrastar + guardar |
 
-Espaços vêm dos `NexusOpsUnit` já registados (fluxo RadarSpaceSetup). Sem layout guardado, a API devolve grelha automática.
+Espaços vêm dos `NexusOpsUnit` da propriedade. Sem layout guardado, a API devolve grelha automática.
 
-O vínculo do telefone continua em `/api/nexus/whatsapp/link`. O ingest HTTP continua em `/api/nexus/ingest/readings`. São canais partilhados; a fachada é que os mostra dentro do módulo.
+O vínculo do telefone continua em `/api/nexus/whatsapp/link`. O ingest HTTP continua em `/api/nexus/ingest/readings`.
 
 Alertas no ecrã seguem sempre os protocolos de agricultura. A mensagem automática de WhatsApp ainda usa o setor da empresa (`deriveOpsAlerts`) até o canal passar a ser dono do módulo RADAR.
 
 ## Roadmap
 
-1. **Agricultura** — a exploração abre sozinha. O ecrã diz o que fazer hoje (irrigar, não colher, ouvir o campo). WhatsApp é o canal. Fechado.
-2. **Traçabilidade (cadeia)** — lote na colheita → transformação → transporte → venda; link público. Fechado neste ciclo.
-3. **Pecuária** — o mesmo laço com rebanho, sanidade, alimento e mortalidade.
-4. **Agroindústria** — lotes industriais, perda e qualidade (além da cadeia agrícola).
-5. **Carbono** — primeira leitura de práticas a partir do caderno dos três módulos. Sem UI de dossiê.
-6. **IA** — ler o caderno e propor um comando (irrigar ou não). A saída pede confirmação no WhatsApp; não actua sozinha.
-7. **SKU RADAR** — licença própria. Fora deste ciclo. Até lá, `NEXUS`.
+1. **Agricultura** — decisão ao vivo + WhatsApp. Fechado.
+2. **Traçabilidade (cadeia de custódia)** — check-in geo/foto/QR por etapa. Fechado neste ciclo (esqueleto presentável).
+3. **Personas + propriedades** — prestador/produtor, clientes → funil. Fechado neste ciclo (esqueleto).
+4. **Pecuária / agroindústria / carbono** — mesmo laço.
+5. **IA** — ler o caderno e propor comando (confirmação WhatsApp).
+6. **SKU RADAR** — licença própria. Fora deste ciclo. Até lá, `NEXUS`.
 
 ## Fora de âmbito
 
 - Retrato, brechas, potenciais e apostas na UI do RADAR.
 - Menu ou fluxo partilhado com AURORA ou POLARIS.
 - Migration para renomear `pulsoModule`.
-- QR gráfico, blockchain ou SKU próprio só para traçabilidade.
+- Vista Técnico paralela / toggle Empresa|Técnico.
+- GIS completo, 3D, blockchain.
 - Rebuild de Postgres, Caddy ou Jitsi. Deploy de UI é só `etholys-web`.

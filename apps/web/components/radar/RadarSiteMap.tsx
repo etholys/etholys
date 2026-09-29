@@ -102,26 +102,31 @@ function labelAction(action: ParcelAction, loc: Loc) {
 type Props = {
   companyId: string;
   engagementId?: string | null;
+  propertyId?: string | null;
   locale: string;
   parcels: MapParcel[];
   sensors: MapSensor[];
   focusedId: string | null;
   onFocus: (id: string) => void;
-  /** Empresa: drag + save. Técnico: compact, no edit chrome. */
-  mode: 'empresa' | 'tecnico';
+  /** Full plant + metrics surface (single ops UI for all roles). */
+  mode?: 'ops' | 'empresa';
+  onSaved?: () => void;
 };
 
 export function RadarSiteMap({
   companyId,
   engagementId,
+  propertyId,
   locale,
   parcels,
   sensors,
   focusedId,
   onFocus,
-  mode,
+  mode = 'ops',
+  onSaved,
 }: Props) {
   const loc: Loc = locale === 'es' || locale === 'en' ? locale : 'pt';
+  const canEdit = mode === 'ops' || mode === 'empresa';
   const copy = COPY[loc];
   const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
   const [dirty, setDirty] = useState(false);
@@ -149,6 +154,7 @@ export function RadarSiteMap({
     try {
       const q = new URLSearchParams({ companyId });
       if (engagementId) q.set('engagementId', engagementId);
+      if (propertyId) q.set('propertyId', propertyId);
       const r = await fetch(`/api/radar/layout?${q}`);
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'layout');
@@ -157,7 +163,7 @@ export function RadarSiteMap({
     } catch {
       setLayout(mergeLayoutWithSpaces(null, ids, sensorRefs));
     }
-  }, [companyId, engagementId, spaceKey, sensorKey]);
+  }, [companyId, engagementId, propertyId, spaceKey, sensorKey]);
 
   useEffect(() => {
     void load();
@@ -170,13 +176,14 @@ export function RadarSiteMap({
       const r = await fetch('/api/radar/layout', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, engagementId, layout }),
+        body: JSON.stringify({ companyId, engagementId, propertyId, layout }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'save');
       setLayout(d.layout);
       setDirty(false);
       setSavedFlash(true);
+      onSaved?.();
       window.setTimeout(() => setSavedFlash(false), 1800);
     } finally {
       setSaving(false);
@@ -184,7 +191,7 @@ export function RadarSiteMap({
   };
 
   const onPointerDown = (e: ReactPointerEvent, rect: RadarSpaceRect) => {
-    if (mode !== 'empresa') return;
+    if (!canEdit) return;
     e.preventDefault();
     e.stopPropagation();
     onFocus(rect.id);
@@ -203,7 +210,7 @@ export function RadarSiteMap({
   };
 
   const onPointerMove = (e: ReactPointerEvent) => {
-    if (!dragging || !dragOrigin.current || mode !== 'empresa') return;
+    if (!dragging || !dragOrigin.current || !canEdit) return;
     const board = boardRef.current;
     if (!board) return;
     const box = board.getBoundingClientRect();
@@ -240,7 +247,6 @@ export function RadarSiteMap({
   }
 
   const parcelById = new Map(parcels.map((p) => [p.id, p]));
-  const tecnicoFocus = mode === 'tecnico' ? focusedId || parcels[0]?.id : null;
 
   return (
     <section className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[radial-gradient(ellipse_at_top_left,rgba(16,185,129,0.14),transparent_50%),linear-gradient(165deg,#071812_0%,#0a1a14_50%,#050f0c_100%)]">
@@ -248,11 +254,11 @@ export function RadarSiteMap({
         <div className="flex items-center gap-2">
           <Leaf className="h-4 w-4 text-emerald-300" />
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">{copy.plant}</p>
-          {mode === 'empresa' && (
+          {canEdit && (
             <span className="hidden text-[11px] text-white/35 sm:inline">· {copy.arrange}</span>
           )}
         </div>
-        {mode === 'empresa' && (
+        {canEdit && (
           <div className="flex items-center gap-2">
             {savedFlash && <span className="text-[11px] text-emerald-200/80">{copy.saved}</span>}
             <button
@@ -271,7 +277,7 @@ export function RadarSiteMap({
         ref={boardRef}
         role="application"
         aria-label={copy.plant}
-        className={`relative touch-none select-none ${mode === 'tecnico' ? 'aspect-[16/9] max-h-[220px]' : 'aspect-[16/10] min-h-[240px] sm:min-h-[320px]'}`}
+        className="relative touch-none select-none aspect-[16/10] min-h-[240px] sm:min-h-[320px]"
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
@@ -291,8 +297,8 @@ export function RadarSiteMap({
           const parcel = parcelById.get(rect.id);
           if (!parcel) return null;
           const tone = actionTone(parcel.nextAction, parcel.harvestBlocked, parcel.moisture);
-          const focused = focusedId === parcel.id || tecnicoFocus === parcel.id;
-          const dimmed = mode === 'tecnico' && Boolean(tecnicoFocus) && tecnicoFocus !== parcel.id;
+          const focused = focusedId === parcel.id;
+          const dimmed = false;
           const alertPulse = tone === 'critical' || parcel.alerts.some((a) => a.severity === 'critical');
           const spaceSensors = layout.sensors.filter((s) => s.spaceId === rect.id);
 
@@ -305,7 +311,7 @@ export function RadarSiteMap({
               onClick={() => onFocus(parcel.id)}
               onPointerDown={(e) => onPointerDown(e, rect)}
               className={`absolute overflow-hidden rounded-2xl border text-left transition-all duration-300 ease-out ${tileClasses(tone, focused, dimmed)} ${
-                dragging === rect.id ? 'z-20 cursor-grabbing' : mode === 'empresa' ? 'cursor-grab' : 'cursor-pointer'
+                dragging === rect.id ? 'z-20 cursor-grabbing' : canEdit ? 'cursor-grab' : 'cursor-pointer'
               }`}
               style={{
                 left: `${rect.x}%`,

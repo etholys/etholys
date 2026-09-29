@@ -178,9 +178,15 @@ async function createParcel(companyId: string, body: Record<string, unknown>) {
     : 'agriculture';
   const kind =
     sectorId === 'livestock' ? 'herd' : sectorId === 'agroindustry' ? 'lot' : sectorId === 'carbon' ? 'generic' : 'parcel';
+  const propertyId = String(body.propertyId || '').trim() || null;
+  if (propertyId) {
+    const prop = await prisma.radarProperty.findFirst({ where: { id: propertyId, companyId } });
+    if (!prop) return NextResponse.json({ error: 'Propriedade inválida.' }, { status: 400 });
+  }
   const unit = await prisma.nexusOpsUnit.create({
     data: {
       companyId,
+      propertyId,
       sectorId,
       kind,
       name: name.slice(0, 120),

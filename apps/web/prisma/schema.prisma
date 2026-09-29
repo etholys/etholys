@@ -186,6 +186,8 @@ model Company {
   /// Respostas do assistente de contexto (sector, comércio, metas) — aciona módulos e memória de IA; não substitui aconselhamento legal.
   contextSetupJson            Json?
   contextSetupAt              DateTime?
+  /// RADAR: producer (empresa rural) | provider (prestadora de assistência). Null = ainda não escolheu.
+  radarOrgRole                String?
   aiSessions                  AiAdvisorSession[]
   aiAlerts                    AiAlert[]
   aiMemories                  AiCompanyMemory[]
@@ -226,6 +228,8 @@ model Company {
   nexusOpsRules               NexusOpsRule[]
   radarLots                   RadarLot[]
   radarSiteLayout             RadarSiteLayout?
+  radarClients                RadarClient[]
+  radarProperties             RadarProperty[]
   businessDossier             BusinessDossier?
   businessBets                BusinessBet[]
   businessRhythmNotes         BusinessRhythmNote[]
@@ -1991,28 +1995,31 @@ model NexusDiagnosis {
 
 /// Unidade operativa do módulo setorial (parcela agro / operação genérica).
 model NexusOpsUnit {
-  id        String            @id @default(cuid())
-  companyId String
-  sectorId  String
+  id         String         @id @default(cuid())
+  companyId  String
+  propertyId String?
+  sectorId   String
   /// parcel | herd | flock | hive | lot | generic
-  kind      String            @default("generic")
-  name      String
-  areaHa    Float?
+  kind       String         @default("generic")
+  name       String
+  areaHa     Float?
   /// Cabeças / aves / colmeias / capacidade — conforme o módulo.
-  qty       Float?
-  crop      String?
-  notes     String?
-  isActive  Boolean           @default(true)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  company   Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  entries   NexusFieldEntry[]
-  sensors   NexusSensor[]
-  readings  NexusReading[]
-  radarLots RadarLot[]
+  qty        Float?
+  crop       String?
+  notes      String?
+  isActive   Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  company    Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property   RadarProperty? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  entries    NexusFieldEntry[]
+  sensors    NexusSensor[]
+  readings   NexusReading[]
+  radarLots  RadarLot[]
 
   @@index([companyId, isActive])
   @@index([companyId, sectorId])
+  @@index([propertyId])
 }
 
 /// Linha do caderno de campo / diário operativo.
@@ -2171,6 +2178,47 @@ model RadarSiteLayout {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+/// Cliente rural de uma prestadora RADAR (assistance / consulting org).
+model RadarClient {
+  id                String          @id @default(cuid())
+  providerCompanyId String
+  name              String
+  contactName       String?
+  contactEmail      String?
+  contactPhone      String?
+  notes             String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  providerCompany   Company         @relation(fields: [providerCompanyId], references: [id], onDelete: Cascade)
+  properties        RadarProperty[]
+
+  @@index([providerCompanyId, createdAt])
+}
+
+/// Propriedade / fazenda / unidade física — no produtor ou sob um cliente do prestador.
+model RadarProperty {
+  id        String       @id @default(cuid())
+  companyId String
+  clientId  String?
+  name      String
+  /// agriculture | agroindustry | livestock | carbon
+  moduleId  String?
+  crop      String?
+  areaHa    Float?
+  lat       Float?
+  lng       Float?
+  /// Planta 2D local à propriedade (mesmo schema que RadarSiteLayout.layoutJson).
+  layoutJson Json?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client    RadarClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  units     NexusOpsUnit[]
+
+  @@index([companyId, createdAt])
+  @@index([clientId])
 }
 
 model MuseSuggestion {

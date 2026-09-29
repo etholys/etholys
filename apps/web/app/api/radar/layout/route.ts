@@ -25,8 +25,39 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const companyId = String(url.searchParams.get('companyId') || '').trim();
   const engagementId = String(url.searchParams.get('engagementId') || '').trim() || null;
+  const propertyId = String(url.searchParams.get('propertyId') || '').trim() || null;
   const auth = await authorize(companyId, engagementId);
   if ('error' in auth && auth.error) return auth.error;
+
+  if (propertyId) {
+    const property = await prisma.radarProperty.findFirst({
+      where: { id: propertyId, companyId },
+      include: {
+        units: { where: { isActive: true }, select: { id: true, kind: true, name: true } },
+      },
+    });
+    if (!property) return NextResponse.json({ error: 'Propriedade inválida.' }, { status: 404 });
+    const unitIds = property.units.map((u) => u.id);
+    const sensors = await prisma.nexusSensor.findMany({
+      where: { companyId, isActive: true, ...(unitIds.length ? { unitId: { in: unitIds } } : { id: '__none__' }) },
+      select: { id: true, unitId: true, name: true },
+      take: 40,
+    });
+    const spaceIds = property.units.filter(isRadarParcel).map((u) => u.id);
+    const saved = parseRadarLayout(property.layoutJson) || emptyRadarLayout();
+    const layout = mergeLayoutWithSpaces(
+      saved,
+      spaceIds,
+      sensors.map((s) => ({ id: s.id, spaceId: s.unitId }))
+    );
+    return NextResponse.json({
+      companyId,
+      propertyId,
+      layout,
+      persisted: Boolean(property.layoutJson),
+      updatedAt: property.updatedAt.toISOString(),
+    });
+  }
 
   const [units, sensors, row] = await Promise.all([
     prisma.nexusOpsUnit.findMany({
@@ -66,8 +97,39 @@ export async function PATCH(req: NextRequest) {
 
   const companyId = String(body.companyId || '').trim();
   const engagementId = String(body.engagementId || '').trim() || null;
+  const propertyId = String(body.propertyId || '').trim() || null;
   const auth = await authorize(companyId, engagementId);
   if ('error' in auth && auth.error) return auth.error;
+
+  if (propertyId) {
+    const property = await prisma.radarProperty.findFirst({
+      where: { id: propertyId, companyId },
+      include: { units: { where: { isActive: true }, select: { id: true, kind: true } } },
+    });
+    if (!property) return NextResponse.json({ error: 'Propriedade inválida.' }, { status: 404 });
+    const unitIds = property.units.map((u) => u.id);
+    const sensors = await prisma.nexusSensor.findMany({
+      where: { companyId, isActive: true, unitId: { in: unitIds } },
+      select: { id: true },
+      take: 40,
+    });
+    const allowedSpaces = new Set(property.units.filter(isRadarParcel).map((u) => u.id));
+    const allowedSensors = new Set(sensors.map((s) => s.id));
+    const patch = sanitizeLayoutPatch(body.layout ?? body, allowedSpaces, allowedSensors);
+    if (!patch || patch.spaces.length === 0) {
+      return NextResponse.json({ error: 'Layout inválido.' }, { status: 400 });
+    }
+    const row = await prisma.radarProperty.update({
+      where: { id: propertyId },
+      data: { layoutJson: patch as object },
+    });
+    return NextResponse.json({
+      ok: true,
+      propertyId,
+      layout: patch,
+      updatedAt: row.updatedAt.toISOString(),
+    });
+  }
 
   const [units, sensors] = await Promise.all([
     prisma.nexusOpsUnit.findMany({

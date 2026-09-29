@@ -4,9 +4,10 @@ import { ProductAppShell } from '@/components/etholys/ProductAppShell';
 import { useApp } from '@/app/providers';
 
 export default function RadarLayout({ children }: { children: React.ReactNode }) {
-  const { locale } = useApp();
+  const { locale, activeCompanyId } = useApp();
   const es = locale === 'es';
   const en = locale === 'en';
+  const q = activeCompanyId ? `?company=${activeCompanyId}` : '';
 
   return (
     <ProductAppShell
@@ -14,16 +15,16 @@ export default function RadarLayout({ children }: { children: React.ReactNode })
       accent="violet"
       nav={[
         {
-          href: '/hub/radar',
+          href: `/hub/radar${q}`,
           label: es ? 'Central' : en ? 'Home' : 'Central',
         },
         {
-          href: '/hub/radar?view=empresa',
-          label: es ? 'Empresa' : en ? 'Company' : 'Empresa',
+          href: `/hub/radar/producer${q}`,
+          label: es ? 'Productor' : en ? 'Producer' : 'Produtor',
         },
         {
-          href: '/hub/radar?view=tecnico',
-          label: es ? 'Técnico' : en ? 'Field' : 'Técnico',
+          href: `/hub/radar/provider${q}`,
+          label: es ? 'Prestadora' : en ? 'Provider' : 'Prestadora',
         },
       ]}
     >
