@@ -13,6 +13,8 @@ import {
   assertSeatAvailable,
   assertSystemsAllowedForCompany,
 } from '@/lib/billing/company-entitlements';
+import { buildInvitationEmail } from '@/lib/email/etholys-mail-layout';
+import { sendAuthHtmlEmail } from '@/lib/send-auth-email';
 
 export async function GET(req: Request) {
   try {
@@ -162,35 +164,30 @@ export async function POST(req: Request) {
       const inviterName = invitation.inviter?.name || 'Un administrador';
       const companyName = invitation.company?.name || 'una empresa';
       const loginUrl = `${appUrl}/login?invite=${encodeURIComponent(invitation.code)}`;
-      const systemsLabel = systems.length > 0 ? systems.join(', ') : data.role === 'ADMIN' ? 'Hub completo' : 'acceso limitado';
+      const systemsLabel =
+        systems.length > 0 ? systems.join(', ') : data.role === 'ADMIN' ? 'Hub completo' : 'acceso limitado';
       const kindLabel =
         data.inviteKind === 'ally'
           ? 'aliado de proyecto'
           : data.inviteKind === 'temporary'
             ? 'acceso temporal'
             : 'miembro';
-      const cargoLine = data.jobTitle ? `<p><strong>Cargo:</strong> ${data.jobTitle}</p>` : '';
-      const projectLine =
-        invitation.project?.name
-          ? `<p><strong>Proyecto:</strong> ${invitation.project.name}</p>`
-          : '';
-      const htmlBody = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: #0f172a; padding: 24px; text-align: center;">
-            <h1 style="color: #2dd4bf; margin: 0;">ETHOLYS</h1>
-          </div>
-          <div style="padding: 24px; border: 1px solid #e2e8f0;">
-            <p><strong>${inviterName}</strong> te invitó como <strong>${kindLabel}</strong> a usar <strong>${systemsLabel}</strong> en ${companyName}.</p>
-            ${cargoLine}
-            ${projectLine}
-            <p>No verás el Hub completo — solo las funciones asignadas (salvo Administrador).</p>
-            <p><strong>Código:</strong> <code style="font-size:18px;color:#0d9488">${invitation.code}</code></p>
-            <p style="text-align:center;margin:24px 0">
-              <a href="${loginUrl}" style="background:#0d9488;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Activar acceso</a>
-            </p>
-            <p style="color:#94a3b8;font-size:12px">Expira en 7 días.</p>
-          </div>
-        </div>`;
+      const { subject, html: htmlBody } = buildInvitationEmail({
+        locale: 'es',
+        inviterName,
+        companyName,
+        inviteKindLabel: kindLabel,
+        systemsLabel,
+        jobTitle: data.jobTitle,
+        projectName: invitation.project?.name,
+        code: invitation.code,
+        loginUrl,
+        expiresDays: 7,
+        pilotNote:
+          companyName.toLowerCase().includes('rikolto')
+            ? 'Este acceso forma parte del piloto institucional Rikolto × Etholys. El equipo Etholys acompaña la puesta en marcha.'
+            : null,
+      });
       if (process.env.ABACUSAI_API_KEY) {
         await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {
           method: 'POST',
@@ -199,7 +196,7 @@ export async function POST(req: Request) {
             deployment_token: process.env.ABACUSAI_API_KEY,
             app_id: process.env.WEB_APP_ID,
             notification_id: process.env.NOTIF_ID_INVITACIN_A_EMPRESA,
-            subject: `Invitación Etholys — ${systemsLabel}`,
+            subject,
             body: htmlBody,
             is_html: true,
             recipient_email: data.email,
@@ -207,20 +204,8 @@ export async function POST(req: Request) {
             sender_alias: 'ETHOLYS',
           }),
         });
-      } else if (process.env.RESEND_API_KEY) {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: process.env.AUTH_EMAIL_FROM || 'Etholys <noreply@etholys.com>',
-            to: [data.email],
-            subject: `Invitación Etholys — ${systemsLabel}`,
-            html: htmlBody,
-          }),
-        });
+      } else {
+        await sendAuthHtmlEmail({ to: data.email, subject, html: htmlBody });
       }
     } catch (emailErr) {
       console.error('Error sending invitation email:', emailErr);
