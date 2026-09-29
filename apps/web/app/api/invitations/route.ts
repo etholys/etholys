@@ -185,7 +185,7 @@ export async function POST(req: Request) {
         expiresDays: 7,
         pilotNote:
           companyName.toLowerCase().includes('rikolto')
-            ? 'Este acceso forma parte del piloto institucional Rikolto × Etholys. El equipo Etholys acompaña la puesta en marcha.'
+            ? 'Forman parte del acceso institucional Rikolto × Etholys. El equipo Etholys acompaña la puesta en marcha.'
             : null,
       });
       if (process.env.ABACUSAI_API_KEY) {

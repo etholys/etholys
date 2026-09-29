@@ -18,12 +18,14 @@ export const RIKOLTO_SHORT = 'RIKOLTO';
 export const RIKOLTO_NAME = 'Rikolto';
 /** Pacote institucional: ATLAS + FUNDHUB + FORGE — adequado a ONG internacional. */
 export const RIKOLTO_PLAN = 'plan.institucional';
-/** Sistemas do piloto (podem ser alargados depois). */
+/**
+ * Licença: ATLAS, SIEP, FUNDHUB, NEXUS (abre AURORA + POLARIS + RADAR).
+ * Sem FORGE / PRISM. Tools no Hub: Studio, Work, Chorus (Advisor e Prism fora do convite).
+ */
 export const RIKOLTO_PILOT_SYSTEMS: WorkspaceSystemKey[] = [
   'ATLAS',
   'SIEP',
   'FUNDHUB',
-  'FORGE',
   'NEXUS',
 ];
 

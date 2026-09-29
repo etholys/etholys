@@ -1,43 +1,57 @@
 /**
- * Layout HTML partilhado para emails Etholys (convites, Meet, marketing).
- * Visual alinhado ao login/Hub: slate profundo + teal #0d9488, superfícies planas.
- * Tabelas + CSS inline — compatível com clientes de email.
+ * Layout HTML partilhado para emails Etholys (convites, marketing).
+ * Tipografia: Syne (títulos) + Figtree (corpo) — mesmas fontes do app.
+ * Cor: slate-900 / teal-600 (#0d9488) / emerald, como o painel do login.
  */
 
 export type EtholysMailLocale = 'es' | 'pt' | 'en';
 
 export type EtholysMailContent = {
   locale?: EtholysMailLocale;
-  /** Pré-cabeçalho (inbox preview) */
   preheader?: string;
-  /** Título principal no cartão */
   headline: string;
-  /** Linha de apoio sob o título (ex.: nome da organização) */
   eyebrow?: string;
-  /** Parágrafos HTML já escapados ou texto simples (escapamos nós) */
   paragraphs: string[];
-  /** Lista de bullets opcional */
   bullets?: string[];
+  /** Secções com título (ex.: Sistemas / Herramientas) */
+  sections?: { title: string; items: string[] }[];
   cta?: { label: string; href: string };
-  /** Bloco destaque (código de convite, etc.) */
   codeBlock?: { label: string; value: string };
-  /** Nota fina no fundo do cartão */
   note?: string;
-  /** Remetente / produto (rodapé) */
   productLine?: string;
 };
 
 export const ETHOLYS_MAIL = {
   teal: '#0d9488',
-  tealDark: '#0f766e',
+  tealBright: '#2dd4bf',
+  emerald: '#10b981',
+  slate950: '#020617',
   slate900: '#0f172a',
   slate800: '#1e293b',
   slate600: '#475569',
   slate500: '#64748b',
   slate400: '#94a3b8',
   slate100: '#f1f5f9',
+  slate50: '#f8fafc',
   white: '#ffffff',
   border: '#e2e8f0',
+} as const;
+
+/** Nomes comerciais no Hub (não chaves de licença). */
+export const RIKOLTO_ACCESS_COPY = {
+  systems: [
+    { key: 'ATLAS', label: 'ATLAS', blurbEs: 'Gestión empresarial (finanzas, RRHH, proveedores, clientes)' },
+    { key: 'SIEP', label: 'SIEP', blurbEs: 'Gestión de proyectos, evidencias y seguimiento' },
+    { key: 'FUNDHUB', label: 'FundHub', blurbEs: 'Captación de fondos y propuestas' },
+    { key: 'AURORA', label: 'AURORA', blurbEs: 'Incubadora virtual y acompañamiento técnico' },
+    { key: 'POLARIS', label: 'POLARIS', blurbEs: 'Línea base y guía de autodesarrollo' },
+    { key: 'RADAR', label: 'RADAR', blurbEs: 'Digitalización productiva (datos, alertas, automatización)' },
+  ],
+  tools: [
+    { key: 'studio', label: 'Studio', blurbEs: 'Documentos, diagramación y diseño con IA' },
+    { key: 'work', label: 'Work', blurbEs: 'Gestor de tareas del equipo' },
+    { key: 'chorus', label: 'Chorus', blurbEs: 'Reuniones, videollamadas, transcripción y grabación' },
+  ],
 } as const;
 
 export function escapeHtml(value: string): string {
@@ -63,17 +77,13 @@ function appBaseUrl(): string {
   ).replace(/\/$/, '');
 }
 
-/** Marca SVG inline (gradiente teal) — funciona em muitos clientes. */
 function markCell(): string {
   return `
-    <td width="40" valign="middle" style="padding:0;">
-      <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#2dd4bf,#0d9488);text-align:center;line-height:40px;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-weight:700;font-size:18px;">E</div>
+    <td width="44" valign="middle" style="padding:0;">
+      <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#2dd4bf 0%,#10b981 100%);text-align:center;line-height:44px;color:#ffffff;font-family:Syne,Arial,Helvetica,sans-serif;font-weight:700;font-size:18px;letter-spacing:-0.02em;">E</div>
     </td>`;
 }
 
-/**
- * Envelope institucional Etholys — header escuro + cartão branco + footer.
- */
 export function renderEtholysMailLayout(content: EtholysMailContent): string {
   const locale: EtholysMailLocale =
     content.locale === 'pt' || content.locale === 'en' ? content.locale : 'es';
@@ -81,48 +91,63 @@ export function renderEtholysMailLayout(content: EtholysMailContent): string {
   const product = escapeHtml(content.productLine || 'Etholys');
   const factory = factoryLine(locale);
   const base = appBaseUrl();
+  const fontSans = "Figtree,Arial,Helvetica,sans-serif";
+  const fontDisplay = "Syne,Arial,Helvetica,sans-serif";
 
   const paragraphsHtml = content.paragraphs
     .map(
       (p) =>
-        `<p style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:${ETHOLYS_MAIL.slate600};">${escapeHtml(p)}</p>`,
+        `<p style="margin:0 0 16px;font-family:${fontSans};font-size:15px;line-height:1.6;color:${ETHOLYS_MAIL.slate600};">${escapeHtml(p)}</p>`,
     )
     .join('');
 
   const bulletsHtml =
     content.bullets && content.bullets.length > 0
-      ? `<ul style="margin:0 0 20px;padding:0 0 0 18px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:${ETHOLYS_MAIL.slate600};">${content.bullets
-          .map((b) => `<li style="margin:0 0 6px;">${escapeHtml(b)}</li>`)
+      ? `<ul style="margin:0 0 20px;padding:0 0 0 18px;font-family:${fontSans};font-size:14px;line-height:1.65;color:${ETHOLYS_MAIL.slate600};">${content.bullets
+          .map((b) => `<li style="margin:0 0 8px;">${escapeHtml(b)}</li>`)
           .join('')}</ul>`
       : '';
 
+  const sectionsHtml = (content.sections || [])
+    .map((sec) => {
+      const items = sec.items
+        .map(
+          (item) =>
+            `<tr><td style="padding:6px 0;font-family:${fontSans};font-size:14px;line-height:1.45;color:${ETHOLYS_MAIL.slate600};border-bottom:1px solid ${ETHOLYS_MAIL.border};">${escapeHtml(item)}</td></tr>`,
+        )
+        .join('');
+      return `<p style="margin:20px 0 8px;font-family:${fontDisplay};font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${ETHOLYS_MAIL.teal};">${escapeHtml(sec.title)}</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">${items}</table>`;
+    })
+    .join('');
+
   const ctaHtml = content.cta
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 24px;">
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 24px;">
         <tr>
           <td style="border-radius:10px;background:${ETHOLYS_MAIL.teal};">
-            <a href="${escapeHtml(content.cta.href)}" style="display:inline-block;padding:14px 28px;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">${escapeHtml(content.cta.label)}</a>
+            <a href="${escapeHtml(content.cta.href)}" style="display:inline-block;padding:14px 28px;font-family:${fontSans};font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">${escapeHtml(content.cta.label)}</a>
           </td>
         </tr>
       </table>`
     : '';
 
   const codeHtml = content.codeBlock
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:${ETHOLYS_MAIL.slate100};border-radius:10px;border:1px solid ${ETHOLYS_MAIL.border};">
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 20px;background:${ETHOLYS_MAIL.slate50};border-radius:12px;border:1px solid ${ETHOLYS_MAIL.border};">
         <tr>
-          <td style="padding:16px 18px;text-align:center;">
-            <p style="margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:${ETHOLYS_MAIL.slate500};">${escapeHtml(content.codeBlock.label)}</p>
-            <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:22px;font-weight:700;letter-spacing:0.12em;color:${ETHOLYS_MAIL.teal};">${escapeHtml(content.codeBlock.value)}</p>
+          <td style="padding:18px 20px;text-align:center;">
+            <p style="margin:0 0 8px;font-family:${fontSans};font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:${ETHOLYS_MAIL.slate500};">${escapeHtml(content.codeBlock.label)}</p>
+            <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:22px;font-weight:700;letter-spacing:0.14em;color:${ETHOLYS_MAIL.teal};">${escapeHtml(content.codeBlock.value)}</p>
           </td>
         </tr>
       </table>`
     : '';
 
   const noteHtml = content.note
-    ? `<p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:${ETHOLYS_MAIL.slate400};">${escapeHtml(content.note)}</p>`
+    ? `<p style="margin:0;font-family:${fontSans};font-size:12px;line-height:1.5;color:${ETHOLYS_MAIL.slate400};">${escapeHtml(content.note)}</p>`
     : '';
 
   const eyebrowHtml = content.eyebrow
-    ? `<p style="margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:${ETHOLYS_MAIL.teal};">${escapeHtml(content.eyebrow)}</p>`
+    ? `<p style="margin:0 0 10px;font-family:${fontSans};font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${ETHOLYS_MAIL.tealBright};">${escapeHtml(content.eyebrow)}</p>`
     : '';
 
   return `<!DOCTYPE html>
@@ -131,22 +156,25 @@ export function renderEtholysMailLayout(content: EtholysMailContent): string {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(content.headline)}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet" />
+  <!--[if mso]><style>*{font-family:Arial,sans-serif!important}</style><![endif]-->
 </head>
 <body style="margin:0;padding:0;background:${ETHOLYS_MAIL.slate100};">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${preheader}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${ETHOLYS_MAIL.slate100};">
     <tr>
-      <td align="center" style="padding:32px 16px;">
+      <td align="center" style="padding:28px 16px 40px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
-          <!-- Header marca -->
+          <!-- Header institucional (login Etholys) -->
           <tr>
-            <td style="padding:0 0 20px;">
+            <td style="background:linear-gradient(135deg,${ETHOLYS_MAIL.slate900} 0%,${ETHOLYS_MAIL.slate800} 100%);border-radius:16px 16px 0 0;padding:28px 28px 24px;">
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
                   ${markCell()}
-                  <td valign="middle" style="padding:0 0 0 12px;">
-                    <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:700;letter-spacing:-0.02em;color:${ETHOLYS_MAIL.slate900};">ETHOLYS</p>
-                    <p style="margin:2px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:${ETHOLYS_MAIL.teal};">${factory}</p>
+                  <td valign="middle" style="padding:0 0 0 14px;">
+                    <p style="margin:0;font-family:${fontDisplay};font-size:22px;font-weight:700;letter-spacing:-0.03em;color:#ffffff;">ETHOLYS</p>
+                    <p style="margin:4px 0 0;font-family:${fontSans};font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:${ETHOLYS_MAIL.tealBright};">${factory}</p>
                   </td>
                 </tr>
               </table>
@@ -154,10 +182,11 @@ export function renderEtholysMailLayout(content: EtholysMailContent): string {
           </tr>
           <!-- Cartão -->
           <tr>
-            <td style="background:${ETHOLYS_MAIL.white};border:1px solid ${ETHOLYS_MAIL.border};border-radius:16px;padding:32px 28px;">
+            <td style="background:${ETHOLYS_MAIL.white};border-left:1px solid ${ETHOLYS_MAIL.border};border-right:1px solid ${ETHOLYS_MAIL.border};padding:32px 28px 28px;">
               ${eyebrowHtml}
-              <h1 style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:24px;line-height:1.25;font-weight:700;letter-spacing:-0.02em;color:${ETHOLYS_MAIL.slate900};">${escapeHtml(content.headline)}</h1>
+              <h1 style="margin:0 0 18px;font-family:${fontDisplay};font-size:26px;line-height:1.2;font-weight:700;letter-spacing:-0.03em;color:${ETHOLYS_MAIL.slate900};">${escapeHtml(content.headline)}</h1>
               ${paragraphsHtml}
+              ${sectionsHtml}
               ${bulletsHtml}
               ${codeHtml}
               ${ctaHtml}
@@ -166,9 +195,9 @@ export function renderEtholysMailLayout(content: EtholysMailContent): string {
           </tr>
           <!-- Footer -->
           <tr>
-            <td style="padding:24px 8px 0;text-align:center;">
-              <p style="margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${ETHOLYS_MAIL.slate500};">${product}</p>
-              <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${ETHOLYS_MAIL.slate400};">
+            <td style="background:${ETHOLYS_MAIL.slate50};border:1px solid ${ETHOLYS_MAIL.border};border-top:0;border-radius:0 0 16px 16px;padding:20px 28px;text-align:center;">
+              <p style="margin:0 0 4px;font-family:${fontSans};font-size:12px;color:${ETHOLYS_MAIL.slate500};">${product}</p>
+              <p style="margin:0;font-family:${fontSans};font-size:11px;color:${ETHOLYS_MAIL.slate400};">
                 <a href="${escapeHtml(base)}" style="color:${ETHOLYS_MAIL.teal};text-decoration:none;">${escapeHtml(base.replace(/^https?:\/\//, ''))}</a>
                 &nbsp;·&nbsp;${factory}
               </p>
@@ -193,7 +222,6 @@ export type InviteMailInput = {
   code: string;
   loginUrl: string;
   expiresDays?: number;
-  /** Mensagem institucional (piloto / onboarding) */
   pilotNote?: string | null;
 };
 
@@ -211,10 +239,10 @@ export function buildInvitationEmail(opts: InviteMailInput): { subject: string; 
 
   const headline =
     locale === 'pt'
-      ? 'Bem-vindo ao Etholys'
+      ? 'O seu acesso Etholys está pronto'
       : locale === 'en'
-        ? 'Welcome to Etholys'
-        : 'Bienvenida a Etholys';
+        ? 'Your Etholys access is ready'
+        : 'Su acceso a Etholys está listo';
 
   const p1 =
     locale === 'pt'
@@ -226,11 +254,7 @@ export function buildInvitationEmail(opts: InviteMailInput): { subject: string; 
   const paragraphs = [p1];
   if (opts.jobTitle) {
     paragraphs.push(
-      locale === 'pt'
-        ? `Cargo: ${opts.jobTitle}`
-        : locale === 'en'
-          ? `Role: ${opts.jobTitle}`
-          : `Cargo: ${opts.jobTitle}`,
+      locale === 'en' ? `Role: ${opts.jobTitle}` : `Cargo: ${opts.jobTitle}`,
     );
   }
   if (opts.projectName) {
@@ -246,10 +270,10 @@ export function buildInvitationEmail(opts: InviteMailInput): { subject: string; 
 
   paragraphs.push(
     locale === 'pt'
-      ? 'O seu acesso é limitado aos sistemas atribuídos. Use o botão abaixo ou introduza o código no login.'
+      ? 'Use o botão abaixo ou introduza o código no login.'
       : locale === 'en'
-        ? 'Your access is limited to the assigned systems. Use the button below or enter the code at login.'
-        : 'Tu acceso está limitado a los sistemas asignados. Usa el botón o introduce el código en el inicio de sesión.',
+        ? 'Use the button below or enter the code at login.'
+        : 'Usa el botón o introduce el código en el inicio de sesión.',
   );
 
   const html = renderEtholysMailLayout({
@@ -268,7 +292,7 @@ export function buildInvitationEmail(opts: InviteMailInput): { subject: string; 
       value: opts.code,
     },
     cta: {
-      label: locale === 'pt' ? 'Activar acesso' : locale === 'en' ? 'Activate access' : 'Activar acceso',
+      label: locale === 'pt' ? 'Entrar no Etholys' : locale === 'en' ? 'Open Etholys' : 'Entrar a Etholys',
       href: opts.loginUrl,
     },
     note:
@@ -283,13 +307,12 @@ export function buildInvitationEmail(opts: InviteMailInput): { subject: string; 
   return { subject, html };
 }
 
-/** Email de piloto institucional (grupo) — texto editorial. */
+/** Email institucional de boas-vindas (grupo) — sem “piloto/espacio”. */
 export function buildPilotWelcomeEmail(opts: {
   locale?: EtholysMailLocale;
   organizationName: string;
   contactName?: string | null;
   loginUrl: string;
-  systems: string[];
 }): { subject: string; html: string } {
   const locale: EtholysMailLocale =
     opts.locale === 'pt' || opts.locale === 'en' ? opts.locale : 'es';
@@ -298,10 +321,10 @@ export function buildPilotWelcomeEmail(opts: {
 
   const subject =
     locale === 'pt'
-      ? `${org} × Etholys — acesso ao piloto`
+      ? `${org} × Etholys — o vosso acesso está pronto`
       : locale === 'en'
-        ? `${org} × Etholys — pilot access`
-        : `${org} × Etholys — acceso al piloto`;
+        ? `${org} × Etholys — your access is ready`
+        : `${org} × Etholys — su acceso está listo`;
 
   const greet =
     locale === 'pt'
@@ -318,56 +341,58 @@ export function buildPilotWelcomeEmail(opts: {
 
   const p1 =
     locale === 'pt'
-      ? `A ${org} foi convidada a experimentar o Etholys — o ecossistema digital para gestão de projectos, captação de fundos e formação integrada.`
+      ? `A ${org} já pode usar o Etholys — o ecossistema digital para gerir a organização, projectos, captação de fundos e acompanhamento no terreno.`
       : locale === 'en'
-        ? `${org} has been invited to try Etholys — the digital ecosystem for project management, fundraising, and integrated learning.`
-        : `${org} ha sido invitada a probar Etholys — el ecosistema digital para gestión de proyectos, captación de fondos y formación integrada.`;
+        ? `${org} can now use Etholys — the digital ecosystem to manage the organization, projects, fundraising, and field accompaniment.`
+        : `${org} ya puede usar Etholys — el ecosistema digital para gestionar la organización, proyectos, captación de fondos y acompañamiento en el terreno.`;
 
   const p2 =
     locale === 'pt'
-      ? 'Durante este piloto terão acesso aos módulos acordados, com suporte da equipa Etholys. Tudo num único login.'
+      ? 'Tudo num único login. A equipa Etholys acompanha-vos na entrada.'
       : locale === 'en'
-        ? 'During this pilot you will have access to the agreed modules, with Etholys team support. Everything in one login.'
-        : 'Durante este piloto tendrán acceso a los módulos acordados, con apoyo del equipo Etholys. Todo en un solo inicio de sesión.';
+        ? 'Everything in one login. The Etholys team will support your onboarding.'
+        : 'Todo en un solo inicio de sesión. El equipo Etholys les acompaña en la puesta en marcha.';
 
-  const bullets =
-    opts.systems.length > 0
-      ? opts.systems.map((s) => s)
-      : locale === 'es'
-        ? ['SIEP — proyectos', 'FUNDHUB — captación', 'FORGE — formación']
-        : locale === 'pt'
-          ? ['SIEP — projectos', 'FUNDHUB — captação', 'FORGE — formação']
-          : ['SIEP — projects', 'FUNDHUB — fundraising', 'FORGE — learning'];
+  const systemItems = RIKOLTO_ACCESS_COPY.systems.map((s) => `${s.label} — ${s.blurbEs}`);
+  const toolItems = RIKOLTO_ACCESS_COPY.tools.map((t) => `${t.label} — ${t.blurbEs}`);
 
   const html = renderEtholysMailLayout({
     locale,
     preheader:
       locale === 'pt'
-        ? `Piloto Etholys para ${org}`
+        ? `${org}: acesso Etholys pronto`
         : locale === 'en'
-          ? `Etholys pilot for ${org}`
-          : `Piloto Etholys para ${org}`,
+          ? `${org}: Etholys access ready`
+          : `${org}: acceso Etholys listo`,
     eyebrow: org,
     headline:
       locale === 'pt'
-        ? 'O vosso espaço de piloto está pronto'
+        ? 'Bem-vindos ao Etholys'
         : locale === 'en'
-          ? 'Your pilot workspace is ready'
-          : 'Su espacio de piloto está listo',
+          ? 'Welcome to Etholys'
+          : 'Bienvenidos a Etholys',
     paragraphs: [greet, p1, p2],
-    bullets,
+    sections: [
+      {
+        title: locale === 'pt' ? 'Sistemas' : locale === 'en' ? 'Systems' : 'Sistemas',
+        items: systemItems,
+      },
+      {
+        title: locale === 'pt' ? 'Ferramentas' : locale === 'en' ? 'Tools' : 'Herramientas',
+        items: toolItems,
+      },
+    ],
     cta: {
-      label:
-        locale === 'pt' ? 'Entrar no Etholys' : locale === 'en' ? 'Open Etholys' : 'Entrar a Etholys',
+      label: locale === 'pt' ? 'Entrar no Etholys' : locale === 'en' ? 'Open Etholys' : 'Entrar a Etholys',
       href: opts.loginUrl,
     },
     note:
       locale === 'pt'
-        ? 'Se ainda não recebeu o código individual, peça-o ao administrador da organização ou à equipa Etholys.'
+        ? 'Cada pessoa recebe um código individual por email. Se não chegou, peçam ao administrador ou à equipa Etholys.'
         : locale === 'en'
-          ? 'If you have not received your personal access code, ask your organization admin or the Etholys team.'
-          : 'Si aún no recibió su código individual, pídalo al administrador de la organización o al equipo Etholys.',
-    productLine: 'Etholys · Piloto institucional',
+          ? 'Each person receives an individual access code by email. If it did not arrive, ask your admin or the Etholys team.'
+          : 'Cada persona recibe un código individual por correo. Si no llegó, pídanlo al administrador o al equipo Etholys.',
+    productLine: 'Etholys · Fábrica de Soluciones',
   });
 
   return { subject, html };
