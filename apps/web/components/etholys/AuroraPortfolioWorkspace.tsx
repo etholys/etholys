@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Loader2, Search } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import type { AuroraMethodStage, AuroraPortfolioItem } from '@/lib/aurora-portfolio';
@@ -15,7 +16,9 @@ import {
   groupAuroraByProgram,
   type AuroraPortfolioCounts,
 } from '@/lib/aurora-week';
+import { writeAuroraAttendedSelection } from '@/lib/aurora-attended-selection';
 import { AuroraMethodRail } from '@/components/etholys/AuroraMethodRail';
+import { useAuroraAttendedOptional } from '@/components/etholys/AuroraAttendedContext';
 
 type FilterId = 'all' | 'mine' | 'unclaimed' | 'blocked' | AuroraMethodStage;
 type ViewId = 'week' | 'board' | 'programs';
@@ -45,26 +48,48 @@ const EMPTY_COUNTS: AuroraPortfolioCounts = {
 };
 
 export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView?: ViewId }) {
-  const { locale } = useApp();
+  const { locale, activeCompanyId } = useApp();
+  const search = useSearchParams();
+  const attended = useAuroraAttendedOptional();
   const loc = locale === 'es' || locale === 'en' ? locale : 'pt';
+  const operatorCompanyId = String(activeCompanyId || attended?.operatorCompanyId || '').trim();
+  const needPick = search.get('pick') === '1';
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [rows, setRows] = useState<AuroraPortfolioItem[]>([]);
   const [counts, setCounts] = useState<AuroraPortfolioCounts>(EMPTY_COUNTS);
+  const [canManage, setCanManage] = useState(false);
+  const [technicians, setTechnicians] = useState<Array<{ userId: string; name: string }>>([]);
+  const [techFilter, setTechFilter] = useState('');
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<FilterId>('all');
   const [view, setView] = useState<ViewId>(initialView);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [weekDraft, setWeekDraft] = useState<Record<string, { happened: string; blocked: string; nextStep: string }>>({});
 
+  const remember = (row: AuroraPortfolioItem) => {
+    if (!operatorCompanyId) return;
+    const ref = {
+      companyId: row.companyId,
+      engagementId: row.engagementId,
+      name: row.name,
+      engagementTitle: row.engagementTitle,
+    };
+    writeAuroraAttendedSelection(operatorCompanyId, ref);
+    attended?.setSelection(ref);
+  };
+
   const copy =
     loc === 'es'
       ? {
-          title: 'Cartera',
-          line: 'Ronda de la semana y mapa del diagnóstico: radiografía por áreas, dossier profundo solo donde haga falta.',
+          title: 'Cartera de asistencia técnica',
+          line: 'Dashboard de la incubadora: negocios externos que acompañás. Elegí un negocio abajo o en el selector de AURORA.',
           search: 'Buscar negocio o programa…',
           empty: 'Todavía no hay negocios. Abrí un contrato AT para acompañar MIPYMEs.',
           contracts: 'Contratos AT',
+          invite: 'Invitar técnicos',
+          techAll: 'Todos los técnicos',
+          pickBanner: 'Elegí un negocio de la cartera para abrir Diagnóstico o Dossier.',
           open: 'Abrir dossier',
           talkNow: 'Empezar conversación',
           diagnose: 'Diagnóstico',
@@ -105,11 +130,14 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
         }
       : loc === 'en'
         ? {
-            title: 'Portfolio',
-            line: 'Weekly round and diagnostic map: area-by-area snapshot; deep dossier only where needed.',
+            title: 'Technical assistance portfolio',
+            line: 'Incubator dashboard: external businesses you accompany. Pick one below or in the AURORA selector.',
             search: 'Search a business or program…',
             empty: 'No businesses yet. Open an AT contract to accompany MSMEs.',
             contracts: 'AT contracts',
+            invite: 'Invite technicians',
+            techAll: 'All technicians',
+            pickBanner: 'Pick a business from the portfolio to open Diagnostic or Dossier.',
             open: 'Open dossier',
             talkNow: 'Start conversation',
             diagnose: 'Diagnostic',
@@ -149,11 +177,14 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
             businesses: 'businesses',
           }
         : {
-            title: 'Carteira',
-            line: 'Ronda da semana e mapa do diagnóstico: radiografia por áreas; dossiê profundo só onde falta.',
+            title: 'Carteira de assistência técnica',
+            line: 'Dashboard da incubadora: negócios externos que acompanhas. Escolhe um negócio abaixo ou no seletor do AURORA.',
             search: 'Pesquisar negócio ou programa…',
             empty: 'Ainda não há negócios. Abre um contrato AT para acompanhar MIPYMEs.',
             contracts: 'Contratos AT',
+            invite: 'Convidar técnicos',
+            techAll: 'Todos os técnicos',
+            pickBanner: 'Escolhe um negócio da carteira para abrir Diagnóstico ou Dossiê.',
             open: 'Abrir dossiê',
             talkNow: 'Começar conversa',
             diagnose: 'Diagnóstico',
@@ -204,12 +235,17 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch('/api/business-dossier/portfolio', { cache: 'no-store' });
+      const params = new URLSearchParams();
+      if (operatorCompanyId) params.set('operatorCompanyId', operatorCompanyId);
+      if (techFilter) params.set('technicianUserId', techFilter);
+      const r = await fetch(`/api/business-dossier/portfolio?${params}`, { cache: 'no-store' });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha');
       const list = (d.businesses || []) as AuroraPortfolioItem[];
       setRows(list);
       setCounts(d.counts || auroraPortfolioCounts(list));
+      setCanManage(Boolean(d.canManage));
+      setTechnicians(Array.isArray(d.technicians) ? d.technicians : []);
       setWeekDraft((prev) => {
         const next = { ...prev };
         for (const row of list) {
@@ -229,7 +265,7 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [operatorCompanyId, techFilter]);
 
   useEffect(() => {
     void load();
@@ -320,7 +356,11 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
       <li key={row.companyId} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <Link href={businessHref(row)} className="font-medium text-slate-900 hover:underline">
+            <Link
+              href={businessHref(row)}
+              onClick={() => remember(row)}
+              className="font-medium text-slate-900 hover:underline"
+            >
               {row.name}
             </Link>
             <p className="truncate text-xs text-slate-500">{row.engagementTitle}</p>
@@ -381,13 +421,21 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
               {copy.reclaim}
             </button>
           )}
-          <Link href={businessHref(row)} className="ml-auto font-medium text-amber-900 hover:underline">
+          <Link
+            href={businessHref(row)}
+            onClick={() => remember(row)}
+            className="ml-auto font-medium text-amber-900 hover:underline"
+          >
             {copy.diagnose}
             {typeof row.diagnosticDone === 'number'
               ? ` ${row.diagnosticDone}/${row.diagnosticTotal || 6}`
               : ''}
           </Link>
-          <Link href={dossierHref(row)} className="font-medium text-slate-600 hover:underline">
+          <Link
+            href={dossierHref(row)}
+            onClick={() => remember(row)}
+            className="font-medium text-slate-600 hover:underline"
+          >
             {copy.open}
           </Link>
         </div>
@@ -478,6 +526,12 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
         </div>
       </header>
 
+      {needPick ? (
+        <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          {copy.pickBanner}
+        </p>
+      ) : null}
+
       {briefing.length > 0 ? (
         <section className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">{copy.briefing}</p>
@@ -514,6 +568,28 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
         <Link href="/hub/aurora/contratos" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
           {copy.contracts}
         </Link>
+        {canManage ? (
+          <>
+            <select
+              value={techFilter}
+              onChange={(e) => setTechFilter(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+            >
+              <option value="">{copy.techAll}</option>
+              {technicians.map((t) => (
+                <option key={t.userId} value={t.userId}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            <Link
+              href="/hub/workspace/team"
+              className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100"
+            >
+              {copy.invite}
+            </Link>
+          </>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-1.5">

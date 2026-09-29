@@ -34,11 +34,12 @@ type Bet = {
 type Note = { id: string; happened: string; blocked: string; nextStep: string; createdAt: string };
 
 export function AuroraDossierWorkspace() {
-  const { locale, activeCompanyId } = useApp();
+  const { locale } = useApp();
   const search = useSearchParams();
   const loc = locale === 'es' || locale === 'en' ? locale : 'pt';
-  const companyId = search.get('company') || activeCompanyId || '';
-  const engagementId = search.get('engagement');
+  /** Só negócio atendido via URL — nunca a incubadora do Hub. */
+  const companyId = String(search.get('company') || '').trim();
+  const engagementId = String(search.get('engagement') || '').trim();
   const scroller = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(true);
@@ -92,15 +93,26 @@ export function AuroraDossierWorkspace() {
 
   const load = useCallback(
     async (quiet = false) => {
-      if (!companyId) {
+      if (!companyId || !engagementId) {
         setLoading(false);
-        setErr(loc === 'es' ? 'Elegí un negocio de la cartera.' : loc === 'en' ? 'Pick a business from the portfolio.' : 'Escolhe um negócio da carteira.');
+        setErr(
+          !companyId
+            ? loc === 'es'
+              ? 'Elegí un negocio atendido en el selector de AURORA o en la cartera.'
+              : loc === 'en'
+                ? 'Pick an attended business in the AURORA selector or portfolio.'
+                : 'Escolhe um negócio atendido no seletor do AURORA ou na carteira.'
+            : loc === 'es'
+              ? 'Falta el contrato AT. Volvé a la cartera.'
+              : loc === 'en'
+                ? 'Missing AT contract. Go back to the portfolio.'
+                : 'Falta o contrato AT. Volta à carteira.',
+        );
         return;
       }
       if (!quiet) setLoading(true);
       try {
-        const q = new URLSearchParams({ companyId, locale: loc });
-        if (engagementId) q.set('engagementId', engagementId);
+        const q = new URLSearchParams({ companyId, engagementId, locale: loc });
         const r = await fetch(`/api/business-dossier/interview?${q}`, { cache: 'no-store' });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || 'Falha');
@@ -445,6 +457,17 @@ export function AuroraDossierWorkspace() {
             now: 'Agora',
             emptyChat: 'Quando ouvires algo concreto, escreve aqui. O AURORA propõe a pergunta seguinte.',
           };
+
+  if (!companyId || !engagementId) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center">
+        <p className="text-sm text-amber-950">{err}</p>
+        <Link href="/hub/aurora" className="inline-block text-sm font-medium text-amber-900 underline">
+          ← {loc === 'es' ? 'Cartera' : loc === 'en' ? 'Portfolio' : 'Carteira'}
+        </Link>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

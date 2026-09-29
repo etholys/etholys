@@ -28,6 +28,8 @@ export type AuroraAttendedBusiness = {
   shortName: string;
   engagementId: string;
   engagementTitle: string;
+  /** Empresa incubadora / operadora do contrato AT (camada Hub). */
+  operatorCompanyId: string;
 };
 
 export function collectAttendedBusinesses(
@@ -35,6 +37,7 @@ export function collectAttendedBusinesses(
     id: string;
     title: string;
     updatedAt: Date;
+    operatorCompanyId?: string;
     members: Array<{
       companyId: string;
       memberRole: string;
@@ -44,6 +47,7 @@ export function collectAttendedBusinesses(
 ): AuroraAttendedBusiness[] {
   const byCompany = new Map<string, AuroraAttendedBusiness & { updatedAt: Date }>();
   for (const engagement of engagements) {
+    const operatorCompanyId = String(engagement.operatorCompanyId || '').trim();
     for (const member of engagement.members) {
       if (!isAttendedMemberRole(member.memberRole)) continue;
       const prev = byCompany.get(member.companyId);
@@ -54,6 +58,7 @@ export function collectAttendedBusinesses(
         shortName: member.company.shortName,
         engagementId: engagement.id,
         engagementTitle: engagement.title,
+        operatorCompanyId,
         updatedAt: engagement.updatedAt,
       });
     }

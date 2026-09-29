@@ -13,6 +13,7 @@ import {
   selectAuroraBets,
   AURORA_THREAD_KEY,
 } from '../../lib/aurora-interview';
+import { auroraToolHref } from '../../lib/aurora-attended-selection';
 import {
   applyDiagTurn,
   confirmDiagBlock,
@@ -94,6 +95,7 @@ test('portfolio keeps attended firms and drops operator/sponsor', () => {
       id: 'eng-old',
       title: 'Programa A',
       updatedAt: new Date('2026-01-01'),
+      operatorCompanyId: 'op',
       members: [
         { companyId: 'op', memberRole: 'operator', company: { name: 'Incubadora', shortName: 'Inc' } },
         { companyId: 'sp', memberRole: 'sponsor', company: { name: 'Fundo', shortName: 'Fundo' } },
@@ -104,6 +106,7 @@ test('portfolio keeps attended firms and drops operator/sponsor', () => {
       id: 'eng-new',
       title: 'Programa B',
       updatedAt: new Date('2026-06-01'),
+      operatorCompanyId: 'op',
       members: [
         { companyId: 'm1', memberRole: 'principal', company: { name: 'Horta', shortName: 'Horta' } },
         { companyId: 'm2', memberRole: 'affiliate', company: { name: 'Queijo', shortName: 'Queijo' } },
@@ -111,10 +114,10 @@ test('portfolio keeps attended firms and drops operator/sponsor', () => {
     },
   ]);
   assert.deepEqual(
-    rows.map((r) => ({ id: r.companyId, eng: r.engagementId })),
+    rows.map((r) => ({ id: r.companyId, eng: r.engagementId, op: r.operatorCompanyId })),
     [
-      { id: 'm1', eng: 'eng-new' },
-      { id: 'm2', eng: 'eng-new' },
+      { id: 'm1', eng: 'eng-new', op: 'op' },
+      { id: 'm2', eng: 'eng-new', op: 'op' },
     ]
   );
   assert.equal(rows.find((r) => r.companyId === 'op'), undefined);
@@ -190,6 +193,7 @@ function item(partial: Partial<AuroraPortfolioItem> & Pick<AuroraPortfolioItem, 
     shortName: partial.name,
     engagementId: 'eng-a',
     engagementTitle: 'Programa A',
+    operatorCompanyId: 'op-1',
     hasPortrait: partial.stage !== 'talk',
     hypothesisAccepted: partial.stage !== 'talk' && partial.stage !== 'portrait',
     hypothesis: '',
@@ -319,5 +323,17 @@ test('AURORA drops the old meta opening and points talk stage at the diagnostic'
     diagnosticComplete: false,
   });
   assert.match(auroraNextAction(talk, 'es'), /diagnóstico/i);
+});
+
+test('AURORA tool href requires attended business and engagement', () => {
+  assert.equal(auroraToolHref('/hub/aurora/diagnostico', null), '/hub/aurora');
+  assert.match(
+    auroraToolHref('/hub/aurora/diagnostico', { companyId: 'c1', engagementId: 'e1' }),
+    /company=c1/,
+  );
+  assert.match(
+    auroraToolHref('/hub/aurora/diagnostico', { companyId: 'c1', engagementId: 'e1' }),
+    /engagement=e1/,
+  );
 });
 

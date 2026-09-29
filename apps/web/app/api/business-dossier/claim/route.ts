@@ -7,6 +7,7 @@ import { canAccessNexusOpsCompany } from '@/lib/nexus-ops';
 import { claimAuroraBusiness, releaseAuroraBusiness } from '@/lib/aurora-turn';
 import { loadDossier } from '@/lib/business-dossier';
 import { readAuroraTech } from '@/lib/aurora-interview';
+import { isCompanyAdmin } from '@/lib/integrated-workspace';
 
 export async function POST(req: NextRequest) {
   const tenant = await getUserCompanyIds();
@@ -24,6 +25,21 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.release === true) {
+    const current = await loadDossier(companyId);
+    const tech = readAuroraTech(current.dossier?.interviewJson);
+    let admin = false;
+    if (engagementId) {
+      const eng = await prisma.nexusAtEngagement.findFirst({
+        where: { id: engagementId, isActive: true },
+        select: { operatorCompanyId: true },
+      });
+      if (eng?.operatorCompanyId) {
+        admin = await isCompanyAdmin(tenant.userId, eng.operatorCompanyId);
+      }
+    }
+    if (tech?.userId && tech.userId !== tenant.userId && !admin) {
+      return NextResponse.json({ error: 'Só o técnico atual ou um admin pode deixar este negócio.' }, { status: 403 });
+    }
     await releaseAuroraBusiness({ companyId, userId: tenant.userId });
     const data = await loadDossier(companyId);
     return NextResponse.json({ ok: true, released: true, tech: null, current: readAuroraTech(data.dossier?.interviewJson) });

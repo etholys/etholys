@@ -22,11 +22,12 @@ function levelTone(level: AuroraMaturity | null | undefined) {
 }
 
 export function AuroraDiagnosticWorkspace() {
-  const { locale, activeCompanyId } = useApp();
+  const { locale } = useApp();
   const search = useSearchParams();
   const loc = locale === 'es' || locale === 'en' ? locale : 'pt';
-  const companyId = search.get('company') || activeCompanyId || '';
-  const engagementId = search.get('engagement');
+  /** Só negócio atendido via URL — nunca a incubadora do Hub. */
+  const companyId = String(search.get('company') || '').trim();
+  const engagementId = String(search.get('engagement') || '').trim();
   const scroller = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(true);
@@ -60,7 +61,8 @@ export function AuroraDiagnosticWorkspace() {
           done: 'listo',
           of: 'de',
           dossier: 'Abrir dossier profundo',
-          needCompany: 'Elegí un negocio de la cartera.',
+          needCompany: 'Elegí un negocio atendido en el selector de AURORA o en la cartera.',
+          needEngagement: 'Falta el contrato AT. Volvé a la cartera y abrí el negocio desde ahí.',
           next: 'Seguir',
         }
       : loc === 'en'
@@ -79,7 +81,8 @@ export function AuroraDiagnosticWorkspace() {
             done: 'done',
             of: 'of',
             dossier: 'Open deep dossier',
-            needCompany: 'Pick a business from the portfolio.',
+            needCompany: 'Pick an attended business in the AURORA selector or portfolio.',
+            needEngagement: 'Missing AT contract. Go back to the portfolio and open the business from there.',
             next: 'Continue',
           }
         : {
@@ -97,7 +100,8 @@ export function AuroraDiagnosticWorkspace() {
             done: 'feitos',
             of: 'de',
             dossier: 'Abrir dossiê profundo',
-            needCompany: 'Escolhe um negócio da carteira.',
+            needCompany: 'Escolhe um negócio atendido no seletor do AURORA ou na carteira.',
+            needEngagement: 'Falta o contrato AT. Volta à carteira e abre o negócio a partir daí.',
             next: 'Seguir',
           };
 
@@ -117,10 +121,14 @@ export function AuroraDiagnosticWorkspace() {
       setErr(t.needCompany);
       return;
     }
+    if (!engagementId) {
+      setLoading(false);
+      setErr(t.needEngagement);
+      return;
+    }
     setLoading(true);
     try {
-      const q = new URLSearchParams({ companyId });
-      if (engagementId) q.set('engagementId', engagementId);
+      const q = new URLSearchParams({ companyId, engagementId });
       const r = await fetch(`/api/business-dossier/diagnostic?${q}`, { cache: 'no-store' });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha');
@@ -131,7 +139,7 @@ export function AuroraDiagnosticWorkspace() {
     } finally {
       setLoading(false);
     }
-  }, [companyId, engagementId, t.needCompany]);
+  }, [companyId, engagementId, t.needCompany, t.needEngagement]);
 
   useEffect(() => {
     void load();
@@ -231,6 +239,17 @@ export function AuroraDiagnosticWorkspace() {
     }
   };
 
+  if (!companyId || !engagementId) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center">
+        <p className="text-sm text-amber-950">{!companyId ? t.needCompany : t.needEngagement}</p>
+        <Link href="/hub/aurora" className="inline-block text-sm font-medium text-amber-900 underline">
+          ← {t.back}
+        </Link>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
@@ -239,12 +258,10 @@ export function AuroraDiagnosticWorkspace() {
     );
   }
 
-  const dossierHref = companyId
-    ? `/hub/aurora/dossie?${new URLSearchParams({
-        company: companyId,
-        ...(engagementId ? { engagement: engagementId } : {}),
-      })}`
-    : '/hub/aurora';
+  const dossierHref = `/hub/aurora/dossie?${new URLSearchParams({
+    company: companyId,
+    engagement: engagementId,
+  })}`;
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">

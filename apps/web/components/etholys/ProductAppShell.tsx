@@ -25,7 +25,7 @@ import { cn, getInitials } from '@/lib/utils';
 import { sysTheme, type SystemAccent } from '@/lib/system-shell';
 import { ETHOLYS_PRODUCTS, type EtholysProductId } from '@/lib/etholys-products';
 
-type Nav = { href: string; label: string };
+type Nav = { href: string; label: string; requiresAttended?: boolean };
 
 const PRODUCT_ICON = {
   aurora: Sunrise,
@@ -38,11 +38,16 @@ export function ProductAppShell({
   accent,
   nav,
   children,
+  sidebarAfterCompany,
+  resolveNavHref,
 }: {
   product: EtholysProductId;
   accent: SystemAccent;
   nav: Nav[];
   children: ReactNode;
+  /** Conteúdo extra sob o seletor global de empresa (ex.: negócio atendido AURORA). */
+  sidebarAfterCompany?: ReactNode;
+  resolveNavHref?: (item: Nav) => string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -64,7 +69,8 @@ export function ProductAppShell({
 
   useEffect(() => {
     if (!companiesReady || !companyId || hydrated.current) return;
-    if (product === 'polaris') return;
+    // AURORA atende negócios externos — não hidratar o dossiê da incubadora.
+    if (product === 'aurora' || product === 'polaris') return;
     hydrated.current = true;
     void fetch(`/api/business-dossier?companyId=${encodeURIComponent(companyId)}&hydrateAll=1`, {
       cache: 'no-store',
@@ -143,7 +149,7 @@ export function ProductAppShell({
           </div>
 
           {!collapsed && (
-            <div className="flex-shrink-0 border-b border-white/10 p-3">
+            <div className="flex-shrink-0 space-y-3 border-b border-white/10 p-3">
               <CompanyPicker
                 companies={companies}
                 activeCompanyId={companyId}
@@ -155,16 +161,18 @@ export function ProductAppShell({
                 compact
                 className="w-full border-white/15 bg-white/5 text-white"
               />
+              {sidebarAfterCompany}
             </div>
           )}
 
           <nav className={cn('flex-1 space-y-0.5 overflow-y-auto', collapsed ? 'p-1.5' : 'p-3')}>
             {nav.map((item) => {
+              const href = resolveNavHref ? resolveNavHref(item) : item.href;
               const active = match?.href === item.href;
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={href}
                   onClick={() => setSidebarOpen(false)}
                   title={collapsed ? item.label : undefined}
                   className={cn(

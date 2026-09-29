@@ -6,14 +6,31 @@ Nomes anteriores (NIDO / RUMO / PULSO) redirecionam para estas rotas.
 
 | Produto | Para quem | O que é | Rota |
 |---------|-----------|---------|------|
-| **AURORA** | técnicos, consultores, incubadoras | Incubadora virtual: mesmo método, carteira humana | `/hub/aurora` |
-| **POLARIS** | o negócio sozinho | Mapa de autodesenvolvimento: linha base de maturidade + acompanhamento com IA do sistema (ecossistema Etholys) | `/hub/polaris` |
+| **AURORA** | técnicos, consultores, incubadoras | Incubadora virtual: assistência técnica a negócios **externos** | `/hub/aurora` |
+| **POLARIS** | o negócio sozinho (interno) | Mapa de autodesenvolvimento: linha base + IA do sistema | `/hub/polaris` |
 | **RADAR** | operação | Digitalização produtiva (dados, WhatsApp, alertas, automações) | `/hub/radar` |
 
-Método partilhado (AURORA e POLARIS): conversa → retrato editável → hipótese aceite → 2–4 apostas → ritmo semanal. Brechas máx. 5, potenciais máx. 3. Não é score de quiz Likert. Em POLARIS a **linha base** (`/hub/polaris/diagnosis`) radiografa maturidade 1–5 por blocos (mesmo motor do diagnóstico AURORA) antes do guia de autodesenvolvimento; a **IA do sistema** (não há consultor humano externo) junta essa linha base ao brief do ecossistema (FundHub, Work, Meet, Studio, memória, RADAR) e só então propõe avanço.
+## Duas camadas no AURORA (não confundir)
 
-RADAR começa com quatro módulos: agricultura, agroindústria, pecuária, carbono. Liga-se a AURORA/POLARIS por `GET /api/radar/bridge` (`/api/pulso/bridge` continua como alias). Arquitetura, roadmap e fachada agrícola: [etholys-radar.md](./etholys-radar.md).
+1. **Seletor global Etholys (Hub)** — empresa do grupo / incubadora com a qual estás a operar (`activeCompanyId` / CompanyPicker). É a **operadora** dos contratos AT.
+2. **Seletor interno AURORA** — **negócio atendido** (MIPYME externa) + contrato AT (`?company=&engagement=` + `localStorage aurora_attended:<operatorId>`). Nunca usar o seletor Hub como se fosse o negócio diagnosticado.
 
-Contratos AT em `/hub/aurora/contratos` (lista) e `/hub/aurora/at/[id]`. A carteira em `/hub/aurora` é a ronda do técnico (meus, travados, sem dono) e o quadro do método. Programas em `/hub/aurora/programas` agrupam a carteira por contrato AT. O **diagnóstico dinâmico** em `/hub/aurora/diagnostico` radiografa o negócio por blocos (maturidade 1–5 + situação real + brecha/potencial) em diálogo — não é planilha nem quiz. O dossiê em `/hub/aurora/dossie` é a conversa profunda do técnico → retrato → hipótese aceite → 2–4 apostas → ritmo. POLARIS reusa jornada, diagnóstico, roadmap e coach. RADAR agricultura usa a fachada `/api/radar/agriculture` por cima das unidades ops; não mostra a central NEXUS nem o retrato. Os dossiês hidratam-se a partir de `NexusDiagnosis`, jornada, roadmap e unidades ops — sem apagar retrato já escrito e sem colar score `/100` no retrato.
+Fluxo alvo (contínuo): diagnóstico inicial → documento/raio-x → validação técnico↔IA → rota de intervenção (atividades) + chat do técnico → vista do atendido (só raio-x, rota, avanço).
+
+## Carteira e técnicos
+
+- **Cartera** (`/hub/aurora`) = dashboard dos processos de assistência técnica da incubadora ativa.
+- Sempre há (ou pode haver) um **técnico** que acompanha cada negócio (claim no dossiê).
+- **Admin** da operadora: vê a carteira completa, filtra por técnico, convida técnicos (`/hub/workspace/team` + NEXUS).
+- **Técnico** (não-admin): API devolve só negócios **seus** + **sem técnico** (para poder acompanhar).
+- Diagnóstico / Dossier **exigem** negócio+contrato na URL; o menu redireciona à carteira se nada estiver selecionado.
+
+## Método e rotas
+
+Método partilhado (AURORA e POLARIS): conversa → retrato editável → hipótese aceite → 2–4 apostas → ritmo semanal. Brechas máx. 5, potenciais máx. 3. Não é score de quiz Likert. Em POLARIS a **linha base** (`/hub/polaris/diagnosis`) radiografa maturidade 1–5 por blocos (mesmo motor do diagnóstico AURORA) antes do guia de autodesenvolvimento; a **IA do sistema** (não há consultor humano externo) junta essa linha base ao brief do ecossistema e só então propõe avanço.
+
+RADAR começa com quatro módulos: agricultura, agroindústria, pecuária, carbono. Liga-se a AURORA/POLARIS por `GET /api/radar/bridge`. Arquitetura: [etholys-radar.md](./etholys-radar.md).
+
+Contratos AT em `/hub/aurora/contratos` e `/hub/aurora/at/[id]`. Programas em `/hub/aurora/programas`. Diagnóstico dinâmico em `/hub/aurora/diagnostico`. Dossiê em `/hub/aurora/dossie`.
 
 `/hub/nexus/campo` redireciona para RADAR. Rotas NEXUS antigas continuam a funcionar.

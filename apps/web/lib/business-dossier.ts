@@ -262,12 +262,31 @@ export function draftPortraitFromInterview(answers: Record<string, string>, loca
   };
 }
 
+export type LoadAuroraPortfolioOpts = {
+  /** Filtra pela incubadora/operadora ativa no Hub. */
+  operatorCompanyId?: string | null;
+  /**
+   * `all` — carteira completa (admin).
+   * `assigned` — só os meus + sem técnico (técnico de campo).
+   * `mine` — só os que eu acompanho.
+   */
+  scope?: 'all' | 'assigned' | 'mine';
+  /** Filtro opcional por técnico (só faz sentido com scope=all). */
+  technicianUserId?: string | null;
+};
+
 export async function loadAuroraPortfolio(
   tenantCompanyIds: string[],
   viewerUserId?: string,
+  opts: LoadAuroraPortfolioOpts = {},
 ): Promise<AuroraPortfolioItem[]> {
   const engagements = await listEngagementsForTenant(tenantCompanyIds);
-  const businesses = collectAttendedBusinesses(engagements).slice(0, 80);
+  let businesses = collectAttendedBusinesses(engagements);
+  const operatorId = String(opts.operatorCompanyId || '').trim();
+  if (operatorId) {
+    businesses = businesses.filter((b) => b.operatorCompanyId === operatorId);
+  }
+  businesses = businesses.slice(0, 80);
   const ids = businesses.map((b) => b.companyId);
   if (ids.length === 0) return [];
 
@@ -364,5 +383,19 @@ export async function loadAuroraPortfolio(
     const bTime = b.lastRhythmAt ? new Date(b.lastRhythmAt).getTime() : 0;
     return aTime - bTime;
   });
-  return items;
+
+  const scope = opts.scope || 'all';
+  const techFilter = String(opts.technicianUserId || '').trim();
+  let filtered = items;
+  if (scope === 'mine' && viewerUserId) {
+    filtered = filtered.filter((row) => row.technicianUserId === viewerUserId);
+  } else if (scope === 'assigned' && viewerUserId) {
+    filtered = filtered.filter(
+      (row) => !row.technicianUserId || row.technicianUserId === viewerUserId,
+    );
+  }
+  if (techFilter) {
+    filtered = filtered.filter((row) => row.technicianUserId === techFilter);
+  }
+  return filtered;
 }
