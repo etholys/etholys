@@ -21,12 +21,18 @@ export async function GET(req: NextRequest) {
   const companyId = String(url.searchParams.get('companyId') || '').trim();
   const engagementId = String(url.searchParams.get('engagementId') || '').trim() || null;
   const clientId = String(url.searchParams.get('clientId') || '').trim() || null;
+  const allClients =
+    url.searchParams.get('all') === '1' ||
+    clientId === 'all' ||
+    clientId === 'todos';
   const auth = await authorize(companyId, engagementId);
   if ('error' in auth && auth.error) return auth.error;
 
-  const where = clientId
-    ? { companyId, clientId }
-    : { companyId, clientId: null as string | null };
+  const where = allClients
+    ? { companyId }
+    : clientId
+      ? { companyId, clientId }
+      : { companyId, clientId: null as string | null };
 
   const properties = await prisma.radarProperty.findMany({
     where,

@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useApp } from '@/app/providers';
-import { RadarClientsBoard } from '@/components/radar/RadarClientsBoard';
+import { RadarProviderHome } from '@/components/radar/RadarProviderHome';
 import { RadarPersonaGate } from '@/components/radar/RadarPersonaGate';
 
 function ProviderInner() {
@@ -31,7 +31,9 @@ function ProviderInner() {
         return;
       }
       if (d.radarOrgRole !== 'provider') {
-        router.replace(`${d.homePath || '/hub/radar/producer'}?company=${companyId}${engagementId ? `&engagement=${engagementId}` : ''}`);
+        router.replace(
+          `${d.homePath || '/hub/radar/producer'}?company=${companyId}${engagementId ? `&engagement=${engagementId}` : ''}`,
+        );
         return;
       }
       setGate('ok');
@@ -64,7 +66,7 @@ function ProviderInner() {
     );
   }
 
-  return <RadarClientsBoard companyId={companyId} engagementId={engagementId} locale={loc} />;
+  return <RadarProviderHome companyId={companyId} engagementId={engagementId} locale={loc} />;
 }
 
 export default function RadarProviderPage() {

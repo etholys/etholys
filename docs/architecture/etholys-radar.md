@@ -21,12 +21,25 @@ RADAR é a operação: dados, eficiência, automação, WhatsApp in/out, alertas
 
 | Persona | Espaço | Hierarquia |
 |---------|--------|------------|
-| **Produtor** | `/hub/radar/producer` | Propriedades próprias |
-| **Prestador** | `/hub/radar/provider` | Clientes → propriedades de cada cliente |
+| **Produtor** | `/hub/radar/producer` | Propriedades próprias + dashboard de alertas |
+| **Prestador** | `/hub/radar/provider` | **ClientPicker** (Todos \| cliente) → alertas + propriedades do âmbito |
 
 - Sem papel → ecrã forçado em `/hub/radar` (escolha prestador vs produtor). Não é toggle Empresa|Técnico.
 - Criação de empresa pode gravar `radarOrgRole` (`POST /api/companies`). Signup global completo fica para depois; o gate RADAR é a fonte de verdade neste ciclo.
 - Modelos: `RadarClient` (prestador), `RadarProperty` (fazenda/unidade), `NexusOpsUnit.propertyId`.
+
+### Âmbito de cliente (prestadora)
+
+Espelho do CompanyPicker do Hub, **sempre visível** na sidebar RADAR (`ProductAppShell.sidebarAfterCompany`):
+
+| Peça | Onde |
+|------|------|
+| UI | `RadarClientPicker` — «Todos os clientes» \| cada `RadarClient` \| `+ Novo cliente` \| `+ Nova fazenda` |
+| Estado | `RadarClientScopeProvider` — URL `?client=` + `localStorage` `radar.clientScope.{companyId}` |
+| Cadastro | `RadarCreatePanel` — cliente (nome + contacto) ou fazenda (nome + módulo + cliente); cria e abre o funil da propriedade |
+| Home | `RadarProviderHome` — dashboard de alertas + CTAs + lista filtrada |
+
+Produtor: picker de cliente oculto; home com alertas das próprias propriedades.
 
 ### Funil da propriedade (progress rail)
 
@@ -37,7 +50,15 @@ RADAR é a operação: dados, eficiência, automação, WhatsApp in/out, alertas
 
 Depois de caracterizada (agricultura), a **mesma UI operativa forte** (planta + métricas + canais + cadeia) vive dentro da propriedade. Não há vista Técnico fraca em paralelo.
 
-Rotas: `/hub/radar/properties/[id]`. APIs: `/api/radar/org-role`, `/api/radar/clients`, `/api/radar/properties`, `/api/radar/properties/[id]`.
+Rotas: `/hub/radar/properties/[id]`. APIs: `/api/radar/org-role`, `/api/radar/clients`, `/api/radar/properties`, `/api/radar/properties/[id]`, `/api/radar/alerts`.
+
+### Dashboard de alertas globais
+
+`GET /api/radar/alerts?companyId=&clientId=` (opcional; `all` / omitido = carteira inteira na prestadora).
+
+Agrega por propriedade no âmbito: humidade/PHI (board agricultura), sensores em falta, funil incompleto, lotes abertos sem check-in recente, WhatsApp desligado/não configurado. UI: `RadarAlertsDashboard` na central prestadora/produtor.
+
+Cartões: severity · cliente · propriedade · mensagem · link para `/hub/radar/properties/[id]`.
 
 ## Arquitetura
 
@@ -149,7 +170,7 @@ Alertas no ecrã seguem sempre os protocolos de agricultura. A mensagem automát
 
 1. **Agricultura** — decisão ao vivo + WhatsApp. Fechado.
 2. **Traçabilidade (cadeia de custódia)** — check-in geo/foto/QR por etapa. Fechado neste ciclo (esqueleto presentável).
-3. **Personas + propriedades** — prestador/produtor, clientes → funil. Fechado neste ciclo (esqueleto).
+3. **Personas + propriedades + âmbito** — prestador/produtor, ClientPicker, cadastro cliente/fazenda, dashboard de alertas. Fechado neste ciclo (esqueleto presentável).
 4. **Pecuária / agroindústria / carbono** — mesmo laço.
 5. **IA** — ler o caderno e propor comando (confirmação WhatsApp).
 6. **SKU RADAR** — licença própria. Fora deste ciclo. Até lá, `NEXUS`.

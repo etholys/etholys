@@ -68,13 +68,14 @@ function ProducerInner() {
       companyId={companyId}
       engagementId={engagementId}
       locale={loc}
+      showDashboard
       title={loc === 'es' ? 'Mis propiedades' : loc === 'en' ? 'My properties' : 'As minhas propriedades'}
       subtitle={
         loc === 'es'
-          ? 'Caracterizar → dibujar planta → geolocalizar → conectar sensores → operación en vivo.'
+          ? 'Alertas de la explotación · caracterizar → planta → geo → sensores → operación.'
           : loc === 'en'
-            ? 'Characterize → draw plant → geolocate → connect sensors → live ops.'
-            : 'Caracterizar → desenhar planta → geolocalizar → conectar sensores → operação ao vivo.'
+            ? 'Farm alerts · characterize → plant → geo → sensors → live ops.'
+            : 'Alertas da exploração · caracterizar → planta → geo → sensores → operação.'
       }
     />
   );

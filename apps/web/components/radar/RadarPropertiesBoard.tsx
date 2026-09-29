@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, Loader2, MapPinned, Plus } from 'lucide-react';
 import type { PropertyStepState } from '@/lib/radar/property-progress';
+import { RadarAlertsDashboard } from '@/components/radar/RadarAlertsDashboard';
 
 type Loc = 'pt' | 'es' | 'en';
 
@@ -17,6 +19,13 @@ type PropRow = {
   unitCount: number;
 };
 
+const MODULES = [
+  { id: 'agriculture', label: { pt: 'Agricultura', es: 'Agricultura', en: 'Agriculture' } },
+  { id: 'agroindustry', label: { pt: 'Agroindústria', es: 'Agroindustria', en: 'Agroindustry' } },
+  { id: 'livestock', label: { pt: 'Pecuária', es: 'Ganadería', en: 'Livestock' } },
+  { id: 'carbon', label: { pt: 'Carbono', es: 'Carbono', en: 'Carbon' } },
+] as const;
+
 export function RadarPropertiesBoard({
   companyId,
   engagementId,
@@ -25,6 +34,7 @@ export function RadarPropertiesBoard({
   title,
   subtitle,
   backHref,
+  showDashboard = false,
 }: {
   companyId: string;
   engagementId?: string | null;
@@ -33,12 +43,15 @@ export function RadarPropertiesBoard({
   title: string;
   subtitle: string;
   backHref?: string;
+  showDashboard?: boolean;
 }) {
   const loc: Loc = locale === 'es' || locale === 'en' ? locale : 'pt';
+  const router = useRouter();
   const [rows, setRows] = useState<PropRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
+  const [moduleId, setModuleId] = useState('agriculture');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -71,13 +84,18 @@ export function RadarPropertiesBoard({
       const r = await fetch('/api/radar/properties', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, engagementId, clientId, name }),
+        body: JSON.stringify({ companyId, engagementId, clientId, name, moduleId }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha');
       setName('');
       setCreating(false);
-      await load();
+      const companyQ = engagementId
+        ? `company=${companyId}&engagement=${engagementId}`
+        : `company=${companyId}`;
+      router.push(
+        `/hub/radar/properties/${d.property.id}?${companyQ}${clientId ? `&client=${clientId}` : ''}`,
+      );
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -90,12 +108,12 @@ export function RadarPropertiesBoard({
     : `company=${companyId}`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           {backHref && (
             <Link href={backHref} className="text-xs text-white/45 hover:text-white/70">
-              ← {loc === 'en' ? 'Clients' : 'Clientes'}
+              ← {loc === 'en' ? 'Back' : 'Voltar'}
             </Link>
           )}
           <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/40">RADAR</p>
@@ -108,21 +126,41 @@ export function RadarPropertiesBoard({
           className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#04110c]"
         >
           <Plus className="h-4 w-4" />
-          {loc === 'en' ? 'New property' : 'Nova propriedade'}
+          {loc === 'en' ? 'Register farm' : 'Cadastrar fazenda'}
         </button>
       </div>
+
+      {showDashboard && (
+        <RadarAlertsDashboard companyId={companyId} engagementId={engagementId} locale={loc} clientId={null} />
+      )}
 
       {err && <p className="text-sm text-rose-200">{err}</p>}
 
       {creating && (
-        <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] px-5 py-5">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={loc === 'en' ? 'Farm / property name' : 'Nome da fazenda / propriedade'}
-            className="w-full rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
-            autoFocus
-          />
+        <div className="rounded-[1.35rem] border border-emerald-400/30 bg-emerald-500/10 px-5 py-5">
+          <p className="mb-3 text-sm font-medium text-emerald-100">
+            {loc === 'en' ? 'New farm / property' : 'Nova fazenda / propriedade'}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={loc === 'en' ? 'Farm / property name' : 'Nome da fazenda / propriedade'}
+              className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
+              autoFocus
+            />
+            <select
+              value={moduleId}
+              onChange={(e) => setModuleId(e.target.value)}
+              className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
+            >
+              {MODULES.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label[loc]}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="mt-3 flex gap-2">
             <button
               type="button"
@@ -130,9 +168,19 @@ export function RadarPropertiesBoard({
               onClick={() => void create()}
               className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-[#04110c] disabled:opacity-40"
             >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : loc === 'en' ? 'Create' : 'Criar'}
+              {busy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : loc === 'en' ? (
+                'Create & open funnel'
+              ) : (
+                'Criar e abrir funil'
+              )}
             </button>
-            <button type="button" onClick={() => setCreating(false)} className="rounded-xl px-4 py-2 text-sm text-white/60">
+            <button
+              type="button"
+              onClick={() => setCreating(false)}
+              className="rounded-xl px-4 py-2 text-sm text-white/60"
+            >
               {loc === 'en' ? 'Cancel' : 'Cancelar'}
             </button>
           </div>
@@ -159,7 +207,7 @@ export function RadarPropertiesBoard({
             onClick={() => setCreating(true)}
             className="mt-6 rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-[#04110c]"
           >
-            {loc === 'en' ? 'Add property' : 'Adicionar propriedade'}
+            {loc === 'en' ? 'Register farm' : 'Cadastrar fazenda'}
           </button>
         </div>
       ) : (
@@ -167,7 +215,7 @@ export function RadarPropertiesBoard({
           {rows.map((p) => (
             <li key={p.id}>
               <Link
-                href={`/hub/radar/properties/${p.id}?${companyQ}`}
+                href={`/hub/radar/properties/${p.id}?${companyQ}${clientId ? `&client=${clientId}` : ''}`}
                 className="group flex items-center justify-between gap-4 rounded-[1.35rem] border border-white/10 bg-white/[0.03] px-5 py-5 transition hover:border-emerald-400/35 hover:bg-emerald-500/10"
               >
                 <div className="min-w-0">
