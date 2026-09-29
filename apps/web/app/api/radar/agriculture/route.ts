@@ -33,11 +33,9 @@ export async function GET(req: NextRequest) {
   const auth = await authorize(companyId, engagementId);
   if ('error' in auth && auth.error) return auth.error;
 
-  await ensureFarm(companyId);
-
   const [units, entries, readings, sensors, rules, whatsapp] = await Promise.all([
     prisma.nexusOpsUnit.findMany({
-      where: { companyId, isActive: true, kind: 'parcel' },
+      where: { companyId, isActive: true },
       orderBy: { createdAt: 'asc' },
       take: 80,
     }),
@@ -112,11 +110,22 @@ export async function GET(req: NextRequest) {
       };
     });
 
+  const spaces = units.map((u) => ({
+    id: u.id,
+    name: u.name,
+    kind: u.kind,
+    sectorId: u.sectorId,
+    crop: u.crop,
+    areaHa: u.areaHa,
+  }));
+
   return NextResponse.json({
     companyId,
     moduleId: 'agriculture',
     decision: board.decision,
     parcels: board.parcels,
+    spaces,
+    hasSpaces: spaces.length > 0,
     alerts: board.alerts.filter((a) => a.code !== 'no_parcels'),
     lines,
     sensors: liveSensors,
@@ -163,17 +172,23 @@ async function createParcel(companyId: string, body: Record<string, unknown>) {
   const name = String(body.name || '').trim() || 'Parcela 1';
   if (name.length < 2) return NextResponse.json({ error: 'Nome da parcela obrigatório.' }, { status: 400 });
   const areaHa = body.areaHa == null || body.areaHa === '' ? null : Number(body.areaHa);
+  const moduleId = String(body.moduleId || 'agriculture').trim();
+  const sectorId = ['agriculture', 'agroindustry', 'livestock', 'carbon'].includes(moduleId)
+    ? moduleId
+    : 'agriculture';
+  const kind =
+    sectorId === 'livestock' ? 'herd' : sectorId === 'agroindustry' ? 'lot' : sectorId === 'carbon' ? 'generic' : 'parcel';
   const unit = await prisma.nexusOpsUnit.create({
     data: {
       companyId,
-      sectorId: 'agriculture',
-      kind: 'parcel',
+      sectorId,
+      kind,
       name: name.slice(0, 120),
       areaHa: Number.isFinite(areaHa as number) && (areaHa as number) > 0 ? (areaHa as number) : null,
       crop: String(body.crop || '').trim().slice(0, 80) || null,
     },
   });
-  return NextResponse.json({ ok: true, unit });
+  return NextResponse.json({ ok: true, unit, moduleId: sectorId });
 }
 
 async function createLine(companyId: string, engagementId: string | null, userId: string, body: Record<string, unknown>) {
@@ -307,27 +322,6 @@ async function setRule(companyId: string, body: Record<string, unknown>) {
     command = await requestAutomationCommand(companyId, kind);
   }
   return NextResponse.json({ ok: true, rule, command });
-}
-
-async function ensureFarm(companyId: string) {
-  const existing = await prisma.nexusOpsUnit.findFirst({
-    where: { companyId, isActive: true, kind: 'parcel' },
-    select: { id: true },
-  });
-  if (existing) return;
-  const company = await prisma.company.findFirst({
-    where: { id: companyId },
-    select: { shortName: true, name: true },
-  });
-  const name = String(company?.shortName || company?.name || 'Finca').trim().slice(0, 120) || 'Finca';
-  await prisma.nexusOpsUnit.create({
-    data: {
-      companyId,
-      sectorId: 'agriculture',
-      kind: 'parcel',
-      name,
-    },
-  });
 }
 
 async function askCommand(companyId: string, body: Record<string, unknown>) {

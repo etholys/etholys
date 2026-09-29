@@ -17,6 +17,14 @@ export default function RadarLayout({ children }: { children: React.ReactNode })
           href: '/hub/radar',
           label: es ? 'Central' : en ? 'Home' : 'Central',
         },
+        {
+          href: '/hub/radar?view=empresa',
+          label: es ? 'Empresa' : en ? 'Company' : 'Empresa',
+        },
+        {
+          href: '/hub/radar?view=tecnico',
+          label: es ? 'Técnico' : en ? 'Field' : 'Técnico',
+        },
       ]}
     >
       {children}

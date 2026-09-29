@@ -86,11 +86,16 @@ Carbono não abre caderno próprio. Lê práticas já registadas.
 
 ### O que a fachada agrícola faz
 
-A pergunta do ecrã: **o que fazer hoje**. Não é um cadastro.
+Duas vistas no Hub:
 
-`GET /api/radar/agriculture` devolve `decision` (`open_farm` | `irrigate` | `hold_harvest` | `scout` | `ok`) e parcelas com humidade, última irrigação, carência e `nextAction`.
+| Vista | Para quem | Pergunta |
+|-------|-----------|----------|
+| **Empresa** | gestão | Onde está cada espaço e canal, agora? |
+| **Técnico** | campo | Qual é a única ação a fazer agora? |
 
-`POST` abre a exploração com uma parcela, regista irrigação (10 mm se não disser), pede confirmação no WhatsApp, liga o telemóvel e emite token de sensor só quando o canal ainda não lê.
+O tipo (agricultura / agroindústria / pecuária / carbono) **não** é um interruptor solto no topo. Entra no fluxo **Registar espaço de medição**: nome → tipo → continuar.
+
+`GET /api/radar/agriculture` devolve `decision`, `parcels`, `spaces` / `hasSpaces`. Sem espaço, a UI abre o setup — não inventa finca sozinha.
 
 Prioridade da decisão: não colher (PHI) → irrigar (humidade &lt; 25%) → percorrer (caderno parado) → em critério.
 
