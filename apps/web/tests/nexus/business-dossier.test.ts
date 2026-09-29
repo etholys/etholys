@@ -10,6 +10,14 @@ import {
   selectAuroraBets,
 } from '../../lib/aurora-interview';
 import {
+  applyDiagTurn,
+  confirmDiagBlock,
+  diagProgress,
+  emptyAuroraDiagnostic,
+  normalizeDiagPending,
+  startDiagBlock,
+} from '../../lib/aurora-diagnostic';
+import {
   auroraAttention,
   auroraNextAction,
   auroraPortfolioCounts,
@@ -192,6 +200,10 @@ function item(partial: Partial<AuroraPortfolioItem> & Pick<AuroraPortfolioItem, 
     technicianUserId: '',
     mine: false,
     dueBetTitles: [],
+    diagnosticDone: 0,
+    diagnosticTotal: 6,
+    diagnosticComplete: false,
+    diagnosticAvg: null,
     ...partial,
   };
 }
@@ -237,3 +249,46 @@ test('AURORA groups the portfolio by AT program', () => {
   assert.equal(groups[0]?.unclaimed, 1);
   assert.equal(groups.find((g) => g.engagementId === 'b')?.needsAttention, 1);
 });
+
+test('AURORA diagnostic confirms a block and tracks progress without quiz scores', () => {
+  let state = emptyAuroraDiagnostic();
+  state = startDiagBlock(state, 'finance', 'pt');
+  assert.equal(state.activeBlockId, 'finance');
+  assert.equal(state.blocks.finance.status, 'active');
+  assert.match(state.blocks.finance.messages[0]!.text, /dinheiro|mês/i);
+
+  state = applyDiagTurn(state, 'finance', 'Anotam no caderno e misturam com a conta pessoal.', {
+    reply: 'E o custo de cada venda — sabem ou é a olho?',
+    ready: false,
+    level: null,
+    situation: '',
+    gap: '',
+    potential: '',
+  });
+  assert.equal(state.blocks.finance.messages.length, 3);
+
+  state = applyDiagTurn(state, 'finance', 'Custo é a olho. Fluxo de caixa não existe.', {
+    reply: 'Proponho nível 2: informal, na cabeça e no caderno.',
+    ready: true,
+    level: 2,
+    situation: 'Caderno informal, conta misturada com a pessoal, custo a olho, sem fluxo de caixa.',
+    gap: 'Não há fluxo de caixa nem custo unitário.',
+    potential: 'Já registam algo no caderno — dá para separar contas.',
+  });
+  const pending = normalizeDiagPending(state.blocks.finance.pending, 'pt');
+  assert.equal(pending.ready, true);
+  assert.equal(pending.level, 2);
+
+  state = confirmDiagBlock(state, 'finance', {
+    level: 2,
+    situation: pending.situation,
+    gap: pending.gap,
+    potential: pending.potential,
+  });
+  const progress = diagProgress(state);
+  assert.equal(progress.done, 1);
+  assert.equal(progress.complete, false);
+  assert.equal(progress.gaps[0], 'Não há fluxo de caixa nem custo unitário.');
+  assert.equal(looksLikeCatalogScore(pending.situation), false);
+});
+

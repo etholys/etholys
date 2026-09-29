@@ -10,6 +10,7 @@ import {
 } from './aurora-portfolio';
 import { readAuroraTech } from './aurora-interview';
 import { auroraDueSoon } from './aurora-week';
+import { diagProgress, readAuroraDiagnostic } from './aurora-diagnostic';
 
 export {
   AURORA_RHYTHM_STALE_MS,
@@ -325,6 +326,7 @@ export async function loadAuroraPortfolio(
     const hypothesisAccepted = Boolean(dossier?.hypothesisAccepted);
     const tech = readAuroraTech(dossier?.interviewJson);
     const technicianUserId = tech?.userId || '';
+    const diag = diagProgress(readAuroraDiagnostic(dossier?.interviewJson));
     return {
       ...b,
       hasPortrait,
@@ -341,6 +343,10 @@ export async function loadAuroraPortfolio(
       technicianUserId,
       mine: Boolean(viewerUserId && technicianUserId === viewerUserId),
       dueBetTitles: dueByCompany.get(b.companyId) || [],
+      diagnosticDone: diag.done,
+      diagnosticTotal: diag.total,
+      diagnosticComplete: diag.complete,
+      diagnosticAvg: diag.avgLevel,
       stage: auroraMethodStage({
         hasPortrait,
         hypothesisAccepted,

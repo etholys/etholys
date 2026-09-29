@@ -13,6 +13,7 @@ export default function AuroraLayout({ children }: { children: React.ReactNode }
       accent="amber"
       nav={[
         { href: '/hub/aurora', label: es ? 'Cartera' : en ? 'Portfolio' : 'Carteira' },
+        { href: '/hub/aurora/diagnostico', label: es ? 'Diagnóstico' : en ? 'Diagnostic' : 'Diagnóstico' },
         { href: '/hub/aurora/dossie', label: es ? 'Dossier' : en ? 'Dossier' : 'Dossiê' },
         { href: '/hub/aurora/programas', label: es ? 'Programas' : en ? 'Programs' : 'Programas' },
         { href: '/hub/aurora/contratos', label: es ? 'Contratos' : en ? 'Contracts' : 'Contratos' },

@@ -79,6 +79,10 @@ export type AuroraPortfolioItem = AuroraAttendedBusiness & {
   mine: boolean;
   stage: AuroraMethodStage;
   dueBetTitles: string[];
+  diagnosticDone: number;
+  diagnosticTotal: number;
+  diagnosticComplete: boolean;
+  diagnosticAvg: number | null;
 };
 
 export const AURORA_STAGE_ORDER: Record<AuroraMethodStage, number> = {

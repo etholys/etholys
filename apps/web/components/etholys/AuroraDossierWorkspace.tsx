@@ -505,6 +505,17 @@ export function AuroraDossierWorkspace() {
           <Link href="/hub/aurora" className="text-xs text-slate-500 hover:text-slate-800">
             ← {t.back}
           </Link>
+          {companyId ? (
+            <Link
+              href={`/hub/aurora/diagnostico?${new URLSearchParams({
+                company: companyId,
+                ...(engagementId ? { engagement: engagementId } : {}),
+              })}`}
+              className="ml-3 text-xs font-medium text-amber-900 hover:underline"
+            >
+              {loc === 'es' ? 'Diagnóstico' : loc === 'en' ? 'Diagnostic' : 'Diagnóstico'}
+            </Link>
+          ) : null}
           <h1 className="font-serif text-3xl text-slate-900">{companyName || t.listen}</h1>
           <p className="max-w-2xl text-sm text-slate-600">{t.hint}</p>
           <AuroraMethodRail stage={stage} labels={stageLabel} />

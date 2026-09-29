@@ -25,6 +25,11 @@ function dossierHref(row: AuroraPortfolioItem) {
   return `/hub/aurora/dossie?${q}`;
 }
 
+function diagnosticHref(row: AuroraPortfolioItem) {
+  const q = new URLSearchParams({ company: row.companyId, engagement: row.engagementId });
+  return `/hub/aurora/diagnostico?${q}`;
+}
+
 const EMPTY_COUNTS: AuroraPortfolioCounts = {
   total: 0,
   mine: 0,
@@ -56,12 +61,14 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
     loc === 'es'
       ? {
           title: 'Cartera',
-          line: 'Tu ronda de esta semana: conversar, corregir el retrato, aceptar la hipótesis, mover 2 a 4 apuestas, anotar qué pasó.',
+          line: 'Ronda de la semana y mapa del diagnóstico: radiografía por áreas, dossier profundo solo donde haga falta.',
           search: 'Buscar negocio o programa…',
           empty: 'Todavía no hay negocios. Abrí un contrato AT para acompañar MIPYMEs.',
           contracts: 'Contratos AT',
           open: 'Abrir dossier',
           talkNow: 'Empezar conversación',
+          diagnose: 'Diagnóstico',
+          diagDone: 'diagnóstico',
           bets: 'apuestas',
           week: 'Ronda',
           board: 'Método',
@@ -99,12 +106,14 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
       : loc === 'en'
         ? {
             title: 'Portfolio',
-            line: "This week's round: talk, correct the portrait, accept the hypothesis, move 2 to 4 bets, log what happened.",
+            line: 'Weekly round and diagnostic map: area-by-area snapshot; deep dossier only where needed.',
             search: 'Search a business or program…',
             empty: 'No businesses yet. Open an AT contract to accompany MSMEs.',
             contracts: 'AT contracts',
             open: 'Open dossier',
             talkNow: 'Start conversation',
+            diagnose: 'Diagnostic',
+            diagDone: 'diagnostic',
             bets: 'bets',
             week: 'Round',
             board: 'Method',
@@ -141,12 +150,14 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
           }
         : {
             title: 'Carteira',
-            line: 'A tua ronda desta semana: conversar, corrigir o retrato, aceitar a hipótese, mover 2 a 4 apostas, anotar o que aconteceu.',
+            line: 'Ronda da semana e mapa do diagnóstico: radiografia por áreas; dossiê profundo só onde falta.',
             search: 'Pesquisar negócio ou programa…',
             empty: 'Ainda não há negócios. Abre um contrato AT para acompanhar MIPYMEs.',
             contracts: 'Contratos AT',
             open: 'Abrir dossiê',
             talkNow: 'Começar conversa',
+            diagnose: 'Diagnóstico',
+            diagDone: 'diagnóstico',
             bets: 'apostas',
             week: 'Ronda',
             board: 'Método',
@@ -370,8 +381,14 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
               {copy.reclaim}
             </button>
           )}
-          <Link href={dossierHref(row)} className="ml-auto font-medium text-amber-900 hover:underline">
-            {row.stage === 'talk' ? copy.talkNow : copy.open}
+          <Link href={diagnosticHref(row)} className="font-medium text-amber-900 hover:underline">
+            {copy.diagnose}
+            {typeof row.diagnosticDone === 'number'
+              ? ` ${row.diagnosticDone}/${row.diagnosticTotal || 6}`
+              : ''}
+          </Link>
+          <Link href={dossierHref(row)} className="font-medium text-amber-900 hover:underline">
+            {row.stage === 'talk' && !row.diagnosticComplete ? copy.talkNow : copy.open}
           </Link>
         </div>
         {opts?.log ? (
