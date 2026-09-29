@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import {
-  auroraOpening,
+  isAuroraMetaPrompt,
   looksLikeCatalogScore,
   readAuroraDraft,
   readAuroraSuggestions,
@@ -318,10 +318,10 @@ export function AuroraDossierWorkspace() {
       ? {
           back: 'Cartera',
           listen: 'Conversación',
-          hint: 'Pegá lo que dijeron. AURORA te da la próxima pregunta. Vos corregís el retrato, aceptás la hipótesis, abrís 2 a 4 apuestas y anotás la semana.',
-          placeholder: 'Lo que acaban de decir, en sus palabras…',
+          hint: 'Dossier profundo: escuchá, corregí el retrato, aceptá la hipótesis y mové las apuestas. Para mapear rápido usá Diagnóstico.',
+          placeholder: 'Lo que acaban de decir…',
           send: 'Enviar',
-          draft: 'Rascunho de la conversa',
+          draft: 'Borrador de la conversa',
           use: 'Usar este retrato',
           portrait: 'Retrato',
           hypo: 'Hipótesis',
@@ -346,7 +346,7 @@ export function AuroraDossierWorkspace() {
           release: 'Dejar de acompañar',
           claimed: 'Técnico',
           needAccept: 'Aceptá la hipótesis para tratar las apuestas como plan.',
-          nextQ: 'Próxima pregunta',
+          nextQ: 'Preguntá esto',
           dueWeek: 'Vence esta semana',
           markWeek: 'Esta semana',
           ready: 'Ya se puede leer en voz alta.',
@@ -356,13 +356,14 @@ export function AuroraDossierWorkspace() {
           rhythmS: 'Ritmo',
           steadyS: 'En ritmo',
           now: 'Ahora',
+          emptyChat: 'Cuando escuches algo concreto, escribilo acá. AURORA propone la siguiente pregunta.',
         }
       : loc === 'en'
         ? {
             back: 'Portfolio',
             listen: 'Conversation',
-            hint: 'Paste what they said. AURORA gives the next question. You correct the portrait, accept the hypothesis, open 2 to 4 bets, log the week.',
-            placeholder: 'What they just said, in their words…',
+            hint: 'Deep dossier: listen, correct the portrait, accept the hypothesis, move the bets. For a fast map use Diagnostic.',
+            placeholder: 'What they just said…',
             send: 'Send',
             draft: 'Draft from the talk',
             use: 'Use this portrait',
@@ -389,7 +390,7 @@ export function AuroraDossierWorkspace() {
             release: 'Stop accompanying',
             claimed: 'Technician',
             needAccept: 'Accept the hypothesis before treating bets as the plan.',
-            nextQ: 'Next question',
+            nextQ: 'Ask this',
             dueWeek: 'Due this week',
             markWeek: 'This week',
             ready: 'Ready to read aloud.',
@@ -399,12 +400,13 @@ export function AuroraDossierWorkspace() {
             rhythmS: 'Rhythm',
             steadyS: 'On rhythm',
             now: 'Now',
+            emptyChat: 'When you hear something concrete, write it here. AURORA suggests the next question.',
           }
         : {
             back: 'Carteira',
             listen: 'Conversa',
-            hint: 'Cola o que disseram. O AURORA dá-te a próxima pergunta. Tu corrijes o retrato, aceitas a hipótese, abres 2 a 4 apostas e anotas a semana.',
-            placeholder: 'O que acabaram de dizer, nas palavras deles…',
+            hint: 'Dossiê profundo: ouve, corrige o retrato, aceita a hipótese e move as apostas. Para mapear depressa usa Diagnóstico.',
+            placeholder: 'O que acabaram de dizer…',
             send: 'Enviar',
             draft: 'Rascunho da conversa',
             use: 'Usar este retrato',
@@ -431,7 +433,7 @@ export function AuroraDossierWorkspace() {
             release: 'Deixar de acompanhar',
             claimed: 'Técnico',
             needAccept: 'Aceita a hipótese antes de tratar as apostas como plano.',
-            nextQ: 'Próxima pergunta',
+            nextQ: 'Pergunta isto',
             dueWeek: 'Vence esta semana',
             markWeek: 'Esta semana',
             ready: 'Já se pode ler em voz alta.',
@@ -441,6 +443,7 @@ export function AuroraDossierWorkspace() {
             rhythmS: 'Ritmo',
             steadyS: 'Em ritmo',
             now: 'Agora',
+            emptyChat: 'Quando ouvires algo concreto, escreve aqui. O AURORA propõe a pergunta seguinte.',
           };
 
   if (loading) {
@@ -451,7 +454,7 @@ export function AuroraDossierWorkspace() {
     );
   }
 
-  const shown = thread.length ? thread : [{ role: 'assistant' as const, text: auroraOpening(loc) }];
+  const shown = thread.filter((m) => !isAuroraMetaPrompt(m.text));
   const openBets = bets.filter((b) => b.status !== 'done' && b.status !== 'dropped');
   const lastWeek = rhythm[0];
   const showDraft = Boolean(draft?.portraitText && draft.portraitText !== portrait);
@@ -461,7 +464,10 @@ export function AuroraDossierWorkspace() {
     openBetCount: openBets.length,
     lastRhythmAt: lastWeek?.createdAt ?? null,
   });
-  const nextQuestion = [...shown].reverse().find((m) => m.role === 'assistant')?.text || '';
+  const hasUserTurn = shown.some((m) => m.role === 'user');
+  const lastAssistant = [...shown].reverse().find((m) => m.role === 'assistant');
+  const nextQuestion =
+    hasUserTurn && lastAssistant && !isAuroraMetaPrompt(lastAssistant.text) ? lastAssistant.text : '';
   const pendingSuggestions = suggestions.filter(
     (s) => !openBets.some((b) => b.title.trim().toLowerCase() === s.title.trim().toLowerCase()),
   );
@@ -553,6 +559,7 @@ export function AuroraDossierWorkspace() {
             </div>
           ) : null}
           <div ref={scroller} className="mt-3 flex-1 space-y-3 overflow-y-auto pr-1">
+            {shown.length === 0 ? <p className="text-sm text-slate-500">{t.emptyChat}</p> : null}
             {shown.map((m, i) => (
               <div key={`${m.role}${i}`} className={m.role === 'assistant' ? 'text-sm text-slate-800' : 'rounded-lg bg-amber-50 px-3 py-2 text-sm text-slate-900'}>
                 {m.text}

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-/** O AURORA não usa o wizard 360 — o trabalho do técnico é o dossiê. */
+/** Entrada escalável: diagnóstico dinâmico, não o dossiê 1:1 nem o wizard 360. */
 export default function AuroraDiagnosisRedirect({
   searchParams,
 }: {
@@ -11,5 +11,5 @@ export default function AuroraDiagnosisRedirect({
   const q = new URLSearchParams({ company });
   const engagement = String(searchParams.engagement || '').trim();
   if (engagement) q.set('engagement', engagement);
-  redirect(`/hub/aurora/dossie?${q}`);
+  redirect(`/hub/aurora/diagnostico?${q}`);
 }

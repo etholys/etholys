@@ -11,7 +11,7 @@ export default function AuroraPortfolioPage({
     const q = new URLSearchParams({ company });
     const engagement = String(searchParams.engagement || '').trim();
     if (engagement) q.set('engagement', engagement);
-    redirect(`/hub/aurora/dossie?${q}`);
+    redirect(`/hub/aurora/diagnostico?${q}`);
   }
   return <AuroraPortfolioWorkspace />;
 }

@@ -38,9 +38,14 @@ export function auroraNextAction(item: AuroraPortfolioItem, locale: AuroraLocale
     return `Destravar: ${block}`;
   }
   if (item.stage === 'talk') {
-    if (locale === 'es') return 'Pegar lo que dijeron y hacer la próxima pregunta';
-    if (locale === 'en') return 'Paste what they said and ask the next question';
-    return 'Colar o que disseram e fazer a próxima pergunta';
+    if (!item.diagnosticComplete && (item.diagnosticDone ?? 0) === 0) {
+      if (locale === 'es') return 'Abrir el diagnóstico por áreas';
+      if (locale === 'en') return 'Open the area diagnostic';
+      return 'Abrir o diagnóstico por áreas';
+    }
+    if (locale === 'es') return 'Seguir el diagnóstico o profundizar en el dossier';
+    if (locale === 'en') return 'Continue the diagnostic or go deeper in the dossier';
+    return 'Seguir o diagnóstico ou aprofundar no dossiê';
   }
   if (item.stage === 'portrait') {
     if (locale === 'es') return 'Corregir el retrato y aceptar la hipótesis';

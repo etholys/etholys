@@ -20,14 +20,14 @@ import { AuroraMethodRail } from '@/components/etholys/AuroraMethodRail';
 type FilterId = 'all' | 'mine' | 'unclaimed' | 'blocked' | AuroraMethodStage;
 type ViewId = 'week' | 'board' | 'programs';
 
+function businessHref(row: AuroraPortfolioItem) {
+  const q = new URLSearchParams({ company: row.companyId, engagement: row.engagementId });
+  return `/hub/aurora/diagnostico?${q}`;
+}
+
 function dossierHref(row: AuroraPortfolioItem) {
   const q = new URLSearchParams({ company: row.companyId, engagement: row.engagementId });
   return `/hub/aurora/dossie?${q}`;
-}
-
-function diagnosticHref(row: AuroraPortfolioItem) {
-  const q = new URLSearchParams({ company: row.companyId, engagement: row.engagementId });
-  return `/hub/aurora/diagnostico?${q}`;
 }
 
 const EMPTY_COUNTS: AuroraPortfolioCounts = {
@@ -320,7 +320,7 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
       <li key={row.companyId} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <Link href={dossierHref(row)} className="font-medium text-slate-900 hover:underline">
+            <Link href={businessHref(row)} className="font-medium text-slate-900 hover:underline">
               {row.name}
             </Link>
             <p className="truncate text-xs text-slate-500">{row.engagementTitle}</p>
@@ -381,14 +381,14 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
               {copy.reclaim}
             </button>
           )}
-          <Link href={diagnosticHref(row)} className="font-medium text-amber-900 hover:underline">
+          <Link href={businessHref(row)} className="ml-auto font-medium text-amber-900 hover:underline">
             {copy.diagnose}
             {typeof row.diagnosticDone === 'number'
               ? ` ${row.diagnosticDone}/${row.diagnosticTotal || 6}`
               : ''}
           </Link>
-          <Link href={dossierHref(row)} className="font-medium text-amber-900 hover:underline">
-            {row.stage === 'talk' && !row.diagnosticComplete ? copy.talkNow : copy.open}
+          <Link href={dossierHref(row)} className="font-medium text-slate-600 hover:underline">
+            {copy.open}
           </Link>
         </div>
         {opts?.log ? (

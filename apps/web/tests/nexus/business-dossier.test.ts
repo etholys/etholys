@@ -4,10 +4,14 @@ import { draftPortraitFromInterview, mergeInterviewJson } from '../../lib/busine
 import { auroraMethodStage, collectAttendedBusinesses } from '../../lib/aurora-portfolio';
 import {
   auroraInterviewPatch,
+  auroraOpening,
+  isAuroraMetaPrompt,
   looksLikeCatalogScore,
   normalizeAuroraDraft,
   readAuroraTech,
+  readAuroraThread,
   selectAuroraBets,
+  AURORA_THREAD_KEY,
 } from '../../lib/aurora-interview';
 import {
   applyDiagTurn,
@@ -290,5 +294,30 @@ test('AURORA diagnostic confirms a block and tracks progress without quiz scores
   assert.equal(progress.complete, false);
   assert.equal(progress.gaps[0], 'Não há fluxo de caixa nem custo unitário.');
   assert.equal(looksLikeCatalogScore(pending.situation), false);
+});
+
+test('AURORA drops the old meta opening and points talk stage at the diagnostic', () => {
+  assert.equal(isAuroraMetaPrompt('Pegá lo que dijeron, en sus palabras. Yo te digo la próxima pregunta — no es un cuestionario.'), true);
+  assert.equal(isAuroraMetaPrompt('¿Qué hace el negocio, en pocas palabras?'), false);
+  assert.match(auroraOpening('es'), /negocio/i);
+  assert.equal(
+    readAuroraThread({
+      [AURORA_THREAD_KEY]: [
+        { role: 'assistant', text: 'Pegá lo que dijeron, en sus palabras. Yo te digo la próxima pregunta — no es un cuestionario.' },
+        { role: 'user', text: 'Venden queso' },
+      ],
+    }).length,
+    1,
+  );
+  const talk = item({
+    companyId: '9',
+    name: 'Queso',
+    stage: 'talk',
+    technicianUserId: 'u1',
+    mine: true,
+    diagnosticDone: 0,
+    diagnosticComplete: false,
+  });
+  assert.match(auroraNextAction(talk, 'es'), /diagnóstico/i);
 });
 

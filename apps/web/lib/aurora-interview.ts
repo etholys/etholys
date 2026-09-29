@@ -29,18 +29,29 @@ const THREAD_CAP = 40;
 
 export function auroraOpening(locale: AuroraLocale): string {
   if (locale === 'es') {
-    return 'Pegá lo que dijeron, en sus palabras. Yo te digo la próxima pregunta — no es un cuestionario.';
+    return '¿Qué hace el negocio, en pocas palabras?';
   }
   if (locale === 'en') {
-    return 'Paste what they said, in their words. I will give you the next question — this is not a questionnaire.';
+    return 'What does the business do, in a few words?';
   }
-  return 'Cola o que disseram, nas palavras deles. Eu digo-te a próxima pergunta — isto não é um questionário.';
+  return 'O que faz o negócio, em poucas palavras?';
 }
 
 export function auroraRetryReply(locale: AuroraLocale): string {
-  if (locale === 'es') return 'Pegá una frase de ellos: qué hacen, o qué está trabado.';
-  if (locale === 'en') return 'Paste one sentence from them: what they do, or what is stuck.';
-  return 'Cola uma frase deles: o que fazem, ou o que está travado.';
+  if (locale === 'es') return 'Contame un ejemplo concreto de cómo funciona hoy.';
+  if (locale === 'en') return 'Give one concrete example of how it works today.';
+  return 'Dá um exemplo concreto de como funciona hoje.';
+}
+
+/** Openings antigos de instrução ao técnico — não são pergunta real. */
+export function isAuroraMetaPrompt(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  return (
+    /no es un cuestionario|not a questionnaire|não é um questionário/i.test(t) ||
+    /peg[aá]\s+lo que dijeron|paste what they said|cola o que disseram/i.test(t) ||
+    /yo te digo la pr[oó]xima pregunta|i will give you the next question|eu digo-te a pr[oó]xima pergunta/i.test(t)
+  );
 }
 
 export function auroraSystemPrompt(locale: AuroraLocale): string {
@@ -178,7 +189,10 @@ export function readAuroraThread(interviewJson: unknown): AuroraMessage[] {
   if (!interviewJson || typeof interviewJson !== 'object' || Array.isArray(interviewJson)) return [];
   const raw = (interviewJson as Record<string, unknown>)[AURORA_THREAD_KEY];
   if (!Array.isArray(raw)) return [];
-  return raw.map(asMessage).filter((m): m is AuroraMessage => Boolean(m)).slice(-THREAD_CAP);
+  return raw
+    .map(asMessage)
+    .filter((m): m is AuroraMessage => Boolean(m) && !isAuroraMetaPrompt(m.text))
+    .slice(-THREAD_CAP);
 }
 
 export function readAuroraDraft(interviewJson: unknown): AuroraDraft | null {
