@@ -11,13 +11,20 @@ export async function POST(req: NextRequest) {
   const ctx = await resolveOpportunityCompanyId(req.nextUrl.searchParams.get('companyId'));
   if (!ctx) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
-  const body = (await req.json()) as { candidate?: ScanCandidate; runId?: string; tempId?: string };
+  const body = (await req.json()) as {
+    candidate?: ScanCandidate;
+    runId?: string;
+    tempId?: string;
+    locale?: string;
+  };
   if (!body.candidate?.name || !body.candidate?.institution) {
     return NextResponse.json({ error: 'candidate obrigatório' }, { status: 400 });
   }
 
+  const locale =
+    body.locale === 'pt' || body.locale === 'en' || body.locale === 'es' ? body.locale : 'es';
   const briefing = await readOpportunityBriefing(ctx.companyId);
-  const fit = evaluateFit(body.candidate, briefing);
+  const fit = evaluateFit(body.candidate, briefing, { locale });
   const runId = body.runId || body.candidate.runId;
   const tempId = body.tempId || body.candidate.tempId;
   if (runId && tempId) {

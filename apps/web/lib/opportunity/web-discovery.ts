@@ -39,9 +39,11 @@ function isWebSearchEnabled(): boolean {
 
 /** Regras partilhadas: descrições úteis para decisão, não marketing. */
 const CANDIDATE_CONTENT_RULES = `CANDIDATE CONTENT (critical — decision support, not marketing):
-Extract from OFFICIAL funder pages when possible. If uncertain, write clearly e.g. "Não confirmado na fonte oficial — verificar no link" — NEVER invent eligibility, amounts, or deadlines.
+Extract from OFFICIAL funder pages when possible. If uncertain, write clearly e.g. "No confirmado en la fuente oficial — verificar en el enlace" — NEVER invent eligibility, amounts, or deadlines.
 
-Each candidate MUST fill these fields (Portuguese preferred unless briefing is in another language):
+Write all candidate narrative fields in the SAME LANGUAGE as the opportunity briefing (Spanish if the briefing is Spanish, Portuguese if Portuguese, English if English). Default to Spanish when unclear — never default to Portuguese for a Spanish Hub/briefing.
+
+Each candidate MUST fill these fields:
 - description: 2–4 SUBSTANTIVE paragraphs. Explain what the call/program funds, thematic/sector focus, geographic scope, and operational context. Dates/amounts/topic codes belong as supporting detail inside the narrative — never as a one-line blurb alone. Thin marketing slogans are forbidden.
 - whoCanApply: who may apply (org types: private company, NGO, university, public body, consortium; nationality / establishment rules).
 - eligibility: key eligibility criteria (size, co-funding %, prior experience, geography, sector exclusions).
@@ -49,7 +51,7 @@ Each candidate MUST fill these fields (Portuguese preferred unless briefing is i
 - howToApply: portal/steps/next actions if known from the source; otherwise say to verify on the official page.
 - risksCaveats: co-financing burden, short windows, restricted beneficiaries, or unknowns.
 - Also: closesAt, opensAt, amount, currency, eligibleCountries, applicationWindow when known.
-DATES: Never invent opensAt/closesAt/deadline. If the official page does not state a calendar date, leave null. NEVER use 1 January / 2026-01-01 as a placeholder. Prefer availabilityNote "prazo a confirmar na página oficial".`;
+DATES: Never invent opensAt/closesAt/deadline. If the official page does not state a calendar date, leave null. NEVER use 1 January / 2026-01-01 as a placeholder. Prefer availabilityNote in the briefing language (e.g. Spanish: "plazo a confirmar en la página oficial").`;
 
 function promptsForFocus(scanFocus: ScanFocus) {
   const today = todayIso();
@@ -73,7 +75,7 @@ Hunt like an operator — wide first, official URL second:
 
 ${OFFICIAL_LINK_PROMPT_RULES}`,
       structure: `Convert the research into JSON only. Return { "candidates": [ ... ] }
-Each item needs compact fields (Portuguese OK):
+Each item needs compact fields in the briefing language (Spanish OK / Portuguese OK / English OK — match the briefing; default Spanish if unclear):
 name, institution, type (Grant|Crédito|Aliança|Técnico local),
 description (1 short paragraph, max ~400 chars),
 whoCanApply, eligibility (1–2 lines each),

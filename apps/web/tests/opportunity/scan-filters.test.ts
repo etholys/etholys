@@ -57,3 +57,20 @@ test('missing availability becomes open_now; closed stays closed', () => {
   assert.equal(isOpenNowCandidate({}), true);
   assert.equal(isOpenNowCandidate({ availabilityStatus: 'seasonal' }), false);
 });
+
+test('past deadline is not open_now even if status says open', () => {
+  assert.equal(
+    isOpenNowCandidate(
+      { availabilityStatus: 'open_now', closesAt: '2020-01-15' },
+      Date.parse('2026-09-29T12:00:00Z'),
+    ),
+    false,
+  );
+  assert.equal(
+    isOpenNowCandidate(
+      { availabilityStatus: 'open_now', closesAt: '2026-12-01' },
+      Date.parse('2026-09-29T12:00:00Z'),
+    ),
+    true,
+  );
+});

@@ -3,6 +3,10 @@ export const maxDuration = 120;
 
 import { NextRequest, NextResponse } from 'next/server';
 import { llmCompleteText } from '@/lib/llm-client';
+import {
+  fundhubLanguageName,
+  normalizeFundhubLocale,
+} from '@/lib/agents/fundhub-proposal-prompt';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import type { ScanCandidate } from '@/lib/opportunity/scan-types';
 
@@ -59,15 +63,18 @@ export async function POST(req: NextRequest) {
     message?: string;
     history?: ChatMessage[];
     mode?: 'chat' | 'brief';
+    locale?: unknown;
   };
 
   if (!body.candidate?.name || !body.candidate?.institution) {
     return NextResponse.json({ error: 'candidate obrigatório' }, { status: 400 });
   }
 
+  const locale = normalizeFundhubLocale(body.locale);
+  const lang = fundhubLanguageName(locale);
   const mode = body.mode === 'brief' ? 'brief' : 'chat';
   const system = `És um analista sénior de captação de fundos (FundHub / Etholys).
-Responde em português (ou no idioma da pergunta do utilizador).
+Responde SEMPRE em ${lang} (idioma da interface do Hub: ${locale}). Mesmo que a pergunta venha noutro idioma, responde em ${lang}.
 Baseia-te nos dados do candidato, na página da convocatória, nos documentos oficiais e no texto extraído das bases.
 Se o utilizador pedir para ver as bases, cita só o texto extraído.
 Se não houver página/documentos oficiais, diz que a oportunidade pode ser genérica ou não verificada.

@@ -45,7 +45,38 @@ export function coerceOpenAvailability(
   return status;
 }
 
-export function isOpenNowCandidate(c: Pick<ScanCandidate, 'availabilityStatus'>): boolean {
+function isPastCloseDate(
+  c: Pick<ScanCandidate, 'closesAt' | 'deadline'>,
+  now = Date.now(),
+): boolean {
+  const raw = c.closesAt ?? c.deadline;
+  if (!raw?.trim()) return false;
+  const dayOnly = raw.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  let ms: number;
+  if (dayOnly) {
+    ms = new Date(
+      Number(dayOnly[1]),
+      Number(dayOnly[2]) - 1,
+      Number(dayOnly[3]),
+      23,
+      59,
+      59,
+      999,
+    ).getTime();
+  } else {
+    ms = Date.parse(raw);
+  }
+  if (Number.isNaN(ms)) return false;
+  return ms < now;
+}
+
+/** Aberto agora: estado open/rolling e prazo (se existir) ainda não passou. */
+export function isOpenNowCandidate(
+  c: Pick<ScanCandidate, 'availabilityStatus' | 'closesAt' | 'deadline'>,
+  now = Date.now(),
+): boolean {
   const status = coerceOpenAvailability(c.availabilityStatus);
-  return status === 'open_now' || status === 'rolling';
+  if (status !== 'open_now' && status !== 'rolling') return false;
+  if (isPastCloseDate(c, now)) return false;
+  return true;
 }

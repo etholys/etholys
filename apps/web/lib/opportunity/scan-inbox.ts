@@ -1,6 +1,10 @@
 import { looksInventedWithoutEvidence } from '@/lib/opportunity/call-evidence';
 import { normalizeInstrumentType } from '@/lib/opportunity/instrument-type';
-import { isLikelyDuplicateFund, normalizeFundIdentity } from '@/lib/opportunity/scan-filters';
+import {
+  isLikelyDuplicateFund,
+  isOpenNowCandidate,
+  normalizeFundIdentity,
+} from '@/lib/opportunity/scan-filters';
 import type { ScanCandidate, ScanFocus, ScanResultsPayload } from '@/lib/opportunity/scan-types';
 
 export type InboxCandidate = ScanCandidate & { runId: string };
@@ -182,5 +186,7 @@ export function splitInboxByFocus(
   focus?: ScanFocus,
 ): InboxCandidate[] {
   if (!focus) return pending;
-  return pending.filter((c) => (c.scanFocus ?? 'open_now') === focus);
+  const focused = pending.filter((c) => (c.scanFocus ?? 'open_now') === focus);
+  if (focus !== 'open_now') return focused;
+  return focused.filter((c) => isOpenNowCandidate(c));
 }

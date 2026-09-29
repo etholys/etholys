@@ -160,7 +160,12 @@ export function CandidateDetailSheet({
         const r = await fetch(q('/api/opportunity/candidates/fit'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ candidate: c, runId: runId ?? c.runId, tempId: c.tempId }),
+          body: JSON.stringify({
+            candidate: c,
+            runId: runId ?? c.runId,
+            tempId: c.tempId,
+            locale,
+          }),
         });
         const d = (await r.json()) as { fit?: CandidateFit };
         if (!cancelled && r.ok && d.fit) {
@@ -177,7 +182,7 @@ export function CandidateDetailSheet({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, c.tempId, companyId, runId]);
+  }, [open, c.tempId, companyId, runId, locale]);
 
   if (!open) return null;
 
@@ -203,6 +208,7 @@ export function CandidateDetailSheet({
           message: asBrief ? undefined : message,
           mode: asBrief ? 'brief' : 'chat',
           history: asBrief ? undefined : chat,
+          locale,
         }),
       });
       const d = (await r.json()) as { reply?: string; error?: string };
@@ -235,7 +241,7 @@ export function CandidateDetailSheet({
         const r = await fetch(q('/api/opportunity/candidates/analyze'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ candidate: live, mode: 'brief' }),
+          body: JSON.stringify({ candidate: live, mode: 'brief', locale }),
         });
         const d = (await r.json()) as { reply?: string };
         analysis = d.reply ?? '';

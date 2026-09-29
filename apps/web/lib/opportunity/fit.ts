@@ -163,7 +163,7 @@ export function evaluateFit(
   briefing: OpportunityBriefing,
   opts?: { now?: number; locale?: string },
 ): CandidateFit {
-  const locale = opts?.locale ?? 'pt';
+  const locale = opts?.locale ?? 'es';
   const pt = locale === 'pt';
   const es = locale === 'es';
   const t = (a: string, b: string, c: string) => (pt ? a : es ? b : c);
