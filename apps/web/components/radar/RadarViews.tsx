@@ -9,6 +9,7 @@ import {
   type ParcelAction,
 } from '@/lib/radar/agriculture';
 import { RadarChainBoard } from '@/components/radar/RadarChainBoard';
+import { RadarSiteMap } from '@/components/radar/RadarSiteMap';
 import { TRACE_STAGES, TRACE_STAGE_LABEL, type TraceStage } from '@/lib/radar/trace';
 
 type Loc = 'pt' | 'es' | 'en';
@@ -34,7 +35,7 @@ type Board = {
   decision: AgricultureDecision;
   parcels: Parcel[];
   lines: Line[];
-  sensors: Array<{ id: string; name: string; lastValue: number | null; lastRecordedAt: string | null }>;
+  sensors: Array<{ id: string; name: string; unitId?: string | null; lastValue: number | null; lastRecordedAt: string | null }>;
   rules: Array<{ kind: string; enabled: boolean }>;
   whatsapp: { phoneE164: string; lastInboundAt?: string | null; pendingCommandKind?: string | null } | null;
 };
@@ -216,10 +217,17 @@ export function RadarEmpresaView({
   const [phone, setPhone] = useState('');
   const [mm, setMm] = useState(String(DEFAULT_IRRIGATION_MM));
   const [linking, setLinking] = useState(false);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (board?.whatsapp?.phoneE164) setPhone(board.whatsapp.phoneE164);
   }, [board?.whatsapp?.phoneE164]);
+
+  useEffect(() => {
+    if (!board?.parcels?.length) return;
+    const preferred = board.decision?.parcelId || board.parcels[0]?.id || null;
+    setFocusedId((prev) => (prev && board.parcels.some((p) => p.id === prev) ? prev : preferred));
+  }, [board?.parcels, board?.decision?.parcelId]);
 
   if (loading && !board) {
     return (
@@ -231,11 +239,19 @@ export function RadarEmpresaView({
 
   const decision = board?.decision;
   const parcels = board?.parcels || [];
-  const focus = parcels.find((p) => p.id === decision?.parcelId) || parcels[0];
+  const focus = parcels.find((p) => p.id === focusedId) || parcels.find((p) => p.id === decision?.parcelId) || parcels[0];
   const openLot = lots.find((l) => l.status === 'open') || lots[0];
-  const sensorLive = (board?.sensors || []).find((s) => s.lastValue != null);
+  const sensorLive =
+    (board?.sensors || []).find((s) => s.unitId === focus?.id && s.lastValue != null) ||
+    (board?.sensors || []).find((s) => s.lastValue != null);
   const irrigRule = board?.rules.find((r) => r.kind === 'irrigation');
   const alertRule = board?.rules.find((r) => r.kind === 'whatsapp_alerts');
+  const mapSensors = (board?.sensors || []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    unitId: s.unitId ?? null,
+    lastValue: s.lastValue,
+  }));
 
   const savePhone = async () => {
     setLinking(true);
@@ -310,6 +326,18 @@ export function RadarEmpresaView({
         </section>
       )}
 
+      {/* Planta 2D */}
+      <RadarSiteMap
+        companyId={companyId}
+        engagementId={engagementId}
+        locale={loc}
+        mode="empresa"
+        parcels={parcels}
+        sensors={mapSensors}
+        focusedId={focus?.id || null}
+        onFocus={setFocusedId}
+      />
+
       {/* Métricas + espaços */}
       <div className="grid gap-4 lg:grid-cols-12">
         <div className="grid gap-3 sm:grid-cols-3 lg:col-span-5 lg:grid-cols-1">
@@ -341,10 +369,22 @@ export function RadarEmpresaView({
             {parcels.map((p) => {
               const tone = actionTone(p.nextAction);
               const width = p.moisture == null ? 8 : Math.max(6, Math.min(100, p.moisture));
+              const isFocus = focus?.id === p.id;
               return (
                 <article
                   key={p.id}
-                  className={`rounded-2xl border px-4 py-4 ${
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setFocusedId(p.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setFocusedId(p.id);
+                    }
+                  }}
+                  className={`rounded-2xl border px-4 py-4 transition ${
+                    isFocus ? 'ring-2 ring-emerald-300/70' : ''
+                  } ${
                     tone === 'critical'
                       ? 'border-rose-400/30 bg-rose-500/10'
                       : tone === 'warn'
@@ -549,6 +589,13 @@ export function RadarTecnicoView({
   const { board, lots, loading, err, setErr, busy, load, post } = useRadarAgriculture(companyId, engagementId, loc);
   const [note, setNote] = useState('');
   const [mm, setMm] = useState(String(DEFAULT_IRRIGATION_MM));
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!board?.parcels?.length) return;
+    const preferred = board.decision?.parcelId || board.parcels[0]?.id || null;
+    setFocusedId((prev) => (prev && board.parcels.some((p) => p.id === prev) ? prev : preferred));
+  }, [board?.parcels, board?.decision?.parcelId]);
 
   if (loading && !board) {
     return (
@@ -560,12 +607,29 @@ export function RadarTecnicoView({
 
   const decision = board?.decision;
   const parcels = board?.parcels || [];
-  const focus = parcels.find((p) => p.id === decision?.parcelId) || parcels[0];
+  const focus = parcels.find((p) => p.id === focusedId) || parcels.find((p) => p.id === decision?.parcelId) || parcels[0];
   const openLot = lots.find((l) => l.status === 'open');
+  const mapSensors = (board?.sensors || []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    unitId: s.unitId ?? null,
+    lastValue: s.lastValue,
+  }));
 
   return (
     <div className="mx-auto max-w-lg space-y-5">
       {err && <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">{err}</p>}
+
+      <RadarSiteMap
+        companyId={companyId}
+        engagementId={engagementId}
+        locale={loc}
+        mode="tecnico"
+        parcels={parcels}
+        sensors={mapSensors}
+        focusedId={focus?.id || null}
+        onFocus={setFocusedId}
+      />
 
       <section className="rounded-[1.75rem] border border-white/10 bg-gradient-to-b from-emerald-500/15 to-white/[0.03] px-5 py-8 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200/70">{focus?.name || 'RADAR'}</p>

@@ -57,6 +57,7 @@ A ponte `GET /api/radar/bridge` lê o vínculo (módulo gravado, se existe retra
 | Regra | `NexusOpsRule` | `irrigation`, `whatsapp_alerts` (ventilação fica fora da agricultura) |
 | Lote (cadeia) | `RadarLot` | código humano + `publicToken`; estágio atual |
 | Evento de lote | `RadarLotEvent` | colheita / transformação / transporte / venda |
+| Planta 2D | `RadarSiteLayout` | posições dos espaços/sensores no mapa |
 
 Protocolos e limiares vivem em código (`lib/nexus-sector-modules/`, `lib/radar/`), não em score de diagnóstico.
 
@@ -100,6 +101,20 @@ O tipo (agricultura / agroindústria / pecuária / carbono) **não** é um inter
 Prioridade da decisão: não colher (PHI) → irrigar (humidade &lt; 25%) → percorrer (caderno parado) → em critério.
 
 O Hub é o monitor. O WhatsApp é o canal do campo.
+
+### Planta 2D (mapa operativo)
+
+Camada visual agregada às vistas Empresa / Técnico — não as substitui.
+
+| Peça | Onde |
+|------|------|
+| Layout | `RadarSiteLayout.layoutJson` — coords 0–100 por espaço (`x/y/w/h`) e pins de sensor |
+| API | `GET/PATCH /api/radar/layout` (auth `canAccessNexusOpsCompany`) |
+| UI | `RadarSiteMap` — tiles com estado (humidade / PHI / nextAction), sensores, foco no painel textual |
+| Empresa | mapa proeminente + arrastar para organizar + guardar |
+| Técnico | mapa compacto focado no espaço activo |
+
+Espaços vêm dos `NexusOpsUnit` já registados (fluxo RadarSpaceSetup). Sem layout guardado, a API devolve grelha automática.
 
 O vínculo do telefone continua em `/api/nexus/whatsapp/link`. O ingest HTTP continua em `/api/nexus/ingest/readings`. São canais partilhados; a fachada é que os mostra dentro do módulo.
 

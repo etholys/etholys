@@ -225,6 +225,7 @@ model Company {
   nexusWhatsappLinks          NexusWhatsappLink[]
   nexusOpsRules               NexusOpsRule[]
   radarLots                   RadarLot[]
+  radarSiteLayout             RadarSiteLayout?
   businessDossier             BusinessDossier?
   businessBets                BusinessBet[]
   businessRhythmNotes         BusinessRhythmNote[]
@@ -2152,6 +2153,17 @@ model RadarLotEvent {
   author       User?    @relation("RadarLotEventAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
 
   @@index([lotId, occurredAt])
+}
+
+/// Planta 2D da exploração — posições dos espaços (e sensores) no mapa RADAR.
+model RadarSiteLayout {
+  id         String   @id @default(cuid())
+  companyId  String   @unique
+  /// { version: 1, spaces: [{ id, x, y, w, h }], sensors?: [{ id, spaceId, x, y }] } — coords 0–100
+  layoutJson Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
 model MuseSuggestion {
