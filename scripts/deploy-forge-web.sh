@@ -14,12 +14,9 @@ elif [ -f /opt/etholys/infra/docker-compose.prod-nginx.yml ]; then
 fi
 echo "Compose: $COMPOSE_FILE"
 
-echo "=== Parar builds antigos ==="
-pkill -f "docker-buildx" 2>/dev/null || true
-pkill -f "buildkit" 2>/dev/null || true
-docker builder prune -f 2>/dev/null || true
-
 echo "=== Código ==="
+# Do not pkill buildx/buildkit or prune the builder here: concurrent
+# Contabo deploys share one BuildKit and that cancels everyone else's build.
 git fetch origin
 git reset --hard origin/main
 echo "HEAD $(git rev-parse --short HEAD)"
@@ -30,7 +27,7 @@ export DOCKER_BUILDKIT=1
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}"
 docker compose -f "$COMPOSE_FILE" build web
 
-echo "=== Subir web ==="
+echo "=== Subir web (só o serviço web — Postgres/Caddy/Jitsi não se recriam) ==="
 docker compose -f "$COMPOSE_FILE" up -d web
 
 echo "=== Health ==="
