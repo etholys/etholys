@@ -215,93 +215,133 @@ export type InviteMailInput = {
   locale?: EtholysMailLocale;
   inviterName: string;
   companyName: string;
-  inviteKindLabel: string;
-  systemsLabel: string;
+  inviteKind: 'employee' | 'temporary' | 'ally' | string;
   jobTitle?: string | null;
   projectName?: string | null;
   code: string;
   loginUrl: string;
   expiresDays?: number;
-  pilotNote?: string | null;
+  /** Se true, lista sistemas/tools do pacote Rikolto (sem FORGE/PRISM/Advisor). */
+  includeRikoltoCatalog?: boolean;
 };
 
 export function buildInvitationEmail(opts: InviteMailInput): { subject: string; html: string } {
   const locale: EtholysMailLocale =
     opts.locale === 'pt' || opts.locale === 'en' ? opts.locale : 'es';
   const days = opts.expiresDays ?? 7;
+  const kind = opts.inviteKind || 'employee';
 
   const subject =
     locale === 'pt'
-      ? `Convite Etholys — ${opts.companyName}`
+      ? `Convite para Etholys — ${opts.companyName}`
       : locale === 'en'
-        ? `Etholys invitation — ${opts.companyName}`
-        : `Invitación Etholys — ${opts.companyName}`;
+        ? `You're invited to Etholys — ${opts.companyName}`
+        : `Te invitaron a Etholys — ${opts.companyName}`;
 
   const headline =
     locale === 'pt'
-      ? 'O seu acesso Etholys está pronto'
+      ? 'Bem-vindo(a) ao Etholys'
       : locale === 'en'
-        ? 'Your Etholys access is ready'
-        : 'Su acceso a Etholys está listo';
+        ? 'Welcome to Etholys'
+        : 'Bienvenido/a a Etholys';
 
-  const p1 =
-    locale === 'pt'
-      ? `${opts.inviterName} convidou-o(a) como ${opts.inviteKindLabel} a usar ${opts.systemsLabel} em ${opts.companyName}.`
-      : locale === 'en'
-        ? `${opts.inviterName} invited you as ${opts.inviteKindLabel} to use ${opts.systemsLabel} at ${opts.companyName}.`
-        : `${opts.inviterName} te invitó como ${opts.inviteKindLabel} a usar ${opts.systemsLabel} en ${opts.companyName}.`;
+  const who = opts.inviterName?.trim() || (locale === 'en' ? 'Your team' : 'Tu equipo');
 
-  const paragraphs = [p1];
-  if (opts.jobTitle) {
-    paragraphs.push(
-      locale === 'en' ? `Role: ${opts.jobTitle}` : `Cargo: ${opts.jobTitle}`,
-    );
+  let lead: string;
+  if (locale === 'pt') {
+    if (kind === 'ally') {
+      lead = `${who} convidou-o(a) a colaborar em ${opts.companyName}${opts.projectName ? ` (projecto ${opts.projectName})` : ''}.`;
+    } else if (kind === 'temporary') {
+      lead = `${who} concedeu-lhe acesso temporário a Etholys na organização ${opts.companyName}.`;
+    } else {
+      lead = `${who} convidou-o(a) a entrar em Etholys com a organização ${opts.companyName}.`;
+    }
+  } else if (locale === 'en') {
+    if (kind === 'ally') {
+      lead = `${who} invited you to collaborate with ${opts.companyName}${opts.projectName ? ` on ${opts.projectName}` : ''}.`;
+    } else if (kind === 'temporary') {
+      lead = `${who} granted you temporary access to Etholys for ${opts.companyName}.`;
+    } else {
+      lead = `${who} invited you to join Etholys with ${opts.companyName}.`;
+    }
+  } else {
+    if (kind === 'ally') {
+      lead = `${who} te invitó a colaborar con ${opts.companyName}${opts.projectName ? ` en el proyecto ${opts.projectName}` : ''}.`;
+    } else if (kind === 'temporary') {
+      lead = `${who} te dio acceso temporal a Etholys en ${opts.companyName}.`;
+    } else {
+      lead = `${who} te invitó a unirte a Etholys con ${opts.companyName}.`;
+    }
   }
-  if (opts.projectName) {
+
+  const paragraphs = [lead];
+  if (opts.jobTitle?.trim()) {
     paragraphs.push(
       locale === 'pt'
-        ? `Projecto: ${opts.projectName}`
+        ? `O teu cargo: ${opts.jobTitle.trim()}.`
         : locale === 'en'
-          ? `Project: ${opts.projectName}`
-          : `Proyecto: ${opts.projectName}`,
+          ? `Your role: ${opts.jobTitle.trim()}.`
+          : `Tu cargo: ${opts.jobTitle.trim()}.`,
     );
   }
-  if (opts.pilotNote) paragraphs.push(opts.pilotNote);
 
   paragraphs.push(
     locale === 'pt'
-      ? 'Use o botão abaixo ou introduza o código no login.'
+      ? 'Activa a conta com o código abaixo. Se já tens conta Etholys, entra e usa o mesmo código.'
       : locale === 'en'
-        ? 'Use the button below or enter the code at login.'
-        : 'Usa el botón o introduce el código en el inicio de sesión.',
+        ? 'Activate with the code below. If you already have an Etholys account, sign in and use the same code.'
+        : 'Activa tu cuenta con el código de abajo. Si ya tienes cuenta Etholys, inicia sesión y usa el mismo código.',
   );
+
+  const sections =
+    opts.includeRikoltoCatalog || opts.companyName.toLowerCase().includes('rikolto')
+      ? [
+          {
+            title: locale === 'pt' ? 'Sistemas' : locale === 'en' ? 'Systems' : 'Sistemas',
+            items: RIKOLTO_ACCESS_COPY.systems.map((s) =>
+              locale === 'en'
+                ? `${s.label}`
+                : locale === 'pt'
+                  ? `${s.label}`
+                  : `${s.label} — ${s.blurbEs}`,
+            ),
+          },
+          {
+            title: locale === 'pt' ? 'Ferramentas' : locale === 'en' ? 'Tools' : 'Herramientas',
+            items: RIKOLTO_ACCESS_COPY.tools.map((t) =>
+              locale === 'en' ? t.label : locale === 'pt' ? t.label : `${t.label} — ${t.blurbEs}`,
+            ),
+          },
+        ]
+      : undefined;
 
   const html = renderEtholysMailLayout({
     locale,
     preheader:
       locale === 'pt'
-        ? `Convite para ${opts.companyName} no Etholys`
+        ? `${who} convidou-te para ${opts.companyName} no Etholys`
         : locale === 'en'
-          ? `Invitation to ${opts.companyName} on Etholys`
-          : `Invitación a ${opts.companyName} en Etholys`,
+          ? `${who} invited you to ${opts.companyName} on Etholys`
+          : `${who} te invitó a ${opts.companyName} en Etholys`,
     eyebrow: opts.companyName,
     headline,
     paragraphs,
+    sections,
     codeBlock: {
-      label: locale === 'pt' ? 'Código de acesso' : locale === 'en' ? 'Access code' : 'Código de acceso',
+      label: locale === 'pt' ? 'O teu código' : locale === 'en' ? 'Your code' : 'Tu código',
       value: opts.code,
     },
     cta: {
-      label: locale === 'pt' ? 'Entrar no Etholys' : locale === 'en' ? 'Open Etholys' : 'Entrar a Etholys',
+      label: locale === 'pt' ? 'Activar acesso' : locale === 'en' ? 'Activate access' : 'Activar acceso',
       href: opts.loginUrl,
     },
     note:
       locale === 'pt'
-        ? `Este convite expira em ${days} dias.`
+        ? `Este convite é válido por ${days} dias.`
         : locale === 'en'
-          ? `This invitation expires in ${days} days.`
-          : `Esta invitación expira en ${days} días.`,
-    productLine: 'Etholys · Ecosistema digital',
+          ? `This invitation is valid for ${days} days.`
+          : `Esta invitación es válida durante ${days} días.`,
+    productLine: 'Etholys · Fábrica de Soluciones',
   });
 
   return { subject, html };
@@ -341,17 +381,17 @@ export function buildPilotWelcomeEmail(opts: {
 
   const p1 =
     locale === 'pt'
-      ? `A ${org} já pode usar o Etholys — o ecossistema digital para gerir a organização, projectos, captação de fundos e acompanhamento no terreno.`
+      ? `A ${org} já pode usar o Etholys: gestão da organização, projectos, captação de fundos e acompanhamento no terreno — num único login.`
       : locale === 'en'
-        ? `${org} can now use Etholys — the digital ecosystem to manage the organization, projects, fundraising, and field accompaniment.`
-        : `${org} ya puede usar Etholys — el ecosistema digital para gestionar la organización, proyectos, captación de fondos y acompañamiento en el terreno.`;
+        ? `${org} can now use Etholys: organization management, projects, fundraising, and field accompaniment — in one login.`
+        : `${org} ya puede usar Etholys: gestión de la organización, proyectos, captación de fondos y acompañamiento en el terreno — en un solo inicio de sesión.`;
 
   const p2 =
     locale === 'pt'
-      ? 'Tudo num único login. A equipa Etholys acompanha-vos na entrada.'
+      ? 'A equipa Etholys acompanha-vos na entrada. Cada pessoa activa a conta com o seu código individual.'
       : locale === 'en'
-        ? 'Everything in one login. The Etholys team will support your onboarding.'
-        : 'Todo en un solo inicio de sesión. El equipo Etholys les acompaña en la puesta en marcha.';
+        ? 'The Etholys team will support onboarding. Each person activates with their own access code.'
+        : 'El equipo Etholys les acompaña en la entrada. Cada persona activa su cuenta con su propio código.';
 
   const systemItems = RIKOLTO_ACCESS_COPY.systems.map((s) => `${s.label} — ${s.blurbEs}`);
   const toolItems = RIKOLTO_ACCESS_COPY.tools.map((t) => `${t.label} — ${t.blurbEs}`);

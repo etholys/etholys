@@ -164,29 +164,17 @@ export async function POST(req: Request) {
       const inviterName = invitation.inviter?.name || 'Un administrador';
       const companyName = invitation.company?.name || 'una empresa';
       const loginUrl = `${appUrl}/login?invite=${encodeURIComponent(invitation.code)}`;
-      const systemsLabel =
-        systems.length > 0 ? systems.join(', ') : data.role === 'ADMIN' ? 'Hub completo' : 'acceso limitado';
-      const kindLabel =
-        data.inviteKind === 'ally'
-          ? 'aliado de proyecto'
-          : data.inviteKind === 'temporary'
-            ? 'acceso temporal'
-            : 'miembro';
       const { subject, html: htmlBody } = buildInvitationEmail({
         locale: 'es',
         inviterName,
         companyName,
-        inviteKindLabel: kindLabel,
-        systemsLabel,
+        inviteKind: data.inviteKind,
         jobTitle: data.jobTitle,
         projectName: invitation.project?.name,
         code: invitation.code,
         loginUrl,
         expiresDays: 7,
-        pilotNote:
-          companyName.toLowerCase().includes('rikolto')
-            ? 'Forman parte del acceso institucional Rikolto × Etholys. El equipo Etholys acompaña la puesta en marcha.'
-            : null,
+        includeRikoltoCatalog: companyName.toLowerCase().includes('rikolto'),
       });
       if (process.env.ABACUSAI_API_KEY) {
         await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {

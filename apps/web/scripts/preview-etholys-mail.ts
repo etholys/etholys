@@ -16,14 +16,12 @@ const invite = buildInvitationEmail({
   locale: 'es',
   inviterName: 'Equipo Etholys',
   companyName: 'Rikolto',
-  inviteKindLabel: 'miembro',
-  systemsLabel: 'ATLAS, SIEP, FundHub, AURORA, POLARIS, RADAR',
+  inviteKind: 'employee',
   jobTitle: 'Coordinación de proyectos',
   code: 'RIK7A2C9',
   loginUrl: 'https://app.etholys.com/login?invite=RIK7A2C9',
   expiresDays: 14,
-  pilotNote:
-    'Forman parte del acceso institucional Rikolto × Etholys. El equipo Etholys acompaña la puesta en marcha.',
+  includeRikoltoCatalog: true,
 });
 
 const welcome = buildPilotWelcomeEmail({

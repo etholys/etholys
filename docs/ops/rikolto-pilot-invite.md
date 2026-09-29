@@ -14,9 +14,15 @@ URL: https://app.etholys.com
 
 ## A) Email individual
 
-**Asunto:** `Invitación Etholys — Rikolto`  
-**Título:** Su acceso a Etholys está listo  
-**CTA:** Entrar a Etholys
+**Asunto:** `Te invitaron a Etholys — Rikolto`  
+**Título:** Bienvenido/a a Etholys  
+
+**Cuerpo (ES):**
+> Equipo Etholys te invitó a unirte a Etholys con Rikolto.  
+> Tu cargo: Coordinación de proyectos.  
+> Activa tu cuenta con el código de abajo…
+
+Luego secciones Sistemas / Herramientas, código y botón **Activar acceso**.
 
 ## B) Email al grupo
 
