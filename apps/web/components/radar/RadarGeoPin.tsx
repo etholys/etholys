@@ -146,11 +146,19 @@ export function RadarGeoPin({
           </a>
         )}
       </div>
-      <div className="overflow-hidden rounded-[1.35rem] border border-white/10 bg-black/40">
+      {/* OSM export/embed always paints a noisy attribution+donation bar inside the
+          cross-origin iframe — clip it; we cannot set attributionControl on this embed. */}
+      <div className="radar-geo-map relative h-64 overflow-hidden rounded-[1.35rem] border border-white/10 bg-black/40 sm:h-80">
         {iframeSrc ? (
-          <iframe title="map" src={iframeSrc} className="h-64 w-full border-0 sm:h-80" loading="lazy" />
+          <iframe
+            title="map"
+            src={iframeSrc}
+            className="absolute inset-x-0 top-0 h-[calc(100%+3.25rem)] w-full border-0"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
         ) : (
-          <div className="flex h-64 items-center justify-center text-sm text-white/40 sm:h-80">
+          <div className="flex h-full items-center justify-center text-sm text-white/40">
             <MapPin className="mr-2 h-4 w-4" />
             {loc === 'en' ? 'Enter coordinates to preview' : 'Introduz coordenadas para pré-visualizar'}
           </div>
