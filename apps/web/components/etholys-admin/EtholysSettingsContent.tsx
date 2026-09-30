@@ -102,7 +102,7 @@ export function EtholysSettingsContent({
 
   const fetchData = () => {
     if (show('companies') || show('invitations') || show('departments')) {
-      fetch('/api/companies')
+      fetch('/api/companies?detail=1')
         .then((r) => r.json())
         .then((d) => setCompanies(d?.companies ?? []))
         .catch(() => {});

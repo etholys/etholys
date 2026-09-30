@@ -134,7 +134,7 @@ export const authOptions: NextAuthOptions = {
 
       const userId = (token.id as string) || (token.sub as string);
       const checkedAt = typeof token.forgeScopeCheckedAt === 'number' ? token.forgeScopeCheckedAt : 0;
-      const stale = Date.now() - checkedAt > 5 * 60 * 1000;
+      const stale = Date.now() - checkedAt > 15 * 60 * 1000;
       if (userId && (user || stale || !token.forgeAccessMode)) {
         try {
           const { resolveForgeJwtScope } = await import('@/lib/forge/access-context');
@@ -149,7 +149,7 @@ export const authOptions: NextAuthOptions = {
       }
 
       const wsCheckedAt = typeof token.workspaceScopeCheckedAt === 'number' ? token.workspaceScopeCheckedAt : 0;
-      const wsStale = Date.now() - wsCheckedAt > 5 * 60 * 1000;
+      const wsStale = Date.now() - wsCheckedAt > 15 * 60 * 1000;
       if (userId && (user || wsStale || !token.workspaceAccessMode)) {
         try {
           const { resolveWorkspaceJwtScope } = await import('@/lib/workspace-access-scope');
@@ -166,7 +166,7 @@ export const authOptions: NextAuthOptions = {
       }
 
       const stCheckedAt = typeof token.studioScopeCheckedAt === 'number' ? token.studioScopeCheckedAt : 0;
-      const stStale = Date.now() - stCheckedAt > 5 * 60 * 1000;
+      const stStale = Date.now() - stCheckedAt > 15 * 60 * 1000;
       if (userId && (user || stStale || !token.studioAccessMode)) {
         try {
           const { resolveStudioJwtScope } = await import('@/lib/studio/share');
@@ -181,7 +181,7 @@ export const authOptions: NextAuthOptions = {
       }
 
       const siepCheckedAt = typeof token.siepScopeCheckedAt === 'number' ? token.siepScopeCheckedAt : 0;
-      const siepStale = Date.now() - siepCheckedAt > 5 * 60 * 1000;
+      const siepStale = Date.now() - siepCheckedAt > 15 * 60 * 1000;
       if (userId && (user || siepStale || !token.siepAccessMode)) {
         try {
           const { resolveSiepJwtScope } = await import('@/lib/siep/permissions');

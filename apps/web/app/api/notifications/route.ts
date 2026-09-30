@@ -20,12 +20,23 @@ export async function GET(req: Request) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const where: any = { userId: user.id };
     if (unreadOnly) where.read = false;
-    const notifications = await prisma.notification.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    });
-    const unreadCount = await prisma.notification.count({ where: { userId: user.id, read: false } });
+    const [notifications, unreadCount] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          message: true,
+          link: true,
+          read: true,
+          createdAt: true,
+          type: true,
+        },
+      }),
+      prisma.notification.count({ where: { userId: user.id, read: false } }),
+    ]);
     return NextResponse.json({ notifications, unreadCount });
   } catch (error: any) {
     console.error('Notifications GET error:', error);

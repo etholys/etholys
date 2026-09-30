@@ -6,13 +6,33 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 
-export async function GET() {
+/** Lista leve para o seletor do Hub. `?detail=1` inclui departamentos e contagens. */
+export async function GET(req: Request) {
   try {
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    const detail = new URL(req.url).searchParams.get('detail') === '1';
+
+    if (detail) {
+      const companies = await prisma.company.findMany({
+        where: { id: { in: tenant.companyIds }, isActive: true },
+        include: { departments: true, _count: { select: { companyUsers: true, projects: true } } },
+        orderBy: { name: 'asc' },
+      });
+      return NextResponse.json({ companies });
+    }
+
     const companies = await prisma.company.findMany({
       where: { id: { in: tenant.companyIds }, isActive: true },
-      include: { departments: true, _count: { select: { companyUsers: true, projects: true } } },
+      select: {
+        id: true,
+        name: true,
+        shortName: true,
+        color: true,
+        currency: true,
+        description: true,
+        radarOrgRole: true,
+      },
       orderBy: { name: 'asc' },
     });
     return NextResponse.json({ companies });

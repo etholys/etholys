@@ -7,17 +7,54 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import bcrypt from 'bcryptjs';
 
-export async function GET() {
+/** Lista leve por defeito. `?detail=1` inclui empresas e departamentos (página Equipa). */
+export async function GET(req: Request) {
   try {
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    // Only show users who share at least one company with the current user
+    const detail = new URL(req.url).searchParams.get('detail') === '1';
+
     const users = await prisma.user.findMany({
       where: {
         isActive: true,
         companyUsers: { some: { companyId: { in: tenant.companyIds } } },
       },
-      select: { id: true, name: true, email: true, role: true, phone: true, avatar: true, locale: true, createdAt: true, companyUsers: { include: { company: true } }, departmentUsers: { include: { department: { include: { company: true } } } } },
+      select: detail
+        ? {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            phone: true,
+            avatar: true,
+            locale: true,
+            createdAt: true,
+            companyUsers: {
+              select: {
+                role: true,
+                company: { select: { id: true, name: true, shortName: true, color: true } },
+              },
+            },
+            departmentUsers: {
+              select: {
+                department: {
+                  select: {
+                    id: true,
+                    name: true,
+                    companyId: true,
+                    company: { select: { id: true, name: true, shortName: true } },
+                  },
+                },
+              },
+            },
+          }
+        : {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            avatar: true,
+          },
       orderBy: { name: 'asc' },
     });
     return NextResponse.json({ users });

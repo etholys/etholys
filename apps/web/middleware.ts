@@ -160,14 +160,12 @@ function courseOnlyRedirect(req: NextRequest, scope: ForgeScope) {
   return NextResponse.redirect(new URL(home, req.url));
 }
 
-async function enforceStudioShareOnlyScope(req: NextRequest): Promise<NextResponse | null> {
+async function enforceStudioShareOnlyScope(
+  req: NextRequest,
+  token: AccessToken | null,
+): Promise<NextResponse | null> {
   const pathname = req.nextUrl.pathname;
   if (pathname === '/api/internal/studio-scope') return null;
-
-  const token = (await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-  })) as AccessToken | null;
 
   if (!token?.sub && !token?.id) return null;
 
@@ -260,14 +258,12 @@ async function resolveSiepGuestScope(
 }
 
 /** Convidado só de projeto: nada do Hub / outros sistemas Etholys. */
-async function enforceProjectGuestScope(req: NextRequest): Promise<NextResponse | null> {
+async function enforceProjectGuestScope(
+  req: NextRequest,
+  token: AccessToken | null,
+): Promise<NextResponse | null> {
   const pathname = req.nextUrl.pathname;
   if (pathname === '/api/internal/siep-scope') return null;
-
-  const token = (await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-  })) as AccessToken | null;
 
   if (!token?.sub && !token?.id) return null;
   // Outros modos restritos têm prioridade própria
@@ -298,14 +294,12 @@ async function enforceProjectGuestScope(req: NextRequest): Promise<NextResponse 
   return null;
 }
 
-async function enforceCourseOnlyScope(req: NextRequest): Promise<NextResponse | null> {
+async function enforceCourseOnlyScope(
+  req: NextRequest,
+  token: AccessToken | null,
+): Promise<NextResponse | null> {
   const pathname = req.nextUrl.pathname;
   if (pathname === '/api/internal/forge-scope') return null;
-
-  const token = (await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-  })) as AccessToken | null;
 
   if (!token?.sub && !token?.id) return null;
   if (token.forgeAccessMode === 'organization') return null;
@@ -338,7 +332,10 @@ async function enforceCourseOnlyScope(req: NextRequest): Promise<NextResponse | 
   return null;
 }
 
-async function enforceFunctionOnlyScope(req: NextRequest): Promise<NextResponse | null> {
+async function enforceFunctionOnlyScope(
+  req: NextRequest,
+  token: AccessToken | null,
+): Promise<NextResponse | null> {
   if (!isPrecommercialMode()) return null;
 
   const pathname = req.nextUrl.pathname;
@@ -351,11 +348,6 @@ async function enforceFunctionOnlyScope(req: NextRequest): Promise<NextResponse 
   ) {
     return null;
   }
-
-  const token = (await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-  })) as AccessToken | null;
 
   if (!token?.sub && !token?.id) return null;
   if (token.forgeAccessMode === 'course_only') return null;
@@ -412,17 +404,16 @@ async function enforceFunctionOnlyScope(req: NextRequest): Promise<NextResponse 
   return null;
 }
 
-async function enforceApiLicense(req: NextRequest): Promise<NextResponse | null> {
+async function enforceApiLicense(
+  req: NextRequest,
+  token: AccessToken | null,
+): Promise<NextResponse | null> {
   const pathname = req.nextUrl.pathname;
   if (!pathname.startsWith('/api/') || isApiLicenseExempt(pathname)) return null;
 
   const system = apiPathToLicensedSystem(pathname);
   if (!system) return null;
 
-  const token = (await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-  })) as AccessToken | null;
   if (!token?.sub) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
@@ -470,36 +461,35 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const courseOnlyBlock = await enforceCourseOnlyScope(req);
+  // Um único decode JWT por pedido (antes: até 5× getToken nas enforcement chains).
+  const token = (await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+  })) as AccessToken | null;
+
+  if (!token && isProtectedPage(pathname) && !pathname.startsWith('/api/')) {
+    if (isPrecommercialMode()) {
+      return NextResponse.redirect(new URL('/', req.url));
+    }
+    const loginUrl = new URL('/login', req.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const courseOnlyBlock = await enforceCourseOnlyScope(req, token);
   if (courseOnlyBlock) return courseOnlyBlock;
 
-  const studioShareBlock = await enforceStudioShareOnlyScope(req);
+  const studioShareBlock = await enforceStudioShareOnlyScope(req, token);
   if (studioShareBlock) return studioShareBlock;
 
-  const projectGuestBlock = await enforceProjectGuestScope(req);
+  const projectGuestBlock = await enforceProjectGuestScope(req, token);
   if (projectGuestBlock) return projectGuestBlock;
 
-  const functionOnlyBlock = await enforceFunctionOnlyScope(req);
+  const functionOnlyBlock = await enforceFunctionOnlyScope(req, token);
   if (functionOnlyBlock) return functionOnlyBlock;
 
-  const apiBlock = await enforceApiLicense(req);
+  const apiBlock = await enforceApiLicense(req, token);
   if (apiBlock) return apiBlock;
-
-  if (pathname.startsWith('/api/')) {
-    return NextResponse.next();
-  }
-
-  if (isProtectedPage(pathname)) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    if (!token) {
-      if (isPrecommercialMode()) {
-        return NextResponse.redirect(new URL('/', req.url));
-      }
-      const loginUrl = new URL('/login', req.url);
-      loginUrl.searchParams.set('callbackUrl', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-  }
 
   return NextResponse.next();
 }

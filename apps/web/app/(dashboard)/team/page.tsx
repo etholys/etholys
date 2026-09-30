@@ -25,7 +25,7 @@ export default function TeamPage() {
   const [search, setSearch] = useState('');
 
   const fetchUsers = () => {
-    fetch('/api/users').then(r => r.json()).then(d => { setUsers(d?.users ?? []); setLoading(false); }).catch(() => setLoading(false));
+    fetch('/api/users?detail=1').then(r => r.json()).then(d => { setUsers(d?.users ?? []); setLoading(false); }).catch(() => setLoading(false));
   };
 
   useEffect(() => {

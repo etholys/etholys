@@ -65,23 +65,29 @@ export default function WorkspaceTeamPage() {
   const [inviteMsg, setInviteMsg] = useState<string | null>(null);
   const [showInviteWizard, setShowInviteWizard] = useState(true);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!companyId) {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    const a = await fetch(`/api/workspace/access?companyId=${encodeURIComponent(companyId)}`).then((r) => r.json());
-    if (!a.canManage) {
-      setCanManage(false);
+    if (!opts?.silent) setLoading(true);
+    try {
+      const [a, m] = await Promise.all([
+        fetch(`/api/workspace/access?companyId=${encodeURIComponent(companyId)}`).then((r) => r.json()),
+        fetch(`/api/workspace/members?companyId=${encodeURIComponent(companyId)}`).then((r) => r.json()),
+      ]);
+      if (!a.canManage) {
+        setCanManage(false);
+        setGrants([]);
+        setMembers([]);
+        return;
+      }
+      setCanManage(true);
+      setGrants(a.grants || []);
+      if (m.members) setMembers(m.members);
+    } finally {
       setLoading(false);
-      return;
     }
-    setCanManage(true);
-    setGrants(a.grants || []);
-    const m = await fetch(`/api/workspace/members?companyId=${encodeURIComponent(companyId)}`).then((r) => r.json());
-    if (m.members) setMembers(m.members);
-    setLoading(false);
   }, [companyId]);
 
   useEffect(() => {
@@ -154,9 +160,24 @@ export default function WorkspaceTeamPage() {
       setMsg(d.error || 'Erro');
       return;
     }
+    const member = members.find((m) => m.userId === targetUser);
+    const nextSystems = Array.isArray(d.grant?.systems) ? d.grant.systems : systems;
+    setGrants((prev) => {
+      const rest = prev.filter((g) => g.userId !== targetUser);
+      return [
+        {
+          userId: targetUser,
+          email: member?.email || '',
+          name: member?.name || '',
+          systems: nextSystems,
+          enabled: true,
+        },
+        ...rest,
+      ];
+    });
     setMsg(t('Guardado.', 'Guardado.', 'Saved.'));
     setTargetUser('');
-    await load();
+    void load({ silent: true });
   };
 
   const remove = async (userId: string) => {
@@ -172,7 +193,8 @@ export default function WorkspaceTeamPage() {
       setMsg(d.error || 'Erro');
       return;
     }
-    await load();
+    setGrants((prev) => prev.filter((g) => g.userId !== userId));
+    void load({ silent: true });
   };
 
   const pickMyself = () => {
@@ -324,7 +346,7 @@ export default function WorkspaceTeamPage() {
                       ),
                 );
                 setShowInviteWizard(false);
-                void load();
+                void load({ silent: true });
               }}
             />
           )}

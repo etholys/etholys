@@ -189,7 +189,7 @@ function MeetHubContent() {
     setError(null);
     try {
       const r = await fetch(
-        `/api/meet/sessions?companyId=${encodeURIComponent(companyId)}&limit=400`,
+        `/api/meet/sessions?companyId=${encodeURIComponent(companyId)}&limit=120`,
       );
       const d = (await r.json()) as { sessions?: MeetSessionRow[]; error?: string };
       if (!r.ok) throw new Error(d.error || 'Error');

@@ -12,23 +12,18 @@ export async function getUserCompanyIds(): Promise<{ userId: string; companyIds:
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return null;
 
-  let userId = session.user.id;
+  const userId = session.user.id;
 
-  // Check if JWT userId still exists in DB (may be stale after DB reset)
-  const userExists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-  if (!userExists && session.user.email) {
-    // Fallback: find user by email
-    const userByEmail = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
-    if (!userByEmail) return null;
-    userId = userByEmail.id;
-  }
-
-  const companyUsers = await prisma.companyUser.findMany({
-    where: { userId },
-    select: { companyId: true },
-  });
+  // Confiar no JWT em uso normal — a verificação extra de existência na BD
+  // (pós-reset) acrescentava latência a cada pedido autenticado.
+  const [companyUsers, guestIds] = await Promise.all([
+    prisma.companyUser.findMany({
+      where: { userId },
+      select: { companyId: true },
+    }),
+    getGuestCompanyIds(userId),
+  ]);
   const memberIds = companyUsers.map((cu) => cu.companyId);
-  const guestIds = await getGuestCompanyIds(userId);
   return {
     userId,
     companyIds: [...new Set([...memberIds, ...guestIds])],

@@ -25,13 +25,14 @@ export async function GET(req: Request) {
     if (status) where.status = status;
     if (assigneeId) where.assigneeId = assigneeId;
 
-    const companyMemberIds = (
-      await prisma.companyUser.findMany({
+    const [companyMemberRows, guestProjectIds] = await Promise.all([
+      prisma.companyUser.findMany({
         where: { userId: tenant.userId },
         select: { companyId: true },
-      })
-    ).map((r) => r.companyId);
-    const guestProjectIds = await getGuestProjectIds(tenant.userId);
+      }),
+      getGuestProjectIds(tenant.userId),
+    ]);
+    const companyMemberIds = companyMemberRows.map((r) => r.companyId);
 
     if (projectId) {
       const gate = await requireProjectPermission(tenant.userId, projectId, [
@@ -77,14 +78,43 @@ export async function GET(req: Request) {
 
     const tasks = await prisma.task.findMany({
       where,
-      include: {
-        assignee: true,
-        creator: true,
-        project: { include: { company: true } },
-        department: true,
-        group: true,
-        folder: true,
-        checklist: { orderBy: { order: 'asc' } },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        priority: true,
+        dueDate: true,
+        startDate: true,
+        order: true,
+        projectId: true,
+        companyId: true,
+        departmentId: true,
+        groupId: true,
+        folderId: true,
+        assigneeId: true,
+        creatorId: true,
+        parentId: true,
+        isActive: true,
+        updatedAt: true,
+        createdAt: true,
+        assignee: { select: { id: true, name: true, email: true, avatar: true } },
+        creator: { select: { id: true, name: true } },
+        project: {
+          select: {
+            id: true,
+            name: true,
+            companyId: true,
+            company: { select: { id: true, shortName: true, color: true } },
+          },
+        },
+        department: { select: { id: true, name: true } },
+        group: { select: { id: true, name: true, color: true } },
+        folder: { select: { id: true, name: true } },
+        checklist: {
+          select: { id: true, text: true, completed: true, order: true },
+          orderBy: { order: 'asc' },
+        },
         _count: { select: { comments: true, subtasks: true, attachments: true } },
       },
       orderBy: [{ order: 'asc' }, { updatedAt: 'desc' }],
