@@ -47,9 +47,6 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
   const [chatUnread, setChatUnread] = useState(0);
   const [whitelabelActive, setWhitelabelActive] = useState(false);
-  const [redOpen, setRedOpen] = useState(
-    () => Boolean(pathname?.startsWith('/hub/fundhub/crm')),
-  );
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/login');
@@ -85,10 +82,6 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
       return () => clearInterval(interval);
     }
   }, [status]);
-
-  useEffect(() => {
-    if (pathname?.startsWith('/hub/fundhub/crm')) setRedOpen(true);
-  }, [pathname]);
 
   useEffect(() => {
     const cid = String(activeCompanyId ?? '').trim();
@@ -142,29 +135,10 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
       icon: Lightbulb,
       label: locale === 'es' ? 'Propuestas' : locale === 'pt' ? 'Propostas' : 'Proposals',
     },
-  ];
-
-  const redChildren = [
     {
       href: '/hub/fundhub/crm',
-      label: locale === 'es' ? 'Panel' : locale === 'pt' ? 'Painel' : 'Dashboard',
-    },
-    {
-      href: '/hub/fundhub/crm/perfil',
-      label: locale === 'es' ? 'Perfil institucional' : locale === 'pt' ? 'Perfil institucional' : 'Institutional profile',
-    },
-    {
-      href: '/hub/fundhub/crm/aliados',
-      label: locale === 'es' ? 'Aliados' : locale === 'pt' ? 'Aliados' : 'Allies',
-    },
-    {
-      href: '/hub/fundhub/crm/donantes',
-      label:
-        locale === 'es'
-          ? 'Donantes / financiadores'
-          : locale === 'pt'
-            ? 'Doadores / financiadores'
-            : 'Donors / funders',
+      icon: Network,
+      label: locale === 'es' ? 'Red' : locale === 'pt' ? 'Rede' : 'Network',
     },
   ];
 
@@ -332,7 +306,10 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
           </div>
 
           {workItems.map((item) => {
-            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+            const isActive =
+              item.href === '/hub/fundhub/crm'
+                ? Boolean(pathname?.startsWith('/hub/fundhub/crm'))
+                : pathname === item.href || Boolean(pathname?.startsWith(item.href + '/'));
             return (
               <Link
                 key={item.href}
@@ -346,58 +323,6 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
               </Link>
             );
           })}
-
-          {collapsed ? (
-            <Link
-              href="/hub/fundhub/crm"
-              onClick={() => setSidebarOpen(false)}
-              title={locale === 'es' ? 'Red' : locale === 'pt' ? 'Rede' : 'Network'}
-              className={navClass(Boolean(pathname?.startsWith('/hub/fundhub/crm')), true)}
-            >
-              <Network className="h-5 w-5 flex-shrink-0" />
-            </Link>
-          ) : (
-            <div className="space-y-0.5">
-              <button
-                type="button"
-                onClick={() => setRedOpen((v) => !v)}
-                className={cn(
-                  navClass(Boolean(pathname?.startsWith('/hub/fundhub/crm')), false),
-                  'w-full',
-                )}
-              >
-                <Network className="h-5 w-5 flex-shrink-0" />
-                <span className="flex-1 text-left">
-                  {locale === 'es' ? 'Red' : locale === 'pt' ? 'Rede' : 'Network'}
-                </span>
-                <ChevronDown
-                  className={cn('h-4 w-4 text-white/50 transition', redOpen && 'rotate-180')}
-                />
-              </button>
-              {redOpen &&
-                redChildren.map((child) => {
-                  const isActive =
-                    child.href === '/hub/fundhub/crm'
-                      ? pathname === child.href
-                      : Boolean(pathname?.startsWith(child.href));
-                  return (
-                    <Link
-                      key={child.href}
-                      href={child.href}
-                      onClick={() => setSidebarOpen(false)}
-                      className={cn(
-                        'ml-4 flex items-center rounded-lg px-3 py-2 text-xs font-medium transition',
-                        isActive
-                          ? 'bg-amber-500/15 text-amber-100'
-                          : 'text-white/65 hover:bg-white/[0.05] hover:text-white',
-                      )}
-                    >
-                      {child.label}
-                    </Link>
-                  );
-                })}
-            </div>
-          )}
 
           {whitelabelActive && (
             <Link
