@@ -12,7 +12,16 @@ import {
   type DiscoveryQueryPack,
 } from '@/lib/opportunity/discovery-queries';
 import { FUNDHUB_DISCOVERY_MODEL, fundhubScoutModel, fundhubStructureJsonText } from '@/lib/opportunity/fundhub-llm';
+import {
+  discoveryYieldPromptHint,
+  maxDiscoveryPacks,
+} from '@/lib/opportunity/discovery-caps';
 import { salvageJsonText, truncateForStructure } from '@/lib/opportunity/json-salvage';
+import {
+  fundhubLanguageName,
+  normalizeFundhubLocale,
+  type FundhubLocale,
+} from '@/lib/agents/fundhub-proposal-prompt';
 import { formatOpportunityScoutBrief } from '@/lib/opportunity/scout-brief';
 import { enrichAndFilterCandidates } from '@/lib/opportunity/enrich-call';
 import { OFFICIAL_LINK_PROMPT_RULES } from '@/lib/opportunity/official-url';
@@ -38,10 +47,12 @@ function isWebSearchEnabled(): boolean {
 }
 
 /** Regras partilhadas: descrições úteis para decisão, não marketing. */
-const CANDIDATE_CONTENT_RULES = `CANDIDATE CONTENT (critical — decision support, not marketing):
-Extract from OFFICIAL funder pages when possible. If uncertain, write clearly e.g. "No confirmado en la fuente oficial — verificar en el enlace" — NEVER invent eligibility, amounts, or deadlines.
+function candidateContentRules(locale: FundhubLocale): string {
+  const lang = fundhubLanguageName(locale);
+  return `CANDIDATE CONTENT (critical — decision support, not marketing):
+Extract from OFFICIAL funder pages when possible. If uncertain, write clearly that it is unconfirmed on the official source — NEVER invent eligibility, amounts, or deadlines.
 
-Write all candidate narrative fields in the SAME LANGUAGE as the opportunity briefing (Spanish if the briefing is Spanish, Portuguese if Portuguese, English if English). Default to Spanish when unclear — never default to Portuguese for a Spanish Hub/briefing.
+Write ALL candidate narrative fields (description, whoCanApply, eligibility, requirements, howToApply, risksCaveats, availabilityNote, matchJustification) in ${lang} (Hub UI locale: ${locale}). Do not mix languages. Ignore the language of the source page.
 
 Each candidate MUST fill these fields:
 - description: 2–4 SUBSTANTIVE paragraphs. Explain what the call/program funds, thematic/sector focus, geographic scope, and operational context. Dates/amounts/topic codes belong as supporting detail inside the narrative — never as a one-line blurb alone. Thin marketing slogans are forbidden.
@@ -51,16 +62,20 @@ Each candidate MUST fill these fields:
 - howToApply: portal/steps/next actions if known from the source; otherwise say to verify on the official page.
 - risksCaveats: co-financing burden, short windows, restricted beneficiaries, or unknowns.
 - Also: closesAt, opensAt, amount, currency, eligibleCountries, applicationWindow when known.
-DATES: Never invent opensAt/closesAt/deadline. If the official page does not state a calendar date, leave null. NEVER use 1 January / 2026-01-01 as a placeholder. Prefer availabilityNote in the briefing language (e.g. Spanish: "plazo a confirmar en la página oficial").`;
+DATES: Never invent opensAt/closesAt/deadline. If the official page does not state a calendar date, leave null. NEVER use 1 January / 2026-01-01 as a placeholder. Prefer availabilityNote in ${lang}.`;
+}
 
-function promptsForFocus(scanFocus: ScanFocus) {
+function promptsForFocus(scanFocus: ScanFocus, locale: FundhubLocale) {
   const today = todayIso();
+  const lang = fundhubLanguageName(locale);
+  const contentRules = candidateContentRules(locale);
 
   if (scanFocus === 'open_now') {
     return {
       research: `You are a funding scout. Search the LIVE WEB and list every real open call you can verify.
 
 TODAY'S DATE: ${today}
+HUB LANGUAGE: write short notes in ${lang} (${locale}).
 
 Hunt like an operator — wide first, official URL second:
 - Search the whole internet. News, ministry bulletins, foundation pages, LinkedIn and aggregators are valid STARTING points.
@@ -69,13 +84,13 @@ Hunt like an operator — wide first, official URL second:
 - Skip expired or closed windows. Skip homepages with no open call.
 - Cover local/municipal public funds, national public calls, private and corporate foundations, multilaterals, organisms and technical-cooperation windows (GIZ, AFD, AECID, JICA, USAID, etc.).
 - For each hit keep it short: official name, funder, official call URL, deadline if seen, who can apply, what it funds (a few lines each). Do not write essays in this pass.
-- At least 15 distinct open calls from at least 8 institutions when they exist. At most 4 from the same funder.
+- List EVERY distinct open call that matches the briefing themes/geography when they exist. At most 4 from the same funder. No artificial upper limit on total hits.
 - Run every numbered query in THIS pass. They are discovery phrases, not a closed portal list.
 - Ranking notes (Rural Commerce principles, etc.) score matchScore. They must NOT veto a real open call that matches the themes and geography.
 
 ${OFFICIAL_LINK_PROMPT_RULES}`,
       structure: `Convert the research into JSON only. Return { "candidates": [ ... ] }
-Each item needs compact fields in the briefing language (Spanish OK / Portuguese OK / English OK — match the briefing; default Spanish if unclear):
+Each item needs compact fields in ${lang} (Hub locale ${locale} — NO language mixing):
 name, institution, type (Grant|Crédito|Aliança|Técnico local),
 description (1 short paragraph, max ~400 chars),
 whoCanApply, eligibility (1–2 lines each),
@@ -86,7 +101,7 @@ availabilityStatus ("open_now" or "rolling"),
 matchScore (0-100), matchJustification (1 line), sourceUrl,
 classification (direct|client_bridge|joint).
 
-Return 12–24 candidates from DISTINCT institutions when they exist. Prefer complete JSON over long essays.
+${discoveryYieldPromptHint()}
 Skip EXISTING duplicates. Never invent URLs.
 
 ${OFFICIAL_LINK_PROMPT_RULES}`,
@@ -97,6 +112,7 @@ ${OFFICIAL_LINK_PROMPT_RULES}`,
     research: `You are a funding intelligence analyst. Map RELEVANT funding programs, frameworks, and institutions for long-term knowledge — regardless of whether a call is open today.
 
 TODAY'S DATE: ${today}
+HUB LANGUAGE: ${lang} (${locale}).
 
 Include:
 - Permanent/rolling programs (even if no window open now)
@@ -108,7 +124,7 @@ For each: name, institution, type, eligible countries, typical application windo
 
 This feeds an intelligence base — accuracy over quantity. Minimum 8 programs.
 
-${CANDIDATE_CONTENT_RULES}
+${contentRules}
 
 ${OFFICIAL_LINK_PROMPT_RULES}`,
     structure: `Convert the research into JSON only. Return { "candidates": [ ... ] }
@@ -123,7 +139,8 @@ availabilityStatus (seasonal|rolling|closed|reference — NOT open_now unless ve
 availabilityNote (typical windows, last call date, reopening hints),
 matchScore, matchJustification, sourceUrl (official only).
 
-${CANDIDATE_CONTENT_RULES}
+Write every narrative field in ${lang} (Hub locale ${locale}).
+${contentRules}
 ${OFFICIAL_LINK_PROMPT_RULES}
 Do not invent URLs. Skip EXISTING duplicates. Omit linkOficial if only aggregator URL found.`,
   };
@@ -142,10 +159,13 @@ export async function discoverOpportunitiesOnline(opts: {
   existingFunds: Array<{ name: string; institution: string }>;
   optionalExtraContext?: string;
   scanFocus?: ScanFocus;
+  /** Hub UI locale — narrativas dos candidatos neste idioma. */
+  locale?: unknown;
   /** 0–100 phase updates during long web search. */
   onProgress?: (pct: number, phase: string) => void | Promise<void>;
 }): Promise<WebDiscoveryResult> {
   const scanFocus = opts.scanFocus ?? 'open_now';
+  const locale = normalizeFundhubLocale(opts.locale);
   const report = async (pct: number, phase: string) => {
     try {
       await opts.onProgress?.(pct, phase);
@@ -157,6 +177,16 @@ export async function discoverOpportunitiesOnline(opts: {
     opts.existingFunds.map((f) => `${f.name} (${f.institution})`).join('\n') || '(none)';
 
   if (!isWebSearchEnabled()) {
+    // open_now NUNCA cai em knowledge (inventa agências). Sem web search → vazio.
+    if (scanFocus === 'open_now') {
+      await report(90, 'web_disabled');
+      return {
+        candidates: [],
+        discoveryMode: 'web',
+        searchQueries: [],
+        fallbackReason: 'web_search_disabled',
+      };
+    }
     await report(40, 'knowledge');
     const result = await knowledgeOnlyDiscovery(
       opts.briefing,
@@ -165,12 +195,13 @@ export async function discoverOpportunitiesOnline(opts: {
       scanFocus,
       opts.optionalExtraContext,
       opts.existingFunds,
+      locale,
     );
     await report(90, 'structuring');
     return { ...result, fallbackReason: 'web_search_disabled' };
   }
 
-  const { research: RESEARCH_SYSTEM, structure: STRUCTURE_SYSTEM } = promptsForFocus(scanFocus);
+  const { research: RESEARCH_SYSTEM, structure: STRUCTURE_SYSTEM } = promptsForFocus(scanFocus, locale);
   let webFailure: string | undefined;
 
   try {
@@ -191,8 +222,8 @@ export async function discoverOpportunitiesOnline(opts: {
     ].join('');
 
     await report(22, 'web_research');
-    // Um pack de cada vez: 3 em paralelo triplicava web_search + tokens sem melhorar o yield.
-    const packSlice = packs.slice(0, 2);
+    // Packs em série (open_web → instruments → official). Caps via discovery-caps.
+    const packSlice = packs.slice(0, maxDiscoveryPacks());
     const packResults: Array<{ text: string; searchQueries: string[] }> = [];
     for (const pack of packSlice) {
       packResults.push(
@@ -215,7 +246,7 @@ export async function discoverOpportunitiesOnline(opts: {
       `\nEXISTING (skip duplicates):\n${existingBlock.slice(0, 4000)}`,
       `\nBRIEFING:\n${briefingLines(opts.briefing)}`,
       focusHint,
-      `\nKeep each description under 400 characters. Prefer 12–24 complete candidates over a truncated dump.`,
+      `\nKeep each description under 400 characters. ${discoveryYieldPromptHint()}`,
     ].join('');
 
     const structured = await fundhubStructureJsonText(STRUCTURE_SYSTEM, structureUser, {
@@ -234,7 +265,7 @@ export async function discoverOpportunitiesOnline(opts: {
           `RESEARCH REPORT (compact):\n${truncateForStructure(research, 14_000)}`,
           `\nEXISTING:\n${existingBlock.slice(0, 2000)}`,
           `\nBRIEFING:\n${briefingLines(opts.briefing)}`,
-          `\nReturn at most 12 candidates. Very short fields. Valid JSON only.`,
+          `\n${discoveryYieldPromptHint()} Very short fields. Valid JSON only.`,
         ].join(''),
         {
           maxOutputTokens: 10000,
@@ -281,6 +312,7 @@ export async function discoverOpportunitiesOnline(opts: {
         optionalExtraContext: extraClean,
         alreadyFound: candidates,
         requiredQueries,
+        locale,
       });
       if (extra.length > 0) {
         const extraEnriched = (await enrichAndFilterCandidates(extra, scanFocus)).map((c) =>
@@ -329,6 +361,7 @@ export async function discoverOpportunitiesOnline(opts: {
     scanFocus,
     opts.optionalExtraContext,
     opts.existingFunds,
+    locale,
   );
   await report(90, 'structuring');
   return {
@@ -373,11 +406,15 @@ async function secondPassOpusDiscovery(opts: {
   optionalExtraContext?: string;
   alreadyFound: ScanCandidate[];
   requiredQueries: string[];
+  locale: FundhubLocale;
 }): Promise<ScanCandidate[]> {
   const found = opts.alreadyFound
     .map((c) => `${c.name} (${c.institution})`)
     .join('\n') || '(none)';
-  const { research: RESEARCH_SYSTEM, structure: STRUCTURE_SYSTEM } = promptsForFocus('open_now');
+  const { research: RESEARCH_SYSTEM, structure: STRUCTURE_SYSTEM } = promptsForFocus(
+    'open_now',
+    opts.locale,
+  );
   try {
     const { text: research } = await llmCompleteWithWebSearch(
       RESEARCH_SYSTEM,
@@ -429,8 +466,9 @@ async function knowledgeOnlyDiscovery(
   scanFocus: ScanFocus,
   optionalExtraContext?: string,
   existingFunds: Array<{ name: string; institution: string }> = [],
+  locale: FundhubLocale = 'es',
 ): Promise<WebDiscoveryResult> {
-  const { structure: STRUCTURE_SYSTEM } = promptsForFocus(scanFocus);
+  const { structure: STRUCTURE_SYSTEM } = promptsForFocus(scanFocus, locale);
   const system = `You are an opportunity discovery agent. ${scanFocus === 'open_now' ? 'Only return programs verifiably open for applications now.' : 'Map funding programs for intelligence base.'} Return JSON { "candidates": [...] } with 6-10 REAL official programs. NEVER copy items listed under EXISTING (including demo/sandbox funds). ${STRUCTURE_SYSTEM}`;
   const user = [
     `BRIEFING:\n${briefingLines(briefing)}`,

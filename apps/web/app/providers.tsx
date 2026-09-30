@@ -4,12 +4,31 @@ import { SessionProvider } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { useState, useEffect, createContext, useContext } from 'react';
 import type { Locale } from '@/lib/i18n';
-import { t } from '@/lib/i18n';
+import { normalizeLocale, t } from '@/lib/i18n';
 import { ActiveCompanyBootstrap } from '@/components/hub/ActiveCompanyBootstrap';
+
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const m = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+/** Prefer cookie (survives first paint) then localStorage — avoids FundHub chrome flashing Spanish. */
+function readStoredLocale(): Locale {
+  const fromCookie = readCookie('rc360_locale');
+  if (fromCookie === 'es' || fromCookie === 'pt' || fromCookie === 'en') return fromCookie;
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem('rc360_locale');
+    if (saved === 'es' || saved === 'pt' || saved === 'en') return saved;
+  }
+  return 'es';
+}
 
 interface AppContextType {
   locale: Locale;
   setLocale: (l: Locale) => void;
+  /** False until client has applied stored Hub language (avoid enrich/relocalize with default es). */
+  localeReady: boolean;
   activeCompanyId: string | null;
   setActiveCompanyId: (id: string | null) => void;
   tr: (key: string) => string;
@@ -18,6 +37,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType>({
   locale: 'es',
   setLocale: () => {},
+  localeReady: false,
   activeCompanyId: null,
   setActiveCompanyId: () => {},
   tr: (key: string) => key,
@@ -35,11 +55,15 @@ export default function Providers({
   session?: Session | null;
 }) {
   const [locale, setLocale] = useState<Locale>('es');
+  const [localeReady, setLocaleReady] = useState(false);
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('rc360_locale') as Locale;
-    if (saved === 'es' || saved === 'pt' || saved === 'en') setLocale(saved);
+    const saved = readStoredLocale();
+    setLocale(normalizeLocale(saved));
+    document.cookie = `rc360_locale=${saved}; path=/; max-age=31536000; SameSite=Lax`;
+    localStorage.setItem('rc360_locale', saved);
+    setLocaleReady(true);
     const savedCompany = localStorage.getItem('rc360_company');
     if (savedCompany) {
       setActiveCompanyId(savedCompany);
@@ -48,8 +72,10 @@ export default function Providers({
   }, []);
 
   const handleSetLocale = (l: Locale) => {
-    setLocale(l);
-    localStorage.setItem('rc360_locale', l);
+    const next = normalizeLocale(l);
+    setLocale(next);
+    localStorage.setItem('rc360_locale', next);
+    document.cookie = `rc360_locale=${next}; path=/; max-age=31536000; SameSite=Lax`;
   };
 
   const handleSetCompany = (id: string | null) => {
@@ -69,7 +95,16 @@ export default function Providers({
   // mount, which dropped {children} entirely and caused a blank screen if JS/chunks failed to load.
   return (
     <SessionProvider session={session ?? undefined}>
-      <AppContext.Provider value={{ locale, setLocale: handleSetLocale, activeCompanyId, setActiveCompanyId: handleSetCompany, tr }}>
+      <AppContext.Provider
+        value={{
+          locale,
+          setLocale: handleSetLocale,
+          localeReady,
+          activeCompanyId,
+          setActiveCompanyId: handleSetCompany,
+          tr,
+        }}
+      >
         <ActiveCompanyBootstrap />
         {children}
       </AppContext.Provider>

@@ -298,7 +298,7 @@ export default function OpportunityDiscoverPage() {
       const r = await fetch(q('/api/opportunity/scans'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ briefing: briefingToUse, scanFocus: focus }),
+        body: JSON.stringify({ briefing: briefingToUse, scanFocus: focus, locale }),
       });
       const raw = await r.text();
       let d: {

@@ -64,7 +64,7 @@ export function CandidateDetailSheet({
   variant?: 'modal' | 'page';
   initialTab?: 'overview' | 'analyze';
 }) {
-  const { locale, activeCompanyId } = useApp();
+  const { locale, localeReady, activeCompanyId } = useApp();
   const companyId = useMemo(() => {
     const s = String(activeCompanyId ?? '').trim();
     return isLikelyDbId(s) ? s : '';
@@ -118,9 +118,9 @@ export function CandidateDetailSheet({
   }, [moreOpen]);
 
   useEffect(() => {
-    if (!open || !companyId) return;
+    if (!open || !companyId || !localeReady) return;
     const hasPage = Boolean(c.callUrl || c.linkOficial || c.sourceUrl);
-    if (!hasPage) return;
+    // Sempre tenta enrich se há página; sem página ainda pode relocalizar narrativas.
     let cancelled = false;
     setEnriching(true);
     void (async () => {
@@ -128,12 +128,17 @@ export function CandidateDetailSheet({
         const r = await fetch(q('/api/opportunity/candidates/enrich'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ candidate: c, runId: runId ?? c.runId, tempId: c.tempId }),
+          body: JSON.stringify({
+            candidate: c,
+            runId: runId ?? c.runId,
+            tempId: c.tempId,
+            locale,
+          }),
         });
         const d = (await r.json()) as { candidate?: typeof c };
         if (!cancelled && r.ok && d.candidate) {
           setLive(d.candidate);
-          if ((d.candidate.documents?.length ?? 0) > 0) {
+          if (hasPage && (d.candidate.documents?.length ?? 0) > 0) {
             try {
               const br = await fetch(q('/api/opportunity/candidates/bases'), {
                 method: 'POST',
@@ -160,12 +165,11 @@ export function CandidateDetailSheet({
     return () => {
       cancelled = true;
     };
-    // q/companyId are stable enough for this sheet open
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, c.tempId, companyId, runId]);
+  }, [open, c.tempId, companyId, runId, locale, localeReady]);
 
   useEffect(() => {
-    if (!open || !companyId) return;
+    if (!open || !companyId || !localeReady) return;
     let cancelled = false;
     setFitLoading(true);
     void (async () => {
@@ -195,7 +199,7 @@ export function CandidateDetailSheet({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, c.tempId, companyId, runId, locale]);
+  }, [open, c.tempId, companyId, runId, locale, localeReady]);
 
   if (!open) return null;
 
@@ -266,7 +270,7 @@ export function CandidateDetailSheet({
     const blob = buildCandidateWordHtml({
       title: c.name,
       institution: c.institution,
-      bodyMarkdownish: analysis || c.description || '',
+      bodyMarkdownish: analysis || live.description || '',
       meta: {
         Tipo: normalizeInstrumentType(c.type),
         Categoria: c.category,
@@ -274,11 +278,11 @@ export function CandidateDetailSheet({
           c.amount != null ? `${c.amount.toLocaleString()} ${c.currency ?? 'USD'}` : undefined,
         Janela: [opensLabel, closesLabel].filter(Boolean).join(' → ') || c.applicationWindow,
         Países: countries,
-        'Quem pode candidatar': c.whoCanApply,
-        Elegibilidade: c.eligibility,
-        Requisitos: c.requirements,
-        'Como candidatar': c.howToApply,
-        Avisos: c.risksCaveats,
+        'Quem pode candidatar': live.whoCanApply,
+        Elegibilidade: live.eligibility,
+        Requisitos: live.requirements,
+        'Como candidatar': live.howToApply,
+        Avisos: live.risksCaveats,
         Link: c.linkOficial,
         Match: c.matchScore != null ? `${Math.round(c.matchScore)}%` : undefined,
       },
@@ -539,18 +543,18 @@ export function CandidateDetailSheet({
                 </div>
               )}
 
-              {c.description && (
+              {live.description && (
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
                     {t('Descrição', 'Descripción', 'Description')}
                   </p>
                   <p className="mt-1 whitespace-pre-wrap leading-relaxed text-slate-100">
-                    {c.description}
+                    {live.description}
                   </p>
                 </div>
               )}
 
-              {(c.whoCanApply || c.eligibility || c.requirements) && (
+              {(live.whoCanApply || live.eligibility || live.requirements) && (
                 <div className="rounded-lg border border-gray-100 bg-slate-50/80 px-3 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
                     {t(
@@ -560,49 +564,49 @@ export function CandidateDetailSheet({
                     )}
                   </p>
                   <div className="mt-2 space-y-3">
-                    {c.whoCanApply && (
+                    {live.whoCanApply && (
                       <div>
                         <p className="text-[11px] font-semibold text-white">
                           {t('Quem pode candidatar', 'Quién puede postular', 'Who can apply')}
                         </p>
-                        <p className="mt-0.5 whitespace-pre-wrap text-slate-100">{c.whoCanApply}</p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-slate-100">{live.whoCanApply}</p>
                       </div>
                     )}
-                    {c.eligibility && (
+                    {live.eligibility && (
                       <div>
                         <p className="text-[11px] font-semibold text-white">
                           {t('Elegibilidade', 'Elegibilidad', 'Eligibility')}
                         </p>
-                        <p className="mt-0.5 whitespace-pre-wrap text-slate-100">{c.eligibility}</p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-slate-100">{live.eligibility}</p>
                       </div>
                     )}
-                    {c.requirements && (
+                    {live.requirements && (
                       <div>
                         <p className="text-[11px] font-semibold text-white">
                           {t('Requisitos-chave', 'Requisitos clave', 'Key requirements')}
                         </p>
-                        <p className="mt-0.5 whitespace-pre-wrap text-slate-100">{c.requirements}</p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-slate-100">{live.requirements}</p>
                       </div>
                     )}
                   </div>
                 </div>
               )}
 
-              {c.howToApply && (
+              {live.howToApply && (
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
                     {t('Como candidatar', 'Cómo postular', 'How to apply')}
                   </p>
-                  <p className="mt-1 whitespace-pre-wrap text-slate-100">{c.howToApply}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-slate-100">{live.howToApply}</p>
                 </div>
               )}
 
-              {c.risksCaveats && (
+              {live.risksCaveats && (
                 <div>
                   <p className="text-[10px] font-semibold uppercase text-amber-800/80">
                     {t('Riscos / avisos', 'Riesgos / avisos', 'Risks / caveats')}
                   </p>
-                  <p className="mt-1 whitespace-pre-wrap text-slate-100">{c.risksCaveats}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-slate-100">{live.risksCaveats}</p>
                 </div>
               )}
 

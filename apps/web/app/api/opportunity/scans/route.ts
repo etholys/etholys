@@ -155,12 +155,14 @@ export async function POST(req: NextRequest) {
 
   let briefing: OpportunityBriefing | undefined;
   let scanFocus: ScanFocus = 'open_now';
+  let locale: unknown;
   try {
     const body = await req.json();
     if (body?.briefing) briefing = body.briefing as OpportunityBriefing;
     if (body?.scanFocus === 'reference' || body?.scanFocus === 'open_now') {
       scanFocus = body.scanFocus;
     }
+    if (body?.locale != null) locale = body.locale;
   } catch {
     // body opcional
   }
@@ -191,6 +193,7 @@ export async function POST(req: NextRequest) {
     userId,
     briefing: briefingSnapshot,
     scanFocus,
+    locale,
     existingRunId: run.id,
   }).catch((e) => {
     // runOpportunityScan already persists status=failed + aiCost

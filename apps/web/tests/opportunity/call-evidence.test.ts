@@ -101,12 +101,17 @@ test('evidence is verified only after HTTP OK on an official call page', () => {
   assert.equal(canOpenProposalBlind({ ...call, evidence: verified }), true);
   assert.match(evidenceLine(verified, 'pt').label, /Verificado/);
   assert.match(evidenceLine(verified, 'pt').label, /página oficial/);
+  assert.match(evidenceLine(verified, 'pt').label, /sem anexos/);
+  assert.match(evidenceLine(verified, 'es').label, /sin anexos/);
+  assert.match(evidenceLine(verified, 'en').label, /no attachments/);
 
   const failed = buildCallEvidence(call, { httpOk: false, httpStatus: 404 });
   assert.equal(failed.status, 'failed');
   assert.equal(canOpenProposalBlind({ ...call, evidence: failed }), false);
   assert.equal(evidenceLine(failed, 'pt').tone, 'bad');
-  assert.match(evidenceLine(failed, 'es').label, /404/);
+  assert.match(evidenceLine(failed, 'pt').label, /não existe \(404\)/i);
+  assert.match(evidenceLine(failed, 'es').label, /La página oficial no existe \(404\)/);
+  assert.match(evidenceLine(failed, 'en').label, /Official page not found \(404\)/);
   assert.equal(evidenceLine(failed, 'es').label.includes('no respondió'), false);
 
   const networkMiss = buildCallEvidence(call, { httpOk: false, httpStatus: 0 });

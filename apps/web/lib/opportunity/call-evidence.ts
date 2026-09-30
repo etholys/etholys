@@ -274,10 +274,13 @@ export function evidenceForDisplay(
   return { ...ev, status: 'unconfirmed' };
 }
 
+import { normalizeFundhubLocale } from '@/lib/agents/fundhub-proposal-prompt';
+
 export function evidenceLine(
   ev: CallEvidence,
-  locale: string,
+  localeRaw: string,
 ): { label: string; tone: 'ok' | 'warn' | 'bad' } {
+  const locale = normalizeFundhubLocale(localeRaw);
   const pt = locale === 'pt';
   const es = locale === 'es';
   const docs =

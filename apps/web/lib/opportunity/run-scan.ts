@@ -62,6 +62,8 @@ export async function runOpportunityScan(opts: {
   userId: string;
   briefing?: OpportunityBriefing;
   scanFocus?: ScanFocus;
+  /** Hub UI locale — discovery narratives. */
+  locale?: unknown;
   /** Se já criado pelo POST async. */
   existingRunId?: string;
 }): Promise<{
@@ -143,6 +145,7 @@ export async function runOpportunityScan(opts: {
         existingFunds: deskSkip,
         optionalExtraContext: optionalExtraContext || undefined,
         scanFocus,
+        locale: opts.locale,
         onProgress: (pct, phase) => setScanProgress(run.id, pct, phase),
       }),
     );
