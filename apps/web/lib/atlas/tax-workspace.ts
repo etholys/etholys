@@ -1,5 +1,26 @@
 /** International tax workspace: year books + country obligation packs. Not official e-filing. */
 
+export type {
+  TaxCountryPack,
+  TaxObligation,
+  TaxObligationCadence,
+  TaxRegion,
+} from './tax-country-packs';
+export {
+  COUNTRY_NAME_ALIASES,
+  GENERIC_PACK,
+  TAX_COUNTRY_PACKS,
+  TAX_REGION_LABELS,
+  taxCountriesByRegion,
+} from './tax-country-packs';
+
+import {
+  COUNTRY_NAME_ALIASES,
+  GENERIC_PACK,
+  TAX_COUNTRY_PACKS,
+  type TaxCountryPack,
+} from './tax-country-packs';
+
 export type TaxYearTx = {
   type: string;
   amount: number;
@@ -48,238 +69,27 @@ export type TaxYearSummary = {
   executedCount: number;
 };
 
-export type TaxObligation = {
-  id: string;
-  title: string;
-  titleEs: string;
-  titlePt: string;
-  cadence: 'annual' | 'monthly' | 'quarterly' | 'bimonthly' | 'once';
-};
+function foldName(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/['’]/g, '');
+}
 
-export type TaxCountryPack = {
-  code: string;
-  nameEn: string;
-  nameEs: string;
-  namePt: string;
-  taxIdLabel: string;
-  vatName: string;
-  entityHints: string[];
-  obligations: TaxObligation[];
-};
-
-const GENERIC_OBLIGATIONS: TaxObligation[] = [
-  { id: 'income', title: 'Corporate / business income tax', titleEs: 'Impuesto a la renta / sociades', titlePt: 'Imposto sobre o rendimento das empresas', cadence: 'annual' },
-  { id: 'vat', title: 'VAT / GST / sales tax returns', titleEs: 'IVA / impuesto a las ventas', titlePt: 'IVA / ICMS / ISS / GST', cadence: 'monthly' },
-  { id: 'payroll', title: 'Payroll withholdings and social charges', titleEs: 'Retenciones laborales y cargas sociales', titlePt: 'Retenções e encargos trabalhistas', cadence: 'monthly' },
-  { id: 'accounts', title: 'Annual accounts / books close', titleEs: 'Cierre de libros / estados anuales', titlePt: 'Encerramento de livros / demonstrações', cadence: 'annual' },
-  { id: 'local', title: 'Municipal / local business tax', titleEs: 'Tributo municipal / patente', titlePt: 'Tributo municipal / alvará', cadence: 'annual' },
-];
-
-export const TAX_COUNTRY_PACKS: TaxCountryPack[] = [
-  {
-    code: 'UY', nameEn: 'Uruguay', nameEs: 'Uruguay', namePt: 'Uruguai',
-    taxIdLabel: 'RUT', vatName: 'IVA',
-    entityHints: ['SRL', 'SA', 'Unipersonal', 'SAS', 'Cooperativa'],
-    obligations: [
-      { id: 'irae', title: 'IRAE', titleEs: 'IRAE', titlePt: 'IRAE', cadence: 'annual' },
-      { id: 'iva', title: 'IVA (DGI)', titleEs: 'IVA (DGI)', titlePt: 'IVA (DGI)', cadence: 'monthly' },
-      { id: 'bps', title: 'BPS social contributions', titleEs: 'Aportes BPS', titlePt: 'Contribuições BPS', cadence: 'monthly' },
-      { id: 'ip', title: 'IP / wealth if applicable', titleEs: 'IP si corresponde', titlePt: 'IP se aplicável', cadence: 'annual' },
-    ],
-  },
-  {
-    code: 'BR', nameEn: 'Brazil', nameEs: 'Brasil', namePt: 'Brasil',
-    taxIdLabel: 'CNPJ', vatName: 'PIS/COFINS/ICMS/ISS',
-    entityHints: ['LTDA', 'SA', 'MEI', 'EIRELI', 'SLU', 'Cooperativa'],
-    obligations: [
-      { id: 'irpj', title: 'IRPJ / CSLL', titleEs: 'IRPJ / CSLL', titlePt: 'IRPJ / CSLL', cadence: 'quarterly' },
-      { id: 'pis', title: 'PIS / COFINS', titleEs: 'PIS / COFINS', titlePt: 'PIS / COFINS', cadence: 'monthly' },
-      { id: 'iss', title: 'ISS / ICMS', titleEs: 'ISS / ICMS', titlePt: 'ISS / ICMS', cadence: 'monthly' },
-      { id: 'ecf', title: 'ECD / ECF', titleEs: 'ECD / ECF', titlePt: 'ECD / ECF', cadence: 'annual' },
-      { id: 'dctf', title: 'DCTF / eSocial', titleEs: 'DCTF / eSocial', titlePt: 'DCTF / eSocial', cadence: 'monthly' },
-    ],
-  },
-  {
-    code: 'US', nameEn: 'United States', nameEs: 'Estados Unidos', namePt: 'Estados Unidos',
-    taxIdLabel: 'EIN', vatName: 'Sales tax',
-    entityHints: ['LLC', 'C-Corp', 'S-Corp', 'Partnership', 'Sole proprietor'],
-    obligations: [
-      { id: '1120', title: 'Form 1120 (C-Corp / some LLCs)', titleEs: 'Formulario 1120', titlePt: 'Formulário 1120', cadence: 'annual' },
-      { id: 'est', title: 'Estimated federal tax', titleEs: 'Impuesto estimado federal', titlePt: 'Imposto estimado federal', cadence: 'quarterly' },
-      { id: '5472', title: 'Form 5472 if 25%+ foreign-owned', titleEs: 'Formulario 5472 si hay dueño extranjero ≥25%', titlePt: 'Formulário 5472 se sócio estrangeiro ≥25%', cadence: 'annual' },
-      { id: 'state', title: 'State income / franchise / sales tax', titleEs: 'Impuesto estatal / franchise / sales tax', titlePt: 'Imposto estadual / franchise / sales tax', cadence: 'annual' },
-    ],
-  },
-  {
-    code: 'AR', nameEn: 'Argentina', nameEs: 'Argentina', namePt: 'Argentina',
-    taxIdLabel: 'CUIT', vatName: 'IVA',
-    entityHints: ['SRL', 'SA', 'SAS', 'Monotributo'],
-    obligations: [
-      { id: 'gan', title: 'Ganancias', titleEs: 'Ganancias', titlePt: 'Ganancias', cadence: 'annual' },
-      { id: 'iva', title: 'IVA', titleEs: 'IVA', titlePt: 'IVA', cadence: 'monthly' },
-      { id: 'iibb', title: 'Ingresos Brutos', titleEs: 'Ingresos Brutos', titlePt: 'Ingresos Brutos', cadence: 'monthly' },
-    ],
-  },
-  {
-    code: 'CL', nameEn: 'Chile', nameEs: 'Chile', namePt: 'Chile',
-    taxIdLabel: 'RUT', vatName: 'IVA',
-    entityHints: ['SpA', 'Ltda', 'SA', 'EIRL'],
-    obligations: [
-      { id: 'renta', title: 'Renta 1ª categoría / F22', titleEs: 'Renta 1ª categoría / F22', titlePt: 'Renda 1ª categoria / F22', cadence: 'annual' },
-      { id: 'f29', title: 'F29 IVA / retenciones', titleEs: 'F29 IVA / retenciones', titlePt: 'F29 IVA / retenções', cadence: 'monthly' },
-    ],
-  },
-  {
-    code: 'CO', nameEn: 'Colombia', nameEs: 'Colombia', namePt: 'Colômbia',
-    taxIdLabel: 'NIT', vatName: 'IVA',
-    entityHints: ['SAS', 'Ltda', 'SA', 'EU'],
-    obligations: [
-      { id: 'renta', title: 'Renta', titleEs: 'Renta', titlePt: 'Renda', cadence: 'annual' },
-      { id: 'iva', title: 'IVA', titleEs: 'IVA', titlePt: 'IVA', cadence: 'bimonthly' },
-      { id: 'ica', title: 'ICA', titleEs: 'ICA', titlePt: 'ICA', cadence: 'annual' },
-    ],
-  },
-  {
-    code: 'MX', nameEn: 'Mexico', nameEs: 'México', namePt: 'México',
-    taxIdLabel: 'RFC', vatName: 'IVA',
-    entityHints: ['S.A. de C.V.', 'S. de R.L.', 'S.A.P.I.', 'Persona física'],
-    obligations: [
-      { id: 'isr', title: 'ISR', titleEs: 'ISR', titlePt: 'ISR', cadence: 'annual' },
-      { id: 'iva', title: 'IVA', titleEs: 'IVA', titlePt: 'IVA', cadence: 'monthly' },
-      { id: 'diot', title: 'DIOT', titleEs: 'DIOT', titlePt: 'DIOT', cadence: 'monthly' },
-    ],
-  },
-  {
-    code: 'PE', nameEn: 'Peru', nameEs: 'Perú', namePt: 'Peru',
-    taxIdLabel: 'RUC', vatName: 'IGV',
-    entityHints: ['SAC', 'SRL', 'EIRL', 'SA'],
-    obligations: [
-      { id: 'renta', title: 'Renta 3ª categoría', titleEs: 'Renta 3ª categoría', titlePt: 'Renda 3ª categoria', cadence: 'annual' },
-      { id: 'igv', title: 'IGV', titleEs: 'IGV', titlePt: 'IGV', cadence: 'monthly' },
-    ],
-  },
-  {
-    code: 'PY', nameEn: 'Paraguay', nameEs: 'Paraguay', namePt: 'Paraguai',
-    taxIdLabel: 'RUC', vatName: 'IVA',
-    entityHints: ['SRL', 'SA', 'Unipersonal'],
-    obligations: [
-      { id: 'iracis', title: 'IRACIS / IRE', titleEs: 'IRACIS / IRE', titlePt: 'IRACIS / IRE', cadence: 'annual' },
-      { id: 'iva', title: 'IVA', titleEs: 'IVA', titlePt: 'IVA', cadence: 'monthly' },
-    ],
-  },
-  {
-    code: 'BO', nameEn: 'Bolivia', nameEs: 'Bolivia', namePt: 'Bolívia',
-    taxIdLabel: 'NIT', vatName: 'IVA',
-    entityHints: ['SRL', 'SA', 'Unipersonal'],
-    obligations: [
-      { id: 'iue', title: 'IUE', titleEs: 'IUE', titlePt: 'IUE', cadence: 'annual' },
-      { id: 'iva', title: 'IVA', titleEs: 'IVA', titlePt: 'IVA', cadence: 'monthly' },
-    ],
-  },
-  {
-    code: 'CR', nameEn: 'Costa Rica', nameEs: 'Costa Rica', namePt: 'Costa Rica',
-    taxIdLabel: 'Cédula jurídica', vatName: 'IVA',
-    entityHints: ['SRL', 'SA', 'Unipersonal'],
-    obligations: [
-      { id: 'renta', title: 'Impuesto sobre la renta', titleEs: 'Impuesto sobre la renta', titlePt: 'Imposto sobre a renda', cadence: 'annual' },
-      { id: 'iva', title: 'IVA', titleEs: 'IVA', titlePt: 'IVA', cadence: 'monthly' },
-    ],
-  },
-  {
-    code: 'PA', nameEn: 'Panama', nameEs: 'Panamá', namePt: 'Panamá',
-    taxIdLabel: 'RUC', vatName: 'ITBMS',
-    entityHints: ['SRL', 'SA', 'LLC'],
-    obligations: [
-      { id: 'isr', title: 'ISR', titleEs: 'ISR', titlePt: 'ISR', cadence: 'annual' },
-      { id: 'itbms', title: 'ITBMS', titleEs: 'ITBMS', titlePt: 'ITBMS', cadence: 'monthly' },
-    ],
-  },
-  {
-    code: 'GT', nameEn: 'Guatemala', nameEs: 'Guatemala', namePt: 'Guatemala',
-    taxIdLabel: 'NIT', vatName: 'IVA',
-    entityHints: ['SRL', 'SA', 'Unipersonal'],
-    obligations: [
-      { id: 'isr', title: 'ISR', titleEs: 'ISR', titlePt: 'ISR', cadence: 'annual' },
-      { id: 'iva', title: 'IVA', titleEs: 'IVA', titlePt: 'IVA', cadence: 'monthly' },
-    ],
-  },
-  {
-    code: 'EC', nameEn: 'Ecuador', nameEs: 'Ecuador', namePt: 'Equador',
-    taxIdLabel: 'RUC', vatName: 'IVA',
-    entityHints: ['CIA. LTDA.', 'SA', 'SAS'],
-    obligations: [
-      { id: 'renta', title: 'Impuesto a la renta', titleEs: 'Impuesto a la renta', titlePt: 'Imposto de renda', cadence: 'annual' },
-      { id: 'iva', title: 'IVA', titleEs: 'IVA', titlePt: 'IVA', cadence: 'monthly' },
-    ],
-  },
-  {
-    code: 'ES', nameEn: 'Spain', nameEs: 'España', namePt: 'Espanha',
-    taxIdLabel: 'NIF/CIF', vatName: 'IVA',
-    entityHints: ['SL', 'SA', 'Autónomo', 'Cooperativa'],
-    obligations: [
-      { id: 'is', title: 'Impuesto sobre Sociedades (mod. 200)', titleEs: 'Impuesto sobre Sociedades (mod. 200)', titlePt: 'Imposto sobre Sociedades (mod. 200)', cadence: 'annual' },
-      { id: 'iva', title: 'IVA (mod. 303)', titleEs: 'IVA (mod. 303)', titlePt: 'IVA (mod. 303)', cadence: 'quarterly' },
-    ],
-  },
-  {
-    code: 'PT', nameEn: 'Portugal', nameEs: 'Portugal', namePt: 'Portugal',
-    taxIdLabel: 'NIF', vatName: 'IVA',
-    entityHints: ['Lda', 'SA', 'ENI', 'Cooperativa'],
-    obligations: [
-      { id: 'irc', title: 'IRC', titleEs: 'IRC', titlePt: 'IRC', cadence: 'annual' },
-      { id: 'iva', title: 'IVA', titleEs: 'IVA', titlePt: 'IVA', cadence: 'monthly' },
-      { id: 'ies', title: 'IES / accounts', titleEs: 'IES / cuentas', titlePt: 'IES / contas', cadence: 'annual' },
-    ],
-  },
-  {
-    code: 'DE', nameEn: 'Germany', nameEs: 'Alemania', namePt: 'Alemanha',
-    taxIdLabel: 'Steuernummer / USt-IdNr.', vatName: 'USt',
-    entityHints: ['GmbH', 'UG', 'AG', 'GbR'],
-    obligations: [
-      { id: 'kst', title: 'Körperschaftsteuer', titleEs: 'Körperschaftsteuer', titlePt: 'Körperschaftsteuer', cadence: 'annual' },
-      { id: 'ust', title: 'Umsatzsteuer', titleEs: 'Umsatzsteuer', titlePt: 'Umsatzsteuer', cadence: 'monthly' },
-    ],
-  },
-  {
-    code: 'FR', nameEn: 'France', nameEs: 'Francia', namePt: 'França',
-    taxIdLabel: 'SIRET / TVA', vatName: 'TVA',
-    entityHints: ['SARL', 'SAS', 'SA', 'EI'],
-    obligations: [
-      { id: 'is', title: 'Impôt sur les sociétés', titleEs: 'Impôt sur les sociétés', titlePt: 'Impôt sur les sociétés', cadence: 'annual' },
-      { id: 'tva', title: 'TVA', titleEs: 'TVA', titlePt: 'TVA', cadence: 'monthly' },
-    ],
-  },
-  {
-    code: 'GB', nameEn: 'United Kingdom', nameEs: 'Reino Unido', namePt: 'Reino Unido',
-    taxIdLabel: 'UTR / VAT', vatName: 'VAT',
-    entityHints: ['Ltd', 'LLP', 'PLC', 'Sole trader'],
-    obligations: [
-      { id: 'ct', title: 'Corporation Tax', titleEs: 'Corporation Tax', titlePt: 'Corporation Tax', cadence: 'annual' },
-      { id: 'vat', title: 'VAT return', titleEs: 'Declaración VAT', titlePt: 'Declaração VAT', cadence: 'quarterly' },
-      { id: 'accounts', title: 'Companies House accounts', titleEs: 'Cuentas Companies House', titlePt: 'Contas Companies House', cadence: 'annual' },
-    ],
-  },
-];
-
-const GENERIC_PACK: TaxCountryPack = {
-  code: 'XX',
-  nameEn: 'Other country',
-  nameEs: 'Otro país',
-  namePt: 'Outro país',
-  taxIdLabel: 'Tax ID',
-  vatName: 'VAT / GST',
-  entityHints: ['Ltd', 'LLC', 'SRL', 'SA', 'Sole proprietor', 'Cooperative', 'NGO'],
-  obligations: GENERIC_OBLIGATIONS,
-};
+const FOLDED_ALIASES: Record<string, string> = Object.fromEntries(
+  Object.entries(COUNTRY_NAME_ALIASES).map(([k, v]) => [foldName(k), v]),
+);
 
 export function normalizeCountryCode(raw?: string | null): string {
-  const t = String(raw || '').trim().toUpperCase();
+  const t = foldName(String(raw || '').trim());
   if (!t) return '';
-  if (t.length === 2) return t;
+  if (FOLDED_ALIASES[t]) return FOLDED_ALIASES[t];
+  if (/^[A-Z]{2}$/.test(t)) return t;
   const byName = TAX_COUNTRY_PACKS.find(
-    (p) => p.nameEn.toUpperCase() === t || p.nameEs.toUpperCase() === t || p.namePt.toUpperCase() === t,
+    (p) => foldName(p.nameEn) === t || foldName(p.nameEs) === t || foldName(p.namePt) === t,
   );
-  return byName?.code || t.slice(0, 2);
+  return byName?.code || (t.length >= 2 ? t.slice(0, 2) : '');
 }
 
 export function countryPack(code?: string | null): TaxCountryPack {
@@ -428,7 +238,7 @@ export function summarizeTaxYear(
 
 export function seedObligationState(pack: TaxCountryPack): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const o of pack.obligations) out[o.id] = 'pending';
+  for (const ob of pack.obligations) out[ob.id] = 'pending';
   return out;
 }
 

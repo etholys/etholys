@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { AlertCircle, Download, Globe, Landmark, Loader2, RefreshCw, Save } from 'lucide-react';
-import { countryPack, money, type TaxYearSummary } from '@/lib/atlas/tax-workspace';
+import { countryPack, money, TAX_REGION_LABELS, taxCountriesByRegion, type TaxRegion, type TaxYearSummary } from '@/lib/atlas/tax-workspace';
 import type { Locale } from '@/lib/i18n';
 
 type ML = { es: string; pt: string; en: string };
 const ml = (en: string, es: string, pt: string): ML => ({ en, es, pt });
 const loc = (locale: Locale, m: ML) => m[locale] || m.en;
 
-type CountryOpt = { code: string; nameEn: string; nameEs: string; namePt: string; taxIdLabel: string; vatName: string; entityHints: string[] };
+type CountryOpt = { code: string; region?: TaxRegion; nameEn: string; nameEs: string; namePt: string; taxIdLabel: string; vatName: string; entityHints: string[] };
 type Obligation = { id: string; title: string; titleEs: string; titlePt: string; cadence: string };
 
 export type TaxWorkspacePayload = {
@@ -77,7 +77,7 @@ const MONTHS: Record<Locale, string[]> = {
   pt: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
 };
 
-function countryName(c: CountryOpt, locale: Locale) {
+function countryName(c: { nameEn: string; nameEs: string; namePt: string }, locale: Locale) {
   return locale === 'es' ? c.nameEs : locale === 'pt' ? c.namePt : c.nameEn;
 }
 
@@ -240,8 +240,12 @@ export function TaxYearPanel({
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
             >
               <option value="">{L(T.other)}</option>
-              {(payload?.countries || []).map((c) => (
-                <option key={c.code} value={c.code}>{countryName(c, locale)}</option>
+              {taxCountriesByRegion().map((g) => (
+                <optgroup key={g.region} label={TAX_REGION_LABELS[g.region][locale] || TAX_REGION_LABELS[g.region].en}>
+                  {g.packs.map((c) => (
+                    <option key={c.code} value={c.code}>{countryName(c, locale)}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

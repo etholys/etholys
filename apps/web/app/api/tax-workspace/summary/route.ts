@@ -82,6 +82,7 @@ export async function GET(req: Request) {
       },
       countries: TAX_COUNTRY_PACKS.map((p) => ({
         code: p.code,
+        region: p.region,
         nameEn: p.nameEn,
         nameEs: p.nameEs,
         namePt: p.namePt,
