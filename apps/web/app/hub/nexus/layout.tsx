@@ -28,6 +28,7 @@ import { NexusRunwayProvider } from '@/components/nexus/NexusRunwayContext';
 import { NexusCopilotRail } from '@/components/nexus/NexusCopilotRail';
 import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
+import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
 import { sysTheme } from '@/lib/system-shell';
 
 /** Capítulos internos — não são itens de menu. Só servem para realçar o caminho. */
@@ -209,7 +210,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
   ];
 
   const bottomItems = [
-    { href: '/chat', icon: MessageCircle, label: 'Chat', badge: chatUnread > 0 ? chatUnread : undefined },
+    { href: '/chat', icon: MessageCircle, label: locale === 'es' ? 'Chat' : locale === 'pt' ? 'Chat' : 'Chat', badge: chatUnread > 0 ? chatUnread : undefined },
     { href: '/reports', icon: BarChart3, label: tr('nav.reports') },
     { href: '/hub/nexus/settings', icon: Settings, label: tr('nav.settings') },
   ];
@@ -253,7 +254,19 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
                 type="button"
                 onClick={() => setCollapsed(!collapsed)}
                 className="hidden items-center justify-center rounded-lg p-1.5 text-white/35 transition hover:bg-white/5 hover:text-white lg:flex"
-                title={collapsed ? 'Expandir' : 'Minimizar'}
+                title={
+                  collapsed
+                    ? locale === 'es'
+                      ? 'Expandir'
+                      : locale === 'pt'
+                        ? 'Expandir'
+                        : 'Expand'
+                    : locale === 'es'
+                      ? 'Minimizar'
+                      : locale === 'pt'
+                        ? 'Minimizar'
+                        : 'Collapse'
+                }
               >
                 {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
               </button>
@@ -406,6 +419,7 @@ function NexusLayoutShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className={cn('flex-shrink-0 border-t border-white/10', collapsed ? 'p-1.5' : 'p-3')}>
+          <AppearanceToggle collapsed={collapsed} className="mb-1" />
           <div className={cn('mb-2 flex items-center', collapsed ? 'flex-col gap-1' : 'gap-1')}>
             <button
               type="button"

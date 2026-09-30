@@ -20,9 +20,9 @@ const ORBIT: Record<SystemAccent, { fast: string; slow: string }> = {
 export const sysTheme = {
   glow: (accent: SystemAccent) => GLOW[accent],
   orbit: (accent: SystemAccent) => ORBIT[accent],
-  root: 'etholys-system etholys-hub relative isolate flex min-h-screen overflow-hidden bg-[#07111A] text-[#E8EEF2]',
+  root: 'etholys-system etholys-hub relative isolate flex min-h-screen overflow-hidden bg-[color:var(--sys-canvas-bg,#07111A)] text-[color:var(--sys-ink,#E8EEF2)]',
   aside:
-    'fixed inset-y-0 left-0 z-50 flex transform flex-col border-r border-white/10 bg-[#07111A]/88 backdrop-blur-md transition-all',
+    'fixed inset-y-0 left-0 z-50 flex transform flex-col border-r border-[color:var(--sys-line,rgba(255,255,255,0.1))] bg-[color:var(--sys-aside-bg,rgba(7,17,26,0.88))] backdrop-blur-md transition-all',
   icon: {
     teal: 'border-teal-400/30 bg-teal-500/15 text-teal-300',
     indigo: 'border-indigo-400/30 bg-indigo-500/15 text-indigo-300',
@@ -53,8 +53,8 @@ export const sysTheme = {
     amber: 'border-amber-400/25 border-t-amber-400',
     violet: 'border-violet-400/25 border-t-violet-400',
   } as Record<SystemAccent, string>,
-  navIdle: 'text-white/55 hover:bg-white/[0.05] hover:text-white',
-  brand: 'font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-[0.14em] text-white',
+  navIdle: 'sys-nav-idle text-[color:var(--sys-nav-idle,rgba(255,255,255,0.55))] hover:bg-[color:var(--sys-nav-hover,rgba(255,255,255,0.05))] hover:text-[color:var(--sys-ink,#fff)]',
+  brand: 'font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-[0.14em] text-[color:var(--sys-brand,#fff)]',
 };
 
 export function sysNav(active: boolean, accent: SystemAccent, collapsed = false) {

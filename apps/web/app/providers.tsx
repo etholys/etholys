@@ -6,6 +6,13 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import type { Locale } from '@/lib/i18n';
 import { normalizeLocale, t } from '@/lib/i18n';
 import { ActiveCompanyBootstrap } from '@/components/hub/ActiveCompanyBootstrap';
+import {
+  applyAppearanceToDocument,
+  normalizeAppearance,
+  persistAppearance,
+  readStoredAppearance,
+  type Appearance,
+} from '@/lib/appearance';
 
 function readCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
@@ -29,6 +36,8 @@ interface AppContextType {
   setLocale: (l: Locale) => void;
   /** False until client has applied stored Hub language (avoid enrich/relocalize with default es). */
   localeReady: boolean;
+  appearance: Appearance;
+  setAppearance: (a: Appearance) => void;
   activeCompanyId: string | null;
   setActiveCompanyId: (id: string | null) => void;
   tr: (key: string) => string;
@@ -38,6 +47,8 @@ const AppContext = createContext<AppContextType>({
   locale: 'es',
   setLocale: () => {},
   localeReady: false,
+  appearance: 'dark',
+  setAppearance: () => {},
   activeCompanyId: null,
   setActiveCompanyId: () => {},
   tr: (key: string) => key,
@@ -56,6 +67,7 @@ export default function Providers({
 }) {
   const [locale, setLocale] = useState<Locale>('es');
   const [localeReady, setLocaleReady] = useState(false);
+  const [appearance, setAppearanceState] = useState<Appearance>('dark');
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -69,6 +81,9 @@ export default function Providers({
       setActiveCompanyId(savedCompany);
       document.cookie = `rc360_company=${encodeURIComponent(savedCompany)}; path=/; max-age=31536000; SameSite=Lax`;
     }
+    const nextAppearance = readStoredAppearance();
+    setAppearanceState(nextAppearance);
+    applyAppearanceToDocument(nextAppearance);
   }, []);
 
   const handleSetLocale = (l: Locale) => {
@@ -76,6 +91,12 @@ export default function Providers({
     setLocale(next);
     localStorage.setItem('rc360_locale', next);
     document.cookie = `rc360_locale=${next}; path=/; max-age=31536000; SameSite=Lax`;
+  };
+
+  const handleSetAppearance = (a: Appearance) => {
+    const next = normalizeAppearance(a);
+    setAppearanceState(next);
+    persistAppearance(next);
   };
 
   const handleSetCompany = (id: string | null) => {
@@ -91,8 +112,6 @@ export default function Providers({
 
   const tr = (key: string) => t(key, locale);
 
-  // Always render children (SSR + first paint). Previously we returned an empty div until
-  // mount, which dropped {children} entirely and caused a blank screen if JS/chunks failed to load.
   return (
     <SessionProvider session={session ?? undefined}>
       <AppContext.Provider
@@ -100,6 +119,8 @@ export default function Providers({
           locale,
           setLocale: handleSetLocale,
           localeReady,
+          appearance,
+          setAppearance: handleSetAppearance,
           activeCompanyId,
           setActiveCompanyId: handleSetCompany,
           tr,

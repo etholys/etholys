@@ -21,6 +21,8 @@ import { useLicensedSystems } from '@/hooks/useLicensedSystems';
 import { resolveHubCardAccess } from '@/lib/hub-system-license';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { CompanyPicker } from '@/components/hub/CompanyPicker';
+import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
+import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 
 type HubEntry = {
   id: string;
@@ -400,22 +402,10 @@ export default function HubPage() {
   };
 
   return (
-    <div className="etholys-hub relative isolate min-h-screen overflow-hidden bg-[#07111A] text-[#E8EEF2]">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_70%_10%,rgba(13,148,136,0.26),transparent_55%),radial-gradient(90%_70%_at_10%_90%,rgba(15,23,42,0.85),transparent_50%),linear-gradient(165deg,#041018_0%,#0B1C24_42%,#07111A_100%)]"
-      />
-      <div aria-hidden className="etholys-site-grid pointer-events-none absolute inset-0 opacity-[0.14]" />
-      <div
-        aria-hidden
-        className="etholys-site-orbit pointer-events-none absolute -right-[22%] top-[-8%] h-[75vmin] w-[75vmin] rounded-full border border-teal-400/15"
-      />
-      <div
-        aria-hidden
-        className="etholys-site-orbit-slow pointer-events-none absolute -right-[10%] top-[12%] h-[48vmin] w-[48vmin] rounded-full border border-teal-300/10"
-      />
+    <div className="etholys-hub relative isolate min-h-screen overflow-hidden bg-[color:var(--sys-canvas-bg,#07111A)] text-[color:var(--sys-ink,#E8EEF2)]">
+      <SystemAtmosphere accent="teal" />
 
-      <header className="relative z-20 border-b border-white/10 bg-[#07111A]/55 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+      <header className="relative z-20 border-b border-white/10 bg-[color:var(--sys-aside-bg,rgba(7,17,26,0.55))] pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-teal-400/25 bg-teal-500/10">
@@ -437,6 +427,7 @@ export default function HubPage() {
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
+            <AppearanceToggle collapsed />
             <button
               type="button"
               onClick={() => setLocale(locale === 'es' ? 'pt' : locale === 'pt' ? 'en' : 'es')}

@@ -32,6 +32,7 @@ import { useForgeT } from '@/lib/forge/use-forge-t';
 import { ForgeLocaleSwitcher } from '@/components/forge/ForgeLocaleSwitcher';
 import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
+import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
 import { sysTheme } from '@/lib/system-shell';
 
 const fg = {
@@ -198,7 +199,8 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
       <SystemAtmosphere accent="violet" />
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-white/10 bg-[#07111A]/88 backdrop-blur-md transition-transform',
+          sysTheme.aside,
+          'w-64',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
@@ -280,6 +282,7 @@ export default function ForgeLayout({ children }: { children: React.ReactNode })
         </nav>
 
         <div className="border-t border-white/10 p-3">
+          <AppearanceToggle className="mb-1" />
           <div className="flex items-center gap-2 px-2 py-2">
             <div
               className={cn(

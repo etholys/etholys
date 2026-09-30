@@ -20,6 +20,7 @@ import { useApp } from '@/app/providers';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
 import { CompanyPicker } from '@/components/hub/CompanyPicker';
+import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { cn, getInitials } from '@/lib/utils';
 import { sysTheme, type SystemAccent } from '@/lib/system-shell';
@@ -190,6 +191,7 @@ export function ProductAppShell({
           </nav>
 
           <div className={cn('flex-shrink-0 border-t border-white/10', collapsed ? 'p-1.5' : 'p-3')}>
+            <AppearanceToggle collapsed={collapsed} className="mb-1" />
             {!collapsed ? (
               <div className="flex items-center gap-3 px-3 py-2">
                 <div

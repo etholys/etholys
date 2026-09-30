@@ -19,6 +19,7 @@ import {
 import { useApp } from '@/app/providers';
 import { AdminAccessGuard } from '@/components/hub/AdminAccessGuard';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
+import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
 import { sysTheme } from '@/lib/system-shell';
 import { cn } from '@/lib/utils';
 import {
@@ -151,6 +152,9 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
         {Nav}
+        <div className="flex-shrink-0 border-t border-white/10 p-3">
+          <AppearanceToggle />
+        </div>
       </aside>
 
       {mobileOpen && (

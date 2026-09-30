@@ -8,7 +8,6 @@ import { ui } from '@/lib/i18n';
 import Link from 'next/link';
 import {
   LayoutDashboard,
-  Building2,
   Settings,
   LogOut,
   Menu,
@@ -22,16 +21,17 @@ import {
   Search,
   Heart,
   Lightbulb,
-  ShieldCheck,
-  Users,
   HandCoins,
-  MapPin,
-  Handshake,
   Network,
+  UsersRound,
+  Building2,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
 import { FundHubAssistantDock } from '@/components/fundhub/FundHubAssistantDock';
+import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
+import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
+import { sysTheme } from '@/lib/system-shell';
 
 export default function FundHubLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -114,38 +114,15 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
       icon: Lightbulb,
       label: locale === 'es' ? 'Propuestas' : locale === 'pt' ? 'Propostas' : 'Proposals',
     },
-  ];
-
-  const setupItems = [
-    {
-      href: '/hub/fundhub/passport',
-      icon: Building2,
-      label: locale === 'es' ? 'Perfil' : locale === 'pt' ? 'Perfil' : 'Profile',
-    },
-    {
-      href: '/hub/fundhub/demand',
-      icon: MapPin,
-      label: locale === 'es' ? 'Mapa' : locale === 'pt' ? 'Mapa' : 'Map',
-    },
-    {
-      href: '/hub/fundhub/compliance',
-      icon: ShieldCheck,
-      label: ui(locale, 'Cumplimiento', 'Compliance', 'Compliance'),
-    },
-    {
-      href: '/hub/fundhub/coalition',
-      icon: Users,
-      label: locale === 'es' ? 'Coalición' : locale === 'pt' ? 'Coalizão' : 'Coalition',
-    },
     {
       href: '/hub/fundhub/crm',
       icon: Network,
-      label: locale === 'es' ? 'CRM' : locale === 'pt' ? 'CRM' : 'CRM',
+      label: locale === 'es' ? 'Red' : locale === 'pt' ? 'Rede' : 'Network',
     },
     {
-      href: '/hub/fundhub/partners',
-      icon: Handshake,
-      label: locale === 'es' ? 'Socios' : locale === 'pt' ? 'Parceiros' : 'Partners',
+      href: '/hub/fundhub/operator',
+      icon: UsersRound,
+      label: locale === 'es' ? 'Operador' : locale === 'pt' ? 'Operador' : 'Operator',
     },
   ];
 
@@ -182,24 +159,12 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
     );
 
   return (
-    <div className="etholys-fundhub etholys-hub relative isolate flex min-h-screen overflow-hidden bg-[#07111A] text-[#E8EEF2]">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_78%_8%,rgba(217,119,6,0.22),transparent_52%),radial-gradient(90%_70%_at_8%_92%,rgba(15,23,42,0.9),transparent_50%),linear-gradient(165deg,#041018_0%,#0B1C24_42%,#07111A_100%)]"
-      />
-      <div aria-hidden className="etholys-site-grid pointer-events-none absolute inset-0 opacity-[0.12]" />
-      <div
-        aria-hidden
-        className="etholys-site-orbit pointer-events-none absolute -right-[24%] top-[-10%] h-[78vmin] w-[78vmin] rounded-full border border-amber-400/15"
-      />
-      <div
-        aria-hidden
-        className="etholys-site-orbit-slow pointer-events-none absolute -right-[8%] top-[18%] h-[46vmin] w-[46vmin] rounded-full border border-amber-300/10"
-      />
+    <div className="etholys-fundhub etholys-hub relative isolate flex min-h-screen overflow-hidden bg-[color:var(--sys-canvas-bg,#07111A)] text-[color:var(--sys-ink,#E8EEF2)]">
+      <SystemAtmosphere accent="amber" />
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex transform flex-col border-r border-white/10 bg-[#07111A]/88 backdrop-blur-md transition-all',
+          sysTheme.aside,
           collapsed ? 'w-16' : 'w-64',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         )}
@@ -344,26 +309,6 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
             <div className="h-px bg-white/10" />
           </div>
 
-          {setupItems.map((item) => {
-            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                title={collapsed ? item.label : undefined}
-                className={navClass(isActive, collapsed)}
-              >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
-                {!collapsed && item.label}
-              </Link>
-            );
-          })}
-
-          <div className="py-2">
-            <div className="h-px bg-white/10" />
-          </div>
-
           {bottomItems.map((item) => {
             const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
             return (
@@ -389,6 +334,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
         </nav>
 
         <div className={cn('flex-shrink-0 border-t border-white/10', collapsed ? 'p-1.5' : 'p-3')}>
+          <AppearanceToggle collapsed={collapsed} className="mb-1" />
           <div className={cn('mb-2 flex items-center', collapsed ? 'flex-col gap-1' : 'gap-1')}>
             <button
               type="button"
