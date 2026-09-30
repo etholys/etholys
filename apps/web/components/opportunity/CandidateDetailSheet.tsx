@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
@@ -31,6 +31,7 @@ import {
   Loader2,
   MapPin,
   MessageSquare,
+  MoreHorizontal,
   Send,
   ShieldCheck,
   ThumbsDown,
@@ -90,6 +91,8 @@ export function CandidateDetailSheet({
   const [forceProposal, setForceProposal] = useState(false);
   const [fit, setFit] = useState<CandidateFit | undefined>(c.fit);
   const [fitLoading, setFitLoading] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -100,9 +103,19 @@ export function CandidateDetailSheet({
     setRejectOpen(false);
     setDocsOpen(false);
     setForceProposal(false);
+    setMoreOpen(false);
     setFit(c.fit);
     setLive(c);
   }, [open, c.tempId, initialTab, c]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [moreOpen]);
 
   useEffect(() => {
     if (!open || !companyId) return;
@@ -312,14 +325,20 @@ export function CandidateDetailSheet({
     }
   };
 
+  /** Painel opaco sólido — evita ler a lista por detrás (sys-panel remaps são semi-transparentes). */
   const shell =
     variant === 'page'
-      ? 'flex w-full max-w-3xl flex-col rounded-2xl border border-gray-200 bg-white shadow-sm mx-auto'
-      : 'flex max-h-[92vh] w-full max-w-3xl flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl';
+      ? 'relative z-[1] mx-auto flex w-full max-w-3xl flex-col rounded-2xl border border-white/10 bg-[#0C1822] shadow-sm'
+      : 'relative z-[1] flex max-h-[92vh] w-full max-w-3xl flex-col rounded-t-2xl border border-white/10 bg-[#0C1822] shadow-2xl sm:rounded-2xl';
 
   const body = (
-      <div role="dialog" className={shell}>
-        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+      <div
+        role="dialog"
+        aria-modal={variant === 'modal'}
+        className={shell}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
           <div className="min-w-0">
             <div className="flex flex-wrap gap-1.5">
               {c.availabilityStatus && (
@@ -364,14 +383,14 @@ export function CandidateDetailSheet({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+              className="rounded-lg p-1.5 text-white/45 hover:bg-white/10 hover:text-white"
             >
               <X className="h-5 w-5" />
             </button>
           )}
         </div>
 
-        <div className="flex gap-1 border-b border-gray-100 px-4">
+        <div className="flex gap-1 border-b border-white/10 px-4">
           {(
             [
               ['overview', t('Resumo', 'Resumen', 'Overview')],
@@ -384,8 +403,8 @@ export function CandidateDetailSheet({
               onClick={() => setTab(key)}
               className={`border-b-2 px-3 py-2.5 text-sm font-medium ${
                 tab === key
-                  ? 'border-gray-900 text-gray-900'
-                  : 'border-transparent text-gray-500 hover:text-gray-800'
+                  ? 'border-amber-400 text-white'
+                  : 'border-transparent text-white/45 hover:text-white/80'
               }`}
             >
               {label}
@@ -710,118 +729,176 @@ export function CandidateDetailSheet({
           )}
         </div>
 
-        <div className="border-t border-gray-100 px-5 py-3">
-          <div className="flex flex-wrap gap-2">
-            {onFeedback && (
-              <>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onFeedback('save', { reasons: ['more_like_this'] })}
-                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                  {t('Guardar + aprender', 'Guardar + aprender', 'Save + learn')}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onFeedback('not_now')}
-                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  <Clock className="h-3.5 w-3.5" />
-                  {t('Não agora', 'No ahora', 'Not now')}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setRejectOpen((v) => !v)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100"
-                >
-                  <ThumbsDown className="h-3.5 w-3.5" />
-                  {t('Evitar este tipo', 'Evitar este tipo', 'Avoid this type')}
-                </button>
-              </>
-            )}
+        <div className="border-t border-white/10 px-5 py-3">
+          <div className="flex flex-wrap items-center gap-2">
             {proposalReady ? (
               <Link
                 href="/hub/fundhub/proposals?from=candidate"
                 onClick={persistProposalSeed}
-                className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-xs font-semibold text-slate-950 hover:bg-amber-400"
               >
                 <FileText className="h-3.5 w-3.5" />
-                {t('Proposta', 'Propuesta', 'Proposal')}
+                {t('Continuar proposta', 'Continuar propuesta', 'Continue proposal')}
               </Link>
             ) : (
               <button
                 type="button"
                 onClick={() => setForceProposal((v) => !v)}
-                className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-100"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-xs font-semibold text-slate-950 hover:bg-amber-400"
               >
-                <AlertTriangle className="h-3.5 w-3.5" />
-                {t('Proposta', 'Propuesta', 'Proposal')}
+                <FileText className="h-3.5 w-3.5" />
+                {t('Continuar proposta', 'Continuar propuesta', 'Continue proposal')}
               </button>
             )}
-            <button
-              type="button"
-              disabled={briefLoading}
-              onClick={() => void downloadDoc()}
-              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-            >
-              {briefLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-              {t('Descarregar .doc', 'Descargar .doc', 'Download .doc')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setDocsOpen(true)}
-              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-            >
-              {enriching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-              {t('Documentos', 'Documentos', 'Documents')}
-              {docs.length > 0 ? ` (${docs.length})` : ''}
-            </button>
-            {callPage && (
-              <a
-                href={callPage}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+
+            {onFeedback && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onFeedback('save', { reasons: ['more_like_this'] })}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-white/85 hover:bg-white/10 disabled:opacity-50"
               >
-                <ExternalLink className="h-3.5 w-3.5" />
-                {t('Página da convocatória', 'Página de la convocatoria', 'Call page')}
-              </a>
+                <Check className="h-3.5 w-3.5" />
+                {t('Guardar', 'Guardar', 'Save')}
+              </button>
             )}
-            {institutionPage && institutionPage !== callPage && (
-              <a
-                href={institutionPage}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+
+            <div ref={moreRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setMoreOpen((v) => !v)}
+                aria-expanded={moreOpen}
+                aria-haspopup="menu"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 hover:bg-white/10 hover:text-white"
               >
-                <Bookmark className="h-3.5 w-3.5" />
-                {t('Site da instituição', 'Sitio de la institución', 'Institution site')}
-              </a>
-            )}
-            {!callPage && (
-              <span className="inline-flex items-center rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-900">
-                {t('Sem página oficial da convocatória', 'Sin página oficial de la convocatoria', 'No official call page')}
-              </span>
-            )}
-            {previewHref && variant === 'modal' && (
-              <Link
-                href={previewHref}
-                target="_blank"
-                className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-900 hover:bg-violet-100"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                {t('Abrir em nova janela', 'Abrir en nueva ventana', 'Open in new window')}
-              </Link>
-            )}
+                <MoreHorizontal className="h-3.5 w-3.5" />
+                {t('Mais', 'Más', 'More')}
+              </button>
+              {moreOpen && (
+                <div
+                  role="menu"
+                  className="absolute bottom-full left-0 z-20 mb-1.5 min-w-[14rem] overflow-hidden rounded-lg border border-white/10 bg-[#0C1822] py-1 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.95)] sm:left-auto sm:right-0"
+                >
+                  {onFeedback && (
+                    <>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={busy}
+                        onClick={() => {
+                          onFeedback('not_now');
+                          setMoreOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 disabled:opacity-50"
+                      >
+                        <Clock className="h-3.5 w-3.5 text-white/45" />
+                        {t('Não agora', 'No ahora', 'Not now')}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={busy}
+                        onClick={() => {
+                          setRejectOpen(true);
+                          setMoreOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 disabled:opacity-50"
+                      >
+                        <ThumbsDown className="h-3.5 w-3.5 text-white/45" />
+                        {t('Evitar este tipo', 'Evitar este tipo', 'Avoid this type')}
+                      </button>
+                      <div className="my-1 border-t border-white/10" />
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={briefLoading}
+                    onClick={() => {
+                      setMoreOpen(false);
+                      void downloadDoc();
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 disabled:opacity-50"
+                  >
+                    {briefLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-white/45" />
+                    ) : (
+                      <Download className="h-3.5 w-3.5 text-white/45" />
+                    )}
+                    {t('Descarregar .doc', 'Descargar .doc', 'Download .doc')}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setDocsOpen(true);
+                      setMoreOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5"
+                  >
+                    {enriching ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-white/45" />
+                    ) : (
+                      <FileText className="h-3.5 w-3.5 text-white/45" />
+                    )}
+                    {t('Documentos', 'Documentos', 'Documents')}
+                    {docs.length > 0 ? ` (${docs.length})` : ''}
+                  </button>
+                  {callPage && (
+                    <a
+                      href={callPage}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      role="menuitem"
+                      onClick={() => setMoreOpen(false)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 text-white/45" />
+                      {t('Página da convocatória', 'Página de la convocatoria', 'Call page')}
+                    </a>
+                  )}
+                  {institutionPage && institutionPage !== callPage && (
+                    <a
+                      href={institutionPage}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      role="menuitem"
+                      onClick={() => setMoreOpen(false)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5"
+                    >
+                      <Bookmark className="h-3.5 w-3.5 text-white/45" />
+                      {t('Site da instituição', 'Sitio de la institución', 'Institution site')}
+                    </a>
+                  )}
+                  {previewHref && variant === 'modal' && (
+                    <Link
+                      href={previewHref}
+                      target="_blank"
+                      role="menuitem"
+                      onClick={() => setMoreOpen(false)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 text-white/45" />
+                      {t('Abrir em nova janela', 'Abrir en nueva ventana', 'Open in new window')}
+                    </Link>
+                  )}
+                  {!callPage && (
+                    <p className="px-3 py-2 text-[11px] text-amber-200/80">
+                      {t(
+                        'Sem página oficial da convocatória',
+                        'Sin página oficial de la convocatoria',
+                        'No official call page',
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {!proposalReady && forceProposal && (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-              <p className="text-xs text-amber-950">
+            <div className="mt-3 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2.5">
+              <p className="text-xs text-amber-100">
                 {t(
                   'A convocatória ainda não está verificada. Abrir a proposta mesmo assim?',
                   'La convocatoria aún no está verificada. ¿Abrir la propuesta de todos modos?',
@@ -832,14 +909,14 @@ export function CandidateDetailSheet({
                 <Link
                   href="/hub/fundhub/proposals?from=candidate"
                   onClick={persistProposalSeed}
-                  className="inline-flex items-center rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+                  className="inline-flex items-center rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-amber-400"
                 >
                   {t('Abrir mesmo assim', 'Abrir de todos modos', 'Open anyway')}
                 </Link>
                 <button
                   type="button"
                   onClick={() => setForceProposal(false)}
-                  className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100"
+                  className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10"
                 >
                   {t('Cancelar', 'Cancelar', 'Cancel')}
                 </button>
@@ -848,7 +925,7 @@ export function CandidateDetailSheet({
           )}
 
           {rejectOpen && onFeedback && (
-            <div className="mt-3 rounded-lg border border-red-100 bg-red-50/50 p-3">
+            <div className="mt-3 rounded-lg border border-red-400/25 bg-red-500/10 p-3">
               <textarea
                 value={rejectNote}
                 onChange={(e) => setRejectNote(e.target.value)}
@@ -858,7 +935,7 @@ export function CandidateDetailSheet({
                   '¿Por qué evitar este tipo?',
                   'Why avoid this type?',
                 )}
-                className="w-full rounded-lg border border-red-200 px-3 py-2 text-xs"
+                className="w-full rounded-lg border border-white/15 bg-[#07111A] px-3 py-2 text-xs text-white"
               />
               <button
                 type="button"
@@ -870,7 +947,7 @@ export function CandidateDetailSheet({
                   });
                   setRejectOpen(false);
                 }}
-                className="mt-2 rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800"
+                className="mt-2 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500"
               >
                 {t('Confirmar rejeição de tipo', 'Confirmar rechazo', 'Confirm type reject')}
               </button>
@@ -881,14 +958,14 @@ export function CandidateDetailSheet({
   );
 
   const docsModal = docsOpen ? (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
-      <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/75 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+      <div className="relative z-[1] w-full max-w-md rounded-t-2xl border border-white/10 bg-[#0C1822] p-5 shadow-2xl sm:rounded-2xl">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">
+            <h3 className="text-sm font-semibold text-white">
               {t('Documentos da convocatória', 'Documentos de la convocatoria', 'Call documents')}
             </h3>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-white/50">
               {t(
                 'Anexos oficiais para ler, para a IA e para a proposta.',
                 'Anexos oficiales para leer, para la IA y para la propuesta.',
@@ -896,18 +973,22 @@ export function CandidateDetailSheet({
               )}
             </p>
           </div>
-          <button type="button" onClick={() => setDocsOpen(false)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
+          <button
+            type="button"
+            onClick={() => setDocsOpen(false)}
+            className="rounded-lg p-1 text-white/45 hover:bg-white/10 hover:text-white"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
         {enriching && (
-          <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+          <p className="mt-3 flex items-center gap-2 text-xs text-white/50">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             {t('A procurar anexos na página oficial…', 'Buscando anexos en la página oficial…', 'Looking for attachments on the official page…')}
           </p>
         )}
         {docs.length === 0 && !enriching && (
-          <p className="mt-4 text-sm text-gray-600">
+          <p className="mt-4 text-sm text-white/65">
             {callPage
               ? t(
                   'Ainda sem anexos extraídos. Abra a página da convocatória — a IA usará esse endereço.',
@@ -924,18 +1005,25 @@ export function CandidateDetailSheet({
         {docs.length > 0 && (
           <ul className="mt-4 max-h-64 space-y-2 overflow-y-auto">
             {docs.map((doc) => (
-              <li key={doc.url} className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2">
+              <li
+                key={doc.url}
+                className="flex items-center justify-between gap-2 rounded-lg border border-white/10 px-3 py-2"
+              >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-900">{doc.title}</p>
-                  <p className="truncate text-[11px] text-gray-400">{doc.kind ?? 'file'}</p>
+                  <p className="truncate text-sm font-medium text-white">{doc.title}</p>
+                  <p className="truncate text-[11px] text-white/40">{doc.kind ?? 'file'}</p>
                 </div>
                 <button
                   type="button"
                   disabled={downloading !== null}
                   onClick={() => void downloadOfficial([doc.url], false, doc.url)}
-                  className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+                  className="shrink-0 rounded-md border border-white/15 px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/5"
                 >
-                  {downloading === doc.url ? <Loader2 className="h-3 w-3 animate-spin" /> : t('Baixar', 'Descargar', 'Download')}
+                  {downloading === doc.url ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    t('Baixar', 'Descargar', 'Download')
+                  )}
                 </button>
               </li>
             ))}
@@ -947,9 +1035,13 @@ export function CandidateDetailSheet({
               type="button"
               disabled={downloading !== null}
               onClick={() => void downloadOfficial(docs.map((d) => d.url), true, 'zip')}
-              className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
             >
-              {downloading === 'zip' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              {downloading === 'zip' ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
               {t('Baixar todos (ZIP)', 'Descargar todos (ZIP)', 'Download all (ZIP)')}
             </button>
           )}
@@ -958,7 +1050,7 @@ export function CandidateDetailSheet({
               type="button"
               disabled={downloading !== null}
               onClick={() => void downloadOfficial([docs[0]!.url], false, docs[0]!.url)}
-              className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
             >
               <Download className="h-3.5 w-3.5" />
               {t('Baixar ficheiro', 'Descargar archivo', 'Download file')}
@@ -969,7 +1061,7 @@ export function CandidateDetailSheet({
               href={callPage}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/5"
             >
               <ExternalLink className="h-3.5 w-3.5" />
               {t('Abrir convocatória', 'Abrir convocatoria', 'Open call')}
@@ -990,7 +1082,12 @@ export function CandidateDetailSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       {body}
       {docsModal}
     </div>
