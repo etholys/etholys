@@ -36,7 +36,11 @@ function cleanPortrait(text: string): string {
     .trim();
 }
 
-export async function materializeAuroraBets(companyId: string, proposed: AuroraBetDraft[]) {
+export async function materializeAuroraBets(
+  companyId: string,
+  proposed: AuroraBetDraft[],
+  status: 'proposed' | 'accepted' | 'active' = 'proposed',
+) {
   if (!proposed.length) return 0;
   const existing = await prisma.businessBet.findMany({
     where: { companyId },
@@ -55,7 +59,7 @@ export async function materializeAuroraBets(companyId: string, proposed: AuroraB
       title: bet.title,
       why: bet.why,
       indicator: bet.indicator || null,
-      status: 'proposed',
+      status,
       sortOrder: start + i,
     })),
   });

@@ -22,7 +22,6 @@ export function AuroraAttendedPicker({ collapsed }: { collapsed?: boolean }) {
           empty: 'Sin negocio en cartera',
           pick: 'Elegí un negocio…',
           invite: 'Invitar técnicos',
-          hint: 'Incubadora → negocio externo (no es POLARIS).',
           clear: 'Ninguno',
         }
       : loc === 'en'
@@ -31,7 +30,6 @@ export function AuroraAttendedPicker({ collapsed }: { collapsed?: boolean }) {
             empty: 'No businesses in portfolio',
             pick: 'Pick a business…',
             invite: 'Invite technicians',
-            hint: 'Incubator → external business (not POLARIS).',
             clear: 'None',
           }
         : {
@@ -39,7 +37,6 @@ export function AuroraAttendedPicker({ collapsed }: { collapsed?: boolean }) {
             empty: 'Sem negócios na carteira',
             pick: 'Escolhe um negócio…',
             invite: 'Convidar técnicos',
-            hint: 'Incubadora → negócio externo (não é POLARIS).',
             clear: 'Nenhum',
           };
 
@@ -133,7 +130,6 @@ export function AuroraAttendedPicker({ collapsed }: { collapsed?: boolean }) {
           </div>
         )}
       </div>
-      <p className="px-0.5 text-[10px] leading-snug text-white/35">{copy.hint}</p>
       {canManage ? (
         <Link
           href="/hub/workspace/team"

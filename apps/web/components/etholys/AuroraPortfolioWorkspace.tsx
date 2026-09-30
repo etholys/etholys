@@ -33,6 +33,11 @@ function dossierHref(row: AuroraPortfolioItem) {
   return `/hub/aurora/dossie?${q}`;
 }
 
+function avanceHref(row: AuroraPortfolioItem) {
+  const q = new URLSearchParams({ company: row.companyId, engagement: row.engagementId });
+  return `/hub/aurora/avance?${q}`;
+}
+
 const EMPTY_COUNTS: AuroraPortfolioCounts = {
   total: 0,
   mine: 0,
@@ -93,6 +98,7 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
           open: 'Abrir dossier',
           talkNow: 'Empezar conversación',
           diagnose: 'Diagnóstico',
+          avance: 'Avance',
           diagDone: 'diagnóstico',
           bets: 'apuestas',
           week: 'Ronda',
@@ -141,6 +147,7 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
             open: 'Open dossier',
             talkNow: 'Start conversation',
             diagnose: 'Diagnostic',
+            avance: 'Progress',
             diagDone: 'diagnostic',
             bets: 'bets',
             week: 'Round',
@@ -188,6 +195,7 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
             open: 'Abrir dossiê',
             talkNow: 'Começar conversa',
             diagnose: 'Diagnóstico',
+            avance: 'Avanço',
             diagDone: 'diagnóstico',
             bets: 'apostas',
             week: 'Ronda',
@@ -437,6 +445,13 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
             className="font-medium text-slate-600 hover:underline"
           >
             {copy.open}
+          </Link>
+          <Link
+            href={avanceHref(row)}
+            onClick={() => remember(row)}
+            className="font-medium text-slate-500 hover:underline"
+          >
+            {copy.avance}
           </Link>
         </div>
         {opts?.log ? (

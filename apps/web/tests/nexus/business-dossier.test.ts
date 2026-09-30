@@ -23,6 +23,15 @@ import {
   startDiagBlock,
 } from '../../lib/aurora-diagnostic';
 import {
+  attendedAuroraView,
+  composeRadiographyFromDiagnostic,
+  emptyAuroraValidation,
+  nextAuroraBetStatuses,
+  normalizeAuroraBetStatus,
+  proposeRouteFromDiagnostic,
+  resolveAuroraFlowPhase,
+} from '../../lib/aurora-flow';
+import {
   auroraAttention,
   auroraNextAction,
   auroraPortfolioCounts,
@@ -335,5 +344,72 @@ test('AURORA tool href requires attended business and engagement', () => {
     auroraToolHref('/hub/aurora/diagnostico', { companyId: 'c1', engagementId: 'e1' }),
     /engagement=e1/,
   );
+});
+
+test('AURORA radiography and route come from a completed diagnostic', () => {
+  let state = emptyAuroraDiagnostic();
+  for (const id of ['governance', 'finance', 'operations', 'people', 'commercial', 'systems'] as const) {
+    state = startDiagBlock(state, id, 'es');
+    state = confirmDiagBlock(state, id, {
+      level: 2,
+      situation: `Situación real del bloque ${id} con detalle suficiente.`,
+      gap: `Brecha de ${id}`,
+      potential: `Potencial de ${id}`,
+    });
+  }
+  const doc = composeRadiographyFromDiagnostic(state, 'es', 'Rural Commerce');
+  assert.match(doc.body, /Dirección|Dinero|Rural Commerce/i);
+  assert.ok(doc.hypothesis.length > 10);
+  const bets = proposeRouteFromDiagnostic(state, 'es');
+  assert.ok(bets.length >= 2);
+  assert.equal(
+    resolveAuroraFlowPhase({
+      diagnostic: state,
+      radiography: null,
+      validation: emptyAuroraValidation(),
+      openBetCount: 0,
+    }),
+    'radio',
+  );
+  assert.equal(
+    resolveAuroraFlowPhase({
+      diagnostic: state,
+      radiography: doc,
+      validation: { techAccepted: true, aiAccepted: true, techNotes: '', aiNotes: '', acceptedAt: 'x' },
+      openBetCount: 0,
+    }),
+    'route',
+  );
+  const attended = attendedAuroraView({
+    companyName: 'Rural Commerce',
+    portraitText: doc.body,
+    hypothesis: doc.hypothesis,
+    hypothesisAccepted: true,
+    gaps: [{ text: 'x' }],
+    potentials: [{ text: 'y' }],
+    radiography: doc,
+    bets: [
+      { id: '1', title: 'A1', status: 'accepted', why: '', indicator: '' },
+      { id: '2', title: 'A2', status: 'done', why: '', indicator: '' },
+    ],
+    phase: 'live',
+  });
+  assert.equal(attended.progress.pct, 50);
+  assert.equal(attended.route.length, 2);
+  assert.equal(attended.progress.activitiesOpen, 1);
+});
+
+test('AURORA bet status transitions stay linear', () => {
+  assert.deepEqual(nextAuroraBetStatuses('proposed'), ['accepted', 'dropped']);
+  assert.deepEqual(nextAuroraBetStatuses('active'), ['done', 'dropped']);
+  assert.equal(normalizeAuroraBetStatus('done'), 'done');
+  assert.equal(normalizeAuroraBetStatus('nope'), null);
+});
+
+test('AURORA viewer role prefers incubator when the company operates AT', async () => {
+  const { pickAuroraViewerRole } = await import('../../lib/aurora-role');
+  assert.equal(pickAuroraViewerRole({ operates: true, attendedAs: true }), 'incubator');
+  assert.equal(pickAuroraViewerRole({ operates: false, attendedAs: true }), 'attended');
+  assert.equal(pickAuroraViewerRole({ operates: false, attendedAs: false }), 'incubator');
 });
 

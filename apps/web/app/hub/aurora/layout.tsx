@@ -1,6 +1,7 @@
 'use client';
 
-import { Suspense, useCallback, type ReactNode } from 'react';
+import { Suspense, useCallback, useEffect, type ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { ProductAppShell } from '@/components/etholys/ProductAppShell';
 import { useApp } from '@/app/providers';
 import {
@@ -13,13 +14,36 @@ function AuroraShellInner({ children }: { children: ReactNode }) {
   const { locale } = useApp();
   const es = locale === 'es';
   const en = locale === 'en';
-  const { diagnosticHref, dossierHref, hasSelection } = useAuroraAttended();
+  const pathname = usePathname();
+  const router = useRouter();
+  const {
+    diagnosticHref,
+    dossierHref,
+    avanceHref,
+    hasSelection,
+    isAttendedViewer,
+    loading,
+  } = useAuroraAttended();
 
-  const nav = [
+  // Negócio atendido: só Avance — redireciona ferramentas de técnico
+  useEffect(() => {
+    if (loading || !isAttendedViewer) return;
+    const techPaths = ['/hub/aurora/diagnostico', '/hub/aurora/dossie', '/hub/aurora/programas', '/hub/aurora/contratos'];
+    if (pathname === '/hub/aurora' || techPaths.some((p) => pathname?.startsWith(p))) {
+      router.replace(hasSelection ? avanceHref : '/hub/aurora/avance');
+    }
+  }, [loading, isAttendedViewer, pathname, router, avanceHref, hasSelection]);
+
+  const incubatorNav = [
     { href: '/hub/aurora', label: es ? 'Cartera' : en ? 'Portfolio' : 'Carteira' },
     {
       href: '/hub/aurora/diagnostico',
-      label: es ? 'Diagnóstico' : en ? 'Diagnostic' : 'Diagnóstico',
+      label: es ? 'Acompañamiento' : en ? 'Accompaniment' : 'Acompanhamento',
+      requiresAttended: true,
+    },
+    {
+      href: '/hub/aurora/avance',
+      label: es ? 'Avance' : en ? 'Progress' : 'Avanço',
       requiresAttended: true,
     },
     {
@@ -29,20 +53,34 @@ function AuroraShellInner({ children }: { children: ReactNode }) {
     },
     { href: '/hub/aurora/programas', label: es ? 'Programas' : en ? 'Programs' : 'Programas' },
     { href: '/hub/aurora/contratos', label: es ? 'Contratos' : en ? 'Contracts' : 'Contratos' },
-    { href: '/hub/radar', label: 'RADAR' },
   ];
+
+  const attendedNav = [
+    {
+      href: '/hub/aurora/avance',
+      label: es ? 'Mi avance' : en ? 'My progress' : 'O meu avanço',
+    },
+  ];
+
+  const nav = isAttendedViewer ? attendedNav : incubatorNav;
 
   const resolveNavHref = useCallback(
     (item: { href: string; requiresAttended?: boolean }) => {
+      if (isAttendedViewer) {
+        return hasSelection ? avanceHref : '/hub/aurora/avance';
+      }
       if (item.href === '/hub/aurora/diagnostico') {
         return hasSelection ? diagnosticHref : '/hub/aurora?pick=1';
       }
       if (item.href === '/hub/aurora/dossie') {
         return hasSelection ? dossierHref : '/hub/aurora?pick=1';
       }
+      if (item.href === '/hub/aurora/avance') {
+        return hasSelection ? avanceHref : '/hub/aurora?pick=1';
+      }
       return item.href;
     },
-    [diagnosticHref, dossierHref, hasSelection],
+    [isAttendedViewer, hasSelection, avanceHref, diagnosticHref, dossierHref],
   );
 
   return (
@@ -50,7 +88,7 @@ function AuroraShellInner({ children }: { children: ReactNode }) {
       product="aurora"
       accent="amber"
       nav={nav}
-      sidebarAfterCompany={<AuroraAttendedPicker />}
+      sidebarAfterCompany={isAttendedViewer ? null : <AuroraAttendedPicker />}
       resolveNavHref={resolveNavHref}
     >
       {children}

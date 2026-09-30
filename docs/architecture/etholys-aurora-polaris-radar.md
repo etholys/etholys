@@ -15,7 +15,9 @@ Nomes anteriores (NIDO / RUMO / PULSO) redirecionam para estas rotas.
 1. **Seletor global Etholys (Hub)** — empresa do grupo / incubadora com a qual estás a operar (`activeCompanyId` / CompanyPicker). É a **operadora** dos contratos AT.
 2. **Seletor interno AURORA** — **negócio atendido** (MIPYME externa) + contrato AT (`?company=&engagement=` + `localStorage aurora_attended:<operatorId>`). Nunca usar o seletor Hub como se fosse o negócio diagnosticado.
 
-Fluxo alvo (contínuo): diagnóstico inicial → documento/raio-x → validação técnico↔IA → rota de intervenção (atividades) + chat do técnico → vista do atendido (só raio-x, rota, avanço).
+Fluxo alvo (contínuo): diagnóstico inicial → documento/raio-x (`composeRadiographyFromDiagnostic`) → validação técnico↔IA (`/api/business-dossier/flow`) → rota de intervenção (atividades = `BusinessBet`) + chat do técnico → vista do atendido em `/hub/aurora/avance` (só raio-x, rota e avanço).
+
+UI do técnico: `/hub/aurora/diagnostico` = `AuroraJourneyWorkspace` com rail Diagnóstico → Radiografía → Validar → Ruta → En curso. Na rota: mudar estado das atividades, chat com IA (pode sugerir status/novas apostas), nota semanal. Mutações do fluxo (`POST /api/business-dossier/flow`) só pela **operadora** do contrato AT — o negócio atendido não edita. Vista do atendido: `/hub/aurora/avance` — se a empresa ativa do Hub **é** o negócio atendido (não opera AT), o shell AURORA fica limpo (só «Mi avance»), sem seletor de negócio nem menu de técnico.
 
 ## Carteira e técnicos
 

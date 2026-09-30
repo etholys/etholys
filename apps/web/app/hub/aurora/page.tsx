@@ -1,17 +1,15 @@
-import { redirect } from 'next/navigation';
-import { AuroraPortfolioWorkspace } from '@/components/etholys/AuroraPortfolioWorkspace';
+import { Suspense } from 'react';
+import { Loader2 } from 'lucide-react';
+import { AuroraHomeGate } from '@/components/etholys/AuroraHomeGate';
 
 export default function AuroraPortfolioPage({
   searchParams,
 }: {
   searchParams: { company?: string; engagement?: string };
 }) {
-  const company = String(searchParams.company || '').trim();
-  if (company) {
-    const q = new URLSearchParams({ company });
-    const engagement = String(searchParams.engagement || '').trim();
-    if (engagement) q.set('engagement', engagement);
-    redirect(`/hub/aurora/diagnostico?${q}`);
-  }
-  return <AuroraPortfolioWorkspace />;
+  return (
+    <Suspense fallback={<Loader2 className="mx-auto mt-20 h-8 w-8 animate-spin text-amber-700" />}>
+      <AuroraHomeGate company={searchParams.company} engagement={searchParams.engagement} />
+    </Suspense>
+  );
 }
