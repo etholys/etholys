@@ -2,12 +2,39 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 600;
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { readOpportunityBriefing, writeOpportunityBriefing } from '@/lib/opportunity/briefing';
 import { pendingCandidates, readCompanyScanInbox, readScanResults } from '@/lib/opportunity/candidate-store';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import { runOpportunityScan } from '@/lib/opportunity/run-scan';
 import type { OpportunityBriefing, ScanFocus } from '@/lib/opportunity/scan-types';
+import { isSystemAdmin } from '@/lib/platform-access';
+
+type RunCostFields = {
+  estimatedCostUsd?: number | null;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  webSearchRequests?: number | null;
+};
+
+/** Custo IA / tokens — só system admin Etholys; clientes não recebem no JSON. */
+function stripRunCostsForClient<T extends RunCostFields>(
+  run: T,
+  allowInternalCosts: boolean,
+): T {
+  if (allowInternalCosts) return run;
+  const {
+    estimatedCostUsd: _c,
+    inputTokens: _i,
+    outputTokens: _o,
+    webSearchRequests: _w,
+    ...rest
+  } = run;
+  return rest as T;
+}
+
 
 function progressFromErrorsJson(errorsJson: string | null | undefined): {
   progressPct: number | null;
@@ -28,6 +55,9 @@ function progressFromErrorsJson(errorsJson: string | null | undefined): {
 export async function GET(req: NextRequest) {
   const ctx = await resolveOpportunityCompanyId(req.nextUrl.searchParams.get('companyId'));
   if (!ctx) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+
+  const session = await getServerSession(authOptions);
+  const allowInternalCosts = isSystemAdmin(session?.user?.email);
 
   const runId = req.nextUrl.searchParams.get('runId')?.trim();
 
@@ -90,6 +120,8 @@ export async function GET(req: NextRequest) {
     readCompanyScanInbox(ctx.companyId),
   ]);
 
+  const safeRecent = recentRuns.map((r) => stripRunCostsForClient(r, allowInternalCosts));
+
   if (!latest) {
     return NextResponse.json({
       companyId: ctx.companyId,
@@ -98,35 +130,38 @@ export async function GET(req: NextRequest) {
       pendingOpen: [],
       pendingReference: [],
       later: [],
-      recentRuns,
+      recentRuns: safeRecent,
     });
   }
 
   const results = await readScanResults(ctx.companyId, latest.id);
   return NextResponse.json({
     companyId: ctx.companyId,
-    latest: {
-      id: latest.id,
-      status: latest.status,
-      startedAt: latest.startedAt,
-      finishedAt: latest.finishedAt,
-      scanned: latest.scanned,
-      created: latest.created,
-      errorCount: latest.errorCount,
-      estimatedCostUsd: latest.estimatedCostUsd,
-      inputTokens: latest.inputTokens,
-      outputTokens: latest.outputTokens,
-      webSearchRequests: latest.webSearchRequests,
-      discoveryMode: results.discoveryMode ?? null,
-      searchQueries: results.searchQueries ?? [],
-      scanFocus: results.scanFocus ?? null,
-      scanProfileName: results.scanProfileName ?? null,
-    },
+    latest: stripRunCostsForClient(
+      {
+        id: latest.id,
+        status: latest.status,
+        startedAt: latest.startedAt,
+        finishedAt: latest.finishedAt,
+        scanned: latest.scanned,
+        created: latest.created,
+        errorCount: latest.errorCount,
+        estimatedCostUsd: latest.estimatedCostUsd,
+        inputTokens: latest.inputTokens,
+        outputTokens: latest.outputTokens,
+        webSearchRequests: latest.webSearchRequests,
+        discoveryMode: results.discoveryMode ?? null,
+        searchQueries: results.searchQueries ?? [],
+        scanFocus: results.scanFocus ?? null,
+        scanProfileName: results.scanProfileName ?? null,
+      },
+      allowInternalCosts,
+    ),
     pending: inbox.pending,
     pendingOpen: inbox.pendingOpen,
     pendingReference: inbox.pendingReference,
     later: inbox.later,
-    recentRuns,
+    recentRuns: safeRecent,
   });
 }
 

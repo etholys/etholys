@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { useApp } from '@/app/providers';
+
 import { isLikelyDbId } from '@/lib/utils';
 import { StateEmpty, StateLoading } from '@/components/ui/StateBlocks';
 import { CandidateDetailSheet } from '@/components/opportunity/CandidateDetailSheet';
@@ -120,7 +122,12 @@ const KIND_OPTIONS: { id: OpportunityKind; pt: string; es: string }[] = [
 ];
 
 export default function OpportunityDiscoverPage() {
+  const { data: session } = useSession();
+  const isEtholysAdmin = Boolean(
+    (session?.user as { platformAdmin?: boolean } | undefined)?.platformAdmin,
+  );
   const { locale, activeCompanyId } = useApp();
+
   const companyId = useMemo(() => {
     const s = String(activeCompanyId ?? '').trim();
     return isLikelyDbId(s) ? s : '';
@@ -699,8 +706,13 @@ export default function OpportunityDiscoverPage() {
       )}
 
       {(recentRuns.length > 0 || catalogTotal > 0) && (
-        <YieldStatsPanel snap={yieldSnap} locale={locale} />
+        <YieldStatsPanel
+          snap={yieldSnap}
+          locale={locale}
+          showInternalCosts={isEtholysAdmin}
+        />
       )}
+
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="min-w-0 space-y-4">
@@ -719,7 +731,7 @@ export default function OpportunityDiscoverPage() {
                     </span>
                     <span>
                       +{run.created} {t('candidatos', 'candidatos', 'candidates')}
-                      {typeof run.estimatedCostUsd === 'number'
+                      {isEtholysAdmin && typeof run.estimatedCostUsd === 'number'
                         ? ` · $${run.estimatedCostUsd < 0.01 && run.estimatedCostUsd > 0 ? run.estimatedCostUsd.toFixed(4) : run.estimatedCostUsd.toFixed(2)}`
                         : ''}
                       {run.errorCount > 0 ? ` · ${run.errorCount} ${t('erros', 'errores', 'errors')}` : ''}
