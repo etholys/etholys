@@ -705,12 +705,8 @@ export default function OpportunityDiscoverPage() {
         </div>
       )}
 
-      {(recentRuns.length > 0 || catalogTotal > 0) && (
-        <YieldStatsPanel
-          snap={yieldSnap}
-          locale={locale}
-          showInternalCosts={isEtholysAdmin}
-        />
+      {isEtholysAdmin && (recentRuns.length > 0 || catalogTotal > 0) && (
+        <YieldStatsPanel snap={yieldSnap} locale={locale} showInternalCosts />
       )}
 
 
