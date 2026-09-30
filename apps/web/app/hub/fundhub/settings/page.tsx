@@ -35,10 +35,10 @@ export default function FundHubSettingsPage() {
           </div>
           <Link
             href="/hub/fundhub/crm"
-            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-amber-800 hover:underline"
+            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-amber-300 hover:underline"
           >
             <Network className="h-4 w-4" />
-            {t('Abrir CRM de captação', 'Abrir CRM de captación', 'Open capture CRM')}
+            {t('Abrir Rede (perfil · aliados · doadores)', 'Abrir Red (perfil · aliados · donantes)', 'Open Network (profile · allies · donors)')}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

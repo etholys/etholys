@@ -26,7 +26,7 @@ import {
   UsersRound,
   Building2,
 } from 'lucide-react';
-import { cn, getInitials } from '@/lib/utils';
+import { cn, getInitials, isLikelyDbId } from '@/lib/utils';
 import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
 import { FundHubAssistantDock } from '@/components/fundhub/FundHubAssistantDock';
 import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
@@ -46,6 +46,10 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
   const [notifications, setNotifications] = useState<any[]>([]);
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
   const [chatUnread, setChatUnread] = useState(0);
+  const [whitelabelActive, setWhitelabelActive] = useState(false);
+  const [redOpen, setRedOpen] = useState(
+    () => Boolean(pathname?.startsWith('/hub/fundhub/crm')),
+  );
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/login');
@@ -82,6 +86,30 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
     }
   }, [status]);
 
+  useEffect(() => {
+    if (pathname?.startsWith('/hub/fundhub/crm')) setRedOpen(true);
+  }, [pathname]);
+
+  useEffect(() => {
+    const cid = String(activeCompanyId ?? '').trim();
+    if (status !== 'authenticated' || !isLikelyDbId(cid)) {
+      setWhitelabelActive(false);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/fundhub/operator/inbox?companyId=${encodeURIComponent(cid)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { operator?: boolean } | null) => {
+        if (!cancelled) setWhitelabelActive(Boolean(d?.operator));
+      })
+      .catch(() => {
+        if (!cancelled) setWhitelabelActive(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [status, activeCompanyId]);
+
   if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#07111A]">
@@ -114,15 +142,29 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
       icon: Lightbulb,
       label: locale === 'es' ? 'Propuestas' : locale === 'pt' ? 'Propostas' : 'Proposals',
     },
+  ];
+
+  const redChildren = [
     {
       href: '/hub/fundhub/crm',
-      icon: Network,
-      label: locale === 'es' ? 'Red' : locale === 'pt' ? 'Rede' : 'Network',
+      label: locale === 'es' ? 'Panel' : locale === 'pt' ? 'Painel' : 'Dashboard',
     },
     {
-      href: '/hub/fundhub/operator',
-      icon: UsersRound,
-      label: locale === 'es' ? 'Operador' : locale === 'pt' ? 'Operador' : 'Operator',
+      href: '/hub/fundhub/crm/perfil',
+      label: locale === 'es' ? 'Perfil institucional' : locale === 'pt' ? 'Perfil institucional' : 'Institutional profile',
+    },
+    {
+      href: '/hub/fundhub/crm/aliados',
+      label: locale === 'es' ? 'Aliados' : locale === 'pt' ? 'Aliados' : 'Allies',
+    },
+    {
+      href: '/hub/fundhub/crm/donantes',
+      label:
+        locale === 'es'
+          ? 'Donantes / financiadores'
+          : locale === 'pt'
+            ? 'Doadores / financiadores'
+            : 'Donors / funders',
     },
   ];
 
@@ -304,6 +346,75 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
               </Link>
             );
           })}
+
+          {collapsed ? (
+            <Link
+              href="/hub/fundhub/crm"
+              onClick={() => setSidebarOpen(false)}
+              title={locale === 'es' ? 'Red' : locale === 'pt' ? 'Rede' : 'Network'}
+              className={navClass(Boolean(pathname?.startsWith('/hub/fundhub/crm')), true)}
+            >
+              <Network className="h-5 w-5 flex-shrink-0" />
+            </Link>
+          ) : (
+            <div className="space-y-0.5">
+              <button
+                type="button"
+                onClick={() => setRedOpen((v) => !v)}
+                className={cn(
+                  navClass(Boolean(pathname?.startsWith('/hub/fundhub/crm')), false),
+                  'w-full',
+                )}
+              >
+                <Network className="h-5 w-5 flex-shrink-0" />
+                <span className="flex-1 text-left">
+                  {locale === 'es' ? 'Red' : locale === 'pt' ? 'Rede' : 'Network'}
+                </span>
+                <ChevronDown
+                  className={cn('h-4 w-4 text-white/50 transition', redOpen && 'rotate-180')}
+                />
+              </button>
+              {redOpen &&
+                redChildren.map((child) => {
+                  const isActive =
+                    child.href === '/hub/fundhub/crm'
+                      ? pathname === child.href
+                      : Boolean(pathname?.startsWith(child.href));
+                  return (
+                    <Link
+                      key={child.href}
+                      href={child.href}
+                      onClick={() => setSidebarOpen(false)}
+                      className={cn(
+                        'ml-4 flex items-center rounded-lg px-3 py-2 text-xs font-medium transition',
+                        isActive
+                          ? 'bg-amber-500/15 text-amber-100'
+                          : 'text-white/65 hover:bg-white/[0.05] hover:text-white',
+                      )}
+                    >
+                      {child.label}
+                    </Link>
+                  );
+                })}
+            </div>
+          )}
+
+          {whitelabelActive && (
+            <Link
+              href="/hub/fundhub/operator"
+              onClick={() => setSidebarOpen(false)}
+              title={collapsed ? (locale === 'es' ? 'Operador' : locale === 'pt' ? 'Operador' : 'Operator') : undefined}
+              className={navClass(
+                pathname === '/hub/fundhub/operator' ||
+                  Boolean(pathname?.startsWith('/hub/fundhub/operator/')),
+                collapsed,
+              )}
+            >
+              <UsersRound className="h-5 w-5 flex-shrink-0" />
+              {!collapsed &&
+                (locale === 'es' ? 'Operador' : locale === 'pt' ? 'Operador' : 'Operator')}
+            </Link>
+          )}
 
           <div className="py-2">
             <div className="h-px bg-white/10" />

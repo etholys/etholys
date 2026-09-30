@@ -1,23 +1,22 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
-import { ContentLibraryPanel } from '@/components/fundhub/ContentLibraryPanel';
-import { EligibilityProfileForm } from '@/components/fundhub/EligibilityProfileForm';
-import type { FunderImportRow } from '@/lib/opportunity/funder-import';
-import {
-  ArrowLeft,
-  Building2,
-  Check,
-  Handshake,
-  Loader2,
-  Upload,
-  Users,
-} from 'lucide-react';
+import { CrmSubnav } from '@/components/fundhub/CrmSubnav';
+import { ArrowRight, Building2, Handshake, Landmark, Loader2 } from 'lucide-react';
 
-export default function FundHubCrmPage() {
+type NetworkSnap = {
+  readinessPct: number;
+  profile: { ready: boolean; orgKind: string | null; themes: number; countries: number };
+  partners: number;
+  funders: number;
+  pipelineOpen: number;
+  links: Array<{ from: string; to: string; pt: string; es: string; en: string; active: boolean }>;
+};
+
+export default function FundHubCrmDashboardPage() {
   const { locale, activeCompanyId } = useApp();
   const companyId = useMemo(() => {
     const s = String(activeCompanyId ?? '').trim();
@@ -26,339 +25,147 @@ export default function FundHubCrmPage() {
   const t = (pt: string, es: string, en: string) =>
     locale === 'pt' ? pt : locale === 'es' ? es : en;
 
-  const [raw, setRaw] = useState('');
-  const [rows, setRows] = useState<FunderImportRow[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [snap, setSnap] = useState<NetworkSnap | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const runPreview = useCallback(
-    async (payload: { text?: string; file?: File }) => {
-      if (!companyId) return;
-      if (!payload.file && !payload.text?.trim()) return;
-      setBusy(true);
-      setMsg(null);
-      try {
-        let r: Response;
-        if (payload.file) {
-          const fd = new FormData();
-          fd.append('file', payload.file);
-          r = await fetch(
-            `/api/opportunity/catalog/import?companyId=${encodeURIComponent(companyId)}`,
-            { method: 'POST', body: fd },
-          );
-        } else {
-          r = await fetch(
-            `/api/opportunity/catalog/import?companyId=${encodeURIComponent(companyId)}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: payload.text }),
-            },
-          );
-        }
-        const d = (await r.json()) as { rows?: FunderImportRow[]; error?: string };
-        if (!r.ok) throw new Error(d.error || 'preview failed');
-        setRows(d.rows ?? []);
-        if (payload.file) setFileName(payload.file.name);
-      } catch (e) {
-        setMsg(e instanceof Error ? e.message : 'Error');
-      } finally {
-        setBusy(false);
-      }
-    },
-    [companyId],
-  );
-
-  const preview = useCallback(async () => {
-    await runPreview({ text: raw });
-  }, [raw, runPreview]);
-
-  const onFile = useCallback(
-    async (file: File | null) => {
-      if (!file) return;
-      setRaw('');
-      await runPreview({ file });
-    },
-    [runPreview],
-  );
-
-  const confirm = useCallback(async () => {
-    if (!companyId || !rows?.length) return;
-    setBusy(true);
-    setMsg(null);
+  const load = useCallback(async () => {
+    if (!companyId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
       const r = await fetch(
-        `/api/opportunity/catalog/import?companyId=${encodeURIComponent(companyId)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ confirm: true, rows }),
-        },
+        `/api/fundhub/network-snapshot?companyId=${encodeURIComponent(companyId)}`,
+        { cache: 'no-store' },
       );
-      const d = (await r.json()) as { count?: number; error?: string };
-      if (!r.ok) throw new Error(d.error || 'confirm failed');
-      setMsg(
-        t(
-          `${d.count ?? 0} financiadores importados.`,
-          `${d.count ?? 0} financiadores importados.`,
-          `${d.count ?? 0} funders imported.`,
-        ),
-      );
-      setRows(null);
-      setRaw('');
-      setFileName(null);
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Error');
+      if (r.ok) setSnap((await r.json()) as NetworkSnap);
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
-  }, [companyId, rows, t]);
+  }, [companyId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   if (!companyId) {
     return (
-      <p className="p-6 text-sm text-gray-600">
+      <p className="p-6 text-sm text-gray-400">
         {t('Seleccione uma empresa.', 'Seleccione una empresa.', 'Select a company.')}
       </p>
     );
   }
 
+  const pillars = [
+    {
+      href: '/hub/fundhub/crm/perfil',
+      icon: Building2,
+      title: t('Perfil institucional', 'Perfil institucional', 'Institutional profile'),
+      value: snap
+        ? snap.profile.ready
+          ? t('Pronto', 'Listo', 'Ready')
+          : t('Incompleto', 'Incompleto', 'Incomplete')
+        : '—',
+      sub: snap
+        ? t(
+            `${snap.profile.themes} temas · ${snap.profile.countries} países · readiness ${snap.readinessPct}%`,
+            `${snap.profile.themes} temas · ${snap.profile.countries} países · readiness ${snap.readinessPct}%`,
+            `${snap.profile.themes} themes · ${snap.profile.countries} countries · readiness ${snap.readinessPct}%`,
+          )
+        : '',
+    },
+    {
+      href: '/hub/fundhub/crm/aliados',
+      icon: Handshake,
+      title: t('Aliados', 'Aliados', 'Allies'),
+      value: snap ? String(snap.partners) : '—',
+      sub: t('Sócios para co-postular', 'Socios para co-postular', 'Partners for co-application'),
+    },
+    {
+      href: '/hub/fundhub/crm/donantes',
+      icon: Landmark,
+      title: t('Doadores / financiadores', 'Donantes / financiadores', 'Donors / funders'),
+      value: snap ? String(snap.funders) : '—',
+      sub: t(
+        `${snap?.pipelineOpen ?? 0} em curso no pipeline`,
+        `${snap?.pipelineOpen ?? 0} en curso en el pipeline`,
+        `${snap?.pipelineOpen ?? 0} in pipeline`,
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-8 text-gray-100">
+    <div className="space-y-6 text-gray-100">
+      <CrmSubnav active="dashboard" />
       <div>
-        <Link href="/hub/fundhub" className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-100">
-          <ArrowLeft className="h-4 w-4" />
-          FundHub
-        </Link>
-        <h1 className="mt-2 text-2xl font-bold text-white md:text-3xl">
+        <h1 className="text-2xl font-bold text-white md:text-3xl">
           {t('Rede de captação', 'Red de captación', 'Capture network')}
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-gray-400">
           {t(
-            'Rede da organização: elegibilidade, financiadores conhecidos e sócios locais — o que a Salesforce cobre na prática de fundos.',
-            'Red de la organización: elegibilidad, financiadores conocidos y socios locales — lo que Salesforce cubre en la práctica de fondos.',
-            'Org network: eligibility, known funders, and local partners — Salesforce for funding practice.',
+            'Como perfil, aliados e financiadores se ligam na prática — sem misturar tudo numa página só.',
+            'Cómo perfil, aliados y financiadores se conectan en la práctica — sin mezclarlo todo en una sola página.',
+            'How profile, allies, and funders connect in practice — without dumping everything on one page.',
           )}
         </p>
       </div>
 
-      <EligibilityProfileForm />
-
-      <ContentLibraryPanel />
-
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Link
-          href="/hub/fundhub/partners"
-          className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 hover:border-amber-500/40"
-        >
-          <div className="flex items-center gap-2 font-semibold text-white">
-            <Handshake className="h-5 w-5 text-amber-400" />
-            {t('Sócios / aliados', 'Socios / aliados', 'Partners / allies')}
-          </div>
-          <p className="mt-2 text-sm text-gray-400">
-            {t(
-              'Quem pode co-postular quando falta registo no país ou tipo de org.',
-              'Quién puede co-postular cuando falta registro en el país o tipo de org.',
-              'Who can co-apply when country registration or org type is missing.',
-            )}
-          </p>
-        </Link>
-        <Link
-          href="/hub/fundhub/my-funds"
-          className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 hover:border-amber-500/40"
-        >
-          <div className="flex items-center gap-2 font-semibold text-white">
-            <Building2 className="h-5 w-5 text-amber-400" />
-            {t('Pipeline Em curso', 'Pipeline En curso', 'In-progress pipeline')}
-          </div>
-          <p className="mt-2 text-sm text-gray-400">
-            {t(
-              'Fundos guardados, estados Decide → Preparar → Submetido.',
-              'Fondos guardados, estados Decidir → Preparar → Enviado.',
-              'Saved funds, Decide → Prepare → Submitted.',
-            )}
-          </p>
-        </Link>
-        <Link
-          href="/hub/fundhub/coalition"
-          className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 hover:border-amber-500/40"
-        >
-          <div className="flex items-center gap-2 font-semibold text-white">
-            <Users className="h-5 w-5 text-amber-400" />
-            {t('Coalizão', 'Coalición', 'Coalition')}
-          </div>
-          <p className="mt-2 text-sm text-gray-400">
-            {t('Consórcios e redes de proposta.', 'Consorcios y redes de propuesta.', 'Proposal consortia and networks.')}
-          </p>
-        </Link>
-        <Link
-          href="/hub/fundhub/passport"
-          className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 hover:border-amber-500/40"
-        >
-          <div className="flex items-center gap-2 font-semibold text-white">
-            {t('Perfil / passaporte', 'Perfil / pasaporte', 'Profile / passport')}
-          </div>
-          <p className="mt-2 text-sm text-gray-400">
-            {t('Readiness institucional.', 'Readiness institucional.', 'Institutional readiness.')}
-          </p>
-        </Link>
-        <Link
-          href="/hub/fundhub/demand"
-          className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 hover:border-amber-500/40"
-        >
-          <div className="flex items-center gap-2 font-semibold text-white">
-            {t('Mapa de procura', 'Mapa de demanda', 'Demand map')}
-          </div>
-        </Link>
-        <Link
-          href="/hub/fundhub/compliance"
-          className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 hover:border-amber-500/40"
-        >
-          <div className="flex items-center gap-2 font-semibold text-white">
-            {t('Cumprimento', 'Cumplimiento', 'Compliance')}
-          </div>
-        </Link>
-      </section>
-
-      <section className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
-        <div className="flex items-center gap-2">
-          <Upload className="h-5 w-5 text-amber-400" />
-          <h2 className="text-base font-semibold text-white">
-            {t('Importar financiadores', 'Importar financiadores', 'Import funders')}
-          </h2>
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-gray-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          …
         </div>
-        <p className="mt-1 text-sm text-gray-400">
-          {t(
-            'Carregue a planilha (.xlsx / .csv) ou cole o texto. O sistema lê, mostra pré-visualização; corrija e confirme.',
-            'Suba la planilla (.xlsx / .csv) o pegue el texto. El sistema lee, muestra vista previa; corrija y confirme.',
-            'Upload the spreadsheet (.xlsx / .csv) or paste text. The system reads it, shows a preview; fix and confirm.',
-          )}
-        </p>
-        <label className="mt-3 flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-amber-500/40 bg-amber-950/20 px-4 py-6 text-center hover:bg-amber-950/40">
-          <Upload className="mb-2 h-6 w-6 text-amber-400" />
-          <span className="text-sm font-medium text-gray-100">
-            {fileName
-              ? fileName
-              : t('Escolher ficheiro Excel/CSV', 'Elegir archivo Excel/CSV', 'Choose Excel/CSV file')}
-          </span>
-          <span className="mt-1 text-xs text-gray-500">
-            {t('Colunas: Nome, Instituição, URL…', 'Columnas: Nombre, Institución, URL…', 'Columns: Name, Institution, URL…')}
-          </span>
-          <input
-            type="file"
-            accept=".xlsx,.xls,.csv,.tsv,.txt"
-            className="hidden"
-            onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
-          />
-        </label>
-        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-gray-500">
-          {t('Ou colar', 'O pegar', 'Or paste')}
-        </p>
-        <textarea
-          value={raw}
-          onChange={(e) => {
-            setRaw(e.target.value);
-            setFileName(null);
-          }}
-          rows={5}
-          className="mt-1 w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 font-mono text-xs text-gray-100"
-          placeholder={'Nombre | Institución | URL\nAECID Cooperación 2026 | AECID | https://www.aecid.es/...'}
-        />
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy || !raw.trim()}
-            onClick={() => void preview()}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-50"
-          >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {t('Pré-visualizar texto', 'Previsualizar texto', 'Preview paste')}
-          </button>
-          {rows && (
-            <button
-              type="button"
-              disabled={busy || !rows.some((r) => r.ok)}
-              onClick={() => void confirm()}
-              className="inline-flex items-center gap-2 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
-              <Check className="h-4 w-4" />
-              {t('Confirmar importação', 'Confirmar importación', 'Confirm import')}
-            </button>
-          )}
-        </div>
-        {msg && <p className="mt-2 text-sm text-gray-700">{msg}</p>}
+      ) : (
+        <>
+          <section className="grid gap-3 sm:grid-cols-3">
+            {pillars.map((p) => (
+              <Link
+                key={p.href}
+                href={p.href}
+                className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 transition hover:border-amber-500/40"
+              >
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                  <p.icon className="h-4 w-4 text-amber-400" />
+                  {p.title}
+                </div>
+                <p className="mt-2 text-2xl font-semibold text-white">{p.value}</p>
+                <p className="mt-1 text-xs text-gray-500">{p.sub}</p>
+                <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-amber-300">
+                  {t('Abrir', 'Abrir', 'Open')}
+                  <ArrowRight className="h-3 w-3" />
+                </span>
+              </Link>
+            ))}
+          </section>
 
-        {rows && (
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="text-xs uppercase text-gray-500">
-                <tr>
-                  <th className="py-2 pr-3">#</th>
-                  <th className="py-2 pr-3">{t('Nome', 'Nombre', 'Name')}</th>
-                  <th className="py-2 pr-3">{t('Instituição', 'Institución', 'Institution')}</th>
-                  <th className="py-2 pr-3">URL</th>
-                  <th className="py-2">{t('Estado', 'Estado', 'Status')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, idx) => (
-                  <tr key={row.rowIndex} className="border-t border-gray-100">
-                    <td className="py-2 pr-3 text-gray-400">{row.rowIndex}</td>
-                    <td className="py-2 pr-3">
-                      <input
-                        className="w-full rounded border border-gray-200 px-2 py-1"
-                        value={row.name}
-                        onChange={(e) => {
-                          const next = [...rows];
-                          next[idx] = {
-                            ...row,
-                            name: e.target.value,
-                            ok: Boolean(e.target.value.trim() && row.institution.trim()),
-                          };
-                          setRows(next);
-                        }}
-                      />
-                    </td>
-                    <td className="py-2 pr-3">
-                      <input
-                        className="w-full rounded border border-gray-200 px-2 py-1"
-                        value={row.institution}
-                        onChange={(e) => {
-                          const next = [...rows];
-                          next[idx] = {
-                            ...row,
-                            institution: e.target.value,
-                            ok: Boolean(row.name.trim() && e.target.value.trim()),
-                          };
-                          setRows(next);
-                        }}
-                      />
-                    </td>
-                    <td className="py-2 pr-3">
-                      <input
-                        className="w-full rounded border border-gray-200 px-2 py-1 font-mono text-xs"
-                        value={row.linkOficial ?? ''}
-                        onChange={(e) => {
-                          const next = [...rows];
-                          next[idx] = { ...row, linkOficial: e.target.value || undefined };
-                          setRows(next);
-                        }}
-                      />
-                    </td>
-                    <td className="py-2">
-                      {row.ok ? (
-                        <span className="text-emerald-700">{t('OK', 'OK', 'OK')}</span>
-                      ) : (
-                        <span className="text-amber-700">{row.issues.join(', ')}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+          <section className="rounded-2xl border border-white/10 bg-slate-900/40 p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-200/90">
+              {t('Como se comunicam', 'Cómo se comunican', 'How they connect')}
+            </h2>
+            <ul className="mt-3 space-y-3">
+              {(snap?.links ?? []).map((link) => (
+                <li
+                  key={`${link.from}-${link.to}`}
+                  className={`rounded-xl border px-3 py-2.5 text-sm ${
+                    link.active
+                      ? 'border-emerald-500/30 bg-emerald-950/30 text-gray-200'
+                      : 'border-white/10 bg-slate-950/40 text-gray-400'
+                  }`}
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                    {link.from} → {link.to}
+                    {link.active
+                      ? ` · ${t('activo', 'activo', 'active')}`
+                      : ` · ${t('ainda fraco', 'aún débil', 'still weak')}`}
+                  </p>
+                  <p className="mt-1">{t(link.pt, link.es, link.en)}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </>
+      )}
     </div>
   );
 }
