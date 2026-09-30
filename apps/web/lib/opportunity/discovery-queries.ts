@@ -1,4 +1,5 @@
 import type { OpportunityBriefing } from '@/lib/opportunity/scan-types';
+import { isDiscoveryUnlimited, maxPerInstitution } from '@/lib/opportunity/discovery-caps';
 
 export type DiscoveryRegion = 'br' | 'us' | 'latam' | 'eu' | 'global';
 
@@ -123,6 +124,10 @@ export function buildDiscoveryQueryPacks(briefing: OpportunityBriefing): Discove
   const regions = detectDiscoveryRegions(briefing.countries, briefing.themes);
   const grantHint = briefing.kinds.includes('grant') || briefing.kinds.length === 0;
   const packs: DiscoveryQueryPack[] = [];
+  const loose = isDiscoveryUnlimited();
+  const qOpen = loose ? 16 : 10;
+  const qInst = loose ? 12 : 8;
+  const qOfficial = loose ? 28 : 16;
 
   const openWeb: string[] = [];
   if (briefing.searchFeedback?.trim()) {
@@ -143,7 +148,7 @@ export function buildDiscoveryQueryPacks(briefing: OpportunityBriefing): Discove
   packs.push({
     id: 'open_web',
     label: 'Open-web discovery across the whole internet',
-    queries: uniqueQueries(openWeb).slice(0, 10),
+    queries: uniqueQueries(openWeb).slice(0, qOpen),
   });
 
   const instruments: string[] = [
@@ -159,7 +164,7 @@ export function buildDiscoveryQueryPacks(briefing: OpportunityBriefing): Discove
   packs.push({
     id: 'instruments',
     label: 'Public, private, foundation and cooperation windows',
-    queries: uniqueQueries(instruments).slice(0, 8),
+    queries: uniqueQueries(instruments).slice(0, qInst),
   });
 
   const official: string[] = [];
@@ -179,7 +184,7 @@ export function buildDiscoveryQueryPacks(briefing: OpportunityBriefing): Discove
   packs.push({
     id: 'official',
     label: 'Follow through on official funder domains',
-    queries: uniqueQueries(official).slice(0, 16),
+    queries: uniqueQueries(official).slice(0, qOfficial),
   });
 
   return packs.filter((p) => p.queries.length > 0);
@@ -187,7 +192,8 @@ export function buildDiscoveryQueryPacks(briefing: OpportunityBriefing): Discove
 
 /** Queries que o scout DEVE correr — internet aberta primeiro, portais para fechar o URL. */
 export function buildDiscoverySearchQueries(briefing: OpportunityBriefing): string[] {
-  return uniqueQueries(buildDiscoveryQueryPacks(briefing).flatMap((p) => p.queries)).slice(0, 48);
+  const cap = isDiscoveryUnlimited() ? 80 : 48;
+  return uniqueQueries(buildDiscoveryQueryPacks(briefing).flatMap((p) => p.queries)).slice(0, cap);
 }
 
 export function isIfadSourceUrl(url: string | null | undefined): boolean {
@@ -286,8 +292,10 @@ export function applyBriefingDiversity<
     matchScore?: number;
   },
 >(candidates: T[], briefing: OpportunityBriefing): T[] {
-  const maxPer = briefingRequestsIfad(briefing) ? 5 : 4;
-  return capPerInstitution(candidates, maxPer);
+  // Unlimited: sem corte por doador — só o filtro do briefing / IFAD rule.
+  const maxPer = maxPerInstitution();
+  const ifadBoost = briefingRequestsIfad(briefing) ? Math.max(maxPer, 5) : maxPer;
+  return capPerInstitution(candidates, ifadBoost);
 }
 
 /** Demasiado da mesma agência (ex.: 3 IFAD rolling) = pesquisa pobre. */

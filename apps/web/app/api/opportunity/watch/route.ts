@@ -3,7 +3,11 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { syncWindowOpenNotifications } from '@/lib/opportunity/deadline-alerts';
-import { parseFundHubMeta, writeFundHubMeta } from '@/lib/opportunity/pipeline';
+import {
+  fundColumnDataFromMeta,
+  parseFundHubMeta,
+  writeFundHubMeta,
+} from '@/lib/opportunity/pipeline';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 
 export async function POST(req: NextRequest) {
@@ -23,11 +27,41 @@ export async function POST(req: NextRequest) {
   if (!fund) return NextResponse.json({ error: 'Fundo não encontrado' }, { status: 404 });
 
   const notes = writeFundHubMeta(fund.notes, { watchOpen: body.watchOpen });
-  await prisma.fund.update({ where: { id: fund.id }, data: { notes, lastReviewedAt: new Date() } });
+  const cols = fundColumnDataFromMeta(parseFundHubMeta(notes));
+  await prisma.fund.update({
+    where: { id: fund.id },
+    data: {
+      notes,
+      watchOpen: cols.watchOpen,
+      pipelineStatus: cols.pipelineStatus,
+      ownerUserId: cols.ownerUserId,
+      fundHubMetaJson: cols.fundHubMetaJson,
+      lastReviewedAt: new Date(),
+    },
+  });
 
   if (body.watchOpen && fund.status === 'open') {
-    await syncWindowOpenNotifications(ctx.companyId, ctx.userId, [fund]);
+    await syncWindowOpenNotifications(
+      ctx.companyId,
+      ctx.userId,
+      [
+        {
+          id: fund.id,
+          name: fund.name,
+          institution: fund.institution,
+          status: fund.status,
+          notes,
+          watchOpen: true,
+          fundHubMetaJson: cols.fundHubMetaJson,
+        },
+      ],
+      { watchJustEnabledIds: [fund.id] },
+    );
   }
 
-  return NextResponse.json({ ok: true, fundId: fund.id, watchOpen: parseFundHubMeta(notes).watchOpen === true });
+  return NextResponse.json({
+    ok: true,
+    fundId: fund.id,
+    watchOpen: parseFundHubMeta(notes).watchOpen === true,
+  });
 }

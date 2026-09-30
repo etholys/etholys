@@ -115,7 +115,7 @@ Reutilizar `FundhubAlert` + `syncDeadlineNotifications`. F5 adiciona tipo `oppor
 | GET/POST/DELETE | `/api/opportunity/sources` | mesa | Portais oficiais + extras do utilizador |
 | GET | `/api/opportunity/catalog?drawer=&export=1` | mesa | Gavetas + CSV |
 
-**Modelo de descoberta (custo):** Claude Sonnet 4.6 por defeito. Fable 5.1 só com `FUNDHUB_USE_FABLE=1`. Varredura: 2 packs em série, poucas web_searches; enrich limitado a 12 candidatos. Mythos não se usa.
+**Modelo de descoberta (custo):** Claude Sonnet 4.6 por defeito. Fable 5.1 só com `FUNDHUB_USE_FABLE=1`. Varredura: packs `open_web` → `instruments` → `official` em série; structure via Gemini→Haiku→Sonnet. Mythos não se usa. Caps de yield: ver `lib/opportunity/discovery-caps.ts` (modo teste = sem tecto artificial).
 
 **Medição de custo (system admin):** cada `FundhubDiscoveryRun` grava tokens, web_search e `estimatedCostUsd` (tabela Anthropic em `lib/llm-usage.ts`). Consola interna: `/lab/costs` + `GET /api/platform/ai-costs` — só `ETHOLYS_PLATFORM_ADMIN_EMAILS`. Serve para ver $/varredura e $/candidato por empresa (rentabilidade), não para facturar ao cliente.
 
@@ -124,6 +124,32 @@ Reutilizar `FundhubAlert` + `syncDeadlineNotifications`. F5 adiciona tipo `oppor
 ---
 
 ## 6. Roadmap de implementação
+
+### Ciclo F0–F9 (entregue)
+
+Base histórica do produto (inbox, evidência, fit, mesa, proposta, relógio, owner, coalizão, operador, success fee comercial). Detalhe abaixo.
+
+### Roadmap de produto 2026-Q4+ (activo)
+
+Posicionamento: *grant seeker* LatAm/cooperação — descoberta viva com URL oficial + expediente + proposta ancorada no edital. **Não** clonamos Candid/FDO nem GMS de doador (Fluxx/Submittable).
+
+**Modo de teste (actual):** caps de quantidade **desligados por defeito** (`FUNDHUB_DISCOVERY_UNLIMITED=1`). O filtro/briefing da empresa manda; **não** cortamos yield por total nem por doador enquanto medimos cobertura. Em produção com orçamento: `FUNDHUB_DISCOVERY_UNLIMITED=0` + caps opcionais.
+
+| Fase | Objectivo | Entregas |
+|------|----------|----------|
+| **R0 — Estabilizar** | Confiança para beta | Propostas server-side; colunas Prisma (`pipelineStatus`, `ownerUserId`, `watchOpen`); bloquear knowledge em `open_now`; UI alinhada ao shell; pack `official` na varredura |
+| **R1 — Expediente** | Nível tracker Instrumentl | Kanban + calendário; tarefas/milestones; amounts/outcomes; menu **Buscar · Em curso · Propostas · Rede**; catalog SQL/paginado |
+| **R2 — Descoberta contínua** | Diferencial LatAm | Base permanente de portais + refresh ✅; matching a partir do perfil ✅; yield helpers + **dashboard UI Buscar** ✅; import com dedupe ✅; relógio robusto ✅; **cron** `POST /api/fundhub/cron/portal-refresh` ✅ |
+| **R3 — Redação institucional** | Grantable light | Content library ✅; checklist → secções ✅; voz writer ✅; versões ✅; comentários ✅; **aprovação formal** ✅; ponte SIEP ✅ |
+| **R4 — Operador / comercial** | SKU | UI operador ✅; success fee guard + **UI Definições** ✅; funil won + CTA SIEP ✅ |
+
+**Não fazer:** base comprada tipo Candid; writer sem edital; pós-prémio no FundHub; success fee em conta pública; 40 campos de perfil; novos grupos de menu Captación/Alianzas.
+
+**Ordem de implementação R0:** (1) propostas no servidor (2) colunas pipeline (3) open_now sem knowledge (4) tema UI (5) pack official + caps livres de teste.
+
+**Progresso (dev local, sem produção):** Roadmap R0–R4 **completo em MVP local**. Descoberta sem tecto artificial (filtro da empresa). Success fee UI em Definições. Aprovação formal na proposta. Execução pós-prémio continua no SIEP.
+
+---
 
 ### F0 — Fundação (feito)
 
@@ -216,8 +242,11 @@ SKU actual `sys.FUNDHUB` = USD 129/mês, 15 seats — chão, não lista do produ
 | F2 | fit vs perfil (país mismatch → red) |
 | F3 | transições de `pipelineStatus` |
 | F4 | extract de HTML/PDF → secções |
-| F5 | watch + tipo de notificação |
+| F5 | watch + tipo de notificação; R2 `watch-reopen.test.ts` (closed→open) |
+| R2 | `portal-base.test.ts`, `profile-match.test.ts`, `funder-import` dedupe, `watch-reopen.test.ts`, `yield-stats.test.ts` |
+| R3 | `rfp-checklist.test.ts`, `content-library.test.ts`, `proposal-versions.test.ts` |
+| R4 | `success-fee-policy.test.ts` (bloqueio conta pública) |
 
 ---
 
-Última actualização: **27 set 2026**.
+Última actualização: **30 set 2026** (caps ilimitados por filtro; fee UI; aprovação formal; R0–R4 MVP local).

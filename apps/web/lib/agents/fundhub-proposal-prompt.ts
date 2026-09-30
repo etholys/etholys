@@ -30,6 +30,10 @@ export type FundhubProposalContext = {
   sectionContent?: string | null;
   /** Short org profile (mission, geography, track record) — never invent if missing */
   orgProfile?: string | null;
+  /** RFP checklist items (heuristic) — guide structure / sections */
+  rfpChecklist?: Array<{ id?: string; label: string; kind?: string }> | null;
+  /** Content-library voice block already formatted */
+  contentLibraryBlock?: string | null;
   sourceExcerpt?: string | null;
   basesText?: string | null;
   documents?: Array<{ title?: string; url?: string }> | null;
@@ -54,6 +58,16 @@ function buildContextBlock(ctx: FundhubProposalContext): string {
   if (ctx.sourceExcerpt?.trim()) lines.push(`Texto da página oficial:\n${ctx.sourceExcerpt.trim().slice(0, 7000)}`);
   if (ctx.basesText?.trim()) lines.push(`Texto das bases / PDFs:\n${ctx.basesText.trim().slice(0, 10000)}`);
   if (ctx.orgProfile?.trim()) lines.push(`Perfil da organização (usar; não inventar para além disto):\n${ctx.orgProfile.trim()}`);
+  if (ctx.contentLibraryBlock?.trim()) {
+    lines.push(`Biblioteca de conteúdo / voz da org (preferir estes trechos quando couberem):\n${ctx.contentLibraryBlock.trim().slice(0, 6000)}`);
+  }
+  if (ctx.rfpChecklist?.length) {
+    lines.push(
+      `Checklist RFP detectado no edital (cobrir nas secções):\n${ctx.rfpChecklist
+        .map((i, n) => `${n + 1}. ${i.label}${i.kind ? ` [${i.kind}]` : ''}`)
+        .join('\n')}`,
+    );
+  }
   if (ctx.documentMarkdown?.trim()) {
     lines.push(`Documento actual no canvas:\n${ctx.documentMarkdown.trim().slice(0, 8000)}`);
   }
@@ -97,6 +111,7 @@ ${SHARED_RULES.replace('## REGRAS\n', '')}`;
 ## TRABALHO (estrutura)
 Analisa o edital/notas e propõe uma estrutura de secções para a proposta.
 - Secções específicas ao edital (não genéricas vazias).
+- Se CONTEXTO tiver «Checklist RFP», inclui uma secção por item relevante (ou funde com títulos equivalentes).
 - Ordem lógica: elegibilidade/contexto → objectivos → actividades → resultados → orçamento → equipa → anexos (só se fizer sentido).
 - SAÍDA OBRIGATÓRIA: APENAS os títulos das secções, uma por linha, numeradas (1. 2. 3. …). Sem introdução, sem bullets extras, sem explicações.`;
   }

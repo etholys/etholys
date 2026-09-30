@@ -5,7 +5,7 @@ import { readOpportunityBriefing } from '@/lib/opportunity/briefing';
 import { readCompanyScanInbox, writeScanResults } from '@/lib/opportunity/candidate-store';
 import { buildLearningContext } from '@/lib/opportunity/scan-context';
 import { fetchSourceSnippets, snippetsToPromptBlock } from '@/lib/opportunity/fetch-sources';
-import { listEtholysCatalogHints, listUserMonitoredUrls } from '@/lib/opportunity/source-catalog';
+import { listPortalRefreshSources } from '@/lib/opportunity/source-catalog';
 import { discoverOpportunitiesOnline } from '@/lib/opportunity/web-discovery';
 import { applyBriefingDiversity } from '@/lib/opportunity/discovery-queries';
 import { dropDuplicateFunds } from '@/lib/opportunity/scan-filters';
@@ -80,15 +80,18 @@ export async function runOpportunityScan(opts: {
   const started = Date.now();
   const briefing = opts.briefing ?? (await readOpportunityBriefing(opts.companyId));
 
-  const [existingFunds, learningContext, optionalUrls, catalogHints, inbox] = await Promise.all([
+  const [existingFunds, learningContext, portalSources, inbox] = await Promise.all([
     prisma.fund.findMany({
       where: { companyId: opts.companyId, isActive: true },
       select: { name: true, institution: true },
       take: 80,
     }),
     buildLearningContext(opts.companyId),
-    listUserMonitoredUrls(opts.companyId),
-    listEtholysCatalogHints(),
+    listPortalRefreshSources({
+      companyId: opts.companyId,
+      countries: briefing.countries,
+      limit: 12,
+    }),
     readCompanyScanInbox(opts.companyId),
   ]);
 
@@ -111,20 +114,18 @@ export async function runOpportunityScan(opts: {
   let usage: LlmUsageTotals = emptyLlmUsageTotals();
 
   try {
-    const extraUrls = optionalUrls;
-
     let optionalExtraContext = '';
-    if (catalogHints.length > 0) {
-      optionalExtraContext = catalogHints
-        .map((h) => `- ${h.name}: ${h.url}${h.tags ? ` (${h.tags})` : ''}`)
-        .join('\n');
-    }
-    if (extraUrls.length > 0) {
+    if (portalSources.length > 0) {
       try {
         await setScanProgress(run.id, 12, 'fetching_portals');
-        const { snippets } = await fetchSourceSnippets(extraUrls);
+        const { snippets } = await fetchSourceSnippets(portalSources);
         const block = snippetsToPromptBlock(snippets);
-        optionalExtraContext = [optionalExtraContext, block].filter(Boolean).join('\n');
+        const catalogLines = portalSources
+          .filter((s) => s.kind === 'catalog' || s.kind === 'official')
+          .slice(0, 8)
+          .map((h) => `- ${h.name}: ${h.url}${h.tags ? ` (${h.tags})` : ''}`)
+          .join('\n');
+        optionalExtraContext = [catalogLines, block].filter(Boolean).join('\n');
       } catch {
         // portais opcionais — ignorar falhas
       }

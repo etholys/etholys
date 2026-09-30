@@ -18,6 +18,7 @@ import {
 } from '@/lib/opportunity/call-evidence';
 import { normalizeInstrumentType } from '@/lib/opportunity/instrument-type';
 import { buildCandidateWordHtml, downloadBlob } from '@/lib/opportunity/candidate-export';
+import { checklistFromCandidateFields } from '@/lib/opportunity/rfp-checklist';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import type { CandidateFit, FitItemStatus, ScanCandidate } from '@/lib/opportunity/scan-types';
 import {
@@ -93,6 +94,21 @@ export function CandidateDetailSheet({
   const [fitLoading, setFitLoading] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement | null>(null);
+
+  const rfpChecklist = useMemo(
+    () =>
+      checklistFromCandidateFields(
+        {
+          eligibility: live.eligibility,
+          whoCanApply: live.whoCanApply,
+          requirements: live.requirements,
+          basesText: live.basesText,
+          sourceExcerpt: live.sourceExcerpt,
+        },
+        locale,
+      ),
+    [live.eligibility, live.whoCanApply, live.requirements, live.basesText, live.sourceExcerpt, locale],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -589,6 +605,27 @@ export function CandidateDetailSheet({
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {rfpChecklist.length > 0 && (
+                <div className="rounded-lg border border-amber-200/60 bg-amber-50/10 px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-200/90">
+                    {t('Checklist do edital', 'Checklist de la convocatoria', 'RFP checklist')}
+                  </p>
+                  <ul className="mt-2 space-y-1.5">
+                    {rfpChecklist.map((item) => (
+                      <li key={item.id} className="flex items-start gap-2 text-xs text-slate-100">
+                        <Check className="mt-0.5 h-3 w-3 shrink-0 text-amber-400" />
+                        <span>
+                          <span className="font-medium">{item.label}</span>
+                          {item.sourceHint ? (
+                            <span className="text-slate-400"> · “{item.sourceHint}”</span>
+                          ) : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
 

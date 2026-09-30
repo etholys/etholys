@@ -5,12 +5,18 @@ import * as XLSX from 'xlsx';
 import { prisma } from '@/lib/prisma';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import {
+  annotateImportAgainstCatalog,
+  isImportDuplicate,
   matrixToImportText,
   parseFunderImportText,
   type FunderImportRow,
 } from '@/lib/opportunity/funder-import';
 import { sanitizeFundingLinks } from '@/lib/opportunity/official-url';
-import { writeFundHubMeta } from '@/lib/opportunity/pipeline';
+import {
+  fundColumnDataFromMeta,
+  parseFundHubMeta,
+  writeFundHubMeta,
+} from '@/lib/opportunity/pipeline';
 
 async function textFromUpload(file: File): Promise<string> {
   const name = file.name.toLowerCase();
@@ -26,6 +32,14 @@ async function textFromUpload(file: File): Promise<string> {
     return matrixToImportText(matrix);
   }
   return await file.text();
+}
+
+async function loadCatalogRefs(companyId: string) {
+  return prisma.fund.findMany({
+    where: { companyId, isActive: true },
+    select: { id: true, name: true, institution: true, linkOficial: true },
+    take: 500,
+  });
 }
 
 /** Preview: cola CSV/planilha → linhas editáveis. Confirm: grava no catálogo. */
@@ -62,30 +76,41 @@ export async function POST(req: NextRequest) {
     rows = Array.isArray(body.rows) ? body.rows : [];
   }
 
+  const catalog = await loadCatalogRefs(ctx.companyId);
+
   if (!confirm) {
-    const previewRows = parseFunderImportText(text);
+    const previewRows = annotateImportAgainstCatalog(parseFunderImportText(text), catalog);
     return NextResponse.json({
       preview: true,
       rows: previewRows,
-      okCount: previewRows.filter((r) => r.ok).length,
+      okCount: previewRows.filter((r) => r.ok && !isImportDuplicate(r)).length,
       issueCount: previewRows.filter((r) => !r.ok).length,
+      duplicateCount: previewRows.filter((r) => isImportDuplicate(r)).length,
     });
   }
 
+  const annotated = annotateImportAgainstCatalog(rows, catalog);
   const created: string[] = [];
   const skipped: string[] = [];
+  const duplicates: string[] = [];
 
-  for (const row of rows) {
+  for (const row of annotated) {
     const name = String(row.name ?? '').trim();
     const institution = String(row.institution ?? name).trim();
     if (!name || !institution) {
       skipped.push(name || `(row ${row.rowIndex})`);
       continue;
     }
+    if (isImportDuplicate(row)) {
+      duplicates.push(name);
+      continue;
+    }
     const links = sanitizeFundingLinks(row.linkOficial, row.linkOficial);
     const notes = writeFundHubMeta(row.notes ?? '', {
+      pipelineStatus: 'decide',
       origin: { savedAt: new Date().toISOString() },
     });
+    const cols = fundColumnDataFromMeta(parseFundHubMeta(notes));
     const fund = await prisma.fund.create({
       data: {
         companyId: ctx.companyId,
@@ -94,6 +119,10 @@ export async function POST(req: NextRequest) {
         linkOficial: links.linkOficial || null,
         type: String(row.type || 'Grant').slice(0, 40),
         notes,
+        pipelineStatus: cols.pipelineStatus,
+        ownerUserId: cols.ownerUserId,
+        watchOpen: cols.watchOpen,
+        fundHubMetaJson: cols.fundHubMetaJson,
         status: 'reference',
         isActive: true,
       },
@@ -106,5 +135,6 @@ export async function POST(req: NextRequest) {
     count: created.length,
     created,
     skipped,
+    duplicates,
   });
 }

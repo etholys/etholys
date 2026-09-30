@@ -1,6 +1,10 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
+import {
+  buildPortalRefreshBase,
+  type PortalRefreshSource,
+} from '@/lib/opportunity/portal-base';
 import type { FundingSourceRef } from '@/lib/opportunity/scan-types';
 
 /** URLs opcionais adicionadas pelo utilizador — NÃO são requisito para varredura. */
@@ -29,4 +33,25 @@ export async function listEtholysCatalogHints(): Promise<FundingSourceRef[]> {
     url: c.url,
     tags: c.tags ?? undefined,
   }));
+}
+
+/**
+ * R2 — base permanente de refresh: portais oficiais (filtrados por país do perfil)
+ * + monitorizadas do utilizador + hints do catálogo Etholys.
+ */
+export async function listPortalRefreshSources(opts: {
+  companyId: string;
+  countries?: string[];
+  limit?: number;
+}): Promise<PortalRefreshSource[]> {
+  const [monitored, catalogHints] = await Promise.all([
+    listUserMonitoredUrls(opts.companyId),
+    listEtholysCatalogHints(),
+  ]);
+  return buildPortalRefreshBase({
+    countries: opts.countries,
+    monitored,
+    catalogHints,
+    limit: opts.limit ?? 12,
+  });
 }

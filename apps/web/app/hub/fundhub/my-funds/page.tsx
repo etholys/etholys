@@ -5,18 +5,26 @@ import Link from 'next/link';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
 import { DeadlineAlertsPanel } from '@/components/opportunity/DeadlineAlertsPanel';
+import { FundDeskCalendar } from '@/components/fundhub/FundDeskCalendar';
 import { StateEmpty, StateLoading } from '@/components/ui/StateBlocks';
 import { formatOriginLine } from '@/lib/opportunity/official-portals';
 import {
   pipelineLabel,
   type DonorFiche,
+  type FundDecisionOutcome,
   type FundDrawer,
   type FundOrigin,
   type PipelineStatus,
 } from '@/lib/opportunity/pipeline';
+import {
+  defaultMilestones,
+  newFundTask,
+  type FundTask,
+} from '@/lib/opportunity/fund-tasks';
 import { daysUntilClose, deadlineUrgency } from '@/lib/opportunity/scan-inbox';
 import {
   ArrowLeft,
+  CheckSquare,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -33,6 +41,7 @@ type Opportunity = {
   type: string;
   category?: string | null;
   amount?: number | null;
+  amountRequested?: number | null;
   currency: string;
   deadline?: string | null;
   countries?: string | null;
@@ -44,6 +53,10 @@ type Opportunity = {
   ownerUserId?: string | null;
   origin?: FundOrigin;
   donor?: DonorFiche;
+  tasks?: FundTask[];
+  decisionOutcome?: FundDecisionOutcome;
+  decisionNote?: string | null;
+  siepProjectId?: string | null;
 };
 
 function csvCell(value: string): string {
@@ -86,14 +99,21 @@ export default function OpportunitiesPage() {
   const [donorFund, setDonorFund] = useState<Opportunity | null>(null);
   const [donorDraft, setDonorDraft] = useState<DonorFiche>({});
   const [exporting, setExporting] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'board' | 'calendar'>('table');
+  const [taskDraft, setTaskDraft] = useState('');
+  const [ficheTab, setFicheTab] = useState<'donor' | 'tasks'>('donor');
+  const [flash, setFlash] = useState<string | null>(null);
 
   const q = (path: string) =>
     `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
 
   const filterParams = (pageNum: number, extra?: Record<string, string>) => {
-    const params = new URLSearchParams({ page: String(pageNum), limit: '20' });
+    const params = new URLSearchParams({
+      page: String(pageNum),
+      limit: viewMode === 'board' || viewMode === 'calendar' ? '100' : '20',
+    });
     if (search.trim()) params.set('search', search.trim());
-    if (pipeline !== 'all') params.set('pipeline', pipeline);
+    if (pipeline !== 'all' && viewMode !== 'board') params.set('pipeline', pipeline);
     if (drawer !== 'all') params.set('drawer', drawer);
     if (typeFilter) params.set('type', typeFilter);
     if (institutionFilter) params.set('institution', institutionFilter);
@@ -130,7 +150,7 @@ export default function OpportunitiesPage() {
         setLoading(false);
       }
     },
-    [companyId, search, pipeline, drawer, typeFilter, institutionFilter],
+    [companyId, search, pipeline, drawer, typeFilter, institutionFilter, viewMode],
   );
 
   useEffect(() => {
@@ -152,6 +172,11 @@ export default function OpportunitiesPage() {
       watchOpen?: boolean;
       ownerUserId?: string | null;
       donor?: DonorFiche;
+      amountRequested?: number | null;
+      decisionOutcome?: FundDecisionOutcome;
+      decisionNote?: string | null;
+      tasks?: FundTask[];
+      seedDefaultTasks?: boolean;
     },
   ) => {
     if (!companyId) return;
@@ -163,15 +188,100 @@ export default function OpportunitiesPage() {
         body: JSON.stringify({ fundId, ...body }),
       });
       if (r.ok) {
-        const d = (await r.json()) as { donor?: DonorFiche | null };
+        const d = (await r.json()) as {
+          donor?: DonorFiche | null;
+          tasks?: FundTask[];
+          decisionOutcome?: FundDecisionOutcome;
+          amountRequested?: number | null;
+          siepProjectId?: string | null;
+          successFee?: {
+            allowed: boolean;
+            accrued?: boolean;
+            blockedReason?: string | null;
+          };
+          siepHint?: { canHandoff: boolean };
+        };
         setItems((prev) =>
           prev.map((item) =>
-            item.id === fundId ? { ...item, ...body, donor: d.donor ?? body.donor ?? item.donor } : item,
+            item.id === fundId
+              ? {
+                  ...item,
+                  ...body,
+                  donor: d.donor ?? body.donor ?? item.donor,
+                  tasks: d.tasks ?? body.tasks ?? item.tasks,
+                  decisionOutcome: d.decisionOutcome ?? body.decisionOutcome ?? item.decisionOutcome,
+                  amountRequested:
+                    d.amountRequested !== undefined
+                      ? d.amountRequested
+                      : body.amountRequested !== undefined
+                        ? body.amountRequested
+                        : item.amountRequested,
+                  siepProjectId: d.siepProjectId ?? item.siepProjectId,
+                }
+              : item,
           ),
         );
-        if (donorFund?.id === fundId && d.donor) {
-          setDonorFund((cur) => (cur ? { ...cur, donor: d.donor ?? undefined } : cur));
+        if (donorFund?.id === fundId) {
+          setDonorFund((cur) =>
+            cur
+              ? {
+                  ...cur,
+                  ...body,
+                  donor: d.donor ?? body.donor ?? cur.donor,
+                  tasks: d.tasks ?? body.tasks ?? cur.tasks,
+                  siepProjectId: d.siepProjectId ?? cur.siepProjectId,
+                }
+              : cur,
+          );
         }
+        if (body.pipelineStatus === 'won') {
+          if (d.successFee && !d.successFee.allowed && d.successFee.blockedReason) {
+            setFlash(d.successFee.blockedReason);
+          } else if (d.successFee?.accrued) {
+            setFlash(
+              t(
+                'Ganho registado · success fee acumulada (consultoria).',
+                'Ganado registrado · success fee acumulada (consultoría).',
+                'Won recorded · success fee accrued (consulting).',
+              ),
+            );
+          } else if (d.siepHint?.canHandoff) {
+            setFlash(
+              t(
+                'Ganho registado. Pode abrir o projecto SIEP para execução.',
+                'Ganado registrado. Puede abrir el proyecto SIEP para ejecución.',
+                'Won recorded. You can open the SIEP project for execution.',
+              ),
+            );
+          }
+        }
+      }
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handoffSiep = async (fundId: string) => {
+    if (!companyId) return;
+    setBusyId(fundId);
+    try {
+      const r = await fetch(q('/api/fundhub/siep-handoff'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fundId, locale }),
+      });
+      const d = (await r.json()) as { href?: string; projectId?: string; error?: string };
+      if (!r.ok) {
+        setFlash(d.error || 'SIEP handoff failed');
+        return;
+      }
+      if (d.projectId) {
+        setItems((prev) =>
+          prev.map((item) => (item.id === fundId ? { ...item, siepProjectId: d.projectId } : item)),
+        );
+      }
+      if (d.href) {
+        window.open(d.href, '_blank', 'noopener,noreferrer');
       }
     } finally {
       setBusyId(null);
@@ -236,6 +346,11 @@ export default function OpportunitiesPage() {
       typicalWindow: f.donor?.typicalWindow ?? '',
       approach: f.donor?.approach ?? '',
     });
+    setFicheTab('donor');
+    setTaskDraft('');
+    if (!f.tasks?.length) {
+      void patchFund(f.id, { seedDefaultTasks: true });
+    }
   };
 
   const saveDonor = async () => {
@@ -287,6 +402,15 @@ export default function OpportunitiesPage() {
         </div>
       </div>
 
+      {flash && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          <span>{flash}</span>
+          <button type="button" onClick={() => setFlash(null)} className="text-xs underline">
+            OK
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-1.5">
         {(
           [
@@ -302,6 +426,25 @@ export default function OpportunitiesPage() {
             onClick={() => setDrawer(key)}
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               drawer === key ? 'bg-amber-700 text-white' : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <span className="mx-1 hidden h-6 w-px bg-gray-200 sm:inline-block" />
+        {(
+          [
+            ['table', t('Tabela', 'Tabla', 'Table')],
+            ['board', t('Quadro', 'Tablero', 'Board')],
+            ['calendar', t('Calendário', 'Calendario', 'Calendar')],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setViewMode(key)}
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              viewMode === key ? 'bg-slate-800 text-white' : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
             {label}
@@ -414,12 +557,88 @@ export default function OpportunitiesPage() {
         </div>
       ) : (
         <>
+          {viewMode === 'calendar' ? (
+            <FundDeskCalendar
+              funds={items}
+              locale={locale}
+              onSelect={(id) => {
+                const f = items.find((x) => x.id === id);
+                if (f) openDonor(f);
+              }}
+            />
+          ) : viewMode === 'board' ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {(
+                [
+                  ['decide', t('Decidir', 'Decidir', 'Decide')],
+                  ['prepare', t('Preparar', 'Preparar', 'Prepare')],
+                  ['submitted', t('Submetido', 'Enviado', 'Submitted')],
+                  ['closed', t('Fechado', 'Cerrado', 'Closed')],
+                ] as const
+              ).map(([col, label]) => {
+                const colItems = items.filter((f) => {
+                  const st = f.pipelineStatus ?? 'decide';
+                  if (col === 'closed') return st === 'won' || st === 'lost';
+                  return st === col;
+                });
+                return (
+                  <div key={col} className="rounded-xl border border-gray-200 bg-gray-50/80 p-2">
+                    <div className="mb-2 flex items-center justify-between px-1">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-600">{label}</h3>
+                      <span className="text-xs text-gray-400">{colItems.length}</span>
+                    </div>
+                    <ul className="space-y-2">
+                      {colItems.map((f) => (
+                        <li
+                          key={f.id}
+                          className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
+                        >
+                          <p className="text-sm font-medium text-gray-900 line-clamp-2">{f.name}</p>
+                          <p className="mt-0.5 text-xs text-gray-500">{f.institution}</p>
+                          {f.deadline && (
+                            <p className="mt-1 text-[11px] text-amber-800">
+                              {new Date(f.deadline).toLocaleDateString(locale === 'en' ? 'en' : locale === 'pt' ? 'pt' : 'es')}
+                            </p>
+                          )}
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {(
+                              [
+                                ['decide', t('Decidir', 'Decidir', 'Decide')],
+                                ['prepare', t('Preparar', 'Preparar', 'Prepare')],
+                                ['submitted', t('Submetido', 'Enviado', 'Submitted')],
+                                ['won', t('Ganho', 'Ganado', 'Won')],
+                                ['lost', t('Perdido', 'Perdido', 'Lost')],
+                              ] as const
+                            ).map(([st, stLabel]) => (
+                              <button
+                                key={st}
+                                type="button"
+                                disabled={busyId === f.id || (f.pipelineStatus ?? 'decide') === st}
+                                onClick={() => void patchFund(f.id, { pipelineStatus: st })}
+                                className="rounded px-1.5 py-0.5 text-[10px] font-medium text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-40"
+                              >
+                                {stLabel}
+                              </button>
+                            ))}
+                          </div>
+                        </li>
+                      ))}
+                      {colItems.length === 0 && (
+                        <li className="px-1 py-6 text-center text-xs text-gray-400">—</li>
+                      )}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
             <table className="min-w-[920px] w-full text-left text-sm">
               <thead className="bg-gray-50 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-3 py-2 w-8" />
                   <th className="px-3 py-2">{t('Fundo', 'Fondo', 'Fund')}</th>
+                  <th className="px-3 py-2">{t('Pedido', 'Pedido', 'Requested')}</th>
                   <th className="px-3 py-2">{t('Prazo', 'Plazo', 'Deadline')}</th>
                   <th className="px-3 py-2">{t('Estado', 'Estado', 'Status')}</th>
                   <th className="px-3 py-2">{t('Origem', 'Origen', 'Origin')}</th>
@@ -446,6 +665,24 @@ export default function OpportunitiesPage() {
                           {f.institution}
                           {f.type ? ` · ${f.type}` : ''}
                         </p>
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="number"
+                          min={0}
+                          disabled={busyId === f.id}
+                          className="w-24 rounded border border-gray-200 px-1.5 py-1 text-xs"
+                          placeholder="USD"
+                          defaultValue={f.amountRequested ?? ''}
+                          key={`${f.id}-${f.amountRequested ?? 'x'}`}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            const n = v === '' ? null : Number(v);
+                            if (n !== (f.amountRequested ?? null) && (v === '' || Number.isFinite(n))) {
+                              void patchFund(f.id, { amountRequested: n });
+                            }
+                          }}
+                        />
                       </td>
                       <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">
                         {f.deadline ? new Date(f.deadline).toLocaleDateString() : '—'}
@@ -525,6 +762,24 @@ export default function OpportunitiesPage() {
                             <FileText className="h-3 w-3" />
                             {t('Proposta', 'Propuesta', 'Proposal')}
                           </Link>
+                          {(f.pipelineStatus === 'won' || f.siepProjectId) && (
+                            <button
+                              type="button"
+                              disabled={busyId === f.id}
+                              onClick={() => {
+                                if (f.siepProjectId) {
+                                  window.open(`/siep/projects/${f.siepProjectId}`, '_blank', 'noopener,noreferrer');
+                                } else {
+                                  void handoffSiep(f.id);
+                                }
+                              }}
+                              className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
+                            >
+                              {f.siepProjectId
+                                ? t('Abrir SIEP', 'Abrir SIEP', 'Open SIEP')
+                                : t('Criar no SIEP', 'Crear en SIEP', 'Create in SIEP')}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -533,8 +788,9 @@ export default function OpportunitiesPage() {
               </tbody>
             </table>
           </div>
+          )}
 
-          {pages > 1 && (
+          {viewMode === 'table' && pages > 1 && (
             <div className="flex items-center justify-between">
               <p className="text-sm text-gray-600">
                 {total} {t('oportunidades', 'oportunidades', 'opportunities')}
@@ -571,7 +827,7 @@ export default function OpportunitiesPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold text-gray-900">
-                  {t('Ficha do financiador', 'Ficha del financiador', 'Funder fiche')}
+                  {t('Expediente', 'Expediente', 'Case file')}
                 </h2>
                 <p className="mt-0.5 text-xs text-gray-500">
                   {donorFund.institution} · {donorFund.name}
@@ -581,50 +837,149 @@ export default function OpportunitiesPage() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <label className="mt-4 block text-xs font-medium text-gray-600">
-              {t('Contactos', 'Contactos', 'Contacts')}
-              <textarea
-                value={donorDraft.contacts ?? ''}
-                onChange={(e) => setDonorDraft((d) => ({ ...d, contacts: e.target.value }))}
-                rows={2}
-                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="mt-3 block text-xs font-medium text-gray-600">
-              {t('Janela típica', 'Ventana típica', 'Typical window')}
-              <input
-                value={donorDraft.typicalWindow ?? ''}
-                onChange={(e) => setDonorDraft((d) => ({ ...d, typicalWindow: e.target.value }))}
-                placeholder={t('ex.: março–maio', 'ej.: marzo–mayo', 'e.g. March–May')}
-                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="mt-3 block text-xs font-medium text-gray-600">
-              {t('Como abordar', 'Cómo abordar', 'How to approach')}
-              <textarea
-                value={donorDraft.approach ?? ''}
-                onChange={(e) => setDonorDraft((d) => ({ ...d, approach: e.target.value }))}
-                rows={3}
-                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              />
-            </label>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setDonorFund(null)}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-700"
-              >
-                {t('Cancelar', 'Cancelar', 'Cancel')}
-              </button>
-              <button
-                type="button"
-                disabled={busyId === donorFund.id}
-                onClick={() => void saveDonor()}
-                className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-              >
-                {t('Guardar ficha', 'Guardar ficha', 'Save fiche')}
-              </button>
+            <div className="mt-3 flex gap-1">
+              {(
+                [
+                  ['donor', t('Doador', 'Donante', 'Funder')],
+                  ['tasks', t('Tarefas', 'Tareas', 'Tasks')],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFicheTab(key)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${
+                    ficheTab === key ? 'bg-amber-700 text-white' : 'border border-gray-200 text-gray-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
+
+            {ficheTab === 'donor' ? (
+              <>
+                <label className="mt-4 block text-xs font-medium text-gray-600">
+                  {t('Contactos', 'Contactos', 'Contacts')}
+                  <textarea
+                    value={donorDraft.contacts ?? ''}
+                    onChange={(e) => setDonorDraft((d) => ({ ...d, contacts: e.target.value }))}
+                    rows={2}
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="mt-3 block text-xs font-medium text-gray-600">
+                  {t('Janela típica', 'Ventana típica', 'Typical window')}
+                  <input
+                    value={donorDraft.typicalWindow ?? ''}
+                    onChange={(e) => setDonorDraft((d) => ({ ...d, typicalWindow: e.target.value }))}
+                    placeholder={t('ex.: março–maio', 'ej.: marzo–mayo', 'e.g. March–May')}
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="mt-3 block text-xs font-medium text-gray-600">
+                  {t('Como abordar', 'Cómo abordar', 'How to approach')}
+                  <textarea
+                    value={donorDraft.approach ?? ''}
+                    onChange={(e) => setDonorDraft((d) => ({ ...d, approach: e.target.value }))}
+                    rows={3}
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDonorFund(null)}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-700"
+                  >
+                    {t('Cancelar', 'Cancelar', 'Cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === donorFund.id}
+                    onClick={() => void saveDonor()}
+                    className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {t('Guardar ficha', 'Guardar ficha', 'Save fiche')}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="mt-4 space-y-3">
+                <ul className="max-h-56 space-y-2 overflow-y-auto">
+                  {(donorFund.tasks ?? []).map((task) => (
+                    <li key={task.id} className="flex items-start gap-2 rounded-lg border border-gray-100 px-2 py-1.5">
+                      <input
+                        type="checkbox"
+                        checked={task.done}
+                        disabled={busyId === donorFund.id}
+                        onChange={() => {
+                          const next = (donorFund.tasks ?? []).map((x) =>
+                            x.id === task.id ? { ...x, done: !x.done } : x,
+                          );
+                          void patchFund(donorFund.id, { tasks: next });
+                        }}
+                        className="mt-1"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-sm ${task.done ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+                          {task.title}
+                        </p>
+                        {task.dueAt && (
+                          <p className="text-[11px] text-amber-800">{task.dueAt.slice(0, 10)}</p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                  {(donorFund.tasks ?? []).length === 0 && (
+                    <li className="py-4 text-center text-xs text-gray-400">
+                      {t('Sem tarefas — adicione abaixo.', 'Sin tareas — añada abajo.', 'No tasks — add below.')}
+                    </li>
+                  )}
+                </ul>
+                <div className="flex gap-2">
+                  <input
+                    value={taskDraft}
+                    onChange={(e) => setTaskDraft(e.target.value)}
+                    placeholder={t('Nova tarefa…', 'Nueva tarea…', 'New task…')}
+                    className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && taskDraft.trim()) {
+                        const next = [...(donorFund.tasks ?? []), newFundTask(taskDraft)];
+                        setTaskDraft('');
+                        void patchFund(donorFund.id, { tasks: next });
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={!taskDraft.trim() || busyId === donorFund.id}
+                    onClick={() => {
+                      const next = [...(donorFund.tasks ?? []), newFundTask(taskDraft)];
+                      setTaskDraft('');
+                      void patchFund(donorFund.id, { tasks: next });
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg bg-amber-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                  >
+                    <CheckSquare className="h-3.5 w-3.5" />
+                    {t('Add', 'Add', 'Add')}
+                  </button>
+                </div>
+                {!(donorFund.tasks ?? []).length && (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-amber-800 underline"
+                    onClick={() =>
+                      void patchFund(donorFund.id, {
+                        tasks: defaultMilestones(locale, donorFund.deadline),
+                      })
+                    }
+                  >
+                    {t('Usar milestones padrão', 'Usar hitos por defecto', 'Use default milestones')}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

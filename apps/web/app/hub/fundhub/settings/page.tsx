@@ -5,6 +5,7 @@ import { ArrowLeft, ShieldCheck, Building2, ArrowRight, Radar, Network } from 'l
 import { useApp } from '@/app/providers';
 import { MonitoredSourcesPanel } from '@/components/opportunity/MonitoredSourcesPanel';
 import { EligibilityProfileForm } from '@/components/fundhub/EligibilityProfileForm';
+import { SuccessFeePanel } from '@/components/fundhub/SuccessFeePanel';
 
 export default function FundHubSettingsPage() {
   const { locale } = useApp();
@@ -12,23 +13,26 @@ export default function FundHubSettingsPage() {
     locale === 'pt' ? pt : locale === 'es' ? es : en;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-gray-100">
       <main>
         <div className="mb-8">
-          <Link href="/hub/fundhub" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
+          <Link href="/hub/fundhub" className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-100">
             <ArrowLeft className="h-4 w-4" />
             FundHub
           </Link>
-          <h1 className="mt-3 text-3xl font-bold text-gray-900">
+          <h1 className="mt-3 text-3xl font-bold text-white">
             {t('Definições', 'Ajustes', 'Settings')}
           </h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-gray-400">
             {t('Elegibilidade, fontes e acesso.', 'Elegibilidad, fuentes y acceso.', 'Eligibility, sources, and access.')}
           </p>
         </div>
 
         <div className="mb-8">
           <EligibilityProfileForm />
+          <div className="mt-4">
+            <SuccessFeePanel />
+          </div>
           <Link
             href="/hub/fundhub/crm"
             className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-amber-800 hover:underline"

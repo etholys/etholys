@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/app/providers';
+import { ui } from '@/lib/i18n';
 import { isLikelyDbId } from '@/lib/utils';
 import Link from 'next/link';
 import {
@@ -16,6 +17,7 @@ import {
   Loader2,
   Send,
   ExternalLink,
+  History,
 } from 'lucide-react';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import { RichTextPane } from '@/components/etholys/RichTextPane';
@@ -26,6 +28,13 @@ import {
   sectionsFromMarkdown,
   type ProposalFundSeed,
 } from '@/lib/opportunity/proposal-workspace';
+import { checklistFromCandidateFields, appendChecklistSections } from '@/lib/opportunity/rfp-checklist';
+import { ProposalReviewPanel } from '@/components/fundhub/ProposalReviewPanel';
+import {
+  parseReviewStatus,
+  reviewStatusLabel,
+  type ProposalReviewStatus,
+} from '@/lib/opportunity/proposal-review';
 
 interface Fund extends ProposalFundSeed {
   id: string;
@@ -75,8 +84,29 @@ export default function FundHubProposalEditorPage() {
   const [openingStudio, setOpeningStudio] = useState(false);
   const [coalitionPool, setCoalitionPool] = useState<Array<{ id: string; orgName: string; role: string }>>([]);
   const [coalition, setCoalition] = useState<Array<{ id: string; orgName: string; role: string; budgetPct?: number }>>([]);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const [versions, setVersions] = useState<
+    Array<{ id: string; versionNum: number; label: string; createdAt: string; content: string }>
+  >([]);
+  const [versionsBusy, setVersionsBusy] = useState(false);
+  const [reviewStatus, setReviewStatus] = useState<ProposalReviewStatus>('draft');
   const understandRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  const rfpChecklist = useMemo(
+    () =>
+      checklistFromCandidateFields(
+        {
+          basesText: fund?.basesText,
+          sourceExcerpt: fund?.sourceExcerpt,
+          eligibility: fund?.eligibility,
+          whoCanApply: fund?.whoCanApply,
+          requirements: fund?.requirements,
+        },
+        locale,
+      ),
+    [fund?.basesText, fund?.sourceExcerpt, fund?.eligibility, fund?.whoCanApply, fund?.requirements, locale],
+  );
 
   const persistDraft = useCallback(
     (patch?: {
@@ -85,12 +115,15 @@ export default function FundHubProposalEditorPage() {
       chat?: ChatMessage[];
       coalition?: typeof coalition;
       stage?: 'understand' | 'write';
+      reviewStatus?: ProposalReviewStatus;
     }) => {
       if (!workspaceId || typeof window === 'undefined') return;
       const md = patch?.documentMarkdown ?? documentMarkdown;
       const notes = patch?.intakeNotes ?? intakeNotes;
       const chats = patch?.chat ?? chatMessages;
       const nextStage = patch?.stage ?? stage;
+      const nextReview = patch?.reviewStatus ?? reviewStatus;
+      if (patch?.reviewStatus) setReviewStatus(patch.reviewStatus);
       const draftKey = `proposalDraft:${workspaceId}`;
       const listRaw = localStorage.getItem('proposalDrafts') || '[]';
       let drafts: Array<Record<string, unknown>> = [];
@@ -108,6 +141,7 @@ export default function FundHubProposalEditorPage() {
         editalLink,
         editalSummary: notes,
         status: 'draft' as const,
+        reviewStatus: nextReview,
         createdAt: idx >= 0 ? drafts[idx]!.createdAt : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         title: fund?.name,
@@ -142,8 +176,48 @@ export default function FundHubProposalEditorPage() {
         }),
       );
       setDraftSaved(true);
+
+      const resolvedFundId = String(fund?.id || fundId || '').trim();
+      if (companyId && resolvedFundId && isLikelyDbId(resolvedFundId)) {
+        void fetch(
+          `/api/fundhub/proposals?companyId=${encodeURIComponent(companyId)}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              workspaceId,
+              fundId: resolvedFundId,
+              title: fund?.name || 'Proposta',
+              editalLink,
+              editalSummary: notes,
+              status: 'draft',
+              documentMarkdown: md,
+              chatMessages: chats,
+              stage: nextStage,
+              reviewStatus: nextReview,
+              coalition: patch?.coalition ?? coalition,
+              sections: sectionsFromMarkdown(md),
+            }),
+          },
+        ).catch(() => {
+          /* local cache already saved */
+        });
+      }
     },
-    [workspaceId, fund, fundId, editalLink, intakeNotes, attachedFiles, documentMarkdown, chatMessages, coalition, stage],
+    [
+      workspaceId,
+      fund,
+      fundId,
+      companyId,
+      editalLink,
+      intakeNotes,
+      attachedFiles,
+      documentMarkdown,
+      chatMessages,
+      coalition,
+      stage,
+      reviewStatus,
+    ],
   );
 
   useEffect(() => {
@@ -283,12 +357,19 @@ export default function FundHubProposalEditorPage() {
         if (!p) return;
         if (p.editalLink) setEditalLink(p.editalLink);
         if (p.editalSummary) setIntakeNotes(p.editalSummary);
-        if (p.sections?.length && !documentMarkdown) {
+        if (typeof p.documentMarkdown === 'string' && p.documentMarkdown.trim() && !documentMarkdown) {
+          setDocumentMarkdown(p.documentMarkdown);
+        } else if (p.sections?.length && !documentMarkdown) {
           const md = p.sections
             .map((s: { title?: string; content?: string }) => `## ${s.title || 'Secção'}\n\n${s.content || ''}`)
             .join('\n\n');
           setDocumentMarkdown(md);
         }
+        if (Array.isArray(p.chatMessages) && p.chatMessages.length) {
+          setChatMessages(p.chatMessages as ChatMessage[]);
+        }
+        if (p.stage === 'write' || p.stage === 'understand') setStage(p.stage);
+        if (p.reviewStatus) setReviewStatus(parseReviewStatus(p.reviewStatus));
         if (p.fundName) {
           setFund((prev) =>
             prev || {
@@ -316,9 +397,10 @@ export default function FundHubProposalEditorPage() {
       sourceExcerpt: fund?.sourceExcerpt,
       basesText: fund?.basesText,
       documents: fund?.documents,
+      rfpChecklist: rfpChecklist.map((i) => ({ id: i.id, label: i.label, kind: i.kind })),
       locale,
     }),
-    [companyId, fund, editalLink, intakeNotes, documentMarkdown, locale],
+    [companyId, fund, editalLink, intakeNotes, documentMarkdown, rfpChecklist, locale],
   );
 
   const runUnderstand = useCallback(async () => {
@@ -392,10 +474,13 @@ export default function FundHubProposalEditorPage() {
   const passToWrite = useCallback(() => {
     setStage('write');
     setDocumentMarkdown((prev) => {
-      const next = appendWriteSections(
+      let next = appendWriteSections(
         prev || seedDocumentMarkdown(fund || { id: 'adhoc', name: fund?.name || 'Proposta' }, undefined, locale),
         locale,
       );
+      if (rfpChecklist.length) {
+        next = appendChecklistSections(next, rfpChecklist, locale);
+      }
       persistDraft({ documentMarkdown: next, stage: 'write' });
       return next;
     });
@@ -416,7 +501,7 @@ export default function FundHubProposalEditorPage() {
       persistDraft({ chat: next, stage: 'write' });
       return next;
     });
-  }, [fund, persistDraft, locale]);
+  }, [fund, persistDraft, locale, rfpChecklist]);
 
   useEffect(() => {
     if (loading || !workspaceId) return;
@@ -533,7 +618,10 @@ export default function FundHubProposalEditorPage() {
             .filter((t) => !existing.toLowerCase().includes(`## ${t.toLowerCase()}`))
             .map((t) => `## ${t}\n\n`)
             .join('\n');
-          const next = extra ? `${existing}\n\n${extra}` : existing;
+          let next = extra ? `${existing}\n\n${extra}` : existing;
+          if (rfpChecklist.length) {
+            next = appendChecklistSections(next, rfpChecklist, locale);
+          }
           persistDraft({ documentMarkdown: next });
           return next;
         });
@@ -551,7 +639,66 @@ export default function FundHubProposalEditorPage() {
     } finally {
       setChatLoading(false);
     }
-  }, [assistantBody, persistDraft]);
+  }, [assistantBody, persistDraft, rfpChecklist, locale]);
+
+  const loadVersions = useCallback(async () => {
+    if (!workspaceId || !companyId) return;
+    setVersionsBusy(true);
+    try {
+      const r = await fetch(
+        `/api/fundhub/proposals/versions?companyId=${encodeURIComponent(companyId)}&workspaceId=${encodeURIComponent(workspaceId)}&locale=${encodeURIComponent(locale)}`,
+        { cache: 'no-store' },
+      );
+      const d = (await r.json()) as { versions?: typeof versions };
+      if (r.ok) setVersions(d.versions ?? []);
+    } finally {
+      setVersionsBusy(false);
+    }
+  }, [workspaceId, companyId, locale]);
+
+  const saveVersion = useCallback(async () => {
+    if (!workspaceId || !companyId || !documentMarkdown.trim()) return;
+    setVersionsBusy(true);
+    try {
+      await fetch(
+        `/api/fundhub/proposals/versions?companyId=${encodeURIComponent(companyId)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workspaceId, content: documentMarkdown, force: true }),
+        },
+      );
+      await loadVersions();
+      setVersionsOpen(true);
+    } finally {
+      setVersionsBusy(false);
+    }
+  }, [workspaceId, companyId, documentMarkdown, loadVersions]);
+
+  const restoreVersion = useCallback(
+    async (versionNum: number) => {
+      if (!workspaceId || !companyId) return;
+      setVersionsBusy(true);
+      try {
+        const r = await fetch(
+          `/api/fundhub/proposals/versions?companyId=${encodeURIComponent(companyId)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ workspaceId, restoreVersionNum: versionNum }),
+          },
+        );
+        const d = (await r.json()) as { documentMarkdown?: string };
+        if (r.ok && d.documentMarkdown) {
+          setDocumentMarkdown(d.documentMarkdown);
+          persistDraft({ documentMarkdown: d.documentMarkdown });
+        }
+      } finally {
+        setVersionsBusy(false);
+      }
+    },
+    [workspaceId, companyId, persistDraft],
+  );
 
   const handleAttachFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -659,13 +806,49 @@ export default function FundHubProposalEditorPage() {
         drafts[draftIndex].status = 'submitted';
         localStorage.setItem('proposalDrafts', JSON.stringify(drafts));
       }
+      const resolvedFundId = String(fund?.id || fundId || '').trim();
+      if (companyId && resolvedFundId && isLikelyDbId(resolvedFundId)) {
+        const r = await fetch(
+          `/api/fundhub/proposals?companyId=${encodeURIComponent(companyId)}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              workspaceId,
+              fundId: resolvedFundId,
+              title: fund?.name || 'Proposta',
+              editalLink,
+              editalSummary: intakeNotes,
+              status: 'submitted',
+              documentMarkdown,
+              chatMessages,
+              stage,
+              coalition,
+              sections: sectionsFromMarkdown(documentMarkdown),
+            }),
+          },
+        );
+        if (!r.ok) throw new Error('Falha ao gravar no servidor');
+      }
       setError(null);
     } catch {
       setError('Erro ao enviar proposta.');
     } finally {
       setIsSubmitting(false);
     }
-  }, [documentMarkdown, workspaceId, persistDraft]);
+  }, [
+    documentMarkdown,
+    workspaceId,
+    persistDraft,
+    companyId,
+    fund,
+    fundId,
+    editalLink,
+    intakeNotes,
+    chatMessages,
+    stage,
+    coalition,
+  ]);
 
   const officialUrl = editalLink || fund?.linkOficial || '';
 
@@ -679,9 +862,11 @@ export default function FundHubProposalEditorPage() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <Link href="/hub/fundhub/proposals" className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
-            <ArrowLeft className="h-4 w-4" /> Propostas
+            <ArrowLeft className="h-4 w-4" /> {ui(locale, 'Propuestas', 'Propostas', 'Proposals')}
           </Link>
-          <h1 className="mt-2 truncate text-2xl font-bold text-gray-900">{fund?.name || 'Proposta'}</h1>
+          <h1 className="mt-2 truncate text-2xl font-bold text-gray-900">
+            {fund?.name || ui(locale, 'Propuesta', 'Proposta', 'Proposal')}
+          </h1>
           {headerMeta && <p className="text-sm text-gray-600">{headerMeta}</p>}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -693,7 +878,7 @@ export default function FundHubProposalEditorPage() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Edital
+              {ui(locale, 'Edital', 'Edital', 'Call notice')}
             </a>
           )}
           <button
@@ -702,7 +887,21 @@ export default function FundHubProposalEditorPage() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
           >
             <Save className="h-3.5 w-3.5" />
-            {draftSaved ? 'Guardado' : 'Guardar'}
+            {draftSaved
+              ? ui(locale, 'Guardado', 'Guardado', 'Saved')
+              : ui(locale, 'Guardar', 'Guardar', 'Save')}
+          </button>
+          <button
+            type="button"
+            disabled={versionsBusy}
+            onClick={() => {
+              setVersionsOpen((v) => !v);
+              if (!versionsOpen) void loadVersions();
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <History className="h-3.5 w-3.5" />
+            {ui(locale, 'Versiones', 'Versões', 'Versions')}
           </button>
           <div className="relative">
             <button
@@ -710,7 +909,7 @@ export default function FundHubProposalEditorPage() {
               onClick={() => setShowExportMenu((v) => !v)}
               className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
             >
-              Exportar
+              {ui(locale, 'Exportar', 'Exportar', 'Export')}
             </button>
             {showExportMenu && (
               <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-lg border border-gray-200 bg-white shadow-lg">
@@ -763,6 +962,89 @@ export default function FundHubProposalEditorPage() {
           <span>{error}</span>
         </div>
       )}
+
+      {versionsOpen && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-amber-950">
+              {ui(locale, 'Historial de versiones', 'Histórico de versões', 'Version history')}
+            </p>
+            <button
+              type="button"
+              disabled={versionsBusy || !documentMarkdown.trim()}
+              onClick={() => void saveVersion()}
+              className="rounded-lg bg-amber-800 px-2.5 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+            >
+              {ui(locale, 'Guardar versión ahora', 'Guardar versão agora', 'Save version now')}
+            </button>
+          </div>
+          {versionsBusy && versions.length === 0 ? (
+            <p className="mt-2 text-xs text-amber-800/80">…</p>
+          ) : versions.length === 0 ? (
+            <p className="mt-2 text-xs text-amber-800/80">
+              {ui(
+                locale,
+                'Aún sin versiones — guarde una o edite y grabe la propuesta.',
+                'Ainda sem versões — guarde uma ou edite e grave a proposta.',
+                'No versions yet — save one or edit and save the proposal.',
+              )}
+            </p>
+          ) : (
+            <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto">
+              {versions.map((v) => (
+                <li
+                  key={v.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/80 px-2.5 py-1.5 text-xs"
+                >
+                  <span className="font-medium text-gray-900">
+                    {v.label}{' '}
+                    <span className="font-normal text-gray-500">
+                      · {new Date(v.createdAt).toLocaleString(locale === 'pt' ? 'pt-PT' : locale === 'es' ? 'es-ES' : 'en-US')}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={versionsBusy}
+                    onClick={() => void restoreVersion(v.versionNum)}
+                    className="text-amber-900 underline disabled:opacity-50"
+                  >
+                    {ui(locale, 'Restaurar', 'Restaurar', 'Restore')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {workspaceId ? <ProposalReviewPanel workspaceId={workspaceId} /> : null}
+
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+          {ui(locale, 'Revisión', 'Revisão', 'Review')}:
+        </span>
+        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
+          {reviewStatusLabel(reviewStatus, locale)}
+        </span>
+        {(
+          [
+            ['in_review', ui(locale, 'Enviar a revisión', 'Enviar para revisão', 'Send to review')],
+            ['approved', ui(locale, 'Aprobar', 'Aprovar', 'Approve')],
+            ['changes_requested', ui(locale, 'Pedir cambios', 'Pedir alterações', 'Request changes')],
+            ['draft', ui(locale, 'Volver a borrador', 'Voltar a rascunho', 'Back to draft')],
+          ] as const
+        ).map(([st, label]) => (
+          <button
+            key={st}
+            type="button"
+            disabled={reviewStatus === st}
+            onClick={() => persistDraft({ reviewStatus: st })}
+            className="rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       {coalitionPool.length > 0 && (
         <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
@@ -839,6 +1121,20 @@ export default function FundHubProposalEditorPage() {
               )}
             </div>
             <div className="fh-pane-scroll min-h-0 flex-1 space-y-3 px-4 py-3">
+              {rfpChecklist.length > 0 && stage === 'understand' && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-900/80">
+                    {ui(locale, 'Checklist do edital', 'Checklist de la convocatoria', 'RFP checklist')}
+                  </p>
+                  <ul className="mt-2 space-y-1">
+                    {rfpChecklist.map((item) => (
+                      <li key={item.id} className="text-xs text-amber-950">
+                        · {item.label}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {understanding && chatMessages.length === 0 && (
                 <div className="rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-950">
                   <p className="flex items-center gap-2 font-medium">

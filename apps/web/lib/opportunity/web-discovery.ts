@@ -84,7 +84,7 @@ Hunt like an operator — wide first, official URL second:
 - Skip expired or closed windows. Skip homepages with no open call.
 - Cover local/municipal public funds, national public calls, private and corporate foundations, multilaterals, organisms and technical-cooperation windows (GIZ, AFD, AECID, JICA, USAID, etc.).
 - For each hit keep it short: official name, funder, official call URL, deadline if seen, who can apply, what it funds (a few lines each). Do not write essays in this pass.
-- List EVERY distinct open call that matches the briefing themes/geography when they exist. At most 4 from the same funder. No artificial upper limit on total hits.
+- List EVERY distinct open call that matches the briefing themes/geography when they exist. No artificial upper limit on total hits or per funder when they match the filter. Skip only duplicates and EXISTING.
 - Run every numbered query in THIS pass. They are discovery phrases, not a closed portal list.
 - Ranking notes (Rural Commerce principles, etc.) score matchScore. They must NOT veto a real open call that matches the themes and geography.
 

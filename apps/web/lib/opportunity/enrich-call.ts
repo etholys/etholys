@@ -9,6 +9,7 @@ import {
   pickInstitutionUrl,
   pickOfficialCallUrl,
 } from '@/lib/opportunity/call-evidence';
+import { maxEnrichCandidates } from '@/lib/opportunity/discovery-caps';
 import { isAggregatorFundingUrl } from '@/lib/opportunity/official-url';
 import { ingestOfficialEdital } from '@/lib/opportunity/ingest-edital';
 import { normalizeInstrumentType } from '@/lib/opportunity/instrument-type';
@@ -72,7 +73,7 @@ export async function enrichAndFilterCandidates(
   scanFocus: ScanFocus,
 ): Promise<ScanCandidate[]> {
   const enriched: ScanCandidate[] = [];
-  const queue = candidates.slice(0, 24);
+  const queue = candidates.slice(0, maxEnrichCandidates());
   const concurrency = 3;
   let i = 0;
   async function worker() {

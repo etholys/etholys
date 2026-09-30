@@ -14,6 +14,8 @@ import {
   ScanProgressRing,
 } from '@/components/opportunity/ScanProgressRing';
 import { SearchCoachingPanel } from '@/components/opportunity/SearchCoachingPanel';
+import { YieldStatsPanel } from '@/components/fundhub/YieldStatsPanel';
+import { buildYieldSnapshot } from '@/lib/opportunity/yield-stats';
 import {
   availabilityBadgeClass,
   availabilityLabel,
@@ -104,6 +106,7 @@ type ScanMeta = {
   scanned: number;
   created: number;
   errorCount: number;
+  estimatedCostUsd?: number | null;
   discoveryMode?: 'web' | 'knowledge' | null;
   searchQueries?: string[];
   scanFocus?: ScanFocus | null;
@@ -233,6 +236,16 @@ export default function OpportunityDiscoverPage() {
         type: typeFilter ?? undefined,
       }),
     [listSource, listQuery, dueSoonOnly, typeFilter],
+  );
+  const yieldSnap = useMemo(
+    () =>
+      buildYieldSnapshot(recentRuns, {
+        pendingOpen: pendingOpen.length,
+        pendingReference: pendingReference.length,
+        later: later.length,
+        catalogTotal,
+      }),
+    [recentRuns, pendingOpen.length, pendingReference.length, later.length, catalogTotal],
   );
 
   const loadCatalog = useCallback(async () => {
@@ -685,6 +698,10 @@ export default function OpportunityDiscoverPage() {
         </div>
       )}
 
+      {(recentRuns.length > 0 || catalogTotal > 0) && (
+        <YieldStatsPanel snap={yieldSnap} locale={locale} />
+      )}
+
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="min-w-0 space-y-4">
           {historyOpen && recentRuns.length > 0 && (
@@ -702,6 +719,9 @@ export default function OpportunityDiscoverPage() {
                     </span>
                     <span>
                       +{run.created} {t('candidatos', 'candidatos', 'candidates')}
+                      {typeof run.estimatedCostUsd === 'number'
+                        ? ` · $${run.estimatedCostUsd < 0.01 && run.estimatedCostUsd > 0 ? run.estimatedCostUsd.toFixed(4) : run.estimatedCostUsd.toFixed(2)}`
+                        : ''}
                       {run.errorCount > 0 ? ` · ${run.errorCount} ${t('erros', 'errores', 'errors')}` : ''}
                     </span>
                     <span

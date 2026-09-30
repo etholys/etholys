@@ -21,6 +21,7 @@ import {
 } from '@/lib/opportunity/call-evidence';
 import { parseCandidateFit } from '@/lib/opportunity/fit';
 import { normalizeInstrumentType } from '@/lib/opportunity/instrument-type';
+import { maxNormalizeCandidates } from '@/lib/opportunity/discovery-caps';
 
 export const SCAN_MEMORY_CATEGORY = 'opportunity_scan';
 
@@ -200,7 +201,7 @@ export function normalizeCandidates(raw: unknown[], scanFocus?: ScanFocus): Scan
       }),
     );
   }
-  return out.slice(0, 48);
+  return out.slice(0, maxNormalizeCandidates());
 }
 
 export async function patchScanCandidate(

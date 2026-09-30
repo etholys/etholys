@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
+import { ContentLibraryPanel } from '@/components/fundhub/ContentLibraryPanel';
 import { EligibilityProfileForm } from '@/components/fundhub/EligibilityProfileForm';
 import type { FunderImportRow } from '@/lib/opportunity/funder-import';
 import {
@@ -123,16 +124,16 @@ export default function FundHubCrmPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 text-gray-100">
       <div>
-        <Link href="/hub/fundhub" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
+        <Link href="/hub/fundhub" className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-100">
           <ArrowLeft className="h-4 w-4" />
           FundHub
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-gray-900 md:text-3xl">
-          {t('CRM de captação', 'CRM de captación', 'Capture CRM')}
+        <h1 className="mt-2 text-2xl font-bold text-white md:text-3xl">
+          {t('Rede de captação', 'Red de captación', 'Capture network')}
         </h1>
-        <p className="mt-1 max-w-2xl text-sm text-gray-600">
+        <p className="mt-1 max-w-2xl text-sm text-gray-400">
           {t(
             'Rede da organização: elegibilidade, financiadores conhecidos e sócios locais — o que a Salesforce cobre na prática de fundos.',
             'Red de la organización: elegibilidad, financiadores conocidos y socios locales — lo que Salesforce cubre en la práctica de fondos.',
@@ -143,16 +144,18 @@ export default function FundHubCrmPage() {
 
       <EligibilityProfileForm />
 
-      <section className="grid gap-4 sm:grid-cols-2">
+      <ContentLibraryPanel />
+
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link
           href="/hub/fundhub/partners"
-          className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:border-amber-300"
+          className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 hover:border-amber-500/40"
         >
-          <div className="flex items-center gap-2 font-semibold text-gray-900">
-            <Handshake className="h-5 w-5 text-amber-700" />
+          <div className="flex items-center gap-2 font-semibold text-white">
+            <Handshake className="h-5 w-5 text-amber-400" />
             {t('Sócios / aliados', 'Socios / aliados', 'Partners / allies')}
           </div>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-gray-400">
             {t(
               'Quem pode co-postular quando falta registo no país ou tipo de org.',
               'Quién puede co-postular cuando falta registro en el país o tipo de org.',
@@ -162,13 +165,13 @@ export default function FundHubCrmPage() {
         </Link>
         <Link
           href="/hub/fundhub/my-funds"
-          className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:border-amber-300"
+          className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 hover:border-amber-500/40"
         >
-          <div className="flex items-center gap-2 font-semibold text-gray-900">
-            <Building2 className="h-5 w-5 text-amber-700" />
+          <div className="flex items-center gap-2 font-semibold text-white">
+            <Building2 className="h-5 w-5 text-amber-400" />
             {t('Pipeline Em curso', 'Pipeline En curso', 'In-progress pipeline')}
           </div>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-gray-400">
             {t(
               'Fundos guardados, estados Decide → Preparar → Submetido.',
               'Fondos guardados, estados Decidir → Preparar → Enviado.',
@@ -178,35 +181,62 @@ export default function FundHubCrmPage() {
         </Link>
         <Link
           href="/hub/fundhub/coalition"
-          className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:border-amber-300"
+          className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 hover:border-amber-500/40"
         >
-          <div className="flex items-center gap-2 font-semibold text-gray-900">
-            <Users className="h-5 w-5 text-amber-700" />
+          <div className="flex items-center gap-2 font-semibold text-white">
+            <Users className="h-5 w-5 text-amber-400" />
             {t('Coalizão', 'Coalición', 'Coalition')}
           </div>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-gray-400">
             {t('Consórcios e redes de proposta.', 'Consorcios y redes de propuesta.', 'Proposal consortia and networks.')}
           </p>
         </Link>
+        <Link
+          href="/hub/fundhub/passport"
+          className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 hover:border-amber-500/40"
+        >
+          <div className="flex items-center gap-2 font-semibold text-white">
+            {t('Perfil / passaporte', 'Perfil / pasaporte', 'Profile / passport')}
+          </div>
+          <p className="mt-2 text-sm text-gray-400">
+            {t('Readiness institucional.', 'Readiness institucional.', 'Institutional readiness.')}
+          </p>
+        </Link>
+        <Link
+          href="/hub/fundhub/demand"
+          className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 hover:border-amber-500/40"
+        >
+          <div className="flex items-center gap-2 font-semibold text-white">
+            {t('Mapa de procura', 'Mapa de demanda', 'Demand map')}
+          </div>
+        </Link>
+        <Link
+          href="/hub/fundhub/compliance"
+          className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 hover:border-amber-500/40"
+        >
+          <div className="flex items-center gap-2 font-semibold text-white">
+            {t('Cumprimento', 'Cumplimiento', 'Compliance')}
+          </div>
+        </Link>
       </section>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
         <div className="flex items-center gap-2">
-          <Upload className="h-5 w-5 text-amber-700" />
-          <h2 className="text-base font-semibold text-gray-900">
+          <Upload className="h-5 w-5 text-amber-400" />
+          <h2 className="text-base font-semibold text-white">
             {t('Importar financiadores', 'Importar financiadores', 'Import funders')}
           </h2>
         </div>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-1 text-sm text-gray-400">
           {t(
             'Carregue a planilha (.xlsx / .csv) ou cole o texto. O sistema lê, mostra pré-visualização; corrija e confirme.',
             'Suba la planilla (.xlsx / .csv) o pegue el texto. El sistema lee, muestra vista previa; corrija y confirme.',
             'Upload the spreadsheet (.xlsx / .csv) or paste text. The system reads it, shows a preview; fix and confirm.',
           )}
         </p>
-        <label className="mt-3 flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-amber-300 bg-amber-50/50 px-4 py-6 text-center hover:bg-amber-50">
-          <Upload className="mb-2 h-6 w-6 text-amber-700" />
-          <span className="text-sm font-medium text-gray-800">
+        <label className="mt-3 flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-amber-500/40 bg-amber-950/20 px-4 py-6 text-center hover:bg-amber-950/40">
+          <Upload className="mb-2 h-6 w-6 text-amber-400" />
+          <span className="text-sm font-medium text-gray-100">
             {fileName
               ? fileName
               : t('Escolher ficheiro Excel/CSV', 'Elegir archivo Excel/CSV', 'Choose Excel/CSV file')}
@@ -221,7 +251,7 @@ export default function FundHubCrmPage() {
             onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
           />
         </label>
-        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-gray-400">
+        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-gray-500">
           {t('Ou colar', 'O pegar', 'Or paste')}
         </p>
         <textarea
@@ -231,7 +261,7 @@ export default function FundHubCrmPage() {
             setFileName(null);
           }}
           rows={5}
-          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-xs"
+          className="mt-1 w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 font-mono text-xs text-gray-100"
           placeholder={'Nombre | Institución | URL\nAECID Cooperación 2026 | AECID | https://www.aecid.es/...'}
         />
         <div className="mt-3 flex flex-wrap gap-2">
@@ -239,7 +269,7 @@ export default function FundHubCrmPage() {
             type="button"
             disabled={busy || !raw.trim()}
             onClick={() => void preview()}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-50"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {t('Pré-visualizar texto', 'Previsualizar texto', 'Preview paste')}

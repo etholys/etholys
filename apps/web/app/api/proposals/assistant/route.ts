@@ -14,8 +14,26 @@ import {
   normalizeFundhubMode,
   type FundhubProposalContext,
 } from '@/lib/agents/fundhub-proposal-prompt';
+import {
+  emptyContentLibrary,
+  parseContentLibrary,
+} from '@/lib/opportunity/content-library';
+import { checklistFromCandidateFields } from '@/lib/opportunity/rfp-checklist';
 
-async function loadOrgProfileText(companyId: string): Promise<string> {
+function formatContentLibraryBlock(raw: unknown): string {
+  const lib = parseContentLibrary(raw) ?? emptyContentLibrary();
+  const parts: string[] = [];
+  if (lib.voiceNotes?.trim()) parts.push(`Tom / voz: ${lib.voiceNotes.trim()}`);
+  for (const s of lib.snippets.slice(0, 12)) {
+    parts.push(`[${s.kind}] ${s.title}\n${s.body}`);
+  }
+  return parts.join('\n\n');
+}
+
+async function loadOrgProfileText(companyId: string): Promise<{
+  orgProfile: string;
+  contentLibraryBlock: string;
+}> {
   const [company, profile] = await Promise.all([
     prisma.company.findUnique({
       where: { id: companyId },
@@ -29,10 +47,10 @@ async function loadOrgProfileText(companyId: string): Promise<string> {
     }),
     prisma.fundingCaptureProfile.findUnique({
       where: { companyId },
-      select: { themesCsv: true, countriesCsv: true },
+      select: { themesCsv: true, countriesCsv: true, preferencesJson: true },
     }),
   ]);
-  if (!company) return '';
+  if (!company) return { orgProfile: '', contentLibraryBlock: '' };
   const lines = [
     `Nome: ${company.name}`,
     company.shortName && company.shortName !== company.name ? `Nome curto: ${company.shortName}` : '',
@@ -42,7 +60,18 @@ async function loadOrgProfileText(companyId: string): Promise<string> {
     profile?.themesCsv ? `Temas: ${profile.themesCsv}` : '',
     profile?.countriesCsv ? `Países de actuação: ${profile.countriesCsv}` : '',
   ].filter(Boolean);
-  return lines.join('\n');
+
+  let contentLibraryBlock = '';
+  if (profile?.preferencesJson) {
+    try {
+      const prefs = JSON.parse(profile.preferencesJson) as Record<string, unknown>;
+      contentLibraryBlock = formatContentLibraryBlock(prefs.contentLibrary);
+    } catch {
+      contentLibraryBlock = '';
+    }
+  }
+
+  return { orgProfile: lines.join('\n'), contentLibraryBlock };
 }
 
 function contextChars(ctx: FundhubProposalContext): number {
@@ -66,14 +95,38 @@ export async function POST(req: NextRequest) {
     }
 
     let orgProfile = typeof body.orgProfile === 'string' ? body.orgProfile : '';
+    let contentLibraryBlock =
+      typeof body.contentLibraryBlock === 'string' ? body.contentLibraryBlock : '';
     const tenant = await resolveOpportunityCompanyId(body.companyId ?? req.nextUrl.searchParams.get('companyId'));
-    if (tenant && !orgProfile.trim()) {
-      orgProfile = await loadOrgProfileText(tenant.companyId);
+    if (tenant) {
+      const loaded = await loadOrgProfileText(tenant.companyId);
+      if (!orgProfile.trim()) orgProfile = loaded.orgProfile;
+      if (!contentLibraryBlock.trim()) contentLibraryBlock = loaded.contentLibraryBlock;
     }
 
     const documents = Array.isArray(body.documents)
       ? body.documents.filter((d) => d && (d.title || d.url)).slice(0, 12)
       : undefined;
+
+    const rfpChecklist = Array.isArray(body.rfpChecklist)
+      ? body.rfpChecklist
+          .filter((i) => i && typeof i.label === 'string' && i.label.trim())
+          .slice(0, 14)
+          .map((i) => ({
+            id: typeof i.id === 'string' ? i.id : undefined,
+            label: String(i.label).slice(0, 200),
+            kind: typeof i.kind === 'string' ? i.kind : undefined,
+          }))
+      : checklistFromCandidateFields(
+          {
+            basesText: body.basesText,
+            sourceExcerpt: body.sourceExcerpt,
+            eligibility: null,
+            whoCanApply: null,
+            requirements: body.editalSummary,
+          },
+          locale,
+        ).map((i) => ({ id: i.id, label: i.label, kind: i.kind }));
 
     const ctx: FundhubProposalContext = {
       fundName: body.fundName,
@@ -85,6 +138,8 @@ export async function POST(req: NextRequest) {
       sectionTitle: body.sectionTitle,
       sectionContent: body.sectionContent,
       orgProfile,
+      contentLibraryBlock: contentLibraryBlock || undefined,
+      rfpChecklist: rfpChecklist.length ? rfpChecklist : undefined,
       sourceExcerpt: body.sourceExcerpt,
       basesText: body.basesText,
       documents,

@@ -1,3 +1,5 @@
+import { parseFundTasks, type FundTask } from '@/lib/opportunity/fund-tasks';
+
 export const PIPELINE_STATUSES = ['decide', 'prepare', 'submitted', 'won', 'lost'] as const;
 export type PipelineStatus = (typeof PIPELINE_STATUSES)[number];
 
@@ -23,19 +25,33 @@ export type DonorFiche = {
   approach?: string;
 };
 
+export type FundDecisionOutcome = 'pending' | 'won' | 'lost' | 'withdrawn';
+
 export type FundHubMeta = {
   pipelineStatus?: PipelineStatus;
   ownerUserId?: string;
   watchOpen?: boolean;
+  /** Último status observado pelo relógio (para detectar reabertura). */
+  lastSeenStatus?: string;
   dossier?: FundHubDossier;
   origin?: FundOrigin;
   donor?: DonorFiche;
+  /** Milestones do expediente (também em fundHubMetaJson). */
+  tasks?: FundTask[];
+  decisionOutcome?: FundDecisionOutcome;
+  decisionNote?: string;
+  /** Handoff pós-prémio → projeto SIEP (só ponte; execução no SIEP). */
+  siepProjectId?: string;
 };
 
 const MARK_RE = /<!--fh:({[\s\S]*?})-->/;
 
 export function isPipelineStatus(value: unknown): value is PipelineStatus {
   return typeof value === 'string' && (PIPELINE_STATUSES as readonly string[]).includes(value);
+}
+
+function isDecisionOutcome(value: unknown): value is FundDecisionOutcome {
+  return value === 'pending' || value === 'won' || value === 'lost' || value === 'withdrawn';
 }
 
 export function parseFundHubMeta(notes?: string | null): FundHubMeta {
@@ -47,9 +63,14 @@ export function parseFundHubMeta(notes?: string | null): FundHubMeta {
       pipelineStatus: isPipelineStatus(raw.pipelineStatus) ? raw.pipelineStatus : undefined,
       ownerUserId: typeof raw.ownerUserId === 'string' ? raw.ownerUserId : undefined,
       watchOpen: typeof raw.watchOpen === 'boolean' ? raw.watchOpen : undefined,
+      lastSeenStatus: typeof raw.lastSeenStatus === 'string' ? raw.lastSeenStatus.slice(0, 40) : undefined,
       dossier: parseDossier(raw.dossier),
       origin: parseOrigin(raw.origin),
       donor: parseDonor(raw.donor),
+      tasks: parseTasks(raw.tasks),
+      decisionOutcome: isDecisionOutcome(raw.decisionOutcome) ? raw.decisionOutcome : undefined,
+      decisionNote: typeof raw.decisionNote === 'string' ? raw.decisionNote.slice(0, 500) : undefined,
+      siepProjectId: typeof raw.siepProjectId === 'string' ? raw.siepProjectId.slice(0, 80) : undefined,
     };
   } catch {
     return {};
@@ -74,6 +95,11 @@ function parseDonor(raw: unknown): DonorFiche | undefined {
   const approach = typeof o.approach === 'string' ? o.approach.slice(0, 2000) : undefined;
   if (!contacts && !typicalWindow && !approach) return undefined;
   return { contacts, typicalWindow, approach };
+}
+
+function parseTasks(raw: unknown): FundTask[] | undefined {
+  const tasks = parseFundTasks(raw);
+  return tasks.length ? tasks : undefined;
 }
 
 function parseDossier(raw: unknown): FundHubDossier | undefined {
@@ -115,12 +141,50 @@ export function writeFundHubMeta(notes: string | null | undefined, patch: FundHu
   if (patch.pipelineStatus !== undefined) next.pipelineStatus = patch.pipelineStatus;
   if (patch.ownerUserId !== undefined) next.ownerUserId = patch.ownerUserId || undefined;
   if (patch.watchOpen !== undefined) next.watchOpen = patch.watchOpen;
+  if (patch.lastSeenStatus !== undefined) next.lastSeenStatus = patch.lastSeenStatus || undefined;
   if (patch.dossier) next.dossier = { ...current.dossier, ...patch.dossier };
   if (patch.origin) next.origin = { ...current.origin, ...patch.origin };
   if (patch.donor) next.donor = { ...current.donor, ...patch.donor };
+  if (patch.tasks !== undefined) next.tasks = patch.tasks;
+  if (patch.decisionOutcome !== undefined) next.decisionOutcome = patch.decisionOutcome;
+  if (patch.decisionNote !== undefined) next.decisionNote = patch.decisionNote || undefined;
+  if (patch.siepProjectId !== undefined) next.siepProjectId = patch.siepProjectId || undefined;
   const body = (notes ?? '').replace(MARK_RE, '').trim();
   const mark = `<!--fh:${JSON.stringify(next)}-->`;
   return body ? `${body}\n${mark}` : mark;
+}
+
+/** Colunas Prisma + JSON tipado (R0). Dual-write com notes <!--fh:-->. */
+export function fundColumnDataFromMeta(meta: FundHubMeta): {
+  pipelineStatus: PipelineStatus;
+  ownerUserId: string | null;
+  watchOpen: boolean;
+  fundHubMetaJson: {
+    dossier?: FundHubDossier;
+    origin?: FundOrigin;
+    donor?: DonorFiche;
+    tasks?: FundTask[];
+    decisionOutcome?: FundDecisionOutcome;
+    decisionNote?: string;
+    lastSeenStatus?: string;
+    siepProjectId?: string;
+  };
+} {
+  return {
+    pipelineStatus: meta.pipelineStatus ?? 'decide',
+    ownerUserId: meta.ownerUserId ?? null,
+    watchOpen: Boolean(meta.watchOpen),
+    fundHubMetaJson: {
+      ...(meta.dossier ? { dossier: meta.dossier } : {}),
+      ...(meta.origin ? { origin: meta.origin } : {}),
+      ...(meta.donor ? { donor: meta.donor } : {}),
+      ...(meta.tasks?.length ? { tasks: meta.tasks } : {}),
+      ...(meta.decisionOutcome ? { decisionOutcome: meta.decisionOutcome } : {}),
+      ...(meta.decisionNote ? { decisionNote: meta.decisionNote } : {}),
+      ...(meta.lastSeenStatus ? { lastSeenStatus: meta.lastSeenStatus } : {}),
+      ...(meta.siepProjectId ? { siepProjectId: meta.siepProjectId } : {}),
+    },
+  };
 }
 
 export function dossierFromCandidate(c: {
@@ -143,13 +207,47 @@ export function dossierFromCandidate(c: {
   }) ?? {};
 }
 
-export function hydrateFundFromNotes<T extends { notes?: string | null }>(fund: T) {
-  const meta = parseFundHubMeta(fund.notes);
+type HydrateFundInput = {
+  notes?: string | null;
+  pipelineStatus?: string | null;
+  ownerUserId?: string | null;
+  watchOpen?: boolean | null;
+  fundHubMetaJson?: unknown;
+};
+
+export function hydrateFundFromNotes<T extends HydrateFundInput>(fund: T) {
+  const fromNotes = parseFundHubMeta(fund.notes);
+  const fromJson =
+    fund.fundHubMetaJson && typeof fund.fundHubMetaJson === 'object' && !Array.isArray(fund.fundHubMetaJson)
+      ? (fund.fundHubMetaJson as FundHubMeta)
+      : {};
+  const meta: FundHubMeta = {
+    ...fromNotes,
+    ...fromJson,
+    dossier: { ...fromNotes.dossier, ...fromJson.dossier },
+    origin: { ...fromNotes.origin, ...fromJson.origin },
+    donor: { ...fromNotes.donor, ...fromJson.donor },
+    tasks: fromJson.tasks?.length ? fromJson.tasks : fromNotes.tasks,
+    decisionOutcome: fromJson.decisionOutcome ?? fromNotes.decisionOutcome,
+    decisionNote: fromJson.decisionNote ?? fromNotes.decisionNote,
+    siepProjectId: fromJson.siepProjectId ?? fromNotes.siepProjectId,
+  };
+  const pipelineStatus =
+    (isPipelineStatus(fund.pipelineStatus) ? fund.pipelineStatus : undefined) ??
+    meta.pipelineStatus ??
+    'decide';
+  const watchOpen =
+    typeof fund.watchOpen === 'boolean' ? fund.watchOpen : Boolean(meta.watchOpen);
+  const ownerUserId =
+    fund.ownerUserId !== undefined && fund.ownerUserId !== null
+      ? fund.ownerUserId
+      : meta.ownerUserId ?? null;
+
   return {
     ...fund,
-    pipelineStatus: meta.pipelineStatus ?? 'decide',
-    watchOpen: Boolean(meta.watchOpen),
-    ownerUserId: meta.ownerUserId ?? null,
+    pipelineStatus,
+    watchOpen,
+    ownerUserId,
     callUrl: meta.dossier?.callUrl,
     institutionUrl: meta.dossier?.institutionUrl,
     documents: meta.dossier?.documents,
@@ -159,6 +257,10 @@ export function hydrateFundFromNotes<T extends { notes?: string | null }>(fund: 
     fit: meta.dossier?.fit,
     origin: meta.origin,
     donor: meta.donor,
+    tasks: meta.tasks ?? [],
+    decisionOutcome: meta.decisionOutcome ?? 'pending',
+    decisionNote: meta.decisionNote,
+    siepProjectId: meta.siepProjectId ?? null,
   };
 }
 

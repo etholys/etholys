@@ -16,7 +16,7 @@ import {
   type LikeReason,
   type RejectReason,
 } from '@/lib/opportunity/learning-feedback';
-import { dossierFromCandidate, pipelineOf, writeFundHubMeta } from '@/lib/opportunity/pipeline';
+import { dossierFromCandidate, fundColumnDataFromMeta, parseFundHubMeta, pipelineOf, writeFundHubMeta } from '@/lib/opportunity/pipeline';
 
 function parseDeadline(raw: string | null | undefined): Date | null {
   if (!raw) return null;
@@ -181,27 +181,42 @@ async function upsertFundFromCandidate(
     lastReviewedAt: new Date(),
   };
 
+  const cols = fundColumnDataFromMeta(parseFundHubMeta(data.notes as string));
+  const columnPatch = {
+    pipelineStatus: cols.pipelineStatus,
+    ownerUserId: cols.ownerUserId ?? (existing ? undefined : ownerUserId) ?? null,
+    watchOpen: cols.watchOpen,
+    fundHubMetaJson: cols.fundHubMetaJson,
+  };
+
   if (existing) {
-    await prisma.fund.update({ where: { id: existing.id }, data });
+    await prisma.fund.update({ where: { id: existing.id }, data: { ...data, ...columnPatch } });
     return existing.id;
   }
 
+  const createdNotes = writeFundHubMeta(
+    [`Descoberto na varredura ${runId}`, ...noteParts].filter(Boolean).join(' · '),
+    {
+      pipelineStatus: 'decide',
+      ownerUserId,
+      dossier: dossierFromCandidate(c),
+      origin: {
+        runId,
+        scanFocus: c.scanFocus,
+        savedAt: new Date().toISOString(),
+      },
+    },
+  );
+  const createdCols = fundColumnDataFromMeta(parseFundHubMeta(createdNotes));
   const created = await prisma.fund.create({
     data: {
       companyId,
       ...data,
-      notes: writeFundHubMeta(
-        [`Descoberto na varredura ${runId}`, ...noteParts].filter(Boolean).join(' · '),
-        {
-          pipelineStatus: 'decide',
-          dossier: dossierFromCandidate(c),
-          origin: {
-            runId,
-            scanFocus: c.scanFocus,
-            savedAt: new Date().toISOString(),
-          },
-        },
-      ),
+      notes: createdNotes,
+      pipelineStatus: createdCols.pipelineStatus,
+      ownerUserId: createdCols.ownerUserId,
+      watchOpen: createdCols.watchOpen,
+      fundHubMetaJson: createdCols.fundHubMetaJson,
     },
   });
   return created.id;

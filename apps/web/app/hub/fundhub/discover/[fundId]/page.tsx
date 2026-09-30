@@ -12,6 +12,8 @@ import {
   MapPin,
   ExternalLink,
 } from 'lucide-react';
+import { useApp } from '@/app/providers';
+import { ui } from '@/lib/i18n';
 
 interface Fund {
   id: string;
@@ -34,6 +36,7 @@ interface Fund {
 export default function FundDetailPage() {
   const params = useParams();
   const fundId = params.fundId as string;
+  const { locale } = useApp();
 
   const [fund, setFund] = useState<Fund | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,9 +84,11 @@ export default function FundDetailPage() {
   if (!fund) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center">
-        <p className="mb-4 text-gray-600">Fundo não encontrado</p>
+        <p className="mb-4 text-gray-600">
+          {ui(locale, 'Fondo no encontrado', 'Fundo não encontrado', 'Fund not found')}
+        </p>
         <Link href="/hub/fundhub/my-funds" className="text-amber-600 hover:text-amber-700">
-          ← Em curso
+          ← {ui(locale, 'En curso', 'Em curso', 'In progress')}
         </Link>
       </div>
     );
@@ -101,7 +106,7 @@ export default function FundDetailPage() {
         className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="h-4 w-4" />
-        Em curso
+        {ui(locale, 'En curso', 'Em curso', 'In progress')}
       </Link>
 
       <header className="rounded-2xl border border-gray-200 bg-white p-6">
@@ -113,7 +118,9 @@ export default function FundDetailPage() {
                   fund.status === 'open' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'
                 }`}
               >
-                {fund.status === 'open' ? 'Aberto' : fund.status}
+                {fund.status === 'open'
+                  ? ui(locale, 'Abierto', 'Aberto', 'Open')
+                  : fund.status}
               </span>
               {fund.type && (
                 <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
@@ -131,14 +138,16 @@ export default function FundDetailPage() {
               className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50"
             >
               <Heart className={`h-4 w-4 ${isSaved ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
-              {isSaved ? 'Guardado' : 'Guardar'}
+              {isSaved
+                ? ui(locale, 'Guardado', 'Guardado', 'Saved')
+                : ui(locale, 'Guardar', 'Guardar', 'Save')}
             </button>
             <Link
               href={`/hub/fundhub/proposals?fundId=${fund.id}`}
               className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700"
             >
               <FileText className="h-4 w-4" />
-              Proposta
+              {ui(locale, 'Propuesta', 'Proposta', 'Proposal')}
             </Link>
           </div>
         </div>
@@ -147,14 +156,14 @@ export default function FundDetailPage() {
           <div className="flex items-start gap-2">
             <DollarSign className="mt-0.5 h-4 w-4 text-amber-600" />
             <div>
-              <dt className="text-xs text-gray-500">Montante</dt>
+              <dt className="text-xs text-gray-500">{ui(locale, 'Monto', 'Montante', 'Amount')}</dt>
               <dd className="text-sm font-semibold text-gray-900">{amountLabel}</dd>
             </div>
           </div>
           <div className="flex items-start gap-2">
             <Calendar className="mt-0.5 h-4 w-4 text-amber-600" />
             <div>
-              <dt className="text-xs text-gray-500">Prazo</dt>
+              <dt className="text-xs text-gray-500">{ui(locale, 'Plazo', 'Prazo', 'Deadline')}</dt>
               <dd className="text-sm font-semibold text-gray-900">
                 {fund.deadline ? new Date(fund.deadline).toLocaleDateString() : '—'}
               </dd>
@@ -163,7 +172,7 @@ export default function FundDetailPage() {
           <div className="flex items-start gap-2">
             <MapPin className="mt-0.5 h-4 w-4 text-amber-600" />
             <div>
-              <dt className="text-xs text-gray-500">Países</dt>
+              <dt className="text-xs text-gray-500">{ui(locale, 'Países', 'Países', 'Countries')}</dt>
               <dd className="text-sm font-semibold text-gray-900">{fund.countries || '—'}</dd>
             </div>
           </div>
@@ -172,7 +181,9 @@ export default function FundDetailPage() {
 
       {fund.description && (
         <section className="rounded-2xl border border-gray-200 bg-white p-6">
-          <h2 className="text-sm font-semibold text-gray-900">Descrição</h2>
+          <h2 className="text-sm font-semibold text-gray-900">
+            {ui(locale, 'Descripción', 'Descrição', 'Description')}
+          </h2>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{fund.description}</p>
         </section>
       )}
@@ -185,7 +196,7 @@ export default function FundDetailPage() {
           className="inline-flex items-center gap-2 text-sm font-medium text-amber-700 hover:underline"
         >
           <ExternalLink className="h-4 w-4" />
-          Site oficial
+          {ui(locale, 'Sitio oficial', 'Site oficial', 'Official site')}
         </a>
       )}
     </div>
