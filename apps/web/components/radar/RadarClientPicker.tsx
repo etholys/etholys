@@ -1,20 +1,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Loader2, MapPinned, Plus, Users } from 'lucide-react';
+import { ChevronDown, Home, Loader2, MapPinned, Plus, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { RADAR_CLIENT_ALL } from '@/lib/radar/client-scope';
+import { RADAR_SCOPE_ALL, RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
 import { useRadarClientScope } from '@/components/radar/RadarClientScopeContext';
 
 export function RadarClientPicker({ className }: { className?: string }) {
   const {
-    role,
-    roleLoading,
     clients,
     clientsLoading,
-    clientScope,
+    scope,
     selectedClient,
-    setClientScope,
+    setScope,
     setCreateOpen,
   } = useRadarClientScope();
   const [open, setOpen] = useState(false);
@@ -33,26 +31,17 @@ export function RadarClientPicker({ className }: { className?: string }) {
     };
   }, [open]);
 
-  if (roleLoading) {
-    return (
-      <div className={cn('inline-flex items-center gap-1.5 text-xs text-white/45', className)}>
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        Cliente…
-      </div>
-    );
-  }
-
-  if (role !== 'provider') return null;
-
   const label =
-    clientScope === RADAR_CLIENT_ALL
-      ? 'Todos os clientes'
-      : selectedClient?.name || 'Cliente…';
+    scope === RADAR_SCOPE_OWN
+      ? 'Minha operação'
+      : scope === RADAR_SCOPE_ALL
+        ? 'Todos'
+        : selectedClient?.name || 'Cliente…';
 
   return (
     <div ref={ref} className={cn('relative space-y-1.5', className)}>
       <p className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/70">
-        Cliente RADAR
+        Âmbito RADAR
       </p>
       <button
         type="button"
@@ -62,7 +51,11 @@ export function RadarClientPicker({ className }: { className?: string }) {
         aria-haspopup="listbox"
       >
         <span className="flex min-w-0 items-center gap-1.5">
-          <Users className="h-3.5 w-3.5 shrink-0 text-emerald-300/80" />
+          {scope === RADAR_SCOPE_OWN ? (
+            <Home className="h-3.5 w-3.5 shrink-0 text-emerald-300/80" />
+          ) : (
+            <Users className="h-3.5 w-3.5 shrink-0 text-emerald-300/80" />
+          )}
           <span className="truncate">{clientsLoading ? 'A carregar…' : label}</span>
         </span>
         <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-white/40 transition', open && 'rotate-180')} />
@@ -78,31 +71,48 @@ export function RadarClientPicker({ className }: { className?: string }) {
             <button
               type="button"
               role="option"
-              aria-selected={clientScope === RADAR_CLIENT_ALL}
+              aria-selected={scope === RADAR_SCOPE_OWN}
               onClick={() => {
-                setClientScope(RADAR_CLIENT_ALL);
+                setScope(RADAR_SCOPE_OWN);
                 setOpen(false);
               }}
               className={cn(
                 'flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-white/5',
-                clientScope === RADAR_CLIENT_ALL && 'bg-emerald-500/15 font-medium text-emerald-100',
+                scope === RADAR_SCOPE_OWN && 'bg-emerald-500/15 font-medium text-emerald-100',
               )}
             >
-              Todos os clientes
+              <Home className="h-3.5 w-3.5 text-emerald-300/80" />
+              Minha operação
             </button>
+            <button
+              type="button"
+              role="option"
+              aria-selected={scope === RADAR_SCOPE_ALL}
+              onClick={() => {
+                setScope(RADAR_SCOPE_ALL);
+                setOpen(false);
+              }}
+              className={cn(
+                'flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-white/5',
+                scope === RADAR_SCOPE_ALL && 'bg-emerald-500/15 font-medium text-emerald-100',
+              )}
+            >
+              Todos (alertas globais)
+            </button>
+            {clients.length > 0 && <div className="my-1 border-t border-white/10" />}
             {clients.map((c) => (
               <button
                 key={c.id}
                 type="button"
                 role="option"
-                aria-selected={clientScope === c.id}
+                aria-selected={scope === c.id}
                 onClick={() => {
-                  setClientScope(c.id);
+                  setScope(c.id);
                   setOpen(false);
                 }}
                 className={cn(
                   'flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-xs hover:bg-white/5',
-                  clientScope === c.id && 'bg-emerald-500/15 font-medium text-emerald-100',
+                  scope === c.id && 'bg-emerald-500/15 font-medium text-emerald-100',
                 )}
               >
                 <span className="truncate">{c.name}</span>
@@ -123,23 +133,11 @@ export function RadarClientPicker({ className }: { className?: string }) {
             </button>
             <button
               type="button"
-              disabled={clientScope === RADAR_CLIENT_ALL}
               onClick={() => {
-                if (clientScope === RADAR_CLIENT_ALL) return;
                 setCreateOpen('property');
                 setOpen(false);
               }}
-              className={cn(
-                'flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-medium hover:bg-emerald-500/10',
-                clientScope === RADAR_CLIENT_ALL
-                  ? 'cursor-not-allowed text-white/25'
-                  : 'text-emerald-200',
-              )}
-              title={
-                clientScope === RADAR_CLIENT_ALL
-                  ? 'Seleciona um cliente primeiro'
-                  : 'Cadastrar fazenda neste cliente'
-              }
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-medium text-emerald-200 hover:bg-emerald-500/10"
             >
               <MapPinned className="h-3.5 w-3.5" />
               + Nova fazenda
@@ -148,7 +146,7 @@ export function RadarClientPicker({ className }: { className?: string }) {
         </>
       )}
       <p className="px-0.5 text-[10px] leading-snug text-white/35">
-        Âmbito da carteira — filtra alertas e propriedades.
+        Minha operação · clientes · todos.
       </p>
     </div>
   );

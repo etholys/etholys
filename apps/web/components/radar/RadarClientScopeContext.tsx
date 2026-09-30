@@ -11,13 +11,13 @@ import {
 } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/app/providers';
-import type { RadarOrgRole } from '@/lib/radar/org-role';
 import {
-  RADAR_CLIENT_ALL,
-  parseRadarClientFromSearch,
-  readRadarClientScope,
-  writeRadarClientScope,
-  type RadarClientScopeId,
+  RADAR_SCOPE_ALL,
+  RADAR_SCOPE_OWN,
+  parseRadarScopeFromSearch,
+  readRadarScope,
+  writeRadarScope,
+  type RadarScopeId,
 } from '@/lib/radar/client-scope';
 
 export type RadarClientOption = {
@@ -25,29 +25,36 @@ export type RadarClientOption = {
   name: string;
   contactName: string | null;
   propertyCount: number;
+  linkedCompanyId?: string | null;
 };
 
-type RadarClientScopeValue = {
+type RadarScopeValue = {
   companyId: string;
   engagementId: string | null;
-  role: RadarOrgRole | null;
-  roleLoading: boolean;
   clients: RadarClientOption[];
   clientsLoading: boolean;
-  clientScope: RadarClientScopeId;
+  scope: RadarScopeId;
+  /** @deprecated use scope */
+  clientScope: RadarScopeId;
   selectedClientId: string | null;
   selectedClient: RadarClientOption | null;
-  setClientScope: (scope: RadarClientScopeId) => void;
+  isOwnScope: boolean;
+  isAllScope: boolean;
+  setScope: (scope: RadarScopeId) => void;
+  /** @deprecated use setScope */
+  setClientScope: (scope: RadarScopeId) => void;
   refreshClients: () => Promise<void>;
-  refreshRole: () => Promise<void>;
   createOpen: 'client' | 'property' | null;
   setCreateOpen: (v: 'client' | 'property' | null) => void;
-  /** Bumps when clients/properties change so home lists refresh. */
   listRevision: number;
   bumpListRevision: () => void;
+  /** legacy no-ops so old callers don't crash */
+  role: null;
+  roleLoading: boolean;
+  refreshRole: () => Promise<void>;
 };
 
-const Ctx = createContext<RadarClientScopeValue | null>(null);
+const Ctx = createContext<RadarScopeValue | null>(null);
 
 export function useRadarClientScope() {
   const ctx = useContext(Ctx);
@@ -68,37 +75,15 @@ export function RadarClientScopeProvider({ children }: { children: ReactNode }) 
   const companyId = String(search.get('company') || activeCompanyId || '').trim();
   const engagementId = String(search.get('engagement') || '').trim() || null;
 
-  const [role, setRole] = useState<RadarOrgRole | null>(null);
-  const [roleLoading, setRoleLoading] = useState(true);
   const [clients, setClients] = useState<RadarClientOption[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
-  const [clientScope, setClientScopeState] = useState<RadarClientScopeId>(RADAR_CLIENT_ALL);
+  const [scope, setScopeState] = useState<RadarScopeId>(RADAR_SCOPE_OWN);
   const [createOpen, setCreateOpen] = useState<'client' | 'property' | null>(null);
   const [listRevision, setListRevision] = useState(0);
   const bumpListRevision = useCallback(() => setListRevision((n) => n + 1), []);
 
-  const refreshRole = useCallback(async () => {
-    if (!companyId) {
-      setRole(null);
-      setRoleLoading(false);
-      return;
-    }
-    setRoleLoading(true);
-    try {
-      const q = new URLSearchParams({ companyId });
-      if (engagementId) q.set('engagementId', engagementId);
-      const r = await fetch(`/api/radar/org-role?${q}`, { cache: 'no-store' });
-      const d = await r.json().catch(() => ({}));
-      setRole(r.ok && d.radarOrgRole ? d.radarOrgRole : null);
-    } catch {
-      setRole(null);
-    } finally {
-      setRoleLoading(false);
-    }
-  }, [companyId, engagementId]);
-
   const refreshClients = useCallback(async () => {
-    if (!companyId || role !== 'provider') {
+    if (!companyId) {
       setClients([]);
       setClientsLoading(false);
       return;
@@ -116,6 +101,7 @@ export function RadarClientScopeProvider({ children }: { children: ReactNode }) 
           name: c.name,
           contactName: c.contactName ?? null,
           propertyCount: c.propertyCount ?? 0,
+          linkedCompanyId: c.linkedCompanyId ?? null,
         })),
       );
     } catch {
@@ -123,29 +109,25 @@ export function RadarClientScopeProvider({ children }: { children: ReactNode }) 
     } finally {
       setClientsLoading(false);
     }
-  }, [companyId, engagementId, role]);
-
-  useEffect(() => {
-    void refreshRole();
-  }, [refreshRole]);
+  }, [companyId, engagementId]);
 
   useEffect(() => {
     void refreshClients();
   }, [refreshClients]);
 
   useEffect(() => {
-    const fromUrl = parseRadarClientFromSearch(search);
+    const fromUrl = parseRadarScopeFromSearch(search);
     if (fromUrl) {
-      setClientScopeState(fromUrl);
-      if (companyId) writeRadarClientScope(companyId, fromUrl);
+      setScopeState(fromUrl);
+      if (companyId) writeRadarScope(companyId, fromUrl);
       return;
     }
     if (!companyId) {
-      setClientScopeState(RADAR_CLIENT_ALL);
+      setScopeState(RADAR_SCOPE_OWN);
       return;
     }
-    const stored = readRadarClientScope(companyId);
-    setClientScopeState(stored || RADAR_CLIENT_ALL);
+    const stored = readRadarScope(companyId);
+    setScopeState(stored || RADAR_SCOPE_OWN);
   }, [search, companyId]);
 
   useEffect(() => {
@@ -154,13 +136,13 @@ export function RadarClientScopeProvider({ children }: { children: ReactNode }) 
     else if (newParam === 'property' || newParam === 'farm') setCreateOpen('property');
   }, [search]);
 
-  const setClientScope = useCallback(
-    (scope: RadarClientScopeId) => {
-      setClientScopeState(scope);
-      if (companyId) writeRadarClientScope(companyId, scope);
+  const setScope = useCallback(
+    (next: RadarScopeId) => {
+      setScopeState(next);
+      if (companyId) writeRadarScope(companyId, next);
       const params = new URLSearchParams(search.toString());
       if (companyId) params.set('company', companyId);
-      params.set('client', scope);
+      params.set('client', next);
       params.delete('new');
       const qs = params.toString();
       router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false });
@@ -168,44 +150,46 @@ export function RadarClientScopeProvider({ children }: { children: ReactNode }) 
     [companyId, pathname, router, search],
   );
 
-  const selectedClientId = clientScope === RADAR_CLIENT_ALL ? null : clientScope;
+  const selectedClientId =
+    scope === RADAR_SCOPE_ALL || scope === RADAR_SCOPE_OWN ? null : scope;
   const selectedClient = useMemo(
     () => (selectedClientId ? clients.find((c) => c.id === selectedClientId) || null : null),
     [clients, selectedClientId],
   );
 
-  const value = useMemo<RadarClientScopeValue>(
+  const value = useMemo<RadarScopeValue>(
     () => ({
       companyId,
       engagementId,
-      role,
-      roleLoading,
       clients,
       clientsLoading,
-      clientScope,
+      scope,
+      clientScope: scope,
       selectedClientId,
       selectedClient,
-      setClientScope,
+      isOwnScope: scope === RADAR_SCOPE_OWN,
+      isAllScope: scope === RADAR_SCOPE_ALL,
+      setScope,
+      setClientScope: setScope,
       refreshClients,
-      refreshRole,
       createOpen,
       setCreateOpen,
       listRevision,
       bumpListRevision,
+      role: null,
+      roleLoading: false,
+      refreshRole: async () => undefined,
     }),
     [
       companyId,
       engagementId,
-      role,
-      roleLoading,
       clients,
       clientsLoading,
-      clientScope,
+      scope,
       selectedClientId,
       selectedClient,
-      setClientScope,
+      setScope,
       refreshClients,
-      refreshRole,
       createOpen,
       listRevision,
       bumpListRevision,

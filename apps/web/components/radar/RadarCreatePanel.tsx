@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, X } from 'lucide-react';
 import { useRadarClientScope } from '@/components/radar/RadarClientScopeContext';
-import { RADAR_CLIENT_ALL } from '@/lib/radar/client-scope';
+import { RADAR_SCOPE_ALL, RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
 
 const MODULES = [
   { id: 'agriculture', label: { pt: 'Agricultura', es: 'Agricultura', en: 'Agriculture' } },
@@ -13,18 +13,21 @@ const MODULES = [
   { id: 'carbon', label: { pt: 'Carbono', es: 'Carbono', en: 'Carbon' } },
 ] as const;
 
-export function RadarCreatePanel({ locale = 'pt' }: { locale?: string }) {
+type AuroraOpt = { id: string; name: string };
+
+export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
   const loc = locale === 'es' || locale === 'en' ? locale : 'pt';
   const router = useRouter();
   const {
     companyId,
     engagementId,
     clients,
-    clientScope,
+    scope,
     selectedClientId,
+    isOwnScope,
     createOpen,
     setCreateOpen,
-    setClientScope,
+    setScope,
     refreshClients,
     bumpListRevision,
   } = useRadarClientScope();
@@ -34,19 +37,45 @@ export function RadarCreatePanel({ locale = 'pt' }: { locale?: string }) {
   const [phone, setPhone] = useState('');
   const [moduleId, setModuleId] = useState('agriculture');
   const [linkClientId, setLinkClientId] = useState('');
+  const [clientMode, setClientMode] = useState<'new' | 'aurora'>('new');
+  const [auroraOpts, setAuroraOpts] = useState<AuroraOpt[]>([]);
+  const [linkedCompanyId, setLinkedCompanyId] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (createOpen !== 'client' || !companyId) return;
+    void (async () => {
+      const q = new URLSearchParams({ companyId, aurora: '1' });
+      if (engagementId) q.set('engagementId', engagementId);
+      const r = await fetch(`/api/radar/clients?${q}`);
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) setAuroraOpts(d.aurora || []);
+    })();
+  }, [createOpen, companyId, engagementId]);
 
   if (!createOpen || !companyId) return null;
 
   const isClient = createOpen === 'client';
-  const effectiveClientId = selectedClientId || linkClientId || '';
+  const propertyOwner: 'own' | 'client' =
+    isOwnScope || (!selectedClientId && scope === RADAR_SCOPE_OWN)
+      ? 'own'
+      : selectedClientId
+        ? 'client'
+        : linkClientId === 'own' || !linkClientId
+          ? 'own'
+          : 'client';
+
+  const effectiveClientId =
+    propertyOwner === 'own' ? null : selectedClientId || (linkClientId !== 'own' ? linkClientId : null);
 
   const close = () => {
     setCreateOpen(null);
     setName('');
     setContact('');
     setPhone('');
+    setLinkedCompanyId('');
+    setClientMode('new');
     setErr(null);
   };
 
@@ -58,31 +87,36 @@ export function RadarCreatePanel({ locale = 'pt' }: { locale?: string }) {
   };
 
   const submitClient = async () => {
-    if (name.trim().length < 2) return;
     setBusy(true);
     setErr(null);
     try {
+      const payload: Record<string, unknown> = {
+        companyId,
+        engagementId,
+        contactName: contact || undefined,
+        contactPhone: phone || undefined,
+      };
+      if (clientMode === 'aurora') {
+        if (!linkedCompanyId) throw new Error(loc === 'en' ? 'Pick an AURORA company.' : 'Escolhe uma empresa AURORA.');
+        payload.linkedCompanyId = linkedCompanyId;
+        const opt = auroraOpts.find((a) => a.id === linkedCompanyId);
+        payload.name = name.trim() || opt?.name;
+      } else {
+        if (name.trim().length < 2) throw new Error(loc === 'en' ? 'Name required.' : 'Nome obrigatório.');
+        payload.name = name;
+      }
       const r = await fetch('/api/radar/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId,
-          engagementId,
-          name,
-          contactName: contact || undefined,
-          contactPhone: phone || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha');
       await refreshClients();
       bumpListRevision();
-      setClientScope(d.client.id);
+      setScope(d.client.id);
       close();
-      // Re-open farm form under the new client without full remount flicker
-      window.setTimeout(() => {
-        setCreateOpen('property');
-      }, 50);
+      window.setTimeout(() => setCreateOpen('property'), 50);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -92,10 +126,6 @@ export function RadarCreatePanel({ locale = 'pt' }: { locale?: string }) {
 
   const submitProperty = async () => {
     if (name.trim().length < 2) return;
-    if (!effectiveClientId) {
-      setErr(loc === 'en' ? 'Pick a client first.' : 'Seleciona um cliente primeiro.');
-      return;
-    }
     setBusy(true);
     setErr(null);
     try {
@@ -114,10 +144,11 @@ export function RadarCreatePanel({ locale = 'pt' }: { locale?: string }) {
       if (!r.ok) throw new Error(d.error || 'Falha');
       await refreshClients();
       bumpListRevision();
-      if (clientScope === RADAR_CLIENT_ALL) setClientScope(effectiveClientId);
+      if (effectiveClientId) setScope(effectiveClientId);
+      else setScope(RADAR_SCOPE_OWN);
       close();
       const q = companyQs();
-      q.set('client', effectiveClientId);
+      q.set('client', effectiveClientId || RADAR_SCOPE_OWN);
       router.push(`/hub/radar/properties/${d.property.id}?${q}`);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erro');
@@ -150,22 +181,56 @@ export function RadarCreatePanel({ locale = 'pt' }: { locale?: string }) {
         </button>
       </div>
 
+      {isClient && (
+        <div className="mt-4 inline-flex rounded-xl border border-white/15 bg-black/20 p-1">
+          <button
+            type="button"
+            onClick={() => setClientMode('new')}
+            className={`rounded-lg px-3 py-1.5 text-xs ${clientMode === 'new' ? 'bg-emerald-500 text-[#04110c] font-semibold' : 'text-white/60'}`}
+          >
+            {loc === 'en' ? 'New' : 'Novo'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setClientMode('aurora')}
+            className={`rounded-lg px-3 py-1.5 text-xs ${clientMode === 'aurora' ? 'bg-emerald-500 text-[#04110c] font-semibold' : 'text-white/60'}`}
+          >
+            AURORA / ATER
+          </button>
+        </div>
+      )}
+
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={
-            isClient
-              ? loc === 'en'
-                ? 'Client name'
-                : 'Nome do cliente'
-              : loc === 'en'
-                ? 'Farm / property name'
-                : 'Nome da fazenda / propriedade'
-          }
-          className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
-          autoFocus
-        />
+        {isClient && clientMode === 'aurora' ? (
+          <select
+            value={linkedCompanyId}
+            onChange={(e) => setLinkedCompanyId(e.target.value)}
+            className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
+          >
+            <option value="">{loc === 'en' ? 'Pick AURORA company…' : 'Escolher empresa AURORA…'}</option>
+            {auroraOpts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={
+              isClient
+                ? loc === 'en'
+                  ? 'Client name'
+                  : 'Nome do cliente'
+                : loc === 'en'
+                  ? 'Farm / property name'
+                  : 'Nome da fazenda / propriedade'
+            }
+            className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
+            autoFocus
+          />
+        )}
         {isClient ? (
           <>
             <input
@@ -180,16 +245,23 @@ export function RadarCreatePanel({ locale = 'pt' }: { locale?: string }) {
               placeholder={loc === 'en' ? 'Phone (optional)' : 'Telefone (opcional)'}
               className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
             />
+            {clientMode === 'aurora' && auroraOpts.length === 0 && (
+              <p className="sm:col-span-2 text-xs text-white/45">
+                {loc === 'en'
+                  ? 'No ATER companies found for this operator. Create a new client instead.'
+                  : 'Sem empresas ATER ligadas. Cria um cliente novo.'}
+              </p>
+            )}
           </>
         ) : (
           <>
             {!selectedClientId && (
               <select
-                value={linkClientId}
+                value={linkClientId || (isOwnScope ? 'own' : '')}
                 onChange={(e) => setLinkClientId(e.target.value)}
                 className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
               >
-                <option value="">{loc === 'en' ? 'Link to client…' : 'Ligar a cliente…'}</option>
+                <option value="own">{loc === 'en' ? 'My operation (no client)' : 'Minha operação (sem cliente)'}</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -200,7 +272,7 @@ export function RadarCreatePanel({ locale = 'pt' }: { locale?: string }) {
             <select
               value={moduleId}
               onChange={(e) => setModuleId(e.target.value)}
-              className={cnSelect(!selectedClientId)}
+              className={`rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40${!selectedClientId ? '' : ' sm:col-span-2'}`}
             >
               {MODULES.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -227,8 +299,8 @@ export function RadarCreatePanel({ locale = 'pt' }: { locale?: string }) {
               ? 'Create client'
               : 'Criar cliente'
             : loc === 'en'
-              ? 'Create & open funnel'
-              : 'Criar e abrir funil'}
+              ? 'Create & open'
+              : 'Criar e abrir'}
         </button>
         <button type="button" onClick={close} className="rounded-xl px-4 py-2.5 text-sm text-white/60">
           {loc === 'en' ? 'Cancel' : 'Cancelar'}
@@ -236,8 +308,4 @@ export function RadarCreatePanel({ locale = 'pt' }: { locale?: string }) {
       </div>
     </div>
   );
-}
-
-function cnSelect(full: boolean) {
-  return `rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40${full ? '' : ' sm:col-span-2'}`;
 }

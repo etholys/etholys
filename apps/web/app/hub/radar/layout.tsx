@@ -12,7 +12,7 @@ import { RadarCreatePanel } from '@/components/radar/RadarCreatePanel';
 
 function RadarShellInner({ children }: { children: ReactNode }) {
   const { locale, activeCompanyId } = useApp();
-  const { companyId, engagementId, role, roleLoading, clientScope } = useRadarClientScope();
+  const { companyId, engagementId, scope } = useRadarClientScope();
   const es = locale === 'es';
   const en = locale === 'en';
   const loc = es || en ? locale : 'pt';
@@ -22,41 +22,23 @@ function RadarShellInner({ children }: { children: ReactNode }) {
     const q = new URLSearchParams();
     if (cid) q.set('company', cid);
     if (engagementId) q.set('engagement', engagementId);
-    if (role === 'provider' && clientScope) q.set('client', clientScope);
+    if (scope) q.set('client', scope);
     const s = q.toString();
     return s ? `?${s}` : '';
-  }, [cid, engagementId, role, clientScope]);
+  }, [cid, engagementId, scope]);
 
-  const nav = useMemo(() => {
-    if (roleLoading) {
-      return [{ href: `/hub/radar${qs}`, label: es ? 'Central' : en ? 'Home' : 'Central' }];
-    }
-    if (role === 'provider') {
-      return [
-        {
-          href: `/hub/radar/provider${qs}`,
-          label: es ? 'Central' : en ? 'Home' : 'Central',
-        },
-      ];
-    }
-    if (role === 'producer') {
-      return [
-        {
-          href: `/hub/radar/producer${qs}`,
-          label: es ? 'Central' : en ? 'Home' : 'Central',
-        },
-      ];
-    }
-    return [{ href: `/hub/radar${cid ? `?company=${cid}` : ''}`, label: es ? 'Central' : en ? 'Home' : 'Central' }];
-  }, [role, roleLoading, qs, cid, engagementId, es, en]);
+  const nav = useMemo(
+    () => [
+      {
+        href: `/hub/radar${qs}`,
+        label: es ? 'Central' : en ? 'Home' : 'Central',
+      },
+    ],
+    [qs, es, en],
+  );
 
   return (
-    <ProductAppShell
-      product="radar"
-      accent="violet"
-      nav={nav}
-      sidebarAfterCompany={role === 'provider' ? <RadarClientPicker /> : null}
-    >
+    <ProductAppShell product="radar" accent="violet" nav={nav} sidebarAfterCompany={<RadarClientPicker />}>
       <RadarCreatePanel locale={loc} />
       {children}
     </ProductAppShell>

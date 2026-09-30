@@ -72,6 +72,7 @@ model User {
   notifications                 Notification[]
   projectMembers                ProjectMember[]
   createdProposals              Proposal[]                   @relation("ProposalCreator")
+  ownedFunds                    Fund[]                       @relation("FundOwner")
   proposalComments              ProposalComment[]            @relation("ProposalCommentCreator")
   uploadedProposalFiles         ProposalFile[]               @relation("ProposalFileUploader")
   proposalVersions              ProposalVersion[]            @relation("ProposalVersionCreator")
@@ -128,6 +129,7 @@ model User {
   nexusDiagnosesCreated         NexusDiagnosis[]             @relation("NexusDiagnosisCreator")
   nexusFieldEntriesAuthored     NexusFieldEntry[]            @relation("NexusFieldEntryAuthor")
   radarLotEventsAuthored        RadarLotEvent[]              @relation("RadarLotEventAuthor")
+  radarTechnicians              RadarTechnician[]            @relation("RadarTechnicianUser")
   meetContacts                  MeetContact[]                @relation("MeetContactOwner")
 }
 
@@ -186,7 +188,7 @@ model Company {
   /// Respostas do assistente de contexto (sector, comércio, metas) — aciona módulos e memória de IA; não substitui aconselhamento legal.
   contextSetupJson            Json?
   contextSetupAt              DateTime?
-  /// RADAR: producer (empresa rural) | provider (prestadora de assistência). Null = ainda não escolheu.
+  /// Legado RADAR (producer|provider) — já não governa a UI; mantido só por compatibilidade.
   radarOrgRole                String?
   aiSessions                  AiAdvisorSession[]
   aiAlerts                    AiAlert[]
@@ -229,7 +231,9 @@ model Company {
   radarLots                   RadarLot[]
   radarSiteLayout             RadarSiteLayout?
   radarClients                RadarClient[]
+  radarClientsLinked          RadarClient[]                @relation("RadarClientLinkedCompany")
   radarProperties             RadarProperty[]
+  radarTechnicians            RadarTechnician[]
   businessDossier             BusinessDossier?
   businessBets                BusinessBet[]
   businessRhythmNotes         BusinessRhythmNote[]
@@ -1455,6 +1459,11 @@ model Fund {
   type                 String
   category             String?
   amount               Float?
+  /** Valor pedido na candidatura (mesa Em curso). */
+  amountRequested      Float?
+  /** Resultado da decisão: pending|won|lost|withdrawn */
+  decisionOutcome      String                       @default("pending")
+  decisionNote         String?
   currency             String                       @default("USD")
   deadline             DateTime?
   status               String                       @default("open")
@@ -1472,10 +1481,17 @@ model Fund {
   chance               Float?
   lastReviewedAt       DateTime?
   isActive             Boolean                      @default(true)
+  /** Mesa Em curso — decide|prepare|submitted|won|lost (legado também em notes <!--fh:-->). */
+  pipelineStatus       String                       @default("decide")
+  ownerUserId          String?
+  watchOpen            Boolean                      @default(false)
+  /** Dossier/origem/doador tipado (JSON); notes <!--fh:--> continua como fallback de leitura. */
+  fundHubMetaJson      Json?
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
   conversationThreads  ConversationThread[]
   company              Company                      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner                User?                        @relation("FundOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   opportunityFeedbacks FundingOpportunityFeedback[]
   proposals            Proposal[]
   userStatus           UserFundStatus[]
@@ -1485,6 +1501,9 @@ model Fund {
   @@index([companyId])
   @@index([status])
   @@index([deadline])
+  @@index([companyId, pipelineStatus])
+  @@index([companyId, ownerUserId])
+  @@index([companyId, watchOpen])
 }
 
 model UserFundStatus {
@@ -1509,6 +1528,8 @@ model Proposal {
   editalLink    String?
   editalSummary String?
   status        String            @default("draft")
+  /** Estado completo do editor (markdown, chat, intake, coalition) — fonte de verdade server-side. */
+  draftJson     Json?
   submittedAt   DateTime?
   deletedAt     DateTime?
   createdBy     String?
@@ -2180,24 +2201,29 @@ model RadarSiteLayout {
   company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
-/// Cliente rural de uma prestadora RADAR (assistance / consulting org).
+/// Cliente externo da empresa no RADAR (opcional — operação própria não precisa).
 model RadarClient {
-  id                String          @id @default(cuid())
+  id                String                  @id @default(cuid())
   providerCompanyId String
   name              String
   contactName       String?
   contactEmail      String?
   contactPhone      String?
   notes             String?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  providerCompany   Company         @relation(fields: [providerCompanyId], references: [id], onDelete: Cascade)
+  /// Empresa Etholys / AURORA-ATER já existente (opção C).
+  linkedCompanyId   String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  providerCompany   Company                 @relation(fields: [providerCompanyId], references: [id], onDelete: Cascade)
+  linkedCompany     Company?                @relation("RadarClientLinkedCompany", fields: [linkedCompanyId], references: [id], onDelete: SetNull)
   properties        RadarProperty[]
+  technicianScopes  RadarTechnicianScope[]
 
   @@index([providerCompanyId, createdAt])
+  @@index([linkedCompanyId])
 }
 
-/// Propriedade / fazenda / unidade física — no produtor ou sob um cliente do prestador.
+/// Propriedade / fazenda — da empresa (clientId null) ou de um cliente externo.
 model RadarProperty {
   id        String       @id @default(cuid())
   companyId String
@@ -2216,9 +2242,46 @@ model RadarProperty {
   company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   client    RadarClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   units     NexusOpsUnit[]
+  technicianScopes RadarTechnicianScope[]
 
   @@index([companyId, createdAt])
   @@index([clientId])
+}
+
+/// Técnico RADAR — utilizador da empresa (lista de funcionários) com atribuições.
+model RadarTechnician {
+  id               String                 @id @default(cuid())
+  companyId        String
+  userId           String
+  /// Vê toda a carteira (clientes + operação própria).
+  canSeeAll        Boolean                @default(false)
+  /// Pode criar clientes.
+  canCreateClients Boolean                @default(false)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  company          Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user             User                   @relation("RadarTechnicianUser", fields: [userId], references: [id], onDelete: Cascade)
+  scopes           RadarTechnicianScope[]
+
+  @@unique([companyId, userId])
+  @@index([companyId])
+}
+
+model RadarTechnicianScope {
+  id           String          @id @default(cuid())
+  technicianId String
+  /// Cliente inteiro (todas as propriedades desse cliente).
+  clientId     String?
+  /// Propriedade concreta (própria ou de cliente).
+  propertyId   String?
+  createdAt    DateTime        @default(now())
+  technician   RadarTechnician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  client       RadarClient?    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  property     RadarProperty?  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([technicianId])
+  @@index([clientId])
+  @@index([propertyId])
 }
 
 model MuseSuggestion {

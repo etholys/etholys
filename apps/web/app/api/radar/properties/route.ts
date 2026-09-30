@@ -97,20 +97,21 @@ export async function POST(req: NextRequest) {
 
   const company = await prisma.company.findFirst({
     where: { id: companyId },
-    select: { radarOrgRole: true },
+    select: { id: true },
   });
-  const clientId = String(body.clientId || '').trim() || null;
+  if (!company) return NextResponse.json({ error: 'Empresa inválida.' }, { status: 404 });
 
-  if (company?.radarOrgRole === 'provider') {
-    if (!clientId) {
-      return NextResponse.json({ error: 'Prestadora precisa de um cliente.' }, { status: 400 });
-    }
+  const clientIdRaw = String(body.clientId || '').trim();
+  const clientId =
+    !clientIdRaw || clientIdRaw === 'own' || clientIdRaw === 'mine' || clientIdRaw === 'null'
+      ? null
+      : clientIdRaw;
+
+  if (clientId) {
     const client = await prisma.radarClient.findFirst({
       where: { id: clientId, providerCompanyId: companyId },
     });
     if (!client) return NextResponse.json({ error: 'Cliente inválido.' }, { status: 404 });
-  } else if (clientId) {
-    return NextResponse.json({ error: 'Produtor não usa clientes.' }, { status: 400 });
   }
 
   const areaHa = body.areaHa == null || body.areaHa === '' ? null : Number(body.areaHa);

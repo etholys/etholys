@@ -7,7 +7,6 @@ import { canAccessNexusOpsCompany } from '@/lib/nexus-ops';
 import { AGRICULTURE_MODULE } from '@/lib/nexus-sector-modules';
 import { buildAgricultureBoard, isRadarParcel } from '@/lib/radar/agriculture';
 import { whatsappConfigured } from '@/lib/nexus-whatsapp';
-import { RADAR_CLIENT_ALL } from '@/lib/radar/client-scope';
 
 const SENSOR_METRICS = AGRICULTURE_MODULE.metrics.map((m) => m.id);
 const STALE_LOT_MS = 7 * 24 * 60 * 60 * 1000;
@@ -41,18 +40,12 @@ export async function GET(req: NextRequest) {
   const auth = await authorize(companyId, engagementId);
   if ('error' in auth && auth.error) return auth.error;
 
-  const company = await prisma.company.findFirst({
-    where: { id: companyId },
-    select: { radarOrgRole: true },
-  });
-  const isProvider = company?.radarOrgRole === 'provider';
-
   const propertyWhere =
-    isProvider && clientParam && clientParam !== RADAR_CLIENT_ALL && clientParam !== 'todos'
-      ? { companyId, clientId: clientParam }
-      : isProvider
-        ? { companyId, clientId: { not: null } as const }
-        : { companyId, clientId: null as string | null };
+    !clientParam || clientParam === 'all' || clientParam === 'todos'
+      ? { companyId }
+      : clientParam === 'own' || clientParam === 'mine' || clientParam === 'minha'
+        ? { companyId, clientId: null as string | null }
+        : { companyId, clientId: clientParam };
 
   const properties = await prisma.radarProperty.findMany({
     where: propertyWhere,
@@ -206,9 +199,8 @@ export async function GET(req: NextRequest) {
     if (now.getTime() - lastAt < STALE_LOT_MS) continue;
     const meta = lot.unitId ? unitToProperty.get(lot.unitId) : null;
     const propertyId = meta?.propertyId || lot.unit?.propertyId || null;
-    if (isProvider && clientParam && clientParam !== RADAR_CLIENT_ALL) {
-      if (!meta || meta.clientId !== clientParam) continue;
-    }
+    if (clientParam && !["all","todos","own","mine","minha",""].includes(clientParam)) { if (!meta || meta.clientId !== clientParam) continue; }
+    if ((clientParam === "own" || clientParam === "mine" || clientParam === "minha") && meta?.clientId) continue;
     alerts.push({
       id: `lot:${lot.id}:stale_checkin`,
       severity: 'warning',
@@ -222,7 +214,7 @@ export async function GET(req: NextRequest) {
       clientName: meta?.clientName || null,
       propertyId,
       propertyName: meta?.propertyName || null,
-      href: propertyId ? `/hub/radar/properties/${propertyId}?${qsBase}` : `/hub/radar/provider?${qsBase}`,
+      href: propertyId ? `/hub/radar/properties/${propertyId}?${qsBase}` : `/hub/radar?${qsBase}`,
     });
   }
 
@@ -241,7 +233,7 @@ export async function GET(req: NextRequest) {
       clientName: null,
       propertyId: null,
       propertyName: null,
-      href: `/hub/radar/provider?${qsBase}`,
+      href: `/hub/radar?${qsBase}`,
     });
   } else if (!whatsapp) {
     alerts.push({
@@ -257,7 +249,7 @@ export async function GET(req: NextRequest) {
       clientName: null,
       propertyId: null,
       propertyName: null,
-      href: isProvider ? `/hub/radar/provider?${qsBase}` : `/hub/radar/producer?${qsBase}`,
+      href: `/hub/radar?${qsBase}`,
     });
   }
 
@@ -268,21 +260,16 @@ export async function GET(req: NextRequest) {
       severity: 'warning',
       code: 'empty_portfolio',
       message: {
-        es: isProvider
-          ? 'Sin propiedades en este ámbito — registrá un cliente y una finca.'
-          : 'Sin propiedades — registrá la primera finca para abrir el Radar.',
-        pt: isProvider
-          ? 'Sem propriedades neste âmbito — cadastra um cliente e uma fazenda.'
-          : 'Sem propriedades — cadastra a primeira fazenda para abrir o Radar.',
-        en: isProvider
-          ? 'No properties in this scope — register a client and a farm.'
-          : 'No properties — register the first farm to open Radar.',
+        es: 'Sin propiedades en este ámbito — registrá una finca (propia o de cliente).',
+        pt: 'Sem propriedades neste âmbito — cadastra uma fazenda (própria ou de cliente).',
+        en: 'No properties in this scope — register a farm (own or client).',
       },
-      clientId: clientParam && clientParam !== RADAR_CLIENT_ALL ? clientParam : null,
+      clientId:
+        clientParam && !['all', 'todos', 'own', 'mine', 'minha'].includes(clientParam) ? clientParam : null,
       clientName: null,
       propertyId: null,
       propertyName: null,
-      href: isProvider ? `/hub/radar/provider?${qsBase}` : `/hub/radar/producer?${qsBase}`,
+      href: `/hub/radar?${qsBase}`,
     });
   }
 
@@ -291,8 +278,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     companyId,
-    clientId: clientParam || RADAR_CLIENT_ALL,
-    role: company?.radarOrgRole || null,
+    clientId: clientParam || 'all',
     count: alerts.length,
     alerts: alerts.slice(0, 60),
   });

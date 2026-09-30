@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { AlertTriangle, Bell, Loader2, MapPinned } from 'lucide-react';
+import { RADAR_SCOPE_ALL, RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
 import { useRadarClientScopeOptional } from '@/components/radar/RadarClientScopeContext';
-import { RADAR_CLIENT_ALL } from '@/lib/radar/client-scope';
+import { AlertTriangle, Bell, Loader2, MapPinned } from 'lucide-react';
+import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
 
 type Loc = 'pt' | 'es' | 'en';
 
@@ -41,13 +41,9 @@ export function RadarAlertsDashboard({
   const loc: Loc = locale === 'es' || locale === 'en' ? locale : 'pt';
   const scope = useRadarClientScopeOptional();
   const resolvedClient =
-    clientId !== undefined
+    clientId !== undefined && clientId !== null
       ? clientId
-      : scope?.role === 'provider'
-        ? scope.clientScope === RADAR_CLIENT_ALL
-          ? RADAR_CLIENT_ALL
-          : scope.clientScope
-        : null;
+      : scope?.scope || RADAR_SCOPE_OWN;
 
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,19 +74,41 @@ export function RadarAlertsDashboard({
   }, [load]);
 
   const title =
-    loc === 'es' ? 'Alertas principales' : loc === 'en' ? 'Main alerts' : 'Alertas principais';
-  const subtitle =
-    resolvedClient && resolvedClient !== RADAR_CLIENT_ALL
+    resolvedClient === RADAR_SCOPE_ALL
       ? loc === 'es'
-        ? 'Ámbito del cliente seleccionado.'
+        ? 'Alertas globales'
         : loc === 'en'
-          ? 'Scoped to the selected client.'
-          : 'Âmbito do cliente selecionado.'
-      : loc === 'es'
+          ? 'Global alerts'
+          : 'Alertas globais'
+      : resolvedClient === RADAR_SCOPE_OWN
+        ? loc === 'es'
+          ? 'Alertas — mi operación'
+          : loc === 'en'
+            ? 'Alerts — my operation'
+            : 'Alertas — minha operação'
+        : loc === 'es'
+          ? 'Alertas del ámbito'
+          : loc === 'en'
+            ? 'Scoped alerts'
+            : 'Alertas do âmbito';
+  const subtitle =
+    resolvedClient === RADAR_SCOPE_ALL
+      ? loc === 'es'
         ? 'Humedad, carencia, sensores, cadena y WhatsApp en toda la cartera.'
         : loc === 'en'
           ? 'Moisture, PHI, sensors, chain and WhatsApp across the portfolio.'
-          : 'Humidade, carência, sensores, cadeia e WhatsApp em toda a carteira.';
+          : 'Humidade, carência, sensores, cadeia e WhatsApp em toda a carteira.'
+      : resolvedClient === RADAR_SCOPE_OWN
+        ? loc === 'es'
+          ? 'Solo tu operación propia.'
+          : loc === 'en'
+            ? 'Your own operation only.'
+            : 'Só a tua operação própria.'
+        : loc === 'es'
+          ? 'Ámbito del cliente seleccionado.'
+          : loc === 'en'
+            ? 'Scoped to the selected client.'
+            : 'Âmbito do cliente selecionado.';
 
   return (
     <section className="space-y-4">

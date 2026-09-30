@@ -15,40 +15,26 @@ RADAR é a operação: dados, eficiência, automação, WhatsApp in/out, alertas
 
 `/hub/nexus/campo` e `/hub/pulso` redirecionam para `/hub/radar`.
 
-## Personas (prestador vs produtor)
+## Modelo de produto (empresa única)
 
-`Company.radarOrgRole`: `producer` | `provider` | `null`.
+RADAR é **sempre a empresa** no Etholys — um produto, uma central. Não há gate prestador vs produtor.
 
-| Persona | Espaço | Hierarquia |
-|---------|--------|------------|
-| **Produtor** | `/hub/radar/producer` | Propriedades próprias + dashboard de alertas |
-| **Prestador** | `/hub/radar/provider` | **ClientPicker** (Todos \| cliente) → alertas + propriedades do âmbito |
+| Peça | Comportamento |
+|------|----------------|
+| **Âmbito** | Seletor na sidebar: **Minha operação** \| **Cliente** \| **Todos** |
+| **Caso zero** | Só a minha fazenda — propriedades com `clientId` null; sem clientes nem técnicos obrigatórios |
+| **Clientes** | Opcionais. Criar novo **ou** vincular empresa AURORA/ATER (`linkedCompanyId`) |
+| **Técnicos** | Da lista de funcionários; atribuição por cliente/propriedade em escala; flags `canSeeAll` / `canCreateClients` |
+| **Home** | `/hub/radar` — alertas + propriedades do âmbito + clientes + técnicos |
 
-- Sem papel → ecrã forçado em `/hub/radar` (escolha prestador vs produtor). Não é toggle Empresa|Técnico.
-- Criação de empresa pode gravar `radarOrgRole` (`POST /api/companies`). Signup global completo fica para depois; o gate RADAR é a fonte de verdade neste ciclo.
-- Modelos: `RadarClient` (prestador), `RadarProperty` (fazenda/unidade), `NexusOpsUnit.propertyId`.
+Rotas legadas `/hub/radar/provider` e `/hub/radar/producer` redireccionam para `/hub/radar`.
 
-### Âmbito de cliente (prestadora)
+`Company.radarOrgRole` fica só por compatibilidade e **não governa a UI**.
 
-Espelho do CompanyPicker do Hub, **sempre visível** na sidebar RADAR (`ProductAppShell.sidebarAfterCompany`):
-
-| Peça | UI / API |
-|------|----------|
-| Seletor | `RadarClientPicker` — Todos \| cliente \| `+ Novo cliente` \| `+ Nova fazenda` |
-| Estado | `?client=` + `localStorage` `radar.clientScope.{companyId}` |
-| Cadastro | `RadarCreatePanel` — lista atualiza de imediato (`listRevision`) |
-| Home | `RadarProviderHome` — alertas + CTAs + clientes/fazendas filtrados |
-
-### Cultivos e parcelas (planta 2D)
-
-| Peça | Como |
-|------|------|
-| Cultivos | `RadarCropsPanel` — nome + variedade/época; persistidos em `RadarProperty.layoutJson.crops` |
-| Nova parcela | `RadarAddParcelForm` + botão no `RadarSiteMap` → `PATCH …/properties/[id]` `action: parcel` |
-| Mapa | Arrastar + redimensionar (canto); Guardar planta |
-| Associar cultivo | selector na parcela focada (`action: parcel_update`) |
+APIs: `/api/radar/clients` (`?aurora=1`), `/api/radar/properties`, `/api/radar/technicians`, `/api/radar/alerts?clientId=own|all|<id>`.
 
 ### Funil da propriedade (progress rail)
+
 
 1. **Caracterizar** — módulo (`pulsoModule` / `moduleId`), cultura, área  
 2. **Desenhar planta** — `RadarSiteMap` + `layoutJson` na propriedade  
