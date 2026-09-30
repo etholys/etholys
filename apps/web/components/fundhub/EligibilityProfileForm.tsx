@@ -87,11 +87,11 @@ export function EligibilityProfileForm() {
       ];
 
   return (
-    <section className="rounded-2xl border border-amber-500/30 bg-amber-950/20 p-5 shadow-sm text-gray-100">
-      <h2 className="text-base font-semibold text-white">
+    <section className="rounded-2xl border border-amber-500/30 bg-white p-5 shadow-sm">
+      <h2 className="text-base font-semibold text-gray-900">
         {t('Elegibilidade institucional', 'Elegibilidad institucional', 'Institutional eligibility')}
       </h2>
-      <p className="mt-1 text-sm text-gray-400">
+      <p className="mt-1 text-sm text-gray-600">
         {t(
           'Camada essencial para filtros e recomendações — poucos campos, alto impacto.',
           'Capa esencial para filtros y recomendaciones — pocos campos, alto impacto.',
@@ -101,11 +101,11 @@ export function EligibilityProfileForm() {
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <label className="block text-sm">
-          <span className="font-medium text-gray-300">
+          <span className="font-medium text-gray-700">
             {t('Tipo de organização', 'Tipo de organización', 'Organization type')}
           </span>
           <select
-            className="mt-1 w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-gray-100"
+            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900"
             value={briefing.orgKind ?? ''}
             onChange={(e) =>
               setBriefing({
@@ -124,11 +124,11 @@ export function EligibilityProfileForm() {
         </label>
 
         <label className="block text-sm">
-          <span className="font-medium text-gray-300">
+          <span className="font-medium text-gray-700">
             {t('Países de registo jurídico', 'Países de registro jurídico', 'Legal registration countries')}
           </span>
           <input
-            className="mt-1 w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-gray-100"
+            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900"
             value={(briefing.legalCountries ?? []).join(', ')}
             onChange={(e) =>
               setBriefing({
@@ -144,13 +144,13 @@ export function EligibilityProfileForm() {
         </label>
 
         <label className="block text-sm">
-          <span className="font-medium text-gray-300">
+          <span className="font-medium text-gray-700">
             {t('Anos de operação', 'Años de operación', 'Years operating')}
           </span>
           <input
             type="number"
             min={0}
-            className="mt-1 w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-gray-100"
+            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900"
             value={briefing.yearsOperating ?? ''}
             onChange={(e) =>
               setBriefing({
@@ -162,9 +162,9 @@ export function EligibilityProfileForm() {
         </label>
 
         <label className="block text-sm">
-          <span className="font-medium text-gray-300">{t('Maturidade', 'Madurez', 'Maturity')}</span>
+          <span className="font-medium text-gray-700">{t('Maturidade', 'Madurez', 'Maturity')}</span>
           <select
-            className="mt-1 w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-gray-100"
+            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900"
             value={briefing.maturityLevel ?? ''}
             onChange={(e) =>
               setBriefing({
@@ -181,7 +181,7 @@ export function EligibilityProfileForm() {
         </label>
 
         <label className="block text-sm sm:col-span-2">
-          <span className="font-medium text-gray-300">
+          <span className="font-medium text-gray-700">
             {t('Auditoria externa (últimos 5 anos)', 'Auditoría externa (últimos 5 años)', 'External audit (last 5 years)')}
           </span>
           <div className="mt-2 flex flex-wrap gap-3 text-sm">
@@ -196,7 +196,7 @@ export function EligibilityProfileForm() {
                 className={`rounded-full px-3 py-1.5 ring-1 ${
                   briefing.hasAuditLast5Years === opt.v
                     ? 'bg-amber-600 text-white ring-amber-600'
-                    : 'bg-slate-900 text-gray-300 ring-white/15'
+                    : 'bg-gray-100 text-gray-700 ring-gray-200'
                 }`}
               >
                 {opt.label}
@@ -207,20 +207,20 @@ export function EligibilityProfileForm() {
       </div>
 
       <div className="mt-4">
-        <p className="text-sm font-medium text-gray-300">
+        <p className="text-sm font-medium text-gray-700">
           {t('Faturamento anual (USD)', 'Facturación anual (USD)', 'Annual revenue (USD)')}
         </p>
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
           {revenue.map((row, idx) => (
             <div
               key={row.year}
-              className="flex items-center gap-2 rounded-lg border border-white/10 bg-slate-900 px-2 py-1.5"
+              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5"
             >
-              <span className="w-12 text-xs text-gray-500">{row.year}</span>
+              <span className="w-12 text-xs font-medium text-gray-600">{row.year}</span>
               <input
                 type="number"
                 min={0}
-                className="w-full bg-transparent text-sm text-gray-100 outline-none"
+                className="w-full bg-transparent text-sm text-gray-900 outline-none"
                 value={row.amountUsd || ''}
                 onChange={(e) => {
                   const next = [...revenue];
@@ -243,7 +243,7 @@ export function EligibilityProfileForm() {
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {t('Guardar elegibilidade', 'Guardar elegibilidad', 'Save eligibility')}
         </button>
-        {msg && <span className="text-sm text-gray-400">{msg}</span>}
+        {msg && <span className="text-sm text-gray-600">{msg}</span>}
       </div>
     </section>
   );

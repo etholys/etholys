@@ -1099,23 +1099,25 @@
   pointer-events: none;
 }
 
-/* ——— Aparência clara (Hub / sistemas) ——— */
+/* ——— Aparência clara (Hub / sistemas) ———
+ * Anula remaps escuros (catch-alls #f1f5f9 / pastéis tintados) e converte
+ * painéis pensados para dark (slate-900, #0C1822, amber-950) em superfícies claras. */
 html[data-appearance='light'] .etholys-hub,
 html[data-appearance='light'] .etholys-system,
 html[data-appearance='light'] .etholys-fundhub {
   color-scheme: light;
   --sys-canvas-bg: #f1f5f9;
-  --sys-aside-bg: rgba(255, 255, 255, 0.92);
+  --sys-aside-bg: rgba(255, 255, 255, 0.94);
   --sys-brand: #0f172a;
-  --sys-nav-idle: rgba(15, 23, 42, 0.55);
+  --sys-nav-idle: rgba(15, 23, 42, 0.58);
   --sys-nav-hover: rgba(15, 23, 42, 0.06);
   --sys-ink: #0f172a;
   --sys-muted: #334155;
-  --sys-faint: #64748b;
+  --sys-faint: #475569;
   --sys-icon: #64748b;
-  --sys-line: rgba(15, 23, 42, 0.12);
+  --sys-line: rgba(15, 23, 42, 0.14);
   --sys-panel: #ffffff;
-  --sys-panel-soft: #f1f5f9;
+  --sys-panel-soft: #f8fafc;
   --sys-amber: #b45309;
   --sys-mint: #047857;
   --sys-lilac: #6d28d9;
@@ -1128,18 +1130,19 @@ html[data-appearance='light'] .etholys-fundhub {
 html[data-appearance='light'] .etholys-system .sys-canvas,
 html[data-appearance='light'] .etholys-fundhub,
 html[data-appearance='light'] .etholys-fundhub .fh-canvas {
-  color: var(--sys-ink);
+  color: var(--sys-ink) !important;
 }
 
+/* Inputs */
 html[data-appearance='light'] .etholys-system .sys-canvas input:not([type='checkbox']):not([type='radio']):not([type='range']),
 html[data-appearance='light'] .etholys-system .sys-canvas textarea,
 html[data-appearance='light'] .etholys-system .sys-canvas select,
 html[data-appearance='light'] .etholys-fundhub input:not([type='checkbox']):not([type='radio']):not([type='range']),
 html[data-appearance='light'] .etholys-fundhub textarea,
 html[data-appearance='light'] .etholys-fundhub select {
-  background-color: #ffffff;
-  border-color: rgba(15, 23, 42, 0.16);
-  color: #0f172a;
+  background-color: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.2) !important;
+  color: #0f172a !important;
 }
 
 html[data-appearance='light'] .etholys-system .sys-canvas input[type='date'],
@@ -1149,97 +1152,396 @@ html[data-appearance='light'] .etholys-fundhub input[type='time'] {
   color-scheme: light;
 }
 
-/* Desfazer remaps escuros no modo claro */
+html[data-appearance='light'] .etholys-system .sys-canvas input::placeholder,
+html[data-appearance='light'] .etholys-system .sys-canvas textarea::placeholder,
+html[data-appearance='light'] .etholys-fundhub input::placeholder,
+html[data-appearance='light'] .etholys-fundhub textarea::placeholder,
+html[data-appearance='light'] .etholys-fundhub .placeholder\:text-gray-400::placeholder,
+html[data-appearance='light'] .etholys-fundhub .placeholder\:text-gray-500::placeholder,
+html[data-appearance='light'] .etholys-fundhub .placeholder\:text-slate-400::placeholder {
+  color: #64748b !important;
+  opacity: 1 !important;
+}
+
+/* Superfícies: desfazer painel escuro e restaurar branco / soft */
 html[data-appearance='light'] .etholys-system .sys-canvas .bg-white,
 html[data-appearance='light'] .etholys-system .sys-canvas .bg-gray-50,
 html[data-appearance='light'] .etholys-system .sys-canvas .bg-slate-50,
+html[data-appearance='light'] .etholys-system .sys-canvas .bg-slate-50\/80,
+html[data-appearance='light'] .etholys-system .sys-canvas .bg-white\/60,
+html[data-appearance='light'] .etholys-system .sys-canvas .bg-white\/70,
+html[data-appearance='light'] .etholys-system .sys-canvas .bg-white\/80,
+html[data-appearance='light'] .etholys-system .sys-canvas .bg-white\/90,
+html[data-appearance='light'] .etholys-system .sys-canvas .bg-white\/95,
 html[data-appearance='light'] .etholys-fundhub .bg-white,
 html[data-appearance='light'] .etholys-fundhub .bg-gray-50,
-html[data-appearance='light'] .etholys-fundhub .bg-slate-50 {
+html[data-appearance='light'] .etholys-fundhub .bg-slate-50,
+html[data-appearance='light'] .etholys-fundhub .bg-slate-50\/80,
+html[data-appearance='light'] .etholys-fundhub .bg-white\/40,
+html[data-appearance='light'] .etholys-fundhub .bg-white\/50,
+html[data-appearance='light'] .etholys-fundhub .bg-white\/60,
+html[data-appearance='light'] .etholys-fundhub .bg-white\/70,
+html[data-appearance='light'] .etholys-fundhub .bg-white\/80,
+html[data-appearance='light'] .etholys-fundhub .bg-white\/90,
+html[data-appearance='light'] .etholys-fundhub .bg-white\/95 {
   background-color: #ffffff !important;
 }
 
 html[data-appearance='light'] .etholys-system .sys-canvas .bg-gray-100,
+html[data-appearance='light'] .etholys-system .sys-canvas .bg-gray-200,
 html[data-appearance='light'] .etholys-system .sys-canvas .bg-slate-100,
 html[data-appearance='light'] .etholys-fundhub .bg-gray-100,
+html[data-appearance='light'] .etholys-fundhub .bg-gray-200,
 html[data-appearance='light'] .etholys-fundhub .bg-slate-100 {
   background-color: #f1f5f9 !important;
 }
 
-html[data-appearance='light'] .etholys-system .sys-canvas .text-gray-900,
-html[data-appearance='light'] .etholys-system .sys-canvas .text-gray-800,
-html[data-appearance='light'] .etholys-system .sys-canvas .text-slate-900,
-html[data-appearance='light'] .etholys-system .sys-canvas .text-slate-800,
-html[data-appearance='light'] .etholys-fundhub .text-gray-900,
-html[data-appearance='light'] .etholys-fundhub .text-slate-900 {
-  color: #0f172a !important;
+/* Painéis pensados para dark → claros */
+html[data-appearance='light'] .etholys-system .bg-\[\#07111A\],
+html[data-appearance='light'] .etholys-fundhub .bg-\[\#07111A\],
+html[data-appearance='light'] .etholys-hub .bg-\[\#07111A\],
+html[data-appearance='light'] .etholys-system .bg-\[\#07111A\]\/70,
+html[data-appearance='light'] .etholys-system .bg-\[\#07111A\]\/80,
+html[data-appearance='light'] .etholys-system .bg-\[\#07111A\]\/85,
+html[data-appearance='light'] .etholys-hub .bg-\[\#07111A\]\/70,
+html[data-appearance='light'] .etholys-fundhub .bg-\[\#07111A\]\/70,
+html[data-appearance='light'] .etholys-fundhub .bg-\[\#07111A\]\/88 {
+  background-color: #f1f5f9 !important;
 }
 
-html[data-appearance='light'] .etholys-system .sys-canvas .text-gray-700,
-html[data-appearance='light'] .etholys-system .sys-canvas .text-gray-600,
-html[data-appearance='light'] .etholys-system .sys-canvas .text-slate-600,
-html[data-appearance='light'] .etholys-fundhub .text-gray-700,
-html[data-appearance='light'] .etholys-fundhub .text-slate-600 {
+html[data-appearance='light'] .etholys-system .bg-\[\#0C1822\],
+html[data-appearance='light'] .etholys-fundhub .bg-\[\#0C1822\],
+html[data-appearance='light'] .etholys-hub .bg-\[\#0C1822\],
+html[data-appearance='light'] .etholys-fundhub .bg-\[\#0C1822\]\/70,
+html[data-appearance='light'] .etholys-fundhub .bg-\[\#0C1822\]\/80 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 8px 24px -12px rgba(15, 23, 42, 0.12) !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .bg-slate-900,
+html[data-appearance='light'] .etholys-fundhub .bg-slate-900\/40,
+html[data-appearance='light'] .etholys-fundhub .bg-slate-900\/60,
+html[data-appearance='light'] .etholys-fundhub .bg-slate-950,
+html[data-appearance='light'] .etholys-fundhub .bg-slate-950\/40,
+html[data-appearance='light'] .etholys-fundhub .bg-slate-950\/80,
+html[data-appearance='light'] .etholys-fundhub .bg-black\/20,
+html[data-appearance='light'] .etholys-fundhub .bg-amber-950\/20,
+html[data-appearance='light'] .etholys-fundhub .bg-amber-950\/30,
+html[data-appearance='light'] .etholys-system .sys-canvas .bg-slate-900,
+html[data-appearance='light'] .etholys-system .sys-canvas .bg-slate-950 {
+  background-color: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .bg-white\/5,
+html[data-appearance='light'] .etholys-fundhub .bg-white\/\[0\.04\],
+html[data-appearance='light'] .etholys-fundhub .bg-white\/\[0\.05\],
+html[data-appearance='light'] .etholys-fundhub .bg-white\/\[0\.07\],
+html[data-appearance='light'] .etholys-system .sys-canvas .bg-white\/5,
+html[data-appearance='light'] .etholys-system .sys-canvas .bg-white\/10 {
+  background-color: rgba(15, 23, 42, 0.04) !important;
+}
+
+/* Catch-alls de tinta clara → hierarquia legível no fundo claro */
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-gray-'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-slate-'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-gray-'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-slate-'] {
   color: #334155 !important;
 }
 
-html[data-appearance='light'] .etholys-system .sys-canvas .text-gray-500,
-html[data-appearance='light'] .etholys-system .sys-canvas .text-gray-400,
-html[data-appearance='light'] .etholys-system .sys-canvas .text-slate-500,
-html[data-appearance='light'] .etholys-fundhub .text-gray-500,
-html[data-appearance='light'] .etholys-fundhub .text-slate-500 {
-  color: #64748b !important;
-}
-
-html[data-appearance='light'] .etholys-system .sys-canvas .text-white,
-html[data-appearance='light'] .etholys-fundhub .text-white,
-html[data-appearance='light'] .etholys-hub .text-white {
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-gray-9'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-slate-9'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-gray-8'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-slate-8'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-gray-9'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-slate-9'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-gray-8'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-slate-8'] {
   color: #0f172a !important;
 }
 
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-gray-5'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-slate-5'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-gray-4'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-slate-4'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-gray-3'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-slate-3'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-gray-2'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-slate-2'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-gray-1'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-slate-1'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-gray-5'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-slate-5'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-gray-4'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-slate-4'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-gray-3'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-slate-3'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-gray-2'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-slate-2'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-gray-1'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-slate-1'] {
+  color: #475569 !important;
+}
+
+/* text-white* (usado em chrome escuro) → tinta escura */
+html[data-appearance='light'] .etholys-system .sys-canvas .text-white,
+html[data-appearance='light'] .etholys-fundhub .text-white,
+html[data-appearance='light'] .etholys-hub .text-white,
+html[data-appearance='light'] .etholys-fundhub .text-gray-100,
+html[data-appearance='light'] .etholys-fundhub .text-slate-100,
+html[data-appearance='light'] .etholys-fundhub .text-slate-50 {
+  color: #0f172a !important;
+}
+
+html[data-appearance='light'] .etholys-system .sys-canvas .text-white\/85,
+html[data-appearance='light'] .etholys-system .sys-canvas .text-white\/80,
+html[data-appearance='light'] .etholys-system .sys-canvas .text-white\/70,
+html[data-appearance='light'] .etholys-system .sys-canvas .text-white\/65,
 html[data-appearance='light'] .etholys-system .sys-canvas .text-white\/55,
 html[data-appearance='light'] .etholys-system .sys-canvas .text-white\/50,
 html[data-appearance='light'] .etholys-system .sys-canvas .text-white\/45,
 html[data-appearance='light'] .etholys-system .sys-canvas .text-white\/40,
+html[data-appearance='light'] .etholys-hub .text-white\/85,
+html[data-appearance='light'] .etholys-hub .text-white\/80,
 html[data-appearance='light'] .etholys-hub .text-white\/70,
+html[data-appearance='light'] .etholys-hub .text-white\/65,
 html[data-appearance='light'] .etholys-hub .text-white\/55,
 html[data-appearance='light'] .etholys-hub .text-white\/50,
 html[data-appearance='light'] .etholys-hub .text-white\/45,
 html[data-appearance='light'] .etholys-hub .text-white\/40,
 html[data-appearance='light'] .etholys-hub .text-white\/35,
 html[data-appearance='light'] .etholys-hub .text-white\/30,
+html[data-appearance='light'] .etholys-fundhub .text-white\/85,
+html[data-appearance='light'] .etholys-fundhub .text-white\/80,
 html[data-appearance='light'] .etholys-fundhub .text-white\/75,
 html[data-appearance='light'] .etholys-fundhub .text-white\/70,
-html[data-appearance='light'] .etholys-fundhub .text-white\/65 {
-  color: rgba(15, 23, 42, 0.55) !important;
+html[data-appearance='light'] .etholys-fundhub .text-white\/65,
+html[data-appearance='light'] .etholys-fundhub .text-white\/55,
+html[data-appearance='light'] .etholys-fundhub .text-white\/50,
+html[data-appearance='light'] .etholys-fundhub .text-white\/45,
+html[data-appearance='light'] .etholys-fundhub .text-white\/40,
+html[data-appearance='light'] .etholys-fundhub .text-slate-200,
+html[data-appearance='light'] .etholys-fundhub .text-slate-300 {
+  color: #475569 !important;
 }
 
+/* Acentos: pastéis legíveis + tinta escura (não mint/lilac claros) */
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-amber-6'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-amber-7'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-amber-8'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-amber-9'],
+html[data-appearance='light'] .etholys-fundhub .text-amber-200,
+html[data-appearance='light'] .etholys-fundhub .text-amber-200\/90,
+html[data-appearance='light'] .etholys-fundhub .text-amber-300,
+html[data-appearance='light'] .etholys-fundhub .text-amber-400 {
+  color: #b45309 !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-emerald-6'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-emerald-7'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-emerald-8'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-emerald-9'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-emerald-6'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-emerald-7'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-emerald-8'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-emerald-9'] {
+  color: #047857 !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-violet-'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-purple-'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-indigo-6'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-indigo-7'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-indigo-8'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-indigo-9'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-violet-'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-purple-'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-indigo-6'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-teal-6'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-teal-7'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-teal-8'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-teal-9'] {
+  color: #5b21b6 !important;
+}
+
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-teal-6'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-teal-7'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-teal-8'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-teal-9'] {
+  color: #0f766e !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-orange-'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-yellow-8'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-orange-'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-amber-6'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-amber-7'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-amber-8'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-amber-9'] {
+  color: #c2410c !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-red-6'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-red-7'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-red-8'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='text-red-9'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-red-6'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-red-7'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-red-8'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='text-red-9'] {
+  color: #b91c1c !important;
+}
+
+/* Pastéis de fundo restaurados (não tintas escuras semi-transparentes) */
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='bg-amber-50'],
+html[data-appearance='light'] .etholys-fundhub .bg-amber-50,
+html[data-appearance='light'] .etholys-fundhub .bg-amber-50\/30,
+html[data-appearance='light'] .etholys-fundhub .bg-amber-50\/60,
+html[data-appearance='light'] .etholys-fundhub .bg-amber-50\/90,
+html[data-appearance='light'] .etholys-fundhub .bg-amber-100 {
+  background-color: #fffbeb !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='bg-orange-50'],
+html[data-appearance='light'] .etholys-fundhub .bg-orange-50,
+html[data-appearance='light'] .etholys-fundhub .bg-orange-100,
+html[data-appearance='light'] .etholys-fundhub .bg-yellow-50,
+html[data-appearance='light'] .etholys-fundhub .bg-yellow-100 {
+  background-color: #fff7ed !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='bg-emerald-50'],
+html[data-appearance='light'] .etholys-fundhub .bg-emerald-50,
+html[data-appearance='light'] .etholys-fundhub .bg-emerald-100,
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='bg-emerald-50'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='bg-emerald-100'] {
+  background-color: #ecfdf5 !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='bg-violet-50'],
+html[data-appearance='light'] .etholys-fundhub .bg-violet-50,
+html[data-appearance='light'] .etholys-fundhub .bg-violet-100,
+html[data-appearance='light'] .etholys-fundhub .bg-purple-100,
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='bg-violet-50'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='bg-indigo-50'],
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='bg-teal-50'] {
+  background-color: #f5f3ff !important;
+}
+
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='bg-teal-50'] {
+  background-color: #f0fdfa !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .bg-red-50,
+html[data-appearance='light'] .etholys-fundhub .bg-red-50\/90,
+html[data-appearance='light'] .etholys-fundhub .bg-red-100,
+html[data-appearance='light'] .etholys-system .sys-canvas [class*='bg-red-50'] {
+  background-color: #fef2f2 !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='bg-gradient-to-'][class*='from-amber-50'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='bg-gradient-to-'][class*='from-orange-50'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='bg-gradient-to-'][class*='from-white'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='from-amber-50'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='to-orange-50'],
+html[data-appearance='light'] .etholys-fundhub .fh-canvas [class*='to-amber-50'] {
+  background-image: linear-gradient(to bottom right, #fffbeb, #fff7ed) !important;
+  background-color: transparent !important;
+}
+
+/* Borders / shadows / divide */
+html[data-appearance='light'] .etholys-system .border-white\/10,
+html[data-appearance='light'] .etholys-fundhub .border-white\/10,
+html[data-appearance='light'] .etholys-hub .border-white\/10,
+html[data-appearance='light'] .etholys-fundhub .border-white\/15,
+html[data-appearance='light'] .etholys-system .border-white\/15 {
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .border-gray-100,
+html[data-appearance='light'] .etholys-fundhub .border-gray-200,
+html[data-appearance='light'] .etholys-fundhub .border-gray-300,
+html[data-appearance='light'] .etholys-fundhub .border-slate-200,
+html[data-appearance='light'] .etholys-system .sys-canvas .border-gray-100,
+html[data-appearance='light'] .etholys-system .sys-canvas .border-gray-200,
+html[data-appearance='light'] .etholys-system .sys-canvas .border-slate-200 {
+  border-color: rgba(15, 23, 42, 0.14) !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .border-amber-200,
+html[data-appearance='light'] .etholys-fundhub .border-orange-200,
+html[data-appearance='light'] .etholys-fundhub .border-yellow-200,
+html[data-appearance='light'] .etholys-fundhub .border-amber-500\/30 {
+  border-color: rgba(217, 119, 6, 0.35) !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .border-emerald-200 {
+  border-color: rgba(5, 150, 105, 0.35) !important;
+}
+
+html[data-appearance='light'] .etholys-system .sys-canvas .shadow-sm,
+html[data-appearance='light'] .etholys-system .sys-canvas .shadow-lg,
+html[data-appearance='light'] .etholys-fundhub .shadow-sm,
+html[data-appearance='light'] .etholys-fundhub .shadow-lg,
+html[data-appearance='light'] .etholys-fundhub .shadow-xl {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px -16px rgba(15, 23, 42, 0.14) !important;
+}
+
+html[data-appearance='light'] .etholys-system .sys-canvas .divide-y > :not([hidden]) ~ :not([hidden]),
+html[data-appearance='light'] .etholys-fundhub .divide-y > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .hover\:bg-gray-50:hover,
+html[data-appearance='light'] .etholys-fundhub .hover\:bg-gray-100:hover,
+html[data-appearance='light'] .etholys-fundhub .hover\:bg-white:hover,
+html[data-appearance='light'] .etholys-fundhub .hover\:bg-white\/5:hover,
+html[data-appearance='light'] .etholys-fundhub .hover\:bg-white\/10:hover,
+html[data-appearance='light'] .etholys-system .sys-canvas .hover\:bg-gray-50:hover,
+html[data-appearance='light'] .etholys-system .sys-canvas .hover\:bg-slate-50:hover {
+  background-color: #f1f5f9 !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .hover\:text-gray-900:hover,
+html[data-appearance='light'] .etholys-fundhub .hover\:text-gray-800:hover,
+html[data-appearance='light'] .etholys-fundhub .hover\:text-gray-700:hover {
+  color: #0f172a !important;
+}
+
+/* CTAs âmbar: texto escuro legível */
+html[data-appearance='light'] .etholys-fundhub .bg-amber-700,
+html[data-appearance='light'] .etholys-fundhub .bg-amber-600,
+html[data-appearance='light'] .etholys-fundhub .bg-amber-500 {
+  color: #fffbeb !important;
+}
+
+html[data-appearance='light'] .etholys-fundhub .bg-gray-900 {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+/* Aside / chrome */
 html[data-appearance='light'] .etholys-system aside,
 html[data-appearance='light'] .etholys-fundhub aside,
 html[data-appearance='light'] .etholys-hub aside {
   border-color: rgba(15, 23, 42, 0.1) !important;
-  background-color: rgba(255, 255, 255, 0.94) !important;
+  background-color: rgba(255, 255, 255, 0.96) !important;
   color: #0f172a !important;
 }
 
 html[data-appearance='light'] .etholys-system aside .text-white,
 html[data-appearance='light'] .etholys-fundhub aside .text-white,
 html[data-appearance='light'] .etholys-hub aside .text-white,
-html[data-appearance='light'] .etholys-system aside .text-white\/80,
-html[data-appearance='light'] .etholys-system aside .text-white\/55,
-html[data-appearance='light'] .etholys-system aside .text-white\/45,
-html[data-appearance='light'] .etholys-system aside .text-white\/40,
-html[data-appearance='light'] .etholys-fundhub aside .text-white\/80,
-html[data-appearance='light'] .etholys-fundhub aside .text-white\/75,
-html[data-appearance='light'] .etholys-fundhub aside .text-white\/70,
-html[data-appearance='light'] .etholys-fundhub aside .text-white\/65,
-html[data-appearance='light'] .etholys-fundhub aside .text-white\/45,
-html[data-appearance='light'] .etholys-fundhub aside .text-white\/40 {
+html[data-appearance='light'] .etholys-system aside [class*='text-white'],
+html[data-appearance='light'] .etholys-fundhub aside [class*='text-white'],
+html[data-appearance='light'] .etholys-hub aside [class*='text-white'] {
   color: #0f172a !important;
 }
 
 html[data-appearance='light'] .etholys-appearance-toggle {
-  color: rgba(15, 23, 42, 0.5) !important;
+  color: rgba(15, 23, 42, 0.55) !important;
 }
 html[data-appearance='light'] .etholys-appearance-toggle:hover {
   background: rgba(15, 23, 42, 0.06) !important;
@@ -1249,29 +1551,6 @@ html[data-appearance='light'] .etholys-appearance-toggle:hover {
 html[data-appearance='light'] .hub-company-picker-dark button {
   border-color: rgba(15, 23, 42, 0.14) !important;
   background: #ffffff !important;
-  color: #0f172a !important;
-}
-
-html[data-appearance='light'] .etholys-system .border-white\/10,
-html[data-appearance='light'] .etholys-fundhub .border-white\/10,
-html[data-appearance='light'] .etholys-hub .border-white\/10 {
-  border-color: rgba(15, 23, 42, 0.1) !important;
-}
-
-html[data-appearance='light'] .etholys-system .bg-\[\#07111A\],
-html[data-appearance='light'] .etholys-fundhub .bg-\[\#07111A\],
-html[data-appearance='light'] .etholys-hub .bg-\[\#07111A\],
-html[data-appearance='light'] .etholys-system .bg-\[\#07111A\]\/70,
-html[data-appearance='light'] .etholys-system .bg-\[\#07111A\]\/80,
-html[data-appearance='light'] .etholys-system .bg-\[\#07111A\]\/85,
-html[data-appearance='light'] .etholys-hub .bg-\[\#07111A\]\/70 {
-  background-color: #f1f5f9 !important;
-}
-
-html[data-appearance='light'] .etholys-system .bg-\[\#0C1822\],
-html[data-appearance='light'] .etholys-fundhub .bg-\[\#0C1822\],
-html[data-appearance='light'] .etholys-hub .bg-\[\#0C1822\] {
-  background-color: #ffffff !important;
   color: #0f172a !important;
 }
 
