@@ -6,6 +6,8 @@ import { createMeetSession, listMeetSessions } from '@/lib/meet/create-session';
 import { isMeetMirror } from '@/lib/meet/types';
 import { isMeetRecurrenceFrequency } from '@/lib/meet/recurrence';
 import { sendMeetInviteEmail } from '@/lib/meet/send-meet-email';
+import { pushMeetSessionToGoogle } from '@/lib/meet/calendar-google-sync';
+import { getGoogleCalendarAccessToken } from '@/lib/meet/calendar-google';
 
 export async function GET(req: Request) {
   try {
@@ -18,11 +20,19 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'companyId inválido' }, { status: 400 });
     }
 
-    const limit = Number(searchParams.get('limit') || '120');
+    const limit = Number(searchParams.get('limit') || '250');
     const projectId = searchParams.get('projectId')?.trim() || undefined;
+    const fromRaw = searchParams.get('from')?.trim();
+    const toRaw = searchParams.get('to')?.trim();
+    const unbounded = searchParams.get('unbounded') === '1';
+    const from = fromRaw ? new Date(fromRaw) : undefined;
+    const to = toRaw ? new Date(toRaw) : undefined;
     const sessions = await listMeetSessions(companyId, {
-      limit: Number.isFinite(limit) ? limit : 120,
+      limit: Number.isFinite(limit) ? limit : 250,
       projectId,
+      unbounded,
+      from: from && Number.isFinite(from.getTime()) ? from : undefined,
+      to: to && Number.isFinite(to.getTime()) ? to : undefined,
     });
     return NextResponse.json({ sessions });
   } catch (error: unknown) {
@@ -104,6 +114,16 @@ export async function POST(req: Request) {
         });
         inviteResults.push({ email, ...r });
       }
+    }
+
+    // CHORUS → Google (automático se calendário ligado)
+    const gcal = await getGoogleCalendarAccessToken(tenant.userId);
+    if (gcal.connected && !gcal.needsReconnect && gcal.accessToken) {
+      await pushMeetSessionToGoogle({
+        userId: tenant.userId,
+        sessionId: session.id,
+        timeZone: (body as { timeZone?: string }).timeZone || 'UTC',
+      }).catch((err) => console.warn('[meet/sessions] gcal push', err));
     }
 
     return NextResponse.json({ session, inviteResults });

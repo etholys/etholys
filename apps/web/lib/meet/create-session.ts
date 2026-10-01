@@ -8,6 +8,7 @@ import {
   isMeetRecurrenceFrequency,
   type MeetRecurrenceFrequency,
 } from '@/lib/meet/recurrence';
+import { rememberMeetContacts } from '@/lib/meet/contacts';
 
 export type CreateMeetSessionInput = {
   companyId: string;
@@ -42,6 +43,7 @@ async function attachParticipants(
   sessionId: string,
   createdById: string | undefined,
   inviteEmails: string[],
+  companyId?: string,
 ) {
   const emails = inviteEmails.map((e) => e.trim().toLowerCase()).filter((e) => e.includes('@'));
   if (emails.length > 0) {
@@ -52,6 +54,13 @@ async function attachParticipants(
         role: 'guest',
       })),
     });
+    if (companyId) {
+      await rememberMeetContacts({
+        ownerId: createdById,
+        companyId,
+        emails,
+      });
+    }
   }
   if (createdById) {
     await prisma.meetParticipant.create({
@@ -138,7 +147,12 @@ export async function createMeetSession(input: CreateMeetSessionInput) {
     where: { id: master.id },
     data: { seriesId: master.id },
   });
-  await attachParticipants(master.id, input.createdById, input.inviteEmails ?? []);
+  await attachParticipants(
+    master.id,
+    input.createdById,
+    input.inviteEmails ?? [],
+    input.companyId,
+  );
 
   if (recurrence === 'none' || !scheduledAt || !endsAt) {
     return prisma.meetSession.findUniqueOrThrow({ where: { id: master.id } });
@@ -282,18 +296,53 @@ export async function reconcileStaleLiveMeetSessions(companyId: string): Promise
 
 export async function listMeetSessions(
   companyId: string,
-  opts?: { limit?: number; projectId?: string },
+  opts?: {
+    limit?: number;
+    projectId?: string;
+    /** Inclusivo — por omissão: 60 dias atrás */
+    from?: Date | null;
+    /** Inclusivo — por omissão: 180 dias à frente */
+    to?: Date | null;
+    /** Se true, não aplica janela temporal (só para admin/debug) */
+    unbounded?: boolean;
+  },
 ) {
   assertMeetPrismaReady();
   await reconcileStaleLiveMeetSessions(companyId).catch(() => 0);
-  const limit = Math.min(250, Math.max(1, opts?.limit ?? 120));
+  const limit = Math.min(500, Math.max(1, opts?.limit ?? 250));
+  const now = Date.now();
+  const from =
+    opts?.from ??
+    (opts?.unbounded ? null : new Date(now - 60 * 86_400_000));
+  const to =
+    opts?.to ??
+    (opts?.unbounded ? null : new Date(now + 180 * 86_400_000));
+
+  const scheduleFilter =
+    opts?.unbounded || (!from && !to)
+      ? undefined
+      : {
+          OR: [
+            { isPermanent: true },
+            { status: 'live' as const },
+            { scheduledAt: null, status: { in: ['scheduled', 'live'] } },
+            {
+              scheduledAt: {
+                ...(from ? { gte: from } : {}),
+                ...(to ? { lte: to } : {}),
+              },
+            },
+          ],
+        };
+
   return prisma.meetSession.findMany({
     where: {
       companyId,
       ...(opts?.projectId ? { projectId: opts.projectId } : {}),
       status: { not: 'cancelled' },
+      ...scheduleFilter,
     },
-    orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }],
+    orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'desc' }],
     take: limit,
     include: {
       createdBy: { select: { id: true, name: true, email: true } },
@@ -425,6 +474,11 @@ export async function syncMeetParticipants(input: {
         skipDuplicates: true,
       });
     }
+    await rememberMeetContacts({
+      ownerId: existing.createdById,
+      companyId: input.companyId,
+      emails: addEmails,
+    });
   }
 
   if (input.projectId !== undefined) {
