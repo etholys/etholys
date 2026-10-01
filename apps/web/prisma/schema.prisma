@@ -105,6 +105,7 @@ model User {
   activityReportsReviewed       TaskActivityReport[]         @relation("ActivityReportReviewer")
   reportGuidesUploaded          ProjectReportGuide[]         @relation("ReportGuideUploader")
   meetSessionsCreated           MeetSession[]                @relation("MeetSessionCreator")
+  meetGoogleCalendarSync        MeetGoogleCalendarSync?
   meetParticipations            MeetParticipant[]
   labAnvilMembers               LabAnvilMember[]             @relation("LabAnvilMemberUser")
   labAnvilMembersInvited        LabAnvilMember[]             @relation("LabAnvilMemberInviter")
@@ -259,6 +260,7 @@ model Company {
   forgeGamificationEvents     ForgeGamificationEvent[]
   forgeCertificates           ForgeCertificate[]
   meetSessions                MeetSession[]
+  meetGoogleCalendarSyncs     MeetGoogleCalendarSync[]
   studioFolders               StudioFolder[]
   studioDocuments             StudioDocument[]
   studioTemplates             StudioTemplate[]
@@ -3249,6 +3251,9 @@ model MeetSession {
   summaryText        String?           @db.Text
   projectId          String?
   forgeLiveSessionId String?
+  /// Id do evento no Google Calendar (sync bidirecional)
+  googleCalendarEventId  String?  @unique
+  googleCalendarHtmlLink String?
   /// Sala permanente: mesmo link sempre, sem “passar” no calendário
   isPermanent        Boolean           @default(false)
   /// none | daily | weekly | weekdays | monthly
@@ -3277,6 +3282,28 @@ model MeetSession {
   @@index([seriesId])
   @@index([seriesParentId])
   @@index([companyId, isPermanent])
+}
+
+/// Estado de sync Google Calendar ↔ CHORUS (por utilizador).
+model MeetGoogleCalendarSync {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  /// Empresa para onde os eventos Google são importados
+  companyId       String?
+  /// Token incremental Google (sem janela de datas após o 1.º sync)
+  syncToken       String?   @db.Text
+  watchChannelId  String?   @unique
+  watchResourceId String?
+  watchExpiration DateTime?
+  lastSyncedAt    DateTime?
+  lastError       String?   @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company         Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([watchChannelId])
+  @@index([companyId])
 }
 
 model MeetParticipant {

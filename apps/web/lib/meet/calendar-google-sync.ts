@@ -126,7 +126,31 @@ function publicAppBaseUrl(): string {
 }
 
 async function ensureSyncRow(userId: string, companyId: string) {
-  return prisma.meetGoogleCalendarSync.upsert({
+  const client = prisma as unknown as {
+    meetGoogleCalendarSync?: {
+      upsert: (args: {
+        where: { userId: string };
+        create: { userId: string; companyId: string };
+        update: { companyId: string };
+      }) => Promise<{
+        id: string;
+        userId: string;
+        companyId: string | null;
+        syncToken: string | null;
+        watchChannelId: string | null;
+        watchResourceId: string | null;
+        watchExpiration: Date | null;
+        lastSyncedAt: Date | null;
+        lastError: string | null;
+      }>;
+    };
+  };
+  if (!client.meetGoogleCalendarSync?.upsert) {
+    throw new Error(
+      'Sync Google indisponível: o cliente da base de dados está desactualizado (MeetGoogleCalendarSync). Redeploy da app web.',
+    );
+  }
+  return client.meetGoogleCalendarSync.upsert({
     where: { userId },
     create: { userId, companyId },
     update: { companyId },
