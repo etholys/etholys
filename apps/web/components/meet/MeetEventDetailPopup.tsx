@@ -19,7 +19,16 @@ import {
   UserMinus,
   FolderKanban,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { MeetExternalJoinPrompt } from '@/components/meet/MeetExternalJoinPrompt';
+import { MeetGuestPicker } from '@/components/meet/MeetGuestPicker';
 import { meetHubJoinPath, meetJoinTargetId, meetRecapPath, meetCapturePath, isGoogleImportedMeetSession } from '@/lib/meet/types';
+import {
+  MEET_TIMEZONE_OPTIONS,
+  browserTimeZone,
+  meetUtcToWallInput,
+  meetWallTimeToUtc,
+} from '@/lib/meet/timezone';
 
 export type MeetEventParticipant = {
   id: string;
@@ -63,11 +72,6 @@ type Props = {
   onDeleted: (sessionId: string) => void;
 };
 
-function localInputValue(date: Date): string {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
-
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return '?';
@@ -86,48 +90,58 @@ export function MeetEventDetailPopup({
   onUpdated,
   onDeleted,
 }: Props) {
+  const router = useRouter();
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const intl = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
 
   const [editing, setEditing] = useState(false);
+  const [externalJoinOpen, setExternalJoinOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [calBusy, setCalBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleteScope, setDeleteScope] = useState<'this' | 'following' | 'series'>('this');
+  const [deleteScope, setDeleteScope] = useState<'this' | 'following' | 'series'>('series');
   const [editScope, setEditScope] = useState<'this' | 'following' | 'series'>('series');
+  const detectedTz = browserTimeZone();
+  const [timezone, setTimezone] = useState(detectedTz);
+  const timezoneOptions = useMemo(() => {
+    const set = new Set<string>([...MEET_TIMEZONE_OPTIONS, detectedTz, timezone]);
+    return Array.from(set);
+  }, [detectedTz, timezone]);
   const [title, setTitle] = useState(session.title);
   const [description, setDescription] = useState(session.description || '');
   const [startsAt, setStartsAt] = useState(
-    session.scheduledAt ? localInputValue(new Date(session.scheduledAt)) : '',
+    session.scheduledAt ? meetUtcToWallInput(new Date(session.scheduledAt), detectedTz) : '',
   );
   const [endsAt, setEndsAt] = useState(
-    session.endsAt ? localInputValue(new Date(session.endsAt)) : '',
+    session.endsAt ? meetUtcToWallInput(new Date(session.endsAt), detectedTz) : '',
   );
   const [projectId, setProjectId] = useState(session.projectId || '');
-  const [newInviteText, setNewInviteText] = useState('');
+  const [newInviteEmails, setNewInviteEmails] = useState<string[]>([]);
   const [sendInvites, setSendInvites] = useState(true);
-  const [notifyAttendees, setNotifyAttendees] = useState(false);
+  const [notifyAttendees, setNotifyAttendees] = useState(true);
   const [removedParticipantIds, setRemovedParticipantIds] = useState<string[]>([]);
   const [editParticipants, setEditParticipants] = useState<MeetEventParticipant[]>([]);
   const [resendingEmail, setResendingEmail] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
   useEffect(() => {
+    const zone = browserTimeZone();
+    setTimezone(zone);
     setTitle(session.title);
     setDescription(session.description || '');
-    setStartsAt(session.scheduledAt ? localInputValue(new Date(session.scheduledAt)) : '');
-    setEndsAt(session.endsAt ? localInputValue(new Date(session.endsAt)) : '');
+    setStartsAt(session.scheduledAt ? meetUtcToWallInput(new Date(session.scheduledAt), zone) : '');
+    setEndsAt(session.endsAt ? meetUtcToWallInput(new Date(session.endsAt), zone) : '');
     setProjectId(session.projectId || '');
-    setNewInviteText('');
+    setNewInviteEmails([]);
     setSendInvites(true);
-    setNotifyAttendees(false);
+    setNotifyAttendees(true);
     setRemovedParticipantIds([]);
     setEditParticipants(session.participants ?? []);
     setEditing(false);
     setConfirmDelete(false);
-    setDeleteScope('this');
+    setDeleteScope('series');
     setEditScope('series');
     setError(null);
     setSaveNotice(null);
@@ -256,19 +270,24 @@ export function MeetEventDetailPopup({
     setError(null);
     setSaveNotice(null);
     try {
-      const newEmails = newInviteText
-        .split(/[,;\s]+/)
-        .map((email) => email.trim().toLowerCase())
-        .filter((email) => email.includes('@'));
+      const newEmails = newInviteEmails;
+      const startsIso = startsAt
+        ? meetWallTimeToUtc(startsAt, timezone).toISOString()
+        : null;
+      const endsIso = endsAt ? meetWallTimeToUtc(endsAt, timezone).toISOString() : null;
+      if (startsAt && startsIso && !Number.isFinite(Date.parse(startsIso))) {
+        throw new Error(t('Data/hora inválida', 'Fecha/hora inválida', 'Invalid date/time'));
+      }
 
       const payload: Record<string, unknown> = {
         companyId,
         title: title.trim(),
         description: description.trim() || null,
-        scheduledAt: startsAt ? new Date(startsAt).toISOString() : null,
-        endsAt: endsAt ? new Date(endsAt).toISOString() : null,
+        scheduledAt: startsIso,
+        endsAt: endsIso,
         editScope: inSeries ? editScope : 'this',
         locale,
+        timeZone: timezone,
       };
       if (newEmails.length > 0) payload.inviteEmails = newEmails;
       if (removedParticipantIds.length > 0) payload.removeParticipantIds = removedParticipantIds;
@@ -298,6 +317,14 @@ export function MeetEventDetailPopup({
             `${sentCount} invite(s) sent by email.`,
           ),
         );
+      } else if (notifyAttendees && googleCalendarReady) {
+        setSaveNotice(
+          t(
+            'Série actualizada no Google Calendar.',
+            'Serie actualizada en Google Calendar.',
+            'Series updated on Google Calendar.',
+          ),
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -319,7 +346,7 @@ export function MeetEventDetailPopup({
           companyId,
           provider: 'google',
           notifyAttendees: true,
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          timeZone: timezone,
         }),
       });
       const data = (await response.json()) as { error?: string; event?: { htmlLink?: string } };
@@ -429,6 +456,32 @@ export function MeetEventDetailPopup({
                   />
                 </label>
               </div>
+              <label className="block text-xs font-medium text-slate-500">
+                {t('Fuso horário', 'Zona horaria', 'Time zone')}
+                <select
+                  value={timezone}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    // Reinterpretar os campos de parede na nova zona a partir do instante actual.
+                    if (startsAt) {
+                      const instant = meetWallTimeToUtc(startsAt, timezone);
+                      setStartsAt(meetUtcToWallInput(instant, next));
+                    }
+                    if (endsAt) {
+                      const instant = meetWallTimeToUtc(endsAt, timezone);
+                      setEndsAt(meetUtcToWallInput(instant, next));
+                    }
+                    setTimezone(next);
+                  }}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                >
+                  {timezoneOptions.map((zone) => (
+                    <option key={zone} value={zone}>
+                      {zone}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <textarea
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
@@ -528,18 +581,20 @@ export function MeetEventDetailPopup({
                   )}
                 </ul>
                 <label className="mt-3 block text-xs font-medium text-slate-500">
-                  {t('Adicionar convidados (e-mails)', 'Añadir invitados (emails)', 'Add guests (emails)')}
-                  <textarea
-                    value={newInviteText}
-                    onChange={(event) => setNewInviteText(event.target.value)}
-                    rows={2}
-                    placeholder={t(
-                      'email1@..., email2@...',
-                      'email1@..., email2@...',
-                      'email1@..., email2@...',
-                    )}
-                    className="mt-1 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                  />
+                  {t('Adicionar convidados', 'Añadir invitados', 'Add guests')}
+                  <div className="mt-1">
+                    <MeetGuestPicker
+                      locale={locale}
+                      companyId={companyId}
+                      emails={newInviteEmails}
+                      onChange={setNewInviteEmails}
+                      placeholder={t(
+                        'Nome ou e-mail…',
+                        'Nombre o email…',
+                        'Name or email…',
+                      )}
+                    />
+                  </div>
                 </label>
                 <div className="mt-2 space-y-2 text-xs text-slate-600">
                   <label className="flex items-start gap-2">
@@ -822,15 +877,14 @@ export function MeetEventDetailPopup({
                 </Link>
               )}
               {isGoogleImportedMeetSession(session) && session.meetingUrl && (
-                <a
-                  href={session.meetingUrl}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={() => setExternalJoinOpen(true)}
                   className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
                 >
                   <Video className="h-4 w-4" />
                   {t('Abrir call externa', 'Abrir call externa', 'Open external call')}
-                </a>
+                </button>
               )}
               <Link
                 href={meetCapturePath({ companyId, sessionId: session.id })}
@@ -885,6 +939,33 @@ export function MeetEventDetailPopup({
           )}
         </div>
       </div>
+
+      <MeetExternalJoinPrompt
+        open={externalJoinOpen}
+        meetingTitle={session.title}
+        onClose={() => setExternalJoinOpen(false)}
+        onRecordAndOpen={() => {
+          setExternalJoinOpen(false);
+          onClose();
+          if (session.meetingUrl) {
+            window.open(session.meetingUrl, '_blank', 'noopener,noreferrer');
+          }
+          router.push(
+            meetCapturePath({
+              companyId,
+              sessionId: session.id,
+              openMeetingUrl: session.meetingUrl,
+              autoRecord: true,
+            }),
+          );
+        }}
+        onOpenOnly={() => {
+          setExternalJoinOpen(false);
+          if (session.meetingUrl) {
+            window.open(session.meetingUrl, '_blank', 'noopener,noreferrer');
+          }
+        }}
+      />
     </div>
   );
 }

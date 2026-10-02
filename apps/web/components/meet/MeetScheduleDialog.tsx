@@ -13,6 +13,11 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import { MeetGuestPicker } from '@/components/meet/MeetGuestPicker';
+import {
+  MEET_TIMEZONE_OPTIONS,
+  browserTimeZone,
+} from '@/lib/meet/timezone';
 
 export type CalendarProvider = 'google' | 'outlook' | 'none';
 
@@ -38,6 +43,7 @@ export type ScheduleDraft = {
 
 type Props = {
   locale: string;
+  companyId: string;
   projects: { id: string; name: string }[];
   connections: Connections | null;
   saving: boolean;
@@ -51,29 +57,9 @@ function localInputValue(date: Date): string {
   return local.toISOString().slice(0, 16);
 }
 
-const MEET_TIMEZONE_OPTIONS = [
-  'UTC',
-  'America/Sao_Paulo',
-  'America/Argentina/Buenos_Aires',
-  'America/Santiago',
-  'America/Bogota',
-  'America/Mexico_City',
-  'America/Lima',
-  'America/New_York',
-  'America/Chicago',
-  'America/Los_Angeles',
-  'Europe/Lisbon',
-  'Europe/Madrid',
-  'Europe/London',
-  'Europe/Paris',
-] as const;
-
-function browserTimeZone(): string {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-}
-
 export function MeetScheduleDialog({
   locale,
+  companyId,
   projects,
   connections,
   saving,
@@ -92,7 +78,7 @@ export function MeetScheduleDialog({
   const [description, setDescription] = useState('');
   const [startsAt, setStartsAt] = useState(initial.start);
   const [endsAt, setEndsAt] = useState(initial.end);
-  const [inviteText, setInviteText] = useState('');
+  const [inviteEmails, setInviteEmails] = useState<string[]>([]);
   const [projectId, setProjectId] = useState('');
   const [sendInvites, setSendInvites] = useState(true);
   const defaultProvider: CalendarProvider = connections?.google.ready
@@ -129,10 +115,7 @@ export function MeetScheduleDialog({
         startsAt: new Date().toISOString(),
         endsAt: new Date(Date.now() + 60 * 60_000).toISOString(),
         timezone,
-        inviteEmails: inviteText
-          .split(/[,;\s]+/)
-          .map((email) => email.trim().toLowerCase())
-          .filter((email) => email.includes('@')),
+        inviteEmails,
         sendInvites,
         projectId: projectId || null,
         calendarProvider: 'none',
@@ -151,10 +134,7 @@ export function MeetScheduleDialog({
       startsAt: start.toISOString(),
       endsAt: end.toISOString(),
       timezone,
-      inviteEmails: inviteText
-        .split(/[,;\s]+/)
-        .map((email) => email.trim().toLowerCase())
-        .filter((email) => email.includes('@')),
+      inviteEmails,
       sendInvites,
       projectId: projectId || null,
       calendarProvider,
@@ -169,7 +149,18 @@ export function MeetScheduleDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-5">
       <form
-        onSubmit={submit}
+        onSubmit={(event) => {
+          const target = event.target as HTMLFormElement;
+          const active = document.activeElement;
+          if (active && target.contains(active) && active instanceof HTMLInputElement) {
+            const hint = (active.getAttribute('placeholder') || '').toLowerCase();
+            if (hint.includes('email') || hint.includes('e-mail') || hint.includes('nome')) {
+              event.preventDefault();
+              return;
+            }
+          }
+          void submit(event);
+        }}
         className="max-h-[96vh] w-full max-w-4xl overflow-y-auto rounded-t-3xl bg-slate-50 shadow-2xl sm:rounded-3xl"
       >
         <div className="sticky top-0 z-10 flex items-center gap-4 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
@@ -386,17 +377,19 @@ export function MeetScheduleDialog({
                 <Users className="h-5 w-5 text-slate-500" />
                 <h3 className="font-semibold text-slate-900">{t('Convidados', 'Invitados', 'Guests')}</h3>
               </div>
-              <textarea
-                value={inviteText}
-                onChange={(event) => setInviteText(event.target.value)}
-                rows={4}
-                placeholder={t(
-                  'E-mails separados por vírgula',
-                  'Emails separados por comas',
-                  'Emails separated by commas',
-                )}
-                className="mt-3 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-              />
+              <div className="mt-3">
+                <MeetGuestPicker
+                  locale={locale}
+                  companyId={companyId}
+                  emails={inviteEmails}
+                  onChange={setInviteEmails}
+                  placeholder={t(
+                    'Nome ou e-mail do convidado…',
+                    'Nombre o email del invitado…',
+                    'Guest name or email…',
+                  )}
+                />
+              </div>
               <label className="mt-3 flex items-start gap-2 text-xs text-slate-600">
                 <input
                   type="checkbox"

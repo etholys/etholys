@@ -712,10 +712,14 @@ export async function deleteMeetSessionScoped(input: {
 
   const scope = input.scope || 'this';
   const where = meetDeleteScopeWhere(existing, input.companyId, scope);
-  if (scope === 'this' && !existing.isPermanent) {
-    await prisma.meetSession.delete({ where: { id: existing.id } });
-    return { deleted: 1 };
-  }
-  const result = await prisma.meetSession.deleteMany({ where });
+  // Soft-delete: mantém roomSlug para o sync Google não recriar a reunião apagada.
+  const result = await prisma.meetSession.updateMany({
+    where: { ...where, status: { not: 'cancelled' } },
+    data: {
+      status: 'cancelled',
+      googleCalendarEventId: null,
+      googleCalendarHtmlLink: null,
+    },
+  });
   return { deleted: result.count };
 }

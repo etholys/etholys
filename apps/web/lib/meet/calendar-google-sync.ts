@@ -7,9 +7,11 @@ import {
   formatGoogleCalendarDateTime,
   getGoogleCalendarAccessToken,
   googleCalendarMasterEventId,
+  patchGoogleCalendarEvent,
   type MeetCalendarEventInput,
 } from '@/lib/meet/calendar-google';
-import { upsertExternalCalendarMeetSession } from '@/lib/meet/create-session';
+import { upsertExternalCalendarMeetSession, collectMeetGuestEmails } from '@/lib/meet/create-session';
+import { meetRecurrenceToRrule, isMeetRecurrenceFrequency } from '@/lib/meet/recurrence';
 
 export function googleMeetRoomSlug(googleEventId: string): string {
   const safe = googleEventId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 48);
@@ -30,6 +32,7 @@ export type GoogleListedEvent = {
   conferenceUrl: string | null;
   /** true se o utilizador autenticado é o organizador do evento Google */
   organizerSelf: boolean;
+  organizerEmail: string | null;
 };
 
 function googleEventIdsRelated(a: string, b: string): boolean {
@@ -126,6 +129,7 @@ function parseGoogleItem(item: {
     endsAt,
     conferenceUrl: conferenceUrlFromGoogleEvent(item),
     organizerSelf: Boolean(item.organizer?.self),
+    organizerEmail: item.organizer?.email?.trim().toLowerCase() || null,
   };
 }
 
@@ -248,6 +252,7 @@ async function applyGoogleEventToChorus(opts: {
       googleCalendarEventId: true,
       meetingUrl: true,
       roomSlug: true,
+      status: true,
     },
   });
 
@@ -279,6 +284,15 @@ async function applyGoogleEventToChorus(opts: {
     const meetingUrl = normalizeMeetingUrl(event.conferenceUrl);
     const roomSlug = chorusRoomSlugFromMeetingUrl(meetingUrl);
 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+    const userEmail = user?.email?.trim().toLowerCase() || '';
+    const isOrganizer =
+      event.organizerSelf ||
+      Boolean(userEmail && event.organizerEmail && userEmail === event.organizerEmail);
+
     const byRoom = await prisma.meetSession.findFirst({
       where: {
         companyId,
@@ -290,14 +304,15 @@ async function applyGoogleEventToChorus(opts: {
             : []),
         ],
       },
-      select: { id: true, googleCalendarEventId: true },
+      select: { id: true, googleCalendarEventId: true, status: true },
       orderBy: { createdAt: 'asc' },
     });
 
-    // Organizador: reunião apagada no CHORUS → limpar Google (incl. cópias duplicadas).
-    if (event.organizerSelf) {
-      const linked = existingByGoogle || byRoom;
-      if (!linked) {
+    const linked = existingByGoogle || byRoom;
+
+    // Organizador: reunião apagada / cancelada no CHORUS → limpar Google (não recriar).
+    if (isOrganizer) {
+      if (!linked || linked.status === 'cancelled') {
         await deleteGoogleCalendarEvent(userId, event.id);
         const master = googleCalendarMasterEventId(event.id);
         if (master !== event.id) {
@@ -312,9 +327,19 @@ async function applyGoogleEventToChorus(opts: {
         await deleteGoogleCalendarEvent(userId, event.id);
         return 'purged';
       }
+    } else if (linked?.status === 'cancelled') {
+      // Convidado: não ressuscitar sessão cancelada no tenant
+      return 'skipped';
     }
 
     if (existingByGoogle) {
+      if (existingByGoogle.status === 'cancelled') {
+        if (isOrganizer) {
+          await deleteGoogleCalendarEvent(userId, event.id);
+          return 'purged';
+        }
+        return 'skipped';
+      }
       await prisma.meetSession.update({
         where: { id: existingByGoogle.id },
         data: {
@@ -330,7 +355,7 @@ async function applyGoogleEventToChorus(opts: {
       return 'updated';
     }
 
-    if (byRoom) {
+    if (byRoom && byRoom.status !== 'cancelled') {
       await prisma.meetSession.update({
         where: { id: byRoom.id },
         data: {
@@ -354,6 +379,12 @@ async function applyGoogleEventToChorus(opts: {
         }).catch(() => undefined);
       }
       return 'updated';
+    }
+
+    // Organizador sem sessão activa: nunca recriar a partir do Google.
+    if (isOrganizer) {
+      await deleteGoogleCalendarEvent(userId, event.id);
+      return 'purged';
     }
 
     const result = await upsertExternalCalendarMeetSession({
@@ -687,16 +718,40 @@ export async function deleteGoogleCalendarEvent(userId: string, eventId: string)
   }
 }
 
-/** CHORUS → Google: cria ou actualiza o evento ligado. */
+/** CHORUS → Google: cria ou actualiza o evento ligado (série = mestre). */
 export async function pushMeetSessionToGoogle(opts: {
   userId: string;
   sessionId: string;
   timeZone?: string;
+  /** Enviar actualização Google aos convidados (sendUpdates=all). */
+  notifyAttendees?: boolean;
 }): Promise<{ ok: boolean; eventId?: string; skipped?: string }> {
-  const session = await prisma.meetSession.findUnique({
+  const raw = await prisma.meetSession.findUnique({
     where: { id: opts.sessionId },
+    include: {
+      createdBy: { select: { email: true } },
+      participants: {
+        select: { email: true, role: true, user: { select: { email: true } } },
+      },
+    },
   });
-  if (!session) return { ok: false, skipped: 'missing' };
+  if (!raw) return { ok: false, skipped: 'missing' };
+
+  // Séries: o evento Google vive no mestre (RRULE). Filhos sem ID não devem criar cópias.
+  const masterId = raw.seriesParentId || raw.seriesId || raw.id;
+  const session =
+    masterId === raw.id
+      ? raw
+      : (await prisma.meetSession.findUnique({
+          where: { id: masterId },
+          include: {
+            createdBy: { select: { email: true } },
+            participants: {
+              select: { email: true, role: true, user: { select: { email: true } } },
+            },
+          },
+        })) || raw;
+
   if (session.isPermanent || !session.scheduledAt) {
     return { ok: false, skipped: 'unscheduled' };
   }
@@ -716,19 +771,49 @@ export async function pushMeetSessionToGoogle(opts: {
       ? session.endsAt
       : new Date(session.scheduledAt.getTime() + 60 * 60_000);
 
+  const notify = Boolean(opts.notifyAttendees);
+  const organizerEmail = (session.createdBy?.email || '').trim().toLowerCase();
+  const attendeeEmails = notify
+    ? collectMeetGuestEmails(session.participants).filter((email) => email !== organizerEmail)
+    : [];
+
+  const recurrence =
+    session.recurrence && isMeetRecurrenceFrequency(session.recurrence)
+      ? session.recurrence
+      : 'none';
+  const recurrenceRule = meetRecurrenceToRrule(recurrence, session.recurrenceUntil);
+
   const eventInput: MeetCalendarEventInput = {
     title: session.title,
-    description: session.description || undefined,
+    description: [session.description, session.meetingUrl].filter(Boolean).join('\n\n') || undefined,
     locationUrl: session.meetingUrl || undefined,
     startsAt: session.scheduledAt,
     endsAt,
     timeZone: opts.timeZone || 'UTC',
-    notifyAttendees: false,
+    attendeeEmails,
+    notifyAttendees: notify,
+    recurrenceRule: recurrence !== 'none' ? recurrenceRule : null,
   };
 
-  if (session.googleCalendarEventId) {
-    await updateGoogleCalendarEvent(opts.userId, session.googleCalendarEventId, eventInput);
-    return { ok: true, eventId: session.googleCalendarEventId };
+  // Preferir ID Google do mestre; se só o filho tiver, usar esse.
+  const googleId = session.googleCalendarEventId || raw.googleCalendarEventId;
+
+  if (googleId) {
+    try {
+      const patched = await patchGoogleCalendarEvent(opts.userId, googleId, eventInput);
+      if (session.id !== raw.id || !session.googleCalendarEventId) {
+        await prisma.meetSession.update({
+          where: { id: session.id },
+          data: {
+            googleCalendarEventId: patched.id,
+            googleCalendarHtmlLink: patched.htmlLink || null,
+          },
+        });
+      }
+      return { ok: true, eventId: patched.id };
+    } catch (err) {
+      console.warn('[meet/gcal-push] patch failed, recreating', err);
+    }
   }
 
   try {

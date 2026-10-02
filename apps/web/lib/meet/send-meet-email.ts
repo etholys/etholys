@@ -34,6 +34,7 @@ export function buildMeetInviteEmailHtml(opts: {
   endsAt?: Date | null;
   hostName?: string | null;
   locale?: string;
+  timeZone?: string;
 }): { subject: string; html: string } {
   const loc = opts.locale === 'pt' ? 'pt' : opts.locale === 'en' ? 'en' : 'es';
   const subject =
@@ -45,7 +46,11 @@ export function buildMeetInviteEmailHtml(opts: {
 
   const when =
     opts.scheduledAt != null
-      ? opts.scheduledAt.toLocaleString(loc === 'pt' ? 'pt-BR' : loc === 'en' ? 'en-US' : 'es-ES')
+      ? opts.scheduledAt.toLocaleString(loc === 'pt' ? 'pt-BR' : loc === 'en' ? 'en-US' : 'es-ES', {
+          ...(opts.timeZone ? { timeZone: opts.timeZone } : {}),
+          dateStyle: 'full',
+          timeStyle: 'short',
+        })
       : null;
 
   const intro =
@@ -107,6 +112,7 @@ export async function sendMeetInviteEmail(opts: {
   endsAt?: Date | null;
   hostName?: string | null;
   locale?: string;
+  timeZone?: string;
 }): Promise<MeetInviteEmailResult> {
   const { subject, html } = buildMeetInviteEmailHtml(opts);
   const apiKey = process.env.RESEND_API_KEY;

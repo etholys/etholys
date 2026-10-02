@@ -13,6 +13,7 @@ export async function sendMeetSessionInvites(opts: {
   emails: string[];
   locale?: string;
   hostName?: string | null;
+  timeZone?: string;
 }): Promise<{ email: string; sent: boolean; error?: string }[]> {
   const unique = [...new Set(opts.emails.map((e) => e.trim().toLowerCase()).filter((e) => e.includes('@')))];
   const results: { email: string; sent: boolean; error?: string }[] = [];
@@ -26,6 +27,7 @@ export async function sendMeetSessionInvites(opts: {
       endsAt: opts.session.endsAt,
       hostName: opts.hostName,
       locale: opts.locale,
+      timeZone: opts.timeZone,
     });
     results.push({ email, ...r });
   }

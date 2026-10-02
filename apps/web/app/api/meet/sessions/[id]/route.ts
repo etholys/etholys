@@ -71,6 +71,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
       sendInvites?: boolean;
       notifyAttendees?: boolean;
       locale?: string;
+      /** IANA timezone da UI (horas de parede + Google). */
+      timeZone?: string;
     };
     const companyId = body.companyId?.trim();
     if (!companyId || !tenant.companyIds.includes(companyId)) {
@@ -240,18 +242,21 @@ export async function PATCH(req: Request, ctx: Ctx) {
           : [];
 
       if (targets.length > 0) {
+        // Para série, usar o mestre actualizado (título/hora/link canónicos).
+        const inviteSession = master || session;
         inviteResults.push(
           ...(await sendMeetSessionInvites({
             session: {
               id: masterId,
-              title: session.title,
+              title: inviteSession.title,
               meetingUrl,
-              scheduledAt: session.scheduledAt,
-              endsAt: session.endsAt,
+              scheduledAt: inviteSession.scheduledAt,
+              endsAt: inviteSession.endsAt,
             },
             emails: targets,
             locale: body.locale,
             hostName,
+            timeZone: body.timeZone?.trim() || undefined,
           })),
         );
       }
@@ -265,12 +270,16 @@ export async function PATCH(req: Request, ctx: Ctx) {
       return NextResponse.json({ error: 'Nada para actualizar' }, { status: 400 });
     }
 
-    if (editingScheduleOrMeta || data.status === 'cancelled') {
+    if (editingScheduleOrMeta || data.status === 'cancelled' || body.notifyAttendees) {
       const gcal = await getGoogleCalendarAccessToken(tenant.userId);
       if (gcal.connected && !gcal.needsReconnect && gcal.accessToken) {
+        // Sempre o mestre da série — evita criar eventos Google órfãos por ocorrência.
+        const pushId = meetSeriesMasterId(session);
         await pushMeetSessionToGoogle({
           userId: tenant.userId,
-          sessionId: session.id,
+          sessionId: pushId,
+          timeZone: body.timeZone?.trim() || 'UTC',
+          notifyAttendees: Boolean(body.notifyAttendees),
         }).catch((err) => console.warn('[meet/sessions] gcal push', err));
       }
     }
