@@ -114,17 +114,7 @@ export function formatGoogleCalendarDateTime(
   return { dateTime, timeZone: zone };
 }
 
-export async function createGoogleCalendarEvent(
-  userId: string,
-  event: MeetCalendarEventInput,
-): Promise<{ htmlLink: string; id: string }> {
-  const { accessToken, needsReconnect, connected } = await getGoogleCalendarAccessToken(userId);
-  if (!connected || needsReconnect || !accessToken) {
-    throw new Error(
-      'Google Calendar não está ligado. Ligue a conta Google em Meet.',
-    );
-  }
-
+function buildGoogleCalendarEventBody(event: MeetCalendarEventInput): Record<string, unknown> {
   const timeZone = event.timeZone?.trim() || 'UTC';
   const body: Record<string, unknown> = {
     summary: event.title,
@@ -136,6 +126,19 @@ export async function createGoogleCalendarEvent(
   };
   if (event.recurrenceRule) {
     body.recurrence = [`RRULE:${event.recurrenceRule}`];
+  }
+  return body;
+}
+
+export async function createGoogleCalendarEvent(
+  userId: string,
+  event: MeetCalendarEventInput,
+): Promise<{ htmlLink: string; id: string }> {
+  const { accessToken, needsReconnect, connected } = await getGoogleCalendarAccessToken(userId);
+  if (!connected || needsReconnect || !accessToken) {
+    throw new Error(
+      'Google Calendar não está ligado. Ligue a conta Google em Meet.',
+    );
   }
 
   const url = new URL(GOOGLE_CALENDAR_EVENTS);
@@ -149,7 +152,7 @@ export async function createGoogleCalendarEvent(
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(buildGoogleCalendarEventBody(event)),
   });
 
   if (!res.ok) {
@@ -159,4 +162,47 @@ export async function createGoogleCalendarEvent(
 
   const data = (await res.json()) as { id: string; htmlLink?: string };
   return { id: data.id, htmlLink: data.htmlLink || '' };
+}
+
+/** Actualiza evento existente (inclui RRULE / convidados). */
+export async function patchGoogleCalendarEvent(
+  userId: string,
+  eventId: string,
+  event: MeetCalendarEventInput,
+): Promise<{ htmlLink: string; id: string }> {
+  const { accessToken, needsReconnect, connected } = await getGoogleCalendarAccessToken(userId);
+  if (!connected || needsReconnect || !accessToken) {
+    throw new Error(
+      'Google Calendar não está ligado. Ligue a conta Google em Meet.',
+    );
+  }
+
+  const url = new URL(`${GOOGLE_CALENDAR_EVENTS}/${encodeURIComponent(eventId)}`);
+  const shouldNotify =
+    event.notifyAttendees !== false && Boolean(event.attendeeEmails?.length);
+  if (shouldNotify) url.searchParams.set('sendUpdates', 'all');
+  else url.searchParams.set('sendUpdates', 'none');
+
+  const res = await fetch(url.toString(), {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(buildGoogleCalendarEventBody(event)),
+  });
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`Google Calendar API PATCH (${res.status}): ${t.slice(0, 300)}`);
+  }
+
+  const data = (await res.json()) as { id: string; htmlLink?: string };
+  return { id: data.id || eventId, htmlLink: data.htmlLink || '' };
+}
+
+/** ID mestre de uma ocorrência recorrente (`abc_20261006T170000Z` → `abc`). */
+export function googleCalendarMasterEventId(eventId: string): string {
+  const match = eventId.match(/^(.+)_\d{8}T\d{6}Z$/i);
+  return match?.[1] || eventId;
 }

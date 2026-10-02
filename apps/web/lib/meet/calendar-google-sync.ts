@@ -6,6 +6,7 @@ import {
   createGoogleCalendarEvent,
   formatGoogleCalendarDateTime,
   getGoogleCalendarAccessToken,
+  googleCalendarMasterEventId,
   type MeetCalendarEventInput,
 } from '@/lib/meet/calendar-google';
 import { upsertExternalCalendarMeetSession } from '@/lib/meet/create-session';
@@ -27,7 +28,16 @@ export type GoogleListedEvent = {
   scheduledAt: Date;
   endsAt: Date;
   conferenceUrl: string | null;
+  /** true se o utilizador autenticado é o organizador do evento Google */
+  organizerSelf: boolean;
 };
+
+function googleEventIdsRelated(a: string, b: string): boolean {
+  if (a === b) return true;
+  const ma = googleCalendarMasterEventId(a);
+  const mb = googleCalendarMasterEventId(b);
+  return ma === mb || ma === b || a === mb;
+}
 
 function extractUrlFromText(text: string): string | null {
   const match = text.match(
@@ -88,6 +98,7 @@ function parseGoogleItem(item: {
   hangoutLink?: string;
   location?: string;
   conferenceData?: { entryPoints?: Array<{ entryPointType?: string; uri?: string }> };
+  organizer?: { email?: string; self?: boolean };
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
 }): GoogleListedEvent | null {
@@ -114,6 +125,7 @@ function parseGoogleItem(item: {
     scheduledAt,
     endsAt,
     conferenceUrl: conferenceUrlFromGoogleEvent(item),
+    organizerSelf: Boolean(item.organizer?.self),
   };
 }
 
@@ -220,12 +232,23 @@ async function applyGoogleEventToChorus(opts: {
   companyId: string;
   userId: string;
   event: GoogleListedEvent;
-}): Promise<'imported' | 'updated' | 'cancelled' | 'skipped'> {
+}): Promise<'imported' | 'updated' | 'cancelled' | 'skipped' | 'purged'> {
   const { event, companyId, userId } = opts;
 
   const existingByGoogle = await prisma.meetSession.findFirst({
-    where: { googleCalendarEventId: event.id },
-    select: { id: true, companyId: true },
+    where: {
+      OR: [
+        { googleCalendarEventId: event.id },
+        { googleCalendarEventId: googleCalendarMasterEventId(event.id) },
+      ],
+    },
+    select: {
+      id: true,
+      companyId: true,
+      googleCalendarEventId: true,
+      meetingUrl: true,
+      roomSlug: true,
+    },
   });
 
   if (event.status === 'cancelled') {
@@ -256,6 +279,41 @@ async function applyGoogleEventToChorus(opts: {
     const meetingUrl = normalizeMeetingUrl(event.conferenceUrl);
     const roomSlug = chorusRoomSlugFromMeetingUrl(meetingUrl);
 
+    const byRoom = await prisma.meetSession.findFirst({
+      where: {
+        companyId,
+        OR: [
+          { meetingUrl },
+          { meetingUrl: event.conferenceUrl.trim() },
+          ...(roomSlug
+            ? [{ roomSlug }, { meetingUrl: { contains: roomSlug } }]
+            : []),
+        ],
+      },
+      select: { id: true, googleCalendarEventId: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Organizador: reunião apagada no CHORUS → limpar Google (incl. cópias duplicadas).
+    if (event.organizerSelf) {
+      const linked = existingByGoogle || byRoom;
+      if (!linked) {
+        await deleteGoogleCalendarEvent(userId, event.id);
+        const master = googleCalendarMasterEventId(event.id);
+        if (master !== event.id) {
+          await deleteGoogleCalendarEvent(userId, master).catch(() => undefined);
+        }
+        return 'purged';
+      }
+      if (
+        linked.googleCalendarEventId &&
+        !googleEventIdsRelated(linked.googleCalendarEventId, event.id)
+      ) {
+        await deleteGoogleCalendarEvent(userId, event.id);
+        return 'purged';
+      }
+    }
+
     if (existingByGoogle) {
       await prisma.meetSession.update({
         where: { id: existingByGoogle.id },
@@ -271,21 +329,6 @@ async function applyGoogleEventToChorus(opts: {
       });
       return 'updated';
     }
-
-    const byRoom = await prisma.meetSession.findFirst({
-      where: {
-        companyId,
-        OR: [
-          { meetingUrl },
-          { meetingUrl: event.conferenceUrl.trim() },
-          ...(roomSlug
-            ? [{ roomSlug }, { meetingUrl: { contains: roomSlug } }]
-            : []),
-        ],
-      },
-      select: { id: true },
-      orderBy: { createdAt: 'asc' },
-    });
 
     if (byRoom) {
       await prisma.meetSession.update({
@@ -457,6 +500,7 @@ export async function syncGoogleCalendarBidirectional(opts: {
   updated: number;
   cancelled: number;
   skipped: number;
+  purged: number;
   mode: 'full' | 'incremental';
 }> {
   const { accessToken, connected, needsReconnect } = await getGoogleCalendarAccessToken(
@@ -481,6 +525,7 @@ export async function syncGoogleCalendarBidirectional(opts: {
   let updated = 0;
   let cancelled = 0;
   let skipped = 0;
+  let purged = 0;
   let nextSyncToken: string | undefined;
 
   const runPages = async (token: string | null) => {
@@ -501,6 +546,7 @@ export async function syncGoogleCalendarBidirectional(opts: {
           if (r === 'imported') imported += 1;
           else if (r === 'updated') updated += 1;
           else if (r === 'cancelled') cancelled += 1;
+          else if (r === 'purged') purged += 1;
           else skipped += 1;
         } catch (err) {
           console.warn('[meet/gcal-sync] apply', event.id, err);
@@ -532,6 +578,7 @@ export async function syncGoogleCalendarBidirectional(opts: {
     updated = 0;
     cancelled = 0;
     skipped = 0;
+    purged = 0;
     nextSyncToken = undefined;
     await prisma.meetGoogleCalendarSync.update({
       where: { id: syncRow.id },
@@ -561,7 +608,7 @@ export async function syncGoogleCalendarBidirectional(opts: {
     expiration: fresh.watchExpiration,
   });
 
-  return { imported, updated, cancelled, skipped, mode };
+  return { imported, updated, cancelled, skipped, purged, mode };
 }
 
 export async function syncGoogleCalendarByWatchChannel(channelId: string): Promise<void> {

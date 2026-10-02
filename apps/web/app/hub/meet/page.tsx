@@ -332,6 +332,11 @@ function MeetHubContent() {
           recurrence: isPermanent ? 'none' : draft?.recurrence || 'none',
           recurrenceUntil: isPermanent ? null : draft?.recurrenceUntil,
           locale,
+          skipGooglePush: usesCalendarInvite,
+          timeZone:
+            draft?.timezone ||
+            Intl.DateTimeFormat().resolvedOptions().timeZone ||
+            'UTC',
         }),
       });
       const d = (await r.json()) as {
@@ -486,6 +491,7 @@ function MeetHubContent() {
           imported?: number;
           updated?: number;
           cancelled?: number;
+          purged?: number;
           skipped?: number;
           mode?: string;
         };
@@ -495,10 +501,10 @@ function MeetHubContent() {
         if (!opts?.silent) {
           setInfo(
             locale === 'pt'
-              ? `Google sincronizado (${d.mode || 'full'}): ${d.imported ?? 0} novas, ${d.updated ?? 0} actualizadas, ${d.cancelled ?? 0} canceladas.`
+              ? `Google sincronizado (${d.mode || 'full'}): ${d.imported ?? 0} novas, ${d.updated ?? 0} actualizadas, ${d.cancelled ?? 0} canceladas, ${d.purged ?? 0} removidas do Google.`
               : locale === 'es'
-                ? `Google sincronizado (${d.mode || 'full'}): ${d.imported ?? 0} nuevas, ${d.updated ?? 0} actualizadas, ${d.cancelled ?? 0} canceladas.`
-                : `Google synced (${d.mode || 'full'}): ${d.imported ?? 0} new, ${d.updated ?? 0} updated, ${d.cancelled ?? 0} cancelled.`,
+                ? `Google sincronizado (${d.mode || 'full'}): ${d.imported ?? 0} nuevas, ${d.updated ?? 0} actualizadas, ${d.cancelled ?? 0} canceladas, ${d.purged ?? 0} eliminadas de Google.`
+                : `Google synced (${d.mode || 'full'}): ${d.imported ?? 0} new, ${d.updated ?? 0} updated, ${d.cancelled ?? 0} cancelled, ${d.purged ?? 0} removed from Google.`,
           );
         }
       } catch (err) {

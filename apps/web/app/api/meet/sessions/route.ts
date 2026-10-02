@@ -63,6 +63,8 @@ export async function POST(req: Request) {
       isPermanent?: boolean;
       recurrence?: string;
       recurrenceUntil?: string | null;
+      /** Se true, o cliente vai criar o evento via /calendar (evita duplicar no Google). */
+      skipGooglePush?: boolean;
     };
 
     const companyId = body.companyId?.trim();
@@ -116,14 +118,17 @@ export async function POST(req: Request) {
       }
     }
 
-    // CHORUS → Google (automático se calendário ligado)
-    const gcal = await getGoogleCalendarAccessToken(tenant.userId);
-    if (gcal.connected && !gcal.needsReconnect && gcal.accessToken) {
-      await pushMeetSessionToGoogle({
-        userId: tenant.userId,
-        sessionId: session.id,
-        timeZone: (body as { timeZone?: string }).timeZone || 'UTC',
-      }).catch((err) => console.warn('[meet/sessions] gcal push', err));
+    // CHORUS → Google (automático se calendário ligado).
+    // Com convite via /calendar o cliente faz o push com RRULE+convidados — não duplicar.
+    if (!body.skipGooglePush) {
+      const gcal = await getGoogleCalendarAccessToken(tenant.userId);
+      if (gcal.connected && !gcal.needsReconnect && gcal.accessToken) {
+        await pushMeetSessionToGoogle({
+          userId: tenant.userId,
+          sessionId: session.id,
+          timeZone: (body as { timeZone?: string }).timeZone || 'UTC',
+        }).catch((err) => console.warn('[meet/sessions] gcal push', err));
+      }
     }
 
     return NextResponse.json({ session, inviteResults });

@@ -32,6 +32,7 @@ export async function POST(req: Request) {
       updated: result.updated,
       cancelled: result.cancelled,
       skipped: result.skipped,
+      purged: result.purged,
       mode: result.mode,
     });
   } catch (error: unknown) {

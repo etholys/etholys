@@ -637,6 +637,68 @@ export async function updateMeetSessionScoped(input: {
   });
 }
 
+function meetDeleteScopeWhere(
+  existing: { id: string; seriesId: string | null; scheduledAt: Date | null; createdAt: Date; isPermanent: boolean },
+  companyId: string,
+  scope: MeetDeleteScope,
+) {
+  const seriesId = existing.seriesId || existing.id;
+  if (scope === 'series' || existing.isPermanent) {
+    return {
+      companyId,
+      OR: [{ id: seriesId }, { seriesId }],
+    };
+  }
+  if (scope === 'following') {
+    const from = existing.scheduledAt ?? existing.createdAt;
+    return {
+      companyId,
+      OR: [
+        { id: existing.id },
+        {
+          seriesId,
+          scheduledAt: { gte: from },
+        },
+      ],
+    };
+  }
+  return { companyId, id: existing.id };
+}
+
+/** Sessões afectadas por um apagar (para limpar Google Calendar antes do delete). */
+export async function listMeetSessionsForDeleteScope(input: {
+  sessionId: string;
+  companyId: string;
+  scope?: MeetDeleteScope;
+}) {
+  assertMeetPrismaReady();
+  const existing = await prisma.meetSession.findFirst({
+    where: { id: input.sessionId, companyId: input.companyId },
+    select: {
+      id: true,
+      seriesId: true,
+      scheduledAt: true,
+      createdAt: true,
+      isPermanent: true,
+      googleCalendarEventId: true,
+      meetingUrl: true,
+      roomSlug: true,
+    },
+  });
+  if (!existing) return [];
+
+  const scope = input.scope || 'this';
+  return prisma.meetSession.findMany({
+    where: meetDeleteScopeWhere(existing, input.companyId, scope),
+    select: {
+      id: true,
+      googleCalendarEventId: true,
+      meetingUrl: true,
+      roomSlug: true,
+    },
+  });
+}
+
 export async function deleteMeetSessionScoped(input: {
   sessionId: string;
   companyId: string;
@@ -649,35 +711,11 @@ export async function deleteMeetSessionScoped(input: {
   if (!existing) return { deleted: 0 };
 
   const scope = input.scope || 'this';
-  const seriesId = existing.seriesId || existing.id;
-
-  if (scope === 'series' || existing.isPermanent) {
-    const result = await prisma.meetSession.deleteMany({
-      where: {
-        companyId: input.companyId,
-        OR: [{ id: seriesId }, { seriesId }],
-      },
-    });
-    return { deleted: result.count };
+  const where = meetDeleteScopeWhere(existing, input.companyId, scope);
+  if (scope === 'this' && !existing.isPermanent) {
+    await prisma.meetSession.delete({ where: { id: existing.id } });
+    return { deleted: 1 };
   }
-
-  if (scope === 'following') {
-    const from = existing.scheduledAt ?? existing.createdAt;
-    const result = await prisma.meetSession.deleteMany({
-      where: {
-        companyId: input.companyId,
-        OR: [
-          { id: existing.id },
-          {
-            seriesId,
-            scheduledAt: { gte: from },
-          },
-        ],
-      },
-    });
-    return { deleted: result.count };
-  }
-
-  await prisma.meetSession.delete({ where: { id: existing.id } });
-  return { deleted: 1 };
+  const result = await prisma.meetSession.deleteMany({ where });
+  return { deleted: result.count };
 }

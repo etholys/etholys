@@ -5,6 +5,7 @@ import { getUserCompanyIds } from '@/lib/tenant';
 import {
   getMeetSessionForCompany,
   deleteMeetSessionScoped,
+  listMeetSessionsForDeleteScope,
   updateMeetSessionScoped,
   syncMeetParticipants,
   isMeetSessionOwner,
@@ -14,6 +15,14 @@ import {
 import { sendMeetSessionInvites } from '@/lib/meet/send-session-invites';
 import { prisma } from '@/lib/prisma';
 import type { MeetEditScope } from '@/lib/meet/create-session';
+import {
+  deleteGoogleCalendarEvent,
+  pushMeetSessionToGoogle,
+} from '@/lib/meet/calendar-google-sync';
+import {
+  getGoogleCalendarAccessToken,
+  googleCalendarMasterEventId,
+} from '@/lib/meet/calendar-google';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -256,6 +265,16 @@ export async function PATCH(req: Request, ctx: Ctx) {
       return NextResponse.json({ error: 'Nada para actualizar' }, { status: 400 });
     }
 
+    if (editingScheduleOrMeta || data.status === 'cancelled') {
+      const gcal = await getGoogleCalendarAccessToken(tenant.userId);
+      if (gcal.connected && !gcal.needsReconnect && gcal.accessToken) {
+        await pushMeetSessionToGoogle({
+          userId: tenant.userId,
+          sessionId: session.id,
+        }).catch((err) => console.warn('[meet/sessions] gcal push', err));
+      }
+    }
+
     return NextResponse.json({ session, editScope, inviteResults });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Error interno';
@@ -285,12 +304,46 @@ export async function DELETE(req: Request, ctx: Ctx) {
     const scope =
       scopeParam === 'following' || scopeParam === 'series' ? scopeParam : 'this';
 
+    // Apagar no Google todos os eventos ligados ao âmbito (série/seguintes/esta).
+    // Inclui o ID mestre de ocorrências recorrentes para não deixar cópias órfãs.
+    const scoped = await listMeetSessionsForDeleteScope({
+      sessionId: id,
+      companyId,
+      scope,
+    });
+    const googleIds = new Set<string>();
+    for (const row of scoped) {
+      const gid =
+        'googleCalendarEventId' in row
+          ? (row.googleCalendarEventId as string | null | undefined)
+          : null;
+      if (!gid) continue;
+      googleIds.add(gid);
+      googleIds.add(googleCalendarMasterEventId(gid));
+    }
+    const fallbackId =
+      'googleCalendarEventId' in existing
+        ? (existing.googleCalendarEventId as string | null | undefined)
+        : null;
+    if (fallbackId) {
+      googleIds.add(fallbackId);
+      googleIds.add(googleCalendarMasterEventId(fallbackId));
+    }
+
+    await Promise.all(
+      [...googleIds].map((eventId) =>
+        deleteGoogleCalendarEvent(tenant.userId, eventId).catch((err) =>
+          console.warn('[meet/sessions] gcal delete', eventId, err),
+        ),
+      ),
+    );
+
     const result = await deleteMeetSessionScoped({
       sessionId: id,
       companyId,
       scope,
     });
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, ...result, googleDeleted: googleIds.size });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Error interno';
     return NextResponse.json({ error: msg }, { status: 500 });

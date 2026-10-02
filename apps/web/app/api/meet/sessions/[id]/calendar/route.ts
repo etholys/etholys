@@ -3,9 +3,14 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { getMeetSessionForCompany } from '@/lib/meet/create-session';
-import { createGoogleCalendarEvent, getGoogleCalendarAccessToken } from '@/lib/meet/calendar-google';
+import {
+  createGoogleCalendarEvent,
+  getGoogleCalendarAccessToken,
+  patchGoogleCalendarEvent,
+} from '@/lib/meet/calendar-google';
 import { createOutlookCalendarEvent, getOutlookCalendarAccessToken } from '@/lib/meet/calendar-outlook';
 import { meetRecurrenceToRrule, isMeetRecurrenceFrequency } from '@/lib/meet/recurrence';
+import { prisma } from '@/lib/prisma';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -43,7 +48,9 @@ export async function GET(_req: Request, _ctx: Ctx) {
 }
 
 /**
- * POST — cria evento no Google ou Outlook Calendar (F6).
+ * POST — cria ou actualiza o evento no Google/Outlook (F6).
+ * Guarda sempre googleCalendarEventId na sessão mestre — sem isto o apagar no CHORUS
+ * não consegue remover o evento do Google.
  * body: { companyId, provider: 'google' | 'outlook' }
  */
 export async function POST(req: Request, ctx: Ctx) {
@@ -111,10 +118,30 @@ export async function POST(req: Request, ctx: Ctx) {
       recurrenceRule: provider === 'google' ? recurrenceRule : null,
     };
 
-    const created =
-      provider === 'google'
-        ? await createGoogleCalendarEvent(tenant.userId, event)
-        : await createOutlookCalendarEvent(tenant.userId, event);
+    if (provider === 'outlook') {
+      const created = await createOutlookCalendarEvent(tenant.userId, event);
+      return NextResponse.json({ ok: true, provider, event: created });
+    }
+
+    const existingGoogleId =
+      'googleCalendarEventId' in syncSession
+        ? (syncSession.googleCalendarEventId as string | null | undefined)
+        : null;
+
+    const created = existingGoogleId
+      ? await patchGoogleCalendarEvent(tenant.userId, existingGoogleId, event).catch(async (err) => {
+          console.warn('[meet/calendar] patch failed, recreating', err);
+          return createGoogleCalendarEvent(tenant.userId, event);
+        })
+      : await createGoogleCalendarEvent(tenant.userId, event);
+
+    await prisma.meetSession.update({
+      where: { id: syncSession.id },
+      data: {
+        googleCalendarEventId: created.id,
+        googleCalendarHtmlLink: created.htmlLink || null,
+      },
+    });
 
     return NextResponse.json({ ok: true, provider, event: created });
   } catch (error: unknown) {
