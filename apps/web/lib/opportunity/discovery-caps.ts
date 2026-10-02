@@ -1,11 +1,11 @@
 /**
  * Caps de yield da descoberta FundHub.
  *
- * Modo teste / produto (default): SEM tecto artificial de quantidade —
- * o briefing/filtro da empresa manda; devolvemos todos os candidatos que
- * passam filtros oficiais e de match. Só duplicados / fora do filtro saem.
+ * Limite principal em produção de teste: FUNDHUB_SCAN_BUDGET_USD (default $1)
+ * + cooldown de hosts FUNDHUB_SOURCE_COOLDOWN_DAYS (default 7).
+ * Sem tecto artificial de quantidade de candidatos quando unlimited.
  *
- * Produção com orçamento: FUNDHUB_DISCOVERY_UNLIMITED=0 e opcionalmente
+ * Produção com orçamento apertado: FUNDHUB_DISCOVERY_UNLIMITED=0 e opcionalmente
  * FUNDHUB_MAX_NORMALIZE / FUNDHUB_MAX_ENRICH / FUNDHUB_MAX_PACKS /
  * FUNDHUB_MAX_PER_INSTITUTION.
  */

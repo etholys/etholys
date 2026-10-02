@@ -190,6 +190,38 @@ export function buildDiscoveryQueryPacks(briefing: OpportunityBriefing): Discove
   return packs.filter((p) => p.queries.length > 0);
 }
 
+/**
+ * Packs extra (país × tema) para gastar o orçamento da varredura em cobertura nova
+ * enquanto houver budget — não são um tecto de candidatos.
+ */
+export function buildDiscoveryBudgetExpansionPacks(briefing: OpportunityBriefing): DiscoveryQueryPack[] {
+  const year = new Date().getFullYear();
+  const themes = briefing.themes.map((t) => t.trim()).filter(Boolean).slice(0, 8);
+  const countries = briefing.countries.map((c) => c.trim()).filter(Boolean).slice(0, 12);
+  const themeFallback = themeQueryBlob(briefing.themes);
+  const packs: DiscoveryQueryPack[] = [];
+
+  const countriesOr = countries.length ? countries : ['América Latina', 'Brasil'];
+  const themesOr = themes.length ? themes : [themeFallback];
+
+  for (const country of countriesOr) {
+    for (const theme of themesOr.slice(0, 3)) {
+      packs.push({
+        id: `expand_${fold(country).slice(0, 24)}_${fold(theme).slice(0, 24)}`.replace(/\s+/g, '_'),
+        label: `Expand: ${theme} × ${country}`,
+        queries: uniqueQueries([
+          `${theme} convocatoria abierta OR open call ${year} ${country}`,
+          `${theme} edital OR "call for proposals" prazo OR deadline ${year} ${country}`,
+          `site:.gob OR site:.gov ${theme} convocatoria ${country} ${year}`,
+        ]).slice(0, 3),
+      });
+    }
+  }
+
+  // Cap de segurança de pacotes — o budget USD corta antes na prática.
+  return packs.slice(0, 24);
+}
+
 /** Queries que o scout DEVE correr — internet aberta primeiro, portais para fechar o URL. */
 export function buildDiscoverySearchQueries(briefing: OpportunityBriefing): string[] {
   const cap = isDiscoveryUnlimited() ? 80 : 48;

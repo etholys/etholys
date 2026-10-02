@@ -6,6 +6,7 @@ import { sanitizeCandidateDates } from '@/lib/opportunity/availability';
 import { normalizeCandidates } from '@/lib/opportunity/candidate-store';
 import {
   applyBriefingDiversity,
+  buildDiscoveryBudgetExpansionPacks,
   buildDiscoveryQueryPacks,
   buildDiscoverySearchQueries,
   isHomogeneousInstitutionSet,
@@ -16,6 +17,20 @@ import {
   discoveryYieldPromptHint,
   maxDiscoveryPacks,
 } from '@/lib/opportunity/discovery-caps';
+import {
+  budgetStatus,
+  canAffordDiscoveryStep,
+  scanBudgetUsd,
+} from '@/lib/opportunity/discovery-budget';
+import {
+  extractHostsFromCandidates,
+  extractHostsFromText,
+  filterQueriesAgainstCooldown,
+  formatCooldownPromptBlock,
+  loadCooldownHosts,
+  recordSourceVisits,
+  sourceCooldownDays,
+} from '@/lib/opportunity/discovery-source-cooldown';
 import { salvageJsonText, truncateForStructure } from '@/lib/opportunity/json-salvage';
 import {
   fundhubLanguageName,
@@ -151,6 +166,15 @@ export type WebDiscoveryResult = {
   discoveryMode: 'web' | 'knowledge';
   searchQueries: string[];
   fallbackReason?: string;
+  budgetMeta?: {
+    budgetUsd: number;
+    spentUsd: number;
+    packsRun: number;
+    packsSkippedBudget: number;
+    cooldownHosts: number;
+    cooldownDays: number;
+    hostsRecorded: number;
+  };
 };
 
 export async function discoverOpportunitiesOnline(opts: {
@@ -161,6 +185,8 @@ export async function discoverOpportunitiesOnline(opts: {
   scanFocus?: ScanFocus;
   /** Hub UI locale — narrativas dos candidatos neste idioma. */
   locale?: unknown;
+  companyId?: string;
+  runId?: string;
   /** 0–100 phase updates during long web search. */
   onProgress?: (pct: number, phase: string) => void | Promise<void>;
 }): Promise<WebDiscoveryResult> {
@@ -175,6 +201,15 @@ export async function discoverOpportunitiesOnline(opts: {
   };
   const existingBlock =
     opts.existingFunds.map((f) => `${f.name} (${f.institution})`).join('\n') || '(none)';
+
+  const cooledHosts = opts.companyId
+    ? await loadCooldownHosts(opts.companyId, sourceCooldownDays())
+    : new Set<string>();
+  const cooldownBlock = formatCooldownPromptBlock(cooledHosts);
+  const visitedThisRun = new Set<string>();
+  let packsSkippedBudget = 0;
+  let packResults: Array<{ text: string; searchQueries: string[]; label: string }> = [];
+  let searchQueries: string[] = [];
 
   if (!isWebSearchEnabled()) {
     // open_now NUNCA cai em knowledge (inventa agências). Sem web search → vazio.
@@ -211,40 +246,62 @@ export async function discoverOpportunitiesOnline(opts: {
         : `\nMODE: REFERENCE INTELLIGENCE — map programs for future tracking, include seasonal and closed.`;
 
     const packs = buildDiscoveryQueryPacks(opts.briefing);
+    const expandPacks = buildDiscoveryBudgetExpansionPacks(opts.briefing);
     const requiredQueries = buildDiscoverySearchQueries(opts.briefing);
     const extraClean = opts.optionalExtraContext?.trim() ?? '';
+    const budgetUsd = scanBudgetUsd();
     const sharedBrief = [
       `BRIEFING (this is the search intent — obey it, then search the open web):\n${briefingLines(opts.briefing)}`,
       `\nLEARNING (skip-list only — do not copy catalog institutions as the theme):\n${opts.learningContext}`,
       `\nALREADY ON THE DESK OR IN CATALOG (do not repeat — find OTHER official calls from OTHER institutions):\n${existingBlock}`,
+      cooldownBlock,
       extraClean ? `\nOPTIONAL HINTS (not a closed source list):\n${extraClean}` : '',
       focusHint,
+      `\nSCAN BUDGET: spend up to ~$${budgetUsd.toFixed(2)} on this run — maximize NEW distinct matching calls, not re-visits.`,
     ].join('');
 
     await report(22, 'web_research');
-    // Packs em série (open_web → instruments → official). Caps via discovery-caps.
-    const packSlice = packs.slice(0, maxDiscoveryPacks());
-    const packResults: Array<{ text: string; searchQueries: string[] }> = [];
-    for (const pack of packSlice) {
-      packResults.push(
-        await runPackWebSearch({
-          pack,
-          researchSystem: RESEARCH_SYSTEM,
-          sharedBrief,
-          scanFocus,
-        }),
-      );
+    // Packs base + expansão país×tema enquanto o orçamento USD aguentar.
+    const packQueue = [...packs.slice(0, maxDiscoveryPacks()), ...expandPacks];
+    packResults = [];
+    for (let i = 0; i < packQueue.length; i++) {
+      const pack = packQueue[i]!;
+      if (!canAffordDiscoveryStep({ estimatedStepUsd: 0.2 })) {
+        packsSkippedBudget += packQueue.length - i;
+        console.info(
+          `[opportunity/web-discovery] budget stop after ${packResults.length} packs`,
+          budgetStatus(),
+        );
+        break;
+      }
+      const filteredQueries = filterQueriesAgainstCooldown(pack.queries, cooledHosts);
+      if (filteredQueries.length === 0) {
+        packsSkippedBudget += 1;
+        continue;
+      }
+      const pct = 22 + Math.min(40, Math.round((i / Math.max(1, packQueue.length)) * 40));
+      await report(pct, `web_research_${pack.id}`);
+      const result = await runPackWebSearch({
+        pack: { ...pack, queries: filteredQueries },
+        researchSystem: RESEARCH_SYSTEM,
+        sharedBrief,
+        scanFocus,
+      });
+      packResults.push({ ...result, label: pack.label });
+      for (const h of extractHostsFromText(result.text)) {
+        visitedThisRun.add(h);
+        cooledHosts.add(h);
+      }
     }
-    const research = packResults
-      .map((r, i) => `## PASS ${packSlice[i]?.label ?? i}\n${r.text}`)
-      .join('\n\n');
-    const searchQueries = packResults.flatMap((r) => r.searchQueries);
+    const research = packResults.map((r) => `## PASS ${r.label}\n${r.text}`).join('\n\n');
+    searchQueries = packResults.flatMap((r) => r.searchQueries);
 
     await report(65, 'structuring');
     const structureUser = [
       `RESEARCH REPORT:\n${truncateForStructure(research)}`,
       `\nEXISTING (skip duplicates):\n${existingBlock.slice(0, 4000)}`,
       `\nBRIEFING:\n${briefingLines(opts.briefing)}`,
+      cooldownBlock,
       focusHint,
       `\nKeep each description under 400 characters. ${discoveryYieldPromptHint()}`,
     ].join('');
@@ -297,10 +354,15 @@ export async function discoverOpportunitiesOnline(opts: {
       opts.briefing,
     );
 
+    for (const h of extractHostsFromCandidates(candidates)) {
+      visitedThisRun.add(h);
+    }
+
     const needSecondPass =
       scanFocus === 'open_now' &&
       candidates.length < 4 &&
-      isHomogeneousInstitutionSet(candidates);
+      isHomogeneousInstitutionSet(candidates) &&
+      canAffordDiscoveryStep({ estimatedStepUsd: 0.25 });
 
     if (needSecondPass) {
       await report(82, 'web_research_fable');
@@ -309,15 +371,16 @@ export async function discoverOpportunitiesOnline(opts: {
         learningContext: opts.learningContext,
         existingBlock,
         existingFunds: [...opts.existingFunds, ...candidates],
-        optionalExtraContext: extraClean,
+        optionalExtraContext: [extraClean, cooldownBlock].filter(Boolean).join('\n'),
         alreadyFound: candidates,
-        requiredQueries,
+        requiredQueries: filterQueriesAgainstCooldown(requiredQueries, cooledHosts),
         locale,
       });
       if (extra.length > 0) {
         const extraEnriched = (await enrichAndFilterCandidates(extra, scanFocus)).map((c) =>
           sanitizeCandidateDates(c),
         );
+        for (const h of extractHostsFromCandidates(extraEnriched)) visitedThisRun.add(h);
         candidates = applyBriefingDiversity(
           dropDuplicateFunds([...candidates, ...extraEnriched], opts.existingFunds),
           opts.briefing,
@@ -325,9 +388,28 @@ export async function discoverOpportunitiesOnline(opts: {
       }
     }
 
+    let hostsRecorded = 0;
+    if (opts.companyId && visitedThisRun.size > 0) {
+      hostsRecorded = await recordSourceVisits({
+        companyId: opts.companyId,
+        hosts: [...visitedThisRun],
+        runId: opts.runId,
+      });
+    }
+    const spent = budgetStatus();
+    const budgetMeta = {
+      budgetUsd: spent.budget,
+      spentUsd: spent.spent,
+      packsRun: packResults.length,
+      packsSkippedBudget,
+      cooldownHosts: cooledHosts.size,
+      cooldownDays: sourceCooldownDays(),
+      hostsRecorded,
+    };
+
     await report(88, 'filtering');
     if (candidates.length > 0) {
-      return { candidates, discoveryMode: 'web', searchQueries };
+      return { candidates, discoveryMode: 'web', searchQueries, budgetMeta };
     }
     console.warn('[opportunity/web-discovery] web search returned 0 verifiable candidates');
     if (scanFocus === 'open_now') {
@@ -336,6 +418,7 @@ export async function discoverOpportunitiesOnline(opts: {
         discoveryMode: 'web',
         searchQueries,
         fallbackReason: 'no_official_call_page',
+        budgetMeta,
       };
     }
   } catch (e) {

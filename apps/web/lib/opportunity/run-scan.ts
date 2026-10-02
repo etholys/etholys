@@ -147,6 +147,8 @@ export async function runOpportunityScan(opts: {
         optionalExtraContext: optionalExtraContext || undefined,
         scanFocus,
         locale: opts.locale,
+        companyId: opts.companyId,
+        runId: run.id,
         onProgress: (pct, phase) => setScanProgress(run.id, pct, phase),
       }),
     );
@@ -201,6 +203,7 @@ export async function runOpportunityScan(opts: {
           scanFocus,
           scanName: briefing.scanName ?? null,
           fallbackReason: discovery.fallbackReason ?? null,
+          budgetMeta: discovery.budgetMeta ?? null,
           aiCost: llmUsageForPersistence(usage),
         }),
         finishedAt: new Date(),
