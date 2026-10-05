@@ -340,7 +340,7 @@ export default function ProposalsPage() {
       let resolvedFund: FundSummary = fund ?? {
         id: `adhoc-${Date.now()}`,
         name: selectedFiles[0]?.name?.replace(/\.[^.]+$/, '') || 'Proposta avulsa',
-        institution: 'Sem fundo vinculado',
+        institution: locale === 'en' ? 'No fund linked' : locale === 'pt' ? 'Sem fundo vinculado' : 'Sin fondo vinculado',
         description: intakeNotes,
         linkOficial: editalLink.trim() || undefined,
       };

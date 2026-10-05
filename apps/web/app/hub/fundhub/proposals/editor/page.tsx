@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/app/providers';
 import { ui } from '@/lib/i18n';
-import { isLikelyDbId } from '@/lib/utils';
+import { cn, isLikelyDbId } from '@/lib/utils';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -21,6 +21,11 @@ import {
   Mic,
   Square,
   Sparkles,
+  PanelRightClose,
+  PanelRightOpen,
+  MessageSquare,
+  FileText,
+  ClipboardCheck,
 } from 'lucide-react';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import { RichTextPane } from '@/components/etholys/RichTextPane';
@@ -97,11 +102,13 @@ export default function FundHubProposalEditorPage() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [showAttach, setShowAttach] = useState(false);
+  const [showAttach, setShowAttach] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openingStudio, setOpeningStudio] = useState(false);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const [rightRailCollapsed, setRightRailCollapsed] = useState(false);
+  const [rightRailTab, setRightRailTab] = useState<'review' | 'document'>('document');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
   const chatFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -115,6 +122,29 @@ export default function FundHubProposalEditorPage() {
   const [reviewStatus, setReviewStatus] = useState<ProposalReviewStatus>('draft');
   const understandRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('fundhubProposalRightRail');
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { collapsed?: boolean; tab?: 'review' | 'document' };
+      if (typeof parsed.collapsed === 'boolean') setRightRailCollapsed(parsed.collapsed);
+      if (parsed.tab === 'review' || parsed.tab === 'document') setRightRailTab(parsed.tab);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'fundhubProposalRightRail',
+        JSON.stringify({ collapsed: rightRailCollapsed, tab: rightRailTab }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [rightRailCollapsed, rightRailTab]);
 
   const rfpChecklist = useMemo(
     () =>
@@ -571,7 +601,35 @@ export default function FundHubProposalEditorPage() {
       .slice(0, 4)
       .map((f) => `--- Anexo: ${f.name} ---\n${f.textExcerpt!.slice(0, 6000)}`)
       .join('\n\n');
-    const fullMessage = [message, attachBlock].filter(Boolean).join('\n\n');
+
+    const wantsDraft =
+      /\b(item\s*por\s*item|desarroll|redact|complet[ae]|formulari|postulaci[oó]n|escribir|escrev|preench|vamos\s+item|empez|arran[ck])/i.test(
+        message,
+      );
+    const sectionCount = sectionsFromMarkdown(documentMarkdown).filter(
+      (s) => !/lectura|leitura|call reading|elegib|bases oficial/i.test(s.title),
+    ).length;
+
+    // Se pedem redigir e o canvas ainda não tem o formulário, monta a espinha do edital primeiro.
+    if (wantsDraft && rfpChecklist.length && sectionCount < 3) {
+      setDocumentMarkdown((prev) => {
+        const next = appendChecklistSections(prev, rfpChecklist, locale);
+        persistDraft({ documentMarkdown: next });
+        return next;
+      });
+      setRightRailCollapsed(false);
+      setRightRailTab('document');
+    }
+
+    const draftDirective = wantsDraft
+      ? locale === 'en'
+        ? '\n\n[Editor directive] Write NOW. Use the official application form field names from the call/bases. Deliver one complete item ready to paste (## heading + body). At most one inline [MISSING: …]. Do not ask eligibility questions as a gate — draft with assumptions and mark gaps. End with only: next item title?'
+        : locale === 'pt'
+          ? '\n\n[Directiva do editor] Escreve JÁ. Usa os nomes de campos do formulário oficial do edital/bases. Entrega um item completo pronto a colar (## título + corpo). No máximo um [FALTA: …] inline. Não bloqueies com perguntas de elegibilidade — redige com hipóteses e marca lacunas. Termina só com: próximo item?'
+          : '\n\n[Directiva del editor] Escribe YA. Usa los nombres de campos del formulario oficial del edital/bases. Entrega un ítem completo listo para pegar (## título + cuerpo). Máximo un [FALTA: …] inline. No bloquees con preguntas de elegibilidad — redacta con hipótesis y marca huecos. Termina solo con: ¿siguiente ítem?'
+      : '';
+
+    const fullMessage = [message + draftDirective, attachBlock].filter(Boolean).join('\n\n');
     if (!fullMessage.trim()) return;
     const display =
       message ||
@@ -604,6 +662,10 @@ export default function FundHubProposalEditorPage() {
         persistDraft({ chat: next });
         return next;
       });
+      if (wantsDraft && String(data.answer || '').includes('## ')) {
+        setRightRailCollapsed(false);
+        setRightRailTab('document');
+      }
     } catch {
       setChatMessages((prev) => [
         ...prev,
@@ -621,7 +683,16 @@ export default function FundHubProposalEditorPage() {
     } finally {
       setChatLoading(false);
     }
-  }, [chatInput, chatLoading, attachedFiles, assistantBody, persistDraft, locale]);
+  }, [
+    chatInput,
+    chatLoading,
+    attachedFiles,
+    assistantBody,
+    persistDraft,
+    locale,
+    documentMarkdown,
+    rfpChecklist,
+  ]);
 
   const insertIntoDocument = useCallback(
     (text: string) => {
@@ -1237,88 +1308,13 @@ export default function FundHubProposalEditorPage() {
         </div>
       )}
 
-      {workspaceId ? <ProposalReviewPanel workspaceId={workspaceId} /> : null}
-
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-          {ui(locale, 'Revisión', 'Revisão', 'Review')}:
-        </span>
-        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
-          {reviewStatusLabel(reviewStatus, locale)}
-        </span>
-        {(
-          [
-            ['in_review', ui(locale, 'Enviar a revisión', 'Enviar para revisão', 'Send to review')],
-            ['approved', ui(locale, 'Aprobar', 'Aprovar', 'Approve')],
-            ['changes_requested', ui(locale, 'Pedir cambios', 'Pedir alterações', 'Request changes')],
-            ['draft', ui(locale, 'Volver a borrador', 'Voltar a rascunho', 'Back to draft')],
-          ] as const
-        ).map(([st, label]) => (
-          <button
-            key={st}
-            type="button"
-            disabled={reviewStatus === st}
-            onClick={() => persistDraft({ reviewStatus: st })}
-            className="rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {coalitionPool.length > 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
-          <p className="text-xs font-semibold text-gray-900">Coligação nesta proposta</p>
-          <p className="mt-0.5 text-[11px] text-gray-500">Membros já na página Coalizão — papel e % do orçamento.</p>
-          <ul className="mt-2 space-y-1.5">
-            {coalitionPool.map((m) => {
-              const picked = coalition.find((c) => c.id === m.id);
-              return (
-                <li key={m.id} className="flex flex-wrap items-center gap-2 text-xs">
-                  <label className="inline-flex items-center gap-1.5 text-gray-800">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(picked)}
-                      onChange={(e) => {
-                        const next = e.target.checked
-                          ? [...coalition, { id: m.id, orgName: m.orgName, role: m.role, budgetPct: 0 }]
-                          : coalition.filter((c) => c.id !== m.id);
-                        setCoalition(next);
-                        persistDraft({ coalition: next });
-                      }}
-                    />
-                    <span className="font-medium">{m.orgName}</span>
-                    <span className="text-gray-500">{m.role}</span>
-                  </label>
-                  {picked && (
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={picked.budgetPct ?? 0}
-                      onChange={(e) => {
-                        const budgetPct = Number(e.target.value);
-                        const next = coalition.map((c) => (c.id === m.id ? { ...c, budgetPct } : c));
-                        setCoalition(next);
-                        persistDraft({ coalition: next });
-                      }}
-                      className="w-16 rounded border border-gray-200 px-1.5 py-0.5 text-xs"
-                    />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
       {loading ? (
         <div className="flex flex-1 items-center justify-center rounded-2xl border border-gray-200 bg-white">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-amber-600" />
         </div>
       ) : (
-        <div className="grid min-h-0 gap-3 lg:h-[calc(100dvh-11rem)] lg:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.2fr)]">
-          <section className="flex h-[70vh] min-h-[22rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white lg:h-full">
+        <div className="flex min-h-0 gap-3 lg:h-[calc(100dvh-9rem)]">
+          <section className="flex h-[70vh] min-h-[22rem] min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white lg:h-full">
             <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
               <p className="text-sm font-semibold text-gray-900">
                 {stage === 'understand'
@@ -1425,7 +1421,11 @@ export default function FundHubProposalEditorPage() {
                   {message.role === 'assistant' && (
                     <button
                       type="button"
-                      onClick={() => insertIntoDocument(message.content)}
+                      onClick={() => {
+                        insertIntoDocument(message.content);
+                        setRightRailCollapsed(false);
+                        setRightRailTab('document');
+                      }}
                       className="mt-2 text-xs font-medium text-amber-800 hover:underline"
                     >
                       {ui(locale, 'Insertar en el documento', 'Inserir no documento', 'Insert into document')}
@@ -1531,73 +1531,265 @@ export default function FundHubProposalEditorPage() {
             </form>
           </section>
 
-          <section className="flex h-[70vh] min-h-[22rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white lg:h-full">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
-              <p className="text-sm font-semibold text-gray-900">
-                {stage === 'understand'
-                  ? ui(locale, 'Notas del edital', 'Notas do edital', 'Call notes')
-                  : ui(locale, 'Documento', 'Documento', 'Document')}
-              </p>
-              <div className="flex items-center gap-2">
+          <aside
+            className={cn(
+              'flex h-[70vh] min-h-[22rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all lg:h-full',
+              rightRailCollapsed
+                ? 'w-14 flex-shrink-0'
+                : rightRailTab === 'document'
+                  ? 'w-full max-w-xl flex-shrink-0 lg:w-[min(42vw,34rem)]'
+                  : 'w-full max-w-sm flex-shrink-0 lg:w-80',
+            )}
+          >
+            {rightRailCollapsed ? (
+              <div className="flex h-full flex-col items-center gap-1 p-1.5">
                 <button
                   type="button"
-                  onClick={() => setShowAttach((v) => !v)}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900"
+                  onClick={() => setRightRailCollapsed(false)}
+                  className="rounded-lg p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  title={ui(locale, 'Expandir panel', 'Expandir painel', 'Expand panel')}
                 >
-                  <Paperclip className="h-3.5 w-3.5" />
-                  {ui(locale, 'Anexos', 'Anexos', 'Files')}
-                  {attachedFiles.length ? ` (${attachedFiles.length})` : ''}
+                  <PanelRightOpen className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRightRailTab('review');
+                    setRightRailCollapsed(false);
+                  }}
+                  className={cn(
+                    'rounded-lg p-2 hover:bg-gray-50',
+                    rightRailTab === 'review' ? 'bg-amber-50 text-amber-900' : 'text-gray-600',
+                  )}
+                  title={ui(locale, 'Revisión', 'Revisão', 'Review')}
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRightRailTab('document');
+                    setRightRailCollapsed(false);
+                  }}
+                  className={cn(
+                    'rounded-lg p-2 hover:bg-gray-50',
+                    rightRailTab === 'document' ? 'bg-amber-50 text-amber-900' : 'text-gray-600',
+                  )}
+                  title={ui(locale, 'Documento', 'Documento', 'Document')}
+                >
+                  <FileText className="h-4 w-4" />
                 </button>
               </div>
-            </div>
-            {showAttach && (
-              <div className="border-b border-gray-100 px-4 py-3 text-xs">
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 hover:bg-gray-50">
-                  <Paperclip className="h-3.5 w-3.5" />
-                  {ui(locale, 'Adjuntar', 'Anexar', 'Attach')}
-                  <input type="file" multiple className="hidden" onChange={handleAttachFile} />
-                </label>
-                {attachedFiles.length > 0 && (
-                  <ul className="mt-2 space-y-1 text-gray-600">
-                    {attachedFiles.map((file, index) => (
-                      <li key={`${file.name}-${index}`} className="flex justify-between gap-2">
-                        <span className="truncate">{file.name}</span>
-                        <button
-                          type="button"
-                          className="text-red-600"
-                          onClick={() => setAttachedFiles((prev) => prev.filter((_, i) => i !== index))}
-                        >
-                          {ui(locale, 'Quitar', 'Remover', 'Remove')}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+            ) : (
+              <>
+                <div className="flex items-center gap-1 border-b border-gray-100 px-2 py-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setRightRailTab('review')}
+                    className={cn(
+                      'inline-flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium',
+                      rightRailTab === 'review'
+                        ? 'bg-amber-50 text-amber-950'
+                        : 'text-gray-600 hover:bg-gray-50',
+                    )}
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    {ui(locale, 'Revisión', 'Revisão', 'Review')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRightRailTab('document')}
+                    className={cn(
+                      'inline-flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium',
+                      rightRailTab === 'document'
+                        ? 'bg-amber-50 text-amber-950'
+                        : 'text-gray-600 hover:bg-gray-50',
+                    )}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    {ui(locale, 'Documento', 'Documento', 'Document')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRightRailCollapsed(true)}
+                    className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+                    title={ui(locale, 'Minimizar', 'Minimizar', 'Minimize')}
+                  >
+                    <PanelRightClose className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {rightRailTab === 'review' ? (
+                  <div className="fh-pane-scroll min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+                    <p className="text-xs text-gray-500">
+                      {fund?.institution?.trim() &&
+                      !/^sem fundo vinculado$/i.test(fund.institution.trim())
+                        ? fund.institution
+                        : ui(locale, 'Sin fondo vinculado', 'Sem fundo vinculado', 'No fund linked')}
+                    </p>
+                    {workspaceId ? <ProposalReviewPanel workspaceId={workspaceId} /> : null}
+                    <div className="rounded-xl border border-gray-200 bg-white px-3 py-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {ui(locale, 'Revisión', 'Revisão', 'Review')}:
+                      </span>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
+                          {reviewStatusLabel(reviewStatus, locale)}
+                        </span>
+                        {(
+                          [
+                            ['in_review', ui(locale, 'Enviar a revisión', 'Enviar para revisão', 'Send to review')],
+                            ['approved', ui(locale, 'Aprobar', 'Aprovar', 'Approve')],
+                            [
+                              'changes_requested',
+                              ui(locale, 'Pedir cambios', 'Pedir alterações', 'Request changes'),
+                            ],
+                            ['draft', ui(locale, 'Volver a borrador', 'Voltar a rascunho', 'Back to draft')],
+                          ] as const
+                        ).map(([st, label]) => (
+                          <button
+                            key={st}
+                            type="button"
+                            disabled={reviewStatus === st}
+                            onClick={() => persistDraft({ reviewStatus: st })}
+                            className="rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {coalitionPool.length > 0 && (
+                      <div className="rounded-xl border border-gray-200 bg-white px-3 py-3">
+                        <p className="text-xs font-semibold text-gray-900">
+                          {ui(locale, 'Coalición en esta propuesta', 'Coligação nesta proposta', 'Coalition on this proposal')}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-gray-500">
+                          {ui(
+                            locale,
+                            'Miembros de Coalición — rol y % del presupuesto.',
+                            'Membros já na página Coalizão — papel e % do orçamento.',
+                            'Coalition page members — role and budget %.',
+                          )}
+                        </p>
+                        <ul className="mt-2 space-y-1.5">
+                          {coalitionPool.map((m) => {
+                            const picked = coalition.find((c) => c.id === m.id);
+                            return (
+                              <li key={m.id} className="flex flex-wrap items-center gap-2 text-xs">
+                                <label className="inline-flex items-center gap-1.5 text-gray-800">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(picked)}
+                                    onChange={(e) => {
+                                      const next = e.target.checked
+                                        ? [...coalition, { id: m.id, orgName: m.orgName, role: m.role, budgetPct: 0 }]
+                                        : coalition.filter((c) => c.id !== m.id);
+                                      setCoalition(next);
+                                      persistDraft({ coalition: next });
+                                    }}
+                                  />
+                                  <span className="font-medium">{m.orgName}</span>
+                                  <span className="text-gray-500">{m.role}</span>
+                                </label>
+                                {picked && (
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={picked.budgetPct ?? 0}
+                                    onChange={(e) => {
+                                      const budgetPct = Number(e.target.value);
+                                      const next = coalition.map((c) =>
+                                        c.id === m.id ? { ...c, budgetPct } : c,
+                                      );
+                                      setCoalition(next);
+                                      persistDraft({ coalition: next });
+                                    }}
+                                    className="w-16 rounded border border-gray-200 px-1.5 py-0.5 text-xs"
+                                  />
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-3 py-2">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {stage === 'understand'
+                          ? ui(locale, 'Notas del edital', 'Notas do edital', 'Call notes')
+                          : ui(locale, 'Documento', 'Documento', 'Document')}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowAttach((v) => !v)}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900"
+                      >
+                        <Paperclip className="h-3.5 w-3.5" />
+                        {ui(locale, 'Anexos', 'Anexos', 'Files')}
+                        {attachedFiles.length ? ` (${attachedFiles.length})` : ''}
+                      </button>
+                    </div>
+                    {showAttach && (
+                      <div className="border-b border-gray-100 px-3 py-2 text-xs">
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 hover:bg-gray-50">
+                          <Paperclip className="h-3.5 w-3.5" />
+                          {ui(locale, 'Adjuntar', 'Anexar', 'Attach')}
+                          <input type="file" multiple className="hidden" onChange={handleAttachFile} />
+                        </label>
+                        {attachedFiles.length > 0 && (
+                          <ul className="mt-2 space-y-1 text-gray-600">
+                            {attachedFiles.map((file, index) => (
+                              <li key={`${file.name}-${index}`} className="flex justify-between gap-2">
+                                <span className="truncate">{file.name}</span>
+                                <button
+                                  type="button"
+                                  className="text-red-600"
+                                  onClick={() =>
+                                    setAttachedFiles((prev) => prev.filter((_, i) => i !== index))
+                                  }
+                                >
+                                  {ui(locale, 'Quitar', 'Remover', 'Remove')}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    <div className="min-h-0 flex-1">
+                      <RichTextPane
+                        value={documentMarkdown}
+                        onChange={(next) => {
+                          setDocumentMarkdown(next);
+                          setDraftSaved(false);
+                        }}
+                        placeholder={
+                          stage === 'understand'
+                            ? ui(
+                                locale,
+                                'La lectura del edital aparece aquí, ya diagramada. La postulación solo después del botón al lado.',
+                                'A leitura do edital aparece aqui, já diagramada. A postulação só depois do botão ao lado.',
+                                'The call briefing appears here, laid out. Writing starts only after the button beside the chat.',
+                              )
+                            : ui(
+                                locale,
+                                'Escriba la candidatura. Títulos, negrita y listas en la barra de arriba — sin # ni *.',
+                                'Escreva a candidatura. Títulos, negrito e listas na barra acima — sem # nem *.',
+                                'Write the application. Use the toolbar for headings, bold and lists — no # or *.',
+                              )
+                        }
+                      />
+                    </div>
+                  </div>
                 )}
-              </div>
+              </>
             )}
-            <RichTextPane
-              value={documentMarkdown}
-              onChange={(next) => {
-                setDocumentMarkdown(next);
-                setDraftSaved(false);
-              }}
-              placeholder={
-                stage === 'understand'
-                  ? ui(
-                      locale,
-                      'La lectura del edital aparece aquí, ya diagramada. La postulación solo después del botón al lado.',
-                      'A leitura do edital aparece aqui, já diagramada. A postulação só depois do botão ao lado.',
-                      'The call briefing appears here, laid out. Writing starts only after the button beside the chat.',
-                    )
-                  : ui(
-                      locale,
-                      'Escriba la candidatura. Títulos, negrita y listas en la barra de arriba — sin # ni *.',
-                      'Escreva a candidatura. Títulos, negrito e listas na barra acima — sem # nem *.',
-                      'Write the application. Use the toolbar for headings, bold and lists — no # or *.',
-                    )
-              }
-            />
-          </section>
+          </aside>
         </div>
       )}
     </div>
