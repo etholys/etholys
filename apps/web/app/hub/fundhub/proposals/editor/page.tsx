@@ -246,7 +246,14 @@ export default function FundHubProposalEditorPage() {
   useEffect(() => {
     if (!workspaceId) {
       setLoading(false);
-      setError('Workspace não encontrado. Volte a Propostas.');
+      setError(
+        ui(
+          locale,
+          'Workspace no encontrado. Vuelva a Propuestas.',
+          'Workspace não encontrado. Volte a Propostas.',
+          'Workspace not found. Go back to Proposals.',
+        ),
+      );
       return;
     }
 
@@ -943,7 +950,14 @@ export default function FundHubProposalEditorPage() {
   const openInStudio = useCallback(async () => {
     const sections = sectionsFromMarkdown(documentMarkdown).filter((s) => s.title.trim() || s.content.trim());
     if (!sections.length) {
-      setError('Escreva no documento antes de abrir no Studio.');
+      setError(
+        ui(
+          locale,
+          'Escriba en el documento antes de abrir en Studio.',
+          'Escreva no documento antes de abrir no Studio.',
+          'Write in the document before opening in Studio.',
+        ),
+      );
       return;
     }
     setOpeningStudio(true);
@@ -954,27 +968,47 @@ export default function FundHubProposalEditorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source: 'fundhub_proposal',
-          title: fund?.name ? `Proposta · ${fund.name}` : 'Proposta',
+          title: fund?.name
+            ? `${ui(locale, 'Propuesta', 'Proposta', 'Proposal')} · ${fund.name}`
+            : ui(locale, 'Propuesta', 'Proposta', 'Proposal'),
           sections: sections.map((s) => ({ title: s.title, content: s.content })),
         }),
       });
       const d = (await r.json()) as { document?: { id: string }; error?: string };
-      if (!r.ok || !d.document?.id) throw new Error(d.error || 'Falha ao abrir no Studio');
+      if (!r.ok || !d.document?.id) {
+        throw new Error(
+          d.error ||
+            ui(locale, 'No se pudo abrir en Studio', 'Falha ao abrir no Studio', 'Could not open in Studio'),
+        );
+      }
       router.push(`/hub/studio/${d.document.id}`);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erro ao abrir no Studio');
+      setError(
+        e instanceof Error
+          ? e.message
+          : ui(locale, 'Error al abrir en Studio', 'Erro ao abrir no Studio', 'Error opening Studio'),
+      );
     } finally {
       setOpeningStudio(false);
     }
-  }, [documentMarkdown, fund, router]);
+  }, [documentMarkdown, fund, router, locale]);
 
   const submitProposal = useCallback(async () => {
     if (!documentMarkdown.trim()) {
-      setError('Escreva a proposta antes de marcar como enviada.');
+      setError(
+        ui(
+          locale,
+          'Escriba la propuesta antes de marcarla como enviada.',
+          'Escreva a proposta antes de marcar como enviada.',
+          'Write the proposal before marking it as submitted.',
+        ),
+      );
       return;
     }
     if (!workspaceId) {
-      setError('Workspace não identificado.');
+      setError(
+        ui(locale, 'Workspace no identificado.', 'Workspace não identificado.', 'Workspace not identified.'),
+      );
       return;
     }
     setIsSubmitting(true);
@@ -997,7 +1031,7 @@ export default function FundHubProposalEditorPage() {
             body: JSON.stringify({
               workspaceId,
               fundId: resolvedFundId,
-              title: fund?.name || 'Proposta',
+              title: fund?.name || ui(locale, 'Propuesta', 'Proposta', 'Proposal'),
               editalLink,
               editalSummary: intakeNotes,
               status: 'submitted',
@@ -1009,11 +1043,15 @@ export default function FundHubProposalEditorPage() {
             }),
           },
         );
-        if (!r.ok) throw new Error('Falha ao gravar no servidor');
+        if (!r.ok) {
+          throw new Error(
+            ui(locale, 'No se pudo guardar en el servidor', 'Falha ao gravar no servidor', 'Failed to save on server'),
+          );
+        }
       }
       setError(null);
     } catch {
-      setError('Erro ao enviar proposta.');
+      setError(ui(locale, 'Error al enviar la propuesta.', 'Erro ao enviar proposta.', 'Error submitting proposal.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -1029,6 +1067,7 @@ export default function FundHubProposalEditorPage() {
     chatMessages,
     stage,
     coalition,
+    locale,
   ]);
 
   const officialUrl = editalLink || fund?.linkOficial || '';
@@ -1318,7 +1357,7 @@ export default function FundHubProposalEditorPage() {
               {rfpChecklist.length > 0 && stage === 'understand' && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-900/80">
-                    {ui(locale, 'Checklist do edital', 'Checklist de la convocatoria', 'RFP checklist')}
+                    {ui(locale, 'Checklist de la convocatoria', 'Checklist do edital', 'RFP checklist')}
                   </p>
                   <ul className="mt-2 space-y-1">
                     {rfpChecklist.map((item) => (
@@ -1333,17 +1372,32 @@ export default function FundHubProposalEditorPage() {
                 <div className="rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-950">
                   <p className="flex items-center gap-2 font-medium">
                     <Loader2 className="h-4 w-4 animate-spin text-amber-700" />
-                    A ler a convocatória oficial…
+                    {ui(
+                      locale,
+                      'Leyendo la convocatoria oficial…',
+                      'A ler a convocatória oficial…',
+                      'Reading the official call…',
+                    )}
                   </p>
                   <p className="mt-1 text-xs text-amber-800/80">
-                    Página, anexos e bases — ainda sem chuva de ideias nem rascunho.
+                    {ui(
+                      locale,
+                      'Página, anexos y bases — aún sin lluvia de ideas ni borrador.',
+                      'Página, anexos e bases — ainda sem chuva de ideias nem rascunho.',
+                      'Page, annexes and guidelines — no brainstorm or draft yet.',
+                    )}
                   </p>
                 </div>
               )}
               {stage === 'understand' && chatMessages.some((m) => m.role === 'assistant') && !understanding && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
                   <p className="text-xs text-amber-950">
-                    Confirme a leitura. Só depois avance para escrever a candidatura.
+                    {ui(
+                      locale,
+                      'Confirme la lectura. Solo después avance a escribir la candidatura.',
+                      'Confirme a leitura. Só depois avance para escrever a candidatura.',
+                      'Confirm the briefing. Only then move on to writing the application.',
+                    )}
                   </p>
                   <button
                     type="button"
@@ -1351,7 +1405,7 @@ export default function FundHubProposalEditorPage() {
                     className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
                   >
                     <PenLine className="h-3.5 w-3.5" />
-                    Passar à postulação
+                    {ui(locale, 'Pasar a la postulación', 'Passar à postulação', 'Start writing')}
                   </button>
                 </div>
               )}
@@ -1363,7 +1417,9 @@ export default function FundHubProposalEditorPage() {
                   }`}
                 >
                   <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                    {message.role === 'assistant' ? 'IA' : 'Você'}
+                    {message.role === 'assistant'
+                      ? ui(locale, 'IA', 'IA', 'AI')
+                      : ui(locale, 'Tú', 'Você', 'You')}
                   </p>
                   <StudioMarkdown text={message.content} />
                   {message.role === 'assistant' && (
@@ -1372,14 +1428,15 @@ export default function FundHubProposalEditorPage() {
                       onClick={() => insertIntoDocument(message.content)}
                       className="mt-2 text-xs font-medium text-amber-800 hover:underline"
                     >
-                      Inserir no documento
+                      {ui(locale, 'Insertar en el documento', 'Inserir no documento', 'Insert into document')}
                     </button>
                   )}
                 </div>
               ))}
               {chatLoading && (
                 <p className="flex items-center gap-2 text-xs text-gray-500">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> A escrever…
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />{' '}
+                  {ui(locale, 'Escribiendo…', 'A escrever…', 'Writing…')}
                 </p>
               )}
               <div ref={chatEndRef} />
@@ -1435,8 +1492,13 @@ export default function FundHubProposalEditorPage() {
                   >
                     <Paperclip className="h-3.5 w-3.5" />
                     {attachedFiles.length
-                      ? ui(locale, `Anexos (${attachedFiles.length})`, `Anexos (${attachedFiles.length})`, `Files (${attachedFiles.length})`)
-                      : ui(locale, 'Anexar', 'Anexar', 'Attach')}
+                      ? ui(
+                          locale,
+                          `Anexos (${attachedFiles.length})`,
+                          `Anexos (${attachedFiles.length})`,
+                          `Files (${attachedFiles.length})`,
+                        )
+                      : ui(locale, 'Adjuntar', 'Anexar', 'Attach')}
                   </button>
                   <button
                     type="button"
@@ -1472,7 +1534,9 @@ export default function FundHubProposalEditorPage() {
           <section className="flex h-[70vh] min-h-[22rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white lg:h-full">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
               <p className="text-sm font-semibold text-gray-900">
-                {stage === 'understand' ? 'Notas do edital' : 'Documento'}
+                {stage === 'understand'
+                  ? ui(locale, 'Notas del edital', 'Notas do edital', 'Call notes')
+                  : ui(locale, 'Documento', 'Documento', 'Document')}
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -1481,7 +1545,8 @@ export default function FundHubProposalEditorPage() {
                   className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900"
                 >
                   <Paperclip className="h-3.5 w-3.5" />
-                  Anexos{attachedFiles.length ? ` (${attachedFiles.length})` : ''}
+                  {ui(locale, 'Anexos', 'Anexos', 'Files')}
+                  {attachedFiles.length ? ` (${attachedFiles.length})` : ''}
                 </button>
               </div>
             </div>
@@ -1489,7 +1554,7 @@ export default function FundHubProposalEditorPage() {
               <div className="border-b border-gray-100 px-4 py-3 text-xs">
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 hover:bg-gray-50">
                   <Paperclip className="h-3.5 w-3.5" />
-                  Anexar
+                  {ui(locale, 'Adjuntar', 'Anexar', 'Attach')}
                   <input type="file" multiple className="hidden" onChange={handleAttachFile} />
                 </label>
                 {attachedFiles.length > 0 && (
@@ -1502,7 +1567,7 @@ export default function FundHubProposalEditorPage() {
                           className="text-red-600"
                           onClick={() => setAttachedFiles((prev) => prev.filter((_, i) => i !== index))}
                         >
-                          Remover
+                          {ui(locale, 'Quitar', 'Remover', 'Remove')}
                         </button>
                       </li>
                     ))}
@@ -1518,8 +1583,18 @@ export default function FundHubProposalEditorPage() {
               }}
               placeholder={
                 stage === 'understand'
-                  ? 'A leitura do edital aparece aqui, já diagramada. A postulação só depois do botão ao lado.'
-                  : 'Escreva a candidatura. Títulos, negrito e listas na barra acima — sem # nem *.'
+                  ? ui(
+                      locale,
+                      'La lectura del edital aparece aquí, ya diagramada. La postulación solo después del botón al lado.',
+                      'A leitura do edital aparece aqui, já diagramada. A postulação só depois do botão ao lado.',
+                      'The call briefing appears here, laid out. Writing starts only after the button beside the chat.',
+                    )
+                  : ui(
+                      locale,
+                      'Escriba la candidatura. Títulos, negrita y listas en la barra de arriba — sin # ni *.',
+                      'Escreva a candidatura. Títulos, negrito e listas na barra acima — sem # nem *.',
+                      'Write the application. Use the toolbar for headings, bold and lists — no # or *.',
+                    )
               }
             />
           </section>
