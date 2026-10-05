@@ -8,6 +8,7 @@ import { signOut, useSession } from 'next-auth/react';
 import {
   ChevronDown,
   Compass,
+  Globe,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
@@ -25,6 +26,7 @@ import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { cn, getInitials } from '@/lib/utils';
 import { sysTheme, type SystemAccent } from '@/lib/system-shell';
 import { ETHOLYS_PRODUCTS, type EtholysProductId } from '@/lib/etholys-products';
+import type { Locale } from '@/lib/i18n';
 
 type Nav = { href: string; label: string; requiresAttended?: boolean };
 
@@ -52,7 +54,7 @@ export function ProductAppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { locale, activeCompanyId, setActiveCompanyId } = useApp();
+  const { locale, setLocale, activeCompanyId, setActiveCompanyId } = useApp();
   const { data: session, status } = useSession();
   const { companies, companiesReady, companiesLoadError, reloadCompanies, companyId: ensuredId } =
     useEnsureActiveCompany();
@@ -63,6 +65,11 @@ export function ProductAppShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const Icon = PRODUCT_ICON[product];
+
+  const cycleLocale = () => {
+    const next: Locale = locale === 'es' ? 'pt' : locale === 'pt' ? 'en' : 'es';
+    setLocale(next);
+  };
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/login');
@@ -192,6 +199,19 @@ export function ProductAppShell({
 
           <div className={cn('flex-shrink-0 border-t border-white/10', collapsed ? 'p-1.5' : 'p-3')}>
             <AppearanceToggle collapsed={collapsed} className="mb-1" />
+            <button
+              type="button"
+              onClick={cycleLocale}
+              title={loc === 'es' ? 'Idioma' : loc === 'en' ? 'Language' : 'Idioma'}
+              className={cn(
+                'mb-1 flex items-center rounded-lg text-xs text-white/45 transition hover:bg-white/5 hover:text-white',
+                collapsed ? 'w-full justify-center p-2' : 'w-full gap-2 px-2.5 py-1.5',
+              )}
+            >
+              <Globe className="h-3.5 w-3.5 shrink-0" />
+              {!collapsed && <span className="truncate">{(locale || 'es').toUpperCase()}</span>}
+              {collapsed && <span className="sr-only">{(locale || 'es').toUpperCase()}</span>}
+            </button>
             {!collapsed ? (
               <div className="flex items-center gap-3 px-3 py-2">
                 <div

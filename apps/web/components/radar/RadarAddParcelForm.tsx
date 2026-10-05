@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { Loader2, MapPinned, Plus } from 'lucide-react';
 import type { RadarCrop } from '@/lib/radar/site-layout';
-import { spaceKindMeta, type Loc } from '@/lib/radar/space';
+import { spaceKindMeta } from '@/lib/radar/space';
+import { radarLoc, radarT } from '@/lib/radar/i18n';
 
 export function RadarAddParcelForm({
   locale,
@@ -22,7 +23,7 @@ export function RadarAddParcelForm({
   compact?: boolean;
   moduleId?: string | null;
 }) {
-  const loc: Loc = locale === 'es' || locale === 'en' ? locale : 'pt';
+  const loc = radarLoc(locale);
   const meta = spaceKindMeta(moduleId);
   const [name, setName] = useState('');
   const [crop, setCrop] = useState('');
@@ -57,7 +58,7 @@ export function RadarAddParcelForm({
       <div className="flex items-center gap-2">
         <MapPinned className="h-4 w-4 text-emerald-200" />
         <p className="text-sm font-semibold text-emerald-50">
-          {loc === 'en' ? `New ${meta.unitLabel.en.toLowerCase()}` : `Nova ${meta.unitLabel[loc].toLowerCase()}`}
+          {radarT(loc, `Nova ${meta.unitLabel.pt.toLowerCase()}`, `Nueva ${meta.unitLabel.es.toLowerCase()}`, `New ${meta.unitLabel.en.toLowerCase()}`)}
         </p>
       </div>
       <p className="mt-1 text-xs text-white/50">{meta.hint[loc]}</p>
@@ -109,11 +110,11 @@ export function RadarAddParcelForm({
           className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-[#04110c] disabled:opacity-40"
         >
           {localBusy || busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          {loc === 'en' ? 'Add to map' : 'Adicionar ao mapa'}
+          {radarT(loc, 'Adicionar ao mapa', 'Agregar al mapa', 'Add to map')}
         </button>
         {onCancel && (
           <button type="button" onClick={onCancel} className="rounded-xl px-3 py-2 text-sm text-white/55">
-            {loc === 'en' ? 'Cancel' : 'Cancelar'}
+            {radarT(loc, 'Cancelar', 'Cancelar', 'Cancel')}
           </button>
         )}
       </div>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, Loader2, Radio, Sprout } from 'lucide-react';
 import { RADAR_MODULES, type RadarModuleId } from '@/lib/etholys-products';
 import { isRadarModuleId, spaceKindMeta } from '@/lib/radar/space';
+import { radarLoc, radarT } from '@/lib/radar/i18n';
 import type { PropertyStepId, PropertyStepState } from '@/lib/radar/property-progress';
 import { RadarProgressRail } from '@/components/radar/RadarProgressRail';
 import { RadarGeoPin } from '@/components/radar/RadarGeoPin';
@@ -49,7 +50,7 @@ export function RadarPropertyWorkspace({
   locale: string;
   backHref: string;
 }) {
-  const loc: Loc = locale === 'es' || locale === 'en' ? locale : 'pt';
+  const loc = radarLoc(locale);
   const [data, setData] = useState<PropertyDetail | null>(null);
   const [step, setStep] = useState<PropertyStepId>('characterize');
   const [loading, setLoading] = useState(true);
@@ -190,13 +191,14 @@ export function RadarPropertyWorkspace({
 
       {showOperate ? (
         <div className="space-y-6">
-          <RadarSiteMap
-            companyId={companyId}
-            engagementId={engagementId}
-            propertyId={propertyId}
-            locale={loc}
-            mode="ops"
-            parcels={mapParcels}
+                  <RadarSiteMap
+                    companyId={companyId}
+                    engagementId={engagementId}
+                    propertyId={propertyId}
+                    locale={loc}
+                    moduleId={data.moduleId}
+                    mode="ops"
+                    parcels={mapParcels}
             sensors={data.sensors.map((s) => ({
               id: s.id,
               name: s.name,
@@ -342,7 +344,7 @@ export function RadarPropertyWorkspace({
               className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-[#04110c] disabled:opacity-40"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sprout className="h-4 w-4" />}
-              {loc === 'en' ? 'Save & continue' : 'Guardar e continuar'}
+              {radarT(loc, 'Guardar e continuar', 'Guardar y continuar', 'Save & continue')}
             </button>
           </div>
         )}
@@ -402,6 +404,7 @@ export function RadarPropertyWorkspace({
                   engagementId={engagementId}
                   propertyId={propertyId}
                   locale={loc}
+                  moduleId={data.moduleId}
                   mode="empresa"
                   parcels={mapParcels}
                   sensors={data.sensors.map((s) => ({

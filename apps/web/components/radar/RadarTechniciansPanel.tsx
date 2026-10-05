@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Plus, UserCog } from 'lucide-react';
 import { useRadarClientScopeOptional } from '@/components/radar/RadarClientScopeContext';
+import { radarLoc, radarT } from '@/lib/radar/i18n';
 
-type Loc = 'pt' | 'es' | 'en';
-
-type Employee = { userId: string; name: string | null; email: string; alreadyTechnician: boolean };
 type Tech = {
   id: string;
   userId: string;
@@ -16,6 +14,7 @@ type Tech = {
   canCreateClients: boolean;
   scopes: { id: string; clientId: string | null; clientName: string | null; propertyId: string | null; propertyName: string | null }[];
 };
+type Employee = { userId: string; name: string | null; email: string; alreadyTechnician: boolean };
 type ClientOpt = { id: string; name: string };
 type PropOpt = { id: string; name: string; clientId: string | null };
 
@@ -28,7 +27,7 @@ export function RadarTechniciansPanel({
   engagementId?: string | null;
   locale: string;
 }) {
-  const loc: Loc = locale === 'es' || locale === 'en' ? locale : 'pt';
+  const loc = radarLoc(locale);
   const scopeCtx = useRadarClientScopeOptional();
   const clientsFromScope = scopeCtx?.clients || [];
 
@@ -123,7 +122,7 @@ export function RadarTechniciansPanel({
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/40">
-          {loc === 'en' ? 'Technicians' : 'Técnicos'}
+          {radarT(loc, 'Técnicos', 'Técnicos', 'Technicians')}
         </h2>
         <button
           type="button"
@@ -131,7 +130,7 @@ export function RadarTechniciansPanel({
           className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-xs text-emerald-200"
         >
           <Plus className="h-3.5 w-3.5" />
-          {loc === 'en' ? 'Add from staff' : 'Adicionar da equipa'}
+          {radarT(loc, 'Adicionar da equipa', 'Agregar del equipo', 'Add from staff')}
         </button>
       </div>
 
@@ -144,7 +143,7 @@ export function RadarTechniciansPanel({
             onChange={(e) => setUserId(e.target.value)}
             className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
           >
-            <option value="">{loc === 'en' ? 'Pick employee…' : 'Escolher funcionário…'}</option>
+            <option value="">{radarT(loc, 'Escolher funcionário…', 'Elegir empleado…', 'Pick employee…')}</option>
             {employees
               .filter((e) => !e.alreadyTechnician)
               .map((e) => (
@@ -155,16 +154,16 @@ export function RadarTechniciansPanel({
           </select>
           <label className="flex items-center gap-2 text-xs text-white/70">
             <input type="checkbox" checked={canSeeAll} onChange={(e) => setCanSeeAll(e.target.checked)} />
-            {loc === 'en' ? 'See full portfolio' : 'Ver toda a carteira'}
+            {radarT(loc, 'Ver toda a carteira', 'Ver toda la cartera', 'See full portfolio')}
           </label>
           <label className="flex items-center gap-2 text-xs text-white/70">
             <input type="checkbox" checked={canCreateClients} onChange={(e) => setCanCreateClients(e.target.checked)} />
-            {loc === 'en' ? 'Can create clients' : 'Pode criar clientes'}
+            {radarT(loc, 'Pode criar clientes', 'Puede crear clientes', 'Can create clients')}
           </label>
           {!canSeeAll && (
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <p className="mb-1 text-[10px] uppercase text-white/40">{loc === 'en' ? 'Clients (bulk)' : 'Clientes (escala)'}</p>
+                <p className="mb-1 text-[10px] uppercase text-white/40">{radarT(loc, 'Clientes (escala)', 'Clientes (escala)', 'Clients (bulk)')}</p>
                 <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-white/10 p-2">
                   {clients.map((c) => (
                     <label key={c.id} className="flex items-center gap-2 text-xs text-white/70">
@@ -180,7 +179,7 @@ export function RadarTechniciansPanel({
                 </div>
               </div>
               <div>
-                <p className="mb-1 text-[10px] uppercase text-white/40">{loc === 'en' ? 'Properties' : 'Propriedades'}</p>
+                <p className="mb-1 text-[10px] uppercase text-white/40">{radarT(loc, 'Propriedades', 'Propiedades', 'Properties')}</p>
                 <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-white/10 p-2">
                   {properties.map((p) => (
                     <label key={p.id} className="flex items-center gap-2 text-xs text-white/70">
@@ -190,7 +189,7 @@ export function RadarTechniciansPanel({
                         onChange={() => toggleId(propertyIds, p.id, setPropertyIds)}
                       />
                       {p.name}
-                      {!p.clientId ? ' · própria' : ''}
+                      {!p.clientId ? ` · ${radarT(loc, 'própria', 'propia', 'own')}` : ''}
                     </label>
                   ))}
                 </div>
@@ -204,7 +203,7 @@ export function RadarTechniciansPanel({
             className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-[#04110c] disabled:opacity-40"
           >
             {busy ? <Loader2 className="inline h-4 w-4 animate-spin" /> : null}{' '}
-            {loc === 'en' ? 'Save technician' : 'Guardar técnico'}
+            {radarT(loc, 'Guardar técnico', 'Guardar técnico', 'Save technician')}
           </button>
         </div>
       )}
@@ -224,18 +223,14 @@ export function RadarTechniciansPanel({
                   <p className="text-sm font-medium text-white">{t.name || t.email}</p>
                   <p className="text-[11px] text-white/40">
                     {t.canSeeAll
-                      ? loc === 'en'
-                        ? 'Full portfolio'
-                        : 'Carteira completa'
+                      ? radarT(loc, 'Carteira completa', 'Cartera completa', 'Full portfolio')
                       : t.scopes.length
                         ? t.scopes
                             .map((s) => s.clientName || s.propertyName)
                             .filter(Boolean)
                             .join(', ')
-                        : loc === 'en'
-                          ? 'No assignments yet'
-                          : 'Sem atribuições'}
-                    {t.canCreateClients ? (loc === 'en' ? ' · can create clients' : ' · cria clientes') : ''}
+                        : radarT(loc, 'Sem atribuições', 'Sin asignaciones', 'No assignments yet')}
+                    {t.canCreateClients ? radarT(loc, ' · cria clientes', ' · crea clientes', ' · can create clients') : ''}
                   </p>
                 </div>
               </div>

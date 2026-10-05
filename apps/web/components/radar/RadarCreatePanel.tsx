@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, X } from 'lucide-react';
 import { useRadarClientScope } from '@/components/radar/RadarClientScopeContext';
 import { RADAR_SCOPE_ALL, RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
+import { radarLoc, radarT } from '@/lib/radar/i18n';
 
 const MODULES = [
   { id: 'agriculture', label: { pt: 'Agricultura', es: 'Agricultura', en: 'Agriculture' } },
@@ -16,7 +17,7 @@ const MODULES = [
 type AuroraOpt = { id: string; name: string };
 
 export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
-  const loc = locale === 'es' || locale === 'en' ? locale : 'pt';
+  const loc = radarLoc(locale);
   const router = useRouter();
   const {
     companyId,
@@ -158,16 +159,8 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
   };
 
   const title = isClient
-    ? loc === 'es'
-      ? 'Registrar cliente'
-      : loc === 'en'
-        ? 'Register client'
-        : 'Cadastrar cliente'
-    : loc === 'es'
-      ? 'Nuevo espacio'
-      : loc === 'en'
-        ? 'New space'
-        : 'Novo espaço';
+    ? radarT(loc, 'Cadastrar cliente', 'Registrar cliente', 'Register client')
+    : radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space');
 
   return (
     <div className="mb-6 rounded-[1.35rem] border border-emerald-400/30 bg-emerald-500/10 px-5 py-5">
@@ -188,7 +181,7 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
             onClick={() => setClientMode('new')}
             className={`rounded-lg px-3 py-1.5 text-xs ${clientMode === 'new' ? 'bg-emerald-500 text-[#04110c] font-semibold' : 'text-white/60'}`}
           >
-            {loc === 'en' ? 'New' : 'Novo'}
+            {radarT(loc, 'Novo', 'Nuevo', 'New')}
           </button>
           <button
             type="button"
@@ -207,7 +200,7 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
             onChange={(e) => setLinkedCompanyId(e.target.value)}
             className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
           >
-            <option value="">{loc === 'en' ? 'Pick AURORA company…' : 'Escolher empresa AURORA…'}</option>
+            <option value="">{radarT(loc, 'Escolher empresa AURORA…', 'Elegir empresa AURORA…', 'Pick AURORA company…')}</option>
             {auroraOpts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
@@ -220,12 +213,8 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
             onChange={(e) => setName(e.target.value)}
             placeholder={
               isClient
-                ? loc === 'en'
-                  ? 'Client name'
-                  : 'Nome do cliente'
-                : loc === 'en'
-                  ? 'Space name'
-                  : 'Nome do espaço'
+                ? radarT(loc, 'Nome do cliente', 'Nombre del cliente', 'Client name')
+                : radarT(loc, 'Nome do espaço', 'Nombre del espacio', 'Space name')
             }
             className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
             autoFocus
@@ -236,20 +225,23 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
             <input
               value={contact}
               onChange={(e) => setContact(e.target.value)}
-              placeholder={loc === 'en' ? 'Contact (optional)' : 'Contacto (opcional)'}
+              placeholder={radarT(loc, 'Contacto (opcional)', 'Contacto (opcional)', 'Contact (optional)')}
               className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
             />
             <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder={loc === 'en' ? 'Phone (optional)' : 'Telefone (opcional)'}
+              placeholder={radarT(loc, 'Telefone (opcional)', 'Teléfono (opcional)', 'Phone (optional)')}
               className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
             />
             {clientMode === 'aurora' && auroraOpts.length === 0 && (
               <p className="sm:col-span-2 text-xs text-white/45">
-                {loc === 'en'
-                  ? 'No ATER companies found for this operator. Create a new client instead.'
-                  : 'Sem empresas ATER ligadas. Cria um cliente novo.'}
+                {radarT(
+                  loc,
+                  'Sem empresas ATER ligadas. Cria um cliente novo.',
+                  'Sin empresas ATER vinculadas. Creá un cliente nuevo.',
+                  'No ATER companies found. Create a new client instead.',
+                )}
               </p>
             )}
           </>
@@ -261,7 +253,7 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
                 onChange={(e) => setLinkClientId(e.target.value)}
                 className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
               >
-                <option value="own">{loc === 'en' ? 'My operation (no client)' : 'Minha operação (sem cliente)'}</option>
+                <option value="own">{radarT(loc, 'Minha operação (sem cliente)', 'Mi operación (sin cliente)', 'My operation (no client)')}</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -295,15 +287,11 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {isClient
-            ? loc === 'en'
-              ? 'Create client'
-              : 'Criar cliente'
-            : loc === 'en'
-              ? 'Create & open'
-              : 'Criar e abrir'}
+            ? radarT(loc, 'Criar cliente', 'Crear cliente', 'Create client')
+            : radarT(loc, 'Criar e abrir', 'Crear y abrir', 'Create & open')}
         </button>
         <button type="button" onClick={close} className="rounded-xl px-4 py-2.5 text-sm text-white/60">
-          {loc === 'en' ? 'Cancel' : 'Cancelar'}
+          {radarT(loc, 'Cancelar', 'Cancelar', 'Cancel')}
         </button>
       </div>
     </div>

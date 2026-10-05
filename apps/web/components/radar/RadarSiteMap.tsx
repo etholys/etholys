@@ -9,8 +9,10 @@ import {
   type RadarSiteLayoutDoc,
   type RadarSpaceRect,
 } from '@/lib/radar/site-layout';
+import { spaceKindMeta } from '@/lib/radar/space';
+import { radarLoc, radarT, type RadarLoc } from '@/lib/radar/i18n';
 
-type Loc = 'pt' | 'es' | 'en';
+type Loc = RadarLoc;
 
 export type MapParcel = {
   id: string;
@@ -30,50 +32,36 @@ export type MapSensor = {
   lastValue: number | null;
 };
 
-const COPY = {
-  pt: {
-    plant: 'Planta',
-    arrange: 'Arrastar para organizar · canto para redimensionar',
-    save: 'Guardar planta',
-    saving: 'A guardar…',
-    saved: 'Planta guardada',
-    emptyTitle: 'Ainda sem parcelas no mapa',
-    emptyBody: 'Cria a primeira parcela — um pedaço de terra para cultivar — e ela aparece aqui.',
-    emptyCta: 'Nova parcela',
-    addParcel: 'Nova parcela',
-    focus: 'Em foco',
-    moisture: 'Humidade',
-    sensor: 'Sensor',
-  },
-  es: {
-    plant: 'Planta',
-    arrange: 'Arrastrar para organizar · esquina para redimensionar',
-    save: 'Guardar planta',
-    saving: 'Guardando…',
-    saved: 'Planta guardada',
-    emptyTitle: 'Aún sin parcelas en el mapa',
-    emptyBody: 'Creá la primera parcela — un pedazo de tierra para cultivar — y aparece aquí.',
-    emptyCta: 'Nueva parcela',
-    addParcel: 'Nueva parcela',
-    focus: 'En foco',
-    moisture: 'Humedad',
-    sensor: 'Sensor',
-  },
-  en: {
-    plant: 'Plant map',
-    arrange: 'Drag to arrange · corner to resize',
-    save: 'Save layout',
-    saving: 'Saving…',
-    saved: 'Layout saved',
-    emptyTitle: 'No parcels on the map yet',
-    emptyBody: 'Create the first parcel — a piece of land to cultivate — and it appears here.',
-    emptyCta: 'New parcel',
-    addParcel: 'New parcel',
-    focus: 'Focused',
-    moisture: 'Moisture',
-    sensor: 'Sensor',
-  },
-} as const;
+function mapCopy(loc: Loc, moduleId?: string | null) {
+  const kind = spaceKindMeta(moduleId);
+  const unit = kind.unitLabel[loc].toLowerCase();
+  const unitCap = kind.unitLabel[loc];
+  return {
+    plant: kind.drawTitle[loc],
+    arrange: radarT(
+      loc,
+      'Arrastar para organizar · canto para redimensionar',
+      'Arrastrar para organizar · esquina para redimensionar',
+      'Drag to arrange · corner to resize',
+    ),
+    save: radarT(loc, 'Guardar planta', 'Guardar planta', 'Save layout'),
+    saving: radarT(loc, 'A guardar…', 'Guardando…', 'Saving…'),
+    saved: radarT(loc, 'Planta guardada', 'Planta guardada', 'Layout saved'),
+    emptyTitle: radarT(
+      loc,
+      `Ainda sem ${kind.unitLabelPlural.pt.toLowerCase()} no mapa`,
+      `Aún sin ${kind.unitLabelPlural.es.toLowerCase()} en el mapa`,
+      `No ${kind.unitLabelPlural.en.toLowerCase()} on the map yet`,
+    ),
+    emptyBody: kind.hint[loc],
+    emptyCta: radarT(loc, `Nova ${unit}`, `Nueva ${unit}`, `New ${kind.unitLabel.en.toLowerCase()}`),
+    addParcel: radarT(loc, `Nova ${unit}`, `Nueva ${unit}`, `New ${kind.unitLabel.en.toLowerCase()}`),
+    focus: radarT(loc, 'Em foco', 'En foco', 'Focused'),
+    moisture: radarT(loc, 'Humidade', 'Humedad', 'Moisture'),
+    sensor: radarT(loc, 'Sensor', 'Sensor', 'Sensor'),
+    unitCap,
+  };
+}
 
 function actionTone(action: ParcelAction, harvestBlocked: boolean, moisture: number | null) {
   if (action === 'irrigate' || action === 'hold_harvest' || harvestBlocked) return 'critical' as const;
@@ -95,10 +83,10 @@ function tileClasses(tone: 'ok' | 'warn' | 'critical', focused: boolean, dimmed:
 }
 
 function labelAction(action: ParcelAction, loc: Loc) {
-  if (action === 'irrigate') return loc === 'es' ? 'Irrigar' : loc === 'en' ? 'Irrigate' : 'Irrigar';
-  if (action === 'hold_harvest') return loc === 'es' ? 'No cosechar' : loc === 'en' ? 'Hold' : 'Não colher';
-  if (action === 'scout') return loc === 'es' ? 'Recorrer' : loc === 'en' ? 'Walk' : 'Percorrer';
-  if (action === 'await_signal') return loc === 'es' ? 'Escuchar' : loc === 'en' ? 'Listen' : 'Ouvir';
+  if (action === 'irrigate') return radarT(loc, 'Irrigar', 'Irrigar', 'Irrigate');
+  if (action === 'hold_harvest') return radarT(loc, 'Não colher', 'No cosechar', 'Hold');
+  if (action === 'scout') return radarT(loc, 'Percorrer', 'Recorrer', 'Walk');
+  if (action === 'await_signal') return radarT(loc, 'Ouvir', 'Escuchar', 'Listen');
   return 'OK';
 }
 
@@ -107,6 +95,8 @@ type Props = {
   engagementId?: string | null;
   propertyId?: string | null;
   locale: string;
+  /** agriculture | agroindustry | livestock | carbon — drives empty-state vocabulary */
+  moduleId?: string | null;
   parcels: MapParcel[];
   sensors: MapSensor[];
   focusedId: string | null;
@@ -123,6 +113,7 @@ export function RadarSiteMap({
   engagementId,
   propertyId,
   locale,
+  moduleId,
   parcels,
   sensors,
   focusedId,
@@ -131,9 +122,9 @@ export function RadarSiteMap({
   onSaved,
   onRequestAddParcel,
 }: Props) {
-  const loc: Loc = locale === 'es' || locale === 'en' ? locale : 'pt';
+  const loc = radarLoc(locale);
   const canEdit = mode === 'ops' || mode === 'empresa';
-  const copy = COPY[loc];
+  const copy = mapCopy(loc, moduleId);
   const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);

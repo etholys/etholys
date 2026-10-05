@@ -331,6 +331,7 @@ export function RadarOpsView({
         companyId={companyId}
         engagementId={engagementId}
         locale={loc}
+        moduleId="agriculture"
         mode="ops"
         parcels={parcels}
         sensors={mapSensors}
