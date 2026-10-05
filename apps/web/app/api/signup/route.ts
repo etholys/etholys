@@ -26,29 +26,63 @@ export async function POST(req: Request) {
       );
     }
 
+    const emailNorm = String(email).trim().toLowerCase();
     const existing = await prisma.user.findUnique({
-      where: { email: String(email).trim().toLowerCase() },
+      where: { email: emailNorm },
     });
-    if (existing) {
-      return NextResponse.json({ error: 'El email ya está registrado' }, { status: 400 });
-    }
 
     let invitation: Awaited<ReturnType<typeof prisma.invitation.findUnique>> = null;
-
     if (code) {
       invitation = await prisma.invitation.findUnique({ where: { code } });
-      if (!invitation || invitation.status !== 'pending') {
+      if (!invitation) {
         return NextResponse.json({ error: 'Código de convite inválido ou já usado.' }, { status: 400 });
+      }
+      if (invitation.email.toLowerCase() !== emailNorm) {
+        return NextResponse.json(
+          { error: 'Este código fue enviado a otro email.' },
+          { status: 403 },
+        );
       }
       if (invitation.expiresAt && new Date() > invitation.expiresAt) {
         return NextResponse.json({ error: 'Este convite expirou.' }, { status: 400 });
       }
     }
 
+    if (existing) {
+      if (invitation) {
+        const alreadyMember = await prisma.companyUser.findFirst({
+          where: { userId: existing.id, companyId: invitation.companyId },
+          select: { id: true },
+        });
+        if (invitation.status === 'accepted' || alreadyMember) {
+          return NextResponse.json(
+            {
+              error:
+                'Ya tienes cuenta y acceso. Inicia sesión (no te registres de nuevo).',
+              code: 'ALREADY_MEMBER',
+            },
+            { status: 400 },
+          );
+        }
+      }
+      return NextResponse.json(
+        {
+          error:
+            'El email ya está registrado. Inicia sesión e introduce el código de invitación.',
+          code: 'EMAIL_EXISTS',
+        },
+        { status: 400 },
+      );
+    }
+
+    if (code && (!invitation || invitation.status !== 'pending')) {
+      return NextResponse.json({ error: 'Código de convite inválido ou já usado.' }, { status: 400 });
+    }
+
     const hashed = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: {
-        email: String(email).trim().toLowerCase(),
+        email: emailNorm,
         password: hashed,
         name: String(name).trim(),
         role: 'COLLABORATOR',

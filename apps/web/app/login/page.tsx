@@ -26,7 +26,8 @@ function LoginContent() {
     // fallback: produção pública Etholys
     (typeof window !== 'undefined' && window.location.hostname.includes('etholys.com'));
 
-  const [isLogin, setIsLogin] = useState(!inviteFromUrl);
+  // Com código na URL: preferir login — quem já tem conta (ex. outro escritório) não deve cair em «Registrarse».
+  const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,9 +43,16 @@ function LoginContent() {
   useEffect(() => {
     if (inviteFromUrl) {
       setForm((f) => ({ ...f, inviteCode: inviteFromUrl }));
-      setIsLogin(false);
+      setIsLogin(true);
+      setSuccess(
+        locale === 'es'
+          ? 'Si ya tienes cuenta Etholys, inicia sesión. El código se aplicará al entrar.'
+          : locale === 'pt'
+            ? 'Se já tem conta Etholys, entre. O código será aplicado ao iniciar sessão.'
+            : 'If you already have an Etholys account, sign in. The code will be applied after login.',
+      );
     }
-  }, [inviteFromUrl]);
+  }, [inviteFromUrl, locale]);
 
   // Handle NextAuth error redirects (e.g. from Google SSO failures)
   useEffect(() => {
@@ -74,6 +82,25 @@ function LoginContent() {
     }
   }, [searchParams, locale]);
 
+  const goAfterAuth = async () => {
+    const code = form.inviteCode.trim();
+    if (code) {
+      try {
+        await fetch('/api/invitations', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+      } catch {
+        /* convite já aceite ou inválido — seguir para o Hub */
+      }
+    }
+    const entry = await fetch('/api/workspace/entry-route', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : { href: '/hub' }))
+      .catch(() => ({ href: '/hub' }));
+    router.replace(typeof entry?.href === 'string' ? entry.href : '/hub');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -81,12 +108,12 @@ function LoginContent() {
     try {
       if (isLogin) {
         const res = await signIn('credentials', { redirect: false, email: form.email, password: form.password });
-        if (res?.error) { setError(locale === 'es' ? 'Credenciales inv\u00e1lidas' : locale === 'pt' ? 'Credenciais inv\u00e1lidas' : 'Invalid credentials'); }
-        else {
-          const entry = await fetch('/api/workspace/entry-route', { cache: 'no-store' })
-            .then((r) => (r.ok ? r.json() : { href: '/hub' }))
-            .catch(() => ({ href: '/hub' }));
-          router.replace(typeof entry?.href === 'string' ? entry.href : '/hub');
+        if (res?.error) {
+          setError(
+            locale === 'es' ? 'Credenciales inválidas' : locale === 'pt' ? 'Credenciais inválidas' : 'Invalid credentials',
+          );
+        } else {
+          await goAfterAuth();
         }
       } else {
         const res = await fetch('/api/signup', {
@@ -94,21 +121,40 @@ function LoginContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(form),
         });
+        const data = await res.json().catch(() => ({} as { error?: string; code?: string }));
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setError(data?.error || 'Error al registrar');
+          if (data?.code === 'EMAIL_EXISTS' || data?.code === 'ALREADY_MEMBER') {
+            setIsLogin(true);
+            setSuccess(
+              data.code === 'ALREADY_MEMBER'
+                ? locale === 'es'
+                  ? 'Ya tienes acceso. Inicia sesión con tu contraseña.'
+                  : locale === 'pt'
+                    ? 'Já tem acesso. Entre com a sua senha.'
+                    : 'You already have access. Sign in with your password.'
+                : locale === 'es'
+                  ? 'Esa cuenta ya existe. Inicia sesión; el código se aplicará al entrar.'
+                  : locale === 'pt'
+                    ? 'Essa conta já existe. Entre; o código será aplicado ao iniciar sessão.'
+                    : 'That account already exists. Sign in; the code will be applied after login.',
+            );
+            setError('');
+          } else {
+            setError(data?.error || 'Error al registrar');
+          }
         } else {
-          const signInRes = await signIn('credentials', { redirect: false, email: form.email, password: form.password });
+          const signInRes = await signIn('credentials', {
+            redirect: false,
+            email: form.email,
+            password: form.password,
+          });
           if (!signInRes?.error) {
-            const entry = await fetch('/api/workspace/entry-route', { cache: 'no-store' })
-              .then((r) => (r.ok ? r.json() : { href: '/hub' }))
-              .catch(() => ({ href: '/hub' }));
-            router.replace(typeof entry?.href === 'string' ? entry.href : '/hub');
+            await goAfterAuth();
           }
         }
       }
-    } catch (err: any) {
-      setError(err?.message ?? 'Error inesperado');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
       setLoading(false);
     }
@@ -116,8 +162,10 @@ function LoginContent() {
 
   const handleGoogleSignIn = () => {
     setGoogleLoading(true);
-    // Pós-login: entry-route decide hub vs função (não forçar /hub)
-    signIn('google', { redirect: true, callbackUrl: '/' });
+    const cb = form.inviteCode.trim()
+      ? `/?invite=${encodeURIComponent(form.inviteCode.trim())}`
+      : '/';
+    signIn('google', { redirect: true, callbackUrl: cb });
   };
 
   const features = locale === 'es'
@@ -260,35 +308,41 @@ function LoginContent() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{tr('auth.name')}</label>
-                  <input type="text" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {locale === 'es'
-                      ? 'Código de invitación (obligatorio)'
-                      : locale === 'pt'
-                        ? 'Código de convite (obrigatório)'
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{tr('auth.name')}</label>
+                <input type="text" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition" />
+              </div>
+            )}
+            {(form.inviteCode || !isLogin) && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {locale === 'es'
+                    ? isLogin
+                      ? 'Código de invitación'
+                      : 'Código de invitación (obligatorio)'
+                    : locale === 'pt'
+                      ? isLogin
+                        ? 'Código de convite'
+                        : 'Código de convite (obrigatório)'
+                      : isLogin
+                        ? 'Invitation code'
                         : 'Invitation code (required)'}
-                  </label>
-                  <input
-                    type="text"
-                    required={precommercial}
-                    value={form.inviteCode}
-                    onChange={(e) => setForm({ ...form, inviteCode: e.target.value })}
-                    placeholder={
-                      locale === 'es'
-                        ? 'Código del correo de invitación'
-                        : locale === 'pt'
-                          ? 'Código do e-mail de convite'
-                          : 'Code from invite email'
-                    }
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition font-mono"
-                  />
-                </div>
-              </>
+                </label>
+                <input
+                  type="text"
+                  required={!isLogin && precommercial}
+                  value={form.inviteCode}
+                  onChange={(e) => setForm({ ...form, inviteCode: e.target.value })}
+                  placeholder={
+                    locale === 'es'
+                      ? 'Código del correo de invitación'
+                      : locale === 'pt'
+                        ? 'Código do e-mail de convite'
+                        : 'Code from invite email'
+                  }
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition font-mono"
+                />
+              </div>
             )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{tr('auth.email')}</label>
