@@ -26,6 +26,7 @@ import {
   MessageSquare,
   FileText,
   ClipboardCheck,
+  ChevronDown,
 } from 'lucide-react';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import { RichTextPane } from '@/components/etholys/RichTextPane';
@@ -47,6 +48,7 @@ import {
   reviewStatusLabel,
   type ProposalReviewStatus,
 } from '@/lib/opportunity/proposal-review';
+import { sysTheme } from '@/lib/system-shell';
 
 interface Fund extends ProposalFundSeed {
   id: string;
@@ -109,6 +111,7 @@ export default function FundHubProposalEditorPage() {
   const [transcribing, setTranscribing] = useState(false);
   const [rightRailCollapsed, setRightRailCollapsed] = useState(false);
   const [rightRailTab, setRightRailTab] = useState<'review' | 'document'>('document');
+  const [rightRailMenuOpen, setRightRailMenuOpen] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
   const chatFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -713,6 +716,8 @@ export default function FundHubProposalEditorPage() {
   const handleGenerateStructure = useCallback(async () => {
     setChatLoading(true);
     setError(null);
+    setRightRailCollapsed(false);
+    setRightRailTab('document');
     try {
       // Preferir formato do edital (checklist) — não inventar outra arquitectura.
       let titles =
@@ -1533,20 +1538,21 @@ export default function FundHubProposalEditorPage() {
 
           <aside
             className={cn(
-              'flex h-[70vh] min-h-[22rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all lg:h-full',
+              'flex h-[70vh] min-h-[22rem] flex-shrink-0 flex-col overflow-hidden border border-white/10 bg-[color:var(--sys-aside-bg,rgba(7,17,26,0.92))] text-[color:var(--sys-ink,#E8EEF2)] shadow-[0_24px_80px_-48px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all lg:h-full',
+              'rounded-2xl',
               rightRailCollapsed
-                ? 'w-14 flex-shrink-0'
+                ? 'w-16'
                 : rightRailTab === 'document'
-                  ? 'w-full max-w-xl flex-shrink-0 lg:w-[min(42vw,34rem)]'
-                  : 'w-full max-w-sm flex-shrink-0 lg:w-80',
+                  ? 'w-full max-w-xl lg:w-[min(42vw,34rem)]'
+                  : 'w-full max-w-sm lg:w-80',
             )}
           >
             {rightRailCollapsed ? (
-              <div className="flex h-full flex-col items-center gap-1 p-1.5">
+              <div className="flex h-full flex-col items-center gap-0.5 p-1.5">
                 <button
                   type="button"
                   onClick={() => setRightRailCollapsed(false)}
-                  className="rounded-lg p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  className="rounded-lg p-2.5 text-white/70 transition hover:bg-white/5 hover:text-white"
                   title={ui(locale, 'Expandir panel', 'Expandir painel', 'Expand panel')}
                 >
                   <PanelRightOpen className="h-4 w-4" />
@@ -1558,8 +1564,10 @@ export default function FundHubProposalEditorPage() {
                     setRightRailCollapsed(false);
                   }}
                   className={cn(
-                    'rounded-lg p-2 hover:bg-gray-50',
-                    rightRailTab === 'review' ? 'bg-amber-50 text-amber-900' : 'text-gray-600',
+                    'rounded-lg p-2.5 transition',
+                    rightRailTab === 'review'
+                      ? 'bg-amber-500/15 text-amber-100'
+                      : 'text-white/55 hover:bg-white/5 hover:text-white',
                   )}
                   title={ui(locale, 'Revisión', 'Revisão', 'Review')}
                 >
@@ -1572,8 +1580,10 @@ export default function FundHubProposalEditorPage() {
                     setRightRailCollapsed(false);
                   }}
                   className={cn(
-                    'rounded-lg p-2 hover:bg-gray-50',
-                    rightRailTab === 'document' ? 'bg-amber-50 text-amber-900' : 'text-gray-600',
+                    'rounded-lg p-2.5 transition',
+                    rightRailTab === 'document'
+                      ? 'bg-amber-500/15 text-amber-100'
+                      : 'text-white/55 hover:bg-white/5 hover:text-white',
                   )}
                   title={ui(locale, 'Documento', 'Documento', 'Document')}
                 >
@@ -1582,58 +1592,93 @@ export default function FundHubProposalEditorPage() {
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-1 border-b border-gray-100 px-2 py-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setRightRailTab('review')}
-                    className={cn(
-                      'inline-flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium',
-                      rightRailTab === 'review'
-                        ? 'bg-amber-50 text-amber-950'
-                        : 'text-gray-600 hover:bg-gray-50',
-                    )}
-                  >
-                    <MessageSquare className="h-3.5 w-3.5" />
-                    {ui(locale, 'Revisión', 'Revisão', 'Review')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRightRailTab('document')}
-                    className={cn(
-                      'inline-flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium',
-                      rightRailTab === 'document'
-                        ? 'bg-amber-50 text-amber-950'
-                        : 'text-gray-600 hover:bg-gray-50',
-                    )}
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    {ui(locale, 'Documento', 'Documento', 'Document')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRightRailCollapsed(true)}
-                    className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-50 hover:text-gray-900"
-                    title={ui(locale, 'Minimizar', 'Minimizar', 'Minimize')}
-                  >
-                    <PanelRightClose className="h-4 w-4" />
-                  </button>
+                <div className="flex-shrink-0 border-b border-white/10 p-3">
+                  <div className="flex items-center gap-2">
+                    <div className="relative min-w-0 flex-1">
+                      <button
+                        type="button"
+                        onClick={() => setRightRailMenuOpen((v) => !v)}
+                        className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/85 transition hover:bg-white/[0.07]"
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          {rightRailTab === 'review' ? (
+                            <MessageSquare className="h-4 w-4 flex-shrink-0 text-amber-300" />
+                          ) : (
+                            <FileText className="h-4 w-4 flex-shrink-0 text-amber-300" />
+                          )}
+                          <span className="truncate font-medium">
+                            {rightRailTab === 'review'
+                              ? ui(locale, 'Revisión', 'Revisão', 'Review')
+                              : ui(locale, 'Documento', 'Documento', 'Document')}
+                          </span>
+                        </span>
+                        <ChevronDown
+                          className={cn(
+                            'h-4 w-4 flex-shrink-0 text-white/55 transition',
+                            rightRailMenuOpen && 'rotate-180',
+                          )}
+                        />
+                      </button>
+                      {rightRailMenuOpen && (
+                        <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-white/10 bg-[#0C1822] py-1 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.9)]">
+                          {(
+                            [
+                              ['review', ui(locale, 'Revisión', 'Revisão', 'Review'), MessageSquare],
+                              ['document', ui(locale, 'Documento', 'Documento', 'Document'), FileText],
+                            ] as const
+                          ).map(([key, label, Icon]) => (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => {
+                                setRightRailTab(key);
+                                setRightRailMenuOpen(false);
+                              }}
+                              className={cn(
+                                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/5',
+                                rightRailTab === key
+                                  ? 'font-medium text-amber-200'
+                                  : 'text-white/70',
+                              )}
+                            >
+                              <Icon className="h-4 w-4 flex-shrink-0" />
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRightRailMenuOpen(false);
+                        setRightRailCollapsed(true);
+                      }}
+                      className="rounded-lg p-1.5 text-white/70 transition hover:bg-white/5 hover:text-white"
+                      title={ui(locale, 'Minimizar', 'Minimizar', 'Minimize')}
+                    >
+                      <PanelRightClose className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="mt-2 truncate px-0.5 text-[11px] text-white/45">
+                    {fund?.institution?.trim() &&
+                    !/^(sem fundo vinculado|sin fondo vinculado|no fund linked)$/i.test(
+                      fund.institution.trim(),
+                    )
+                      ? fund.institution
+                      : ui(locale, 'Sin fondo vinculado', 'Sem fundo vinculado', 'No fund linked')}
+                  </p>
                 </div>
 
                 {rightRailTab === 'review' ? (
                   <div className="fh-pane-scroll min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-                    <p className="text-xs text-gray-500">
-                      {fund?.institution?.trim() &&
-                      !/^sem fundo vinculado$/i.test(fund.institution.trim())
-                        ? fund.institution
-                        : ui(locale, 'Sin fondo vinculado', 'Sem fundo vinculado', 'No fund linked')}
-                    </p>
-                    {workspaceId ? <ProposalReviewPanel workspaceId={workspaceId} /> : null}
-                    <div className="rounded-xl border border-gray-200 bg-white px-3 py-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                    {workspaceId ? <ProposalReviewPanel workspaceId={workspaceId} tone="shell" /> : null}
+                    <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-white/45">
                         {ui(locale, 'Revisión', 'Revisão', 'Review')}:
                       </span>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
+                        <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-100">
                           {reviewStatusLabel(reviewStatus, locale)}
                         </span>
                         {(
@@ -1652,7 +1697,7 @@ export default function FundHubProposalEditorPage() {
                             type="button"
                             disabled={reviewStatus === st}
                             onClick={() => persistDraft({ reviewStatus: st })}
-                            className="rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                            className="rounded-lg border border-white/10 px-2 py-1 text-[11px] font-medium text-white/75 transition hover:bg-white/5 hover:text-white disabled:opacity-40"
                           >
                             {label}
                           </button>
@@ -1660,11 +1705,16 @@ export default function FundHubProposalEditorPage() {
                       </div>
                     </div>
                     {coalitionPool.length > 0 && (
-                      <div className="rounded-xl border border-gray-200 bg-white px-3 py-3">
-                        <p className="text-xs font-semibold text-gray-900">
-                          {ui(locale, 'Coalición en esta propuesta', 'Coligação nesta proposta', 'Coalition on this proposal')}
+                      <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3">
+                        <p className="text-xs font-semibold text-white">
+                          {ui(
+                            locale,
+                            'Coalición en esta propuesta',
+                            'Coligação nesta proposta',
+                            'Coalition on this proposal',
+                          )}
                         </p>
-                        <p className="mt-0.5 text-[11px] text-gray-500">
+                        <p className="mt-0.5 text-[11px] text-white/45">
                           {ui(
                             locale,
                             'Miembros de Coalición — rol y % del presupuesto.',
@@ -1677,20 +1727,23 @@ export default function FundHubProposalEditorPage() {
                             const picked = coalition.find((c) => c.id === m.id);
                             return (
                               <li key={m.id} className="flex flex-wrap items-center gap-2 text-xs">
-                                <label className="inline-flex items-center gap-1.5 text-gray-800">
+                                <label className="inline-flex items-center gap-1.5 text-white/85">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(picked)}
                                     onChange={(e) => {
                                       const next = e.target.checked
-                                        ? [...coalition, { id: m.id, orgName: m.orgName, role: m.role, budgetPct: 0 }]
+                                        ? [
+                                            ...coalition,
+                                            { id: m.id, orgName: m.orgName, role: m.role, budgetPct: 0 },
+                                          ]
                                         : coalition.filter((c) => c.id !== m.id);
                                       setCoalition(next);
                                       persistDraft({ coalition: next });
                                     }}
                                   />
                                   <span className="font-medium">{m.orgName}</span>
-                                  <span className="text-gray-500">{m.role}</span>
+                                  <span className="text-white/45">{m.role}</span>
                                 </label>
                                 {picked && (
                                   <input
@@ -1706,7 +1759,7 @@ export default function FundHubProposalEditorPage() {
                                       setCoalition(next);
                                       persistDraft({ coalition: next });
                                     }}
-                                    className="w-16 rounded border border-gray-200 px-1.5 py-0.5 text-xs"
+                                    className="w-16 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-xs text-white"
                                   />
                                 )}
                               </li>
@@ -1718,8 +1771,8 @@ export default function FundHubProposalEditorPage() {
                   </div>
                 ) : (
                   <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-3 py-2">
-                      <p className="text-sm font-semibold text-gray-900">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+                      <p className="text-sm font-semibold text-white">
                         {stage === 'understand'
                           ? ui(locale, 'Notas del edital', 'Notas do edital', 'Call notes')
                           : ui(locale, 'Documento', 'Documento', 'Document')}
@@ -1727,7 +1780,7 @@ export default function FundHubProposalEditorPage() {
                       <button
                         type="button"
                         onClick={() => setShowAttach((v) => !v)}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-white/65 transition hover:text-amber-200"
                       >
                         <Paperclip className="h-3.5 w-3.5" />
                         {ui(locale, 'Anexos', 'Anexos', 'Files')}
@@ -1735,20 +1788,20 @@ export default function FundHubProposalEditorPage() {
                       </button>
                     </div>
                     {showAttach && (
-                      <div className="border-b border-gray-100 px-3 py-2 text-xs">
-                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 hover:bg-gray-50">
+                      <div className="border-b border-white/10 px-3 py-2 text-xs">
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-white/20 px-3 py-2 text-white/75 transition hover:bg-white/[0.04] hover:text-white">
                           <Paperclip className="h-3.5 w-3.5" />
                           {ui(locale, 'Adjuntar', 'Anexar', 'Attach')}
                           <input type="file" multiple className="hidden" onChange={handleAttachFile} />
                         </label>
                         {attachedFiles.length > 0 && (
-                          <ul className="mt-2 space-y-1 text-gray-600">
+                          <ul className="mt-2 space-y-1 text-white/70">
                             {attachedFiles.map((file, index) => (
                               <li key={`${file.name}-${index}`} className="flex justify-between gap-2">
                                 <span className="truncate">{file.name}</span>
                                 <button
                                   type="button"
-                                  className="text-red-600"
+                                  className="text-red-300 hover:text-red-200"
                                   onClick={() =>
                                     setAttachedFiles((prev) => prev.filter((_, i) => i !== index))
                                   }
@@ -1761,7 +1814,7 @@ export default function FundHubProposalEditorPage() {
                         )}
                       </div>
                     )}
-                    <div className="min-h-0 flex-1">
+                    <div className="min-h-0 flex-1 overflow-hidden bg-white/[0.03]">
                       <RichTextPane
                         value={documentMarkdown}
                         onChange={(next) => {
