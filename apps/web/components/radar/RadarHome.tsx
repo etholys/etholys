@@ -241,6 +241,7 @@ export function RadarHome({
             locale={loc}
             moduleId={selected.moduleId}
             hero
+            operateHrefFor={(unitId) => `${openHref}&unit=${unitId}`}
           />
           {selectedAlerts.length > 0 ? (
             <ul className="space-y-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
@@ -301,13 +302,14 @@ export function RadarHome({
               }}
             />
 
-            {selected && (
+            {selected && openHref && (
               <RadarPlantPreview
                 companyId={companyId}
                 engagementId={engagementId}
                 propertyId={selected.id}
                 locale={loc}
                 moduleId={selected.moduleId}
+                operateHrefFor={(unitId) => `${openHref}&unit=${unitId}`}
               />
             )}
 

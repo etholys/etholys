@@ -466,17 +466,37 @@ export function RadarSiteMap({
                 </div>
                 {spaceSensors.map((pin) => {
                   const sens = sensors.find((s) => s.id === pin.id);
+                  const live = sens?.lastValue;
+                  const label =
+                    live != null
+                      ? `${sens?.name || copy.sensor}: ${Number.isInteger(live) ? live : live.toFixed(1)}`
+                      : sens?.name || copy.sensor;
                   return (
                     <span
                       key={pin.id}
-                      title={sens?.name || copy.sensor}
-                      className="pointer-events-none absolute z-10 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+                      title={label}
+                      className="pointer-events-none absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
                       style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
                     >
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-300/55" />
-                      <span className="relative flex h-3 w-3 items-center justify-center rounded-full bg-sky-300 text-[#04110c] shadow-[0_0_10px_rgba(125,211,252,0.8)]">
-                        <Radio className="h-2 w-2" />
+                      <span className="relative flex h-4 w-4 items-center justify-center">
+                        <span
+                          className={`absolute inline-flex h-full w-full animate-ping rounded-full ${
+                            live != null ? 'bg-sky-300/55' : 'bg-white/25'
+                          }`}
+                        />
+                        <span
+                          className={`relative flex h-3 w-3 items-center justify-center rounded-full shadow-[0_0_10px_rgba(125,211,252,0.8)] ${
+                            live != null ? 'bg-sky-300 text-[#04110c]' : 'bg-white/30 text-white/70'
+                          }`}
+                        >
+                          <Radio className="h-2 w-2" />
+                        </span>
                       </span>
+                      {live != null && (
+                        <span className="mt-0.5 rounded bg-black/55 px-1 text-[9px] font-semibold tabular-nums text-sky-100">
+                          {Number.isInteger(live) ? live : live.toFixed(0)}
+                        </span>
+                      )}
                     </span>
                   );
                 })}

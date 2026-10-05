@@ -17,6 +17,7 @@ import { RadarChainBoard } from '@/components/radar/RadarChainBoard';
 import { RadarSpaceOpsPanel } from '@/components/radar/RadarSpaceOpsPanel';
 import { RadarChainTrailBar } from '@/components/radar/RadarOpsCanvas';
 import type { RadarCrop } from '@/lib/radar/site-layout';
+import { MOISTURE_THRESHOLD } from '@/lib/radar/agriculture';
 import { isTraceStage, type TraceStage } from '@/lib/radar/trace';
 
 type Loc = 'pt' | 'es' | 'en';
@@ -31,8 +32,21 @@ type PropertyDetail = {
   lng: number | null;
   clientId: string | null;
   clientName: string | null;
-  units: Array<{ id: string; name: string; kind: string; crop: string | null; areaHa: number | null }>;
-  sensors: Array<{ id: string; name: string; metric: string; unitId: string | null }>;
+  units: Array<{
+    id: string;
+    name: string;
+    kind: string;
+    crop: string | null;
+    areaHa: number | null;
+    moisture?: number | null;
+  }>;
+  sensors: Array<{
+    id: string;
+    name: string;
+    metric: string;
+    unitId: string | null;
+    lastValue?: number | null;
+  }>;
   crops?: RadarCrop[];
   steps: PropertyStepState[];
   nextStep: PropertyStepId;
@@ -45,12 +59,14 @@ export function RadarPropertyWorkspace({
   engagementId,
   locale,
   backHref,
+  initialUnitId,
 }: {
   companyId: string;
   propertyId: string;
   engagementId?: string | null;
   locale: string;
   backHref: string;
+  initialUnitId?: string | null;
 }) {
   const loc = radarLoc(locale);
   const [data, setData] = useState<PropertyDetail | null>(null);
@@ -89,19 +105,25 @@ export function RadarPropertyWorkspace({
       setCrop(p.crop || '');
       setArea(p.areaHa != null ? String(p.areaHa) : '');
       setStep((prev) => (p.steps.some((s) => s.id === prev) ? prev : p.nextStep));
-      setFocusedId(p.units[0]?.id || null);
+      const prefer =
+        (initialUnitId && p.units.some((u) => u.id === initialUnitId) && initialUnitId) ||
+        p.units[0]?.id ||
+        null;
+      setFocusedId(prefer);
       if (!Array.isArray(p.crops)) (p as PropertyDetail).crops = [];
       const done = Boolean(p.steps.find((s) => s.id === 'characterize')?.done);
       if (!done) {
         setMode('setup');
         setStep('characterize');
+      } else if (initialUnitId) {
+        setMode('operate');
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erro');
     } finally {
       setLoading(false);
     }
-  }, [companyId, propertyId, engagementId]);
+  }, [companyId, propertyId, engagementId, initialUnitId]);
 
   useEffect(() => {
     void load();
@@ -159,16 +181,21 @@ export function RadarPropertyWorkspace({
   const kindMeta = spaceKindMeta(data.moduleId);
   const mapParcels = data.units
     .filter((u) => u.kind === 'parcel' || u.kind === 'lot' || u.kind === 'herd' || u.kind === 'generic')
-    .map((u) => ({
-      id: u.id,
-      name: u.name,
-      crop: u.crop,
-      areaHa: u.areaHa,
-      moisture: null as number | null,
-      nextAction: 'ok' as const,
-      harvestBlocked: false,
-      alerts: [] as Array<{ severity: string }>,
-    }));
+    .map((u) => {
+      const moisture = u.moisture ?? null;
+      const nextAction =
+        moisture != null && moisture < MOISTURE_THRESHOLD ? ('irrigate' as const) : ('ok' as const);
+      return {
+        id: u.id,
+        name: u.name,
+        crop: u.crop,
+        areaHa: u.areaHa,
+        moisture,
+        nextAction,
+        harvestBlocked: false,
+        alerts: [] as Array<{ severity: string }>,
+      };
+    });
 
   const showOperate = Boolean(characterized) && mode === 'operate';
   const companyQ = engagementId
@@ -233,7 +260,7 @@ export function RadarPropertyWorkspace({
               id: s.id,
               name: s.name,
               unitId: s.unitId,
-              lastValue: null,
+              lastValue: s.lastValue ?? null,
             }))}
             focusedId={focusedId}
             onFocus={setFocusedId}
@@ -442,7 +469,7 @@ export function RadarPropertyWorkspace({
                     id: s.id,
                     name: s.name,
                     unitId: s.unitId,
-                    lastValue: null,
+                    lastValue: s.lastValue ?? null,
                   }))}
                   focusedId={focusedId}
                   onFocus={setFocusedId}

@@ -13,6 +13,7 @@ function PropertyInner() {
   const loc = locale === 'es' || locale === 'en' ? locale : 'pt';
   const companyId = search.get('company') || activeCompanyId || '';
   const engagementId = search.get('engagement');
+  const initialUnitId = search.get('unit');
   const propertyId = String(params.id || '');
 
   if (!companyId || !propertyId) {
@@ -32,6 +33,7 @@ function PropertyInner() {
       engagementId={engagementId}
       locale={loc}
       backHref={backHref}
+      initialUnitId={initialUnitId}
     />
   );
 }

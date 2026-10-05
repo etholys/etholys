@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { MOISTURE_THRESHOLD } from '@/lib/radar/agriculture';
 import { RadarSiteMap, type MapParcel } from '@/components/radar/RadarSiteMap';
 
 /** Read-only plant preview for the selected property on RADAR home. */
@@ -12,6 +14,7 @@ export function RadarPlantPreview({
   locale,
   moduleId,
   hero = false,
+  operateHrefFor,
 }: {
   companyId: string;
   engagementId?: string | null;
@@ -20,7 +23,10 @@ export function RadarPlantPreview({
   moduleId?: string | null;
   /** Larger plant surface when home has a single site. */
   hero?: boolean;
+  /** Click a space → open Operate focused on that unit. */
+  operateHrefFor?: (unitId: string) => string;
 }) {
+  const router = useRouter();
   const [parcels, setParcels] = useState<MapParcel[]>([]);
   const [sensors, setSensors] = useState<Array<{ id: string; name: string; unitId: string | null; lastValue: number | null }>>([]);
   const [focusedId, setFocusedId] = useState<string | null>(null);
@@ -41,26 +47,29 @@ export function RadarPlantPreview({
           name: string;
           crop: string | null;
           areaHa: number | null;
+          moisture?: number | null;
         }>;
         const mapped: MapParcel[] = units.map((u) => ({
           id: u.id,
           name: u.name,
           crop: u.crop,
           areaHa: u.areaHa,
-          moisture: null,
-          nextAction: 'ok',
+          moisture: u.moisture ?? null,
+          nextAction: u.moisture != null && u.moisture < MOISTURE_THRESHOLD ? 'irrigate' : 'ok',
           harvestBlocked: false,
           alerts: [],
         }));
         setParcels(mapped);
         setFocusedId(mapped[0]?.id || null);
         setSensors(
-          (d.property?.sensors || []).map((s: { id: string; name: string; unitId: string | null }) => ({
-            id: s.id,
-            name: s.name,
-            unitId: s.unitId,
-            lastValue: null,
-          })),
+          (d.property?.sensors || []).map(
+            (s: { id: string; name: string; unitId: string | null; lastValue?: number | null }) => ({
+              id: s.id,
+              name: s.name,
+              unitId: s.unitId,
+              lastValue: s.lastValue ?? null,
+            }),
+          ),
         );
       } finally {
         if (!cancelled) setLoading(false);
@@ -102,7 +111,10 @@ export function RadarPlantPreview({
       parcels={parcels}
       sensors={sensors}
       focusedId={focusedId}
-      onFocus={setFocusedId}
+      onFocus={(id) => {
+        setFocusedId(id);
+        if (operateHrefFor) router.push(operateHrefFor(id));
+      }}
       trailUnitIds={parcels.map((p) => p.id)}
       hero={hero}
     />

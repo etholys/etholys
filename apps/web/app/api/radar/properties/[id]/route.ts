@@ -66,6 +66,40 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     select: { id: true, name: true, metric: true, unitId: true, lastSeenAt: true },
   });
 
+  const readingOr = [
+    ...(sensors.length ? [{ sensorId: { in: sensors.map((s) => s.id) } }] : []),
+    ...(unitIds.length ? [{ unitId: { in: unitIds } }] : []),
+  ];
+  const readings = readingOr.length
+    ? await prisma.nexusReading.findMany({
+        where: { companyId, OR: readingOr },
+        orderBy: { recordedAt: 'desc' },
+        take: 200,
+        select: { sensorId: true, unitId: true, metric: true, value: true, recordedAt: true },
+      })
+    : [];
+
+  const liveSensors = sensors.map((s) => {
+    const last =
+      readings.find((r) => r.sensorId === s.id) ||
+      readings.find((r) => r.unitId === s.unitId && r.metric === s.metric);
+    return {
+      ...s,
+      lastValue: last?.value ?? null,
+      lastRecordedAt: last?.recordedAt
+        ? last.recordedAt.toISOString()
+        : s.lastSeenAt
+          ? new Date(s.lastSeenAt).toISOString()
+          : null,
+    };
+  });
+
+  const moistureByUnit = new Map<string, number>();
+  for (const r of readings) {
+    if (r.metric !== 'soil_moisture' || !r.unitId || moistureByUnit.has(r.unitId)) continue;
+    moistureByUnit.set(r.unitId, r.value);
+  }
+
   const sensorCount = await propertySensorCount(companyId, property.id, unitIds);
   const progressInput = {
     moduleId: property.moduleId,
@@ -104,8 +138,9 @@ export async function GET(req: NextRequest, ctx: Ctx) {
         crop: u.crop,
         areaHa: u.areaHa,
         sectorId: u.sectorId,
+        moisture: moistureByUnit.get(u.id) ?? null,
       })),
-      sensors,
+      sensors: liveSensors,
       layout,
       crops: cropsFromLayout(parseRadarLayout(property.layoutJson)),
       steps: buildPropertyProgress(progressInput),
