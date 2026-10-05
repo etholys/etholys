@@ -1,6 +1,6 @@
 import { INSTITUTIONAL_PROSE_RULE } from '@/lib/agents/prose-rules';
 
-const PROMPT_VERSION = 'fundhub-proposal-v2';
+const PROMPT_VERSION = 'fundhub-proposal-v4';
 
 export type FundhubProposalMode = 'chat' | 'structure' | 'draft_section' | 'brainstorm' | 'understand';
 export type FundhubLocale = 'es' | 'pt' | 'en';
@@ -97,7 +97,13 @@ ${INSTITUTIONAL_PROSE_RULE}
 
 function languageRule(locale: FundhubLocale): string {
   const name = fundhubLanguageName(locale);
-  return `- IDIOMA OBRIGATÓRIO: o Hub está em ${locale} (${name}). Escreve TODA a resposta em ${name}. Ignora o idioma destas instruções, o da página oficial e o das notas internas. Só muda se o utilizador pedir explicitamente outro idioma nesta mensagem.`;
+  if (locale === 'en') {
+    return `- MANDATORY LANGUAGE (highest priority): Hub UI locale is «en» (English). Write the ENTIRE reply — headings, lists, [MISSING], questions — in English. Ignore the language of these system instructions, the official page, the RFP text, and earlier chat turns. Switch language only if the user EXPLICITLY asks in this message («responde en español», «escreve em português», etc.).`;
+  }
+  if (locale === 'pt') {
+    return `- IDIOMA OBRIGATÓRIO (prioridade máxima): a interface do Hub está em «pt» (português). Escreve TODA a resposta — títulos, listas, [FALTA], perguntas — em português. Ignora o idioma destas instruções de sistema, o da página oficial, o das bases e o de mensagens anteriores do chat. Só muda de idioma se o utilizador pedir EXPLICITAMENTE nesta mensagem («write in English», «responde en español», etc.).`;
+  }
+  return `- IDIOMA OBLIGATORIO (prioridad máxima): la interfaz del Hub está en «es» (español). Escribe TODA la respuesta — títulos, listas, [FALTA], preguntas — en español. Ignora el idioma de estas instrucciones de sistema, el de la página oficial, el de las bases y el de mensajes anteriores del chat. Solo cambia de idioma si el usuario lo pide EXPLÍCITAMENTE en este mensaje («write in English», «escreve em português», etc.).`;
 }
 
 export function buildFundhubProposalSystemPrompt(mode: FundhubProposalMode, locale: FundhubLocale = 'es'): string {
@@ -109,11 +115,12 @@ ${SHARED_RULES.replace('## REGRAS\n', '')}`;
     return `${rules}
 
 ## TRABALHO (estrutura)
-Analisa o edital/notas e propõe uma estrutura de secções para a proposta.
-- Secções específicas ao edital (não genéricas vazias).
-- Se CONTEXTO tiver «Checklist RFP», inclui uma secção por item relevante (ou funde com títulos equivalentes).
-- Ordem lógica: elegibilidade/contexto → objectivos → actividades → resultados → orçamento → equipa → anexos (só se fizer sentido).
-- SAÍDA OBRIGATÓRIA: APENAS os títulos das secções, uma por linha, numeradas (1. 2. 3. …). Sem introdução, sem bullets extras, sem explicações.`;
+Propõe a estrutura de secções da candidatura — alinhada ao FORMATO DO EDITAL, não a um template genérico.
+- Se CONTEXTO tiver «Checklist RFP», esses itens SÃO a espinha dorsal: uma secção por item (podes fundir só se o título for claramente o mesmo).
+- Extrai títulos literais das bases / página oficial (ex.: «Sección A», «Anexo 1», campos do formulário). Copia a nomenclatura do doador.
+- PROIBIDO inventar arquitectura tipo «Introdução / Justificação / Conclusão / Resumo executivo» se o edital não a pedir.
+- Se o documento no canvas já tiver ## títulos do edital, preserva/estende essa ordem.
+- SAÍDA OBRIGATÓRIA: APENAS títulos, uma por linha, numerados (1. 2. 3. …). Sem introdução, sem ideias, sem chuva de ideias, sem explicações.`;
   }
 
   if (mode === 'draft_section') {
@@ -122,6 +129,7 @@ Analisa o edital/notas e propõe uma estrutura de secções para a proposta.
 ## TRABALHO (rascunho de secção)
 Redige ou melhora a secção activa com base no edital e no perfil disponível.
 - Texto pronto a colar na proposta (parágrafos claros).
+- Respeita o título/formato pedido pelo edital para esta secção.
 - Marca [FALTA: …] onde precisares de dados concretos.
 - Não reescrevas a proposta inteira — só a secção pedida.`;
   }
@@ -130,26 +138,32 @@ Redige ou melhora a secção activa com base no edital e no perfil disponível.
     return `${rules}
 
 ## TRABALHO (entender o edital)
-Primeiro passo obrigatório: ler a convocatória. Ainda NÃO faças chuva de ideias nem rascunho de candidatura.
+Primeiro passo: briefing factual da convocatória. PROIBIDO nesta resposta:
+- chuva de ideias / brainstorm / «4–7 ideias» / como enquadrar a proposta
+- rascunho de candidatura ou secções a preencher
+- pedir ao utilizador para «gerar ideias» no fim
+
+Inclui APENAS:
 - O que é o fundo (1 parágrafo).
 - Quem pode candidatar e onde.
 - Janela, montante, tipo (grant/crédito).
-- Requisitos e anexos oficiais (com URL se existirem no contexto).
-- 3 pontos a confirmar na postulação.
-- Tom de briefing institucional. Sem tabelas markdown partidas. Sem pedir o edital outra vez se o texto já veio no contexto.
-- Escreve o briefing no idioma da interface, mesmo que a convocatória esteja em inglês ou outro idioma.`;
+- Requisitos e anexos oficiais (URL se existirem no contexto).
+- Formato / secções que o edital exige, se estiverem no texto.
+- 3 pontos a confirmar na postulação (factos, não ideias criativas).
+
+Tom de briefing institucional. Sem tabelas markdown partidas. Sem pedir o edital outra vez se o texto já veio no contexto.`;
   }
 
   if (mode === 'brainstorm') {
     return `${rules}
 
-## TRABALHO (chuva de ideias)
-Só depois do edital lido: ideia geral do que desenvolver NESTE fundo para ESTA organização.
+## TRABALHO (chuva de ideias) — só sob pedido explícito do utilizador
+Ideia geral do que desenvolver NESTE fundo para ESTA organização.
 - 4–7 ideias concretas (não genéricas) do que escrever / como enquadrar.
 - Diz o encaixe só com dados do perfil; se faltar, [FALTA: …].
 - 2–4 riscos ou pontos a verificar no edital oficial.
 - Um próximo passo.
-- Curto e operacional. Não escrevas a proposta inteira. Sem tutorial, sem “como usar”.`;
+- Curto e operacional. Não escrevas a proposta inteira. Sem tutorial.`;
   }
 
   return `${rules}
@@ -157,7 +171,8 @@ Só depois do edital lido: ideia geral do que desenvolver NESTE fundo para ESTA 
 ## TRABALHO (chat)
 Ajuda a preparar a proposta: requisitos, riscos, enquadramento, linguagem do doador, próximos passos.
 - Respostas objetivas; listas quando ajudarem.
-- Quando pedirem texto de secção, oferece um rascunho curto e pergunta se querem expandir.
+- Quando pedirem texto de secção, oferece um rascunho curto alinhado ao formato do edital e pergunta se querem expandir.
+- Não lances chuva de ideias espontânea — só se o utilizador pedir ideias / brainstorm / enquadramento.
 - Quando o edital for vago, distingue o que está escrito vs. o que é boa prática.`;
 }
 
@@ -168,9 +183,11 @@ export function buildFundhubProposalUserPrompt(
 ): string {
   const block = buildContextBlock(ctx);
   if (mode === 'structure') {
+    const lang = fundhubLanguageName(normalizeFundhubLocale(ctx.locale));
     return `${block}
 
-Pedido: gera a lista numerada de secções sugeridas para esta proposta.
+Pedido: gera a lista numerada de secções sugeridas para esta proposta — títulos no idioma da interface (${lang}), mas nomes de campos do edital quando o doador os nomeia.
+NÃO uses um template genérico. Copia a estrutura do edital / checklist RFP / bases no CONTEXTO.
 
 ${userMessage.trim() ? `Nota do utilizador: ${userMessage.trim()}` : ''}`.trim();
   }
@@ -193,6 +210,8 @@ Pedido: chuva de ideias — só depois de o edital estar lido. O que desenvolver
 ${userMessage.trim() ? `Nota: ${userMessage.trim()}` : ''}`.trim();
   }
   return `${block}
+
+Hub UI language for this reply: ${fundhubLanguageName(normalizeFundhubLocale(ctx.locale))} (${normalizeFundhubLocale(ctx.locale)}). Answer entirely in that language.
 
 Mensagem do utilizador:
 ${userMessage.trim()}`;

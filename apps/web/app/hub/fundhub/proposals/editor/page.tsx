@@ -18,6 +18,9 @@ import {
   Send,
   ExternalLink,
   History,
+  Mic,
+  Square,
+  Sparkles,
 } from 'lucide-react';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import { RichTextPane } from '@/components/etholys/RichTextPane';
@@ -28,7 +31,11 @@ import {
   sectionsFromMarkdown,
   type ProposalFundSeed,
 } from '@/lib/opportunity/proposal-workspace';
-import { checklistFromCandidateFields, appendChecklistSections } from '@/lib/opportunity/rfp-checklist';
+import {
+  checklistFromCandidateFields,
+  appendChecklistSections,
+  checklistToSectionTitles,
+} from '@/lib/opportunity/rfp-checklist';
 import { ProposalReviewPanel } from '@/components/fundhub/ProposalReviewPanel';
 import {
   parseReviewStatus,
@@ -53,6 +60,17 @@ interface AttachedFile {
   size: number;
   type: string;
   uploadedAt: string;
+  /** Texto extraído (só ficheiros texto) para o assistente. */
+  textExcerpt?: string;
+}
+
+/** Remove chuva de ideias que o modelo às vezes cola no briefing «understand». */
+function stripUnsolicitedBrainstorm(text: string): string {
+  const cut = text.search(
+    /\n(?:#{1,3}\s*)?(?:\*\*)?(?:💡\s*)?(?:\d+[–-]\d+\s+)?(?:ideias?\s+para|ideas?\s+(?:para|to)|brainstorm|chuva de ideias|lluvia de ideas)/i,
+  );
+  if (cut > 80) return text.slice(0, cut).trim();
+  return text.trim();
 }
 
 export default function FundHubProposalEditorPage() {
@@ -82,6 +100,11 @@ export default function FundHubProposalEditorPage() {
   const [showAttach, setShowAttach] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openingStudio, setOpeningStudio] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaChunksRef = useRef<Blob[]>([]);
+  const chatFileInputRef = useRef<HTMLInputElement | null>(null);
   const [coalitionPool, setCoalitionPool] = useState<Array<{ id: string; orgName: string; role: string }>>([]);
   const [coalition, setCoalition] = useState<Array<{ id: string; orgName: string; role: string; budgetPct?: number }>>([]);
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -432,7 +455,7 @@ export default function FundHubProposalEditorPage() {
                 : 'No se pudo leer la convocatoria.'),
         );
       }
-      const answer = String(data.answer);
+      const answer = stripUnsolicitedBrainstorm(String(data.answer));
       const seed = fund || { id: fundId || 'adhoc', name: 'Proposta', institution: '' };
       const replaceBriefing = !chatMessages.some((m) => m.role === 'user');
       const nextDoc =
@@ -474,12 +497,15 @@ export default function FundHubProposalEditorPage() {
   const passToWrite = useCallback(() => {
     setStage('write');
     setDocumentMarkdown((prev) => {
-      let next = appendWriteSections(
-        prev || seedDocumentMarkdown(fund || { id: 'adhoc', name: fund?.name || 'Proposta' }, undefined, locale),
-        locale,
-      );
+      // Não injectar «Ideia geral / Rascunho» genéricos se já há checklist do edital —
+      // o formato oficial manda; o utilizador usa «Estrutura» se ainda faltar.
+      let next =
+        prev?.trim() ||
+        seedDocumentMarkdown(fund || { id: 'adhoc', name: fund?.name || 'Proposta' }, undefined, locale);
       if (rfpChecklist.length) {
         next = appendChecklistSections(next, rfpChecklist, locale);
+      } else if (!/^##\s+/m.test(next)) {
+        next = appendWriteSections(next, locale);
       }
       persistDraft({ documentMarkdown: next, stage: 'write' });
       return next;
@@ -491,10 +517,10 @@ export default function FundHubProposalEditorPage() {
           role: 'assistant',
           content:
             locale === 'en'
-              ? 'Call read. You can structure the application, ask for a section draft, or use the canvas.'
+              ? 'Call read. Use «Structure» for the RFP section list, «Ideas» only when you want brainstorming, or ask in chat to draft a section.'
               : locale === 'pt'
-                ? 'Edital lido. Pode estruturar a candidatura, pedir um rascunho de secção ou usar o canvas ao lado.'
-                : 'Convocatoria leída. Puede estructurar la candidatura, pedir un borrador de sección o usar el canvas.',
+                ? 'Edital lido. Use «Estrutura» para as secções do edital, «Ideias» só se quiser chuva de ideias, ou peça no chat um rascunho de secção.'
+                : 'Convocatoria leída. Use «Estructura» para las secciones del edital, «Ideas» solo si quiere lluvia de ideas, o pida en el chat un borrador de sección.',
           createdAt: new Date().toISOString(),
         },
       ];
@@ -532,8 +558,18 @@ export default function FundHubProposalEditorPage() {
 
   const handleSendChat = useCallback(async () => {
     const message = chatInput.trim();
-    if (!message || chatLoading) return;
-    const nextUser: ChatMessage = { role: 'user', content: message, createdAt: new Date().toISOString() };
+    if ((!message && attachedFiles.every((f) => !f.textExcerpt)) || chatLoading) return;
+    const attachBlock = attachedFiles
+      .filter((f) => f.textExcerpt?.trim())
+      .slice(0, 4)
+      .map((f) => `--- Anexo: ${f.name} ---\n${f.textExcerpt!.slice(0, 6000)}`)
+      .join('\n\n');
+    const fullMessage = [message, attachBlock].filter(Boolean).join('\n\n');
+    if (!fullMessage.trim()) return;
+    const display =
+      message ||
+      ui(locale, 'Archivos adjuntos enviados.', 'Anexos enviados.', 'Attachments sent.');
+    const nextUser: ChatMessage = { role: 'user', content: display, createdAt: new Date().toISOString() };
     setChatMessages((prev) => [...prev, nextUser]);
     setChatInput('');
     setChatLoading(true);
@@ -541,7 +577,7 @@ export default function FundHubProposalEditorPage() {
       const response = await fetch('/api/proposals/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(assistantBody('chat', message)),
+        body: JSON.stringify(assistantBody('chat', fullMessage)),
       });
       const data = await response.json();
       const reply: ChatMessage = {
@@ -578,7 +614,7 @@ export default function FundHubProposalEditorPage() {
     } finally {
       setChatLoading(false);
     }
-  }, [chatInput, chatLoading, assistantBody, persistDraft, locale]);
+  }, [chatInput, chatLoading, attachedFiles, assistantBody, persistDraft, locale]);
 
   const insertIntoDocument = useCallback(
     (text: string) => {
@@ -600,17 +636,35 @@ export default function FundHubProposalEditorPage() {
     setChatLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/proposals/assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(assistantBody('structure', 'Gera a estrutura da proposta.')),
-      });
-      const data = await response.json();
-      const answer = String(data.answer || '');
-      const titles = answer
-        .split(/\r?\n/)
-        .map((line) => line.replace(/^\s*[\d\-\)\.]+\s*/, '').trim())
-        .filter(Boolean);
+      // Preferir formato do edital (checklist) — não inventar outra arquitectura.
+      let titles =
+        rfpChecklist.length > 0 ? checklistToSectionTitles(rfpChecklist, locale) : [];
+      let answer = '';
+      if (!titles.length) {
+        const response = await fetch('/api/proposals/assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            assistantBody(
+              'structure',
+              ui(
+                locale,
+                'Genera solo los títulos de sección que pide esta convocatoria.',
+                'Gera só os títulos de secção que este edital pede.',
+                'Generate only the section titles this call requires.',
+              ),
+            ),
+          ),
+        });
+        const data = await response.json();
+        answer = String(data.answer || '');
+        titles = answer
+          .split(/\r?\n/)
+          .map((line) => line.replace(/^\s*[\d\-\)\.]+\s*/, '').trim())
+          .filter(Boolean);
+      } else {
+        answer = titles.map((t, i) => `${i + 1}. ${t}`).join('\n');
+      }
       if (titles.length) {
         setDocumentMarkdown((prev) => {
           const existing = prev.trim();
@@ -629,17 +683,169 @@ export default function FundHubProposalEditorPage() {
       setChatMessages((prev) => {
         const next = [
           ...prev,
-          { role: 'assistant' as const, content: answer || 'Estrutura gerada.', createdAt: new Date().toISOString() },
+          {
+            role: 'assistant' as const,
+            content:
+              answer ||
+              ui(locale, 'Estructura aplicada.', 'Estrutura aplicada.', 'Structure applied.'),
+            createdAt: new Date().toISOString(),
+          },
         ];
         persistDraft({ chat: next });
         return next;
       });
     } catch {
-      setError('Não foi possível gerar a estrutura.');
+      setError(
+        ui(
+          locale,
+          'No se pudo generar la estructura.',
+          'Não foi possível gerar a estrutura.',
+          'Could not generate the structure.',
+        ),
+      );
     } finally {
       setChatLoading(false);
     }
   }, [assistantBody, persistDraft, rfpChecklist, locale]);
+
+  const handleBrainstorm = useCallback(async () => {
+    if (chatLoading) return;
+    setChatLoading(true);
+    setError(null);
+    const userLine = ui(
+      locale,
+      'Quiero una lluvia de ideas para enmarcar esta propuesta.',
+      'Quero uma chuva de ideias para enquadrar esta proposta.',
+      'I want a brainstorm to frame this proposal.',
+    );
+    setChatMessages((prev) => [
+      ...prev,
+      { role: 'user', content: userLine, createdAt: new Date().toISOString() },
+    ]);
+    try {
+      const response = await fetch('/api/proposals/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(assistantBody('brainstorm', userLine)),
+      });
+      const data = await response.json();
+      setChatMessages((prev) => {
+        const next = [
+          ...prev,
+          {
+            role: 'assistant' as const,
+            content:
+              String(data.answer || data.error || '') ||
+              ui(locale, 'No se pudo generar ideas.', 'Não foi possível gerar ideias.', 'Could not generate ideas.'),
+            createdAt: new Date().toISOString(),
+          },
+        ];
+        persistDraft({ chat: next });
+        return next;
+      });
+    } catch {
+      setError(ui(locale, 'Error al pedir ideas.', 'Erro ao pedir ideias.', 'Error requesting ideas.'));
+    } finally {
+      setChatLoading(false);
+    }
+  }, [chatLoading, assistantBody, persistDraft, locale]);
+
+  const stopRecording = useCallback(() => {
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') rec.stop();
+    setRecording(false);
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    if (recording || chatLoading || transcribing) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : 'audio/webm';
+      const rec = new MediaRecorder(stream, { mimeType: mime });
+      mediaChunksRef.current = [];
+      rec.ondataavailable = (ev) => {
+        if (ev.data.size > 0) mediaChunksRef.current.push(ev.data);
+      };
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(mediaChunksRef.current, { type: mime });
+        mediaChunksRef.current = [];
+        if (blob.size < 64) return;
+        setTranscribing(true);
+        try {
+          const fd = new FormData();
+          fd.append('file', blob, 'voice.webm');
+          fd.append('locale', locale);
+          const r = await fetch('/api/proposals/transcribe', { method: 'POST', body: fd });
+          const d = (await r.json()) as { text?: string; error?: string };
+          if (!r.ok || !d.text?.trim()) {
+            setError(d.error || ui(locale, 'No se pudo transcribir.', 'Não foi possível transcrever.', 'Could not transcribe.'));
+            return;
+          }
+          setChatInput((prev) => (prev.trim() ? `${prev.trim()} ${d.text!.trim()}` : d.text!.trim()));
+        } catch {
+          setError(ui(locale, 'Error de transcripción.', 'Erro de transcrição.', 'Transcription error.'));
+        } finally {
+          setTranscribing(false);
+        }
+      };
+      mediaRecorderRef.current = rec;
+      rec.start();
+      setRecording(true);
+    } catch {
+      setError(
+        ui(
+          locale,
+          'No se pudo acceder al micrófono.',
+          'Não foi possível aceder ao microfone.',
+          'Could not access the microphone.',
+        ),
+      );
+    }
+  }, [recording, chatLoading, transcribing, locale]);
+
+  const handleAttachFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!files.length) return;
+    const MAX_FILES = 50;
+    const MAX_FILE_BYTES = 25 * 1024 * 1024;
+    const ACCEPTED_EXT =
+      /\.(pdf|docx?|xlsx?|pptx?|txt|md|csv|rtf|odt|ods|odp|zip|rar|7z|png|jpe?g|gif|webp)$/i;
+    const TEXT_EXT = /\.(txt|md|csv|rtf)$/i;
+    const additions: AttachedFile[] = [];
+    for (const file of files) {
+      if (!ACCEPTED_EXT.test(file.name) || file.size > MAX_FILE_BYTES) continue;
+      let textExcerpt: string | undefined;
+      if (TEXT_EXT.test(file.name) && file.size < 400_000) {
+        try {
+          textExcerpt = (await file.text()).slice(0, 12_000);
+        } catch {
+          textExcerpt = undefined;
+        }
+      }
+      additions.push({
+        name: file.name,
+        size: file.size,
+        type: file.type || 'application/octet-stream',
+        uploadedAt: new Date().toISOString(),
+        textExcerpt,
+      });
+    }
+    if (!additions.length) return;
+    setAttachedFiles((prev) => {
+      const next = [...prev];
+      for (const file of additions) {
+        if (next.length >= MAX_FILES) break;
+        if (next.some((f) => f.name === file.name && f.size === file.size)) continue;
+        next.push(file);
+      }
+      return next;
+    });
+    setShowAttach(true);
+  }, []);
 
   const loadVersions = useCallback(async () => {
     if (!workspaceId || !companyId) return;
@@ -699,31 +905,6 @@ export default function FundHubProposalEditorPage() {
     },
     [workspaceId, companyId, persistDraft],
   );
-
-  const handleAttachFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    event.target.value = '';
-    if (!files.length) return;
-    const MAX_FILES = 50;
-    const MAX_FILE_BYTES = 25 * 1024 * 1024;
-    const ACCEPTED_EXT =
-      /\.(pdf|docx?|xlsx?|pptx?|txt|md|csv|rtf|odt|ods|odp|zip|rar|7z|png|jpe?g|gif|webp)$/i;
-    setAttachedFiles((prev) => {
-      const next = [...prev];
-      for (const file of files) {
-        if (next.length >= MAX_FILES) break;
-        if (!ACCEPTED_EXT.test(file.name) || file.size > MAX_FILE_BYTES) continue;
-        if (next.some((f) => f.name === file.name && f.size === file.size)) continue;
-        next.push({
-          name: file.name,
-          size: file.size,
-          type: file.type || 'application/octet-stream',
-          uploadedAt: new Date().toISOString(),
-        });
-      }
-      return next;
-    });
-  }, []);
 
   const exportAsMarkdown = useCallback(() => {
     if (documentMarkdown.trim()) return documentMarkdown;
@@ -1099,24 +1280,37 @@ export default function FundHubProposalEditorPage() {
       ) : (
         <div className="grid min-h-0 gap-3 lg:h-[calc(100dvh-11rem)] lg:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.2fr)]">
           <section className="flex h-[70vh] min-h-[22rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white lg:h-full">
-            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
+            <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
               <p className="text-sm font-semibold text-gray-900">
-                {stage === 'understand' ? 'Leitura do edital' : 'Chat'}
+                {stage === 'understand'
+                  ? ui(locale, 'Lectura del edital', 'Leitura do edital', 'Call reading')
+                  : ui(locale, 'Chat', 'Chat', 'Chat')}
               </p>
               {stage === 'write' ? (
-                <button
-                  type="button"
-                  onClick={() => void handleGenerateStructure()}
-                  disabled={chatLoading}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 hover:underline disabled:opacity-50"
-                >
-                  <Lightbulb className="h-3.5 w-3.5" />
-                  Estrutura
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleGenerateStructure()}
+                    disabled={chatLoading}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 hover:underline disabled:opacity-50"
+                  >
+                    <Lightbulb className="h-3.5 w-3.5" />
+                    {ui(locale, 'Estructura', 'Estrutura', 'Structure')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleBrainstorm()}
+                    disabled={chatLoading}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 hover:underline disabled:opacity-50"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {ui(locale, 'Ideas', 'Ideias', 'Ideas')}
+                  </button>
+                </div>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800">
                   <BookOpen className="h-3.5 w-3.5" />
-                  1 / 2 · Entender
+                  1 / 2 · {ui(locale, 'Entender', 'Entender', 'Understand')}
                 </span>
               )}
             </div>
@@ -1209,19 +1403,67 @@ export default function FundHubProposalEditorPage() {
                 rows={3}
                 placeholder={
                   stage === 'understand'
-                    ? 'Pergunte sobre o edital (elegibilidade, prazo, anexos)…'
-                    : 'Peça para redigir uma secção ou ajustar o tom do doador…'
+                    ? ui(
+                        locale,
+                        'Pregunte sobre el edital (elegibilidad, plazo, anexos)…',
+                        'Pergunte sobre o edital (elegibilidade, prazo, anexos)…',
+                        'Ask about the call (eligibility, deadline, annexes)…',
+                      )
+                    : ui(
+                        locale,
+                        'Pida redactar una sección o ajustar el tono del donante…',
+                        'Peça para redigir uma secção ou ajustar o tom do doador…',
+                        'Ask to draft a section or adjust donor tone…',
+                      )
                 }
                 className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
               />
-              <div className="mt-2 flex justify-end">
+              <input
+                ref={chatFileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={handleAttachFile}
+              />
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => chatFileInputRef.current?.click()}
+                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    title={ui(locale, 'Adjuntar archivo', 'Anexar ficheiro', 'Attach file')}
+                  >
+                    <Paperclip className="h-3.5 w-3.5" />
+                    {attachedFiles.length
+                      ? ui(locale, `Anexos (${attachedFiles.length})`, `Anexos (${attachedFiles.length})`, `Files (${attachedFiles.length})`)
+                      : ui(locale, 'Anexar', 'Anexar', 'Attach')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => (recording ? stopRecording() : void startRecording())}
+                    disabled={chatLoading || transcribing}
+                    className={`inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium disabled:opacity-50 ${
+                      recording
+                        ? 'bg-red-50 text-red-700 hover:bg-red-100'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                    title={ui(locale, 'Nota de voz', 'Nota de voz', 'Voice note')}
+                  >
+                    {recording ? <Square className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                    {transcribing
+                      ? ui(locale, 'Transcribiendo…', 'A transcrever…', 'Transcribing…')
+                      : recording
+                        ? ui(locale, 'Detener', 'Parar', 'Stop')
+                        : ui(locale, 'Audio', 'Áudio', 'Audio')}
+                  </button>
+                </div>
                 <button
                   type="submit"
-                  disabled={chatLoading || !chatInput.trim()}
+                  disabled={chatLoading || (!chatInput.trim() && !attachedFiles.some((f) => f.textExcerpt))}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
                 >
                   <Send className="h-3.5 w-3.5" />
-                  Enviar
+                  {ui(locale, 'Enviar', 'Enviar', 'Send')}
                 </button>
               </div>
             </form>

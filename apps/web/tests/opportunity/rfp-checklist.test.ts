@@ -49,7 +49,7 @@ describe('rfp-checklist', () => {
     );
     const titles = checklistToSectionTitles(items, 'en');
     assert.ok(titles.some((t) => /Budget/i.test(t)));
-    assert.ok(titles.some((t) => /Executive summary/i.test(t)));
+    assert.ok(!titles.some((t) => /Executive summary/i.test(t)));
     const md = appendChecklistSections('# Proposal\n\n## Draft\n\n', items, 'en');
     assert.match(md, /## Budget/);
   });

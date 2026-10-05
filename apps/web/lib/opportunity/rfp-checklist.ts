@@ -152,24 +152,14 @@ export function checklistToSectionTitles(
   const titles: string[] = [];
   const seen = new Set<string>();
   for (const item of items) {
-    const title = byId[item.id] || item.label;
+    // byId dá títulos de secção; label do checklist é acção («Montar orçamento…»).
+    const title = byId[item.id] || item.label?.trim() || item.id;
     const key = title.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     titles.push(title);
   }
-
-  // Secções base sempre úteis se há checklist
-  if (titles.length) {
-    const core = [
-      t('Resumo executivo', 'Resumen ejecutivo', 'Executive summary'),
-      t('Objectivos e resultados', 'Objetivos y resultados', 'Objectives and results'),
-      t('Actividades', 'Actividades', 'Activities'),
-    ];
-    for (const c of core.reverse()) {
-      if (!seen.has(c.toLowerCase())) titles.unshift(c);
-    }
-  }
+  // Não injectar template genérico (resumo / objectivos / actividades).
   return titles.slice(0, 14);
 }
 
