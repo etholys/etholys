@@ -161,7 +161,7 @@ export function MeetScheduleDialog({
           }
           void submit(event);
         }}
-        className="max-h-[96vh] w-full max-w-4xl overflow-y-auto rounded-t-3xl bg-slate-50 shadow-2xl sm:rounded-3xl"
+        className="etholys-meet-light max-h-[96vh] w-full max-w-4xl overflow-y-auto rounded-t-3xl bg-slate-50 shadow-2xl sm:rounded-3xl"
       >
         <div className="sticky top-0 z-10 flex items-center gap-4 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
           <button
@@ -225,7 +225,7 @@ export function MeetScheduleDialog({
                           required
                           value={startsAt}
                           onChange={(event) => updateStart(event.target.value)}
-                          className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
+                          className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
                         />
                       </label>
                       <label className="text-xs font-medium text-slate-500">
@@ -236,7 +236,7 @@ export function MeetScheduleDialog({
                           value={endsAt}
                           min={startsAt}
                           onChange={(event) => setEndsAt(event.target.value)}
-                          className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
+                          className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
                         />
                       </label>
                     </div>
@@ -245,7 +245,7 @@ export function MeetScheduleDialog({
                       <select
                         value={timezone}
                         onChange={(event) => setTimezone(event.target.value)}
-                        className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
+                        className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
                       >
                         {timezoneOptions.map((zone) => (
                           <option key={zone} value={zone}>
@@ -262,7 +262,7 @@ export function MeetScheduleDialog({
                           onChange={(event) =>
                             setRecurrence(event.target.value as ScheduleDraft['recurrence'])
                           }
-                          className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
+                          className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
                         >
                           <option value="none">
                             {t('Não se repete', 'No se repite', 'Does not repeat')}
@@ -283,7 +283,7 @@ export function MeetScheduleDialog({
                             value={recurrenceUntil}
                             min={startsAt.slice(0, 10)}
                             onChange={(event) => setRecurrenceUntil(event.target.value)}
-                            className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
+                            className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500"
                           />
                         </label>
                       )}
@@ -330,7 +330,7 @@ export function MeetScheduleDialog({
               <select
                 value={projectId}
                 onChange={(event) => setProjectId(event.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-sky-500"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-sky-500"
               >
                 <option value="">{t('Sem projeto vinculado', 'Sin proyecto vinculado', 'No linked project')}</option>
                 {projects.map((project) => (
@@ -366,7 +366,7 @@ export function MeetScheduleDialog({
                   'Agregar descripción, agenda o materiales de la reunión',
                   'Add description, agenda or meeting materials',
                 )}
-                className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-sky-500"
+                className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-sky-500"
               />
             </div>
           </div>

@@ -103,6 +103,28 @@
   --sys-nav-hover: rgba(255, 255, 255, 0.05);
 }
 
+/*
+ * CHORUS / Meet — superfícies sempre claras.
+ * O Hub define color-scheme no <html>; sem isto, datetime-local/select
+ * nativos ficam escuros com texto slate-900 (ilegível).
+ */
+.etholys-meet-light {
+  color-scheme: light;
+}
+.etholys-meet-light input:not([type='checkbox']):not([type='radio']):not([type='range']),
+.etholys-meet-light select,
+.etholys-meet-light textarea {
+  color-scheme: light;
+  background-color: #ffffff;
+  color: #0f172a;
+  border-color: #e2e8f0;
+}
+.etholys-meet-light input::placeholder,
+.etholys-meet-light textarea::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
 /* Sistemas — mesma atmosfera do Hub; canvas partilhado */
 .etholys-system,
 .etholys-fundhub {

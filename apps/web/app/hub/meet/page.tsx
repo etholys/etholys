@@ -617,7 +617,7 @@ function MeetHubContent() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-white pb-[env(safe-area-inset-bottom)]">
+    <div className="etholys-meet-light flex min-h-dvh flex-col bg-white pb-[env(safe-area-inset-bottom)]">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Link

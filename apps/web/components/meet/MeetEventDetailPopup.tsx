@@ -393,7 +393,7 @@ export function MeetEventDetailPopup({
       <div
         role="dialog"
         aria-modal="true"
-        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl lg:max-w-xl"
+        className="etholys-meet-light max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl lg:max-w-xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-end gap-1 px-3 pt-3">
@@ -442,7 +442,7 @@ export function MeetEventDetailPopup({
                     type="datetime-local"
                     value={startsAt}
                     onChange={(event) => setStartsAt(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
                   />
                 </label>
                 <label className="text-xs font-medium text-slate-500">
@@ -452,7 +452,7 @@ export function MeetEventDetailPopup({
                     value={endsAt}
                     min={startsAt || undefined}
                     onChange={(event) => setEndsAt(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
                   />
                 </label>
               </div>
@@ -473,7 +473,7 @@ export function MeetEventDetailPopup({
                     }
                     setTimezone(next);
                   }}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
                 >
                   {timezoneOptions.map((zone) => (
                     <option key={zone} value={zone}>
@@ -487,7 +487,7 @@ export function MeetEventDetailPopup({
                 onChange={(event) => setDescription(event.target.value)}
                 rows={3}
                 placeholder={t('Descrição', 'Descripción', 'Description')}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
               />
 
               {projects.length > 0 && (
@@ -499,7 +499,7 @@ export function MeetEventDetailPopup({
                   <select
                     value={projectId}
                     onChange={(event) => setProjectId(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
                   >
                     <option value="">
                       {t('Sem projeto', 'Sin proyecto', 'No project')}
