@@ -204,9 +204,19 @@ async function createLine(companyId: string, engagementId: string | null, userId
     return NextResponse.json({ error: 'Parcela e tipo de linha obrigatórios.' }, { status: 400 });
   }
   const unit = await prisma.nexusOpsUnit.findFirst({
-    where: { id: unitId, companyId, isActive: true, kind: 'parcel' },
+    where: {
+      id: unitId,
+      companyId,
+      isActive: true,
+      kind: kind === 'scout' ? { in: ['parcel', 'lot', 'herd', 'generic'] } : 'parcel',
+    },
   });
-  if (!unit) return NextResponse.json({ error: 'Parcela inválida.' }, { status: 400 });
+  if (!unit) {
+    return NextResponse.json(
+      { error: kind === 'scout' ? 'Espaço inválido.' : 'Parcela inválida.' },
+      { status: 400 },
+    );
+  }
 
   const note = String(body.note || '').trim().slice(0, 2000);
   const mm =

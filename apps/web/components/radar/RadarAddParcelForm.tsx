@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { Loader2, MapPinned, Plus } from 'lucide-react';
 import type { RadarCrop } from '@/lib/radar/site-layout';
-
-type Loc = 'pt' | 'es' | 'en';
+import { spaceKindMeta, type Loc } from '@/lib/radar/space';
 
 export function RadarAddParcelForm({
   locale,
@@ -13,6 +12,7 @@ export function RadarAddParcelForm({
   onSubmit,
   onCancel,
   compact,
+  moduleId,
 }: {
   locale: string;
   crops: RadarCrop[];
@@ -20,8 +20,10 @@ export function RadarAddParcelForm({
   onSubmit: (input: { name: string; crop?: string; areaHa?: number }) => Promise<void>;
   onCancel?: () => void;
   compact?: boolean;
+  moduleId?: string | null;
 }) {
   const loc: Loc = locale === 'es' || locale === 'en' ? locale : 'pt';
+  const meta = spaceKindMeta(moduleId);
   const [name, setName] = useState('');
   const [crop, setCrop] = useState('');
   const [area, setArea] = useState('');
@@ -55,21 +57,15 @@ export function RadarAddParcelForm({
       <div className="flex items-center gap-2">
         <MapPinned className="h-4 w-4 text-emerald-200" />
         <p className="text-sm font-semibold text-emerald-50">
-          {loc === 'es' ? 'Nueva parcela' : loc === 'en' ? 'New parcel' : 'Nova parcela'}
+          {loc === 'en' ? `New ${meta.unitLabel.en.toLowerCase()}` : `Nova ${meta.unitLabel[loc].toLowerCase()}`}
         </p>
       </div>
-      <p className="mt-1 text-xs text-white/50">
-        {loc === 'es'
-          ? 'Crea un pedazo de tierra en el mapa y asigná un cultivo.'
-          : loc === 'en'
-            ? 'Create a plot on the map and assign a crop.'
-            : 'Cria um pedaço de terra no mapa e associa um cultivo.'}
-      </p>
+      <p className="mt-1 text-xs text-white/50">{meta.hint[loc]}</p>
       <div className="mt-3 grid gap-2 sm:grid-cols-3">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder={loc === 'en' ? 'Parcel name (e.g. North)' : 'Nome da parcela (ex.: Norte)'}
+          placeholder={meta.exampleName[loc]}
           className="rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-3"
           autoFocus
         />
@@ -79,7 +75,9 @@ export function RadarAddParcelForm({
             onChange={(e) => setCrop(e.target.value)}
             className="rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
           >
-            <option value="">{loc === 'en' ? 'Crop (optional)' : 'Cultivo (opcional)'}</option>
+            <option value="">
+              {meta.secondaryLabel[loc]} ({loc === 'en' ? 'optional' : 'opcional'})
+            </option>
             {crops.map((c) => (
               <option key={c.id} value={c.name}>
                 {c.name}
@@ -91,7 +89,7 @@ export function RadarAddParcelForm({
           <input
             value={crop}
             onChange={(e) => setCrop(e.target.value)}
-            placeholder={loc === 'en' ? 'Crop (optional)' : 'Cultivo (opcional)'}
+            placeholder={`${meta.secondaryLabel[loc]} (${loc === 'en' ? 'optional' : 'opcional'})`}
             className="rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
           />
         )}
@@ -99,7 +97,7 @@ export function RadarAddParcelForm({
           value={area}
           onChange={(e) => setArea(e.target.value)}
           inputMode="decimal"
-          placeholder="ha"
+          placeholder={meta.areaUnit[loc]}
           className="rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
         />
       </div>

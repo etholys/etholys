@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, Radio, Sprout } from 'lucide-react';
 import { RADAR_MODULES, type RadarModuleId } from '@/lib/etholys-products';
-import { isRadarModuleId } from '@/lib/radar/space';
+import { isRadarModuleId, spaceKindMeta } from '@/lib/radar/space';
 import type { PropertyStepId, PropertyStepState } from '@/lib/radar/property-progress';
 import { RadarProgressRail } from '@/components/radar/RadarProgressRail';
 import { RadarGeoPin } from '@/components/radar/RadarGeoPin';
@@ -13,6 +13,7 @@ import { RadarOpsView } from '@/components/radar/RadarViews';
 import { RadarCropsPanel } from '@/components/radar/RadarCropsPanel';
 import { RadarAddParcelForm } from '@/components/radar/RadarAddParcelForm';
 import { RadarChainBoard } from '@/components/radar/RadarChainBoard';
+import { RadarSpaceOpsPanel } from '@/components/radar/RadarSpaceOpsPanel';
 import type { RadarCrop } from '@/lib/radar/site-layout';
 
 type Loc = 'pt' | 'es' | 'en';
@@ -132,6 +133,7 @@ export function RadarPropertyWorkspace({
   }
 
   const characterized = data.steps.find((s) => s.id === 'characterize')?.done;
+  const kindMeta = spaceKindMeta(data.moduleId);
   const mapParcels = data.units
     .filter((u) => u.kind === 'parcel' || u.kind === 'lot' || u.kind === 'herd' || u.kind === 'generic')
     .map((u) => ({
@@ -146,6 +148,10 @@ export function RadarPropertyWorkspace({
     }));
 
   const showOperate = Boolean(characterized) && mode === 'operate';
+  const companyQ = engagementId
+    ? `company=${companyId}&engagement=${engagementId}`
+    : `company=${companyId}`;
+  const chainHref = `/hub/radar/cadeia?${companyQ}`;
 
   return (
     <div className="space-y-5">
@@ -211,35 +217,17 @@ export function RadarPropertyWorkspace({
             <RadarOpsView companyId={companyId} engagementId={engagementId} locale={loc} />
           ) : (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">
-                  {loc === 'en' ? 'Spaces in this site' : 'Espaços neste sítio'}
-                </p>
-                {mapParcels.length === 0 ? (
-                  <p className="mt-2 text-sm text-white/50">
-                    {loc === 'en'
-                      ? 'Add rooms, lines or areas in Setup → Draw plant.'
-                      : 'Adiciona salas, linhas ou áreas em Configurar → Desenhar planta.'}
-                  </p>
-                ) : (
-                  <ul className="mt-2 space-y-1">
-                    {mapParcels.map((u) => (
-                      <li key={u.id}>
-                        <button
-                          type="button"
-                          onClick={() => setFocusedId(u.id)}
-                          className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
-                            focusedId === u.id ? 'bg-emerald-500/15 text-emerald-50' : 'text-white/70 hover:bg-white/5'
-                          }`}
-                        >
-                          {u.name}
-                          {u.crop ? <span className="text-white/40"> · {u.crop}</span> : null}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              <RadarSpaceOpsPanel
+                companyId={companyId}
+                engagementId={engagementId}
+                locale={loc}
+                moduleId={data.moduleId}
+                propertyName={data.name}
+                units={data.units}
+                focusedId={focusedId}
+                onFocus={setFocusedId}
+                chainHref={chainHref}
+              />
               <RadarChainBoard
                 companyId={companyId}
                 engagementId={engagementId}
@@ -313,7 +301,7 @@ export function RadarPropertyWorkspace({
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
                 <span className="text-xs uppercase tracking-wide text-white/45">
-                  {loc === 'es' ? 'Cultivo' : loc === 'en' ? 'Crop' : 'Cultura'}
+                  {moduleId ? spaceKindMeta(moduleId).secondaryLabel[loc] : loc === 'es' ? 'Cultivo' : loc === 'en' ? 'Crop' : 'Cultura'}
                 </span>
                 <input
                   value={crop}
@@ -322,7 +310,9 @@ export function RadarPropertyWorkspace({
                 />
               </label>
               <label className="block">
-                <span className="text-xs uppercase tracking-wide text-white/45">ha</span>
+                <span className="text-xs uppercase tracking-wide text-white/45">
+                  {moduleId ? spaceKindMeta(moduleId).areaUnit[loc] : 'ha'}
+                </span>
                 <input
                   value={area}
                   onChange={(e) => setArea(e.target.value)}
@@ -360,16 +350,8 @@ export function RadarPropertyWorkspace({
         {step === 'draw' && (
           <div className="space-y-5">
             <div>
-              <h2 className="font-serif text-2xl text-white">
-                {loc === 'es' ? 'Dibujar planta' : loc === 'en' ? 'Draw plant' : 'Desenhar planta'}
-              </h2>
-              <p className="mt-1 text-sm text-white/55">
-                {loc === 'es'
-                  ? 'Agregá parcelas (pedazos de tierra), asigná cultivos, arrastrá y redimensioná.'
-                  : loc === 'en'
-                    ? 'Add parcels (plots), assign crops, drag and resize.'
-                    : 'Adiciona parcelas (pedaços de terra), associa cultivos, arrasta e redimensiona.'}
-              </p>
+              <h2 className="font-serif text-2xl text-white">{kindMeta.drawTitle[loc]}</h2>
+              <p className="mt-1 text-sm text-white/55">{kindMeta.hint[loc]}</p>
             </div>
             {!characterized ? (
               <EmptyHint
@@ -383,23 +365,26 @@ export function RadarPropertyWorkspace({
               />
             ) : (
               <>
-                <RadarCropsPanel
-                  locale={loc}
-                  crops={data.crops || []}
-                  busy={busy}
-                  onAdd={async (input) => {
-                    await patch({ action: 'crop_add', ...input });
-                    await load();
-                  }}
-                  onRemove={async (cropId) => {
-                    await patch({ action: 'crop_remove', cropId });
-                    await load();
-                  }}
-                />
+                {data.moduleId === 'agriculture' && (
+                  <RadarCropsPanel
+                    locale={loc}
+                    crops={data.crops || []}
+                    busy={busy}
+                    onAdd={async (input) => {
+                      await patch({ action: 'crop_add', ...input });
+                      await load();
+                    }}
+                    onRemove={async (cropId) => {
+                      await patch({ action: 'crop_remove', cropId });
+                      await load();
+                    }}
+                  />
+                )}
 
                 {addingParcel || mapParcels.length === 0 ? (
                   <RadarAddParcelForm
                     locale={loc}
+                    moduleId={data.moduleId}
                     crops={data.crops || []}
                     busy={busy}
                     onCancel={mapParcels.length > 0 ? () => setAddingParcel(false) : undefined}
@@ -431,7 +416,7 @@ export function RadarPropertyWorkspace({
                   onRequestAddParcel={() => setAddingParcel(true)}
                 />
 
-                {focusedId && mapParcels.length > 0 && (
+                {focusedId && mapParcels.length > 0 && data.moduleId === 'agriculture' && (
                   <ParcelAssignCrop
                     locale={loc}
                     unit={data.units.find((u) => u.id === focusedId)}
