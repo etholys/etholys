@@ -109,6 +109,8 @@ type Props = {
   onRequestAddParcel?: () => void;
   /** Unit ids to connect with a custody dashed path (centers). */
   trailUnitIds?: string[];
+  /** Taller board when home shows a single site as the hero. */
+  hero?: boolean;
 };
 
 function HeaderIcon({ moduleId }: { moduleId?: string | null }) {
@@ -131,6 +133,7 @@ export function RadarSiteMap({
   onSaved,
   onRequestAddParcel,
   trailUnitIds,
+  hero = false,
 }: Props) {
   const loc = radarLoc(locale);
   const canEdit = mode === 'ops' || mode === 'empresa';
@@ -367,7 +370,9 @@ export function RadarSiteMap({
         ref={boardRef}
         role="application"
         aria-label={copy.plant}
-        className="relative touch-none select-none aspect-[16/10] min-h-[240px] sm:min-h-[320px]"
+        className={`relative touch-none select-none aspect-[16/10] ${
+          hero ? 'min-h-[280px] sm:min-h-[380px] md:min-h-[440px]' : 'min-h-[240px] sm:min-h-[320px]'
+        }`}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}

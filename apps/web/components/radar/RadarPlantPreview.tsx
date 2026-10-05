@@ -11,12 +11,15 @@ export function RadarPlantPreview({
   propertyId,
   locale,
   moduleId,
+  hero = false,
 }: {
   companyId: string;
   engagementId?: string | null;
   propertyId: string;
   locale: string;
   moduleId?: string | null;
+  /** Larger plant surface when home has a single site. */
+  hero?: boolean;
 }) {
   const [parcels, setParcels] = useState<MapParcel[]>([]);
   const [sensors, setSensors] = useState<Array<{ id: string; name: string; unitId: string | null; lastValue: number | null }>>([]);
@@ -76,7 +79,17 @@ export function RadarPlantPreview({
     );
   }
 
-  if (parcels.length === 0) return null;
+  if (parcels.length === 0) {
+    return (
+      <div
+        className={`flex items-center justify-center rounded-[1.5rem] border border-dashed border-white/15 bg-[#0a1620] text-sm text-white/50 ${
+          hero ? 'min-h-[22rem] md:min-h-[28rem]' : 'min-h-[12rem]'
+        }`}
+      >
+        —
+      </div>
+    );
+  }
 
   return (
     <RadarSiteMap
@@ -91,6 +104,7 @@ export function RadarPlantPreview({
       focusedId={focusedId}
       onFocus={setFocusedId}
       trailUnitIds={parcels.map((p) => p.id)}
+      hero={hero}
     />
   );
 }

@@ -74,15 +74,17 @@ export function RadarChainTrailBar({
   locale,
   stage,
   code,
+  href,
 }: {
   locale: string;
   stage: TraceStage;
   code?: string;
+  href?: string;
 }) {
   const loc = radarLoc(locale);
   const cur = TRACE_STAGES.indexOf(stage);
-  return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-2">
+  const inner = (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-2 transition hover:border-emerald-400/30">
       {code && <span className="text-[11px] font-semibold text-emerald-200">{code}</span>}
       <ol className="flex flex-1 items-center gap-1">
         {TRACE_STAGES.map((s, i) => {
@@ -111,6 +113,8 @@ export function RadarChainTrailBar({
       <Truck className="h-3.5 w-3.5 shrink-0 text-white/40" />
     </div>
   );
+  if (!href) return inner;
+  return <Link href={href}>{inner}</Link>;
 }
 
 export function RadarOpsCanvas({
@@ -121,6 +125,7 @@ export function RadarOpsCanvas({
   selectedId,
   onSelect,
   hrefFor,
+  chainHref,
 }: {
   locale: string;
   properties: OpsCanvasProperty[];
@@ -129,6 +134,7 @@ export function RadarOpsCanvas({
   selectedId: string | null;
   onSelect: (id: string) => void;
   hrefFor: (id: string) => string;
+  chainHref?: string;
 }) {
   const loc: RadarLoc = radarLoc(locale);
   const openLot = lots.find((l) => l.status === 'open') || lots[0] || null;
@@ -154,7 +160,12 @@ export function RadarOpsCanvas({
   return (
     <div className="space-y-3">
       {openLot && (
-        <RadarChainTrailBar locale={locale} stage={openLot.currentStage} code={openLot.code} />
+        <RadarChainTrailBar
+          locale={locale}
+          stage={openLot.currentStage}
+          code={openLot.code}
+          href={chainHref}
+        />
       )}
       <div
         className="relative aspect-[16/10] overflow-hidden rounded-[1.5rem] border border-white/10"

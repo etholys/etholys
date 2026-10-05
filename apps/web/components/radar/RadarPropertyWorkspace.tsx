@@ -214,7 +214,12 @@ export function RadarPropertyWorkspace({
       {showOperate ? (
         <div className="space-y-6">
           {openLot && (
-            <RadarChainTrailBar locale={loc} stage={openLot.currentStage} code={openLot.code} />
+            <RadarChainTrailBar
+              locale={loc}
+              stage={openLot.currentStage}
+              code={openLot.code}
+              href={chainHref}
+            />
           )}
           <RadarSiteMap
             companyId={companyId}
@@ -239,37 +244,37 @@ export function RadarPropertyWorkspace({
               setAddingParcel(true);
             }}
             trailUnitIds={openLot ? mapParcels.map((p) => p.id) : undefined}
+            hero
+          />
+
+          <RadarSpaceOpsPanel
+            companyId={companyId}
+            engagementId={engagementId}
+            locale={loc}
+            moduleId={data.moduleId}
+            propertyName={data.name}
+            units={data.units}
+            focusedId={focusedId}
+            onFocus={setFocusedId}
+            chainHref={chainHref}
           />
 
           {data.moduleId === 'agriculture' ? (
             <RadarOpsView companyId={companyId} engagementId={engagementId} locale={loc} />
           ) : (
-            <div className="space-y-4">
-              <RadarSpaceOpsPanel
-                companyId={companyId}
-                engagementId={engagementId}
-                locale={loc}
-                moduleId={data.moduleId}
-                propertyName={data.name}
-                units={data.units}
-                focusedId={focusedId}
-                onFocus={setFocusedId}
-                chainHref={chainHref}
-              />
-              <RadarChainBoard
-                companyId={companyId}
-                engagementId={engagementId}
-                locale={loc}
-                unitId={focusedId}
-                unitCrop={data.units.find((u) => u.id === focusedId)?.crop || data.crop}
-                unitOptions={data.units.map((u) => ({
-                  id: u.id,
-                  name: u.name,
-                  crop: u.crop,
-                  propertyName: data.name,
-                }))}
-              />
-            </div>
+            <RadarChainBoard
+              companyId={companyId}
+              engagementId={engagementId}
+              locale={loc}
+              unitId={focusedId}
+              unitCrop={data.units.find((u) => u.id === focusedId)?.crop || data.crop}
+              unitOptions={data.units.map((u) => ({
+                id: u.id,
+                name: u.name,
+                crop: u.crop,
+                propertyName: data.name,
+              }))}
+            />
           )}
         </div>
       ) : (

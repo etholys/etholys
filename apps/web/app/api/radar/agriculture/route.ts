@@ -64,6 +64,7 @@ export async function GET(req: NextRequest) {
   ]);
 
   const parcelIds = new Set(units.filter(isRadarParcel).map((u) => u.id));
+  const unitIds = new Set(units.map((u) => u.id));
   const parcelEntries = entries.filter((e) => e.unitId && parcelIds.has(e.unitId));
   const board = buildAgricultureBoard({
     now: new Date(),
@@ -85,13 +86,16 @@ export async function GET(req: NextRequest) {
       })),
   });
 
-  const lines = parcelEntries.slice(0, 20)
+  const lines = entries
+    .filter((e) => e.unitId && unitIds.has(e.unitId))
+    .slice(0, 24)
     .map((e) => ({
       id: e.id,
       kind: e.kind,
       occurredAt: e.occurredAt.toISOString(),
       channel: e.channel,
       note: noteOf(e.payloadJson),
+      unitId: e.unitId,
       unitName: e.unit?.name || null,
     }));
 

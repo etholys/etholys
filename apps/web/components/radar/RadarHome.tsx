@@ -6,10 +6,10 @@ import { Loader2, MapPinned, Plus } from 'lucide-react';
 import { useRadarClientScopeOptional } from '@/components/radar/RadarClientScopeContext';
 import { RADAR_SCOPE_ALL, RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
 import type { PropertyStepState } from '@/lib/radar/property-progress';
-import { RadarOpsCanvas } from '@/components/radar/RadarOpsCanvas';
+import { RadarChainTrailBar, RadarOpsCanvas } from '@/components/radar/RadarOpsCanvas';
 import { RadarPlantPreview } from '@/components/radar/RadarPlantPreview';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
-import type { TraceStage } from '@/lib/radar/trace';
+import { isTraceStage, type TraceStage } from '@/lib/radar/trace';
 
 type PropRow = {
   id: string;
@@ -114,6 +114,12 @@ export function RadarHome({
   const selected = properties.find((p) => p.id === selectedId) || properties[0] || null;
   const selectedAlerts = alerts.filter((a) => a.propertyId === selected?.id);
   const urgentCount = alerts.filter((a) => a.severity === 'critical' || a.severity === 'warning').length;
+  const chainHref = `/hub/radar/cadeia?${companyQ}`;
+  const openLot = lots.find((l) => l.status === 'open' && isTraceStage(l.currentStage)) || null;
+  const singleSite = properties.length === 1;
+  const openHref = selected
+    ? `/hub/radar/properties/${selected.id}?${companyQ}&client=${selected.clientId || RADAR_SCOPE_OWN}`
+    : null;
 
   const treeGroups = useMemo(() => {
     const map = new Map<string, PropRow[]>();
@@ -205,6 +211,49 @@ export function RadarHome({
             {radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
           </button>
         </div>
+      ) : singleSite && selected && openHref ? (
+        <div className="space-y-3">
+          {openLot && (
+            <RadarChainTrailBar
+              locale={loc}
+              stage={openLot.currentStage}
+              code={openLot.code}
+              href={chainHref}
+            />
+          )}
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-medium text-white">{selected.name}</h2>
+              {selected.crop && <p className="mt-0.5 text-sm text-white/50">{selected.crop}</p>}
+            </div>
+            <Link
+              href={openHref}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-[#04110c]"
+            >
+              <MapPinned className="h-4 w-4" />
+              {radarT(loc, 'Operar', 'Operar', 'Operate')}
+            </Link>
+          </div>
+          <RadarPlantPreview
+            companyId={companyId}
+            engagementId={engagementId}
+            propertyId={selected.id}
+            locale={loc}
+            moduleId={selected.moduleId}
+            hero
+          />
+          {selectedAlerts.length > 0 ? (
+            <ul className="space-y-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+              {selectedAlerts.slice(0, 2).map((a) => (
+                <li key={a.id}>
+                  <Link href={a.href} className="text-sm text-white/75 hover:text-emerald-200">
+                    {a.message[loc]}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[200px_minmax(0,1fr)]">
           <aside className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
@@ -245,6 +294,7 @@ export function RadarHome({
               lots={lots}
               selectedId={selected?.id || null}
               onSelect={setSelectedId}
+              chainHref={chainHref}
               hrefFor={(id) => {
                 const p = properties.find((x) => x.id === id);
                 return `/hub/radar/properties/${id}?${companyQ}&client=${p?.clientId || RADAR_SCOPE_OWN}`;
@@ -261,7 +311,7 @@ export function RadarHome({
               />
             )}
 
-            {selected && (
+            {selected && openHref && (
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -269,7 +319,7 @@ export function RadarHome({
                     {selected.crop && <p className="mt-1 text-sm text-white/50">{selected.crop}</p>}
                   </div>
                   <Link
-                    href={`/hub/radar/properties/${selected.id}?${companyQ}&client=${selected.clientId || RADAR_SCOPE_OWN}`}
+                    href={openHref}
                     className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-[#04110c]"
                   >
                     <MapPinned className="h-4 w-4" />
