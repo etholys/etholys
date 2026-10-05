@@ -27,6 +27,7 @@ import {
   FileText,
   ClipboardCheck,
   ChevronDown,
+  X,
 } from 'lucide-react';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import { RichTextPane } from '@/components/etholys/RichTextPane';
@@ -48,7 +49,6 @@ import {
   reviewStatusLabel,
   type ProposalReviewStatus,
 } from '@/lib/opportunity/proposal-review';
-import { sysTheme } from '@/lib/system-shell';
 
 interface Fund extends ProposalFundSeed {
   id: string;
@@ -104,7 +104,7 @@ export default function FundHubProposalEditorPage() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [showAttach, setShowAttach] = useState(true);
+  const [showAttach, setShowAttach] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openingStudio, setOpeningStudio] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -1777,43 +1777,74 @@ export default function FundHubProposalEditorPage() {
                           ? ui(locale, 'Notas del edital', 'Notas do edital', 'Call notes')
                           : ui(locale, 'Documento', 'Documento', 'Document')}
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => setShowAttach((v) => !v)}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-white/65 transition hover:text-amber-200"
-                      >
-                        <Paperclip className="h-3.5 w-3.5" />
-                        {ui(locale, 'Anexos', 'Anexos', 'Files')}
-                        {attachedFiles.length ? ` (${attachedFiles.length})` : ''}
-                      </button>
-                    </div>
-                    {showAttach && (
-                      <div className="border-b border-white/10 px-3 py-2 text-xs">
-                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-white/20 px-3 py-2 text-white/75 transition hover:bg-white/[0.04] hover:text-white">
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowAttach((v) => !v)}
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition',
+                            showAttach || attachedFiles.length
+                              ? 'bg-white/[0.08] text-amber-200'
+                              : 'text-white/65 hover:bg-white/[0.06] hover:text-amber-200',
+                          )}
+                          aria-expanded={showAttach}
+                        >
                           <Paperclip className="h-3.5 w-3.5" />
-                          {ui(locale, 'Adjuntar', 'Anexar', 'Attach')}
-                          <input type="file" multiple className="hidden" onChange={handleAttachFile} />
-                        </label>
-                        {attachedFiles.length > 0 && (
-                          <ul className="mt-2 space-y-1 text-white/70">
-                            {attachedFiles.map((file, index) => (
-                              <li key={`${file.name}-${index}`} className="flex justify-between gap-2">
-                                <span className="truncate">{file.name}</span>
-                                <button
-                                  type="button"
-                                  className="text-red-300 hover:text-red-200"
-                                  onClick={() =>
-                                    setAttachedFiles((prev) => prev.filter((_, i) => i !== index))
-                                  }
-                                >
-                                  {ui(locale, 'Quitar', 'Remover', 'Remove')}
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
+                          {attachedFiles.length
+                            ? ui(
+                                locale,
+                                `Anexos (${attachedFiles.length})`,
+                                `Anexos (${attachedFiles.length})`,
+                                `Files (${attachedFiles.length})`,
+                              )
+                            : ui(locale, 'Anexos', 'Anexos', 'Files')}
+                          <ChevronDown
+                            className={cn('h-3 w-3 opacity-70 transition', showAttach && 'rotate-180')}
+                          />
+                        </button>
+                        {showAttach && (
+                          <div className="absolute right-0 top-full z-20 mt-1 w-[min(17rem,calc(100vw-2rem))] rounded-lg border border-white/15 bg-[#152033] p-2 shadow-xl">
+                            <label className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed border-white/20 px-2.5 py-1.5 text-[11px] font-medium text-white/75 transition hover:bg-white/[0.06] hover:text-white">
+                              <Paperclip className="h-3.5 w-3.5" />
+                              {ui(locale, 'Adjuntar', 'Anexar', 'Attach')}
+                              <input type="file" multiple className="hidden" onChange={handleAttachFile} />
+                            </label>
+                            {attachedFiles.length > 0 ? (
+                              <ul className="mt-2 flex max-h-36 flex-wrap gap-1.5 overflow-y-auto">
+                                {attachedFiles.map((file, index) => (
+                                  <li
+                                    key={`${file.name}-${index}`}
+                                    className="inline-flex max-w-full items-center gap-1 rounded-md bg-white/[0.08] py-0.5 pl-2 pr-1 text-[11px] text-white/80"
+                                    title={file.name}
+                                  >
+                                    <span className="max-w-[9rem] truncate">{file.name}</span>
+                                    <button
+                                      type="button"
+                                      className="rounded p-0.5 text-white/45 transition hover:bg-white/10 hover:text-red-300"
+                                      aria-label={ui(locale, 'Quitar', 'Remover', 'Remove')}
+                                      onClick={() =>
+                                        setAttachedFiles((prev) => prev.filter((_, i) => i !== index))
+                                      }
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-2 text-center text-[11px] text-white/40">
+                                {ui(
+                                  locale,
+                                  'Ningún archivo adjunto',
+                                  'Nenhum ficheiro anexado',
+                                  'No files attached',
+                                )}
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
+                    </div>
                     <div className="min-h-0 flex-1 overflow-hidden bg-white/[0.03]">
                       <RichTextPane
                         value={documentMarkdown}
