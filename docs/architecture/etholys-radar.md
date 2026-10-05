@@ -25,7 +25,11 @@ RADAR é **sempre a empresa** no Etholys — um produto, uma central. Não há g
 | **Caso zero** | Só a minha fazenda — propriedades com `clientId` null; sem clientes nem técnicos obrigatórios |
 | **Clientes** | Opcionais. Criar novo **ou** vincular empresa AURORA/ATER (`linkedCompanyId`) |
 | **Técnicos** | Da lista de funcionários; atribuição por cliente/propriedade em escala; flags `canSeeAll` / `canCreateClients` |
-| **Home** | `/hub/radar` — alertas + propriedades do âmbito + clientes + técnicos |
+| **Home** | `/hub/radar` — **mapa** da operação (árvore de espaços + canvas + aviso quieto). Não é muro de alertas. |
+| **Nav** | Mapa · Cadeia · Tarefas · Equipa |
+| **Tarefas** | `/hub/radar/tarefas` — lista curta a partir de alertas (prioridade), não grelha LED |
+| **Cadeia** | `/hub/radar/cadeia` — lotes / custódia |
+| **Equipa** | `/hub/radar/equipa` — técnicos + clientes (admin) |
 
 Rotas legadas `/hub/radar/provider` e `/hub/radar/producer` redireccionam para `/hub/radar`.
 
@@ -49,7 +53,7 @@ Rotas: `/hub/radar/properties/[id]`. APIs: `/api/radar/org-role`, `/api/radar/cl
 
 `GET /api/radar/alerts?companyId=&clientId=` (opcional; `all` / omitido = carteira inteira na prestadora).
 
-Agrega por propriedade no âmbito: humidade/PHI (board agricultura), sensores em falta, funil incompleto, lotes abertos sem check-in recente, WhatsApp desligado/não configurado. UI: `RadarAlertsDashboard` na central prestadora/produtor.
+Agrega por propriedade no âmbito: humidade/PHI (board agricultura), sensores em falta, funil incompleto, lotes abertos sem check-in recente, WhatsApp desligado/não configurado. Alimenta o badge «atenção» no mapa e a lista em `/hub/radar/tarefas` — não a home como grelha LED.
 
 Cartões: severity · cliente · propriedade · mensagem · link para `/hub/radar/properties/[id]`.
 

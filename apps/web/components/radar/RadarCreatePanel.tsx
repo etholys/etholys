@@ -164,10 +164,10 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
         ? 'Register client'
         : 'Cadastrar cliente'
     : loc === 'es'
-      ? 'Registrar finca / propiedad'
+      ? 'Nuevo espacio'
       : loc === 'en'
-        ? 'Register farm / property'
-        : 'Cadastrar fazenda / propriedade';
+        ? 'New space'
+        : 'Novo espaço';
 
   return (
     <div className="mb-6 rounded-[1.35rem] border border-emerald-400/30 bg-emerald-500/10 px-5 py-5">
@@ -224,8 +224,8 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
                   ? 'Client name'
                   : 'Nome do cliente'
                 : loc === 'en'
-                  ? 'Farm / property name'
-                  : 'Nome da fazenda / propriedade'
+                  ? 'Space name'
+                  : 'Nome do espaço'
             }
             className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
             autoFocus

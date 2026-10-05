@@ -135,12 +135,6 @@ export function RadarTechniciansPanel({
         </button>
       </div>
 
-      <p className="text-xs text-white/45">
-        {loc === 'en'
-          ? 'Staff from your company. By default they only see assigned clients/properties — unless “see all”.'
-          : 'Funcionários da empresa. Por defeito só veem o atribuído — salvo “ver tudo”.'}
-      </p>
-
       {err && <p className="text-sm text-rose-200">{err}</p>}
 
       {open && (
@@ -217,11 +211,7 @@ export function RadarTechniciansPanel({
 
       {loading ? (
         <Loader2 className="h-5 w-5 animate-spin text-emerald-300" />
-      ) : technicians.length === 0 ? (
-        <p className="text-sm text-white/45">
-          {loc === 'en' ? 'No technicians yet — optional if you work alone.' : 'Ainda sem técnicos — opcional se trabalhas sozinho.'}
-        </p>
-      ) : (
+      ) : technicians.length > 0 ? (
         <ul className="space-y-2">
           {technicians.map((t) => (
             <li
@@ -252,7 +242,7 @@ export function RadarTechniciansPanel({
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
     </section>
   );
 }
