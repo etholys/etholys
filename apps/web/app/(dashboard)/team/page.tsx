@@ -25,15 +25,25 @@ export default function TeamPage() {
   const [search, setSearch] = useState('');
 
   const fetchUsers = () => {
-    fetch('/api/users?detail=1').then(r => r.json()).then(d => { setUsers(d?.users ?? []); setLoading(false); }).catch(() => setLoading(false));
+    const q = new URLSearchParams({ detail: '1' });
+    if (activeCompanyId) q.set('companyId', activeCompanyId);
+    fetch(`/api/users?${q}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setUsers(d?.users ?? []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   };
 
   useEffect(() => {
+    setLoading(true);
     fetchUsers();
     fetch('/api/companies').then(r => r.json()).then(d => setCompanies(d?.companies ?? [])).catch(() => {});
     fetch('/api/departments').then(r => r.json()).then(d => setDepartments(d?.departments ?? [])).catch(() => {});
     fetch('/api/roles').then(r => r.json()).then(d => setCustomRoles(d?.roles ?? [])).catch(() => {});
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when company selector changes
+  }, [activeCompanyId]);
 
   const getRoleInfo = (userRole: string) => {
     const cr = customRoles.find(r => r.code === userRole || r.name.toUpperCase().replace(/\s+/g, '_') === userRole);

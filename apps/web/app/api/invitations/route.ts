@@ -105,18 +105,78 @@ export async function POST(req: Request) {
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
-    if (existingUser && data.inviteKind !== 'ally') {
-      const alreadyMember = await prisma.companyUser.findFirst({
-        where: { userId: existingUser.id, companyId: data.companyId },
-      });
-      if (alreadyMember) {
-        return NextResponse.json({ error: 'Este usuario ya es miembro de la empresa' }, { status: 400 });
-      }
-    }
+    const alreadyMember =
+      existingUser && data.inviteKind !== 'ally'
+        ? await prisma.companyUser.findFirst({
+            where: { userId: existingUser.id, companyId: data.companyId },
+            select: { id: true },
+          })
+        : null;
 
     const existingInvite = await prisma.invitation.findFirst({
       where: { companyId: data.companyId, email: data.email, status: 'pending' },
     });
+    // Já é membro: atualizar papel/sistemas em vez de bloquear (muitos só apareciam em grants).
+    if (alreadyMember && existingUser) {
+      const accessMode = data.inviteKind === 'ally' ? 'project_guest' : 'company';
+      const role = (data.role || 'COLLABORATOR') as UserRole;
+      const inviteData = {
+        role,
+        inviteKind: data.inviteKind,
+        jobTitle: data.jobTitle || null,
+        accessUntil: data.accessUntil ? new Date(data.accessUntil) : null,
+        systems: systems.length > 0 ? (systems as unknown as Prisma.InputJsonValue) : undefined,
+        projectId: data.projectId || null,
+        accessMode,
+        projectPermissions: data.projectPermissions?.length
+          ? (data.projectPermissions as unknown as Prisma.InputJsonValue)
+          : undefined,
+        companySiepPermissions: data.companySiepPermissions?.length
+          ? (data.companySiepPermissions as unknown as Prisma.InputJsonValue)
+          : undefined,
+        status: 'accepted',
+        acceptedAt: new Date(),
+      };
+      const invitation = existingInvite
+        ? await prisma.invitation.update({
+            where: { id: existingInvite.id },
+            data: inviteData,
+            include: {
+              company: true,
+              inviter: { select: { name: true } },
+              project: { select: { id: true, name: true } },
+            },
+          })
+        : await prisma.invitation.create({
+            data: {
+              companyId: data.companyId,
+              email: data.email,
+              invitedBy: tenant.userId,
+              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+              ...inviteData,
+            },
+            include: {
+              company: true,
+              inviter: { select: { name: true } },
+              project: { select: { id: true, name: true } },
+            },
+          });
+
+      await applyAcceptedInvitation(
+        invitationRowToApplyOpts(invitation, existingUser.id, systems),
+      );
+
+      return NextResponse.json({
+        invitation: {
+          ...invitation,
+          systems,
+          alreadyAccepted: true,
+          accessUpdated: true,
+          loginHint: `/login?invite=${invitation.code}`,
+        },
+      });
+    }
+
     if (existingInvite) {
       return NextResponse.json({ error: 'Ya existe una invitación pendiente para este email' }, { status: 400 });
     }

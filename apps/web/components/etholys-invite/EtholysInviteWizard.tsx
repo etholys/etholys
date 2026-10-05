@@ -265,7 +265,10 @@ export function EtholysInviteWizard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      let d: { error?: string; invitation?: { code?: string; alreadyAccepted?: boolean } } = {};
+      let d: {
+        error?: string;
+        invitation?: { code?: string; alreadyAccepted?: boolean; accessUpdated?: boolean };
+      } = {};
       try {
         d = (await r.json()) as typeof d;
       } catch {
@@ -280,7 +283,7 @@ export function EtholysInviteWizard({
       if (!r.ok) throw new Error(d.error || 'Error');
       onSuccess?.({
         code: d.invitation?.code,
-        alreadyAccepted: d.invitation?.alreadyAccepted,
+        alreadyAccepted: Boolean(d.invitation?.alreadyAccepted || d.invitation?.accessUpdated),
         email: email.trim().toLowerCase(),
       });
     } catch (e) {

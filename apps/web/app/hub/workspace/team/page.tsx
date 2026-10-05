@@ -335,9 +335,9 @@ export default function WorkspaceTeamPage() {
                 setInviteMsg(
                   alreadyAccepted
                     ? t(
-                        `Acesso atribuído a ${email}.`,
-                        `Acceso asignado a ${email}.`,
-                        `Access granted to ${email}.`,
+                        `Acesso atualizado para ${email} (já era membro).`,
+                        `Acceso actualizado para ${email} (ya era miembro).`,
+                        `Access updated for ${email} (already a member).`,
                       )
                     : t(
                         `Convite enviado a ${email}. Código: ${code || '—'}`,
@@ -356,6 +356,49 @@ export default function WorkspaceTeamPage() {
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             {t('Membros já na empresa', 'Miembros ya en la empresa', 'Existing company members')}
           </p>
+          {members.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              {t(
+                'Ainda sem membros nesta empresa.',
+                'Aún sin miembros en esta empresa.',
+                'No members in this company yet.',
+              )}
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100">
+              {members.map((m) => {
+                const grant = grants.find((g) => g.userId === m.userId);
+                return (
+                  <li key={m.userId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900 truncate">{m.name || m.email}</p>
+                      <p className="text-xs text-slate-500 truncate">{m.email}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                        {m.role}
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        {grant?.enabled
+                          ? grant.systems.map(systemDisplayName).join(', ')
+                          : t('Sem sistemas atribuídos', 'Sin sistemas asignados', 'No systems granted')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTargetUser(m.userId);
+                          setMsg(null);
+                        }}
+                        className="text-xs font-medium text-teal-700 hover:underline"
+                      >
+                        {t('Configurar', 'Configurar', 'Configure')}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
             <div className="flex flex-wrap items-end justify-between gap-2">
               <label className="text-sm font-medium text-slate-700">{t('Utilizador', 'Usuario', 'User')}</label>
               {meId && members.some((m) => m.userId === meId) && (

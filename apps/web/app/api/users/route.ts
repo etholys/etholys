@@ -12,12 +12,18 @@ export async function GET(req: Request) {
   try {
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    const detail = new URL(req.url).searchParams.get('detail') === '1';
+    const url = new URL(req.url);
+    const detail = url.searchParams.get('detail') === '1';
+    const companyIdParam = url.searchParams.get('companyId')?.trim() || '';
+    const scopeCompanyIds =
+      companyIdParam && tenant.companyIds.includes(companyIdParam)
+        ? [companyIdParam]
+        : tenant.companyIds;
 
     const users = await prisma.user.findMany({
       where: {
         isActive: true,
-        companyUsers: { some: { companyId: { in: tenant.companyIds } } },
+        companyUsers: { some: { companyId: { in: scopeCompanyIds } } },
       },
       select: detail
         ? {
