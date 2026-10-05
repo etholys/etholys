@@ -7,6 +7,7 @@ import { useRadarClientScopeOptional } from '@/components/radar/RadarClientScope
 import { RADAR_SCOPE_ALL, RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
 import type { PropertyStepState } from '@/lib/radar/property-progress';
 import { RadarOpsCanvas } from '@/components/radar/RadarOpsCanvas';
+import { RadarPlantPreview } from '@/components/radar/RadarPlantPreview';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
 import type { TraceStage } from '@/lib/radar/trace';
 
@@ -249,6 +250,16 @@ export function RadarHome({
                 return `/hub/radar/properties/${id}?${companyQ}&client=${p?.clientId || RADAR_SCOPE_OWN}`;
               }}
             />
+
+            {selected && (
+              <RadarPlantPreview
+                companyId={companyId}
+                engagementId={engagementId}
+                propertyId={selected.id}
+                locale={loc}
+                moduleId={selected.moduleId}
+              />
+            )}
 
             {selected && (
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">

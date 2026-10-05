@@ -217,13 +217,13 @@ export function RadarPropertyWorkspace({
             <RadarChainTrailBar locale={loc} stage={openLot.currentStage} code={openLot.code} />
           )}
           <RadarSiteMap
-                    companyId={companyId}
-                    engagementId={engagementId}
-                    propertyId={propertyId}
-                    locale={loc}
-                    moduleId={data.moduleId}
-                    mode="ops"
-                    parcels={mapParcels}
+            companyId={companyId}
+            engagementId={engagementId}
+            propertyId={propertyId}
+            locale={loc}
+            moduleId={data.moduleId}
+            mode="ops"
+            parcels={mapParcels}
             sensors={data.sensors.map((s) => ({
               id: s.id,
               name: s.name,
@@ -238,6 +238,7 @@ export function RadarPropertyWorkspace({
               setStep('draw');
               setAddingParcel(true);
             }}
+            trailUnitIds={openLot ? mapParcels.map((p) => p.id) : undefined}
           />
 
           {data.moduleId === 'agriculture' ? (

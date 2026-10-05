@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Leaf, MapPinned, Plus, Radio } from 'lucide-react';
+import { Factory, Leaf, MapPinned, Package, Plus, Radio } from 'lucide-react';
 import { MOISTURE_THRESHOLD, type ParcelAction } from '@/lib/radar/agriculture';
 import {
   emptyRadarLayout,
@@ -59,6 +59,7 @@ function mapCopy(loc: Loc, moduleId?: string | null) {
     focus: radarT(loc, 'Em foco', 'En foco', 'Focused'),
     moisture: radarT(loc, 'Humidade', 'Humedad', 'Moisture'),
     sensor: radarT(loc, 'Sensor', 'Sensor', 'Sensor'),
+    secondary: kind.secondaryLabel[loc],
     unitCap,
   };
 }
@@ -102,11 +103,19 @@ type Props = {
   focusedId: string | null;
   onFocus: (id: string) => void;
   /** Full plant + metrics surface (single ops UI for all roles). */
-  mode?: 'ops' | 'empresa';
+  mode?: 'ops' | 'empresa' | 'preview';
   onSaved?: () => void;
   /** Show CTA to create a new parcel (parent owns the form). */
   onRequestAddParcel?: () => void;
+  /** Unit ids to connect with a custody dashed path (centers). */
+  trailUnitIds?: string[];
 };
+
+function HeaderIcon({ moduleId }: { moduleId?: string | null }) {
+  if (moduleId === 'agroindustry') return <Factory className="h-4 w-4 text-slate-200" />;
+  if (moduleId === 'livestock') return <Package className="h-4 w-4 text-amber-200" />;
+  return <Leaf className="h-4 w-4 text-emerald-300" />;
+}
 
 export function RadarSiteMap({
   companyId,
@@ -121,10 +130,12 @@ export function RadarSiteMap({
   mode = 'ops',
   onSaved,
   onRequestAddParcel,
+  trailUnitIds,
 }: Props) {
   const loc = radarLoc(locale);
   const canEdit = mode === 'ops' || mode === 'empresa';
   const copy = mapCopy(loc, moduleId);
+  const showMoisture = !moduleId || moduleId === 'agriculture';
   const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -296,11 +307,32 @@ export function RadarSiteMap({
 
   const parcelById = new Map(parcels.map((p) => [p.id, p]));
 
+  const trailPoints = (() => {
+    const ids =
+      trailUnitIds && trailUnitIds.length > 0
+        ? trailUnitIds
+        : layout.spaces.map((s) => s.id).slice(0, 4);
+    const pts: Array<{ x: number; y: number }> = [];
+    for (const id of ids) {
+      const rect = layout.spaces.find((s) => s.id === id);
+      if (!rect) continue;
+      pts.push({ x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 });
+    }
+    return pts;
+  })();
+
+  const trailPath =
+    trailPoints.length >= 2
+      ? trailPoints
+          .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+          .join(' ')
+      : null;
+
   return (
     <section className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[radial-gradient(ellipse_at_top_left,rgba(16,185,129,0.14),transparent_50%),linear-gradient(165deg,#071812_0%,#0a1a14_50%,#050f0c_100%)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 px-4 py-3 sm:px-5">
         <div className="flex items-center gap-2">
-          <Leaf className="h-4 w-4 text-emerald-300" />
+          <HeaderIcon moduleId={moduleId} />
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">{copy.plant}</p>
           {canEdit && (
             <span className="hidden text-[11px] text-white/35 sm:inline">· {copy.arrange}</span>
@@ -340,7 +372,6 @@ export function RadarSiteMap({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        {/* Soft field grid */}
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.12]"
           style={{
@@ -350,6 +381,27 @@ export function RadarSiteMap({
           }}
         />
         <div className="pointer-events-none absolute inset-6 rounded-[2rem] border border-emerald-400/10" />
+
+        {trailPath && (
+          <svg
+            className="pointer-events-none absolute inset-0 z-[5] h-full w-full"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            aria-hidden
+          >
+            <path
+              d={trailPath}
+              fill="none"
+              stroke="rgba(52,211,153,0.65)"
+              strokeWidth="0.8"
+              strokeDasharray="2.2 1.6"
+              strokeLinecap="round"
+            />
+            {trailPoints.map((p, i) => (
+              <circle key={i} cx={p.x} cy={p.y} r="1.3" fill="#34d399" />
+            ))}
+          </svg>
+        )}
 
         {layout.spaces.map((rect) => {
           const parcel = parcelById.get(rect.id);
@@ -385,19 +437,27 @@ export function RadarSiteMap({
                 <div>
                   <p className="truncate text-sm font-semibold text-white sm:text-base">{parcel.name}</p>
                   <p className="truncate text-[10px] text-white/55 sm:text-xs">
-                    {[parcel.crop, parcel.areaHa != null ? `${parcel.areaHa} ha` : null].filter(Boolean).join(' · ') || '—'}
+                    {[parcel.crop, parcel.areaHa != null ? `${parcel.areaHa}` : null].filter(Boolean).join(' · ') || '—'}
                   </p>
                 </div>
                 <div className="flex items-end justify-between gap-1">
                   <div>
-                    <p className="text-[9px] uppercase tracking-wide text-white/40">{copy.moisture}</p>
+                    <p className="text-[9px] uppercase tracking-wide text-white/40">
+                      {showMoisture ? copy.moisture : copy.secondary}
+                    </p>
                     <p className="font-serif text-lg leading-none text-white sm:text-xl">
-                      {parcel.moisture == null ? '—' : `${parcel.moisture}%`}
+                      {showMoisture
+                        ? parcel.moisture == null
+                          ? '—'
+                          : `${parcel.moisture}%`
+                        : parcel.crop || '—'}
                     </p>
                   </div>
-                  <span className="rounded-full border border-white/20 bg-black/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-white/75">
-                    {labelAction(parcel.nextAction, loc)}
-                  </span>
+                  {showMoisture && (
+                    <span className="rounded-full border border-white/20 bg-black/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-white/75">
+                      {labelAction(parcel.nextAction, loc)}
+                    </span>
+                  )}
                 </div>
                 {spaceSensors.map((pin) => {
                   const sens = sensors.find((s) => s.id === pin.id);
@@ -405,12 +465,12 @@ export function RadarSiteMap({
                     <span
                       key={pin.id}
                       title={sens?.name || copy.sensor}
-                      className="pointer-events-none absolute z-10 flex h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+                      className="pointer-events-none absolute z-10 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
                       style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
                     >
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-300/50" />
-                      <span className="relative flex h-2.5 w-2.5 items-center justify-center rounded-full bg-sky-300 text-[#04110c] shadow">
-                        <Radio className="h-1.5 w-1.5" />
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-300/55" />
+                      <span className="relative flex h-3 w-3 items-center justify-center rounded-full bg-sky-300 text-[#04110c] shadow-[0_0_10px_rgba(125,211,252,0.8)]">
+                        <Radio className="h-2 w-2" />
                       </span>
                     </span>
                   );
@@ -421,7 +481,7 @@ export function RadarSiteMap({
                   role="presentation"
                   onPointerDown={(e) => onResizeDown(e, rect)}
                   className="absolute bottom-1 right-1 z-30 h-4 w-4 cursor-se-resize rounded-sm border border-emerald-200/60 bg-emerald-400/80"
-                  title={loc === 'en' ? 'Resize' : 'Redimensionar'}
+                  title={radarT(loc, 'Redimensionar', 'Redimensionar', 'Resize')}
                 />
               )}
             </button>
