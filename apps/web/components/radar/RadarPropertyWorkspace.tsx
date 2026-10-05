@@ -15,7 +15,9 @@ import { RadarCropsPanel } from '@/components/radar/RadarCropsPanel';
 import { RadarAddParcelForm } from '@/components/radar/RadarAddParcelForm';
 import { RadarChainBoard } from '@/components/radar/RadarChainBoard';
 import { RadarSpaceOpsPanel } from '@/components/radar/RadarSpaceOpsPanel';
+import { RadarChainTrailBar } from '@/components/radar/RadarOpsCanvas';
 import type { RadarCrop } from '@/lib/radar/site-layout';
+import { isTraceStage, type TraceStage } from '@/lib/radar/trace';
 
 type Loc = 'pt' | 'es' | 'en';
 
@@ -67,6 +69,7 @@ export function RadarPropertyWorkspace({
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [addingParcel, setAddingParcel] = useState(false);
   const [mode, setMode] = useState<'operate' | 'setup'>('operate');
+  const [openLot, setOpenLot] = useState<{ code: string; currentStage: TraceStage } | null>(null);
 
   const load = useCallback(async () => {
     if (!companyId || !propertyId) return;
@@ -103,6 +106,25 @@ export function RadarPropertyWorkspace({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    void (async () => {
+      const q = new URLSearchParams({ companyId });
+      if (engagementId) q.set('engagementId', engagementId);
+      const r = await fetch(`/api/radar/lots?${q}`, { cache: 'no-store' });
+      const d = await r.json().catch(() => ({}));
+      if (cancelled || !r.ok) return;
+      const open = (d.lots || []).find((l: { status: string }) => l.status === 'open');
+      if (open && isTraceStage(open.currentStage)) {
+        setOpenLot({ code: open.code, currentStage: open.currentStage });
+      } else setOpenLot(null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, engagementId, data?.id, mode]);
 
   const patch = async (payload: Record<string, unknown>) => {
     setBusy(true);
@@ -191,7 +213,10 @@ export function RadarPropertyWorkspace({
 
       {showOperate ? (
         <div className="space-y-6">
-                  <RadarSiteMap
+          {openLot && (
+            <RadarChainTrailBar locale={loc} stage={openLot.currentStage} code={openLot.code} />
+          )}
+          <RadarSiteMap
                     companyId={companyId}
                     engagementId={engagementId}
                     propertyId={propertyId}
