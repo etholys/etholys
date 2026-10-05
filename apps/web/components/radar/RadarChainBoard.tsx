@@ -1,7 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, Crosshair, Loader2, MapPin, QrCode } from 'lucide-react';
+import {
+  Camera,
+  Crosshair,
+  Factory,
+  Loader2,
+  MapPin,
+  Package,
+  QrCode,
+  Sprout,
+  Truck,
+} from 'lucide-react';
 import { TRACE_STAGES, TRACE_STAGE_LABEL, type TraceStage } from '@/lib/radar/trace';
 
 type Loc = 'pt' | 'es' | 'en';
@@ -22,14 +32,21 @@ type LotSummary = {
   lastCheckIn?: { lat: number | null; lng: number | null; hasPhoto: boolean; checkedInAt: string | null } | null;
 };
 
+export type ChainUnitOption = {
+  id: string;
+  name: string;
+  crop: string | null;
+  propertyName?: string | null;
+};
+
 const COPY = {
   pt: {
     title: 'Cadeia de custódia',
-    empty: 'Ainda sem colheita — o lote nasce no primeiro check-in de colheita.',
-    open: 'Check-in de colheita',
+    empty: 'Ainda sem lote — escolhe um espaço e faz o check-in de colheita.',
+    open: 'Iniciar lote (colheita)',
     qty: 'Quantidade',
     crop: 'Cultura',
-    checkin: 'Confirmar check-in',
+    checkin: 'Avançar para',
     note: 'Nota (opcional)',
     dest: 'Destino',
     buyer: 'Comprador',
@@ -38,7 +55,7 @@ const COPY = {
     copied: 'Link copiado',
     closed: 'Fechado',
     openStatus: 'Aberto',
-    trust: 'Cada etapa exige check-in com hora, localização e foto (evidência).',
+    trust: 'Campo → transformação → transporte → venda. Cada passo pede local + foto.',
     blocked: 'Carência ativa — não é possível colher.',
     geo: 'Capturar localização',
     geoOk: 'Localização capturada',
@@ -46,14 +63,16 @@ const COPY = {
     photoOk: 'Foto pronta',
     needGeo: 'Precisas da geolocalização para o check-in.',
     qr: 'QR do lote',
+    pickSpace: 'Espaço de origem…',
+    path: 'Percurso do lote',
   },
   es: {
     title: 'Cadena de custodia',
-    empty: 'Todavía sin cosecha — el lote nace en el primer check-in de cosecha.',
-    open: 'Check-in de cosecha',
+    empty: 'Aún sin lote — elegí un espacio y hacé el check-in de cosecha.',
+    open: 'Iniciar lote (cosecha)',
     qty: 'Cantidad',
     crop: 'Cultivo',
-    checkin: 'Confirmar check-in',
+    checkin: 'Avanzar a',
     note: 'Nota (opcional)',
     dest: 'Destino',
     buyer: 'Comprador',
@@ -62,7 +81,7 @@ const COPY = {
     copied: 'Enlace copiado',
     closed: 'Cerrado',
     openStatus: 'Abierto',
-    trust: 'Cada etapa exige check-in con hora, ubicación y foto (evidencia).',
+    trust: 'Campo → transformación → transporte → venta. Cada paso pide ubicación + foto.',
     blocked: 'Carencia activa — no se puede cosechar.',
     geo: 'Capturar ubicación',
     geoOk: 'Ubicación capturada',
@@ -70,14 +89,16 @@ const COPY = {
     photoOk: 'Foto lista',
     needGeo: 'Necesitás geolocalización para el check-in.',
     qr: 'QR del lote',
+    pickSpace: 'Espacio de origen…',
+    path: 'Recorrido del lote',
   },
   en: {
     title: 'Chain of custody',
-    empty: 'No harvest yet — the lot starts at the first harvest check-in.',
-    open: 'Harvest check-in',
+    empty: 'No lot yet — pick a space and do the harvest check-in.',
+    open: 'Start lot (harvest)',
     qty: 'Quantity',
     crop: 'Crop',
-    checkin: 'Confirm check-in',
+    checkin: 'Advance to',
     note: 'Note (optional)',
     dest: 'Destination',
     buyer: 'Buyer',
@@ -86,7 +107,7 @@ const COPY = {
     copied: 'Link copied',
     closed: 'Closed',
     openStatus: 'Open',
-    trust: 'Each stage requires check-in with time, location and photo (evidence).',
+    trust: 'Field → processing → transport → sale. Each step needs location + photo.',
     blocked: 'PHI active — harvest blocked.',
     geo: 'Capture location',
     geoOk: 'Location captured',
@@ -94,20 +115,85 @@ const COPY = {
     photoOk: 'Photo ready',
     needGeo: 'Geolocation is required for check-in.',
     qr: 'Lot QR',
+    pickSpace: 'Source space…',
+    path: 'Lot journey',
   },
+} as const;
+
+const STAGE_ICON = {
+  harvest: Sprout,
+  transform: Factory,
+  transport: Truck,
+  sale: Package,
 } as const;
 
 function stageLabel(stage: TraceStage, loc: Loc) {
   return TRACE_STAGE_LABEL[stage][loc];
 }
 
+function JourneyPath({
+  current,
+  loc,
+}: {
+  current: TraceStage | null;
+  loc: Loc;
+}) {
+  const curIdx = current ? TRACE_STAGES.indexOf(current) : -1;
+  return (
+    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-emerald-950/40 to-black/20 px-4 py-5">
+      <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">
+        {COPY[loc].path}
+      </p>
+      <ol className="relative flex items-start justify-between gap-1">
+        {TRACE_STAGES.map((stage, i) => {
+          const Icon = STAGE_ICON[stage];
+          const done = curIdx >= 0 && i <= curIdx;
+          const currentStep = stage === current;
+          return (
+            <li key={stage} className="relative z-[1] flex flex-1 flex-col items-center text-center">
+              {i < TRACE_STAGES.length - 1 && (
+                <span
+                  className={`absolute left-[50%] top-5 h-0.5 w-full ${
+                    curIdx > i ? 'bg-emerald-400/70' : 'bg-white/10'
+                  }`}
+                  aria-hidden
+                />
+              )}
+              <span
+                className={`relative flex h-10 w-10 items-center justify-center rounded-full border ${
+                  currentStep
+                    ? 'border-emerald-300 bg-emerald-500 text-[#04110c] shadow-[0_0_20px_rgba(52,211,153,0.35)]'
+                    : done
+                      ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-100'
+                      : 'border-white/15 bg-black/30 text-white/35'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+              </span>
+              <span
+                className={`mt-2 text-[11px] font-medium ${
+                  currentStep ? 'text-emerald-100' : done ? 'text-white/70' : 'text-white/35'
+                }`}
+              >
+                {stageLabel(stage, loc)}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 export function RadarChainBoard({
   companyId,
   engagementId,
   locale,
-  unitId,
+  unitId: unitIdProp,
   unitCrop,
   harvestBlocked,
+  unitOptions,
+  hideTitle,
 }: {
   companyId: string;
   engagementId?: string | null;
@@ -115,6 +201,9 @@ export function RadarChainBoard({
   unitId?: string | null;
   unitCrop?: string | null;
   harvestBlocked?: boolean;
+  /** When set (or when unitId missing), user can pick a space to start a lot. */
+  unitOptions?: ChainUnitOption[];
+  hideTitle?: boolean;
 }) {
   const loc: Loc = locale === 'es' || locale === 'en' ? locale : 'pt';
   const copy = COPY[loc];
@@ -127,12 +216,19 @@ export function RadarChainBoard({
   const [crop, setCrop] = useState('');
   const [advanceNote, setAdvanceNote] = useState('');
   const [extra, setExtra] = useState('');
+  const [pickedUnitId, setPickedUnitId] = useState(unitIdProp || '');
   const [copied, setCopied] = useState(false);
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [geoBusy, setGeoBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const unitId = unitIdProp || pickedUnitId || null;
+
+  useEffect(() => {
+    if (unitIdProp) setPickedUnitId(unitIdProp);
+  }, [unitIdProp]);
 
   const load = useCallback(async () => {
     if (!companyId) {
@@ -170,6 +266,7 @@ export function RadarChainBoard({
   }, [unitCrop, crop]);
 
   const focus = lots.find((l) => l.id === focusId) || lots[0] || null;
+  const canStart = Boolean(unitId) && !harvestBlocked;
 
   const captureGeo = () => {
     if (!navigator.geolocation) {
@@ -188,7 +285,7 @@ export function RadarChainBoard({
         setErr(copy.needGeo);
         setGeoBusy(false);
       },
-      { enableHighAccuracy: true, timeout: 15000 }
+      { enableHighAccuracy: true, timeout: 15000 },
     );
   };
 
@@ -308,10 +405,10 @@ export function RadarChainBoard({
 
   if (loading && lots.length === 0) {
     return (
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">{copy.title}</p>
-        <div className="mt-3 flex justify-center">
-          <Loader2 className="h-5 w-5 animate-spin text-violet-300" />
+      <section className="space-y-4">
+        {!hideTitle && <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">{copy.title}</p>}
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-5 w-5 animate-spin text-emerald-300" />
         </div>
       </section>
     );
@@ -331,13 +428,22 @@ export function RadarChainBoard({
     ? `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(publicUrl)}`
     : null;
 
-  return (
-    <section className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">{copy.title}</p>
-      <p className="mt-1 text-sm text-white/55">{copy.trust}</p>
-      {err && <p className="mt-2 text-sm text-rose-200">{err}</p>}
+  const showUnitPicker = !unitIdProp && (unitOptions?.length || 0) > 0;
 
-      <div className="mt-3 flex flex-wrap gap-2">
+  return (
+    <section className="space-y-4">
+      {!hideTitle && (
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">{copy.title}</p>
+          <p className="mt-1 text-sm text-white/55">{copy.trust}</p>
+        </div>
+      )}
+
+      <JourneyPath current={focus?.currentStage || null} loc={loc} />
+
+      {err && <p className="text-sm text-rose-200">{err}</p>}
+
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
           disabled={geoBusy}
@@ -370,17 +476,19 @@ export function RadarChainBoard({
       </div>
 
       {lots.length === 0 ? (
-        <p className="mt-3 text-sm text-white/50">{copy.empty}</p>
+        <p className="text-sm text-white/50">{copy.empty}</p>
       ) : (
-        <div className="mt-3 space-y-3">
+        <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
-            {lots.slice(0, 8).map((lot) => (
+            {lots.slice(0, 12).map((lot) => (
               <button
                 key={lot.id}
                 type="button"
                 onClick={() => setFocusId(lot.id)}
                 className={`rounded-lg border px-3 py-1.5 text-xs ${
-                  focus?.id === lot.id ? 'border-violet-400/50 bg-violet-500/15 text-white' : 'border-white/15 text-white/60'
+                  focus?.id === lot.id
+                    ? 'border-emerald-400/50 bg-emerald-500/15 text-white'
+                    : 'border-white/15 text-white/60'
                 }`}
               >
                 {lot.code}
@@ -390,7 +498,7 @@ export function RadarChainBoard({
           </div>
 
           {focus && (
-            <div className="space-y-3">
+            <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-serif text-2xl text-white">{focus.code}</p>
@@ -428,29 +536,6 @@ export function RadarChainBoard({
                 </div>
               </div>
 
-              <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {TRACE_STAGES.map((stage) => {
-                  const idx = TRACE_STAGES.indexOf(stage);
-                  const cur = TRACE_STAGES.indexOf(focus.currentStage);
-                  const done = idx <= cur;
-                  const current = stage === focus.currentStage;
-                  return (
-                    <li
-                      key={stage}
-                      className={`rounded-lg border px-2 py-2 text-center text-[11px] ${
-                        current
-                          ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100'
-                          : done
-                            ? 'border-white/20 text-white/70'
-                            : 'border-white/10 text-white/35'
-                      }`}
-                    >
-                      {stageLabel(stage, loc)}
-                    </li>
-                  );
-                })}
-              </ol>
-
               {focus.nextStage && focus.status === 'open' && (
                 <div className="flex flex-wrap gap-2">
                   <input
@@ -471,9 +556,9 @@ export function RadarChainBoard({
                     type="button"
                     disabled={busy || lat == null}
                     onClick={() => void checkIn()}
-                    className="rounded-lg bg-violet-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-[#04110c] disabled:opacity-50"
                   >
-                    {copy.checkin}: {stageLabel(focus.nextStage, loc)}
+                    {copy.checkin} {stageLabel(focus.nextStage, loc)}
                   </button>
                 </div>
               )}
@@ -482,9 +567,28 @@ export function RadarChainBoard({
         </div>
       )}
 
-      {unitId && (
-        <div className="mt-4 border-t border-white/10 pt-3">
-          <div className="flex flex-wrap gap-2">
+      {(canStart || showUnitPicker) && (
+        <div className="rounded-2xl border border-dashed border-emerald-400/25 bg-emerald-500/5 px-4 py-4">
+          <p className="text-xs font-medium text-emerald-100/90">{copy.open}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {showUnitPicker && (
+              <select
+                value={pickedUnitId}
+                onChange={(e) => {
+                  setPickedUnitId(e.target.value);
+                  const opt = unitOptions?.find((u) => u.id === e.target.value);
+                  if (opt?.crop) setCrop(opt.crop);
+                }}
+                className="min-w-[12rem] flex-1 rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
+              >
+                <option value="">{copy.pickSpace}</option>
+                {unitOptions!.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.propertyName ? `${u.propertyName} · ${u.name}` : u.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <input
               value={qty}
               onChange={(e) => setQty(e.target.value)}
@@ -500,12 +604,12 @@ export function RadarChainBoard({
             />
             <button
               type="button"
-              disabled={busy || harvestBlocked || lat == null}
+              disabled={busy || harvestBlocked || lat == null || !unitId}
               onClick={() => void openLot()}
-              className="rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-4 py-2 text-sm text-emerald-50 disabled:opacity-40"
+              className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-[#04110c] disabled:opacity-40"
               title={harvestBlocked ? copy.blocked : undefined}
             >
-              {copy.open}
+              {busy ? <Loader2 className="inline h-4 w-4 animate-spin" /> : null} {copy.open}
             </button>
           </div>
         </div>

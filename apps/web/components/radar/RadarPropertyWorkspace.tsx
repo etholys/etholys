@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Leaf, Loader2, Radio, Sprout } from 'lucide-react';
+import { ArrowLeft, Loader2, Radio, Sprout } from 'lucide-react';
 import { RADAR_MODULES, type RadarModuleId } from '@/lib/etholys-products';
 import { isRadarModuleId } from '@/lib/radar/space';
 import type { PropertyStepId, PropertyStepState } from '@/lib/radar/property-progress';
@@ -12,6 +12,7 @@ import { RadarSiteMap } from '@/components/radar/RadarSiteMap';
 import { RadarOpsView } from '@/components/radar/RadarViews';
 import { RadarCropsPanel } from '@/components/radar/RadarCropsPanel';
 import { RadarAddParcelForm } from '@/components/radar/RadarAddParcelForm';
+import { RadarChainBoard } from '@/components/radar/RadarChainBoard';
 import type { RadarCrop } from '@/lib/radar/site-layout';
 
 type Loc = 'pt' | 'es' | 'en';
@@ -63,6 +64,7 @@ export function RadarPropertyWorkspace({
   const [sensorName, setSensorName] = useState('');
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [addingParcel, setAddingParcel] = useState(false);
+  const [mode, setMode] = useState<'operate' | 'setup'>('operate');
 
   const load = useCallback(async () => {
     if (!companyId || !propertyId) return;
@@ -84,6 +86,11 @@ export function RadarPropertyWorkspace({
       setStep((prev) => (p.steps.some((s) => s.id === prev) ? prev : p.nextStep));
       setFocusedId(p.units[0]?.id || null);
       if (!Array.isArray(p.crops)) (p as PropertyDetail).crops = [];
+      const done = Boolean(p.steps.find((s) => s.id === 'characterize')?.done);
+      if (!done) {
+        setMode('setup');
+        setStep('characterize');
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -138,6 +145,8 @@ export function RadarPropertyWorkspace({
       alerts: [] as Array<{ severity: string }>,
     }));
 
+  const showOperate = Boolean(characterized) && mode === 'operate';
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -147,24 +156,119 @@ export function RadarPropertyWorkspace({
             {loc === 'es' ? 'Volver' : loc === 'en' ? 'Back' : 'Voltar'}
           </Link>
           <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/40">
-            RADAR · {data.clientName || (loc === 'en' ? 'Property' : 'Propriedade')}
+            RADAR · {data.clientName || (loc === 'en' ? 'Space' : 'Espaço')}
           </p>
           <h1 className="mt-1 font-serif text-3xl text-white sm:text-4xl">{data.name}</h1>
         </div>
+        {characterized && (
+          <div className="inline-flex rounded-xl border border-white/15 bg-black/20 p-1">
+            <button
+              type="button"
+              onClick={() => setMode('operate')}
+              className={`rounded-lg px-3 py-1.5 text-xs ${mode === 'operate' ? 'bg-emerald-500 font-semibold text-[#04110c]' : 'text-white/60'}`}
+            >
+              {loc === 'en' ? 'Operate' : 'Operar'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('setup')}
+              className={`rounded-lg px-3 py-1.5 text-xs ${mode === 'setup' ? 'bg-emerald-500 font-semibold text-[#04110c]' : 'text-white/60'}`}
+            >
+              {loc === 'en' ? 'Setup' : 'Configurar'}
+            </button>
+          </div>
+        )}
       </div>
 
       {err && <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">{err}</p>}
 
-      <RadarProgressRail
-        steps={data.steps}
-        active={step}
-        locale={loc}
-        percent={data.progressPercent}
-        onSelect={setStep}
-      />
+      {showOperate ? (
+        <div className="space-y-6">
+          <RadarSiteMap
+            companyId={companyId}
+            engagementId={engagementId}
+            propertyId={propertyId}
+            locale={loc}
+            mode="ops"
+            parcels={mapParcels}
+            sensors={data.sensors.map((s) => ({
+              id: s.id,
+              name: s.name,
+              unitId: s.unitId,
+              lastValue: null,
+            }))}
+            focusedId={focusedId}
+            onFocus={setFocusedId}
+            onSaved={() => void load()}
+            onRequestAddParcel={() => {
+              setMode('setup');
+              setStep('draw');
+              setAddingParcel(true);
+            }}
+          />
 
-      <div className="rounded-[1.5rem] border border-white/10 bg-gradient-to-br from-white/[0.05] to-transparent px-5 py-6 sm:px-7">
-        {step === 'characterize' && (
+          {data.moduleId === 'agriculture' ? (
+            <RadarOpsView companyId={companyId} engagementId={engagementId} locale={loc} />
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">
+                  {loc === 'en' ? 'Spaces in this site' : 'Espaços neste sítio'}
+                </p>
+                {mapParcels.length === 0 ? (
+                  <p className="mt-2 text-sm text-white/50">
+                    {loc === 'en'
+                      ? 'Add rooms, lines or areas in Setup → Draw plant.'
+                      : 'Adiciona salas, linhas ou áreas em Configurar → Desenhar planta.'}
+                  </p>
+                ) : (
+                  <ul className="mt-2 space-y-1">
+                    {mapParcels.map((u) => (
+                      <li key={u.id}>
+                        <button
+                          type="button"
+                          onClick={() => setFocusedId(u.id)}
+                          className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
+                            focusedId === u.id ? 'bg-emerald-500/15 text-emerald-50' : 'text-white/70 hover:bg-white/5'
+                          }`}
+                        >
+                          {u.name}
+                          {u.crop ? <span className="text-white/40"> · {u.crop}</span> : null}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <RadarChainBoard
+                companyId={companyId}
+                engagementId={engagementId}
+                locale={loc}
+                unitId={focusedId}
+                unitCrop={data.units.find((u) => u.id === focusedId)?.crop || data.crop}
+                unitOptions={data.units.map((u) => ({
+                  id: u.id,
+                  name: u.name,
+                  crop: u.crop,
+                  propertyName: data.name,
+                }))}
+              />
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <RadarProgressRail
+            steps={data.steps}
+            active={step}
+            locale={loc}
+            percent={data.progressPercent}
+            onSelect={setStep}
+          />
+
+          <div className="rounded-[1.5rem] border border-white/10 bg-gradient-to-br from-white/[0.05] to-transparent px-5 py-6 sm:px-7">
+            {/* setup steps stay below — unchanged block continues */}
+            {step === 'characterize' && (
           <div className="space-y-5">
             <div>
               <h2 className="font-serif text-2xl text-white">
@@ -239,7 +343,10 @@ export function RadarPropertyWorkspace({
                   areaHa: area ? Number(area) : null,
                 })
                   .then(() => load())
-                  .then(() => setStep('draw'))
+                  .then(() => {
+                    setMode('setup');
+                    setStep('draw');
+                  })
                   .catch((e) => setErr(e.message))
               }
               className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-[#04110c] disabled:opacity-40"
@@ -431,30 +538,7 @@ export function RadarPropertyWorkspace({
           </div>
         )}
       </div>
-
-      {characterized && data.moduleId === 'agriculture' && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-white/50">
-            <Leaf className="h-4 w-4 text-emerald-300" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em]">
-              {loc === 'es' ? 'Operación en vivo' : loc === 'en' ? 'Live operations' : 'Operação ao vivo'}
-            </p>
-          </div>
-          <RadarOpsView companyId={companyId} engagementId={engagementId} locale={loc} />
-        </div>
-      )}
-
-      {characterized && data.moduleId && data.moduleId !== 'agriculture' && (
-        <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.03] px-6 py-8 text-center">
-          <p className="font-serif text-xl text-white">
-            {loc === 'es' ? 'Mismo lazo, aún en camino' : loc === 'en' ? 'Same loop, still on the way' : 'Mesmo laço, ainda a caminho'}
-          </p>
-          <p className="mt-2 text-sm text-white/50">
-            {loc === 'es'
-              ? 'Agroindustria, pecuaria y carbono llegan después. El embudo de la propiedad ya está aquí.'
-              : 'Agroindústria, pecuária e carbono chegam a seguir. O funil da propriedade já está aqui.'}
-          </p>
-        </div>
+        </>
       )}
     </div>
   );

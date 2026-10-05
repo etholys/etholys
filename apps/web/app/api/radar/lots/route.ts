@@ -144,11 +144,16 @@ async function openFromHarvest(
   body: Record<string, unknown>
 ) {
   const unitId = String(body.unitId || '').trim();
-  if (!unitId) return NextResponse.json({ error: 'Parcela obrigatória.' }, { status: 400 });
+  if (!unitId) return NextResponse.json({ error: 'Espaço obrigatório.' }, { status: 400 });
   const unit = await prisma.nexusOpsUnit.findFirst({
-    where: { id: unitId, companyId, isActive: true, kind: 'parcel' },
+    where: {
+      id: unitId,
+      companyId,
+      isActive: true,
+      kind: { in: ['parcel', 'lot', 'herd', 'generic'] },
+    },
   });
-  if (!unit) return NextResponse.json({ error: 'Parcela inválida.' }, { status: 400 });
+  if (!unit) return NextResponse.json({ error: 'Espaço inválido.' }, { status: 400 });
 
   const coords = clampTraceCoord(body.lat, body.lng);
   if (!coords) {
@@ -158,20 +163,23 @@ async function openFromHarvest(
     );
   }
 
-  const lastInput = await prisma.nexusFieldEntry.findFirst({
-    where: { companyId, unitId, kind: 'input' },
-    orderBy: { occurredAt: 'desc' },
-    select: { occurredAt: true, payloadJson: true },
-  });
-  if (lastInput) {
-    const phiDays = Number((lastInput.payloadJson as { phiDays?: unknown })?.phiDays);
-    const wait = Number.isFinite(phiDays) && phiDays > 0 ? phiDays : 7;
-    const elapsed = (Date.now() - lastInput.occurredAt.getTime()) / (24 * 60 * 60 * 1000);
-    if (elapsed < wait) {
-      return NextResponse.json(
-        { error: `Carência ativa: faltam ${Math.ceil(wait - elapsed)} dia(s) antes de colher.` },
-        { status: 409 }
-      );
+  // PHI só para parcelas de campo (agricultura)
+  if (unit.kind === 'parcel') {
+    const lastInput = await prisma.nexusFieldEntry.findFirst({
+      where: { companyId, unitId, kind: 'input' },
+      orderBy: { occurredAt: 'desc' },
+      select: { occurredAt: true, payloadJson: true },
+    });
+    if (lastInput) {
+      const phiDays = Number((lastInput.payloadJson as { phiDays?: unknown })?.phiDays);
+      const wait = Number.isFinite(phiDays) && phiDays > 0 ? phiDays : 7;
+      const elapsed = (Date.now() - lastInput.occurredAt.getTime()) / (24 * 60 * 60 * 1000);
+      if (elapsed < wait) {
+        return NextResponse.json(
+          { error: `Carência ativa: faltam ${Math.ceil(wait - elapsed)} dia(s) antes de colher.` },
+          { status: 409 }
+        );
+      }
     }
   }
 
