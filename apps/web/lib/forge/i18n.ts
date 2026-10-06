@@ -2255,7 +2255,7 @@ const forge: Record<Locale, Record<string, string>> = {
     'forge.room.jitsiShareHint': 'Share screen: monitor button on the CHORUS toolbar.',
     'forge.studio.title': 'Session studio',
     'forge.studio.subtitle':
-      'One room: video call, slides, collective board, and each learner's map.',
+      "One room: video call, slides, collective board, and each learner's map.",
     'forge.studio.immersiveVideo': 'Video call · learner room',
     'forge.studio.videoFallback': 'Open the video call if embed fails to load.',
     'forge.alumnos.rolesHint':
@@ -2271,7 +2271,7 @@ const forge: Record<Locale, Record<string, string>> = {
     'forge.studio.boardHint': 'One board for the whole session; you move the token and everyone sees the track.',
     'forge.studio.startBoard': 'Start collective board',
     'forge.studio.noGameActivity': 'No game activity in this course.',
-    'forge.studio.mapsHint': 'Each learner's personal map progress (business model).',
+    'forge.studio.mapsHint': "Each learner's personal map progress (business model).",
     'forge.studio.mapStations': 'stations',
     'forge.analytics.notifyTeamOk': 'Notice sent to facilitators/admins',
     'forge.analytics.notifyLearnersOk':
