@@ -104,7 +104,7 @@ export default function FundHubProposalEditorPage() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [showAttach, setShowAttach] = useState(false);
+  const [showChatAttachMenu, setShowChatAttachMenu] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openingStudio, setOpeningStudio] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -1485,43 +1485,104 @@ export default function FundHubProposalEditorPage() {
                 type="file"
                 multiple
                 className="hidden"
-                onChange={handleAttachFile}
+                onChange={(e) => {
+                  void handleAttachFile(e);
+                  setShowChatAttachMenu(false);
+                }}
               />
+              {attachedFiles.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {attachedFiles.map((file, index) => (
+                    <span
+                      key={`${file.name}-${index}`}
+                      className="inline-flex max-w-[10rem] items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-2 pr-1 text-[10px] text-gray-700"
+                      title={file.name}
+                    >
+                      <span className="truncate">{file.name}</span>
+                      <button
+                        type="button"
+                        className="rounded-full p-0.5 text-gray-400 hover:bg-gray-200 hover:text-red-600"
+                        aria-label={ui(locale, 'Quitar', 'Remover', 'Remove')}
+                        onClick={() => setAttachedFiles((prev) => prev.filter((_, i) => i !== index))}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-1">
+                <div className="relative flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => chatFileInputRef.current?.click()}
-                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    onClick={() => {
+                      if (attachedFiles.length) setShowChatAttachMenu((v) => !v);
+                      else chatFileInputRef.current?.click();
+                    }}
+                    className={cn(
+                      'relative inline-flex items-center justify-center rounded-lg p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                      attachedFiles.length && 'text-amber-800',
+                    )}
                     title={ui(locale, 'Adjuntar archivo', 'Anexar ficheiro', 'Attach file')}
                   >
-                    <Paperclip className="h-3.5 w-3.5" />
-                    {attachedFiles.length
-                      ? ui(
-                          locale,
-                          `Anexos (${attachedFiles.length})`,
-                          `Anexos (${attachedFiles.length})`,
-                          `Files (${attachedFiles.length})`,
-                        )
-                      : ui(locale, 'Adjuntar', 'Anexar', 'Attach')}
+                    <Paperclip className="h-4 w-4" />
+                    {attachedFiles.length > 0 && (
+                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-600 px-1 text-[9px] font-semibold text-white">
+                        {attachedFiles.length}
+                      </span>
+                    )}
                   </button>
+                  {showChatAttachMenu && attachedFiles.length > 0 && (
+                    <div className="absolute bottom-full left-0 z-20 mb-1 w-52 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => chatFileInputRef.current?.click()}
+                        className="mb-1.5 flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 px-2 py-1.5 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+                      >
+                        <Paperclip className="h-3.5 w-3.5" />
+                        {ui(locale, 'Adjuntar más', 'Anexar mais', 'Attach more')}
+                      </button>
+                      <ul className="max-h-28 space-y-1 overflow-y-auto">
+                        {attachedFiles.map((file, index) => (
+                          <li
+                            key={`menu-${file.name}-${index}`}
+                            className="flex items-center justify-between gap-1 text-[11px] text-gray-700"
+                          >
+                            <span className="truncate" title={file.name}>
+                              {file.name}
+                            </span>
+                            <button
+                              type="button"
+                              className="text-red-600"
+                              onClick={() =>
+                                setAttachedFiles((prev) => prev.filter((_, i) => i !== index))
+                              }
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => (recording ? stopRecording() : void startRecording())}
                     disabled={chatLoading || transcribing}
-                    className={`inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium disabled:opacity-50 ${
+                    className={`inline-flex items-center justify-center rounded-lg p-2 disabled:opacity-50 ${
                       recording
                         ? 'bg-red-50 text-red-700 hover:bg-red-100'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
-                    title={ui(locale, 'Nota de voz', 'Nota de voz', 'Voice note')}
+                    title={
+                      transcribing
+                        ? ui(locale, 'Transcribiendo…', 'A transcrever…', 'Transcribing…')
+                        : recording
+                          ? ui(locale, 'Detener', 'Parar', 'Stop')
+                          : ui(locale, 'Nota de voz', 'Nota de voz', 'Voice note')
+                    }
                   >
-                    {recording ? <Square className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-                    {transcribing
-                      ? ui(locale, 'Transcribiendo…', 'A transcrever…', 'Transcribing…')
-                      : recording
-                        ? ui(locale, 'Detener', 'Parar', 'Stop')
-                        : ui(locale, 'Audio', 'Áudio', 'Audio')}
+                    {recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                   </button>
                 </div>
                 <button
@@ -1771,79 +1832,12 @@ export default function FundHubProposalEditorPage() {
                   </div>
                 ) : (
                   <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+                    <div className="border-b border-white/10 px-3 py-2">
                       <p className="text-sm font-semibold text-white">
                         {stage === 'understand'
                           ? ui(locale, 'Notas del edital', 'Notas do edital', 'Call notes')
                           : ui(locale, 'Documento', 'Documento', 'Document')}
                       </p>
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setShowAttach((v) => !v)}
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition',
-                            showAttach || attachedFiles.length
-                              ? 'bg-white/[0.08] text-amber-200'
-                              : 'text-white/65 hover:bg-white/[0.06] hover:text-amber-200',
-                          )}
-                          aria-expanded={showAttach}
-                        >
-                          <Paperclip className="h-3.5 w-3.5" />
-                          {attachedFiles.length
-                            ? ui(
-                                locale,
-                                `Anexos (${attachedFiles.length})`,
-                                `Anexos (${attachedFiles.length})`,
-                                `Files (${attachedFiles.length})`,
-                              )
-                            : ui(locale, 'Anexos', 'Anexos', 'Files')}
-                          <ChevronDown
-                            className={cn('h-3 w-3 opacity-70 transition', showAttach && 'rotate-180')}
-                          />
-                        </button>
-                        {showAttach && (
-                          <div className="absolute right-0 top-full z-20 mt-1 w-[min(17rem,calc(100vw-2rem))] rounded-lg border border-white/15 bg-[#152033] p-2 shadow-xl">
-                            <label className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed border-white/20 px-2.5 py-1.5 text-[11px] font-medium text-white/75 transition hover:bg-white/[0.06] hover:text-white">
-                              <Paperclip className="h-3.5 w-3.5" />
-                              {ui(locale, 'Adjuntar', 'Anexar', 'Attach')}
-                              <input type="file" multiple className="hidden" onChange={handleAttachFile} />
-                            </label>
-                            {attachedFiles.length > 0 ? (
-                              <ul className="mt-2 flex max-h-36 flex-wrap gap-1.5 overflow-y-auto">
-                                {attachedFiles.map((file, index) => (
-                                  <li
-                                    key={`${file.name}-${index}`}
-                                    className="inline-flex max-w-full items-center gap-1 rounded-md bg-white/[0.08] py-0.5 pl-2 pr-1 text-[11px] text-white/80"
-                                    title={file.name}
-                                  >
-                                    <span className="max-w-[9rem] truncate">{file.name}</span>
-                                    <button
-                                      type="button"
-                                      className="rounded p-0.5 text-white/45 transition hover:bg-white/10 hover:text-red-300"
-                                      aria-label={ui(locale, 'Quitar', 'Remover', 'Remove')}
-                                      onClick={() =>
-                                        setAttachedFiles((prev) => prev.filter((_, i) => i !== index))
-                                      }
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <p className="mt-2 text-center text-[11px] text-white/40">
-                                {ui(
-                                  locale,
-                                  'Ningún archivo adjunto',
-                                  'Nenhum ficheiro anexado',
-                                  'No files attached',
-                                )}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
                     </div>
                     <div className="min-h-0 flex-1 overflow-hidden bg-white/[0.03]">
                       <RichTextPane
