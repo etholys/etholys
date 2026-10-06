@@ -1,13 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
+import type { WorkspaceSystemKey, WorkspaceToolKey } from '@/lib/integrated-workspace-shared';
 
 export type UserAccessScope = 'loading' | 'full' | 'systems' | 'none';
 
 export function useLicensedSystems(companyId: string | null) {
   const [licensedSystems, setLicensedSystems] = useState<WorkspaceSystemKey[] | null>(null);
+  const [licensedTools, setLicensedTools] = useState<WorkspaceToolKey[] | null>(null);
   const [companyLicensedSystems, setCompanyLicensedSystems] = useState<WorkspaceSystemKey[] | null>(null);
+  const [companyTools, setCompanyTools] = useState<WorkspaceToolKey[] | null>(null);
   const [addOnCodes, setAddOnCodes] = useState<string[]>([]);
   const [billingEnforced, setBillingEnforced] = useState(false);
   const [canManage, setCanManage] = useState(false);
@@ -18,7 +20,9 @@ export function useLicensedSystems(companyId: string | null) {
   const refresh = useCallback(async () => {
     if (!companyId) {
       setLicensedSystems(null);
+      setLicensedTools(null);
       setCompanyLicensedSystems(null);
+      setCompanyTools(null);
       setAddOnCodes([]);
       setBillingEnforced(false);
       setCanManage(false);
@@ -35,7 +39,9 @@ export function useLicensedSystems(companyId: string | null) {
       });
       if (!res.ok) {
         setLicensedSystems([]);
+        setLicensedTools([]);
         setCompanyLicensedSystems([]);
+        setCompanyTools([]);
         setAddOnCodes([]);
         setBillingEnforced(false);
         setCanManage(false);
@@ -45,19 +51,22 @@ export function useLicensedSystems(companyId: string | null) {
       }
       const data = (await res.json()) as {
         canManage?: boolean;
-        me?: { enabled?: boolean; systems?: WorkspaceSystemKey[] } | null;
+        me?: { enabled?: boolean; systems?: WorkspaceSystemKey[]; tools?: WorkspaceToolKey[] } | null;
         companyLicensedSystems?: WorkspaceSystemKey[] | null;
+        companyTools?: WorkspaceToolKey[] | null;
         addOnCodes?: string[] | null;
         billing?: { enforced?: boolean };
       };
       const manage = data.canManage === true;
       setCanManage(manage);
       setCompanyLicensedSystems(data.companyLicensedSystems ?? null);
+      setCompanyTools(data.companyTools ?? null);
       setAddOnCodes(Array.isArray(data.addOnCodes) ? data.addOnCodes : []);
       setBillingEnforced(data.billing?.enforced === true);
 
       if (manage) {
         setLicensedSystems(data.companyLicensedSystems ?? null);
+        setLicensedTools(data.companyTools ?? null);
         setAccessScope('full');
         setShowIntegratedWorkspace(true);
         return;
@@ -66,25 +75,31 @@ export function useLicensedSystems(companyId: string | null) {
       const me = data.me;
       if (!me || me.enabled === false) {
         setLicensedSystems([]);
+        setLicensedTools([]);
         setAccessScope('none');
         setShowIntegratedWorkspace(false);
         return;
       }
 
       const systems = Array.isArray(me.systems) ? me.systems : [];
-      if (systems.length === 0) {
+      const tools = Array.isArray(me.tools) ? me.tools : [];
+      if (systems.length === 0 && tools.length === 0) {
         setLicensedSystems([]);
+        setLicensedTools([]);
         setAccessScope('none');
         setShowIntegratedWorkspace(false);
         return;
       }
 
       setLicensedSystems(systems);
+      setLicensedTools(tools);
       setAccessScope('systems');
-      setShowIntegratedWorkspace(systems.length > 0);
+      setShowIntegratedWorkspace(systems.length > 0 || tools.length > 0);
     } catch {
       setLicensedSystems([]);
+      setLicensedTools([]);
       setCompanyLicensedSystems([]);
+      setCompanyTools([]);
       setAddOnCodes([]);
       setBillingEnforced(false);
       setCanManage(false);
@@ -101,7 +116,9 @@ export function useLicensedSystems(companyId: string | null) {
 
   return {
     licensedSystems,
+    licensedTools,
     companyLicensedSystems,
+    companyTools,
     addOnCodes,
     billingEnforced,
     canManage,

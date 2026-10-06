@@ -156,6 +156,7 @@ export const authOptions: NextAuthOptions = {
           const ws = await resolveWorkspaceJwtScope(userId);
           token.workspaceAccessMode = ws.mode;
           token.allowedSystems = ws.allowedSystems;
+          token.allowedTools = ws.allowedTools;
           token.workspaceHomePath = ws.homePath;
           token.workspaceScopeCheckedAt = Date.now();
           // System admin Etholys (allowlist) — NÃO confundir com Hub full via admin de empresa
@@ -206,6 +207,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).forgeHomePath = token.forgeHomePath;
         (session.user as any).workspaceAccessMode = token.workspaceAccessMode;
         (session.user as any).allowedSystems = token.allowedSystems ?? [];
+        (session.user as any).allowedTools = token.allowedTools ?? [];
         (session.user as any).workspaceHomePath = token.workspaceHomePath;
         (session.user as any).platformAdmin = Boolean(token.platformAdmin);
         (session.user as any).studioAccessMode = token.studioAccessMode;

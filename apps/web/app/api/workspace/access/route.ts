@@ -4,16 +4,40 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import {
+  companyAvailableTools,
+  clampToolsToCompany,
   ensureWorkspaceAccessBootstrapForCompanyAdmin,
   isCompanyAdmin,
   normalizeSystemsInput,
+  normalizeToolsInput,
   parseSystemsJson,
+  parseToolsJson,
 } from '@/lib/integrated-workspace';
 import {
   assertSystemsAllowedForCompany,
   effectiveCompanyCatalog,
   getCompanyEntitlements,
 } from '@/lib/billing/company-entitlements';
+
+function grantPayload(row: {
+  id: string;
+  userId: string;
+  systems: unknown;
+  tools: unknown;
+  enabled: boolean;
+  email?: string | null;
+  name?: string | null;
+}) {
+  return {
+    id: row.id,
+    userId: row.userId,
+    email: row.email,
+    name: row.name,
+    systems: parseSystemsJson(row.systems),
+    tools: parseToolsJson(row.tools),
+    enabled: row.enabled,
+  };
+}
 
 /** GET: acesso do utilizador actual +, se for admin, lista de grants na empresa. */
 export async function GET(req: NextRequest) {
@@ -34,15 +58,28 @@ export async function GET(req: NextRequest) {
   const admin = await isCompanyAdmin(tenant.userId, companyId);
   const entitlements = await getCompanyEntitlements(companyId);
   const companyLicensedSystems = effectiveCompanyCatalog(entitlements);
+  const companyTools = companyAvailableTools({
+    billingEnforced: entitlements.billingEnforced,
+    addOnCodes: entitlements.addOnCodes,
+  });
 
   const me = await prisma.integratedWorkspaceAccess.findUnique({
     where: { companyId_userId: { companyId, userId: tenant.userId } },
   });
 
+  const mePayload = me
+    ? {
+        ...me,
+        systems: parseSystemsJson(me.systems),
+        tools: parseToolsJson(me.tools),
+      }
+    : null;
+
   if (!admin) {
     return NextResponse.json({
       canManage: false,
       companyLicensedSystems,
+      companyTools,
       addOnCodes: entitlements.addOnCodes,
       billing: {
         enforced: entitlements.billingEnforced,
@@ -50,9 +87,7 @@ export async function GET(req: NextRequest) {
         planCode: entitlements.planCode,
         maxSeats: entitlements.maxSeats,
       },
-      me: me
-        ? { ...me, systems: parseSystemsJson(me.systems) }
-        : null,
+      me: mePayload,
     });
   }
 
@@ -65,6 +100,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     canManage: true,
     companyLicensedSystems,
+    companyTools,
     addOnCodes: entitlements.addOnCodes,
     billing: {
       enforced: entitlements.billingEnforced,
@@ -72,15 +108,18 @@ export async function GET(req: NextRequest) {
       planCode: entitlements.planCode,
       maxSeats: entitlements.maxSeats,
     },
-    me: me ? { ...me, systems: parseSystemsJson(me.systems) } : null,
-    grants: grants.map((g) => ({
-      id: g.id,
-      userId: g.userId,
-      email: g.user.email,
-      name: g.user.name,
-      systems: parseSystemsJson(g.systems),
-      enabled: g.enabled,
-    })),
+    me: mePayload,
+    grants: grants.map((g) =>
+      grantPayload({
+        id: g.id,
+        userId: g.userId,
+        systems: g.systems,
+        tools: g.tools,
+        enabled: g.enabled,
+        email: g.user.email,
+        name: g.user.name,
+      }),
+    ),
   });
 }
 
@@ -118,10 +157,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: allowed.error }, { status: 400 });
   }
   const systems = allowed.systems;
+
+  const entitlements = await getCompanyEntitlements(companyId);
+  const tools = clampToolsToCompany(normalizeToolsInput(body.tools), {
+    billingEnforced: entitlements.billingEnforced,
+    addOnCodes: entitlements.addOnCodes,
+  });
   const enabled = body.enabled !== false;
 
-  if (enabled && systems.length === 0) {
-    return NextResponse.json({ error: 'Selecione pelo menos um sistema (módulo).' }, { status: 400 });
+  if (enabled && systems.length === 0 && tools.length === 0) {
+    return NextResponse.json(
+      { error: 'Selecione pelo menos um sistema ou uma Etholys Tool.' },
+      { status: 400 },
+    );
   }
 
   const record = await prisma.integratedWorkspaceAccess.upsert({
@@ -130,11 +178,13 @@ export async function POST(req: NextRequest) {
       companyId,
       userId: targetUserId,
       systems: systems as unknown as import('@prisma/client').Prisma.InputJsonValue,
+      tools: tools as unknown as import('@prisma/client').Prisma.InputJsonValue,
       enabled,
       grantedByUserId: tenant.userId,
     },
     update: {
       systems: systems as unknown as import('@prisma/client').Prisma.InputJsonValue,
+      tools: tools as unknown as import('@prisma/client').Prisma.InputJsonValue,
       enabled,
       grantedByUserId: tenant.userId,
     },
@@ -142,7 +192,11 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    grant: { ...record, systems: parseSystemsJson(record.systems) },
+    grant: {
+      ...record,
+      systems: parseSystemsJson(record.systems),
+      tools: parseToolsJson(record.tools),
+    },
   });
 }
 

@@ -9,7 +9,13 @@ import {
   effectiveCompanyCatalog,
   getCompanyEntitlements,
 } from '@/lib/billing/company-entitlements';
-import { normalizeSystemsInput, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
+import {
+  normalizeSystemsInput,
+  normalizeToolsInput,
+  type WorkspaceSystemKey,
+  type WorkspaceToolKey,
+} from '@/lib/integrated-workspace-shared';
+import { clampToolsToCompany, companyAvailableTools } from '@/lib/integrated-workspace';
 
 type ApplyOpts = {
   invitationId: string;
@@ -20,6 +26,7 @@ type ApplyOpts = {
   jobTitle?: string | null;
   accessUntil?: Date | null;
   systems: string[];
+  tools?: string[];
   accessMode: string;
   projectId?: string | null;
   projectPermissions?: unknown;
@@ -34,6 +41,10 @@ export async function applyAcceptedInvitation(opts: ApplyOpts): Promise<void> {
   const ent = await getCompanyEntitlements(opts.companyId);
   const normalized = normalizeSystemsInput(opts.systems) as WorkspaceSystemKey[];
   const systemsClamped = clampSystemsToCompanyEntitlements(normalized, ent);
+  const toolsClamped = clampToolsToCompany(normalizeToolsInput(opts.tools), {
+    billingEnforced: ent.billingEnforced,
+    addOnCodes: ent.addOnCodes,
+  });
 
   if (isAlly && opts.projectId) {
     const perms = parseSiepPermissions(opts.projectPermissions);
@@ -62,10 +73,12 @@ export async function applyAcceptedInvitation(opts: ApplyOpts): Promise<void> {
         companyId: opts.companyId,
         userId: opts.userId,
         systems: systems as unknown as Prisma.InputJsonValue,
+        tools: [] as unknown as Prisma.InputJsonValue,
         enabled: true,
       },
       update: {
         systems: systems as unknown as Prisma.InputJsonValue,
+        tools: [] as unknown as Prisma.InputJsonValue,
         enabled: true,
       },
     });
@@ -91,22 +104,31 @@ export async function applyAcceptedInvitation(opts: ApplyOpts): Promise<void> {
       },
     });
 
-    if (systemsClamped.length > 0 || opts.role === 'ADMIN') {
+    if (systemsClamped.length > 0 || toolsClamped.length > 0 || opts.role === 'ADMIN') {
       const grantSystems =
         opts.role === 'ADMIN' && systemsClamped.length === 0
           ? effectiveCompanyCatalog(ent)
           : systemsClamped;
+      const grantTools =
+        opts.role === 'ADMIN' && toolsClamped.length === 0
+          ? companyAvailableTools({
+              billingEnforced: ent.billingEnforced,
+              addOnCodes: ent.addOnCodes,
+            })
+          : toolsClamped;
       await prisma.integratedWorkspaceAccess.upsert({
         where: { companyId_userId: { companyId: opts.companyId, userId: opts.userId } },
         create: {
           companyId: opts.companyId,
           userId: opts.userId,
           systems: grantSystems as unknown as Prisma.InputJsonValue,
-          enabled: opts.role === 'ADMIN' || grantSystems.length > 0,
+          tools: grantTools as unknown as Prisma.InputJsonValue,
+          enabled: opts.role === 'ADMIN' || grantSystems.length > 0 || grantTools.length > 0,
         },
         update: {
           systems: grantSystems as unknown as Prisma.InputJsonValue,
-          enabled: opts.role === 'ADMIN' || grantSystems.length > 0,
+          tools: grantTools as unknown as Prisma.InputJsonValue,
+          enabled: opts.role === 'ADMIN' || grantSystems.length > 0 || grantTools.length > 0,
         },
       });
     }
@@ -127,6 +149,7 @@ export function invitationRowToApplyOpts(
     jobTitle?: string | null;
     accessUntil?: Date | null;
     systems?: unknown;
+    tools?: unknown;
     accessMode?: string | null;
     projectId?: string | null;
     projectPermissions?: unknown;
@@ -134,6 +157,7 @@ export function invitationRowToApplyOpts(
   },
   userId: string,
   systems: string[],
+  tools: string[] = [],
 ): ApplyOpts {
   return {
     invitationId: invitation.id,
@@ -144,6 +168,9 @@ export function invitationRowToApplyOpts(
     jobTitle: invitation.jobTitle,
     accessUntil: invitation.accessUntil,
     systems,
+    tools: tools.length
+      ? tools
+      : normalizeToolsInput(invitation.tools),
     accessMode: invitation.accessMode || 'company',
     projectId: invitation.projectId,
     projectPermissions: invitation.projectPermissions,

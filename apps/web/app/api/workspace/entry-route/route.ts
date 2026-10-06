@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { getWorkspaceAccessForUser } from '@/lib/integrated-workspace';
 import { LICENSE_KEY_TO_HREF } from '@/lib/hub-system-license';
+import { TOOL_KEY_TO_HREF } from '@/lib/platform-access';
 import { isLikelyDbId } from '@/lib/utils';
 
 /** Destino pós-login: hub ou sistema único licenciado. */
@@ -67,29 +68,50 @@ export async function GET(req: Request) {
   }
 
   const access = await getWorkspaceAccessForUser(userId, companyId);
-  if (access.ok && access.systems.length >= 1) {
+  if (access.ok && (access.systems.length >= 1 || access.tools.length >= 1)) {
     const { isPrecommercialMode } = await import('@/lib/platform-access');
     const { isCompanyAdmin } = await import('@/lib/integrated-workspace');
     const admin = await isCompanyAdmin(userId, companyId);
     // Pré-comercial + não-admin: nunca mandar ao Hub — ir à função (ou primeira se várias)
     if (isPrecommercialMode() && !admin) {
-      const key = access.systems[0];
-      const href = LICENSE_KEY_TO_HREF[key];
-      if (href) {
-        return NextResponse.json({
-          href,
-          reason: access.systems.length === 1 ? 'single_system' : 'function_only',
-          system: key,
-          companyId,
-        });
+      if (access.systems.length >= 1) {
+        const key = access.systems[0];
+        const href = LICENSE_KEY_TO_HREF[key];
+        if (href) {
+          return NextResponse.json({
+            href,
+            reason: access.systems.length === 1 ? 'single_system' : 'function_only',
+            system: key,
+            companyId,
+          });
+        }
+      }
+      if (access.tools.length >= 1) {
+        const key = access.tools[0];
+        const href = TOOL_KEY_TO_HREF[key];
+        if (href) {
+          return NextResponse.json({
+            href,
+            reason: access.tools.length === 1 ? 'single_tool' : 'function_only_tools',
+            tool: key,
+            companyId,
+          });
+        }
       }
       return NextResponse.json({ href: '/acesso', reason: 'no_href', companyId });
     }
-    if (access.systems.length === 1) {
+    if (access.systems.length === 1 && access.tools.length === 0) {
       const key = access.systems[0];
       const href = LICENSE_KEY_TO_HREF[key];
       if (href) {
         return NextResponse.json({ href, reason: 'single_system', system: key, companyId });
+      }
+    }
+    if (access.systems.length === 0 && access.tools.length === 1) {
+      const key = access.tools[0];
+      const href = TOOL_KEY_TO_HREF[key];
+      if (href) {
+        return NextResponse.json({ href, reason: 'single_tool', tool: key, companyId });
       }
     }
   }

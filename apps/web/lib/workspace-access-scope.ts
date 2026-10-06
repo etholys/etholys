@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import {
   isPlatformFullAccess,
   homePathForSystems,
+  homePathForTools,
   type WorkspaceAccessMode,
 } from '@/lib/platform-access';
 import {
@@ -11,12 +12,14 @@ import {
   isCompanyAdmin,
   parseSystemsJson,
   type WorkspaceSystemKey,
+  type WorkspaceToolKey,
 } from '@/lib/integrated-workspace';
 import { isCompanyMembershipExpired } from '@/lib/access/membership-access';
 
 export type WorkspaceJwtScope = {
   mode: WorkspaceAccessMode;
   allowedSystems: WorkspaceSystemKey[];
+  allowedTools: WorkspaceToolKey[];
   homePath: string;
   /** System admin Etholys (allowlist) — NÃO admin de empresa. */
   isSystemAdmin: boolean;
@@ -35,7 +38,13 @@ export async function resolveWorkspaceJwtScope(userId: string): Promise<Workspac
   const systemAdmin = isPlatformFullAccess({ email: user?.email, role: user?.role });
 
   if (systemAdmin) {
-    return { mode: 'full', allowedSystems: [], homePath: '/hub', isSystemAdmin: true };
+    return {
+      mode: 'full',
+      allowedSystems: [],
+      allowedTools: [],
+      homePath: '/hub',
+      isSystemAdmin: true,
+    };
   }
 
   const memberships = await prisma.companyUser.findMany({
@@ -51,7 +60,13 @@ export async function resolveWorkspaceJwtScope(userId: string): Promise<Workspac
   }
 
   if (activeMemberships.some((m) => m.role === 'ADMIN')) {
-    return { mode: 'full', allowedSystems: [], homePath: '/hub', isSystemAdmin: false };
+    return {
+      mode: 'full',
+      allowedSystems: [],
+      allowedTools: [],
+      homePath: '/hub',
+      isSystemAdmin: false,
+    };
   }
 
   if (activeMemberships.length === 0) {
@@ -62,12 +77,25 @@ export async function resolveWorkspaceJwtScope(userId: string): Promise<Workspac
         guestProjects.length === 1
           ? `/siep/projects/${guestProjects[0]}`
           : '/siep/projects';
-      return { mode: 'none', allowedSystems: [], homePath: home, isSystemAdmin: false };
+      return {
+        mode: 'none',
+        allowedSystems: [],
+        allowedTools: [],
+        homePath: home,
+        isSystemAdmin: false,
+      };
     }
-    return { mode: 'none', allowedSystems: [], homePath: '/acesso', isSystemAdmin: false };
+    return {
+      mode: 'none',
+      allowedSystems: [],
+      allowedTools: [],
+      homePath: '/acesso',
+      isSystemAdmin: false,
+    };
   }
 
   const systems = new Set<WorkspaceSystemKey>();
+  const tools = new Set<WorkspaceToolKey>();
   let hasEnabledGrant = false;
 
   for (const m of activeMemberships) {
@@ -75,18 +103,32 @@ export async function resolveWorkspaceJwtScope(userId: string): Promise<Workspac
     if (access.ok) {
       hasEnabledGrant = true;
       for (const s of access.systems) systems.add(s);
+      for (const t of access.tools) tools.add(t);
     }
   }
 
-  const list = [...systems];
-  if (!hasEnabledGrant || list.length === 0) {
-    return { mode: 'none', allowedSystems: [], homePath: '/acesso', isSystemAdmin: false };
+  const systemList = [...systems];
+  const toolList = [...tools];
+  if (!hasEnabledGrant || (systemList.length === 0 && toolList.length === 0)) {
+    return {
+      mode: 'none',
+      allowedSystems: [],
+      allowedTools: [],
+      homePath: '/acesso',
+      isSystemAdmin: false,
+    };
   }
+
+  const homePath =
+    systemList.length > 0
+      ? homePathForSystems(systemList)
+      : homePathForTools(toolList);
 
   return {
     mode: 'function_only',
-    allowedSystems: list,
-    homePath: homePathForSystems(list),
+    allowedSystems: systemList,
+    allowedTools: toolList,
+    homePath,
     isSystemAdmin: false,
   };
 }

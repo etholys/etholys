@@ -103,7 +103,7 @@ export function WorkspaceCockpit({
         systems: overview.access.systems as WorkspaceSystemKey[],
         tools: {
           work: overview.tools?.work === true || Boolean(overview.blocks.WORK),
-          meet: overview.tools?.meet !== false,
+          meet: overview.tools?.meet === true,
           studio: overview.tools?.studio === true || Boolean(overview.blocks.STUDIO),
         },
       }),

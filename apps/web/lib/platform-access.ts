@@ -8,8 +8,15 @@
  * Lab / MUSE / ANVIL = só system admin (+ convites Lab/ANVIL).
  */
 
-import type { WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
+import type { WorkspaceSystemKey, WorkspaceToolKey } from '@/lib/integrated-workspace-shared';
 import { LICENSE_KEY_TO_HREF } from '@/lib/hub-system-license';
+
+export const TOOL_KEY_TO_HREF: Record<WorkspaceToolKey, string> = {
+  ADVISOR: '/hub/advisor',
+  STUDIO: '/hub/studio',
+  WORK: '/hub/work',
+  CHORUS: '/hub/meet',
+};
 
 /**
  * Bootstrap mínimo se o env estiver vazio.
@@ -74,6 +81,52 @@ export function homePathForSystems(systems: WorkspaceSystemKey[]): string {
   return '/acesso';
 }
 
+export function homePathForTools(tools: WorkspaceToolKey[]): string {
+  if (tools.length === 0) return '/acesso';
+  if (tools.length === 1) return TOOL_KEY_TO_HREF[tools[0]] || '/acesso';
+  return '/acesso';
+}
+
+export function pagePrefixesForTool(tool: WorkspaceToolKey): string[] {
+  switch (tool) {
+    case 'ADVISOR':
+      return ['/hub/advisor'];
+    case 'STUDIO':
+      return ['/hub/studio', '/studio'];
+    case 'WORK':
+      return ['/hub/work'];
+    case 'CHORUS':
+      return ['/hub/meet'];
+    default:
+      return [];
+  }
+}
+
+export function isPathAllowedForTools(pathname: string, tools: WorkspaceToolKey[]): boolean {
+  for (const tool of tools) {
+    for (const prefix of pagePrefixesForTool(tool)) {
+      if (pathname === prefix || pathname.startsWith(`${prefix}/`)) return true;
+    }
+  }
+  return false;
+}
+
+/** Paths de Etholys Tools (não hub-shell admin). */
+export function isEtholysToolPath(pathname: string): boolean {
+  return (
+    pathname === '/hub/advisor' ||
+    pathname.startsWith('/hub/advisor/') ||
+    pathname === '/hub/studio' ||
+    pathname.startsWith('/hub/studio/') ||
+    pathname === '/studio' ||
+    pathname.startsWith('/studio/') ||
+    pathname === '/hub/work' ||
+    pathname.startsWith('/hub/work/') ||
+    pathname === '/hub/meet' ||
+    pathname.startsWith('/hub/meet/')
+  );
+}
+
 export function pagePrefixesForSystem(system: WorkspaceSystemKey): string[] {
   switch (system) {
     case 'ATLAS':
@@ -130,8 +183,6 @@ export function isHubShellPath(pathname: string): boolean {
   if (pathname === '/hub/admin' || pathname.startsWith('/hub/admin/')) return true;
   if (pathname === '/hub/billing' || pathname.startsWith('/hub/billing/')) return true;
   if (pathname === '/hub/setup' || pathname.startsWith('/hub/setup/')) return true;
-  if (pathname === '/hub/meet' || pathname.startsWith('/hub/meet/')) return true;
-  if (pathname === '/hub/advisor' || pathname.startsWith('/hub/advisor/')) return true;
-  if (pathname === '/hub/work' || pathname.startsWith('/hub/work/')) return true;
+  // Etholys Tools (`/hub/meet`, advisor, work, studio) — gated by allowedTools, not hub-shell.
   return false;
 }

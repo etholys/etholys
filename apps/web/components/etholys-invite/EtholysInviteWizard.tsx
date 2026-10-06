@@ -17,13 +17,17 @@ import { useApp } from '@/app/providers';
 import type { Locale } from '@/lib/i18n';
 import {
   WORKSPACE_SYSTEM_KEYS,
+  WORKSPACE_TOOL_KEYS,
   systemDisplayName,
+  toolDisplayName,
   type WorkspaceSystemKey,
+  type WorkspaceToolKey,
 } from '@/lib/integrated-workspace-shared';
 import {
   buildInviteSummaryLines,
   defaultSiepPermsForKind,
   defaultSystemsForKind,
+  defaultToolsForKind,
   inviteKindHint,
   inviteKindLabel,
   type CompanyPowerRole,
@@ -126,6 +130,15 @@ export function EtholysInviteWizard({
     for (const k of defs) init[k] = true;
     return init;
   });
+  const [tools, setTools] = useState<Record<WorkspaceToolKey, boolean>>(() => {
+    const init = Object.fromEntries(WORKSPACE_TOOL_KEYS.map((k) => [k, false])) as Record<
+      WorkspaceToolKey,
+      boolean
+    >;
+    const defs = defaultToolsForKind(lockAlly || context === 'siep_project' ? 'ally' : 'employee');
+    for (const k of defs) init[k] = true;
+    return init;
+  });
   const [projectId, setProjectId] = useState(defaultProjectId || '');
   const [projects, setProjects] = useState<ProjectOpt[]>(
     defaultProjectId && defaultProjectName
@@ -164,6 +177,7 @@ export function EtholysInviteWizard({
   }, [inviteKind, loadProjects, lockAlly]);
 
   const selectedSystems = WORKSPACE_SYSTEM_KEYS.filter((k) => systems[k] && systemOptions.includes(k));
+  const selectedTools = WORKSPACE_TOOL_KEYS.filter((k) => tools[k]);
   const needsSiepDetail = selectedSystems.includes('SIEP') || inviteKind === 'ally';
   const selectedSiepKeys = Object.entries(siepPerms)
     .filter(([, v]) => v)
@@ -178,6 +192,12 @@ export function EtholysInviteWizard({
     setSystems((prev) => {
       const next = { ...prev };
       for (const k of WORKSPACE_SYSTEM_KEYS) next[k] = defs.includes(k);
+      return next;
+    });
+    const toolDefs = defaultToolsForKind(kind);
+    setTools((prev) => {
+      const next = { ...prev };
+      for (const k of WORKSPACE_TOOL_KEYS) next[k] = toolDefs.includes(k);
       return next;
     });
     const permKeys = defaultSiepPermsForKind(kind);
@@ -204,11 +224,11 @@ export function EtholysInviteWizard({
 
   const validateStep1 = (): string | null => {
     if (inviteKind === 'ally') return null;
-    if (powerRole !== 'ADMIN' && selectedSystems.length === 0) {
+    if (powerRole !== 'ADMIN' && selectedSystems.length === 0 && selectedTools.length === 0) {
       return t(
-        'Marque pelo menos um sistema, ou Administrador.',
-        'Marque al menos un sistema, o Administrador.',
-        'Select at least one system, or Administrator.',
+        'Marque pelo menos um sistema ou ferramenta, ou Administrador.',
+        'Marque al menos un sistema o herramienta, o Administrador.',
+        'Select at least one system or tool, or Administrator.',
       );
     }
     return null;
@@ -255,6 +275,7 @@ export function EtholysInviteWizard({
         role: inviteKind === 'ally' ? 'COLLABORATOR' : powerRole,
         accessUntil: inviteKind === 'temporary' ? accessUntil : null,
         systems: inviteKind === 'ally' ? ['SIEP'] : selectedSystems,
+        tools: inviteKind === 'ally' ? [] : selectedTools,
         projectId: inviteKind === 'ally' ? projectId : null,
         projectPermissions: inviteKind === 'ally' ? selectedSiepKeys : undefined,
         companySiepPermissions:
@@ -319,6 +340,7 @@ export function EtholysInviteWizard({
       role: powerRole,
       accessUntil: accessUntil || null,
       systems: inviteKind === 'ally' ? ['SIEP'] : selectedSystems,
+      tools: inviteKind === 'ally' ? [] : selectedTools,
       projectName,
       siepPermCount: needsSiepDetail ? selectedSiepKeys.length : undefined,
     },
@@ -566,12 +588,34 @@ export function EtholysInviteWizard({
                   </div>
                 </div>
               )}
+              {powerRole !== 'ADMIN' && (
+                <div>
+                  <p className="mb-2 text-sm font-medium text-slate-700">
+                    {t('Etholys Tools', 'Etholys Tools', 'Etholys Tools')}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {WORKSPACE_TOOL_KEYS.map((k) => (
+                      <label
+                        key={k}
+                        className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!tools[k]}
+                          onChange={(e) => setTools((s) => ({ ...s, [k]: e.target.checked }))}
+                        />
+                        <span>{toolDisplayName(k)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               {powerRole === 'ADMIN' && (
                 <p className="text-sm text-slate-600">
                   {t(
-                    'Administradores têm Hub completo; sistemas individuais são opcionais.',
-                    'Los administradores tienen Hub completo; sistemas individuales son opcionales.',
-                    'Administrators get the full Hub; individual systems are optional.',
+                    'Administradores têm Hub completo; sistemas e tools individuais são opcionais.',
+                    'Los administradores tienen Hub completo; sistemas y tools individuales son opcionales.',
+                    'Administrators get the full Hub; individual systems and tools are optional.',
                   )}
                 </p>
               )}

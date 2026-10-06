@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { isPrecommercialMode } from '@/lib/platform-access';
-import { normalizeSystemsInput, parseSystemsJson } from '@/lib/integrated-workspace-shared';
+import { normalizeSystemsInput, normalizeToolsInput, parseSystemsJson, parseToolsJson } from '@/lib/integrated-workspace-shared';
 import { applyAcceptedInvitation, invitationRowToApplyOpts } from '@/lib/etholys-invite-apply';
 
 export async function POST(req: Request) {
@@ -91,7 +91,8 @@ export async function POST(req: Request) {
 
     if (invitation) {
       const systems = normalizeSystemsInput(parseSystemsJson(invitation.systems));
-      await applyAcceptedInvitation(invitationRowToApplyOpts(invitation, user.id, systems));
+      const tools = normalizeToolsInput(parseToolsJson(invitation.tools));
+      await applyAcceptedInvitation(invitationRowToApplyOpts(invitation, user.id, systems, tools));
     }
 
     return NextResponse.json({ success: true, userId: user.id });

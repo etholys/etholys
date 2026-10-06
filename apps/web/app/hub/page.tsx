@@ -209,7 +209,9 @@ export default function HubPage() {
     useEnsureActiveCompany();
   const {
     licensedSystems,
+    licensedTools,
     companyLicensedSystems,
+    companyTools,
     addOnCodes,
     billingEnforced,
     canManage,
@@ -320,6 +322,8 @@ export default function HubPage() {
     canManage,
     loading: accessLoading,
     companyLicensedSystems,
+    companyTools,
+    licensedTools,
     billingEnforced,
     addOnCodes,
   };

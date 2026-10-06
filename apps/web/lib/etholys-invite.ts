@@ -10,9 +10,13 @@ import {
 } from '@/lib/siep/permissions-shared';
 import {
   WORKSPACE_SYSTEM_KEYS,
+  WORKSPACE_TOOL_KEYS,
   normalizeSystemsInput,
+  normalizeToolsInput,
   systemDisplayName,
+  toolDisplayName,
   type WorkspaceSystemKey,
+  type WorkspaceToolKey,
 } from '@/lib/integrated-workspace-shared';
 import type { Locale } from '@/lib/i18n';
 
@@ -31,6 +35,7 @@ export type EtholysInvitePayload = {
   role?: CompanyPowerRole;
   accessUntil?: string | null;
   systems?: WorkspaceSystemKey[];
+  tools?: WorkspaceToolKey[];
   projectId?: string | null;
   projectPermissions?: SiepPermissionKey[];
   companySiepPermissions?: SiepPermissionKey[];
@@ -87,6 +92,11 @@ export function defaultSiepPermsForKind(kind: InviteKind): SiepPermissionKey[] {
   return [...DEFAULT_FIELD_PERMISSIONS];
 }
 
+export function defaultToolsForKind(kind: InviteKind): WorkspaceToolKey[] {
+  if (kind === 'ally') return [];
+  return [];
+}
+
 export function buildInviteSummaryLines(
   payload: {
     email: string;
@@ -95,6 +105,7 @@ export function buildInviteSummaryLines(
     role?: string;
     accessUntil?: string | null;
     systems: string[];
+    tools?: string[];
     projectName?: string | null;
     siepPermCount?: number;
   },
@@ -152,6 +163,18 @@ export function buildInviteSummaryLines(
           : 'Sistemas: ninguno (no verá módulos hasta asignar)',
     );
   }
+  const tools = payload.tools || [];
+  if (tools.length) {
+    lines.push(`Tools: ${tools.map(toolDisplayName).join(', ')}`);
+  } else if (payload.inviteKind !== 'ally' && payload.role !== 'ADMIN') {
+    lines.push(
+      locale === 'pt'
+        ? 'Tools: nenhuma'
+        : locale === 'en'
+          ? 'Tools: none'
+          : 'Tools: ninguna',
+    );
+  }
   if (payload.systems.includes('SIEP') && typeof payload.siepPermCount === 'number') {
     lines.push(
       locale === 'pt'
@@ -175,6 +198,7 @@ export function validateInvitePayload(raw: EtholysInvitePayload): { ok: true; da
   const jobTitle = raw.jobTitle?.trim() || undefined;
   const role: CompanyPowerRole = raw.role === 'ADMIN' ? 'ADMIN' : 'COLLABORATOR';
   let systems = normalizeSystemsInput(raw.systems);
+  let tools = normalizeToolsInput(raw.tools);
   let projectId = raw.projectId?.trim() || null;
   let accessUntil = raw.accessUntil?.trim() || null;
   let projectPermissions = parseSiepPermissions(raw.projectPermissions);
@@ -186,6 +210,7 @@ export function validateInvitePayload(raw: EtholysInvitePayload): { ok: true; da
     }
     systems = systems.length ? systems : ['SIEP'];
     if (!systems.includes('SIEP')) systems = ['SIEP', ...systems];
+    tools = [];
     if (projectPermissions.length === 0) {
       projectPermissions = [...DEFAULT_PROJECT_GUEST_PERMISSIONS];
     }
@@ -198,6 +223,7 @@ export function validateInvitePayload(raw: EtholysInvitePayload): { ok: true; da
         jobTitle,
         role: 'COLLABORATOR',
         systems,
+        tools,
         projectId,
         projectPermissions,
         companySiepPermissions: undefined,
@@ -218,9 +244,9 @@ export function validateInvitePayload(raw: EtholysInvitePayload): { ok: true; da
     accessUntil = null;
   }
 
-  // Admin de empresa: sistemas opcionais (Hub completo)
-  if (role !== 'ADMIN' && systems.length === 0) {
-    return { ok: false, error: 'Seleccione al menos un sistema, o marque Administrador.' };
+  // Admin de empresa: sistemas/tools opcionais (Hub completo)
+  if (role !== 'ADMIN' && systems.length === 0 && tools.length === 0) {
+    return { ok: false, error: 'Seleccione al menos un sistema o herramienta, o marque Administrador.' };
   }
 
   if (systems.includes('SIEP') && companySiepPermissions.length === 0) {
@@ -240,6 +266,7 @@ export function validateInvitePayload(raw: EtholysInvitePayload): { ok: true; da
       role,
       accessUntil,
       systems,
+      tools,
       projectId: null,
       projectPermissions: undefined,
       companySiepPermissions: companySiepPermissions.length ? companySiepPermissions : undefined,
@@ -247,4 +274,4 @@ export function validateInvitePayload(raw: EtholysInvitePayload): { ok: true; da
   };
 }
 
-export { WORKSPACE_SYSTEM_KEYS };
+export { WORKSPACE_SYSTEM_KEYS, WORKSPACE_TOOL_KEYS };

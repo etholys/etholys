@@ -20,12 +20,14 @@ import {
   isPageAllowedForProjectGuest,
 } from '@/lib/siep/project-guest-guard';
 import {
+  isEtholysToolPath,
   isHubShellPath,
   isPathAllowedForSystems,
+  isPathAllowedForTools,
   isPrecommercialMode,
   type WorkspaceAccessMode,
 } from '@/lib/platform-access';
-import type { WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
+import type { WorkspaceSystemKey, WorkspaceToolKey } from '@/lib/integrated-workspace-shared';
 
 const PAGE_PREFIXES = [
   '/hub',
@@ -71,6 +73,7 @@ type AccessToken = {
   forgeHomePath?: string;
   workspaceAccessMode?: WorkspaceAccessMode;
   allowedSystems?: string[];
+  allowedTools?: string[];
   workspaceHomePath?: string;
   platformAdmin?: boolean;
   studioAccessMode?: string;
@@ -90,6 +93,7 @@ type ForgeScope = {
 type WorkspaceScope = {
   mode: WorkspaceAccessMode;
   allowedSystems: WorkspaceSystemKey[];
+  allowedTools: WorkspaceToolKey[];
   homePath: string;
 };
 
@@ -128,12 +132,13 @@ async function resolveForgeScope(req: NextRequest, token: AccessToken): Promise<
 
 async function resolveWorkspaceScope(req: NextRequest, token: AccessToken): Promise<WorkspaceScope | null> {
   if (token.platformAdmin || token.workspaceAccessMode === 'full') {
-    return { mode: 'full', allowedSystems: [], homePath: '/hub' };
+    return { mode: 'full', allowedSystems: [], allowedTools: [], homePath: '/hub' };
   }
   if (token.workspaceAccessMode === 'function_only' || token.workspaceAccessMode === 'none') {
     return {
       mode: token.workspaceAccessMode,
       allowedSystems: (token.allowedSystems || []) as WorkspaceSystemKey[],
+      allowedTools: (token.allowedTools || []) as WorkspaceToolKey[],
       homePath: typeof token.workspaceHomePath === 'string' ? token.workspaceHomePath : '/acesso',
     };
   }
@@ -374,15 +379,14 @@ async function enforceFunctionOnlyScope(
 
   if (pathname === '/acesso' || pathname.startsWith('/acesso/')) return null;
 
-  // Studio / Work = ferramentas transversais (isentas de licença de sistema); disponíveis a autenticados.
-  if (
-    pathname === '/hub/studio' ||
-    pathname.startsWith('/hub/studio/') ||
-    pathname === '/studio' ||
-    pathname.startsWith('/studio/') ||
-    pathname === '/hub/work' ||
-    pathname.startsWith('/hub/work/')
-  ) {
+  // Etholys Tools — exige grant por utilizador (admins / full: passa acima).
+  if (isEtholysToolPath(pathname)) {
+    if (scope.mode === 'none') {
+      return NextResponse.redirect(new URL('/acesso', req.url));
+    }
+    if (!isPathAllowedForTools(pathname, scope.allowedTools || [])) {
+      return NextResponse.redirect(new URL(scope.homePath || '/acesso', req.url));
+    }
     return null;
   }
 

@@ -433,6 +433,8 @@ model IntegratedWorkspaceAccess {
   userId          String
   /// JSON: ["ATLAS","SIEP","FUNDHUB","NEXUS","FORGE","PRISM"] — subconjunto contratado / relevante
   systems         Json     @default("[]")
+  /// JSON: ["ADVISOR","STUDIO","WORK","CHORUS"] — Etholys Tools por utilizador
+  tools           Json     @default("[]")
   enabled         Boolean  @default(true)
   grantedByUserId String?
   createdAt       DateTime @default(now())
@@ -1142,6 +1144,8 @@ model Invitation {
   accessUntil DateTime?
   /// JSON: ["SIEP","ATLAS",…] — convite só a funções; null = legado
   systems    Json?
+  /// JSON: ["ADVISOR","STUDIO","WORK","CHORUS"] — Etholys Tools no convite
+  tools      Json?
   /// Se definido: convite só a este projeto (aliado)
   projectId  String?
   /// company | project_guest

@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useApp } from '@/app/providers';
-import { WORKSPACE_SYSTEM_KEYS, systemDisplayName, type WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
+import {
+  WORKSPACE_SYSTEM_KEYS,
+  WORKSPACE_TOOL_KEYS,
+  systemDisplayName,
+  toolDisplayName,
+  type WorkspaceSystemKey,
+  type WorkspaceToolKey,
+} from '@/lib/integrated-workspace-shared';
 import { Lock, Shield, UserPlus, Users, X } from 'lucide-react';
 import { getSiepPermissionGroups, type SiepPermissionKey } from '@/lib/siep/permissions-shared';
 import type { Locale } from '@/lib/i18n';
@@ -13,7 +20,7 @@ import { StateEmpty, StateError, StateLoading } from '@/components/ui/StateBlock
 import { EtholysInviteWizard } from '@/components/etholys-invite/EtholysInviteWizard';
 
 type Member = { userId: string; email: string; name: string; role: string };
-type Grant = { userId: string; email: string; name: string; systems: string[]; enabled: boolean };
+type Grant = { userId: string; email: string; name: string; systems: string[]; tools: string[]; enabled: boolean };
 
 const PANEL =
   'rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]';
@@ -40,6 +47,13 @@ function emptySystemSel(): Record<WorkspaceSystemKey, boolean> {
     boolean
   >;
 }
+function emptyToolSel(): Record<WorkspaceToolKey, boolean> {
+  return Object.fromEntries(WORKSPACE_TOOL_KEYS.map((k) => [k, false])) as Record<
+    WorkspaceToolKey,
+    boolean
+  >;
+}
+
 
 export function WorkspaceAccessManager() {
   const { data: session } = useSession();
@@ -103,6 +117,8 @@ export function WorkspaceAccessManager() {
   const [siepSaving, setSiepSaving] = useState(false);
   const [siepMsg, setSiepMsg] = useState<string | null>(null);
   const [sel, setSel] = useState<Record<WorkspaceSystemKey, boolean>>(emptySystemSel);
+  const [toolSel, setToolSel] = useState<Record<WorkspaceToolKey, boolean>>(emptyToolSel);
+  const [companyTools, setCompanyTools] = useState<WorkspaceToolKey[]>([...WORKSPACE_TOOL_KEYS]);
   const [inviteMsg, setInviteMsg] = useState<string | null>(null);
   const [showInviteWizard, setShowInviteWizard] = useState(false);
 
@@ -135,7 +151,15 @@ export function WorkspaceAccessManager() {
           return;
         }
         setCanManage(true);
-        setGrants(a.grants || []);
+        setGrants(
+          (a.grants || []).map((g: Grant) => ({
+            ...g,
+            tools: Array.isArray(g.tools) ? g.tools : [],
+          })),
+        );
+        if (Array.isArray(a.companyTools) && a.companyTools.length) {
+          setCompanyTools(a.companyTools as WorkspaceToolKey[]);
+        }
         if (m.members) setMembers(m.members);
       } finally {
         setLoading(false);
@@ -173,6 +197,7 @@ export function WorkspaceAccessManager() {
     setSiepMsg(null);
     const grant = grants.find((g) => g.userId === userId);
     const next = emptySystemSel();
+    const nextTools = emptyToolSel();
     if (grant?.enabled && Array.isArray(grant.systems)) {
       for (const k of grant.systems) {
         if (k in next) next[k as WorkspaceSystemKey] = true;
@@ -181,7 +206,13 @@ export function WorkspaceAccessManager() {
       next.ATLAS = true;
       next.SIEP = true;
     }
+    if (grant?.enabled && Array.isArray(grant.tools)) {
+      for (const k of grant.tools) {
+        if (k in nextTools) nextTools[k as WorkspaceToolKey] = true;
+      }
+    }
     setSel(next);
+    setToolSel(nextTools);
   };
 
   const clearSelection = () => {
@@ -189,6 +220,7 @@ export function WorkspaceAccessManager() {
     setMsg(null);
     setSiepMsg(null);
     setSel(emptySystemSel());
+    setToolSel(emptyToolSel());
   };
 
   const saveSiepPermissions = async () => {
@@ -221,8 +253,15 @@ export function WorkspaceAccessManager() {
       return;
     }
     const systems = WORKSPACE_SYSTEM_KEYS.filter((k) => sel[k]);
-    if (systems.length === 0) {
-      setMsg(t('Marque pelo menos um sistema.', 'Marque al menos un sistema.', 'Select at least one system.'));
+    const tools = WORKSPACE_TOOL_KEYS.filter((k) => toolSel[k] && companyTools.includes(k));
+    if (systems.length === 0 && tools.length === 0) {
+      setMsg(
+        t(
+          'Marque pelo menos um sistema ou uma ferramenta.',
+          'Marque al menos un sistema o una herramienta.',
+          'Select at least one system or tool.',
+        ),
+      );
       return;
     }
     setMsg(null);
@@ -230,7 +269,7 @@ export function WorkspaceAccessManager() {
     const r = await fetch('/api/workspace/access', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyId, userId: targetUser, systems, enabled: true }),
+      body: JSON.stringify({ companyId, userId: targetUser, systems, tools, enabled: true }),
     });
     const d = await r.json();
     setSaving(false);
@@ -240,6 +279,7 @@ export function WorkspaceAccessManager() {
     }
     const member = members.find((m) => m.userId === targetUser);
     const nextSystems = Array.isArray(d.grant?.systems) ? d.grant.systems : systems;
+    const nextToolsList = Array.isArray(d.grant?.tools) ? d.grant.tools : tools;
     setGrants((prev) => {
       const rest = prev.filter((g) => g.userId !== targetUser);
       return [
@@ -248,6 +288,7 @@ export function WorkspaceAccessManager() {
           email: member?.email || '',
           name: member?.name || '',
           systems: nextSystems,
+          tools: nextToolsList,
           enabled: true,
         },
         ...rest,
@@ -524,7 +565,7 @@ export function WorkspaceAccessManager() {
                         <span className="mt-0.5 flex flex-wrap items-center gap-1">
                           <SystemChip label={m.role} />
                           {grant?.enabled && grant.systems.length > 0 ? (
-                            grant.systems.slice(0, 4).map((sys) => (
+                            grant.systems.slice(0, 3).map((sys) => (
                               <SystemChip
                                 key={sys}
                                 label={systemDisplayName(sys as WorkspaceSystemKey)}
@@ -536,9 +577,17 @@ export function WorkspaceAccessManager() {
                               {t('Sem sistemas', 'Sin sistemas', 'No systems')}
                             </span>
                           )}
-                          {grant?.enabled && grant.systems.length > 4 && (
+                          {grant?.enabled &&
+                            Array.isArray(grant.tools) &&
+                            grant.tools.slice(0, 2).map((tool) => (
+                              <SystemChip key={tool} label={toolDisplayName(tool)} active />
+                            ))}
+                          {grant?.enabled &&
+                            (grant.systems.length > 3 || (grant.tools?.length || 0) > 2) && (
                             <span className="text-[10px] font-medium text-slate-500">
-                              +{grant.systems.length - 4}
+                              +
+                              {Math.max(0, grant.systems.length - 3) +
+                                Math.max(0, (grant.tools?.length || 0) - 2)}
                             </span>
                           )}
                         </span>
@@ -595,9 +644,9 @@ export function WorkspaceAccessManager() {
                     </h3>
                     <p className="mt-1 text-xs text-slate-600">
                       {t(
-                        'Produtos do centro integrado que esta pessoa pode abrir.',
-                        'Productos del centro integrado que puede abrir esta persona.',
-                        'Integrated workspace products this person can open.',
+                        'Sistemas e Etholys Tools que esta pessoa pode abrir.',
+                        'Sistemas y Etholys Tools que puede abrir esta persona.',
+                        'Systems and Etholys Tools this person can open.',
                       )}
                     </p>
                     <div className="mt-3 grid grid-cols-2 gap-2">
@@ -621,6 +670,43 @@ export function WorkspaceAccessManager() {
                         </label>
                       ))}
                     </div>
+
+                    <div className="mt-5 border-t border-slate-200 pt-4">
+                      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-800">
+                        {t('Etholys Tools', 'Etholys Tools', 'Etholys Tools')}
+                      </h4>
+                      <p className="mt-1 text-xs text-slate-600">
+                        {t(
+                          'Advisor, Studio, Work e Chorus — marque o que esta pessoa pode abrir.',
+                          'Advisor, Studio, Work y Chorus — marque lo que esta persona puede abrir.',
+                          'Advisor, Studio, Work and Chorus — mark what this person can open.',
+                        )}
+                      </p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {WORKSPACE_TOOL_KEYS.map((k) => (
+                          <label
+                            key={k}
+                            className={cn(
+                              'flex cursor-pointer items-center gap-2 rounded-lg border bg-white px-2.5 py-2 text-sm transition',
+                              toolSel[k]
+                                ? 'border-teal-400 ring-1 ring-teal-400/50'
+                                : 'border-slate-200 hover:border-slate-300',
+                              !companyTools.includes(k) && 'opacity-50',
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={toolSel[k]}
+                              disabled={!companyTools.includes(k)}
+                              onChange={(e) => setToolSel((s) => ({ ...s, [k]: e.target.checked }))}
+                              className="rounded border-slate-300 text-teal-700 focus:ring-teal-600"
+                            />
+                            <span className="font-medium text-slate-800">{toolDisplayName(k)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                       <button
                         type="button"
@@ -751,6 +837,9 @@ export function WorkspaceAccessManager() {
                           label={systemDisplayName(sys as WorkspaceSystemKey)}
                           active
                         />
+                      ))}
+                      {(g.tools || []).map((tool) => (
+                        <SystemChip key={tool} label={toolDisplayName(tool)} active />
                       ))}
                     </div>
                   </div>

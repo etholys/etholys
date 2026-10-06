@@ -1,4 +1,5 @@
-import type { WorkspaceSystemKey } from '@/lib/integrated-workspace-shared';
+import type { WorkspaceSystemKey, WorkspaceToolKey } from '@/lib/integrated-workspace-shared';
+import { hubIdToToolKey } from '@/lib/integrated-workspace-shared';
 import { companyHasHubTool, hubToolAddonSku } from '@/lib/hub-tool-addons';
 
 /** Mapeamento id do cartão Hub → chave de licença (IntegratedWorkspaceAccess.systems). */
@@ -52,6 +53,10 @@ export type HubCardAccessOptions = {
   canManage?: boolean;
   loading?: boolean;
   companyLicensedSystems?: WorkspaceSystemKey[] | null;
+  /** Tools concedidas ao utilizador (function_only). Null = não filtrar por grant. */
+  licensedTools?: WorkspaceToolKey[] | null;
+  /** Tools disponíveis na empresa (add-ons). */
+  companyTools?: WorkspaceToolKey[] | null;
   billingEnforced?: boolean;
   addOnCodes?: string[] | null;
 };
@@ -63,6 +68,27 @@ export function resolveHubCardAccess(
   opts?: HubCardAccessOptions,
 ): HubCardAccess {
   if (!active) return 'coming_soon';
+
+  const toolKey = hubIdToToolKey(systemId);
+  if (toolKey) {
+    if (opts?.loading) return 'locked';
+    if (
+      !companyHasHubTool(systemId, {
+        billingEnforced: opts?.billingEnforced,
+        addOnCodes: opts?.addOnCodes,
+      })
+    ) {
+      return 'locked';
+    }
+    if (opts?.canManage) {
+      if (opts.companyTools && !opts.companyTools.includes(toolKey)) return 'locked';
+      return 'open';
+    }
+    // Sem lista de tools no cliente → não abrir (evita bypass após rollout).
+    if (opts?.licensedTools === null || opts?.licensedTools === undefined) return 'locked';
+    return opts.licensedTools.includes(toolKey) ? 'open' : 'locked';
+  }
+
   if (hubToolAddonSku(systemId)) {
     if (opts?.loading) return 'locked';
     return companyHasHubTool(systemId, {

@@ -5,7 +5,12 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { assertCanInviteToCompany } from '@/lib/workspace-access-scope';
 import { isPrecommercialMode } from '@/lib/platform-access';
-import { normalizeSystemsInput, parseSystemsJson } from '@/lib/integrated-workspace-shared';
+import {
+  normalizeSystemsInput,
+  normalizeToolsInput,
+  parseSystemsJson,
+  parseToolsJson,
+} from '@/lib/integrated-workspace-shared';
 import { validateInvitePayload, type EtholysInvitePayload } from '@/lib/etholys-invite';
 import { applyAcceptedInvitation, invitationRowToApplyOpts } from '@/lib/etholys-invite-apply';
 import type { Prisma, UserRole } from '@prisma/client';
@@ -38,6 +43,7 @@ export async function GET(req: Request) {
       invitations: invitations.map((inv) => ({
         ...inv,
         systems: parseSystemsJson(inv.systems),
+        tools: parseToolsJson(inv.tools),
       })),
     });
   } catch (error: unknown) {
@@ -87,6 +93,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: seatCheck.error }, { status: 400 });
     }
     let systems = systemsRaw;
+    const tools = normalizeToolsInput(data.tools);
     if (systems.length > 0 && data.inviteKind !== 'ally') {
       const allowed = await assertSystemsAllowedForCompany(data.companyId, systems);
       if (!allowed.ok) {
@@ -94,11 +101,16 @@ export async function POST(req: Request) {
       }
       systems = allowed.systems;
     }
-    if (isPrecommercialMode() && data.role !== 'ADMIN' && systems.length === 0 && data.inviteKind !== 'ally') {
+    if (
+      isPrecommercialMode() &&
+      data.role !== 'ADMIN' &&
+      systems.length === 0 &&
+      tools.length === 0 &&
+      data.inviteKind !== 'ally'
+    ) {
       return NextResponse.json(
         {
-          error:
-            'Escolha pelo menos um sistema no convite.',
+          error: 'Escolha pelo menos um sistema ou uma Etholys Tool no convite.',
         },
         { status: 400 },
       );
@@ -126,6 +138,7 @@ export async function POST(req: Request) {
         jobTitle: data.jobTitle || null,
         accessUntil: data.accessUntil ? new Date(data.accessUntil) : null,
         systems: systems.length > 0 ? (systems as unknown as Prisma.InputJsonValue) : undefined,
+        tools: tools.length > 0 ? (tools as unknown as Prisma.InputJsonValue) : undefined,
         projectId: data.projectId || null,
         accessMode,
         projectPermissions: data.projectPermissions?.length
@@ -163,7 +176,7 @@ export async function POST(req: Request) {
           });
 
       await applyAcceptedInvitation(
-        invitationRowToApplyOpts(invitation, existingUser.id, systems),
+        invitationRowToApplyOpts(invitation, existingUser.id, systems, tools),
       );
 
       return NextResponse.json({
@@ -195,6 +208,7 @@ export async function POST(req: Request) {
         jobTitle: data.jobTitle || null,
         accessUntil: data.accessUntil ? new Date(data.accessUntil) : null,
         systems: systems.length > 0 ? (systems as unknown as Prisma.InputJsonValue) : undefined,
+        tools: tools.length > 0 ? (tools as unknown as Prisma.InputJsonValue) : undefined,
         projectId: data.projectId || null,
         accessMode,
         projectPermissions: data.projectPermissions?.length
@@ -214,7 +228,7 @@ export async function POST(req: Request) {
     let alreadyAccepted = false;
     if (existingUser) {
       await applyAcceptedInvitation(
-        invitationRowToApplyOpts(invitation, existingUser.id, systems),
+        invitationRowToApplyOpts(invitation, existingUser.id, systems, tools),
       );
       alreadyAccepted = true;
     }
@@ -318,7 +332,8 @@ export async function PUT(req: Request) {
     }
 
     const systems = normalizeSystemsInput(parseSystemsJson(invitation.systems));
-    await applyAcceptedInvitation(invitationRowToApplyOpts(invitation, tenant.userId, systems));
+    const tools = normalizeToolsInput(parseToolsJson(invitation.tools));
+    await applyAcceptedInvitation(invitationRowToApplyOpts(invitation, tenant.userId, systems, tools));
 
     return NextResponse.json({
       ok: true,

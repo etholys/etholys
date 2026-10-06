@@ -8,6 +8,7 @@ import {
   ensureWorkspaceAccessBootstrapForCompanyAdmin,
   getWorkspaceAccessForUser,
   hasSystem,
+  hasTool,
   type WorkspaceSystemKey,
 } from '@/lib/integrated-workspace';
 import { listNetworksForTenant } from '@/lib/nexus-network';
@@ -51,9 +52,10 @@ export async function GET(req: NextRequest) {
     addOnCodes: entitlements.addOnCodes,
   };
   const tools = {
-    work: companyHasHubTool('WORK', toolOpts),
-    meet: true,
-    studio: companyHasHubTool('STUDIO', toolOpts),
+    work: companyHasHubTool('WORK', toolOpts) && hasTool(access, 'WORK'),
+    meet: hasTool(access, 'CHORUS'),
+    studio: companyHasHubTool('STUDIO', toolOpts) && hasTool(access, 'STUDIO'),
+    advisor: hasTool(access, 'ADVISOR'),
   };
 
   const now = new Date();
@@ -356,7 +358,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     meta: { freshAt: new Date().toISOString() },
     company,
-    access: { systems: systems as WorkspaceSystemKey[] },
+    access: { systems: systems as WorkspaceSystemKey[], tools: access.tools },
     tools,
     advisor: {
       alerts: advisorAlerts.map((a) => ({
