@@ -11,6 +11,7 @@ import {
 } from '@/lib/radar/site-layout';
 import { spaceKindMeta } from '@/lib/radar/space';
 import { radarLoc, radarT, type RadarLoc } from '@/lib/radar/i18n';
+import { RadarSpatialTwin } from '@/components/radar/RadarSpatialTwin';
 
 type Loc = RadarLoc;
 
@@ -111,6 +112,8 @@ type Props = {
   trailUnitIds?: string[];
   /** Taller board when home shows a single site as the hero. */
   hero?: boolean;
+  /** Open lot code shown on the spatial twin custody chip. */
+  lotCode?: string | null;
 };
 
 function HeaderIcon({ moduleId }: { moduleId?: string | null }) {
@@ -134,9 +137,12 @@ export function RadarSiteMap({
   onRequestAddParcel,
   trailUnitIds,
   hero = false,
+  lotCode = null,
 }: Props) {
   const loc = radarLoc(locale);
-  const canEdit = mode === 'ops' || mode === 'empresa';
+  /** Setup keeps flat editor; operate/preview use spatial twin. */
+  const twinMode = mode === 'ops' || mode === 'preview';
+  const canEdit = mode === 'empresa' || (mode === 'ops' && !twinMode);
   const copy = mapCopy(loc, moduleId);
   const showMoisture = !moduleId || moduleId === 'agriculture';
   const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
@@ -331,41 +337,55 @@ export function RadarSiteMap({
           .join(' ')
       : null;
 
+  if (twinMode) {
+    return (
+      <RadarSpatialTwin
+        locale={locale}
+        moduleId={moduleId}
+        layout={layout}
+        parcels={parcels}
+        sensors={sensors}
+        focusedId={focusedId}
+        onFocus={onFocus}
+        trailUnitIds={trailUnitIds}
+        lotCode={lotCode}
+        hero={hero}
+      />
+    );
+  }
+
   return (
     <section className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[radial-gradient(ellipse_at_top_left,rgba(16,185,129,0.14),transparent_50%),linear-gradient(165deg,#071812_0%,#0a1a14_50%,#050f0c_100%)]">
-      {(canEdit || mode === 'preview') && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 px-4 py-2.5 sm:px-5">
-          <div className="flex items-center gap-2">
-            <HeaderIcon moduleId={moduleId} />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">{copy.plant}</p>
-          </div>
-          {canEdit && (dirty || onRequestAddParcel) && (
-            <div className="flex items-center gap-2">
-              {onRequestAddParcel && (
-                <button
-                  type="button"
-                  onClick={onRequestAddParcel}
-                  className="inline-flex items-center gap-1 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  {copy.addParcel}
-                </button>
-              )}
-              {savedFlash && <span className="text-[11px] text-emerald-200/80">{copy.saved}</span>}
-              {dirty && (
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => void save()}
-                  className="rounded-xl bg-emerald-500/90 px-3 py-1.5 text-xs font-semibold text-[#04110c] disabled:opacity-40"
-                >
-                  {saving ? copy.saving : copy.save}
-                </button>
-              )}
-            </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 px-4 py-2.5 sm:px-5">
+        <div className="flex items-center gap-2">
+          <HeaderIcon moduleId={moduleId} />
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">{copy.plant}</p>
+          <span className="hidden text-[11px] text-white/35 sm:inline">· {copy.arrange}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {onRequestAddParcel && (
+            <button
+              type="button"
+              onClick={onRequestAddParcel}
+              className="inline-flex items-center gap-1 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {copy.addParcel}
+            </button>
+          )}
+          {savedFlash && <span className="text-[11px] text-emerald-200/80">{copy.saved}</span>}
+          {dirty && (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void save()}
+              className="rounded-xl bg-emerald-500/90 px-3 py-1.5 text-xs font-semibold text-[#04110c] disabled:opacity-40"
+            >
+              {saving ? copy.saving : copy.save}
+            </button>
           )}
         </div>
-      )}
+      </div>
 
       <div
         ref={boardRef}

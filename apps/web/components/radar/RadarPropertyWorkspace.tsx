@@ -262,6 +262,7 @@ export function RadarPropertyWorkspace({
             onFocus={setFocusedId}
             onSaved={() => void load()}
             trailUnitIds={openLot ? mapParcels.map((p) => p.id) : undefined}
+            lotCode={openLot?.code || null}
             hero
           />
           <RadarFocusSheet
