@@ -128,7 +128,7 @@ export function HubWorkspaceShell({ children }: { children: ReactNode }) {
               </div>
               <div className="min-w-0">
                 <span className="text-lg font-bold text-slate-800">ETHOLYS</span>
-                <span className="ml-2 hidden text-xs text-slate-400 sm:inline">Hub</span>
+                <span className="ml-2 hidden text-xs font-medium text-slate-500 sm:inline">Hub</span>
               </div>
             </Link>
             <div className="hidden h-7 w-px bg-slate-200 sm:block" />
@@ -226,7 +226,7 @@ export function HubWorkspaceShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <div
-        className="border-b border-slate-100 bg-slate-50/80 px-4 py-1.5 text-center text-[11px] text-slate-500 sm:px-6"
+        className="border-b border-slate-200/80 bg-slate-50 px-4 py-1.5 text-center text-[11px] font-medium text-slate-600 sm:px-6"
         style={{ display: companiesReady && companies.length > 0 ? 'block' : 'none' }}
       >
         {locale === 'es'

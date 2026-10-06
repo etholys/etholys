@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useApp } from '@/app/providers';
 import { WorkspaceTopBar } from '@/components/workspace/WorkspaceTopBar';
@@ -21,6 +21,8 @@ import {
   ScanSearch,
   ListTodo,
   BrainCircuit,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { cn, isLikelyDbId } from '@/lib/utils';
 import { StateError, StateLoading } from '@/components/ui/StateBlocks';
@@ -104,6 +106,48 @@ type OverviewPayload = {
 
 type AccessInfo = { canManage: boolean; me: { systems: unknown; enabled: boolean } | null };
 
+const PANEL =
+  'rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]';
+const PANEL_PAD = 'p-4 sm:p-5';
+const INK = 'text-slate-700';
+const INK_MUTED = 'text-slate-600';
+const INK_SOFT = 'text-slate-500';
+const CTA_PRIMARY =
+  'inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-teal-800';
+const CTA_GHOST =
+  'inline-flex items-center gap-1 text-sm font-medium text-teal-800 hover:underline';
+const ROW =
+  'flex items-start justify-between gap-2 rounded-lg border border-slate-200/80 bg-slate-50/50 px-2.5 py-2';
+
+function truncate(s: string, n: number) {
+  const t = s.replace(/\s+/g, ' ').trim();
+  if (t.length <= n) return t;
+  return `${t.slice(0, n - 1)}…`;
+}
+
+function ModuleCard({
+  title,
+  icon,
+  children,
+  footer,
+}: {
+  title: string;
+  icon: ReactNode;
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
+  return (
+    <section className={cn(PANEL, PANEL_PAD, 'flex flex-col')}>
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-800">
+        {icon}
+        {title}
+      </h2>
+      <div className="min-h-0 flex-1 space-y-2">{children}</div>
+      {footer ? <div className="mt-4 border-t border-slate-100 pt-3">{footer}</div> : null}
+    </section>
+  );
+}
+
 export default function IntegratedWorkspacePage() {
   const { activeCompanyId, locale } = useApp();
   const { companiesReady, hasCompanies, companiesLoadError, reloadCompanies } = useHubWorkspaceRoute();
@@ -119,6 +163,7 @@ export default function IntegratedWorkspacePage() {
   const [notifBusy, setNotifBusy] = useState<string | null>(null);
   const [advisorAlertBusy, setAdvisorAlertBusy] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [notifsExpanded, setNotifsExpanded] = useState(false);
 
   const t = (pt: string, es: string, en: string) =>
     locale === 'pt' ? pt : locale === 'es' ? es : en;
@@ -298,12 +343,12 @@ export default function IntegratedWorkspacePage() {
   if (!hasCompanies) {
     return (
       <div className="mx-auto max-w-2xl p-6 sm:p-10">
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 bg-gradient-to-r from-teal-50/80 to-slate-50 px-5 py-4">
+        <div className={cn(PANEL, 'overflow-hidden')}>
+          <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-4">
             <h2 className="text-lg font-semibold text-slate-900">
               {t('Antes de usar o centro integrado', 'Antes de usar el centro integrado', 'Before using the integrated workspace')}
             </h2>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className={cn('mt-1 text-sm', INK)}>
               {t(
                 'Precisa de uma empresa (organização) na sua conta. Crie a primeira em Configuração ou peça a um admin para o adicionar à equipa.',
                 'Necesita una empresa (organización) en su cuenta. Créela en Configuración o pida a un administrador que le invite.',
@@ -314,23 +359,16 @@ export default function IntegratedWorkspacePage() {
           <div className="space-y-3 p-5">
             <Link
               href="/settings"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-teal-700"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white hover:bg-teal-800"
             >
               {t('Ir a Configuração — empresas', 'Ir a Configuración — empresas', 'Go to Settings — companies')}
             </Link>
             <Link
               href="/dashboard"
-              className="flex w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 hover:bg-slate-100"
+              className="flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 hover:bg-slate-50"
             >
               {t('Abrir o painel (ATLAS, etc.)', 'Abrir el panel (ATLAS, etc.)', 'Open dashboard (ATLAS, etc.)')}
             </Link>
-            <p className="text-center text-xs text-slate-500">
-              {t(
-                'Se já tem empresas na conta e não aparecem aqui, recarregue a lista.',
-                'Si ya tiene empresas en la cuenta y no aparecen aquí, recargue la lista.',
-                'If you already have companies on your account and they are missing here, reload the list.'
-              )}
-            </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
               <button
                 type="button"
@@ -341,7 +379,7 @@ export default function IntegratedWorkspacePage() {
               </button>
             </div>
             <div className="pt-1 text-center">
-              <Link href="/hub" className="text-sm text-teal-700 hover:underline">
+              <Link href="/hub" className="text-sm font-medium text-teal-800 hover:underline">
                 ← Hub
               </Link>
             </div>
@@ -354,8 +392,8 @@ export default function IntegratedWorkspacePage() {
   if (!companyId) {
     return (
       <div className="mx-auto max-w-lg p-6 sm:p-10">
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-700">
+        <div className={cn(PANEL, PANEL_PAD)}>
+          <p className={cn('text-sm', INK)}>
             {t(
               'A carregar o contexto da empresa. Use o seletor com o ícone de edifício no cabeçalho, acima, se necessário.',
               'Cargando el contexto. Use el selector con el icono de edificio en la cabecera si hace falta.',
@@ -363,7 +401,7 @@ export default function IntegratedWorkspacePage() {
             )}
           </p>
           <div className="mt-4 h-1 w-32 overflow-hidden rounded bg-slate-200">
-            <div className="h-full w-1/2 animate-pulse bg-teal-500" />
+            <div className="h-full w-1/2 animate-pulse bg-teal-600" />
           </div>
         </div>
       </div>
@@ -382,6 +420,11 @@ export default function IntegratedWorkspacePage() {
   }
 
   const companyLine = overview?.company?.name ?? null;
+  const unreadNotifs = overview?.notifications.filter((n) => !n.read) ?? [];
+  const atlasTasks = overview?.blocks.ATLAS?.tasksOpen ?? [];
+  const advisorAlerts = overview?.advisor?.alerts ?? [];
+  const notifVisible = notifsExpanded ? overview?.notifications ?? [] : (overview?.notifications ?? []).slice(0, 5);
+  const notifHasMore = (overview?.notifications.length ?? 0) > 5;
 
   return (
     <div>
@@ -392,239 +435,241 @@ export default function IntegratedWorkspacePage() {
         showCompanyLine={companyLine}
       />
 
-      <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+      <main className="mx-auto max-w-6xl space-y-8 p-4 sm:p-6">
         {overview && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-            <span>
-              {t('Dados: ', 'Datos: ', 'Data: ')}
-              {overview.meta?.freshAt
-                ? new Date(overview.meta.freshAt).toLocaleString(
-                    locale === 'pt' ? 'pt-PT' : locale === 'es' ? 'es' : 'en',
-                    { dateStyle: 'short', timeStyle: 'short' }
-                  )
-                : '—'}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className={INK_MUTED}>
+              {t('Atualizado ', 'Actualizado ', 'Updated ')}
+              <span className="font-medium text-slate-800">
+                {overview.meta?.freshAt
+                  ? new Date(overview.meta.freshAt).toLocaleString(
+                      locale === 'pt' ? 'pt-PT' : locale === 'es' ? 'es' : 'en',
+                      { dateStyle: 'short', timeStyle: 'short' }
+                    )
+                  : '—'}
+              </span>
             </span>
             <button
               type="button"
               disabled={refreshing}
               onClick={() => void load({ silent: true })}
-              className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-800 hover:bg-slate-100 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50"
             >
               <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
               {t('Atualizar', 'Actualizar', 'Refresh')}
             </button>
           </div>
         )}
+
         {overview?.blocks && !err && (
-          <section
-            className="rounded-2xl border-2 border-teal-200/90 bg-gradient-to-br from-teal-50/90 via-white to-slate-50/80 p-4 shadow-sm sm:p-5"
-            aria-label={t('Hoje', 'Hoy', 'Today')}
-          >
-            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+          <section aria-label={t('Hoje', 'Hoy', 'Today')}>
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
               <div>
-                <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-                  <ListTodo className="h-5 w-5 text-teal-600" />
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+                  {t('Prioridade', 'Prioridad', 'Priority')}
+                </p>
+                <h2 className="mt-0.5 flex items-center gap-2 text-lg font-semibold text-slate-900">
+                  <ListTodo className="h-5 w-5 text-teal-700" />
                   {t('Hoje', 'Hoy', 'Today')}
                 </h2>
               </div>
+              {(overview.blocks.ATLAS?.invoicesOverdue ?? 0) +
+                (overview.blocks.ATLAS?.productsLowStock ?? 0) +
+                (overview.blocks.ATLAS?.purchaseOrdersInFlight ?? 0) +
+                (overview.blocks.NEXUS?.pendingRoadmap ?? 0) >
+                0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {overview.blocks.ATLAS && overview.blocks.ATLAS.invoicesOverdue > 0 && (
+                    <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-950">
+                      {overview.blocks.ATLAS.invoicesOverdue} {t('faturas', 'facturas', 'invoices')}
+                    </span>
+                  )}
+                  {overview.blocks.ATLAS && overview.blocks.ATLAS.productsLowStock > 0 && (
+                    <span className="rounded-md border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-900">
+                      {overview.blocks.ATLAS.productsLowStock} {t('stock', 'stock', 'stock')}
+                    </span>
+                  )}
+                  {overview.blocks.ATLAS && overview.blocks.ATLAS.purchaseOrdersInFlight > 0 && (
+                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-800">
+                      {overview.blocks.ATLAS.purchaseOrdersInFlight} {t('encomendas', 'pedidos', 'POs')}
+                    </span>
+                  )}
+                  {overview.blocks.NEXUS && overview.blocks.NEXUS.pendingRoadmap > 0 && (
+                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-800">
+                      {overview.blocks.NEXUS.pendingRoadmap} NEXUS
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="mb-4 flex flex-wrap gap-2">
-              {overview.blocks.ATLAS && overview.blocks.ATLAS.invoicesOverdue > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-950">
-                  {overview.blocks.ATLAS.invoicesOverdue} {t('faturas atraso', 'facturas atraso', 'invoices overdue')}
-                </span>
-              )}
-              {overview.blocks.ATLAS && overview.blocks.ATLAS.productsLowStock > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-900">
-                  {overview.blocks.ATLAS.productsLowStock} {t('stock baixo', 'stock bajo', 'low stock')}
-                </span>
-              )}
-              {overview.blocks.ATLAS && overview.blocks.ATLAS.purchaseOrdersInFlight > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-800">
-                  {overview.blocks.ATLAS.purchaseOrdersInFlight} {t('encomendas abertas', 'pedidos abiertos', 'POs in flight')}
-                </span>
-              )}
-              {overview.blocks.NEXUS && overview.blocks.NEXUS.pendingRoadmap > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-900">
-                  {overview.blocks.NEXUS.pendingRoadmap} {t('acções NEXUS', 'acciones NEXUS', 'NEXUS actions')}
-                </span>
-              )}
-            </div>
-            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-              <div>
-                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-violet-700">
-                  {t('Advisor', 'Advisor', 'Advisor')}
-                </p>
-                <ul className="min-h-[3rem] space-y-1.5 text-sm text-slate-800">
-                  {(overview.advisor?.alerts ?? []).length > 0 ? (
-                    (overview.advisor?.alerts ?? []).slice(0, 4).map((a) => (
-                      <li
-                        key={a.id}
-                        className={cn(
-                          'flex items-start justify-between gap-2 rounded-lg border bg-white/80 px-2 py-1.5',
-                          a.severity === 'critical' && 'border-red-200',
-                          a.severity === 'warning' && 'border-amber-200',
-                          a.severity === 'info' && 'border-violet-100',
-                          !['critical', 'warning', 'info'].includes(a.severity) && 'border-slate-100'
-                        )}
-                      >
-                        <span className="min-w-0">
-                          <span className="inline-flex items-center gap-1 font-medium text-slate-900">
-                            <BrainCircuit className="h-3.5 w-3.5 shrink-0 text-violet-600" />
+
+            <div className={cn(PANEL, 'overflow-hidden')}>
+              <div className="grid divide-y divide-slate-100 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+                {/* Advisor */}
+                <div className="p-4 sm:p-5">
+                  <p className="mb-2.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-800">
+                    <BrainCircuit className="h-3.5 w-3.5 text-teal-700" />
+                    Advisor
+                  </p>
+                  <ul className="space-y-1.5">
+                    {advisorAlerts.length > 0 ? (
+                      advisorAlerts.slice(0, 3).map((a) => (
+                        <li key={a.id} className={ROW}>
+                          <span className="min-w-0">
                             {a.link ? (
-                              <Link href={a.link} className="text-violet-800 hover:underline">
-                                {a.title}
+                              <Link href={a.link} className="line-clamp-1 text-sm font-medium text-slate-900 hover:text-teal-800">
+                                {truncate(a.title, 72)}
                               </Link>
                             ) : (
-                              a.title
+                              <span className="line-clamp-1 text-sm font-medium text-slate-900">{truncate(a.title, 72)}</span>
                             )}
+                            <span className={cn('mt-0.5 block line-clamp-1 text-xs', INK_MUTED)}>
+                              {truncate(a.message, 90)}
+                            </span>
                           </span>
-                          <span className="block text-[11px] leading-snug text-slate-600">{a.message}</span>
-                        </span>
-                        <button
-                          type="button"
-                          disabled={advisorAlertBusy === a.id}
-                          onClick={() => void markAiAlertRead(a.id)}
-                          className="shrink-0 text-[11px] text-violet-600 hover:underline disabled:opacity-50"
-                        >
-                          {t('Lida', 'Leída', 'Read')}
-                        </button>
+                          <button
+                            type="button"
+                            disabled={advisorAlertBusy === a.id}
+                            onClick={() => void markAiAlertRead(a.id)}
+                            className="shrink-0 text-xs font-medium text-teal-800 hover:underline disabled:opacity-50"
+                          >
+                            {t('Lida', 'Leída', 'Read')}
+                          </button>
+                        </li>
+                      ))
+                    ) : (
+                      <li className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-3 text-sm text-slate-600">
+                        {t('Sem alertas.', 'Sin alertas.', 'No alerts.')}{' '}
+                        <Link href="/hub/advisor" className="font-medium text-teal-800 hover:underline">
+                          Advisor
+                        </Link>
                       </li>
-                    ))
-                  ) : (
-                    <li className="rounded-lg border border-dashed border-violet-200/80 bg-violet-50/30 px-2 py-2 text-xs text-slate-600">
-                      {t('Sem alertas no momento.', 'Sin alertas por ahora.', 'No alerts right now.')}{' '}
-                      <Link href="/hub/advisor" className="font-medium text-violet-700 hover:underline">
-                        {t('Abrir Advisor', 'Abrir Advisor', 'Open Advisor')}
-                      </Link>
-                    </li>
-                  )}
-                </ul>
-              </div>
-              {overview.notifications.filter((n) => !n.read).length > 0 && (
-                <div>
-                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {t('Notificações por ler', 'Notificaciones sin leer', 'Unread notifications')}
+                    )}
+                  </ul>
+                </div>
+
+                {/* Unread notifications — titles only */}
+                <div className="p-4 sm:p-5">
+                  <p className="mb-2.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-800">
+                    <Bell className="h-3.5 w-3.5 text-slate-600" />
+                    {t('Por ler', 'Sin leer', 'Unread')}
+                    {unreadNotifs.length > 0 && (
+                      <span className="ml-1 rounded-md bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-bold text-slate-800">
+                        {unreadNotifs.length}
+                      </span>
+                    )}
                   </p>
-                  <ul className="space-y-1.5 text-sm text-slate-800">
-                    {overview.notifications
-                      .filter((n) => !n.read)
-                      .slice(0, 4)
-                      .map((n) => (
-                        <li key={n.id} className="flex items-start justify-between gap-2 rounded-lg border border-slate-100 bg-white/80 px-2 py-1.5">
+                  <ul className="space-y-1.5">
+                    {unreadNotifs.length > 0 ? (
+                      unreadNotifs.slice(0, 3).map((n) => (
+                        <li key={n.id} className={ROW}>
                           <span className="min-w-0">
                             {n.link ? (
-                              <Link href={n.link} className="font-medium text-teal-800 hover:underline">
-                                {n.title}
+                              <Link href={n.link} className="line-clamp-2 text-sm font-medium text-slate-900 hover:text-teal-800">
+                                {truncate(n.title, 80)}
                               </Link>
                             ) : (
-                              <span className="font-medium">{n.title}</span>
+                              <span className="line-clamp-2 text-sm font-medium text-slate-900">{truncate(n.title, 80)}</span>
                             )}
-                            <span className="text-slate-600">: {n.message}</span>
                           </span>
                           <button
                             type="button"
                             disabled={notifBusy === n.id}
                             onClick={() => void markNotifRead(n.id)}
-                            className="shrink-0 text-xs text-teal-600 hover:underline disabled:opacity-50"
+                            className="shrink-0 text-xs font-medium text-teal-800 hover:underline disabled:opacity-50"
                           >
                             {t('Lida', 'Leída', 'Read')}
                           </button>
                         </li>
-                      ))}
+                      ))
+                    ) : (
+                      <li className={cn('rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-3 text-sm', INK_MUTED)}>
+                        {t('Nada por ler.', 'Nada sin leer.', 'Nothing unread.')}
+                      </li>
+                    )}
+                    {unreadNotifs.length > 3 && (
+                      <li className={cn('pt-1 text-xs font-medium', INK_MUTED)}>
+                        +{unreadNotifs.length - 3}{' '}
+                        {t('mais abaixo', 'más abajo', 'more below')}
+                      </li>
+                    )}
                   </ul>
                 </div>
-              )}
-              {overview.blocks.ATLAS && overview.blocks.ATLAS.tasksOpen.length > 0 && (
-                <div>
-                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {t('Tarefas abertas (ATLAS)', 'Tareas abiertas (ATLAS)', 'Open tasks (ATLAS)')}
+
+                {/* Open tasks — compact */}
+                <div className="p-4 sm:p-5">
+                  <p className="mb-2.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-800">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-slate-600" />
+                    {t('Tarefas ATLAS', 'Tareas ATLAS', 'ATLAS tasks')}
                   </p>
-                  <ul className="space-y-1.5 text-sm">
-                    {overview.blocks.ATLAS.tasksOpen.slice(0, 5).map((task) => (
-                      <li
-                        key={task.id}
-                        className="flex items-start justify-between gap-2 rounded-lg border border-slate-100 bg-white/80 px-2 py-1.5 text-slate-800"
-                      >
-                        <div className="min-w-0">
-                          <span className="font-medium">{task.title}</span>
-                          {task.dueDate && (
-                            <span className="ml-1 text-xs text-slate-500">
-                              ·{' '}
-                              {new Date(task.dueDate).toLocaleDateString(
-                                locale === 'pt' ? 'pt-PT' : locale === 'es' ? 'es' : 'en',
-                                { dateStyle: 'short' }
-                              )}
+                  <ul className="space-y-1.5">
+                    {atlasTasks.length > 0 ? (
+                      atlasTasks.slice(0, 4).map((task) => (
+                        <li key={task.id} className={ROW}>
+                          <div className="min-w-0">
+                            <span className="line-clamp-1 text-sm font-medium text-slate-900">
+                              {truncate(task.title, 64)}
                             </span>
+                            {task.dueDate && (
+                              <span className={cn('mt-0.5 block text-xs', INK_MUTED)}>
+                                {new Date(task.dueDate).toLocaleDateString(
+                                  locale === 'pt' ? 'pt-PT' : locale === 'es' ? 'es' : 'en',
+                                  { dateStyle: 'short' }
+                                )}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            disabled={saving === task.id}
+                            onClick={() => void markTaskDone(task.id)}
+                            className="shrink-0 text-teal-700 hover:text-teal-900 disabled:opacity-50"
+                            title={t('Concluir', 'Completar', 'Done')}
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                          </button>
+                        </li>
+                      ))
+                    ) : (
+                      <li className={cn('rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-3 text-sm', INK_MUTED)}>
+                        {t('Sem tarefas abertas.', 'Sin tareas abiertas.', 'No open tasks.')}
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+
+              {overview.blocks.SIEP && (overview.blocks.SIEP.siepDeadlines?.length ?? 0) > 0 && (
+                <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 sm:px-5">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-800">
+                    {t('Prazos SIEP', 'Plazos SIEP', 'SIEP deadlines')}
+                  </p>
+                  <ul className="flex flex-wrap gap-2">
+                    {overview.blocks.SIEP.siepDeadlines!.slice(0, 4).map((d) => (
+                      <li key={d.id}>
+                        <Link
+                          href={d.href}
+                          className={cn(
+                            'inline-flex max-w-[16rem] items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-medium',
+                            d.overdue
+                              ? 'border-red-200 bg-red-50 text-red-900'
+                              : 'border-slate-200 bg-white text-slate-800'
                           )}
-                        </div>
-                        <button
-                          type="button"
-                          disabled={saving === task.id}
-                          onClick={() => void markTaskDone(task.id)}
-                          className="shrink-0 text-teal-600 hover:text-teal-800 disabled:opacity-50"
-                          title={t('Concluir', 'Completar', 'Done')}
                         >
-                          <CheckCircle2 className="h-4 w-4" />
-                        </button>
+                          <span className="truncate">{d.name}</span>
+                          <span className={cn('shrink-0', INK_SOFT)}>
+                            {new Date(d.endDate).toLocaleDateString(
+                              locale === 'pt' ? 'pt-PT' : locale === 'es' ? 'es' : 'en',
+                              { dateStyle: 'short' }
+                            )}
+                          </span>
+                        </Link>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
             </div>
-            {overview.blocks.SIEP && (overview.blocks.SIEP.siepDeadlines?.length ?? 0) > 0 && (
-              <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-indigo-800">
-                  {t('Prazos de projecto (SIEP)', 'Plazos de proyecto (SIEP)', 'Project deadlines (SIEP)')}
-                </p>
-                <ul className="flex flex-wrap gap-2 text-sm">
-                  {overview.blocks.SIEP.siepDeadlines!.map((d) => (
-                    <li key={d.id}>
-                      <Link
-                        href={d.href}
-                        className={cn(
-                          'inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-medium transition hover:opacity-90',
-                          d.overdue
-                            ? 'border-red-200 bg-red-50 text-red-900'
-                            : 'border-indigo-200 bg-white text-indigo-950'
-                        )}
-                      >
-                        <span className="truncate">{d.name}</span>
-                        <span className="shrink-0 text-[10px] opacity-80">
-                          {d.overdue ? ' · ' + t('atraso', 'atraso', 'overdue') : ''}{' '}
-                          {new Date(d.endDate).toLocaleDateString(
-                            locale === 'pt' ? 'pt-PT' : locale === 'es' ? 'es' : 'en',
-                            { dateStyle: 'short' }
-                          )}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {(() => {
-              const unread = overview.notifications.filter((n) => !n.read).length;
-              const taskN = overview.blocks.ATLAS?.tasksOpen.length ?? 0;
-              const advN = overview.advisor?.alerts?.length ?? 0;
-              const siepD = overview.blocks.SIEP?.siepDeadlines?.length ?? 0;
-              const pills =
-                (overview.blocks.ATLAS?.invoicesOverdue ?? 0) > 0 ||
-                (overview.blocks.ATLAS?.productsLowStock ?? 0) > 0 ||
-                (overview.blocks.ATLAS?.purchaseOrdersInFlight ?? 0) > 0 ||
-                (overview.blocks.NEXUS?.pendingRoadmap ?? 0) > 0;
-              if (pills || unread > 0 || taskN > 0 || advN > 0 || siepD > 0) return null;
-              return (
-                <p className="mt-2 text-sm text-slate-500">
-                  {t(
-                    'Sem itens urgentes.',
-                    'Sin elementos urgentes.',
-                    'Nothing urgent right now.'
-                  )}
-                </p>
-              );
-            })()}
           </section>
         )}
 
@@ -637,7 +682,7 @@ export default function IntegratedWorkspacePage() {
               retryLabel={t('Tentar de novo', 'Reintentar', 'Retry')}
             />
             {accessInfo?.canManage && (
-              <p className="text-sm text-slate-600">
+              <p className={cn('text-sm', INK)}>
                 <Link href="/hub/workspace/team" className="font-medium text-teal-800 underline">
                   {t('Abrir configuração de acessos (Equipa)', 'Abrir accesos (Equipo)', 'Open team access settings')}
                 </Link>
@@ -647,316 +692,309 @@ export default function IntegratedWorkspacePage() {
         )}
 
         {overview?.blocks && (
-          <div className="grid gap-4 lg:grid-cols-2">
-            {overview.blocks.ATLAS && (
-              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h2 className="mb-2 flex items-center gap-2 font-semibold text-slate-900">
-                  <BarChart3 className="h-5 w-5 text-teal-600" /> ATLAS
+          <>
+            <section>
+              <div className="mb-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+                  {t('Sistemas', 'Sistemas', 'Systems')}
+                </p>
+                <h2 className="mt-0.5 text-lg font-semibold text-slate-900">
+                  {t('Atalhos do centro', 'Atajos del centro', 'Workspace shortcuts')}
                 </h2>
-                <p className="text-2xl font-bold text-slate-800">
-                  {overview.blocks.ATLAS.balance.toFixed(0)} {overview.blocks.ATLAS.currency}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {t('Saldo', 'Saldo', 'Balance')}
-                </p>
-                {overview.blocks.ATLAS.invoicesOverdue > 0 && (
-                  <p className="mt-2 text-sm text-amber-800">
-                    {overview.blocks.ATLAS.invoicesOverdue}{' '}
-                    {t('faturas em atraso', 'facturas vencidas', 'invoices overdue')}
-                  </p>
-                )}
-                <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-600">
-                  {overview.blocks.ATLAS.purchaseOrdersInFlight > 0 && (
-                    <span className="inline-flex items-center gap-1">
-                      <Package className="h-3.5 w-3.5 text-slate-500" />
-                      <Link href={overview.blocks.ATLAS.links.suppliers} className="font-medium text-teal-800 hover:underline">
-                        {overview.blocks.ATLAS.purchaseOrdersInFlight}{' '}
-                        {t('encomendas por receber', 'pedidos por recibir', 'purchase orders in flight')}
-                      </Link>
-                    </span>
-                  )}
-                  {overview.blocks.ATLAS.productsLowStock > 0 && (
-                    <span className="inline-flex items-center gap-1 text-rose-800">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      <Link href={overview.blocks.ATLAS.links.inventory} className="font-medium hover:underline">
-                        {overview.blocks.ATLAS.productsLowStock}{' '}
-                        {t('produtos abaixo do mínimo', 'productos bajo mínimo', 'products below min. stock')}
-                      </Link>
-                    </span>
-                  )}
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
-                    href={overview.blocks.ATLAS.links.dashboard}
-                    className="inline-flex items-center gap-1 rounded-md bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700"
-                  >
-                    {t('Abrir ATLAS', 'Abrir ATLAS', 'Open ATLAS')} <ExternalLink className="h-3.5 w-3.5" />
-                  </Link>
-                  <Link href={overview.blocks.ATLAS.links.invoices} className="text-sm text-teal-700 hover:underline">
-                    {t('Faturas', 'Facturas', 'Invoices')}
-                  </Link>
-                  <Link href={overview.blocks.ATLAS.links.inventory} className="text-sm text-teal-700 hover:underline">
-                    {t('Inventário', 'Inventario', 'Inventory')}
-                  </Link>
-                </div>
-                <ul className="mt-3 space-y-1 border-t border-slate-100 pt-2">
-                  {overview.blocks.ATLAS.tasksOpen.length === 0 && (
-                    <li className="text-sm text-slate-500">
-                      {t('Sem tarefas abertas.', 'Sin tareas abiertas.', 'No open tasks.')}
-                    </li>
-                  )}
-                  {overview.blocks.ATLAS.tasksOpen.map((task) => (
-                    <li key={task.id} className="flex items-start justify-between gap-2 text-sm">
-                      <div className="min-w-0 flex-1">
-                        <span className="text-slate-800">{task.title}</span>
-                        {task.project && (
-                          <div>
-                            <Link
-                              href={`/siep/projects/${task.project.id}`}
-                              className="text-xs text-indigo-700 hover:underline"
-                            >
-                              SIEP · {task.project.name}
-                            </Link>
-                          </div>
-                        )}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {overview.blocks.ATLAS && (
+                  <ModuleCard
+                    title="ATLAS"
+                    icon={<BarChart3 className="h-4 w-4 text-teal-700" />}
+                    footer={
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Link href={overview.blocks.ATLAS.links.dashboard} className={CTA_PRIMARY}>
+                          {t('Abrir ATLAS', 'Abrir ATLAS', 'Open ATLAS')} <ExternalLink className="h-3.5 w-3.5" />
+                        </Link>
+                        <Link href={overview.blocks.ATLAS.links.invoices} className={CTA_GHOST}>
+                          {t('Faturas', 'Facturas', 'Invoices')}
+                        </Link>
+                        <Link href={overview.blocks.ATLAS.links.inventory} className={CTA_GHOST}>
+                          {t('Inventário', 'Inventario', 'Inventory')}
+                        </Link>
                       </div>
-                      <button
-                        type="button"
-                        disabled={saving === task.id}
-                        onClick={() => void markTaskDone(task.id)}
-                        className="flex-shrink-0 text-teal-600 hover:text-teal-800 disabled:opacity-50"
-                        title="ATLAS"
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {overview.blocks.SIEP && (
-              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h2 className="mb-2 flex items-center gap-2 font-semibold text-slate-900">
-                  <Sprout className="h-5 w-5 text-indigo-600" /> SIEP
-                </h2>
-                <ul className="space-y-1 text-sm text-slate-700">
-                  {overview.blocks.SIEP.projects.length === 0 && (
-                    <li className="text-slate-500">—</li>
-                  )}
-                  {overview.blocks.SIEP.projects.map((p) => (
-                    <li key={p.id}>
-                      <Link href={p.href} className="font-medium text-indigo-800 hover:underline">
-                        {p.name}
-                      </Link>{' '}
-                      <span className="text-slate-500">
-                        · {p.status} · {p.progress}%
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href={overview.blocks.SIEP.link}
-                  className="mt-3 inline-flex items-center gap-1 text-sm text-indigo-700 hover:underline"
-                >
-                  {t('Abrir SIEP', 'Abrir SIEP', 'Open SIEP')} <ExternalLink className="h-3.5 w-3.5" />
-                </Link>
-              </section>
-            )}
-
-            {overview.blocks.FUNDHUB && (
-              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h2 className="mb-2 flex items-center gap-2 font-semibold text-slate-900">
-                  <HandCoins className="h-5 w-5 text-amber-600" /> FundHub
-                </h2>
-                {overview.blocks.FUNDHUB.discovery && (
-                  <div className="mb-3 flex flex-col gap-2 rounded-lg border border-amber-100 bg-amber-50/90 p-3 text-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5 font-medium text-amber-950">
-                        <ScanSearch className="h-4 w-4 text-amber-700" />
-                        {t('Descoberta de fundos', 'Descubrimiento de fondos', 'Fund discovery')}
-                      </span>
-                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium uppercase text-amber-900">
-                        {overview.blocks.FUNDHUB.discovery.status}
-                      </span>
-                    </div>
-                    <p className="text-xs text-amber-950/85">
-                      {t('Início: ', 'Inicio: ', 'Started: ')}
-                      {new Date(overview.blocks.FUNDHUB.discovery.startedAt).toLocaleString(
+                    }
+                  >
+                    <p className="text-2xl font-semibold tracking-tight text-slate-900">
+                      {overview.blocks.ATLAS.balance.toLocaleString(
                         locale === 'pt' ? 'pt-PT' : locale === 'es' ? 'es' : 'en',
-                        { dateStyle: 'short', timeStyle: 'short' }
+                        { maximumFractionDigits: 0 }
+                      )}{' '}
+                      <span className="text-base font-medium text-slate-600">{overview.blocks.ATLAS.currency}</span>
+                    </p>
+                    <p className={cn('text-xs font-medium', INK_MUTED)}>
+                      {t('Saldo', 'Saldo', 'Balance')}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-slate-700">
+                      {overview.blocks.ATLAS.invoicesOverdue > 0 && (
+                        <span className="text-amber-900">
+                          {overview.blocks.ATLAS.invoicesOverdue}{' '}
+                          {t('em atraso', 'vencidas', 'overdue')}
+                        </span>
+                      )}
+                      {overview.blocks.ATLAS.purchaseOrdersInFlight > 0 && (
+                        <Link href={overview.blocks.ATLAS.links.suppliers} className="inline-flex items-center gap-1 hover:underline">
+                          <Package className="h-3.5 w-3.5 text-slate-500" />
+                          {overview.blocks.ATLAS.purchaseOrdersInFlight}{' '}
+                          {t('encomendas', 'pedidos', 'POs')}
+                        </Link>
+                      )}
+                      {overview.blocks.ATLAS.productsLowStock > 0 && (
+                        <Link href={overview.blocks.ATLAS.links.inventory} className="inline-flex items-center gap-1 text-rose-800 hover:underline">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          {overview.blocks.ATLAS.productsLowStock}{' '}
+                          {t('stock baixo', 'stock bajo', 'low stock')}
+                        </Link>
+                      )}
+                    </div>
+                    {atlasTasks.length > 0 && (
+                      <ul className="mt-3 space-y-1 border-t border-slate-100 pt-2">
+                        {atlasTasks.slice(0, 3).map((task) => (
+                          <li key={task.id} className="flex items-center justify-between gap-2 text-sm">
+                            <span className="line-clamp-1 text-slate-800">{truncate(task.title, 56)}</span>
+                            <button
+                              type="button"
+                              disabled={saving === task.id}
+                              onClick={() => void markTaskDone(task.id)}
+                              className="shrink-0 text-teal-700 hover:text-teal-900 disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </button>
+                          </li>
+                        ))}
+                        {atlasTasks.length > 3 && (
+                          <li className={cn('text-xs font-medium', INK_MUTED)}>
+                            +{atlasTasks.length - 3} {t('tarefas', 'tareas', 'tasks')}
+                          </li>
+                        )}
+                      </ul>
+                    )}
+                  </ModuleCard>
+                )}
+
+                {overview.blocks.SIEP && (
+                  <ModuleCard
+                    title="SIEP"
+                    icon={<Sprout className="h-4 w-4 text-teal-700" />}
+                    footer={
+                      <Link href={overview.blocks.SIEP.link} className={CTA_PRIMARY}>
+                        {t('Abrir SIEP', 'Abrir SIEP', 'Open SIEP')} <ExternalLink className="h-3.5 w-3.5" />
+                      </Link>
+                    }
+                  >
+                    <ul className="space-y-2">
+                      {overview.blocks.SIEP.projects.length === 0 && (
+                        <li className={cn('text-sm', INK_MUTED)}>—</li>
+                      )}
+                      {overview.blocks.SIEP.projects.slice(0, 4).map((p) => (
+                        <li key={p.id} className="text-sm">
+                          <Link href={p.href} className="font-medium text-slate-900 hover:text-teal-800 hover:underline">
+                            {truncate(p.name, 48)}
+                          </Link>
+                          <span className={cn('mt-0.5 block text-xs', INK_MUTED)}>
+                            {p.status} · {p.progress}%
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </ModuleCard>
+                )}
+
+                {overview.blocks.FUNDHUB && (
+                  <ModuleCard
+                    title="FundHub"
+                    icon={<HandCoins className="h-4 w-4 text-teal-700" />}
+                    footer={
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Link href={overview.blocks.FUNDHUB.link} className={CTA_PRIMARY}>
+                          FundHub <ExternalLink className="h-3.5 w-3.5" />
+                        </Link>
+                        <Link href={overview.blocks.FUNDHUB.proposalsList} className={CTA_GHOST}>
+                          {t('Propostas', 'Propuestas', 'Proposals')}
+                        </Link>
+                      </div>
+                    }
+                  >
+                    {overview.blocks.FUNDHUB.discovery && (
+                      <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-900">
+                            <ScanSearch className="h-4 w-4 text-slate-600" />
+                            {t('Descoberta', 'Descubrimiento', 'Discovery')}
+                          </span>
+                          <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
+                            {overview.blocks.FUNDHUB.discovery.status}
+                          </span>
+                        </div>
+                        <p className={cn('mt-1 text-xs', INK_MUTED)}>
+                          {overview.blocks.FUNDHUB.discovery.scanned} URLs · +
+                          {overview.blocks.FUNDHUB.discovery.created}{' '}
+                          {t('novos', 'nuevos', 'new')}
+                        </p>
+                      </div>
+                    )}
+                    <ul className="space-y-1.5">
+                      {overview.blocks.FUNDHUB.proposals.length === 0 && (
+                        <li className={cn('text-sm', INK_MUTED)}>—</li>
+                      )}
+                      {overview.blocks.FUNDHUB.proposals.slice(0, 3).map((p) => (
+                        <li key={p.id} className="flex items-baseline justify-between gap-2 text-sm">
+                          <Link href={p.editorHref} className="line-clamp-1 font-medium text-slate-900 hover:text-teal-800 hover:underline">
+                            {truncate(p.title, 40)}
+                          </Link>
+                          <span className={cn('shrink-0 text-xs', INK_MUTED)}>{p.status}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </ModuleCard>
+                )}
+
+                {overview.blocks.NEXUS && (
+                  <ModuleCard
+                    title="NEXUS"
+                    icon={<GraduationCap className="h-4 w-4 text-teal-700" />}
+                    footer={
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Link href={overview.blocks.NEXUS.link} className={CTA_PRIMARY}>
+                          {t('Abrir NEXUS', 'Abrir NEXUS', 'Open NEXUS')} <ExternalLink className="h-3.5 w-3.5" />
+                        </Link>
+                        <Link href={overview.blocks.NEXUS.networksLink} className={CTA_GHOST}>
+                          {t('Redes', 'Redes', 'Networks')}
+                        </Link>
+                        <Link href={overview.blocks.NEXUS.roadmapLink} className={CTA_GHOST}>
+                          {t('Roteiro', 'Ruta', 'Roadmap')}
+                        </Link>
+                      </div>
+                    }
+                  >
+                    <p className={cn('text-sm', INK)}>
+                      <span className="font-semibold text-slate-900">{overview.blocks.NEXUS.networkCount}</span>{' '}
+                      {t('rede(s)', 'red(es)', 'network(s)')}
+                      <span className="mx-1.5 text-slate-300">·</span>
+                      <span className="font-semibold text-slate-900">{overview.blocks.NEXUS.pendingRoadmap}</span>{' '}
+                      {t('ações pendentes', 'acciones pendientes', 'pending actions')}
+                    </p>
+                  </ModuleCard>
+                )}
+
+                {overview.blocks.FORGE && (
+                  <ModuleCard
+                    title="FORGE"
+                    icon={<Cpu className="h-4 w-4 text-teal-700" />}
+                    footer={
+                      <Link href={overview.blocks.FORGE.link} className={CTA_PRIMARY}>
+                        {t('Abrir FORGE', 'Abrir FORGE', 'Open FORGE')} <ExternalLink className="h-3.5 w-3.5" />
+                      </Link>
+                    }
+                  >
+                    <p className={cn('text-sm', INK)}>
+                      {t(
+                        'Cursos, aprendizagem e atalhos para a jornada.',
+                        'Cursos, aprendizaje y atajos para el recorrido.',
+                        'Courses, learning, and shortcuts for the journey.'
                       )}
                     </p>
-                    <p className="text-xs text-amber-900/80">
-                      {overview.blocks.FUNDHUB.discovery.scanned} {t('URLs analisadas', 'URLs analizadas', 'URLs scanned')} · +
-                      {overview.blocks.FUNDHUB.discovery.created} {t('novos', 'nuevos', 'new')} · ~
-                      {overview.blocks.FUNDHUB.discovery.updated} {t('atualizados', 'actualizados', 'updated')}
-                      {overview.blocks.FUNDHUB.discovery.errorCount > 0 &&
-                        ` · ${overview.blocks.FUNDHUB.discovery.errorCount} ${t('erros', 'errores', 'errors')}`}
-                    </p>
-                    <Link
-                      href={overview.blocks.FUNDHUB.discovery.link}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-amber-900 hover:underline"
-                    >
-                      {t('Ver estado completo', 'Ver estado completo', 'View full status')}{' '}
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </Link>
-                  </div>
+                  </ModuleCard>
                 )}
-                <ul className="space-y-1.5 text-sm">
-                  {overview.blocks.FUNDHUB.proposals.length === 0 && <li className="text-slate-500">—</li>}
-                  {overview.blocks.FUNDHUB.proposals.map((p) => (
-                    <li key={p.id} className="flex flex-wrap items-baseline justify-between gap-2">
-                      <span>
-                        <Link href={p.editorHref} className="font-medium text-amber-900 hover:underline">
-                          {p.title}
-                        </Link>{' '}
-                        <span className="text-slate-500">({p.status})</span>
-                      </span>
-                      <Link href={p.editorHref} className="shrink-0 text-xs text-amber-700 hover:underline">
-                        {t('Editor', 'Editor', 'Editor')}
+
+                {overview.blocks.PRISM && (
+                  <ModuleCard
+                    title="PRISM"
+                    icon={<Target className="h-4 w-4 text-teal-700" />}
+                    footer={
+                      <Link href={overview.blocks.PRISM.link} className={CTA_PRIMARY}>
+                        {t('Abrir PRISM', 'Abrir PRISM', 'Open PRISM')} <ExternalLink className="h-3.5 w-3.5" />
                       </Link>
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
-                    href={overview.blocks.FUNDHUB.proposalsList}
-                    className="inline-flex items-center gap-1 text-sm text-amber-800 hover:underline"
+                    }
                   >
-                    {t('Todas as propostas', 'Todas las propuestas', 'All proposals')} <ExternalLink className="h-3.5 w-3.5" />
-                  </Link>
-                  <span className="text-slate-300">|</span>
-                  <Link href={overview.blocks.FUNDHUB.link} className="text-sm text-amber-800 hover:underline">
-                    FundHub
-                  </Link>
-                </div>
-              </section>
-            )}
-
-            {overview.blocks.NEXUS && (
-              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h2 className="mb-2 flex items-center gap-2 font-semibold text-slate-900">
-                  <GraduationCap className="h-5 w-5 text-violet-600" /> NEXUS
-                </h2>
-                <p className="text-sm text-slate-700">
-                  {overview.blocks.NEXUS.networkCount}{' '}
-                  {t('rede(s)', 'red(es)', 'network(s)')}
-                  {': '}
-                  {overview.blocks.NEXUS.pendingRoadmap}{' '}
-                  {t(
-                    'ações de rota pendentes (agregado)',
-                    'acciones de ruta pendientes (agregado)',
-                    'roadmap actions pending (aggregate)'
-                  )}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                  <Link href={overview.blocks.NEXUS.link} className="inline-flex items-center gap-1 text-violet-800 hover:underline">
-                    {t('NEXUS início', 'NEXUS inicio', 'NEXUS home')} <ExternalLink className="h-3.5 w-3.5" />
-                  </Link>
-                  <span className="text-slate-300">|</span>
-                  <Link href={overview.blocks.NEXUS.networksLink} className="text-violet-700 hover:underline">
-                    {t('Redes', 'Redes', 'Networks')}
-                  </Link>
-                  <span className="text-slate-300">|</span>
-                  <Link href={overview.blocks.NEXUS.roadmapLink} className="text-violet-700 hover:underline">
-                    {t('Roteiro', 'Ruta', 'Roadmap')}
-                  </Link>
-                </div>
-              </section>
-            )}
-
-            {overview.blocks.FORGE && (
-              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h2 className="mb-2 flex items-center gap-2 font-semibold text-slate-900">
-                  <Cpu className="h-5 w-5 text-violet-600" /> FORGE
-                </h2>
-                <p className="text-sm text-slate-600">
-                  {t(
-                    'Cursos, aprendizagem e atalhos para a jornada.',
-                    'Cursos, aprendizaje y atajos para el recorrido.',
-                    'Courses, learning, and shortcuts for the journey.'
-                  )}
-                </p>
-                <Link
-                  href={overview.blocks.FORGE.link}
-                  className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-violet-800 hover:underline"
-                >
-                  {t('Abrir FORGE', 'Abrir FORGE', 'Open FORGE')}{' '}
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </Link>
-              </section>
-            )}
-
-            {overview.blocks.PRISM && (
-              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h2 className="mb-2 flex items-center gap-2 font-semibold text-slate-900">
-                  <Target className="h-5 w-5 text-rose-600" /> PRISM
-                </h2>
-                <p className="text-sm text-slate-600">
-                  {t(
-                    'Impacto, evidência e relatórios.',
-                    'Impacto, evidencia e informes.',
-                    'Impact, evidence, and reporting.'
-                  )}
-                </p>
-                <Link
-                  href={overview.blocks.PRISM.link}
-                  className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-rose-800 hover:underline"
-                >
-                  {t('Abrir PRISM', 'Abrir PRISM', 'Open PRISM')} <ExternalLink className="h-3.5 w-3.5" />
-                </Link>
-              </section>
-            )}
+                    <p className={cn('text-sm', INK)}>
+                      {t(
+                        'Impacto, evidência e relatórios.',
+                        'Impacto, evidencia e informes.',
+                        'Impact, evidence, and reporting.'
+                      )}
+                    </p>
+                  </ModuleCard>
+                )}
+              </div>
+            </section>
 
             {overview.notifications.length > 0 && (
-              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="flex items-center gap-2 font-semibold text-slate-900">
-                    <Bell className="h-5 w-5 text-slate-600" />{' '}
-                    {t('Notificações', 'Notificaciones', 'Notifications')}
-                  </h2>
+              <section className={cn(PANEL, PANEL_PAD)}>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+                      {t('Actividade', 'Actividad', 'Activity')}
+                    </p>
+                    <h2 className="mt-0.5 flex items-center gap-2 text-base font-semibold text-slate-900">
+                      <Bell className="h-4 w-4 text-slate-600" />
+                      {t('Notificações', 'Notificaciones', 'Notifications')}
+                    </h2>
+                  </div>
                   {overview.notifications.some((n) => !n.read) && (
                     <button
                       type="button"
                       disabled={notifBusy === 'all'}
                       onClick={() => void markAllNotifsRead()}
-                      className="text-xs font-medium text-teal-700 hover:underline disabled:opacity-50"
+                      className="text-xs font-semibold text-teal-800 hover:underline disabled:opacity-50"
                     >
                       {t('Marcar todas como lidas', 'Marcar todas como leídas', 'Mark all as read')}
                     </button>
                   )}
                 </div>
                 <ul className="divide-y divide-slate-100">
-                  {overview.notifications.map((n) => (
+                  {notifVisible.map((n) => (
                     <li
                       key={n.id}
-                      className={cn('flex flex-wrap items-start justify-between gap-2 py-2 text-sm', !n.read && 'font-medium text-slate-900')}
+                      className={cn(
+                        'flex items-start justify-between gap-3 py-2.5 text-sm',
+                        !n.read ? 'text-slate-900' : INK
+                      )}
                     >
                       <div className="min-w-0">
                         {n.link ? (
                           n.link.startsWith('http') ? (
                             <a
                               href={n.link}
-                              className="hover:underline"
+                              className="hover:text-teal-800"
                               target="_blank"
                               rel="noreferrer"
                               onClick={() => n.read === false && void markNotifRead(n.id)}
                             >
-                              {n.title}: {n.message}
+                              <span className={cn('font-medium', !n.read && 'text-slate-900')}>
+                                {truncate(n.title, 72)}
+                              </span>
+                              <span className={cn('mt-0.5 block line-clamp-1 text-xs', INK_MUTED)}>
+                                {truncate(n.message, 100)}
+                              </span>
                             </a>
                           ) : (
                             <Link
                               href={n.link}
-                              className="hover:underline"
+                              className="hover:text-teal-800"
                               onClick={() => n.read === false && void markNotifRead(n.id)}
                             >
-                              {n.title}: {n.message}
+                              <span className={cn('font-medium', !n.read && 'text-slate-900')}>
+                                {truncate(n.title, 72)}
+                              </span>
+                              <span className={cn('mt-0.5 block line-clamp-1 text-xs', INK_MUTED)}>
+                                {truncate(n.message, 100)}
+                              </span>
                             </Link>
                           )
                         ) : (
                           <span>
-                            {n.title}: {n.message}
+                            <span className="font-medium">{truncate(n.title, 72)}</span>
+                            <span className={cn('mt-0.5 block line-clamp-1 text-xs', INK_MUTED)}>
+                              {truncate(n.message, 100)}
+                            </span>
                           </span>
                         )}
                       </div>
@@ -965,7 +1003,7 @@ export default function IntegratedWorkspacePage() {
                           type="button"
                           disabled={notifBusy === n.id}
                           onClick={() => void markNotifRead(n.id)}
-                          className="shrink-0 text-xs text-slate-500 hover:text-slate-800 disabled:opacity-50"
+                          className="shrink-0 text-xs font-medium text-teal-800 hover:underline disabled:opacity-50"
                         >
                           {t('Lida', 'Leída', 'Read')}
                         </button>
@@ -973,9 +1011,32 @@ export default function IntegratedWorkspacePage() {
                     </li>
                   ))}
                 </ul>
+                {notifHasMore && (
+                  <button
+                    type="button"
+                    onClick={() => setNotifsExpanded((v) => !v)}
+                    className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-teal-800 hover:underline"
+                  >
+                    {notifsExpanded ? (
+                      <>
+                        <ChevronUp className="h-3.5 w-3.5" />
+                        {t('Mostrar menos', 'Mostrar menos', 'Show less')}
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-3.5 w-3.5" />
+                        {t(
+                          `Ver todas (${overview.notifications.length})`,
+                          `Ver todas (${overview.notifications.length})`,
+                          `Show all (${overview.notifications.length})`
+                        )}
+                      </>
+                    )}
+                  </button>
+                )}
               </section>
             )}
-          </div>
+          </>
         )}
       </main>
     </div>
