@@ -80,7 +80,7 @@ export function RichTextPane({ value, onChange, placeholder, disabled, className
     editable: !disabled,
     editorProps: {
       attributes: {
-        class: 'etholys-prose min-h-full w-full px-5 py-4 outline-none',
+        class: 'etholys-prose w-full px-5 py-4 outline-none',
       },
     },
     onUpdate: ({ editor: ed }) => {
@@ -110,12 +110,12 @@ export function RichTextPane({ value, onChange, placeholder, disabled, className
   }, [editor, value]);
 
   if (!editor) {
-    return <div className={cn('min-h-0 flex-1', className)} />;
+    return <div className={cn('h-full min-h-0 flex-1', className)} />;
   }
 
   return (
-    <div className={cn('flex min-h-0 flex-1 flex-col', className)}>
-      <div className="flex flex-wrap items-center gap-0.5 border-b border-white/10 px-2 py-1.5">
+    <div className={cn('flex h-full min-h-0 flex-1 flex-col overflow-hidden', className)}>
+      <div className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-white/10 px-2 py-1.5">
         <ToolBtn
           label="Título"
           active={editor.isActive('heading', { level: 1 })}
@@ -166,8 +166,8 @@ export function RichTextPane({ value, onChange, placeholder, disabled, className
           <ListOrdered className="h-3.5 w-3.5" />
         </ToolBtn>
       </div>
-      <div className="fh-pane-scroll min-h-0 flex-1">
-        <EditorContent editor={editor} />
+      <div className="fh-pane-scroll min-h-0 flex-1 basis-0 overflow-y-auto">
+        <EditorContent editor={editor} className="block" />
       </div>
     </div>
   );

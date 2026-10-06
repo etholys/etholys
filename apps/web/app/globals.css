@@ -104,9 +104,11 @@
 }
 
 /*
- * Superfícies sempre claras (Meet, login, Centro integrado, etc.).
+ * Superfícies forçadas a claro (ex.: Meet embed, formulários legados).
+ * O Centro integrado (/hub/workspace) herda Hub/sistemas (etholys-hub /
+ * etholys-system + html[data-appearance]) — não usar etholys-light-forms lá.
  * O Hub / html podem ter color-scheme: dark; sem isto, input/select
- * nativos ficam charcoal com texto ilegível.
+ * nativos em superfícies claras ficam charcoal com texto ilegível.
  */
 .etholys-meet-light,
 .etholys-light-forms {
@@ -1050,10 +1052,17 @@
 }
 
 .etholys-fundhub .fh-pane-scroll {
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
-  scrollbar-color: rgba(248, 250, 252, 0.28) transparent;
+  scrollbar-color: rgba(248, 250, 252, 0.35) transparent;
+}
+
+/* TipTap mounts a wrapper; keep scroll on the pane, not an unbounded ProseMirror. */
+.etholys-fundhub .fh-pane-scroll > div {
+  min-height: min-content;
 }
 
 .etholys-fundhub .fh-pane-scroll::-webkit-scrollbar {

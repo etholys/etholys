@@ -1259,8 +1259,8 @@ export default function FundHubProposalEditorPage() {
   }, [fund, locale]);
 
   return (
-    <div className="flex flex-col gap-3">
-      <header className="flex flex-wrap items-start justify-between gap-3">
+    <div className="flex h-[calc(100dvh-5.5rem)] flex-col gap-3 overflow-hidden">
+      <header className="flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <Link
             href="/hub/fundhub/proposals"
@@ -1446,8 +1446,8 @@ export default function FundHubProposalEditorPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-amber-600" />
         </div>
       ) : (
-        <div className="flex min-h-0 gap-3 lg:h-[calc(100dvh-9rem)]">
-          <section className="flex h-[70vh] min-h-[22rem] min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white lg:h-full">
+        <div className="flex min-h-0 flex-1 gap-3 overflow-hidden">
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white">
             <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
               <p className="text-sm font-semibold text-gray-900">
                 {stage === 'understand'
@@ -1508,7 +1508,7 @@ export default function FundHubProposalEditorPage() {
                 </span>
               )}
             </div>
-            <div className="fh-pane-scroll min-h-0 flex-1 space-y-3 px-4 py-3">
+            <div className="fh-pane-scroll min-h-0 flex-1 basis-0 space-y-3 overflow-y-auto px-4 py-3">
               {rfpChecklist.length > 0 && stage === 'understand' && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-900/80">
@@ -1799,7 +1799,7 @@ export default function FundHubProposalEditorPage() {
 
           <aside
             className={cn(
-              'flex h-[70vh] min-h-[22rem] flex-shrink-0 flex-col overflow-hidden border border-white/10 bg-[color:var(--sys-aside-bg,rgba(7,17,26,0.92))] text-[color:var(--sys-ink,#E8EEF2)] shadow-[0_24px_80px_-48px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all lg:h-full',
+              'flex min-h-0 flex-shrink-0 flex-col overflow-hidden border border-white/10 bg-[color:var(--sys-aside-bg,rgba(7,17,26,0.92))] text-[color:var(--sys-ink,#E8EEF2)] shadow-[0_24px_80px_-48px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all',
               'rounded-2xl',
               rightRailCollapsed
                 ? 'w-16'
@@ -1932,7 +1932,7 @@ export default function FundHubProposalEditorPage() {
                 </div>
 
                 {rightRailTab === 'review' ? (
-                  <div className="fh-pane-scroll min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+                  <div className="fh-pane-scroll min-h-0 flex-1 basis-0 space-y-3 overflow-y-auto p-3">
                     {workspaceId ? <ProposalReviewPanel workspaceId={workspaceId} tone="shell" /> : null}
                     <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
                       <span className="text-[11px] font-semibold uppercase tracking-wide text-white/45">
@@ -2031,15 +2031,15 @@ export default function FundHubProposalEditorPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="border-b border-white/10 px-3 py-2">
+                  <div className="flex min-h-0 flex-1 basis-0 flex-col overflow-hidden">
+                    <div className="shrink-0 border-b border-white/10 px-3 py-2">
                       <p className="text-sm font-semibold text-white">
                         {stage === 'understand'
                           ? ui(locale, 'Notas del edital', 'Notas do edital', 'Call notes')
                           : ui(locale, 'Documento', 'Documento', 'Document')}
                       </p>
                     </div>
-                    <div className="min-h-0 flex-1 overflow-hidden bg-white/[0.03]">
+                    <div className="min-h-0 flex-1 basis-0 overflow-hidden bg-white/[0.03]">
                       <RichTextPane
                         value={documentMarkdown}
                         onChange={(next) => {
