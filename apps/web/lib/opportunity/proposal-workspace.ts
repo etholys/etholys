@@ -274,6 +274,61 @@ export function appendWriteSections(md: string, locale?: string | null): string 
   return extra ? `${text}\n\n${extra}` : text;
 }
 
+function splitH2(md: string): { lead: string; sections: Array<{ title: string; content: string }> } {
+  const text = md.replace(/\r\n/g, '\n').trim();
+  if (!text) return { lead: '', sections: [] };
+  const parts = text.split(/^##\s+/m);
+  const lead = (parts[0] ?? '').trim();
+  const sections = parts
+    .slice(1)
+    .map((block) => {
+      const nl = block.indexOf('\n');
+      const title = (nl === -1 ? block : block.slice(0, nl)).trim();
+      const content = (nl === -1 ? '' : block.slice(nl + 1)).trim();
+      return { title, content };
+    })
+    .filter((s) => s.title);
+  return { lead, sections };
+}
+
+/**
+ * Merge AI draft into the canvas: matching ## titles are replaced; new titles are appended.
+ * Draft without headings is appended as a new block.
+ */
+export function mergeDraftIntoMarkdown(existing: string, draft: string): string {
+  const incoming = draft.trim();
+  if (!incoming) return existing;
+  const parsedIn = splitH2(incoming);
+  const cur = existing.trim();
+  if (!parsedIn.sections.length) {
+    if (!cur) return incoming;
+    return `${cur}\n\n${incoming}\n`;
+  }
+  if (!cur) {
+    const body = parsedIn.sections.map((s) => `## ${s.title}\n\n${s.content}`).join('\n\n');
+    return parsedIn.lead ? `${parsedIn.lead}\n\n${body}\n` : `${body}\n`;
+  }
+  const parsedCur = splitH2(cur);
+  const replacements = new Map(parsedIn.sections.map((s) => [s.title.toLowerCase(), s]));
+  const seen = new Set<string>();
+  const out: Array<{ title: string; content: string }> = [];
+  for (const s of parsedCur.sections) {
+    const key = s.title.toLowerCase();
+    const next = replacements.get(key) ?? s;
+    out.push({ title: next.title, content: next.content });
+    seen.add(key);
+  }
+  for (const s of parsedIn.sections) {
+    const key = s.title.toLowerCase();
+    if (seen.has(key)) continue;
+    out.push(s);
+    seen.add(key);
+  }
+  const lead = parsedCur.lead || parsedIn.lead;
+  const body = out.map((s) => `## ${s.title}\n\n${s.content}`).join('\n\n');
+  return `${lead ? `${lead}\n\n` : ''}${body}\n`;
+}
+
 export function seedDocumentMarkdown(seed: ProposalFundSeed, brainstorm?: string, locale?: string | null): string {
   const h = docHead(locale);
   const title = seed.name?.trim() || 'Proposta';

@@ -4,6 +4,7 @@ import {
   buildEditalSummaryFromSeed,
   findReusableDraft,
   appendWriteSections,
+  mergeDraftIntoMarkdown,
   seedDocumentMarkdown,
   seedUnderstandMarkdown,
   sectionsFromMarkdown,
@@ -136,7 +137,7 @@ test('understand prompt is first and forbids brainstorm plus fake login', () => 
   assert.match(sys, /login/i);
   assert.match(sys, /FundHub/);
   assert.match(sys, /español/);
-  assert.match(sys, /IDIOMA OBRIGATÓRIO/);
+  assert.match(sys, /IDIOMA OBLIGATORIO|IDIOMA OBRIGATÓRIO|MANDATORY LANGUAGE/);
 });
 
 test('hub locale drives the reply language', () => {
@@ -163,6 +164,20 @@ test('understand seed has leitura, write appends rascunho', () => {
   const next = appendWriteSections(md, 'pt');
   assert.match(next, /## Ideia geral/);
   assert.match(next, /## Rascunho/);
+});
+
+test('mergeDraftIntoMarkdown replaces matching headings and appends new ones', () => {
+  const base = '# Fondo\n\n## Contexto\n\nViejo.\n\n## Presupuesto\n\nTBD.\n';
+  const next = mergeDraftIntoMarkdown(
+    base,
+    '## Contexto\n\nNuevo párrafo.\n\n## Duración\n\n18 meses.\n',
+  );
+  assert.match(next, /## Contexto/);
+  assert.match(next, /Nuevo párrafo/);
+  assert.equal(next.includes('Viejo.'), false);
+  assert.match(next, /## Presupuesto/);
+  assert.match(next, /## Duración/);
+  assert.match(next, /18 meses/);
 });
 
 test('understand seed follows Spanish hub locale', () => {

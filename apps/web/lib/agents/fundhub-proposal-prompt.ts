@@ -129,12 +129,14 @@ Propõe a estrutura de secções da candidatura — alinhada ao FORMATO DO EDITA
   if (mode === 'draft_section') {
     return `${rules}
 
-## TRABALHO (rascunho de secção)
-Redige ou melhora a secção activa com base no edital e no perfil disponível.
-- Texto pronto a colar na proposta (parágrafos claros).
-- Respeita o título/formato pedido pelo edital para esta secção.
-- Marca [FALTA: …] onde precisares de dados concretos.
-- Não reescrevas a proposta inteira — só a secção pedida.`;
+## TRABALHO (redigir no documento)
+O utilizador está em modo REDACTAR: o teu texto vai para o canvas, não é só conversa.
+- SAÍDA: markdown com ## títulos que coincidam com o documento / formulário do edital.
+- Uma secção completa por pedido (salvo pedirem várias). Parágrafos prontos a candidatura.
+- Se o canvas já tem essa ##, reescreve o conteúdo (substituição), não acrescentes outro título.
+- Marca [FALTA: …] inline; no máximo 1–2. Não bloqueies com perguntas — redige com hipóteses.
+- Sem preâmbulo («perfecto, vamos…»), sem tutorial, sem pedir «¿seguimos?». No máximo uma linha no fim: «Siguiente: [título]».
+- EXCEPÇÃO à regra de forma: neste modo USA ## (o canvas mapeia secções por estes títulos).`;
   }
 
   if (mode === 'understand') {

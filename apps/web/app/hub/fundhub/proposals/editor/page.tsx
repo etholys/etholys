@@ -33,6 +33,7 @@ import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import { RichTextPane } from '@/components/etholys/RichTextPane';
 import {
   appendWriteSections,
+  mergeDraftIntoMarkdown,
   seedDocumentMarkdown,
   seedUnderstandMarkdown,
   sectionsFromMarkdown,
@@ -60,6 +61,8 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   createdAt: string;
+  /** Reply was merged into the canvas (Redactar). */
+  applied?: boolean;
 }
 
 interface AttachedFile {
@@ -104,6 +107,7 @@ export default function FundHubProposalEditorPage() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [composerMode, setComposerMode] = useState<'talk' | 'write'>('talk');
   const [showChatAttachMenu, setShowChatAttachMenu] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openingStudio, setOpeningStudio] = useState(false);
@@ -536,6 +540,7 @@ export default function FundHubProposalEditorPage() {
 
   const passToWrite = useCallback(() => {
     setStage('write');
+    setComposerMode('write');
     setDocumentMarkdown((prev) => {
       // Não injectar «Ideia geral / Rascunho» genéricos se já há checklist do edital —
       // o formato oficial manda; o utilizador usa «Estrutura» se ainda faltar.
@@ -557,10 +562,10 @@ export default function FundHubProposalEditorPage() {
           role: 'assistant',
           content:
             locale === 'en'
-              ? 'Call read. Use «Structure» for the RFP section list, «Ideas» only when you want brainstorming, or ask in chat to draft a section.'
+              ? 'Call read. Use «Structure» for sections. Then switch to «Write» so the AI edits the document — «Talk» is Q&A only.'
               : locale === 'pt'
-                ? 'Edital lido. Use «Estrutura» para as secções do edital, «Ideias» só se quiser chuva de ideias, ou peça no chat um rascunho de secção.'
-                : 'Convocatoria leída. Use «Estructura» para las secciones del edital, «Ideas» solo si quiere lluvia de ideas, o pida en el chat un borrador de sección.',
+                ? 'Edital lido. Use «Estrutura» para as secções. Depois mude para «Redigir» para a IA escrever no documento — «Conversar» só tira dúvidas.'
+                : 'Convocatoria leída. Use «Estructura» para las secciones. Luego cambie a «Redactar» para que la IA escriba en el documento — «Conversar» es solo para dudas.',
           createdAt: new Date().toISOString(),
         },
       ];
@@ -597,15 +602,23 @@ export default function FundHubProposalEditorPage() {
   }, [chatMessages, chatLoading, understanding]);
 
   const handleSendChat = useCallback(async () => {
-    const message = chatInput.trim();
+    let message = chatInput.trim();
     if ((!message && attachedFiles.every((f) => !f.textExcerpt)) || chatLoading) return;
+    const slashWrite = /^\s*\/(redactar|escribir|write|redige)\b/i.test(message);
+    if (slashWrite) {
+      message = message.replace(/^\s*\/(redactar|escribir|write|redige)\s*/i, '').trim();
+      setComposerMode('write');
+    }
+    const isWrite = (composerMode === 'write' || slashWrite) && stage === 'write';
+
     const attachBlock = attachedFiles
       .filter((f) => f.textExcerpt?.trim())
       .slice(0, 4)
       .map((f) => `--- Anexo: ${f.name} ---\n${f.textExcerpt!.slice(0, 6000)}`)
       .join('\n\n');
 
-    const wantsDraft =
+    const wantsDraftHint =
+      isWrite ||
       /\b(item\s*por\s*item|desarroll|redact|complet[ae]|formulari|postulaci[oó]n|escribir|escrev|preench|vamos\s+item|empez|arran[ck])/i.test(
         message,
       );
@@ -613,8 +626,7 @@ export default function FundHubProposalEditorPage() {
       (s) => !/lectura|leitura|call reading|elegib|bases oficial/i.test(s.title),
     ).length;
 
-    // Se pedem redigir e o canvas ainda não tem o formulário, monta a espinha do edital primeiro.
-    if (wantsDraft && rfpChecklist.length && sectionCount < 3) {
+    if (wantsDraftHint && rfpChecklist.length && sectionCount < 3) {
       setDocumentMarkdown((prev) => {
         const next = appendChecklistSections(prev, rfpChecklist, locale);
         persistDraft({ documentMarkdown: next });
@@ -624,12 +636,12 @@ export default function FundHubProposalEditorPage() {
       setRightRailTab('document');
     }
 
-    const draftDirective = wantsDraft
+    const draftDirective = isWrite
       ? locale === 'en'
-        ? '\n\n[Editor directive] Write NOW. Use the official application form field names from the call/bases. Deliver one complete item ready to paste (## heading + body). At most one inline [MISSING: …]. Do not ask eligibility questions as a gate — draft with assumptions and mark gaps. End with only: next item title?'
+        ? '\n\n[WRITE TO DOCUMENT] Output markdown with ## headings matching the official form / canvas. This reply is applied to the document automatically. No interview.'
         : locale === 'pt'
-          ? '\n\n[Directiva do editor] Escreve JÁ. Usa os nomes de campos do formulário oficial do edital/bases. Entrega um item completo pronto a colar (## título + corpo). No máximo um [FALTA: …] inline. Não bloqueies com perguntas de elegibilidade — redige com hipóteses e marca lacunas. Termina só com: próximo item?'
-          : '\n\n[Directiva del editor] Escribe YA. Usa los nombres de campos del formulario oficial del edital/bases. Entrega un ítem completo listo para pegar (## título + cuerpo). Máximo un [FALTA: …] inline. No bloquees con preguntas de elegibilidad — redacta con hipótesis y marca huecos. Termina solo con: ¿siguiente ítem?'
+          ? '\n\n[ESCREVER NO DOCUMENTO] Saída em markdown com ## títulos do formulário / canvas. Esta resposta entra no documento automaticamente. Sem entrevista.'
+          : '\n\n[ESCRIBIR EN EL DOCUMENTO] Salida en markdown con ## títulos del formulario / canvas. Esta respuesta se aplica al documento automáticamente. Sin entrevista.'
       : '';
 
     const fullMessage = [message + draftDirective, attachBlock].filter(Boolean).join('\n\n');
@@ -637,7 +649,11 @@ export default function FundHubProposalEditorPage() {
     const display =
       message ||
       ui(locale, 'Archivos adjuntos enviados.', 'Anexos enviados.', 'Attachments sent.');
-    const nextUser: ChatMessage = { role: 'user', content: display, createdAt: new Date().toISOString() };
+    const nextUser: ChatMessage = {
+      role: 'user',
+      content: isWrite ? `✎ ${display}` : display,
+      createdAt: new Date().toISOString(),
+    };
     setChatMessages((prev) => [...prev, nextUser]);
     setChatInput('');
     setChatLoading(true);
@@ -645,30 +661,46 @@ export default function FundHubProposalEditorPage() {
       const response = await fetch('/api/proposals/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(assistantBody('chat', fullMessage)),
+        body: JSON.stringify(assistantBody(isWrite ? 'draft_section' : 'chat', fullMessage)),
       });
       const data = await response.json();
-      const reply: ChatMessage = {
-        role: 'assistant',
-        content:
-          data.answer ||
+      const answer = String(
+        data.answer ||
           data.error ||
           (locale === 'en'
             ? 'Could not generate a reply.'
             : locale === 'pt'
               ? 'Não foi possível gerar a resposta.'
               : 'No se pudo generar la respuesta.'),
+      );
+      let applied = false;
+      if (isWrite && answer && !data.error) {
+        setDocumentMarkdown((prev) => {
+          const next = mergeDraftIntoMarkdown(prev, answer);
+          persistDraft({ documentMarkdown: next });
+          return next;
+        });
+        setDraftSaved(false);
+        setRightRailCollapsed(false);
+        setRightRailTab('document');
+        applied = true;
+      } else if (wantsDraftHint && answer.includes('## ')) {
+        setRightRailCollapsed(false);
+        setRightRailTab('document');
+      }
+      const reply: ChatMessage = {
+        role: 'assistant',
+        content: applied
+          ? `${locale === 'en' ? 'Written into the document.' : locale === 'pt' ? 'Escrito no documento.' : 'Escrito en el documento.'}\n\n${answer}`
+          : answer,
         createdAt: new Date().toISOString(),
+        applied,
       };
       setChatMessages((prev) => {
         const next = [...prev, reply];
         persistDraft({ chat: next });
         return next;
       });
-      if (wantsDraft && String(data.answer || '').includes('## ')) {
-        setRightRailCollapsed(false);
-        setRightRailTab('document');
-      }
     } catch {
       setChatMessages((prev) => [
         ...prev,
@@ -695,6 +727,8 @@ export default function FundHubProposalEditorPage() {
     locale,
     documentMarkdown,
     rfpChecklist,
+    composerMode,
+    stage,
   ]);
 
   const insertIntoDocument = useCallback(
@@ -702,13 +736,16 @@ export default function FundHubProposalEditorPage() {
       const block = text.trim();
       if (!block) return;
       setDocumentMarkdown((prev) => {
-        const next = prev.trim()
-          ? `${prev.trim()}\n\n${block}\n`
-          : seedDocumentMarkdown(fund || { id: 'adhoc', name: 'Proposta' }, block, locale);
+        const next = mergeDraftIntoMarkdown(
+          prev || seedDocumentMarkdown(fund || { id: 'adhoc', name: 'Proposta' }, block, locale),
+          block,
+        );
         persistDraft({ documentMarkdown: next });
         return next;
       });
       setDraftSaved(false);
+      setRightRailCollapsed(false);
+      setRightRailTab('document');
     },
     [fund, persistDraft, locale],
   );
@@ -1356,6 +1393,32 @@ export default function FundHubProposalEditorPage() {
               </p>
               {stage === 'write' ? (
                 <div className="flex flex-wrap items-center gap-2">
+                  <div className="mr-1 inline-flex rounded-lg border border-gray-200 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setComposerMode('talk')}
+                      className={cn(
+                        'rounded-md px-2 py-1 text-[11px] font-medium',
+                        composerMode === 'talk'
+                          ? 'bg-gray-900 text-white'
+                          : 'text-gray-600 hover:bg-gray-50',
+                      )}
+                    >
+                      {ui(locale, 'Conversar', 'Conversar', 'Talk')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setComposerMode('write')}
+                      className={cn(
+                        'rounded-md px-2 py-1 text-[11px] font-medium',
+                        composerMode === 'write'
+                          ? 'bg-amber-700 text-white'
+                          : 'text-gray-600 hover:bg-gray-50',
+                      )}
+                    >
+                      {ui(locale, 'Redactar', 'Redigir', 'Write')}
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => void handleGenerateStructure()}
@@ -1461,7 +1524,9 @@ export default function FundHubProposalEditorPage() {
                       }}
                       className="mt-2 text-xs font-medium text-amber-800 hover:underline"
                     >
-                      {ui(locale, 'Insertar en el documento', 'Inserir no documento', 'Insert into document')}
+                      {message.applied
+                        ? ui(locale, 'Ya está en el documento', 'Já está no documento', 'Already in the document')
+                        : ui(locale, 'Insertar en el documento', 'Inserir no documento', 'Insert into document')}
                     </button>
                   )}
                 </div>
@@ -1499,12 +1564,19 @@ export default function FundHubProposalEditorPage() {
                         'Pergunte sobre o edital (elegibilidade, prazo, anexos)…',
                         'Ask about the call (eligibility, deadline, annexes)…',
                       )
-                    : ui(
-                        locale,
-                        'Pida redactar una sección o ajustar el tono del donante…',
-                        'Peça para redigir uma secção ou ajustar o tom do doador…',
-                        'Ask to draft a section or adjust donor tone…',
-                      )
+                    : composerMode === 'write'
+                      ? ui(
+                          locale,
+                          'Redactar: p. ej. «ítem 1 — contexto» — entra en el documento.',
+                          'Redigir: p.ex. «item 1 — contexto» — entra no documento.',
+                          'Write: e.g. «item 1 — context» — goes into the document.',
+                        )
+                      : ui(
+                          locale,
+                          'Conversar sobre el edital, o cambie a Redactar para escribir.',
+                          'Conversar sobre o edital, ou mude para Redigir para escrever.',
+                          'Talk about the call, or switch to Write to draft.',
+                        )
                 }
                 className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
               />
