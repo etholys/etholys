@@ -103,7 +103,7 @@ export default function FundHubProposalEditorPage() {
   const [understanding, setUnderstanding] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showChatAttachMenu, setShowChatAttachMenu] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openingStudio, setOpeningStudio] = useState(false);
@@ -1149,38 +1149,36 @@ export default function FundHubProposalEditorPage() {
   const officialUrl = editalLink || fund?.linkOficial || '';
 
   const headerMeta = useMemo(() => {
-    const bits = [fund?.institution, fund?.countries].filter(Boolean);
+    const rawInst = String(fund?.institution ?? '').trim();
+    const inst =
+      !rawInst || /^(sem fundo vinculado|sin fondo vinculado|no fund linked)$/i.test(rawInst)
+        ? ui(locale, 'Sin fondo vinculado', 'Sem fundo vinculado', 'No fund linked')
+        : rawInst;
+    const bits = [inst, fund?.countries].filter(Boolean);
     return bits.join(' · ');
-  }, [fund]);
+  }, [fund, locale]);
 
   return (
     <div className="flex flex-col gap-3">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link href="/hub/fundhub/proposals" className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
+          <Link
+            href="/hub/fundhub/proposals"
+            className="inline-flex items-center gap-2 text-sm text-white/65 transition hover:text-amber-200"
+          >
             <ArrowLeft className="h-4 w-4" /> {ui(locale, 'Propuestas', 'Propostas', 'Proposals')}
           </Link>
-          <h1 className="mt-2 truncate text-2xl font-bold text-gray-900">
+          <h1 className="mt-2 truncate text-2xl font-bold text-white">
             {fund?.name || ui(locale, 'Propuesta', 'Proposta', 'Proposal')}
           </h1>
-          {headerMeta && <p className="text-sm text-gray-600">{headerMeta}</p>}
+          {headerMeta && <p className="text-sm text-white/55">{headerMeta}</p>}
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {officialUrl && (
-            <a
-              href={officialUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              {ui(locale, 'Edital', 'Edital', 'Call notice')}
-            </a>
-          )}
+        <div className="relative flex flex-shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => persistDraft()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2 text-xs font-medium text-white/90 transition hover:bg-white/[0.1]"
+            title={ui(locale, 'Guardar', 'Guardar', 'Save')}
           >
             <Save className="h-3.5 w-3.5" />
             {draftSaved
@@ -1189,66 +1187,96 @@ export default function FundHubProposalEditorPage() {
           </button>
           <button
             type="button"
-            disabled={versionsBusy}
-            onClick={() => {
-              setVersionsOpen((v) => !v);
-              if (!versionsOpen) void loadVersions();
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            onClick={() => setShowActionsMenu((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2 text-xs font-medium text-white/90 transition hover:bg-white/[0.1]"
+            aria-expanded={showActionsMenu}
           >
-            <History className="h-3.5 w-3.5" />
-            {ui(locale, 'Versiones', 'Versões', 'Versions')}
+            {ui(locale, 'Acciones', 'Ações', 'Actions')}
+            <ChevronDown className={cn('h-3.5 w-3.5 opacity-70 transition', showActionsMenu && 'rotate-180')} />
           </button>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowExportMenu((v) => !v)}
-              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-            >
-              {ui(locale, 'Exportar', 'Exportar', 'Export')}
-            </button>
-            {showExportMenu && (
-              <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-lg border border-gray-200 bg-white shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => {
-                    downloadProposal('markdown');
-                    setShowExportMenu(false);
-                  }}
-                  className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50"
+          {showActionsMenu && (
+            <div className="absolute right-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#0C1822] py-1 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.9)]">
+              {officialUrl ? (
+                <a
+                  href={officialUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setShowActionsMenu(false)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white"
                 >
-                  Markdown
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    downloadProposal('json');
-                    setShowExportMenu(false);
-                  }}
-                  className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50"
-                >
-                  JSON
-                </button>
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => void openInStudio()}
-            disabled={openingStudio || !documentMarkdown.trim()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-medium text-violet-900 hover:bg-violet-100 disabled:opacity-50"
-          >
-            {openingStudio ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PenLine className="h-3.5 w-3.5" />}
-            Studio
-          </button>
-          <button
-            type="button"
-            onClick={() => void submitProposal()}
-            disabled={isSubmitting || !documentMarkdown.trim()}
-            className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-          >
-            {isSubmitting ? 'A enviar…' : 'Marcar enviada'}
-          </button>
+                  <ExternalLink className="h-3.5 w-3.5 text-amber-300" />
+                  {ui(locale, 'Edital / convocatoria', 'Edital / convocatória', 'Call notice')}
+                </a>
+              ) : null}
+              <button
+                type="button"
+                disabled={versionsBusy}
+                onClick={() => {
+                  setShowActionsMenu(false);
+                  setVersionsOpen(true);
+                  void loadVersions();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white disabled:opacity-50"
+              >
+                <History className="h-3.5 w-3.5 text-amber-300" />
+                {ui(locale, 'Versiones', 'Versões', 'Versions')}
+              </button>
+              <div className="my-1 border-t border-white/10" />
+              <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/35">
+                {ui(locale, 'Exportar', 'Exportar', 'Export')}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  downloadProposal('markdown');
+                  setShowActionsMenu(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white"
+              >
+                Markdown
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  downloadProposal('json');
+                  setShowActionsMenu(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white"
+              >
+                JSON
+              </button>
+              <div className="my-1 border-t border-white/10" />
+              <button
+                type="button"
+                disabled={openingStudio || !documentMarkdown.trim()}
+                onClick={() => {
+                  setShowActionsMenu(false);
+                  void openInStudio();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-violet-200 hover:bg-white/5 disabled:opacity-50"
+              >
+                {openingStudio ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <PenLine className="h-3.5 w-3.5" />
+                )}
+                Studio
+              </button>
+              <button
+                type="button"
+                disabled={isSubmitting || !documentMarkdown.trim()}
+                onClick={() => {
+                  setShowActionsMenu(false);
+                  void submitProposal();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-emerald-300 hover:bg-white/5 disabled:opacity-50"
+              >
+                {isSubmitting
+                  ? ui(locale, 'Enviando…', 'A enviar…', 'Submitting…')
+                  : ui(locale, 'Marcar como enviada', 'Marcar como enviada', 'Mark as submitted')}
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
