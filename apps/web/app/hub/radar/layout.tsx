@@ -29,10 +29,10 @@ function RadarShellInner({ children }: { children: ReactNode }) {
 
   const nav = useMemo(
     () => [
-      { href: '/hub/radar', label: es ? 'Mapa' : en ? 'Map' : 'Mapa' },
-      { href: '/hub/radar/cadeia', label: es ? 'Cadena' : en ? 'Chain' : 'Cadeia' },
-      { href: '/hub/radar/tarefas', label: es ? 'Tareas' : en ? 'Tasks' : 'Tarefas' },
-      { href: '/hub/radar/equipa', label: es ? 'Equipo' : en ? 'Team' : 'Equipa' },
+      { href: '/hub/radar', label: es ? 'Sitio' : en ? 'Site' : 'Sítio' },
+      { href: '/hub/radar/cadeia', label: es ? 'Lotes' : en ? 'Lots' : 'Lotes' },
+      { href: '/hub/radar/tarefas', label: es ? 'Avisos' : en ? 'Alerts' : 'Avisos' },
+      { href: '/hub/radar/equipa', label: es ? 'Personas' : en ? 'People' : 'Pessoas' },
     ],
     [es, en],
   );

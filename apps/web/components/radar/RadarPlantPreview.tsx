@@ -30,7 +30,6 @@ export function RadarPlantPreview({
   const [parcels, setParcels] = useState<MapParcel[]>([]);
   const [sensors, setSensors] = useState<Array<{ id: string; name: string; unitId: string | null; lastValue: number | null }>>([]);
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [lotCode, setLotCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,13 +39,9 @@ export function RadarPlantPreview({
       try {
         const q = new URLSearchParams({ companyId });
         if (engagementId) q.set('engagementId', engagementId);
-        const [propRes, lotsRes] = await Promise.all([
-          fetch(`/api/radar/properties/${propertyId}?${q}`, { cache: 'no-store' }),
-          fetch(`/api/radar/lots?${q}`, { cache: 'no-store' }),
-        ]);
-        const d = await propRes.json();
-        const lotsData = await lotsRes.json().catch(() => ({}));
-        if (cancelled || !propRes.ok) return;
+        const r = await fetch(`/api/radar/properties/${propertyId}?${q}`, { cache: 'no-store' });
+        const d = await r.json();
+        if (cancelled || !r.ok) return;
         const units = (d.property?.units || []) as Array<{
           id: string;
           name: string;
@@ -76,8 +71,6 @@ export function RadarPlantPreview({
             }),
           ),
         );
-        const open = (lotsData.lots || []).find((l: { status: string }) => l.status === 'open');
-        setLotCode(open?.code || null);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -123,7 +116,6 @@ export function RadarPlantPreview({
         if (operateHrefFor) router.push(operateHrefFor(id));
       }}
       trailUnitIds={parcels.map((p) => p.id)}
-      lotCode={lotCode}
       hero={hero}
     />
   );

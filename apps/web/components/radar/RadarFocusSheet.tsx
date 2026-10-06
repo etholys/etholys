@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Droplets, Loader2, MessageSquare, Package } from 'lucide-react';
+import { Droplets, Loader2, MessageSquare } from 'lucide-react';
 import { DEFAULT_IRRIGATION_MM, MOISTURE_THRESHOLD } from '@/lib/radar/agriculture';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
 import { spaceKindMeta } from '@/lib/radar/space';
@@ -41,7 +40,6 @@ export function RadarFocusSheet({
   moduleId,
   units,
   focusedId,
-  chainHref,
 }: {
   companyId: string;
   engagementId?: string | null;
@@ -49,7 +47,6 @@ export function RadarFocusSheet({
   moduleId: string | null;
   units: Unit[];
   focusedId: string | null;
-  chainHref: string;
 }) {
   const loc = radarLoc(locale);
   const meta = spaceKindMeta(moduleId);
@@ -136,7 +133,7 @@ export function RadarFocusSheet({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
-            {meta.unitLabel[loc]}
+            {radarT(loc, 'Espaço seleccionado', 'Espacio seleccionado', 'Selected space')}
           </p>
           <h2 className="truncate text-xl font-medium text-white">{focus.name}</h2>
           <p className="mt-0.5 text-sm text-white/50">
@@ -196,13 +193,6 @@ export function RadarFocusSheet({
             </button>
           </div>
         )}
-        <Link
-          href={chainHref}
-          className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/80"
-        >
-          <Package className="h-4 w-4" />
-          {radarT(loc, 'Cadeia', 'Cadena', 'Chain')}
-        </Link>
       </div>
 
       <div className="mt-4 border-t border-white/10 pt-3">

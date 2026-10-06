@@ -229,51 +229,49 @@ export function RadarPropertyWorkspace({
 
       {showOperate ? (
         <div className="space-y-3">
+          <p className="text-sm text-white/55">
+            {radarT(
+              loc,
+              'Toca um espaço no mapa — em baixo (ou ao lado) aparece o que fazer agora.',
+              'Tocá un espacio en el mapa — abajo (o al lado) aparece qué hacer ahora.',
+              'Tap a space on the map — below (or beside) you’ll see what to do now.',
+            )}
+          </p>
           {openLot && (
-            <Link
-              href={chainHref}
-              className="flex items-center justify-between gap-2 rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-50"
-            >
-              <span>
-                {radarT(loc, 'Lote', 'Lote', 'Lot')} <strong>{openLot.code}</strong>
-                {' · '}
-                {TRACE_STAGE_LABEL[openLot.currentStage][loc]}
-              </span>
-              <span className="text-xs text-emerald-200/80">
-                {radarT(loc, 'Ver cadeia →', 'Ver cadena →', 'View chain →')}
-              </span>
+            <Link href={chainHref} className="text-xs text-emerald-300/80 hover:text-emerald-200">
+              {radarT(loc, 'Lote', 'Lote', 'Lot')} {openLot.code} · {TRACE_STAGE_LABEL[openLot.currentStage][loc]} →
             </Link>
           )}
-          <RadarSiteMap
-            companyId={companyId}
-            engagementId={engagementId}
-            propertyId={propertyId}
-            locale={loc}
-            moduleId={data.moduleId}
-            mode="ops"
-            parcels={mapParcels}
-            sensors={data.sensors.map((s) => ({
-              id: s.id,
-              name: s.name,
-              unitId: s.unitId,
-              lastValue: s.lastValue ?? null,
-            }))}
-            focusedId={focusedId}
-            onFocus={setFocusedId}
-            onSaved={() => void load()}
-            trailUnitIds={openLot ? mapParcels.map((p) => p.id) : undefined}
-            lotCode={openLot?.code || null}
-            hero
-          />
-          <RadarFocusSheet
-            companyId={companyId}
-            engagementId={engagementId}
-            locale={loc}
-            moduleId={data.moduleId}
-            units={data.units}
-            focusedId={focusedId}
-            chainHref={chainHref}
-          />
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.9fr)] lg:items-start">
+            <RadarSiteMap
+              companyId={companyId}
+              engagementId={engagementId}
+              propertyId={propertyId}
+              locale={loc}
+              moduleId={data.moduleId}
+              mode="ops"
+              parcels={mapParcels}
+              sensors={data.sensors.map((s) => ({
+                id: s.id,
+                name: s.name,
+                unitId: s.unitId,
+                lastValue: s.lastValue ?? null,
+              }))}
+              focusedId={focusedId}
+              onFocus={setFocusedId}
+              onSaved={() => void load()}
+              trailUnitIds={openLot ? mapParcels.map((p) => p.id) : undefined}
+              hero
+            />
+            <RadarFocusSheet
+              companyId={companyId}
+              engagementId={engagementId}
+              locale={loc}
+              moduleId={data.moduleId}
+              units={data.units}
+              focusedId={focusedId}
+            />
+          </div>
         </div>
       ) : (
         <>

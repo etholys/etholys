@@ -11,7 +11,6 @@ import {
 } from '@/lib/radar/site-layout';
 import { spaceKindMeta } from '@/lib/radar/space';
 import { radarLoc, radarT, type RadarLoc } from '@/lib/radar/i18n';
-import { RadarSpatialTwin } from '@/components/radar/RadarSpatialTwin';
 
 type Loc = RadarLoc;
 
@@ -108,12 +107,10 @@ type Props = {
   onSaved?: () => void;
   /** Show CTA to create a new parcel (parent owns the form). */
   onRequestAddParcel?: () => void;
-  /** Unit ids to connect with a custody dashed path (centers). */
+  /** Unit ids to connect with a dashed path (centers). */
   trailUnitIds?: string[];
   /** Taller board when home shows a single site as the hero. */
   hero?: boolean;
-  /** Open lot code shown on the spatial twin custody chip. */
-  lotCode?: string | null;
 };
 
 function HeaderIcon({ moduleId }: { moduleId?: string | null }) {
@@ -137,12 +134,9 @@ export function RadarSiteMap({
   onRequestAddParcel,
   trailUnitIds,
   hero = false,
-  lotCode = null,
 }: Props) {
   const loc = radarLoc(locale);
-  /** Setup keeps flat editor; operate/preview use spatial twin. */
-  const twinMode = mode === 'ops' || mode === 'preview';
-  const canEdit = mode === 'empresa' || (mode === 'ops' && !twinMode);
+  const canEdit = mode === 'empresa';
   const copy = mapCopy(loc, moduleId);
   const showMoisture = !moduleId || moduleId === 'agriculture';
   const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
@@ -337,55 +331,40 @@ export function RadarSiteMap({
           .join(' ')
       : null;
 
-  if (twinMode) {
-    return (
-      <RadarSpatialTwin
-        locale={locale}
-        moduleId={moduleId}
-        layout={layout}
-        parcels={parcels}
-        sensors={sensors}
-        focusedId={focusedId}
-        onFocus={onFocus}
-        trailUnitIds={trailUnitIds}
-        lotCode={lotCode}
-        hero={hero}
-      />
-    );
-  }
-
   return (
     <section className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[radial-gradient(ellipse_at_top_left,rgba(16,185,129,0.14),transparent_50%),linear-gradient(165deg,#071812_0%,#0a1a14_50%,#050f0c_100%)]">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 px-4 py-2.5 sm:px-5">
-        <div className="flex items-center gap-2">
-          <HeaderIcon moduleId={moduleId} />
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">{copy.plant}</p>
-          <span className="hidden text-[11px] text-white/35 sm:inline">· {copy.arrange}</span>
+      {canEdit && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 px-4 py-2.5 sm:px-5">
+          <div className="flex items-center gap-2">
+            <HeaderIcon moduleId={moduleId} />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">{copy.plant}</p>
+            <span className="hidden text-[11px] text-white/35 sm:inline">· {copy.arrange}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {onRequestAddParcel && (
+              <button
+                type="button"
+                onClick={onRequestAddParcel}
+                className="inline-flex items-center gap-1 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {copy.addParcel}
+              </button>
+            )}
+            {savedFlash && <span className="text-[11px] text-emerald-200/80">{copy.saved}</span>}
+            {dirty && (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void save()}
+                className="rounded-xl bg-emerald-500/90 px-3 py-1.5 text-xs font-semibold text-[#04110c] disabled:opacity-40"
+              >
+                {saving ? copy.saving : copy.save}
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {onRequestAddParcel && (
-            <button
-              type="button"
-              onClick={onRequestAddParcel}
-              className="inline-flex items-center gap-1 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              {copy.addParcel}
-            </button>
-          )}
-          {savedFlash && <span className="text-[11px] text-emerald-200/80">{copy.saved}</span>}
-          {dirty && (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void save()}
-              className="rounded-xl bg-emerald-500/90 px-3 py-1.5 text-xs font-semibold text-[#04110c] disabled:opacity-40"
-            >
-              {saving ? copy.saving : copy.save}
-            </button>
-          )}
-        </div>
-      </div>
+      )}
 
       <div
         ref={boardRef}
@@ -434,9 +413,12 @@ export function RadarSiteMap({
           if (!parcel) return null;
           const tone = actionTone(parcel.nextAction, parcel.harvestBlocked, parcel.moisture);
           const focused = focusedId === parcel.id;
-          const dimmed = false;
+          const dimmed = Boolean(focusedId) && !focused;
           const alertPulse = tone === 'critical' || parcel.alerts.some((a) => a.severity === 'critical');
           const spaceSensors = layout.sensors.filter((s) => s.spaceId === rect.id);
+          const extraSensors = sensors.filter(
+            (s) => s.unitId === rect.id && !spaceSensors.some((p) => p.id === s.id),
+          );
 
           return (
             <button
@@ -459,6 +441,9 @@ export function RadarSiteMap({
               {alertPulse && (
                 <span className="pointer-events-none absolute inset-0 animate-pulse bg-rose-400/10" />
               )}
+              <span className="pointer-events-none absolute inset-0 opacity-40">
+                <TileScene moduleId={moduleId} />
+              </span>
               <div className="relative flex h-full flex-col justify-between p-2.5 sm:p-3">
                 <div>
                   <p className="truncate text-sm font-semibold text-white sm:text-base">{parcel.name}</p>
@@ -521,6 +506,34 @@ export function RadarSiteMap({
                     </span>
                   );
                 })}
+                {extraSensors.map((sens, idx) => (
+                  <span
+                    key={sens.id}
+                    title={sens.lastValue != null ? `${sens.name}: ${sens.lastValue}` : sens.name}
+                    className="pointer-events-none absolute z-10 flex flex-col items-center"
+                    style={{ right: `${8 + idx * 18}%`, top: '12%' }}
+                  >
+                    <span className="relative flex h-4 w-4 items-center justify-center">
+                      <span
+                        className={`absolute inline-flex h-full w-full animate-ping rounded-full ${
+                          sens.lastValue != null ? 'bg-sky-300/55' : 'bg-white/25'
+                        }`}
+                      />
+                      <span
+                        className={`relative flex h-3 w-3 items-center justify-center rounded-full ${
+                          sens.lastValue != null ? 'bg-sky-300 text-[#04110c]' : 'bg-white/30 text-white/70'
+                        }`}
+                      >
+                        <Radio className="h-2 w-2" />
+                      </span>
+                    </span>
+                    {sens.lastValue != null && (
+                      <span className="mt-0.5 rounded bg-black/55 px-1 text-[9px] font-semibold tabular-nums text-sky-100">
+                        {Number.isInteger(sens.lastValue) ? sens.lastValue : sens.lastValue.toFixed(0)}
+                      </span>
+                    )}
+                  </span>
+                ))}
               </div>
               {canEdit && focused && (
                 <span
@@ -535,6 +548,43 @@ export function RadarSiteMap({
         })}
       </div>
     </section>
+  );
+}
+
+function TileScene({ moduleId }: { moduleId?: string | null }) {
+  if (moduleId === 'agroindustry') {
+    return (
+      <svg viewBox="0 0 120 80" className="h-full w-full" aria-hidden>
+        <rect x="8" y="48" width="80" height="8" rx="2" fill="rgba(148,163,184,0.45)" />
+        <rect x="14" y="34" width="16" height="12" rx="1" fill="rgba(167,243,208,0.4)" />
+        <rect x="38" y="32" width="16" height="14" rx="1" fill="rgba(167,243,208,0.35)" />
+        <rect x="62" y="34" width="16" height="12" rx="1" fill="rgba(167,243,208,0.4)" />
+        <rect x="90" y="22" width="22" height="36" rx="3" fill="rgba(56,189,248,0.22)" />
+      </svg>
+    );
+  }
+  if (moduleId === 'livestock') {
+    return (
+      <svg viewBox="0 0 120 80" className="h-full w-full" aria-hidden>
+        <rect x="10" y="18" width="44" height="48" rx="4" fill="rgba(251,191,36,0.18)" />
+        <rect x="62" y="18" width="44" height="48" rx="4" fill="rgba(251,191,36,0.12)" />
+        <ellipse cx="30" cy="44" rx="7" ry="5" fill="rgba(253,224,71,0.45)" />
+        <ellipse cx="82" cy="46" rx="7" ry="5" fill="rgba(253,224,71,0.35)" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 120 80" className="h-full w-full" aria-hidden>
+      {[22, 36, 50, 64].map((y) => (
+        <path
+          key={y}
+          d={`M6 ${y} Q36 ${y - 4} 64 ${y} T114 ${y}`}
+          stroke="rgba(52,211,153,0.45)"
+          strokeWidth="2"
+          fill="none"
+        />
+      ))}
+    </svg>
   );
 }
 
