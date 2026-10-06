@@ -70,7 +70,7 @@ export function WorkspaceTopBar({ locale, canManage, active, showCompanyLine }: 
           {canManage && active === 'main' && (
             <Link
               href="/hub/workspace/team"
-              className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              className="rounded-lg border border-teal-700/20 bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-800"
             >
               {t.manage}
             </Link>

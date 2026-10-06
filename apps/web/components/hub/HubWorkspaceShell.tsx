@@ -118,7 +118,7 @@ export function HubWorkspaceShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+    <div className="etholys-light-forms min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-50 text-slate-900">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 sm:gap-4">

@@ -326,7 +326,12 @@ export function EtholysInviteWizard({
   );
 
   return (
-    <div className={cn('rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5', className)}>
+    <div
+      className={cn(
+        'etholys-light-forms rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5',
+        className,
+      )}
+    >
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {visibleSteps.map((s, i) => (
           <div key={s} className="flex items-center gap-2">
@@ -360,7 +365,7 @@ export function EtholysInviteWizard({
               <select
                 value={companyId}
                 onChange={(e) => setCompanyId(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
               >
                 {companies.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -381,7 +386,7 @@ export function EtholysInviteWizard({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="pessoa@org.com"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
             />
           </label>
 
@@ -428,7 +433,7 @@ export function EtholysInviteWizard({
                   'Ej.: Coordinador financiero',
                   'e.g. Finance coordinator',
                 )}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
               />
             </label>
           )}
@@ -442,7 +447,7 @@ export function EtholysInviteWizard({
                 type="date"
                 value={accessUntil}
                 onChange={(e) => setAccessUntil(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
               />
             </label>
           )}
@@ -455,7 +460,7 @@ export function EtholysInviteWizard({
               <select
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
               >
                 <option value="">—</option>
                 {projects.map((p) => (

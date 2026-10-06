@@ -49,8 +49,8 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-      <div className="w-full max-w-md rounded-2xl bg-white border shadow-sm p-8">
+    <div className="etholys-light-forms min-h-screen flex items-center justify-center bg-gray-50 p-6 text-slate-900">
+      <div className="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-sm p-8">
         <Link href="/login" className="inline-flex items-center gap-1 text-sm text-teal-600 hover:underline mb-6">
           <ArrowLeft className="h-4 w-4" />
           {t('Volver al login', 'Voltar ao login', 'Back to login')}
@@ -77,7 +77,7 @@ export default function ForgotPasswordPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 outline-none"
+              className="w-full px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-teal-500 outline-none"
             />
           </div>
           <button

@@ -104,25 +104,42 @@
 }
 
 /*
- * CHORUS / Meet — superfícies sempre claras.
- * O Hub define color-scheme no <html>; sem isto, datetime-local/select
- * nativos ficam escuros com texto slate-900 (ilegível).
+ * Superfícies sempre claras (Meet, login, Centro integrado, etc.).
+ * O Hub / html podem ter color-scheme: dark; sem isto, input/select
+ * nativos ficam charcoal com texto ilegível.
  */
-.etholys-meet-light {
+.etholys-meet-light,
+.etholys-light-forms {
   color-scheme: light;
 }
 .etholys-meet-light input:not([type='checkbox']):not([type='radio']):not([type='range']),
 .etholys-meet-light select,
-.etholys-meet-light textarea {
+.etholys-meet-light textarea,
+.etholys-light-forms input:not([type='checkbox']):not([type='radio']):not([type='range']),
+.etholys-light-forms select,
+.etholys-light-forms textarea {
   color-scheme: light;
   background-color: #ffffff;
   color: #0f172a;
-  border-color: #e2e8f0;
+  border-color: #cbd5e1;
 }
 .etholys-meet-light input::placeholder,
-.etholys-meet-light textarea::placeholder {
+.etholys-meet-light textarea::placeholder,
+.etholys-light-forms input::placeholder,
+.etholys-light-forms textarea::placeholder {
   color: #94a3b8;
   opacity: 1;
+}
+/* Autofill Chrome/Safari sob aparência escura do documento */
+.etholys-meet-light input:-webkit-autofill,
+.etholys-meet-light input:-webkit-autofill:hover,
+.etholys-meet-light input:-webkit-autofill:focus,
+.etholys-light-forms input:-webkit-autofill,
+.etholys-light-forms input:-webkit-autofill:hover,
+.etholys-light-forms input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #0f172a;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+  transition: background-color 99999s ease-in-out 0s;
 }
 
 /* Sistemas — mesma atmosfera do Hub; canvas partilhado */
@@ -1155,7 +1172,16 @@ html[data-appearance='light'] .etholys-fundhub .fh-canvas {
   color: var(--sys-ink) !important;
 }
 
-/* Inputs */
+/* Inputs — globais sob aparência clara (login, workspace, hub, sistemas) */
+html[data-appearance='light'] input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='submit']):not([type='button']):not([type='image']):not([type='color']):not([type='hidden']),
+html[data-appearance='light'] select,
+html[data-appearance='light'] textarea {
+  color-scheme: light;
+  background-color: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.2) !important;
+  color: #0f172a !important;
+}
+
 html[data-appearance='light'] .etholys-system .sys-canvas input:not([type='checkbox']):not([type='radio']):not([type='range']),
 html[data-appearance='light'] .etholys-system .sys-canvas textarea,
 html[data-appearance='light'] .etholys-system .sys-canvas select,
@@ -1167,6 +1193,9 @@ html[data-appearance='light'] .etholys-fundhub select {
   color: #0f172a !important;
 }
 
+html[data-appearance='light'] input[type='date'],
+html[data-appearance='light'] input[type='time'],
+html[data-appearance='light'] input[type='datetime-local'],
 html[data-appearance='light'] .etholys-system .sys-canvas input[type='date'],
 html[data-appearance='light'] .etholys-system .sys-canvas input[type='time'],
 html[data-appearance='light'] .etholys-fundhub input[type='date'],
@@ -1174,6 +1203,8 @@ html[data-appearance='light'] .etholys-fundhub input[type='time'] {
   color-scheme: light;
 }
 
+html[data-appearance='light'] input::placeholder,
+html[data-appearance='light'] textarea::placeholder,
 html[data-appearance='light'] .etholys-system .sys-canvas input::placeholder,
 html[data-appearance='light'] .etholys-system .sys-canvas textarea::placeholder,
 html[data-appearance='light'] .etholys-fundhub input::placeholder,
@@ -1183,6 +1214,13 @@ html[data-appearance='light'] .etholys-fundhub .placeholder\:text-gray-500::plac
 html[data-appearance='light'] .etholys-fundhub .placeholder\:text-slate-400::placeholder {
   color: #64748b !important;
   opacity: 1 !important;
+}
+
+html[data-appearance='light'] input:-webkit-autofill,
+html[data-appearance='light'] input:-webkit-autofill:hover,
+html[data-appearance='light'] input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #0f172a !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
 }
 
 /* Superfícies: desfazer painel escuro e restaurar branco / soft */
