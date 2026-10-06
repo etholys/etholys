@@ -170,7 +170,12 @@ export function RadarHome({
           </Link>
         )}
         <p className="text-xs text-white/40">
-          {radarT(loc, 'Toca um espaço para operar.', 'Tocá un espacio para operar.', 'Tap a space to operate.')}
+          {radarT(
+            loc,
+            'Toca um espaço — abres o sítio com lista + mapa + o que fazer.',
+            'Tocá un espacio — abrís el sitio con lista + mapa + qué hacer.',
+            'Tap a space — open the site with list + map + what to do.',
+          )}
         </p>
         <RadarPlantPreview
           companyId={companyId}

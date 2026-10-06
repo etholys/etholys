@@ -13,6 +13,7 @@ import { RadarSiteMap } from '@/components/radar/RadarSiteMap';
 import { RadarCropsPanel } from '@/components/radar/RadarCropsPanel';
 import { RadarAddParcelForm } from '@/components/radar/RadarAddParcelForm';
 import { RadarFocusSheet } from '@/components/radar/RadarFocusSheet';
+import { RadarSpaceTree } from '@/components/radar/RadarSpaceTree';
 import type { RadarCrop } from '@/lib/radar/site-layout';
 import { MOISTURE_THRESHOLD } from '@/lib/radar/agriculture';
 import { isTraceStage, TRACE_STAGE_LABEL, type TraceStage } from '@/lib/radar/trace';
@@ -229,40 +230,52 @@ export function RadarPropertyWorkspace({
 
       {showOperate ? (
         <div className="space-y-3">
-          <p className="text-sm text-white/55">
-            {radarT(
-              loc,
-              'Toca um espaço no mapa — em baixo (ou ao lado) aparece o que fazer agora.',
-              'Tocá un espacio en el mapa — abajo (o al lado) aparece qué hacer ahora.',
-              'Tap a space on the map — below (or beside) you’ll see what to do now.',
-            )}
-          </p>
           {openLot && (
             <Link href={chainHref} className="text-xs text-emerald-300/80 hover:text-emerald-200">
               {radarT(loc, 'Lote', 'Lote', 'Lot')} {openLot.code} · {TRACE_STAGE_LABEL[openLot.currentStage][loc]} →
             </Link>
           )}
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.9fr)] lg:items-start">
-            <RadarSiteMap
-              companyId={companyId}
-              engagementId={engagementId}
-              propertyId={propertyId}
+          {/* Ref pattern: tree (nav) | plant map | what to do */}
+          <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)_minmax(240px,0.85fr)] lg:items-start">
+            <RadarSpaceTree
               locale={loc}
               moduleId={data.moduleId}
-              mode="ops"
-              parcels={mapParcels}
-              sensors={data.sensors.map((s) => ({
-                id: s.id,
-                name: s.name,
-                unitId: s.unitId,
-                lastValue: s.lastValue ?? null,
-              }))}
+              propertyName={data.name}
+              units={data.units}
+              sensors={data.sensors}
               focusedId={focusedId}
               onFocus={setFocusedId}
-              onSaved={() => void load()}
-              trailUnitIds={openLot ? mapParcels.map((p) => p.id) : undefined}
-              hero
             />
+            <div className="space-y-2">
+              <p className="text-xs text-white/45">
+                {radarT(
+                  loc,
+                  'Mapa do sítio — toca um espaço ou escolhe na lista.',
+                  'Mapa del sitio — tocá un espacio o elegí en la lista.',
+                  'Site map — tap a space or pick from the list.',
+                )}
+              </p>
+              <RadarSiteMap
+                companyId={companyId}
+                engagementId={engagementId}
+                propertyId={propertyId}
+                locale={loc}
+                moduleId={data.moduleId}
+                mode="ops"
+                parcels={mapParcels}
+                sensors={data.sensors.map((s) => ({
+                  id: s.id,
+                  name: s.name,
+                  unitId: s.unitId,
+                  lastValue: s.lastValue ?? null,
+                }))}
+                focusedId={focusedId}
+                onFocus={setFocusedId}
+                onSaved={() => void load()}
+                trailUnitIds={openLot ? mapParcels.map((p) => p.id) : undefined}
+                hero
+              />
+            </div>
             <RadarFocusSheet
               companyId={companyId}
               engagementId={engagementId}
