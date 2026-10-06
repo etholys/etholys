@@ -1,6 +1,6 @@
 import { INSTITUTIONAL_PROSE_RULE } from '@/lib/agents/prose-rules';
 
-const PROMPT_VERSION = 'fundhub-proposal-v7';
+const PROMPT_VERSION = 'fundhub-proposal-v8';
 
 export type FundhubProposalMode = 'chat' | 'structure' | 'draft_section' | 'brainstorm' | 'understand';
 export type FundhubLocale = 'es' | 'pt' | 'en';
@@ -78,7 +78,7 @@ function buildContextBlock(ctx: FundhubProposalContext): string {
     );
   }
   if (ctx.documentMarkdown?.trim()) {
-    lines.push(`Documento actual no canvas:\n${ctx.documentMarkdown.trim().slice(0, 8000)}`);
+    lines.push(`Documento actual no canvas:\n${ctx.documentMarkdown.trim().slice(0, 14000)}`);
   }
   if (ctx.proposalOutline?.length) {
     lines.push(`Esboço actual da proposta:\n${ctx.proposalOutline.map((s, i) => `${i + 1}. ${s}`).join('\n')}`);
@@ -110,6 +110,8 @@ ${INSTITUTIONAL_PROSE_RULE}
   3) Só depois a «empresa do Hub» / biblioteca — e só se não contradizer (1)–(2).
 - Se o utilizador cola texto sobre uma cooperativa/ONG/empresa e pede um ponto do formulário sobre «organización proponente / postulante / applicant», ESSA entidade é a postulante. Não substituas pela empresa do Hub nem a relegues a «aliada / facilitadora».
 - Se o utilizador corrige o nome da postulante, REESCREVE só a secção/ponto pedido com essa entidade. Não saltes para outras secções do canvas.
+- CONTINUIDADE DO CHAT: o histórico de mensagens faz parte do pedido. Se pedirem melhorar / reescrever / corrigir «a resposta anterior» ou um ponto já redigido, PARTE desse texto (histórico ou ## no canvas). PROIBIDO inventar outro tema ou outra secção.
+- Não inventes factos, números, nomes de org, locais ou actividades que não estejam no CONTEXTO, no histórico ou na mensagem actual. Se não houver base, [FALTA: …] — não improvises.
 - Não faças diagnóstico de negócio NEXUS, informes SIEP, layout Studio nem prioridades do Workspace Advisor.
 - Não menciones nomes internos de produto (FUNDHUB, OPPORTUNITY, license keys). Diz FundHub se precisares de te nomear.
 - Tom profissional, claro, alinhado ao doador quando o edital o permitir.`;
@@ -152,6 +154,7 @@ O utilizador está em modo REDACTAR: o teu texto vai para o canvas, não é só 
 - Se pedirem o ponto «c)» / um campo concreto: título ## desse ponto + texto. PROIBIDO preencher C, D, E ou outras secções na mesma resposta.
 - Se corrigirem («é sobre X», «a postulante é Y»): reescreve APENAS essa secção errada com a entidade correcta. Não «continues» noutras partes do canvas.
 - Se colarem material de base (antecedentes, missão, actividades): sintetiza ESSE material no ponto pedido — não inventes outra organização a partir do perfil Hub.
+- Se pedirem melhorar a resposta anterior / um rascunho já dado: reescreve ESSA secção (mesmo ##). Não abras um ponto novo.
 - Se o canvas já tem essa ##, reescreve o conteúdo (substituição), não acrescentes outro título.
 - Marca [FALTA: …] inline; no máximo 1–2. Não bloqueies com perguntas — redige com hipóteses.
 - Sem preâmbulo («perfecto, vamos…»), sem tutorial, sem «ajustaré todas las secciones». No máximo uma linha no fim: «Siguiente: [título do MESMO bloco se ainda faltar]».
@@ -250,4 +253,34 @@ export function normalizeFundhubMode(raw: unknown): FundhubProposalMode {
     return raw;
   }
   return 'chat';
+}
+
+export type FundhubChatTurn = { role: 'user' | 'assistant'; content: string };
+
+/** Strip UI chrome so the model sees the real prior draft when revising. */
+export function sanitizeFundhubChatHistory(raw: unknown, limit = 14): FundhubChatTurn[] {
+  if (!Array.isArray(raw)) return [];
+  const out: FundhubChatTurn[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const role = (item as { role?: unknown }).role;
+    const content = (item as { content?: unknown }).content;
+    if ((role !== 'user' && role !== 'assistant') || typeof content !== 'string') continue;
+    let text = content.replace(/^\s*✎\s*/, '').trim();
+    text = text
+      .replace(
+        /^(?:Escrito en el documento\.|Escrito no documento\.|Written into the document\.)\s*/i,
+        '',
+      )
+      .trim();
+    if (!text) continue;
+    out.push({ role, content: text.slice(0, 4500) });
+  }
+  return out.slice(-Math.max(1, limit));
+}
+
+export function looksLikeRevisionRequest(message: string): boolean {
+  return /\b(mejor(?:a|ar|e)?|melhor(?:a|ar)?|improve|revis(?:a|ar|e)?|reescri[bv]\w*|reescrev\w*|reescrit\w*|corrig\w*|ajust\w*|rehaz|refaz|más\s+corto|mais\s+curto|anterior|última\s+respuesta|ultima\s+resposta|previous\s+(?:answer|reply|draft))\b/i.test(
+    message,
+  );
 }

@@ -47,6 +47,7 @@ import {
   type ProposalFileRole,
   type ProposalFundSeed,
 } from '@/lib/opportunity/proposal-workspace';
+import { looksLikeRevisionRequest } from '@/lib/agents/fundhub-proposal-prompt';
 import {
   checklistFromCandidateFields,
   appendChecklistSections,
@@ -674,7 +675,31 @@ export default function FundHubProposalEditorPage() {
           : '\n\n[ESCRIBIR EN EL DOCUMENTO] Salida SOLO del punto/sección pedido (## título + texto). Si nombran a la postulante o pegan su texto, ESA entidad es la postulante — NO uses la empresa del Hub. Si corrigen la org equivocada, reescribe SOLO esa sección — no saltes a otras del canvas.'
       : '';
 
-    const fullMessage = [message + draftDirective, attachBlock].filter(Boolean).join('\n\n');
+    let reviseAnchor = '';
+    if (looksLikeRevisionRequest(message)) {
+      const lastAssistant = [...chatMessages].reverse().find((m) => m.role === 'assistant');
+      if (lastAssistant?.content?.trim()) {
+        const prior = lastAssistant.content
+          .replace(
+            /^(?:Escrito en el documento\.|Escrito no documento\.|Written into the document\.)\s*/i,
+            '',
+          )
+          .trim()
+          .slice(0, 6000);
+        if (prior) {
+          reviseAnchor =
+            locale === 'en'
+              ? `\n\n[TEXT TO REVISE — last AI reply; improve THIS text only, same section/heading — do not invent another topic]\n${prior}`
+              : locale === 'pt'
+                ? `\n\n[TEXTO A REVISAR — última resposta da IA; melhora SÓ este texto, mesma secção/título — não inventes outro tema]\n${prior}`
+                : `\n\n[TEXTO A REVISAR — última respuesta de la IA; mejora SOLO este texto, misma sección/título — no inventes otro tema]\n${prior}`;
+        }
+      }
+    }
+
+    const fullMessage = [message + draftDirective + reviseAnchor, attachBlock]
+      .filter(Boolean)
+      .join('\n\n');
     if (!fullMessage.trim()) return;
     const display =
       message ||
@@ -686,6 +711,10 @@ export default function FundHubProposalEditorPage() {
       content: isWrite ? `✎ ${display}` : display,
       createdAt: new Date().toISOString(),
     };
+    const historyForApi = chatMessages.slice(-14).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
     setChatMessages((prev) => [...prev, nextUser]);
     setChatInput('');
     if (turnFiles.length) {
@@ -707,6 +736,7 @@ export default function FundHubProposalEditorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...assistantBody(isWrite ? 'draft_section' : 'chat', fullMessage),
+          chatHistory: historyForApi,
           fileParts,
         }),
       });
@@ -768,6 +798,7 @@ export default function FundHubProposalEditorPage() {
   }, [
     chatInput,
     chatLoading,
+    chatMessages,
     attachedFiles,
     assistantBody,
     persistDraft,

@@ -12,6 +12,7 @@ import {
   fundhubLanguageName,
   normalizeFundhubLocale,
   normalizeFundhubMode,
+  sanitizeFundhubChatHistory,
   type FundhubProposalContext,
 } from '@/lib/agents/fundhub-proposal-prompt';
 import {
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest) {
       mode?: unknown;
       companyId?: string;
       fileParts?: Array<{ mimeType?: string; data?: string }>;
+      chatHistory?: unknown;
     };
 
     const mode = normalizeFundhubMode(body.mode);
@@ -172,9 +174,16 @@ export async function POST(req: NextRequest) {
       (mode === 'understand' || ((mode === 'brainstorm' || mode === 'chat') && thin));
 
     const maxOutputTokens = mode === 'structure' ? 800 : mode === 'understand' ? 3500 : mode === 'brainstorm' ? 2500 : 2000;
-    const temperature = mode === 'structure' || mode === 'understand' ? 0.15 : mode === 'brainstorm' ? 0.4 : 0.25;
+    const temperature =
+      mode === 'structure' || mode === 'understand' || mode === 'draft_section'
+        ? 0.15
+        : mode === 'brainstorm'
+          ? 0.4
+          : 0.2;
 
     const promptText = buildFundhubProposalUserPrompt(mode, ctx, userMessage || defaultMessage);
+    const priorTurns = sanitizeFundhubChatHistory(body.chatHistory, 14);
+    const chatMessages = [...priorTurns, { role: 'user' as const, content: promptText }];
     const fileParts = (body.fileParts ?? [])
       .filter(
         (p) =>
@@ -193,9 +202,8 @@ export async function POST(req: NextRequest) {
 
     const { text: answer } = await llmGenerateContent({
       systemInstruction: buildFundhubProposalSystemPrompt(mode, locale),
-      ...(fileParts.length
-        ? { userParts: [{ text: promptText }, ...fileParts] }
-        : { userText: promptText }),
+      chatMessages,
+      ...(fileParts.length ? { userParts: fileParts } : {}),
       maxOutputTokens,
       temperature,
       webSearch: wantSearch,

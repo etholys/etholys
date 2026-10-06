@@ -20,6 +20,8 @@ import {
   normalizeFundhubLocale,
   buildFundhubProposalSystemPrompt,
   buildFundhubProposalUserPrompt,
+  looksLikeRevisionRequest,
+  sanitizeFundhubChatHistory,
 } from '../../lib/agents/fundhub-proposal-prompt';
 
 const richFund: ProposalFundSeed = {
@@ -222,6 +224,26 @@ test('chat prompt distinguishes file roles', () => {
   assert.match(sys, /BASES/);
   assert.match(sys, /REFERÊNCIA/);
   assert.match(sys, /DESTA MENSAGEM/);
+});
+
+test('chat history sanitize and revision intent keep prior draft', () => {
+  const cleaned = sanitizeFundhubChatHistory([
+    { role: 'user', content: '✎ c) objetivo' },
+    {
+      role: 'assistant',
+      content: 'Escrito en el documento.\n\n## c) Objetivo\n\nFrutalcoop acopia frutas.',
+    },
+    { role: 'user', content: 'mejorar la respuesta anterior' },
+  ]);
+  assert.equal(cleaned.length, 3);
+  assert.equal(cleaned[0]?.content, 'c) objetivo');
+  assert.match(cleaned[1]?.content || '', /^## c\) Objetivo/);
+  assert.equal(looksLikeRevisionRequest('mejorar la respuesta anterior'), true);
+  assert.equal(looksLikeRevisionRequest('reescreve o ponto c'), true);
+  assert.equal(looksLikeRevisionRequest('¿cuál es el plazo?'), false);
+  const sys = buildFundhubProposalSystemPrompt('draft_section', 'es');
+  assert.match(sys, /CONTINUIDADE DO CHAT/);
+  assert.match(sys, /Não inventes factos/);
 });
 
 test('draft_section prioritizes user-named applicant over Hub tenant', () => {
