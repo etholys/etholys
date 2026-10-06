@@ -333,38 +333,39 @@ export function RadarSiteMap({
 
   return (
     <section className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[radial-gradient(ellipse_at_top_left,rgba(16,185,129,0.14),transparent_50%),linear-gradient(165deg,#071812_0%,#0a1a14_50%,#050f0c_100%)]">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 px-4 py-3 sm:px-5">
-        <div className="flex items-center gap-2">
-          <HeaderIcon moduleId={moduleId} />
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">{copy.plant}</p>
-          {canEdit && (
-            <span className="hidden text-[11px] text-white/35 sm:inline">· {copy.arrange}</span>
+      {(canEdit || mode === 'preview') && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 px-4 py-2.5 sm:px-5">
+          <div className="flex items-center gap-2">
+            <HeaderIcon moduleId={moduleId} />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">{copy.plant}</p>
+          </div>
+          {canEdit && (dirty || onRequestAddParcel) && (
+            <div className="flex items-center gap-2">
+              {onRequestAddParcel && (
+                <button
+                  type="button"
+                  onClick={onRequestAddParcel}
+                  className="inline-flex items-center gap-1 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {copy.addParcel}
+                </button>
+              )}
+              {savedFlash && <span className="text-[11px] text-emerald-200/80">{copy.saved}</span>}
+              {dirty && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void save()}
+                  className="rounded-xl bg-emerald-500/90 px-3 py-1.5 text-xs font-semibold text-[#04110c] disabled:opacity-40"
+                >
+                  {saving ? copy.saving : copy.save}
+                </button>
+              )}
+            </div>
           )}
         </div>
-        {canEdit && (
-          <div className="flex items-center gap-2">
-            {onRequestAddParcel && (
-              <button
-                type="button"
-                onClick={onRequestAddParcel}
-                className="inline-flex items-center gap-1 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {copy.addParcel}
-              </button>
-            )}
-            {savedFlash && <span className="text-[11px] text-emerald-200/80">{copy.saved}</span>}
-            <button
-              type="button"
-              disabled={!dirty || saving}
-              onClick={() => void save()}
-              className="rounded-xl bg-emerald-500/90 px-3 py-1.5 text-xs font-semibold text-[#04110c] disabled:opacity-40"
-            >
-              {saving ? copy.saving : copy.save}
-            </button>
-          </div>
-        )}
-      </div>
+      )}
 
       <div
         ref={boardRef}

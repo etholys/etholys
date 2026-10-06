@@ -49,7 +49,7 @@ export function RadarClientPicker({ className }: { className?: string }) {
   return (
     <div ref={ref} className={cn('relative space-y-1.5', className)}>
       <p className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/70">
-        {radarT(loc, 'Âmbito RADAR', 'Ámbito RADAR', 'RADAR scope')}
+        {radarT(loc, 'A trabalhar em', 'Trabajando en', 'Working on')}
       </p>
       <button
         type="button"

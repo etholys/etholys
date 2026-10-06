@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Radio, Sprout } from 'lucide-react';
+import { ArrowLeft, Loader2, Radio, Settings2, Sprout } from 'lucide-react';
 import { RADAR_MODULES, type RadarModuleId } from '@/lib/etholys-products';
 import { isRadarModuleId, spaceKindMeta } from '@/lib/radar/space';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
@@ -10,15 +10,12 @@ import type { PropertyStepId, PropertyStepState } from '@/lib/radar/property-pro
 import { RadarProgressRail } from '@/components/radar/RadarProgressRail';
 import { RadarGeoPin } from '@/components/radar/RadarGeoPin';
 import { RadarSiteMap } from '@/components/radar/RadarSiteMap';
-import { RadarOpsView } from '@/components/radar/RadarViews';
 import { RadarCropsPanel } from '@/components/radar/RadarCropsPanel';
 import { RadarAddParcelForm } from '@/components/radar/RadarAddParcelForm';
-import { RadarChainBoard } from '@/components/radar/RadarChainBoard';
-import { RadarSpaceOpsPanel } from '@/components/radar/RadarSpaceOpsPanel';
-import { RadarChainTrailBar } from '@/components/radar/RadarOpsCanvas';
+import { RadarFocusSheet } from '@/components/radar/RadarFocusSheet';
 import type { RadarCrop } from '@/lib/radar/site-layout';
 import { MOISTURE_THRESHOLD } from '@/lib/radar/agriculture';
-import { isTraceStage, type TraceStage } from '@/lib/radar/trace';
+import { isTraceStage, TRACE_STAGE_LABEL, type TraceStage } from '@/lib/radar/trace';
 
 type Loc = 'pt' | 'es' | 'en';
 
@@ -204,49 +201,48 @@ export function RadarPropertyWorkspace({
   const chainHref = `/hub/radar/cadeia?${companyQ}`;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link href={backHref} className="inline-flex items-center gap-1.5 text-xs text-white/45 hover:text-white/70">
             <ArrowLeft className="h-3.5 w-3.5" />
-            {loc === 'es' ? 'Volver' : loc === 'en' ? 'Back' : 'Voltar'}
+            {radarT(loc, 'Lugares', 'Lugares', 'Places')}
           </Link>
-          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/40">
-            RADAR · {data.clientName || (loc === 'en' ? 'Space' : 'Espaço')}
-          </p>
-          <h1 className="mt-1 font-serif text-3xl text-white sm:text-4xl">{data.name}</h1>
+          <h1 className="mt-2 font-serif text-3xl text-white sm:text-4xl">{data.name}</h1>
+          {data.clientName && <p className="mt-0.5 text-sm text-white/45">{data.clientName}</p>}
         </div>
         {characterized && (
-          <div className="inline-flex rounded-xl border border-white/15 bg-black/20 p-1">
-            <button
-              type="button"
-              onClick={() => setMode('operate')}
-              className={`rounded-lg px-3 py-1.5 text-xs ${mode === 'operate' ? 'bg-emerald-500 font-semibold text-[#04110c]' : 'text-white/60'}`}
-            >
-              {loc === 'en' ? 'Operate' : 'Operar'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('setup')}
-              className={`rounded-lg px-3 py-1.5 text-xs ${mode === 'setup' ? 'bg-emerald-500 font-semibold text-[#04110c]' : 'text-white/60'}`}
-            >
-              {loc === 'en' ? 'Setup' : 'Configurar'}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setMode(mode === 'operate' ? 'setup' : 'operate')}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2 text-xs text-white/65 hover:text-white"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+            {mode === 'operate'
+              ? radarT(loc, 'Configurar', 'Configurar', 'Setup')
+              : radarT(loc, 'Voltar ao mapa', 'Volver al mapa', 'Back to map')}
+          </button>
         )}
       </div>
 
       {err && <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">{err}</p>}
 
       {showOperate ? (
-        <div className="space-y-6">
+        <div className="space-y-3">
           {openLot && (
-            <RadarChainTrailBar
-              locale={loc}
-              stage={openLot.currentStage}
-              code={openLot.code}
+            <Link
               href={chainHref}
-            />
+              className="flex items-center justify-between gap-2 rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-50"
+            >
+              <span>
+                {radarT(loc, 'Lote', 'Lote', 'Lot')} <strong>{openLot.code}</strong>
+                {' · '}
+                {TRACE_STAGE_LABEL[openLot.currentStage][loc]}
+              </span>
+              <span className="text-xs text-emerald-200/80">
+                {radarT(loc, 'Ver cadeia →', 'Ver cadena →', 'View chain →')}
+              </span>
+            </Link>
           )}
           <RadarSiteMap
             companyId={companyId}
@@ -265,44 +261,18 @@ export function RadarPropertyWorkspace({
             focusedId={focusedId}
             onFocus={setFocusedId}
             onSaved={() => void load()}
-            onRequestAddParcel={() => {
-              setMode('setup');
-              setStep('draw');
-              setAddingParcel(true);
-            }}
             trailUnitIds={openLot ? mapParcels.map((p) => p.id) : undefined}
             hero
           />
-
-          <RadarSpaceOpsPanel
+          <RadarFocusSheet
             companyId={companyId}
             engagementId={engagementId}
             locale={loc}
             moduleId={data.moduleId}
-            propertyName={data.name}
             units={data.units}
             focusedId={focusedId}
-            onFocus={setFocusedId}
             chainHref={chainHref}
           />
-
-          {data.moduleId === 'agriculture' ? (
-            <RadarOpsView companyId={companyId} engagementId={engagementId} locale={loc} />
-          ) : (
-            <RadarChainBoard
-              companyId={companyId}
-              engagementId={engagementId}
-              locale={loc}
-              unitId={focusedId}
-              unitCrop={data.units.find((u) => u.id === focusedId)?.crop || data.crop}
-              unitOptions={data.units.map((u) => ({
-                id: u.id,
-                name: u.name,
-                crop: u.crop,
-                propertyName: data.name,
-              }))}
-            />
-          )}
         </div>
       ) : (
         <>
