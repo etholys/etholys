@@ -1,6 +1,6 @@
 import { INSTITUTIONAL_PROSE_RULE } from '@/lib/agents/prose-rules';
 
-const PROMPT_VERSION = 'fundhub-proposal-v6';
+const PROMPT_VERSION = 'fundhub-proposal-v7';
 
 export type FundhubProposalMode = 'chat' | 'structure' | 'draft_section' | 'brainstorm' | 'understand';
 export type FundhubLocale = 'es' | 'pt' | 'en';
@@ -60,9 +60,15 @@ function buildContextBlock(ctx: FundhubProposalContext): string {
   if (ctx.sourceExcerpt?.trim()) lines.push(`Texto da página oficial:\n${ctx.sourceExcerpt.trim().slice(0, 7000)}`);
   if (ctx.basesText?.trim()) lines.push(`Texto das bases / PDFs:\n${ctx.basesText.trim().slice(0, 10000)}`);
   if (ctx.workspaceFilesBlock?.trim()) lines.push(ctx.workspaceFilesBlock.trim().slice(0, 18000));
-  if (ctx.orgProfile?.trim()) lines.push(`Perfil da organização (usar; não inventar para além disto):\n${ctx.orgProfile.trim()}`);
+  if (ctx.orgProfile?.trim()) {
+    lines.push(
+      `Empresa do Hub (tenant) — NÃO assumas que é a organização postulante. Só usa se a mensagem do utilizador confirmar, ou se não houver outra entidade nomeada:\n${ctx.orgProfile.trim()}`,
+    );
+  }
   if (ctx.contentLibraryBlock?.trim()) {
-    lines.push(`Biblioteca de conteúdo / voz da org (preferir estes trechos quando couberem):\n${ctx.contentLibraryBlock.trim().slice(0, 6000)}`);
+    lines.push(
+      `Biblioteca de conteúdo do Hub (voz do tenant — só se a postulante for essa empresa):\n${ctx.contentLibraryBlock.trim().slice(0, 6000)}`,
+    );
   }
   if (ctx.rfpChecklist?.length) {
     lines.push(
@@ -98,6 +104,12 @@ ${INSTITUTIONAL_PROSE_RULE}
 - Se o canvas ainda não tiver o formato do formulário oficial, primeiro lista os campos/secções do edital (títulos ##) e em seguida preenche o primeiro ítem completo na mesma resposta — ou só o ítem pedido.
 - Em modo «ítem por ítem»: uma secção completa por resposta (## título + texto pronto a colar). Termina apenas com a pergunta do próximo ítem. Sem preâmbulos longos.
 - Três tipos de ficheiro, nunca misturar: BASES = regras do edital; REFERÊNCIA = evidência da org; DESTA MENSAGEM = recorte pontual (ex. captura de um campo). Uma captura não substitui as bases.
+- PRIORIDADE DA ORGANIZAÇÃO POSTULANTE (crítico):
+  1) O que a mensagem actual do utilizador diz (quem é a postulante, texto colado, «é sobre X»).
+  2) Referências / ficheiros rotulados e o documento no canvas quando nomeiam a entidade.
+  3) Só depois a «empresa do Hub» / biblioteca — e só se não contradizer (1)–(2).
+- Se o utilizador cola texto sobre uma cooperativa/ONG/empresa e pede um ponto do formulário sobre «organización proponente / postulante / applicant», ESSA entidade é a postulante. Não substituas pela empresa do Hub nem a relegues a «aliada / facilitadora».
+- Se o utilizador corrige o nome da postulante, REESCREVE só a secção/ponto pedido com essa entidade. Não saltes para outras secções do canvas.
 - Não faças diagnóstico de negócio NEXUS, informes SIEP, layout Studio nem prioridades do Workspace Advisor.
 - Não menciones nomes internos de produto (FUNDHUB, OPPORTUNITY, license keys). Diz FundHub se precisares de te nomear.
 - Tom profissional, claro, alinhado ao doador quando o edital o permitir.`;
@@ -136,10 +148,13 @@ Propõe a estrutura de secções da candidatura — alinhada ao FORMATO DO EDITA
 ## TRABALHO (redigir no documento)
 O utilizador está em modo REDACTAR: o teu texto vai para o canvas, não é só conversa.
 - SAÍDA: markdown com ## títulos que coincidam com o documento / formulário do edital.
-- Uma secção completa por pedido (salvo pedirem várias). Parágrafos prontos a candidatura.
+- UMA secção / um ponto do formulário por resposta (salvo pedirem várias explicitamente).
+- Se pedirem o ponto «c)» / um campo concreto: título ## desse ponto + texto. PROIBIDO preencher C, D, E ou outras secções na mesma resposta.
+- Se corrigirem («é sobre X», «a postulante é Y»): reescreve APENAS essa secção errada com a entidade correcta. Não «continues» noutras partes do canvas.
+- Se colarem material de base (antecedentes, missão, actividades): sintetiza ESSE material no ponto pedido — não inventes outra organização a partir do perfil Hub.
 - Se o canvas já tem essa ##, reescreve o conteúdo (substituição), não acrescentes outro título.
 - Marca [FALTA: …] inline; no máximo 1–2. Não bloqueies com perguntas — redige com hipóteses.
-- Sem preâmbulo («perfecto, vamos…»), sem tutorial, sem pedir «¿seguimos?». No máximo uma linha no fim: «Siguiente: [título]».
+- Sem preâmbulo («perfecto, vamos…»), sem tutorial, sem «ajustaré todas las secciones». No máximo uma linha no fim: «Siguiente: [título do MESMO bloco se ainda faltar]».
 - EXCEPÇÃO à regra de forma: neste modo USA ## (o canvas mapeia secções por estes títulos).`;
   }
 
@@ -205,7 +220,9 @@ ${userMessage.trim() ? `Nota do utilizador: ${userMessage.trim()}` : ''}`.trim()
   if (mode === 'draft_section') {
     return `${block}
 
-Pedido de rascunho / melhoria da secção activa:
+Pedido de rascunho / melhoria — cumpre EXACTAMENTE o que a mensagem pede (ponto/campo/correção). Não uses a empresa do Hub como postulante se a mensagem nomear outra entidade. Não redijas secções não pedidas.
+
+Mensagem do utilizador:
 ${userMessage.trim()}`;
   }
   if (mode === 'understand') {

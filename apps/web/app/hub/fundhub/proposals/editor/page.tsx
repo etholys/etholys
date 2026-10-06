@@ -668,10 +668,10 @@ export default function FundHubProposalEditorPage() {
 
     const draftDirective = isWrite
       ? locale === 'en'
-        ? '\n\n[WRITE TO DOCUMENT] Output markdown with ## headings matching the official form / canvas. This reply is applied to the document automatically. No interview.'
+        ? '\n\n[WRITE TO DOCUMENT] Output ONLY the section/punto the user asked for (## heading + text). If they name the applicant org or paste its text, that entity is the applicant — do NOT use the Hub company as proponent. If they are correcting a wrong org, rewrite THAT section only — do not jump to other canvas sections.'
         : locale === 'pt'
-          ? '\n\n[ESCREVER NO DOCUMENTO] Saída em markdown com ## títulos do formulário / canvas. Esta resposta entra no documento automaticamente. Sem entrevista.'
-          : '\n\n[ESCRIBIR EN EL DOCUMENTO] Salida en markdown con ## títulos del formulario / canvas. Esta respuesta se aplica al documento automáticamente. Sin entrevista.'
+          ? '\n\n[ESCREVER NO DOCUMENTO] Saída APENAS da secção/ponto pedido (## título + texto). Se nomearem a postulante ou colarem o texto dela, essa entidade é a postulante — NÃO uses a empresa do Hub. Se corrigirem a org errada, reescreve SÓ essa secção — não saltes para outras do canvas.'
+          : '\n\n[ESCRIBIR EN EL DOCUMENTO] Salida SOLO del punto/sección pedido (## título + texto). Si nombran a la postulante o pegan su texto, ESA entidad es la postulante — NO uses la empresa del Hub. Si corrigen la org equivocada, reescribe SOLO esa sección — no saltes a otras del canvas.'
       : '';
 
     const fullMessage = [message + draftDirective, attachBlock].filter(Boolean).join('\n\n');

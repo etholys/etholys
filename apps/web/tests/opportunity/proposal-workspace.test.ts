@@ -19,6 +19,7 @@ import {
   normalizeFundhubMode,
   normalizeFundhubLocale,
   buildFundhubProposalSystemPrompt,
+  buildFundhubProposalUserPrompt,
 } from '../../lib/agents/fundhub-proposal-prompt';
 
 const richFund: ProposalFundSeed = {
@@ -221,4 +222,25 @@ test('chat prompt distinguishes file roles', () => {
   assert.match(sys, /BASES/);
   assert.match(sys, /REFERÊNCIA/);
   assert.match(sys, /DESTA MENSAGEM/);
+});
+
+test('draft_section prioritizes user-named applicant over Hub tenant', () => {
+  const sys = buildFundhubProposalSystemPrompt('draft_section', 'es');
+  assert.match(sys, /ORGANIZAÇÃO POSTULANTE/i);
+  assert.match(sys, /PROIBIDO preencher C, D, E/);
+  assert.match(sys, /empresa do Hub/);
+  const user = buildFundhubProposalUserPrompt(
+    'draft_section',
+    {
+      locale: 'es',
+      orgProfile: 'Nome: Rural Commerce LLC\nPaís: US',
+      documentMarkdown: '## c) Objetivo\n\nTexto viejo sobre Rural Commerce.',
+    },
+    'c) Sírvase describir… la organización proponente:\nLa cooperativa Frutalcoop R.L. …\npero es sobre frutalcoop... que es la organización postulante',
+  );
+  assert.match(user, /Rural Commerce LLC/);
+  assert.match(user, /NÃO assumas que é a organização postulante/);
+  assert.match(user, /Frutalcoop/);
+  assert.match(user, /Não uses a empresa do Hub como postulante/);
+  assert.match(user, /Não redijas secções não pedidas/);
 });
