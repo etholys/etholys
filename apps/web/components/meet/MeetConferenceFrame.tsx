@@ -254,6 +254,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             [true, true, lang],
             [true, true, `translation-languages:${lang}`],
             [true, true],
+            [true],
           ] as unknown[][]) {
             try {
               api.executeCommand('setSubtitles', ...args);
@@ -262,16 +263,19 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               /* tenta a seguinte */
             }
           }
-          try {
-            // Só o transcritor (Jigasi). Nunca gravação de ficheiro nem ecrã.
-            api.executeCommand('startRecording', {
-              mode: 'file',
-              transcription: true,
-              onlyTranscribe: true,
-              onlyTranscription: true,
-            });
-          } catch {
-            /* STT ao vivo pode falhar se o serviço não estiver activo */
+          // Convida o Jigasi/Vosk. Sem ENABLE_RECORDING no servidor isto falha em silêncio.
+          const payloads = [
+            { mode: 'file', onlyTranscription: true },
+            { mode: 'file', transcription: true, onlyTranscribe: true },
+            { mode: 'file', transcription: true },
+          ];
+          for (const payload of payloads) {
+            try {
+              api.executeCommand('startRecording', payload);
+              break;
+            } catch {
+              /* tenta a seguinte */
+            }
           }
         },
         stopTranscription() {
@@ -282,18 +286,25 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
           } catch {
             /* ignore */
           }
-          try {
-            api.executeCommand('stopRecording', 'file', true);
-          } catch {
-            /* ignore */
+          for (const args of [['file', true], ['file'], ['local']] as unknown[][]) {
+            try {
+              api.executeCommand('stopRecording', ...args);
+              break;
+            } catch {
+              /* ignore */
+            }
           }
         },
         startRecording(_destination) {
-          // Só gravação da chamada no Jitsi (Jibri). Nunca getDisplayMedia.
-          apiRef.current?.executeCommand('startRecording', {
-            mode: 'file',
-            transcription: false,
-          });
+          // Preferência: Jibri (gravação da chamada). Sem Jibri o cliente faz fallback local.
+          try {
+            apiRef.current?.executeCommand('startRecording', {
+              mode: 'file',
+              transcription: false,
+            });
+          } catch {
+            /* o MeetRoomClient trata o fallback */
+          }
         },
         stopRecording(_destination) {
           try {
@@ -433,12 +444,14 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               disableTileEnlargement: false,
               defaultLogoUrl: 'https://app.etholys.com/meet-brand/etholys-mark.svg',
               defaultRemoteDisplayName: 'Participante',
+              // Sem Jibri no Contabo: desactivar gravação local do Jitsi (getDisplayMedia
+              // da própria aba → ecrã preto + título estranho no Chrome). O botão CHORUS
+              // usa o nosso gravador com escolha de ecrã/janela + upload Whisper.
               fileRecordingsEnabled: true,
               recordingService: {
                 enabled: false,
                 hideStorageWarning: true,
               },
-              // Local recording = getDisplayMedia da aba → ecrã preto no Chrome.
               localRecording: {
                 disable: true,
                 disableSelfRecording: true,

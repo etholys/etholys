@@ -33,7 +33,7 @@ import {
   type MeetConferenceHandle,
   type MeetLayoutMode,
 } from '@/components/meet/MeetConferenceFrame';
-import { type MeetLocalRecorder } from '@/lib/meet/local-recorder';
+import { startMeetLocalRecorder, type MeetLocalRecorder } from '@/lib/meet/local-recorder';
 import { type MeetJoinSetupPrefs } from '@/components/meet/MeetJoinSetupDialog';
 import { PendingMeetRecordingBanner } from '@/components/meet/PendingMeetRecordingBanner';
 import { resolveMeetSpeechLanguage, type MeetSpeechLanguage } from '@/lib/meet/language';
@@ -230,9 +230,15 @@ export function MeetRoomClient({ sessionId }: Props) {
 
   useEffect(() => {
     const prev = document.title;
-    const label = session?.title?.trim();
-    document.title = label ? `CHORUS — ${label}` : 'CHORUS · Etholys';
+    const apply = () => {
+      const label = session?.title?.trim();
+      // Título limpo e estável — evita nomes estranhos do Chrome/Jitsi ao gravar.
+      document.title = label ? `CHORUS — ${label}` : 'CHORUS · Etholys';
+    };
+    apply();
+    const id = window.setInterval(apply, 2000);
     return () => {
+      window.clearInterval(id);
       document.title = prev;
     };
   }, [session?.title]);
@@ -359,7 +365,7 @@ export function MeetRoomClient({ sessionId }: Props) {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [segments]);
 
-  // Aguarda texto do motor de transcrição ao vivo sem alarmes ruidosos.
+  // Aguarda texto do motor de transcrição ao vivo; se não vier, avisa (Jigasi pode falhar).
   useEffect(() => {
     if (!transcriptionOn) {
       setTranscriptionWaiting(false);
@@ -371,7 +377,20 @@ export function MeetRoomClient({ sessionId }: Props) {
       return;
     }
     setTranscriptionWaiting(true);
-  }, [transcriptionOn, segments]);
+    const started = transcriptionStartedAtRef.current || Date.now();
+    transcriptionStartedAtRef.current = started;
+    const timer = window.setTimeout(() => {
+      if (segmentsRef.current.some((s) => s.text.trim())) return;
+      setError(
+        t(
+          'A transcrição ao vivo ainda não recebeu áudio. Mantém «Transcrever» ligado ou usa «Gravar» (ecrã/janela) — ao sair o CHORUS gera a transcrição pela gravação.',
+          'La transcripción en vivo aún no recibió audio. Mantén «Transcribir» o usa «Grabar» (pantalla/ventana) — al salir CHORUS genera la transcripción desde la grabación.',
+          'Live transcription has no audio yet. Keep Transcribe on, or use Record (screen/window) — on leave CHORUS transcribes from the recording.',
+        ),
+      );
+    }, 25_000);
+    return () => window.clearTimeout(timer);
+  }, [transcriptionOn, segments, locale]);
 
   useEffect(() => {
     return () => {
@@ -695,20 +714,43 @@ export function MeetRoomClient({ sessionId }: Props) {
 
   function startInRoomVideoRecording() {
     setError(null);
-    // Sala interna: NUNCA getDisplayMedia (ecrã preto). Só gravação da chamada no Jitsi.
-    try {
-      conferenceRef.current?.startRecording('cloud');
-      setRecordingOn(true);
-      setJoinPrefs((p) => ({ ...p, enableCloudRecording: true }));
-    } catch {
-      setError(
-        t(
-          'A gravação de vídeo da chamada ainda não está activa neste servidor. Use Transcrever — não precisa escolher ecrã.',
-          'La grabación de vídeo de la llamada aún no está activa en este servidor. Use Transcribir — no hace falta elegir pantalla.',
-          'In-call video recording is not active on this server yet. Use Transcribe — no screen picker.',
-        ),
-      );
-    }
+    if (recordingBusy || localRecorderRef.current) return;
+    setRecordingBusy(true);
+    // Sem Jibri no Contabo: gravar ecrã/janela e enviar à nuvem → Whisper.
+    // Nunca a aba desta reunião (Chrome deixa o vídeo preto).
+    void (async () => {
+      try {
+        const { recorder } = await startMeetLocalRecorder({
+          suggestedTitle: session?.title || 'chorus',
+          forbidSelfTab: true,
+          captureMode: 'room',
+          captureMicrophone: false,
+        });
+        localRecorderRef.current = recorder;
+        setRecordingOn(true);
+        setJoinPrefs((p) => ({ ...p, enableCloudRecording: true }));
+        setError(
+          t(
+            'A gravar. Escolheste bem o ecrã/janela. Ao sair da reunião a gravação sobe e a transcrição gera-se sozinha no CHORUS.',
+            'Grabando. Elegiste bien la pantalla/ventana. Al salir, la grabación sube y la transcripción se genera sola en CHORUS.',
+            'Recording. Good screen/window choice. When you leave, CHORUS uploads and transcribes automatically.',
+          ),
+        );
+      } catch (err) {
+        setRecordingOn(false);
+        setError(
+          err instanceof Error
+            ? err.message
+            : t(
+                'Não foi possível iniciar a gravação. No Chrome escolhe «Ecrã inteiro» ou a janela — nunca esta aba.',
+                'No se pudo iniciar la grabación. En Chrome elige «Pantalla completa» o la ventana — nunca esta pestaña.',
+                'Could not start recording. In Chrome pick “Entire screen” or the window — never this tab.',
+              ),
+        );
+      } finally {
+        setRecordingBusy(false);
+      }
+    })();
   }
 
   async function stopRecording(opts?: { cloudAuto?: boolean; quiet?: boolean }) {
@@ -1132,9 +1174,9 @@ export function MeetRoomClient({ sessionId }: Props) {
               onClick={startInRoomVideoRecording}
               className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm hover:bg-slate-700"
               title={t(
-                'Gravar o vídeo da chamada (pessoas + partilhas). Não pede ecrã do browser.',
-                'Grabar el vídeo de la llamada (personas + compartidos). No pide pantalla del navegador.',
-                'Record the call video (people + shares). Does not ask for a browser screen.',
+                'Gravar a reunião (escolhe ecrã ou janela — nunca esta aba). Ao sair, sobe à nuvem e gera transcrição.',
+                'Grabar la reunión (elige pantalla o ventana — nunca esta pestaña). Al salir, sube a la nube y genera transcripción.',
+                'Record the meeting (pick screen or window — never this tab). On leave, uploads and transcribes.',
               )}
             >
               <Cloud className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -1375,14 +1417,12 @@ export function MeetRoomClient({ sessionId }: Props) {
                       return;
                     }
                     if (state.error) {
+                      // Sem Jibri: ignoramos o erro da nuvem — o gravador local é o caminho real.
+                      if (localRecorderRef.current) {
+                        setRecordingOn(true);
+                        return;
+                      }
                       setRecordingOn(false);
-                      setError(
-                        t(
-                          'A gravação de vídeo da chamada ainda não está activa neste servidor. Use Transcrever — não precisa escolher ecrã.',
-                          'La grabación de vídeo de la llamada aún no está activa en este servidor. Use Transcribir — no hace falta elegir pantalla.',
-                          'In-call video recording is not active on this server yet. Use Transcribe — no screen picker.',
-                        ),
-                      );
                       return;
                     }
                     setRecordingOn(Boolean(state.on));

@@ -24,7 +24,9 @@ export async function GET() {
     liveTranscriptionEnabled: process.env.MEET_LIVE_TRANSCRIPTION_ENABLED === '1',
     whisperTranscriptionEnabled,
     cloudStorageReady,
-    /** Pipeline CHORUS: gravar → nuvem → transcrever */
+    /** Jibri na cloud — hoje false no Contabo; a app usa gravador local + upload. */
+    cloudRecordingEnabled: process.env.MEET_CLOUD_RECORDING_ENABLED === '1',
+    /** Pipeline CHORUS: gravar → nuvem → transcrever (storage + whisper) */
     recordingPipelineReady: cloudStorageReady,
     transcriptionPipelineReady: whisperTranscriptionEnabled,
     message: isDemo

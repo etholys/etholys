@@ -9,12 +9,13 @@ config.defaultRemoteDisplayName = 'Participante';
 config.disabledNotifications = config.disabledNotifications || [];
 
 config.localRecording = {
-  disable: false,
-  notifyAllParticipants: true,
-  disableSelfRecording: false,
+  disable: true,
+  notifyAllParticipants: false,
+  disableSelfRecording: true,
 };
 
-// Sem Jibri / nuvem — gravação = ficheiro no computador do utilizador
+// Sem Jibri / nuvem — a app CHORUS grava ecrã/janela e faz upload+Whisper.
+// ENABLE_RECORDING=1 no .env é obrigatório para o Jigasi (transcrição ao vivo) ser convidado.
 config.recordingService = config.recordingService || {};
 config.recordingService.enabled = false;
 config.recordingService.hideStorageWarning = true;
