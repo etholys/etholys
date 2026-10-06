@@ -458,7 +458,7 @@ export function EtholysSettingsContent({
           </h3>
           <p className="text-sm text-gray-600 mb-4">{systemsCopy.body}</p>
           <Link
-            href="/hub/workspace/team"
+            href="/hub/admin?s=access"
             className={`inline-flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg ${btn}`}
           >
             {systemsCopy.cta}

@@ -132,7 +132,7 @@ export function AuroraAttendedPicker({ collapsed }: { collapsed?: boolean }) {
       </div>
       {canManage ? (
         <Link
-          href="/hub/workspace/team"
+          href="/hub/admin?s=access"
           className="block px-0.5 text-[11px] font-medium text-amber-200/80 hover:text-amber-100 hover:underline"
         >
           {copy.invite}

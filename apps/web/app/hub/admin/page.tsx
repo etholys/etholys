@@ -15,6 +15,7 @@ import { useApp } from '@/app/providers';
 import { EtholysSettingsContent } from '@/components/etholys-admin/EtholysSettingsContent';
 import { BillingConsole } from '@/components/etholys-admin/BillingConsole';
 import { AdminSetupGuide, type AdminSetupStepId } from '@/components/etholys-admin/AdminSetupGuide';
+import { WorkspaceAccessManager } from '@/components/workspace/WorkspaceAccessManager';
 import { parseAdminSection, adminHref, type AdminSection } from '@/lib/admin-control';
 
 function SectionTitle({
@@ -242,32 +243,12 @@ function AdminSectionBody() {
         <SectionTitle
           title={t('Permissões e sistemas', 'Permisos y sistemas', 'Permissions & systems')}
           subtitle={t(
-            'Quem acede a ATLAS, SIEP, FundHub, NEXUS, FORGE, etc.',
-            'Quién accede a ATLAS, SIEP, FundHub, NEXUS, FORGE, etc.',
-            'Who can access ATLAS, SIEP, FundHub, NEXUS, FORGE, etc.',
+            'Equipa, convites e grants do centro integrado — vivem aqui, não no Centro.',
+            'Equipo, invitaciones y grants del centro integrado — viven aquí, no en el Centro.',
+            'Team, invites and integrated workspace grants live here, not in the Centro.',
           )}
         />
-        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
-          <p className="flex items-center gap-2 text-sm font-semibold text-white">
-            <Shield className="h-4 w-4 text-teal-300/90" />
-            {t('Gestão de acesso', 'Gestión de acceso', 'Access management')}
-          </p>
-          <p className="mt-2 text-sm text-white/55">
-            {t(
-              'Atribua módulos a cada membro e permissões finas (ex. SIEP).',
-              'Asigne módulos a cada miembro y permisos finos (ej. SIEP).',
-              'Assign modules to each member and fine-grained permissions (e.g. SIEP).',
-            )}
-          </p>
-          <Link
-            href="/hub/workspace/team"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
-          >
-            {t('Abrir gestão de equipa', 'Abrir gestión de equipo', 'Open team management')}
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-        <EtholysSettingsContent accent="slate" hideHeader title="" sections={['systems']} />
+        <WorkspaceAccessManager />
       </div>
     );
   }

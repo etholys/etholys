@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { getWorkspaceAccessForUser, hasSystem } from '@/lib/integrated-workspace';
+import { getWorkspaceAccessForUser } from '@/lib/integrated-workspace';
 import type { TaskStatus } from '@prisma/client';
 
 /**
@@ -23,7 +23,8 @@ export async function PATCH(
   }
 
   const access = await getWorkspaceAccessForUser(tenant.userId, companyId);
-  if (!access.ok || !hasSystem(access, 'ATLAS')) {
+  // ATLAS mirror or Work (same Task engine) — grant to workspace is enough
+  if (!access.ok) {
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
   }
 

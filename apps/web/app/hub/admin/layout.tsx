@@ -173,7 +173,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
           </span>
         </div>
         <main className="sys-canvas min-w-0 flex-1 overflow-auto p-4 md:p-6">
-          <div className="mx-auto max-w-5xl">
+          <div className={cn('mx-auto', section === 'access' ? 'max-w-6xl' : 'max-w-5xl')}>
             <AdminAccessGuard companyId={activeCompanyId}>{children}</AdminAccessGuard>
           </div>
         </main>

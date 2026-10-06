@@ -283,6 +283,18 @@ export default function HubPage() {
     if (status === 'unauthenticated') router.replace('/login');
   }, [status, router]);
 
+  /** Atalho documentado do Centro (Alt+Shift+W — evita conflito com F11 fullscreen). */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey && e.shiftKey && (e.key === 'w' || e.key === 'W')) {
+        e.preventDefault();
+        router.push('/hub/workspace');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [router]);
+
   useEffect(() => {
     if (status !== 'authenticated') return;
     const u = session?.user as
@@ -495,15 +507,6 @@ export default function HubPage() {
                   : t(locale, 'Completar perfil', 'Completar perfil', 'Complete profile')}
               </Link>
             )}
-            {showIntegratedWorkspace && (
-              <Link
-                href="/hub/workspace"
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-white/80 transition hover:border-white/30 hover:bg-white/10 hover:text-white"
-              >
-                <LayoutGrid className="h-3.5 w-3.5" />
-                {t(locale, 'Centro integrado', 'Centro integrado', 'Integrated workspace')}
-              </Link>
-            )}
             {showLabShortcut && (
               <Link
                 href="/lab"
@@ -515,6 +518,39 @@ export default function HubPage() {
             )}
           </div>
         </div>
+
+        {showIntegratedWorkspace && (
+          <section
+            className="etholys-site-rise mb-6 overflow-hidden rounded-2xl border border-teal-400/25 bg-gradient-to-br from-teal-500/10 via-[#0C1822]/90 to-[#0C1822]/80 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.8)]"
+            style={{ animationDelay: '60ms' }}
+          >
+            <Link
+              href="/hub/workspace"
+              className="group flex items-center gap-4 px-5 py-5 transition hover:bg-teal-500/[0.07] sm:px-6 sm:py-6"
+            >
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-teal-400/30 bg-teal-500/15 text-teal-300 transition group-hover:border-teal-400/50 group-hover:bg-teal-500/20">
+                <LayoutGrid className="h-5 w-5" strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-[family-name:var(--font-etholys-display)] text-lg font-semibold tracking-wide text-white sm:text-xl">
+                  {t(locale, 'Centro integrado', 'Centro integrado', 'Integrated workspace')}
+                </p>
+                <p className="mt-1 text-sm text-white/50 transition group-hover:text-white/65">
+                  {t(
+                    locale,
+                    'Cockpit: trabaje en todos los sistemas licenciados a la vez.',
+                    'Cockpit: trabalhe em todos os sistemas licenciados ao mesmo tempo.',
+                    'Cockpit: work across all licensed systems at once.',
+                  )}
+                </p>
+                <p className="mt-1.5 hidden text-[11px] text-white/35 sm:block">
+                  {t(locale, 'Atajo', 'Atalho', 'Shortcut')}: Alt+Shift+W
+                </p>
+              </div>
+              <ArrowRight className="h-5 w-5 shrink-0 text-teal-300/50 transition group-hover:translate-x-0.5 group-hover:text-teal-300" />
+            </Link>
+          </section>
+        )}
 
         <div className="etholys-site-rise grid gap-6 lg:grid-cols-[1.35fr_1fr]" style={{ animationDelay: '120ms' }}>
           {systemCards.length > 0 && (

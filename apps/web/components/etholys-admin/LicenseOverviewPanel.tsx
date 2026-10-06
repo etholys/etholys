@@ -124,7 +124,7 @@ export function LicenseOverviewPanel() {
           </p>
         </div>
         <Link
-          href="/hub/workspace/team"
+          href="/hub/admin?s=access"
           className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
         >
           {t('Gerir equipa', 'Gestionar equipo', 'Manage team')}

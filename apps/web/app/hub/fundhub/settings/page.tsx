@@ -52,7 +52,7 @@ export default function FundHubSettingsPage() {
 
         <section className="mt-8 grid gap-4 sm:grid-cols-2">
           <Link
-            href="/hub/workspace/team"
+            href="/hub/admin?s=access"
             className="group rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md"
           >
             <div className="flex items-center gap-2 text-amber-800">

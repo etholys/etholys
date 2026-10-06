@@ -428,7 +428,7 @@ export default function HubWorkSettingsPage() {
 
             <section className="grid gap-4 sm:grid-cols-2">
               <Link
-                href="/hub/workspace/team"
+                href="/hub/admin?s=access"
                 className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-cyan-300"
               >
                 <div className="flex items-center gap-2 text-cyan-800">
