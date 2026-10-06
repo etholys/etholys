@@ -84,13 +84,20 @@ export async function POST(req: NextRequest) {
       userMessage?: string;
       mode?: unknown;
       companyId?: string;
+      fileParts?: Array<{ mimeType?: string; data?: string }>;
     };
 
     const mode = normalizeFundhubMode(body.mode);
     const locale = normalizeFundhubLocale(body.locale);
     const userMessage = typeof body.userMessage === 'string' ? body.userMessage : '';
 
-    if (mode !== 'brainstorm' && mode !== 'structure' && mode !== 'understand' && !userMessage.trim()) {
+    if (
+      mode !== 'brainstorm' &&
+      mode !== 'structure' &&
+      mode !== 'understand' &&
+      !userMessage.trim() &&
+      !(body.fileParts && body.fileParts.length)
+    ) {
       return NextResponse.json({ error: 'É necessário informar a pergunta ou instrução.' }, { status: 400 });
     }
 
@@ -142,6 +149,8 @@ export async function POST(req: NextRequest) {
       rfpChecklist: rfpChecklist.length ? rfpChecklist : undefined,
       sourceExcerpt: body.sourceExcerpt,
       basesText: body.basesText,
+      workspaceFilesBlock:
+        typeof body.workspaceFilesBlock === 'string' ? body.workspaceFilesBlock.slice(0, 18000) : undefined,
       documents,
       locale,
     };
@@ -165,9 +174,28 @@ export async function POST(req: NextRequest) {
     const maxOutputTokens = mode === 'structure' ? 800 : mode === 'understand' ? 3500 : mode === 'brainstorm' ? 2500 : 2000;
     const temperature = mode === 'structure' || mode === 'understand' ? 0.15 : mode === 'brainstorm' ? 0.4 : 0.25;
 
+    const promptText = buildFundhubProposalUserPrompt(mode, ctx, userMessage || defaultMessage);
+    const fileParts = (body.fileParts ?? [])
+      .filter(
+        (p) =>
+          p &&
+          typeof p.mimeType === 'string' &&
+          typeof p.data === 'string' &&
+          p.data.length < 2_800_000,
+      )
+      .slice(0, 3)
+      .map((p) => ({
+        inlineData: {
+          mimeType: String(p.mimeType).slice(0, 80),
+          data: String(p.data).replace(/^data:[^;]+;base64,/, ''),
+        },
+      }));
+
     const { text: answer } = await llmGenerateContent({
       systemInstruction: buildFundhubProposalSystemPrompt(mode, locale),
-      userText: buildFundhubProposalUserPrompt(mode, ctx, userMessage || defaultMessage),
+      ...(fileParts.length
+        ? { userParts: [{ text: promptText }, ...fileParts] }
+        : { userText: promptText }),
       maxOutputTokens,
       temperature,
       webSearch: wantSearch,

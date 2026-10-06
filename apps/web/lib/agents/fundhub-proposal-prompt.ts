@@ -1,6 +1,6 @@
 import { INSTITUTIONAL_PROSE_RULE } from '@/lib/agents/prose-rules';
 
-const PROMPT_VERSION = 'fundhub-proposal-v5';
+const PROMPT_VERSION = 'fundhub-proposal-v6';
 
 export type FundhubProposalMode = 'chat' | 'structure' | 'draft_section' | 'brainstorm' | 'understand';
 export type FundhubLocale = 'es' | 'pt' | 'en';
@@ -37,6 +37,8 @@ export type FundhubProposalContext = {
   sourceExcerpt?: string | null;
   basesText?: string | null;
   documents?: Array<{ title?: string; url?: string }> | null;
+  /** Labeled workspace files (bases + reference). Turn files stay in the user message. */
+  workspaceFilesBlock?: string | null;
   /** Hub UI locale — source of truth for the reply language */
   locale?: FundhubLocale | null;
 };
@@ -57,6 +59,7 @@ function buildContextBlock(ctx: FundhubProposalContext): string {
   }
   if (ctx.sourceExcerpt?.trim()) lines.push(`Texto da página oficial:\n${ctx.sourceExcerpt.trim().slice(0, 7000)}`);
   if (ctx.basesText?.trim()) lines.push(`Texto das bases / PDFs:\n${ctx.basesText.trim().slice(0, 10000)}`);
+  if (ctx.workspaceFilesBlock?.trim()) lines.push(ctx.workspaceFilesBlock.trim().slice(0, 18000));
   if (ctx.orgProfile?.trim()) lines.push(`Perfil da organização (usar; não inventar para além disto):\n${ctx.orgProfile.trim()}`);
   if (ctx.contentLibraryBlock?.trim()) {
     lines.push(`Biblioteca de conteúdo / voz da org (preferir estes trechos quando couberem):\n${ctx.contentLibraryBlock.trim().slice(0, 6000)}`);
@@ -94,6 +97,7 @@ ${INSTITUTIONAL_PROSE_RULE}
 - Quando o utilizador pedir redigir / completar o formulário / «ítem por ítem», ESCREVE de imediato. Não bloqueies com perguntas de elegibilidade, geografia ou orçamento como pré-condição. Usa hipóteses razoáveis do CONTEXTO e marca [FALTA: …] inline.
 - Se o canvas ainda não tiver o formato do formulário oficial, primeiro lista os campos/secções do edital (títulos ##) e em seguida preenche o primeiro ítem completo na mesma resposta — ou só o ítem pedido.
 - Em modo «ítem por ítem»: uma secção completa por resposta (## título + texto pronto a colar). Termina apenas com a pergunta do próximo ítem. Sem preâmbulos longos.
+- Três tipos de ficheiro, nunca misturar: BASES = regras do edital; REFERÊNCIA = evidência da org; DESTA MENSAGEM = recorte pontual (ex. captura de um campo). Uma captura não substitui as bases.
 - Não faças diagnóstico de negócio NEXUS, informes SIEP, layout Studio nem prioridades do Workspace Advisor.
 - Não menciones nomes internos de produto (FUNDHUB, OPPORTUNITY, license keys). Diz FundHub se precisares de te nomear.
 - Tom profissional, claro, alinhado ao doador quando o edital o permitir.`;

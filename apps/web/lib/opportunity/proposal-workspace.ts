@@ -79,12 +79,7 @@ export type ProposalIntakeRecord = {
   fundInstitution: string;
   editalLink: string;
   intakeNotes: string;
-  attachedFiles?: Array<{
-    name: string;
-    type: string;
-    size: number;
-    uploadedAt: string;
-  }>;
+  attachedFiles?: ProposalAttachedFile[];
   seedSource?: 'fund' | 'candidate' | 'manual';
   sourceExcerpt?: string;
   basesText?: string;
@@ -104,6 +99,78 @@ export type ProposalDraftIndex = {
   updatedAt: string;
   status: 'draft' | 'submitted' | 'archived';
 };
+
+/** How a file is used — mixing these in one unlabeled pile confuses the model. */
+export type ProposalFileRole = 'bases' | 'reference' | 'turn';
+
+export type ProposalAttachedFile = {
+  name: string;
+  size: number;
+  type: string;
+  uploadedAt: string;
+  role: ProposalFileRole;
+  textExcerpt?: string;
+  /** In-memory only (images/PDF). Never persist to localStorage. */
+  dataBase64?: string;
+};
+
+export function normalizeProposalFileRole(raw: unknown): ProposalFileRole {
+  if (raw === 'reference' || raw === 'turn' || raw === 'bases') return raw;
+  return 'bases';
+}
+
+export function hydrateProposalAttachedFiles(raw: unknown): ProposalAttachedFile[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+    .map((item) => ({
+      name: String(item.name || 'file'),
+      size: Number(item.size) || 0,
+      type: String(item.type || 'application/octet-stream'),
+      uploadedAt: String(item.uploadedAt || ''),
+      role: normalizeProposalFileRole(item.role),
+      textExcerpt: typeof item.textExcerpt === 'string' ? item.textExcerpt : undefined,
+    }));
+}
+
+export function persistableProposalFiles(files: ProposalAttachedFile[]): ProposalAttachedFile[] {
+  return files
+    .filter((f) => f.role !== 'turn')
+    .map(({ dataBase64: _omit, ...rest }) => rest);
+}
+
+const FILE_ROLE_HEADERS: Record<ProposalFileRole, string> = {
+  bases:
+    'FICHEIROS — BASES DO EDITAL (norma oficial / formulário do doador. Prevalecem sobre o resto. Não são evidência da org.)',
+  reference:
+    'FICHEIROS — REFERÊNCIA DA PROPOSTA (CV, relatórios, factos da org. Usar como evidência da candidatura. NUNCA tratar como requisitos do fundo.)',
+  turn:
+    'FICHEIROS DESTA MENSAGEM (captura / recorte pontual. Segue o formato visível aqui. Não promover a bases nem a biblioteca permanente.)',
+};
+
+export function formatProposalFileContext(
+  files: Array<{ name: string; role?: string; textExcerpt?: string }>,
+): string {
+  const buckets: Record<ProposalFileRole, typeof files> = { bases: [], reference: [], turn: [] };
+  for (const file of files) {
+    buckets[normalizeProposalFileRole(file.role)].push(file);
+  }
+  const parts: string[] = [];
+  for (const role of ['bases', 'reference', 'turn'] as const) {
+    const list = buckets[role];
+    if (!list.length) continue;
+    const body = list
+      .map((file) => {
+        const excerpt = file.textExcerpt?.trim();
+        return `--- ${role.toUpperCase()}: ${file.name} ---\n${
+          excerpt ? excerpt.slice(0, 6000) : '(sem texto extraído — há um anexo visual ou binário; não inventes o conteúdo)'
+        }`;
+      })
+      .join('\n\n');
+    parts.push(`${FILE_ROLE_HEADERS[role]}\n${body}`);
+  }
+  return parts.join('\n\n');
+}
 
 export function formatDeadlineLabel(raw: string | Date | null | undefined): string {
   if (!raw) return '';

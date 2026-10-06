@@ -4,6 +4,9 @@ import {
   buildEditalSummaryFromSeed,
   findReusableDraft,
   appendWriteSections,
+  formatProposalFileContext,
+  hydrateProposalAttachedFiles,
+  persistableProposalFiles,
   mergeDraftIntoMarkdown,
   seedDocumentMarkdown,
   seedUnderstandMarkdown,
@@ -186,4 +189,36 @@ test('understand seed follows Spanish hub locale', () => {
   const next = appendWriteSections(md, 'es');
   assert.match(next, /## Idea general/);
   assert.match(next, /## Borrador/);
+});
+
+test('proposal file roles stay labeled and turn files are not persisted', () => {
+  const unlabeled = hydrateProposalAttachedFiles([{ name: 'edital.pdf', size: 10, type: 'application/pdf' }]);
+  assert.equal(unlabeled[0]?.role, 'bases');
+  const labeled = hydrateProposalAttachedFiles([
+    { name: 'cv.pdf', size: 2, type: 'application/pdf', role: 'reference', textExcerpt: 'ONG fundada en 2010' },
+    { name: 'campo.png', size: 3, type: 'image/png', role: 'turn', dataBase64: 'xxxx' },
+  ]);
+  const ctx = formatProposalFileContext([
+    { name: 'bases.pdf', role: 'bases', textExcerpt: 'Sección A obligatoria' },
+    ...labeled,
+  ]);
+  assert.match(ctx, /BASES DO EDITAL/);
+  assert.match(ctx, /REFERÊNCIA DA PROPOSTA/);
+  assert.match(ctx, /DESTA MENSAGEM/);
+  assert.match(ctx, /Sección A/);
+  assert.match(ctx, /ONG fundada/);
+  const stored = persistableProposalFiles([
+    { name: 'a.pdf', size: 1, type: 'application/pdf', uploadedAt: '', role: 'bases', dataBase64: 'abc' },
+    { name: 'b.png', size: 1, type: 'image/png', uploadedAt: '', role: 'turn', dataBase64: 'def' },
+  ]);
+  assert.equal(stored.length, 1);
+  assert.equal(stored[0]?.name, 'a.pdf');
+  assert.equal(stored[0]?.dataBase64, undefined);
+});
+
+test('chat prompt distinguishes file roles', () => {
+  const sys = buildFundhubProposalSystemPrompt('chat', 'es');
+  assert.match(sys, /BASES/);
+  assert.match(sys, /REFERÊNCIA/);
+  assert.match(sys, /DESTA MENSAGEM/);
 });

@@ -28,15 +28,23 @@ import {
   ClipboardCheck,
   ChevronDown,
   X,
+  Library,
+  Image as ImageIcon,
+  ScrollText,
 } from 'lucide-react';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import { RichTextPane } from '@/components/etholys/RichTextPane';
 import {
   appendWriteSections,
+  formatProposalFileContext,
+  hydrateProposalAttachedFiles,
   mergeDraftIntoMarkdown,
+  persistableProposalFiles,
   seedDocumentMarkdown,
   seedUnderstandMarkdown,
   sectionsFromMarkdown,
+  type ProposalAttachedFile,
+  type ProposalFileRole,
   type ProposalFundSeed,
 } from '@/lib/opportunity/proposal-workspace';
 import {
@@ -65,13 +73,28 @@ interface ChatMessage {
   applied?: boolean;
 }
 
-interface AttachedFile {
-  name: string;
-  size: number;
-  type: string;
-  uploadedAt: string;
-  /** Texto extraído (só ficheiros texto) para o assistente. */
-  textExcerpt?: string;
+type AttachedFile = ProposalAttachedFile;
+
+const FILE_ROLE_CYCLE: ProposalFileRole[] = ['turn', 'reference', 'bases'];
+
+function fileRoleLabel(locale: string, role: ProposalFileRole): string {
+  if (role === 'bases') return ui(locale, 'Bases', 'Bases', 'RFP');
+  if (role === 'reference') return ui(locale, 'Referencia', 'Referência', 'Reference');
+  return ui(locale, 'Este mensaje', 'Esta mensagem', 'This turn');
+}
+
+function nextFileRole(role: ProposalFileRole): ProposalFileRole {
+  const i = FILE_ROLE_CYCLE.indexOf(role);
+  return FILE_ROLE_CYCLE[(i + 1) % FILE_ROLE_CYCLE.length]!;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 /** Remove chuva de ideias que o modelo às vezes cola no briefing «understand». */
@@ -109,6 +132,7 @@ export default function FundHubProposalEditorPage() {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [composerMode, setComposerMode] = useState<'talk' | 'write'>('talk');
   const [showChatAttachMenu, setShowChatAttachMenu] = useState(false);
+  const [attachAsRole, setAttachAsRole] = useState<ProposalFileRole>('turn');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openingStudio, setOpeningStudio] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -224,7 +248,7 @@ export default function FundHubProposalEditorPage() {
         draftKey,
         JSON.stringify({
           ...draftData,
-          attachedFiles,
+          attachedFiles: persistableProposalFiles(attachedFiles),
           documentMarkdown: md,
           chatMessages: chats,
           stage: nextStage,
@@ -308,7 +332,7 @@ export default function FundHubProposalEditorPage() {
         const intake = JSON.parse(savedIntake);
         link = intake.editalLink || '';
         notes = intake.intakeNotes || '';
-        setAttachedFiles(intake.attachedFiles || []);
+        setAttachedFiles(hydrateProposalAttachedFiles(intake.attachedFiles));
         if (intake.stage === 'write' || intake.stage === 'understand') setStage(intake.stage);
         if (intake.fundName) {
           seededFund = {
@@ -360,6 +384,9 @@ export default function FundHubProposalEditorPage() {
             basesText: seededFund.basesText || draft.basesText,
             documents: seededFund.documents || (Array.isArray(draft.documents) ? draft.documents : undefined),
           };
+        }
+        if (Array.isArray(draft.attachedFiles) && draft.attachedFiles.length) {
+          setAttachedFiles(hydrateProposalAttachedFiles(draft.attachedFiles));
         }
         setDraftSaved(true);
       } catch {
@@ -463,11 +490,12 @@ export default function FundHubProposalEditorPage() {
       documentMarkdown,
       sourceExcerpt: fund?.sourceExcerpt,
       basesText: fund?.basesText,
+      workspaceFilesBlock: formatProposalFileContext(attachedFiles.filter((f) => f.role !== 'turn')),
       documents: fund?.documents,
       rfpChecklist: rfpChecklist.map((i) => ({ id: i.id, label: i.label, kind: i.kind })),
       locale,
     }),
-    [companyId, fund, editalLink, intakeNotes, documentMarkdown, rfpChecklist, locale],
+    [companyId, fund, editalLink, intakeNotes, documentMarkdown, rfpChecklist, locale, attachedFiles],
   );
 
   const runUnderstand = useCallback(async () => {
@@ -603,7 +631,12 @@ export default function FundHubProposalEditorPage() {
 
   const handleSendChat = useCallback(async () => {
     let message = chatInput.trim();
-    if ((!message && attachedFiles.every((f) => !f.textExcerpt)) || chatLoading) return;
+    if (
+      (!message &&
+        attachedFiles.every((f) => !f.textExcerpt && !f.dataBase64)) ||
+      chatLoading
+    )
+      return;
     const slashWrite = /^\s*\/(redactar|escribir|write|redige)\b/i.test(message);
     if (slashWrite) {
       message = message.replace(/^\s*\/(redactar|escribir|write|redige)\s*/i, '').trim();
@@ -611,11 +644,8 @@ export default function FundHubProposalEditorPage() {
     }
     const isWrite = (composerMode === 'write' || slashWrite) && stage === 'write';
 
-    const attachBlock = attachedFiles
-      .filter((f) => f.textExcerpt?.trim())
-      .slice(0, 4)
-      .map((f) => `--- Anexo: ${f.name} ---\n${f.textExcerpt!.slice(0, 6000)}`)
-      .join('\n\n');
+    const turnFiles = attachedFiles.filter((f) => f.role === 'turn');
+    const attachBlock = formatProposalFileContext(turnFiles);
 
     const wantsDraftHint =
       isWrite ||
@@ -648,7 +678,9 @@ export default function FundHubProposalEditorPage() {
     if (!fullMessage.trim()) return;
     const display =
       message ||
-      ui(locale, 'Archivos adjuntos enviados.', 'Anexos enviados.', 'Attachments sent.');
+      (turnFiles.length
+        ? ui(locale, 'Archivo de esta mensaje.', 'Ficheiro desta mensagem.', 'File for this message.')
+        : ui(locale, 'Archivos adjuntos enviados.', 'Anexos enviados.', 'Attachments sent.'));
     const nextUser: ChatMessage = {
       role: 'user',
       content: isWrite ? `✎ ${display}` : display,
@@ -656,12 +688,27 @@ export default function FundHubProposalEditorPage() {
     };
     setChatMessages((prev) => [...prev, nextUser]);
     setChatInput('');
+    if (turnFiles.length) {
+      setAttachedFiles((prev) => prev.filter((f) => f.role !== 'turn'));
+    }
     setChatLoading(true);
     try {
+      const fileParts = [...turnFiles, ...attachedFiles.filter((f) => f.role !== 'turn' && f.dataBase64)]
+        .filter((f) => f.dataBase64)
+        .slice(0, 3)
+        .map((f) => ({
+          mimeType: f.type || 'application/octet-stream',
+          data: f.dataBase64!,
+          name: f.name,
+          role: f.role,
+        }));
       const response = await fetch('/api/proposals/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(assistantBody(isWrite ? 'draft_section' : 'chat', fullMessage)),
+        body: JSON.stringify({
+          ...assistantBody(isWrite ? 'draft_section' : 'chat', fullMessage),
+          fileParts,
+        }),
       });
       const data = await response.json();
       const answer = String(
@@ -926,7 +973,8 @@ export default function FundHubProposalEditorPage() {
     }
   }, [recording, chatLoading, transcribing, locale]);
 
-  const handleAttachFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAttachFile = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>, role: ProposalFileRole = attachAsRole) => {
     const files = Array.from(event.target.files || []);
     event.target.value = '';
     if (!files.length) return;
@@ -935,10 +983,12 @@ export default function FundHubProposalEditorPage() {
     const ACCEPTED_EXT =
       /\.(pdf|docx?|xlsx?|pptx?|txt|md|csv|rtf|odt|ods|odp|zip|rar|7z|png|jpe?g|gif|webp)$/i;
     const TEXT_EXT = /\.(txt|md|csv|rtf)$/i;
+    const INLINE_EXT = /\.(png|jpe?g|gif|webp|pdf)$/i;
     const additions: AttachedFile[] = [];
     for (const file of files) {
       if (!ACCEPTED_EXT.test(file.name) || file.size > MAX_FILE_BYTES) continue;
       let textExcerpt: string | undefined;
+      let dataBase64: string | undefined;
       if (TEXT_EXT.test(file.name) && file.size < 400_000) {
         try {
           textExcerpt = (await file.text()).slice(0, 12_000);
@@ -946,12 +996,23 @@ export default function FundHubProposalEditorPage() {
           textExcerpt = undefined;
         }
       }
+      if (INLINE_EXT.test(file.name) && file.size < 4_000_000) {
+        try {
+          const url = await readFileAsDataUrl(file);
+          const comma = url.indexOf(',');
+          dataBase64 = comma >= 0 ? url.slice(comma + 1) : url;
+        } catch {
+          dataBase64 = undefined;
+        }
+      }
       additions.push({
         name: file.name,
         size: file.size,
         type: file.type || 'application/octet-stream',
         uploadedAt: new Date().toISOString(),
+        role,
         textExcerpt,
+        dataBase64,
       });
     }
     if (!additions.length) return;
@@ -959,13 +1020,15 @@ export default function FundHubProposalEditorPage() {
       const next = [...prev];
       for (const file of additions) {
         if (next.length >= MAX_FILES) break;
-        if (next.some((f) => f.name === file.name && f.size === file.size)) continue;
+        if (next.some((f) => f.name === file.name && f.size === file.size && f.role === file.role)) continue;
         next.push(file);
       }
       return next;
     });
-    setShowAttach(true);
-  }, []);
+    setShowChatAttachMenu(false);
+  },
+  [attachAsRole],
+);
 
   const loadVersions = useCallback(async () => {
     if (!workspaceId || !companyId) return;
@@ -1586,22 +1649,37 @@ export default function FundHubProposalEditorPage() {
                 multiple
                 className="hidden"
                 onChange={(e) => {
-                  void handleAttachFile(e);
-                  setShowChatAttachMenu(false);
+                  void handleAttachFile(e, attachAsRole);
                 }}
               />
               {attachedFiles.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1">
                   {attachedFiles.map((file, index) => (
                     <span
-                      key={`${file.name}-${index}`}
-                      className="inline-flex max-w-[10rem] items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-2 pr-1 text-[10px] text-gray-700"
-                      title={file.name}
+                      key={`${file.role}-${file.name}-${index}`}
+                      className={cn(
+                        'inline-flex max-w-[14rem] items-center gap-1 rounded-full py-0.5 pl-2 pr-1 text-[10px]',
+                        file.role === 'bases' && 'bg-amber-50 text-amber-950',
+                        file.role === 'reference' && 'bg-sky-50 text-sky-950',
+                        file.role === 'turn' && 'bg-emerald-50 text-emerald-950',
+                      )}
+                      title={`${fileRoleLabel(locale, file.role)} · ${file.name}`}
                     >
+                      <button
+                        type="button"
+                        className="shrink-0 font-semibold underline-offset-2 hover:underline"
+                        onClick={() =>
+                          setAttachedFiles((prev) =>
+                            prev.map((f, i) => (i === index ? { ...f, role: nextFileRole(f.role) } : f)),
+                          )
+                        }
+                      >
+                        {fileRoleLabel(locale, file.role)}
+                      </button>
                       <span className="truncate">{file.name}</span>
                       <button
                         type="button"
-                        className="rounded-full p-0.5 text-gray-400 hover:bg-gray-200 hover:text-red-600"
+                        className="rounded-full p-0.5 text-gray-400 hover:bg-white/80 hover:text-red-600"
                         aria-label={ui(locale, 'Quitar', 'Remover', 'Remove')}
                         onClick={() => setAttachedFiles((prev) => prev.filter((_, i) => i !== index))}
                       >
@@ -1615,10 +1693,7 @@ export default function FundHubProposalEditorPage() {
                 <div className="relative flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (attachedFiles.length) setShowChatAttachMenu((v) => !v);
-                      else chatFileInputRef.current?.click();
-                    }}
+                    onClick={() => setShowChatAttachMenu((v) => !v)}
                     className={cn(
                       'relative inline-flex items-center justify-center rounded-lg p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900',
                       attachedFiles.length && 'text-amber-800',
@@ -1632,37 +1707,58 @@ export default function FundHubProposalEditorPage() {
                       </span>
                     )}
                   </button>
-                  {showChatAttachMenu && attachedFiles.length > 0 && (
-                    <div className="absolute bottom-full left-0 z-20 mb-1 w-52 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
-                      <button
-                        type="button"
-                        onClick={() => chatFileInputRef.current?.click()}
-                        className="mb-1.5 flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 px-2 py-1.5 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
-                      >
-                        <Paperclip className="h-3.5 w-3.5" />
-                        {ui(locale, 'Adjuntar más', 'Anexar mais', 'Attach more')}
-                      </button>
-                      <ul className="max-h-28 space-y-1 overflow-y-auto">
-                        {attachedFiles.map((file, index) => (
-                          <li
-                            key={`menu-${file.name}-${index}`}
-                            className="flex items-center justify-between gap-1 text-[11px] text-gray-700"
-                          >
-                            <span className="truncate" title={file.name}>
-                              {file.name}
+                  {showChatAttachMenu && (
+                    <div className="absolute bottom-full left-0 z-20 mb-1 w-64 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+                      <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                        {ui(locale, 'Adjuntar como', 'Anexar como', 'Attach as')}
+                      </p>
+                      {(
+                        [
+                          ['turn', ImageIcon, ui(locale, 'Este mensaje', 'Esta mensagem', 'This turn')],
+                          ['reference', Library, ui(locale, 'Referencia', 'Referência', 'Reference')],
+                          ['bases', ScrollText, ui(locale, 'Bases / edital', 'Bases / edital', 'RFP / bases')],
+                        ] as const
+                      ).map(([role, Icon, label]) => (
+                        <button
+                          key={role}
+                          type="button"
+                          onClick={() => {
+                            setAttachAsRole(role);
+                            chatFileInputRef.current?.click();
+                          }}
+                          className={cn(
+                            'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-[11px] hover:bg-gray-50',
+                            attachAsRole === role ? 'font-medium text-gray-900' : 'text-gray-600',
+                          )}
+                        >
+                          <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-800" />
+                          <span>
+                            {label}
+                            <span className="mt-0.5 block font-normal text-gray-400">
+                              {role === 'turn'
+                                ? ui(
+                                    locale,
+                                    'Captura o recorte para esta respuesta.',
+                                    'Captura ou recorte para esta resposta.',
+                                    'Screenshot or snippet for this reply.',
+                                  )
+                                : role === 'reference'
+                                  ? ui(
+                                      locale,
+                                      'CV, informes — evidencia de la org.',
+                                      'CV, relatórios — evidência da org.',
+                                      'CV, reports — org evidence.',
+                                    )
+                                  : ui(
+                                      locale,
+                                      'PDF oficial, plantilla, anexos del donante.',
+                                      'PDF oficial, formulário, anexos do doador.',
+                                      'Official PDF, form, donor annexes.',
+                                    )}
                             </span>
-                            <button
-                              type="button"
-                              className="text-red-600"
-                              onClick={() =>
-                                setAttachedFiles((prev) => prev.filter((_, i) => i !== index))
-                              }
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                          </span>
+                        </button>
+                      ))}
                     </div>
                   )}
                   <button
@@ -1687,7 +1783,11 @@ export default function FundHubProposalEditorPage() {
                 </div>
                 <button
                   type="submit"
-                  disabled={chatLoading || (!chatInput.trim() && !attachedFiles.some((f) => f.textExcerpt))}
+                  disabled={
+                    chatLoading ||
+                    (!chatInput.trim() &&
+                      !attachedFiles.some((f) => f.textExcerpt || (f.role === 'turn' && f.dataBase64)))
+                  }
                   className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
                 >
                   <Send className="h-3.5 w-3.5" />
