@@ -4,7 +4,8 @@ import { getJitsiBaseUrl } from '@/lib/forge/jitsi-config';
 
 export type ForgeDeliveryMode = 'async' | 'live' | 'blended';
 
-export type ForgeLivePlatform = 'jitsi' | 'meet' | 'zoom' | 'teams' | 'custom';
+/** Plataforma de vídeo. `jitsi` = alias legado de `chorus` (nunca mostrar “jitsi” na UI). */
+export type ForgeLivePlatform = 'chorus' | 'jitsi' | 'meet' | 'zoom' | 'teams' | 'custom';
 
 export type ForgeLiveConfig = {
   meetingUrl?: string;
@@ -12,12 +13,12 @@ export type ForgeLiveConfig = {
   /** Texto livre: "Sáb 10h GMT-3" */
   scheduledLabel?: string;
   facilitatorNotes?: string;
-  /** Sala Jitsi alunos */
+  /** Sala CHORUS — alunos */
   roomName?: string;
-  /** Sala separada preparação / moderador */
+  /** Sala CHORUS — facilitador */
   facilitatorRoomName?: string;
   facilitatorMeetingUrl?: string;
-  /** presencial = cada um no celular, sem vídeo; online = com Jitsi */
+  /** presencial = cada um no celular, sem vídeo; online = sala CHORUS */
   sessionFormat?: 'presencial' | 'online';
   /** false em sessão presencial */
   videoEnabled?: boolean;
@@ -43,6 +44,19 @@ export const FORGE_DELIVERY_MODES: { id: ForgeDeliveryMode; label: string; desc:
   },
 ];
 
+/** Sala integrada CHORUS (inclui dados antigos gravados como platform=jitsi). */
+export function isChorusLivePlatform(platform?: ForgeLivePlatform | null): boolean {
+  return !platform || platform === 'chorus' || platform === 'jitsi';
+}
+
+export function normalizeLivePlatform(
+  platform?: ForgeLivePlatform | null,
+): ForgeLivePlatform | undefined {
+  if (!platform) return undefined;
+  if (platform === 'jitsi') return 'chorus';
+  return platform;
+}
+
 export function parseDeliveryMode(v: unknown): ForgeDeliveryMode {
   if (v === 'live' || v === 'blended' || v === 'async') return v;
   return 'async';
@@ -51,16 +65,19 @@ export function parseDeliveryMode(v: unknown): ForgeDeliveryMode {
 export function parseLiveConfig(raw: unknown): ForgeLiveConfig {
   if (!raw || typeof raw !== 'object') return {};
   const o = raw as Record<string, unknown>;
+  const platformRaw = o.platform;
+  const platform =
+    platformRaw === 'chorus' ||
+    platformRaw === 'jitsi' ||
+    platformRaw === 'meet' ||
+    platformRaw === 'zoom' ||
+    platformRaw === 'teams' ||
+    platformRaw === 'custom'
+      ? (platformRaw === 'jitsi' ? 'chorus' : platformRaw)
+      : undefined;
   return {
     meetingUrl: typeof o.meetingUrl === 'string' ? o.meetingUrl.trim() : undefined,
-    platform:
-      o.platform === 'jitsi' ||
-      o.platform === 'meet' ||
-      o.platform === 'zoom' ||
-      o.platform === 'teams' ||
-      o.platform === 'custom'
-        ? o.platform
-        : undefined,
+    platform,
     scheduledLabel: typeof o.scheduledLabel === 'string' ? o.scheduledLabel.trim() : undefined,
     facilitatorNotes: typeof o.facilitatorNotes === 'string' ? o.facilitatorNotes.trim() : undefined,
     roomName: typeof o.roomName === 'string' ? o.roomName.trim().replace(/\s+/g, '-') : undefined,
@@ -75,20 +92,23 @@ export function parseLiveConfig(raw: unknown): ForgeLiveConfig {
   };
 }
 
-/** URL para iframe Jitsi ou link externo. */
+/** URL da sala CHORUS ou link externo (Zoom/Meet/Teams). */
 export function resolveMeetingUrl(
   config: ForgeLiveConfig,
   courseId?: string,
   role: ForgeMeetingRole = 'learner',
   sessionOverrideUrl?: string | null,
-  jitsiBaseUrl?: string
+  videoBaseUrl?: string,
 ): string | null {
   if (sessionOverrideUrl) return sessionOverrideUrl;
   if (role === 'facilitator' && config.facilitatorMeetingUrl) return config.facilitatorMeetingUrl;
   if (role === 'learner' && config.meetingUrl) return config.meetingUrl;
 
-  const isJitsi = config.platform === 'jitsi' || !config.platform;
-  if (!isJitsi) return role === 'facilitator' ? config.facilitatorMeetingUrl ?? config.meetingUrl ?? null : config.meetingUrl ?? null;
+  if (!isChorusLivePlatform(config.platform)) {
+    return role === 'facilitator'
+      ? config.facilitatorMeetingUrl ?? config.meetingUrl ?? null
+      : config.meetingUrl ?? null;
+  }
 
   const room =
     role === 'facilitator'
@@ -97,22 +117,44 @@ export function resolveMeetingUrl(
         (courseId ? `etholys-forge-fac-${courseId.slice(-8)}` : 'etholys-forge-facilitador')
       : config.roomName ||
         (courseId ? `etholys-forge-${courseId.slice(-8)}` : 'etholys-forge-room');
-  const base = (jitsiBaseUrl?.replace(/\/$/, '') || getJitsiBaseUrl()).replace(/\/$/, '');
+  const base = (videoBaseUrl?.replace(/\/$/, '') || getJitsiBaseUrl()).replace(/\/$/, '');
   return `${base}/${encodeURIComponent(room)}`;
 }
 
+/** @deprecated use isChorusRoomEmbeddable */
 export function isJitsiEmbeddable(url: string): boolean {
+  return isChorusRoomEmbeddable(url);
+}
+
+export function isChorusRoomEmbeddable(url: string): boolean {
   try {
     const u = new URL(url);
-    return u.hostname.includes('jit.si') || u.hostname.includes('jitsi');
+    const host = u.hostname.toLowerCase();
+    if (host === 'meet.etholys.com' || host.endsWith('.etholys.com')) return true;
+    if (host.includes('jit.si')) return true; // legado / demo
+    try {
+      const baseHost = new URL(getJitsiBaseUrl()).hostname.toLowerCase();
+      if (baseHost && host === baseHost) return true;
+    } catch {
+      /* ignore */
+    }
+    return false;
   } catch {
     return false;
   }
 }
 
+/** @deprecated use chorusRoomEmbedUrl */
 export function jitsiEmbedUrl(
   meetingUrl: string,
-  opts?: { tileView?: boolean; filmstripOnly?: boolean }
+  opts?: { tileView?: boolean; filmstripOnly?: boolean },
+): string {
+  return chorusRoomEmbedUrl(meetingUrl, opts);
+}
+
+export function chorusRoomEmbedUrl(
+  meetingUrl: string,
+  opts?: { tileView?: boolean; filmstripOnly?: boolean },
 ): string {
   const u = new URL(meetingUrl);
   u.searchParams.set('embed', 'true');
@@ -123,7 +165,6 @@ export function jitsiEmbedUrl(
     'desktopSharingFrameRate.max=30',
     'startWithAudioMuted=false',
     'startWithVideoMuted=false',
-    // Capacitações: host precisa de breakout rooms (self-hosted)
     'breakoutRooms.hideAddRoomButton=false',
     'defaultRemoteDisplayName="Participante"',
     'defaultLogoUrl="https://app.etholys.com/meet-brand/etholys-mark.svg"',
@@ -133,6 +174,8 @@ export function jitsiEmbedUrl(
     'SHOW_WATERMARK_FOR_GUESTS=false',
     'SHOW_POWERED_BY=false',
     'MOBILE_APP_PROMO=false',
+    'APP_NAME="CHORUS"',
+    'NATIVE_APP_NAME="CHORUS"',
     'PROVIDER_NAME="Etholys"',
   ];
   if (opts?.tileView) config.push('tileViewEnabled=true');

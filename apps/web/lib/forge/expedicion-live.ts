@@ -1,6 +1,6 @@
 import type { ForgeLiveConfig } from '@/lib/forge/delivery';
 
-/** Sala Jitsi exclusiva por empresa (LLC ≠ LTDA). */
+/** Sala CHORUS exclusiva por empresa (LLC ≠ LTDA). */
 export function expedicionCompanyRoomSlug(shortName: string, companyId: string): string {
   const base =
     shortName
@@ -19,7 +19,7 @@ export function buildExpedicionLiveConfig(opts: {
 }): ForgeLiveConfig {
   const slug = expedicionCompanyRoomSlug(opts.shortName || opts.companyName, opts.companyId);
   return {
-    platform: 'jitsi',
+    platform: 'chorus',
     roomName: slug,
     facilitatorRoomName: `${slug}-facilitador`,
     scheduledLabel: `Sesiones síncronas — ${opts.companyName} (videollamada, sin vídeos grabados)`,

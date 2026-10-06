@@ -195,7 +195,7 @@ export async function createMeetSession(input: CreateMeetSessionInput) {
   return prisma.meetSession.findUniqueOrThrow({ where: { id: master.id } });
 }
 
-/** Importação Google/Outlook: sem sala Jitsi; meetingUrl = link Zoom/Teams/Meet externo. */
+/** Importação Google/Outlook: sem sala CHORUS nativa; meetingUrl = link Zoom/Teams/Meet externo. */
 export async function upsertExternalCalendarMeetSession(input: {
   companyId: string;
   createdById: string;

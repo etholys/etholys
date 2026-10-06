@@ -30,7 +30,7 @@ const MODULES: ModuleCfg[] = [
       durationMinutes: 15,
       body: `Este curso es **síncrono**: aprendéis en **videollamada** con el facilitador, no con vídeos grabados.
 
-En cada sesión entráis a la **videollamada (Jitsi)** y al **Salón FORGE**: un **tablero colectivo** (pista de 20 casillas, todos ven el mismo) y, en paralelo, **vuestro mapa personal** donde pegáis fichas de vuestro modelo de negocio.
+En cada sesión entráis a la **videollamada (CHORUS)** y al **Salón FORGE**: un **tablero colectivo** (pista de 20 casillas, todos ven el mismo) y, en paralelo, **vuestro mapa personal** donde pegáis fichas de vuestro modelo de negocio.
 
 Recibiréis un **Mapa** (cinco estaciones) y **500 Eco-Créditos** iniciales en vuestra cuenta. El objetivo: un modelo de **Triple Impacto** coherente y rentable.
 
@@ -531,7 +531,7 @@ A continuación jugáis la **pista digital** con las cartas de este motor FORGE.
       createdById: userId,
       title: EXPEDICION_COURSE_TITLE,
       description:
-        'Curso síncrono por videollamada (Jitsi). Tablero colectivo en vivo + mapa personal por alumno. Cinco estaciones + taller (20 casillas). Presentación y materiales V2, 2026.',
+        'Curso síncrono por videollamada (CHORUS). Tablero colectivo en vivo + mapa personal por alumno. Cinco estaciones + taller (20 casillas). Presentación y materiales V2, 2026.',
       status: 'published',
       deliveryMode: 'live',
       gamePlayMode: 'shared_live',
@@ -595,7 +595,7 @@ A continuación jugáis la **pista digital** con las cartas de este motor FORGE.
         facilitatorNotes:
           i === sessionDefs.length - 1
             ? `${company.name}: Salón FORGE — tablero colectivo + revisar mapas; validar fichas +100 Eco-Créditos.`
-            : `${company.name}: Salón — Jitsi + PPT; tablero colectivo cuando toque; cada alumno avanza su mapa.`,
+            : `${company.name}: Salón — CHORUS + PPT; tablero colectivo cuando toque; cada alumno avanza su mapa.`,
       },
     });
   }

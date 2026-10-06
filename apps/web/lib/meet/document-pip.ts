@@ -1,6 +1,6 @@
 /**
  * Document Picture-in-Picture: janela flutuante do sistema (Chrome/Edge 116+).
- * Move o contentor da sala sem recriar o iframe Jitsi.
+ * Move o contentor da sala sem recriar o iframe da reunião.
  */
 
 export function supportsDocumentPictureInPicture(): boolean {

@@ -10,7 +10,7 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 | **Etholys Tools — faixa de ferramentas** | [docs/architecture/etholys-tools.md](./docs/architecture/etholys-tools.md) | Advisor, Studio, Work, Chorus (Meet), Prism — não confundir com Core nem com Studio como guarda-chuva |
 | **Etholys Work — motor de tarefas** | [docs/architecture/etholys-work.md](./docs/architecture/etholys-work.md) | `Task` único, espelhos ATLAS/SIEP/Meet; vistas Board/List/Kanban/Calendar/Workload; pastas ACL tipo Drive; Integrated Workspace (F11) |
 | **FORGE — EAD unificado + jogos + gamificação** | [docs/architecture/forge-ead.md](./docs/architecture/forge-ead.md) | Qualquer trabalho em `/hub/forge`, APIs `forge`, LMS, jogos, IA geradora de jogos |
-| **Etholys Meet → CHORUS** | [docs/architecture/etholys-meet.md](./docs/architecture/etholys-meet.md) | Produto **CHORUS** (`/hub/meet`); Jitsi, breakouts, convites, gravação, Whisper+diarização pós-chamada |
+| **Etholys Meet → CHORUS** | [docs/architecture/etholys-meet.md](./docs/architecture/etholys-meet.md) | Produto **CHORUS** (`/hub/meet`): salas, breakouts, convites, gravação, transcrição e pós-chamada. **Não** usar nomes de infra de vídeo na UI nem ao falar com o utilizador |
 | **Etholys Studio — documentos com IA (ferramenta)** | [docs/architecture/etholys-studio.md](./docs/architecture/etholys-studio.md) | `/hub/studio`, pastas, templates, canvas+chat, agente com consentimento, atalho hot |
 | **FundHub — captação de fundos** | [docs/architecture/etholys-fundhub.md](./docs/architecture/etholys-fundhub.md) | Qualquer trabalho em `/hub/fundhub`, APIs `opportunity`/`fundhub`; evidência oficial, pipeline, proposta |
 | **AURORA / POLARIS / RADAR** | [docs/architecture/etholys-aurora-polaris-radar.md](./docs/architecture/etholys-aurora-polaris-radar.md) | Incubadora virtual, mapa de autodesenvolvimento, digitalização produtiva — **não** juntar num só menu NEXUS |
@@ -19,8 +19,8 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 | **Lab ANVIL — agente de engenharia interno** | [docs/architecture/lab-anvil.md](./docs/architecture/lab-anvil.md) | `/lab/anvil` — 1 agente/projeto, OSS vs Etholys, deploy targets, owners+convites |
 | **System admin vs empresa** | [docs/architecture/system-admin.md](./docs/architecture/system-admin.md) | Master Etholys (`ETHOLYS_PLATFORM_ADMIN_EMAILS`) ≠ admin de cliente |
 | **Licenças e pagamentos** | [docs/architecture/etholys-billing.md](./docs/architecture/etholys-billing.md) | Assinaturas, licenciamento, add-ons, comissões, faturas Etholys |
-| **Jitsi no Contabo (ops)** | [docs/MEET-JITSI-CONTABO.md](./docs/MEET-JITSI-CONTABO.md) | Subir `meet.etholys.com` — sem isto a app usa meet.jit.si |
-| **Meet VPS + Jibri (ops)** | [docs/MEET-VPS-JIBRI.md](./docs/MEET-VPS-JIBRI.md) | VPS dedicado, gravação → R2, webhook |
+| **Motor de vídeo CHORUS (ops)** | [docs/MEET-JITSI-CONTABO.md](./docs/MEET-JITSI-CONTABO.md) | Subir `meet.etholys.com` — ops only; nunca expor na UI |
+| **VPS gravação CHORUS (ops)** | [docs/MEET-VPS-JIBRI.md](./docs/MEET-VPS-JIBRI.md) | VPS dedicado, gravação → R2 — ops only |
 | **Índice de toda a documentação** | [docs/README.md](./docs/README.md) | Encontrar outros guias em `docs/` |
 | **Backend (releases)** | [docs/backend-release-hygiene.md](./docs/backend-release-hygiene.md) | Publicar apenas `backend/` |
 | **Instruções legadas (encoding, módulos)** | [etholys-web/.project_instructions.md](./etholys-web/.project_instructions.md) | Convenções JSX/encoding e histórico de módulos |
@@ -52,6 +52,7 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 - Minimizar âmbito do diff; reutilizar padrões de NEXUS para APIs com IA (sessões, JSON validado, `companyId`).
 - Não commitar segredos (`.env`).
 - Commits e PRs apenas quando o utilizador pedir explicitamente.
+- **CHORUS:** produto desvinculado. Na UI, copy, seeds e respostas ao utilizador usar só **CHORUS** / sala / gravação / transcrição. Nomes de motor OSS ou ops ficam em `docs/MEET-*` e código interno — nunca na superfície do produto.
 
 ## Onde implementar FORGE (quando chegar a código)
 

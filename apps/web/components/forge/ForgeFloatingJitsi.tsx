@@ -150,7 +150,7 @@ export function ForgeFloatingJitsi({
             )}
             {embedSrc && (
               <p className="px-2 py-1 text-[9px] text-sky-300/80 bg-sky-950">
-                {ft('forge.room.jitsiShareHint')}
+                {ft('forge.room.screenShareHint')}
               </p>
             )}
           </>

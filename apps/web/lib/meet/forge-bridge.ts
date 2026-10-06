@@ -15,7 +15,7 @@ export type ForgeLiveForMeet = {
 
 /**
  * Garante um MeetSession espelho `forge` ligado à ForgeLiveSession.
- * Se a live session não tiver meetingUrl, preenche com a sala Meet (breakouts via Jitsi).
+ * Se a live session não tiver meetingUrl, preenche com a sala CHORUS (breakouts inclusos).
  */
 export async function ensureMeetForForgeLiveSession(opts: {
   companyId: string;

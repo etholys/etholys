@@ -86,7 +86,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       include: { focusActivity: { select: { title: true } } },
     });
 
-    // Provisiona Etholys Meet (sala Jitsi + breakouts) quando não há URL externa
+    // Provisiona sala CHORUS (+ breakouts) quando não há URL externa
     let meetSessionId: string | null = null;
     try {
       const { ensureMeetForForgeLiveSession } = await import('@/lib/meet/forge-bridge');

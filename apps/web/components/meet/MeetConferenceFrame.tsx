@@ -425,7 +425,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             configOverwrite: {
               subject: title,
               disableDeepLinking: true,
-              // Hub já tem MeetJoinSetupDialog — pré-sala Jitsi deixa 0 participantes
+              // Hub já tem MeetJoinSetupDialog — pré-sala do motor deixa 0 participantes
               // e ecrã preto se o utilizador nunca clica «Entrar» / UI falha.
               prejoinConfig: {
                 enabled: false,
@@ -444,9 +444,8 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               disableTileEnlargement: false,
               defaultLogoUrl: 'https://app.etholys.com/meet-brand/etholys-mark.svg',
               defaultRemoteDisplayName: 'Participante',
-              // Sem Jibri no Contabo: desactivar gravação local do Jitsi (getDisplayMedia
-              // da própria aba → ecrã preto + título estranho no Chrome). O botão CHORUS
-              // usa o nosso gravador com escolha de ecrã/janela + upload Whisper.
+              // Desactivar gravação local do embed (getDisplayMedia da própria aba →
+              // ecrã preto). O botão CHORUS usa gravador com ecrã/janela + upload Whisper.
               fileRecordingsEnabled: true,
               recordingService: {
                 enabled: false,

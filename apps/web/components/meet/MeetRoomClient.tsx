@@ -232,7 +232,7 @@ export function MeetRoomClient({ sessionId }: Props) {
     const prev = document.title;
     const apply = () => {
       const label = session?.title?.trim();
-      // Título limpo e estável — evita nomes estranhos do Chrome/Jitsi ao gravar.
+      // Título limpo e estável — evita nomes estranhos do Chrome ao gravar.
       document.title = label ? `CHORUS — ${label}` : 'CHORUS · Etholys';
     };
     apply();
@@ -341,7 +341,7 @@ export function MeetRoomClient({ sessionId }: Props) {
     if (participantCount > 0) hadParticipantsRef.current = true;
   }, [participantCount]);
 
-  // NÃO parar gravação só porque o contador foi a 0 (Chrome/Jitsi falha em background).
+  // NÃO parar gravação só porque o contador foi a 0 (falhas de contagem em background).
   // A gravação só para: utilizador, pagehide real, ou fim da reunião.
 
   useEffect(() => {
@@ -1403,7 +1403,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                       leaveQuietRef.current = false;
                       return;
                     }
-                    // Nunca encerrar só por blur/PiP/falsos leaves do Jitsi
+                    // Nunca encerrar só por blur/PiP/falsos leaves da sala
                     if (pipEnteringRef.current || pipModeRef.current !== 'none') return;
                     if (document.visibilityState === 'hidden') return;
                     if (Date.now() - lastHiddenAtRef.current < 15_000) return;

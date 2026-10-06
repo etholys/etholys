@@ -172,23 +172,23 @@ export function ForgeDeliverySettings({
           <label className="block text-xs font-medium text-slate-600">
             {ft('forge.delivery.platform')}
             <select
-              value={live.platform ?? 'jitsi'}
+              value={live.platform === 'jitsi' ? 'chorus' : live.platform ?? 'chorus'}
               onChange={(e) =>
                 setLive({ ...live, platform: e.target.value as ForgeLiveConfig['platform'] })
               }
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
             >
-              <option value="jitsi">{ft('forge.delivery.platform.jitsi')}</option>
+              <option value="chorus">{ft('forge.delivery.platform.chorus')}</option>
               <option value="meet">{ft('forge.delivery.platform.meet')}</option>
               <option value="zoom">{ft('forge.delivery.platform.zoom')}</option>
               <option value="teams">{ft('forge.delivery.platform.teams')}</option>
               <option value="custom">{ft('forge.delivery.platform.custom')}</option>
             </select>
           </label>
-          {live.platform === 'jitsi' ? (
+          {!live.platform || live.platform === 'chorus' || live.platform === 'jitsi' ? (
             <>
               <label className="block text-xs font-medium text-slate-600">
-                {ft('forge.delivery.jitsi.room')}
+                {ft('forge.delivery.chorus.room')}
                 <input
                   value={live.roomName ?? ''}
                   onChange={(e) => setLive({ ...live, roomName: e.target.value })}
@@ -197,7 +197,7 @@ export function ForgeDeliverySettings({
                 />
               </label>
               <label className="block text-xs font-medium text-slate-600">
-                {ft('forge.delivery.jitsi.facilitator')}
+                {ft('forge.delivery.chorus.facilitator')}
                 <input
                   value={live.facilitatorRoomName ?? ''}
                   onChange={(e) => setLive({ ...live, facilitatorRoomName: e.target.value })}
@@ -209,7 +209,9 @@ export function ForgeDeliverySettings({
           ) : null}
           <label className="block text-xs font-medium text-slate-600">
             {ft('forge.delivery.meetingUrl')}{' '}
-            {live.platform === 'jitsi' ? ft('forge.delivery.meetingUrlOptional') : ''}
+            {!live.platform || live.platform === 'chorus' || live.platform === 'jitsi'
+              ? ft('forge.delivery.meetingUrlOptional')
+              : ''}
             <input
               value={live.meetingUrl ?? ''}
               onChange={(e) => setLive({ ...live, meetingUrl: e.target.value })}
