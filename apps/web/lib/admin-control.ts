@@ -5,6 +5,7 @@ export const ADMIN_SECTIONS = [
   'org-profile',
   'areas',
   'users',
+  /** @deprecated alias — redireciona para `users` (centro unificado) */
   'access',
   'billing',
   'account',
@@ -14,10 +15,13 @@ export type AdminSection = (typeof ADMIN_SECTIONS)[number];
 
 export function parseAdminSection(raw: string | null | undefined): AdminSection {
   const v = String(raw || '').trim().toLowerCase();
+  // Permisos y sistemas fundiu-se no centro de utilizadores
+  if (v === 'access') return 'users';
   if ((ADMIN_SECTIONS as readonly string[]).includes(v)) return v as AdminSection;
   return 'overview';
 }
 
 export function adminHref(section: AdminSection) {
-  return section === 'overview' ? '/hub/admin' : `/hub/admin?s=${section}`;
+  const resolved = section === 'access' ? 'users' : section;
+  return resolved === 'overview' ? '/hub/admin' : `/hub/admin?s=${resolved}`;
 }

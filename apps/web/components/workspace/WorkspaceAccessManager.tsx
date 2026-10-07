@@ -55,7 +55,7 @@ function emptyToolSel(): Record<WorkspaceToolKey, boolean> {
 }
 
 
-export function WorkspaceAccessManager() {
+export function WorkspaceAccessManager({ embedded = false }: { embedded?: boolean }) {
   const { data: session } = useSession();
   const { activeCompanyId, locale } = useApp();
   const [companies, setCompanies] = useState<Array<{ id: string; shortName: string; name?: string }>>([]);
@@ -214,6 +214,14 @@ export function WorkspaceAccessManager() {
     setSel(next);
     setToolSel(nextTools);
   };
+
+  useEffect(() => {
+    if (!targetUser) return;
+    const id = window.setTimeout(() => {
+      document.getElementById('user-access-profile')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [targetUser]);
 
   const clearSelection = () => {
     setTargetUser('');
@@ -411,67 +419,58 @@ export function WorkspaceAccessManager() {
   }
 
   return (
-    <div>
-            <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
-        <header className={cn(PANEL, 'px-5 py-4 sm:px-6')}>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
-                {t('Administração', 'Administración', 'Administration')}
-              </p>
-              <h1 className="mt-1 flex items-center gap-2 text-xl font-semibold tracking-tight text-slate-900">
-                <Shield className="h-5 w-5 shrink-0 text-teal-700" />
-                {t('Equipa e acessos', 'Equipo y accesos', 'Team & access')}
-              </h1>
-              <p className="mt-1.5 max-w-2xl text-sm text-slate-600">
-                {t(
-                  'Convide pessoas e atribua sistemas do centro integrado — escolha um membro à esquerda.',
-                  'Invite personas y asigne sistemas del centro integrado — elija un miembro a la izquierda.',
-                  'Invite people and grant workspace systems — pick a member on the left.',
-                )}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setShowInviteWizard((v) => !v);
-                setInviteMsg(null);
-              }}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition',
-                showInviteWizard
-                  ? 'border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-                  : 'bg-teal-700 text-white hover:bg-teal-800',
-              )}
-            >
-              <UserPlus className="h-4 w-4" />
-              {showInviteWizard
-                ? t('Fechar convite', 'Cerrar invitación', 'Close invite')
-                : t('Convidar pessoa', 'Invitar persona', 'Invite person')}
-            </button>
-          </div>
-        </header>
-
-        {/* Invite — only real stepper */}
-        {(showInviteWizard || inviteMsg) && (
-          <section className={cn(PANEL, 'p-4 sm:p-5')}>
-            <div className="mb-3 flex items-center gap-2.5">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-700 text-xs font-bold text-white">
-                1
-              </span>
-              <div>
-                <h2 className="text-sm font-semibold text-slate-900">
-                  {t('Convidar pessoa', 'Invitar persona', 'Invite person')}
-                </h2>
-                <p className="text-xs text-slate-600">
+    <div className={embedded ? 'space-y-4' : undefined}>
+      <div className={cn(!embedded && 'mx-auto max-w-6xl space-y-5 p-4 sm:p-6', embedded && 'space-y-4')}>
+        {!embedded && (
+          <header className={cn(PANEL, 'px-5 py-4 sm:px-6')}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+                  {t('Administração', 'Administración', 'Administration')}
+                </p>
+                <h1 className="mt-1 flex items-center gap-2 text-xl font-semibold tracking-tight text-slate-900">
+                  <Shield className="h-5 w-5 shrink-0 text-teal-700" />
+                  {t('Utilizadores', 'Usuarios', 'Users')}
+                </h1>
+                <p className="mt-1.5 max-w-2xl text-sm text-slate-600">
                   {t(
-                    'Novo vínculo por email — só as funções marcadas, não o Hub completo.',
-                    'Nuevo vínculo por email — solo las funciones marcadas, no el Hub completo.',
-                    'New email invite — function access only, not the full Hub.',
+                    'Equipa, convites e permissões num só sítio.',
+                    'Equipo, invitaciones y permisos en un solo lugar.',
+                    'Team, invites and permissions in one place.',
                   )}
                 </p>
               </div>
             </div>
+          </header>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-slate-600">
+            {members.length}{' '}
+            {t('pessoas na empresa activa', 'personas en la empresa activa', 'people in the active company')}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setShowInviteWizard((v) => !v);
+              setInviteMsg(null);
+            }}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+              showInviteWizard
+                ? 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                : 'bg-teal-700 text-white hover:bg-teal-800',
+            )}
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            {showInviteWizard
+              ? t('Fechar', 'Cerrar', 'Close')
+              : t('Convidar', 'Invitar', 'Invite')}
+          </button>
+        </div>
+
+        {(showInviteWizard || inviteMsg) && (
+          <section className={cn(PANEL, 'p-4 sm:p-5')}>
             {inviteMsg && (
               <p className="mb-3 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-950">
                 {inviteMsg}
@@ -507,361 +506,275 @@ export function WorkspaceAccessManager() {
           </section>
         )}
 
-        {/* Master–detail */}
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
-          {/* Members list */}
-          <aside className={cn(PANEL, 'flex min-h-[22rem] flex-col overflow-hidden')}>
-            <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
-              <div>
-                <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-                  <Users className="h-4 w-4 text-slate-600" />
-                  {t('Membros', 'Miembros', 'Members')}
-                </h2>
-                <p className="text-xs text-slate-600">
-                  {members.length}{' '}
-                  {t('na empresa', 'en la empresa', 'in company')}
-                </p>
-              </div>
-              {meId && members.some((m) => m.userId === meId) && (
-                <button
-                  type="button"
-                  onClick={() => selectMember(meId)}
-                  className="text-xs font-semibold text-teal-800 hover:underline"
-                >
-                  {t('Eu', 'Yo', 'Me')}
-                </button>
+        <section className={cn(PANEL, 'overflow-hidden')}>
+          <div className="border-b border-slate-100 px-4 py-3">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+              <Users className="h-4 w-4 text-slate-600" />
+              {t('Equipa', 'Equipo', 'Team')}
+            </h2>
+          </div>
+          {members.length === 0 ? (
+            <p className="m-4 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-8 text-center text-sm text-slate-600">
+              {t(
+                'Ainda sem membros. Use Invitar para adicionar a primeira pessoa.',
+                'Aún sin miembros. Use Invitar para añadir a la primera persona.',
+                'No members yet. Use Invite to add the first person.',
               )}
-            </div>
-
-            {members.length === 0 ? (
-              <p className="m-4 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-600">
-                {t(
-                  'Ainda sem membros nesta empresa.',
-                  'Aún sin miembros en esta empresa.',
-                  'No members in this company yet.',
-                )}
-              </p>
-            ) : (
-              <ul className="flex-1 overflow-y-auto">
-                {members.map((m) => {
-                  const grant = grants.find((g) => g.userId === m.userId);
-                  const active = targetUser === m.userId;
-                  return (
-                    <li key={m.userId}>
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {members.map((m) => {
+                const grant = grants.find((g) => g.userId === m.userId);
+                const active = targetUser === m.userId;
+                return (
+                  <li
+                    key={m.userId}
+                    className={cn(
+                      'flex flex-wrap items-center gap-3 px-4 py-3 transition',
+                      active ? 'bg-teal-50/80' : 'bg-white hover:bg-slate-50/80',
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => (active ? clearSelection() : selectMember(m.userId))}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {m.name || m.email}
+                      </p>
+                      <p className="truncate text-xs text-slate-600">{m.email}</p>
+                      <span className="mt-1.5 flex flex-wrap items-center gap-1">
+                        <SystemChip label={m.role} />
+                        {grant?.enabled && grant.systems.length > 0 ? (
+                          grant.systems.slice(0, 4).map((sys) => (
+                            <SystemChip
+                              key={sys}
+                              label={systemDisplayName(sys as WorkspaceSystemKey)}
+                              active
+                            />
+                          ))
+                        ) : (
+                          <span className="text-[11px] font-medium text-slate-500">
+                            {t('Sem sistemas', 'Sin sistemas', 'No systems')}
+                          </span>
+                        )}
+                        {grant?.enabled &&
+                          Array.isArray(grant.tools) &&
+                          grant.tools.slice(0, 3).map((tool) => (
+                            <SystemChip key={tool} label={toolDisplayName(tool)} active />
+                          ))}
+                      </span>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => (active ? clearSelection() : selectMember(m.userId))}
-                        className={cn(
-                          'flex w-full flex-col gap-1 border-b border-slate-100 px-4 py-3 text-left transition',
-                          active
-                            ? 'bg-teal-50/90 ring-inset ring-1 ring-teal-200'
-                            : 'bg-white hover:bg-slate-50',
-                        )}
+                        onClick={() => selectMember(m.userId)}
+                        className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
                       >
-                        <span className="truncate text-sm font-semibold text-slate-900">
-                          {m.name || m.email}
-                        </span>
-                        <span className="truncate text-xs text-slate-600">{m.email}</span>
-                        <span className="mt-0.5 flex flex-wrap items-center gap-1">
-                          <SystemChip label={m.role} />
-                          {grant?.enabled && grant.systems.length > 0 ? (
-                            grant.systems.slice(0, 3).map((sys) => (
-                              <SystemChip
-                                key={sys}
-                                label={systemDisplayName(sys as WorkspaceSystemKey)}
-                                active
-                              />
-                            ))
-                          ) : (
-                            <span className="text-[11px] font-medium text-slate-500">
-                              {t('Sem sistemas', 'Sin sistemas', 'No systems')}
-                            </span>
-                          )}
-                          {grant?.enabled &&
-                            Array.isArray(grant.tools) &&
-                            grant.tools.slice(0, 2).map((tool) => (
-                              <SystemChip key={tool} label={toolDisplayName(tool)} active />
-                            ))}
-                          {grant?.enabled &&
-                            (grant.systems.length > 3 || (grant.tools?.length || 0) > 2) && (
-                            <span className="text-[10px] font-medium text-slate-500">
-                              +
-                              {Math.max(0, grant.systems.length - 3) +
-                                Math.max(0, (grant.tools?.length || 0) - 2)}
-                            </span>
-                          )}
-                        </span>
+                        {t('Gerir', 'Gestionar', 'Manage')}
                       </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </aside>
+                      {grant?.enabled && (
+                        <button
+                          type="button"
+                          onClick={() => void remove(m.userId)}
+                          className="rounded-md px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                        >
+                          {t('Remover', 'Quitar', 'Remove')}
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
 
-          {/* Access panel */}
-          <section className={cn(PANEL, 'min-h-[22rem] p-4 sm:p-5')}>
-            {!targetUser || !selectedMember ? (
-              <div className="flex h-full min-h-[18rem] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/70 px-6 py-10 text-center">
-                <Users className="mb-3 h-8 w-8 text-slate-400" />
-                <p className="text-sm font-semibold text-slate-800">
-                  {t('Selecione um membro', 'Seleccione un miembro', 'Select a member')}
+        {targetUser && selectedMember && (
+          <section className={cn(PANEL, 'p-4 sm:p-5')} id="user-access-profile">
+            <div className="mb-5 flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-4">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+                  {t('Perfil de acesso', 'Perfil de acceso', 'Access profile')}
                 </p>
-                <p className="mt-1 max-w-sm text-sm text-slate-600">
+                <h2 className="mt-0.5 truncate text-lg font-semibold text-slate-900">
+                  {selectedMember.name || selectedMember.email}
+                </h2>
+                <p className="truncate text-sm text-slate-600">{selectedMember.email}</p>
+              </div>
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <X className="h-3.5 w-3.5" />
+                {t('Fechar', 'Cerrar', 'Close')}
+              </button>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-800">
+                  {t('Sistemas', 'Sistemas', 'Systems')}
+                </h3>
+                <p className="mt-1 text-xs text-slate-600">
                   {t(
-                    'Escolha alguém na lista à esquerda para configurar sistemas e permissões SIEP.',
-                    'Elija a alguien en la lista de la izquierda para configurar sistemas y permisos SIEP.',
-                    'Pick someone in the list on the left to configure systems and SIEP permissions.',
+                    'Sistemas e Etholys Tools que esta pessoa pode abrir.',
+                    'Sistemas y Etholys Tools que puede abrir esta persona.',
+                    'Systems and Etholys Tools this person can open.',
                   )}
                 </p>
-              </div>
-            ) : (
-              <div className="space-y-5">
-                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-4">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
-                      {t('Acesso', 'Acceso', 'Access')}
-                    </p>
-                    <h2 className="mt-0.5 truncate text-lg font-semibold text-slate-900">
-                      {selectedMember.name || selectedMember.email}
-                    </h2>
-                    <p className="truncate text-sm text-slate-600">{selectedMember.email}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {WORKSPACE_SYSTEM_KEYS.map((k) => (
+                    <label
+                      key={k}
+                      className={cn(
+                        'flex cursor-pointer items-center gap-2 rounded-lg border bg-white px-2.5 py-2 text-sm transition',
+                        sel[k]
+                          ? 'border-teal-400 ring-1 ring-teal-400/50'
+                          : 'border-slate-200 hover:border-slate-300',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={sel[k]}
+                        onChange={(e) => setSel((s) => ({ ...s, [k]: e.target.checked }))}
+                        className="rounded border-slate-300 text-teal-700 focus:ring-teal-600"
+                      />
+                      <span className="font-medium text-slate-800">{systemDisplayName(k)}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="mt-5 border-t border-slate-200 pt-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-800">
+                    {t('Etholys Tools', 'Etholys Tools', 'Etholys Tools')}
+                  </h4>
+                  <p className="mt-1 text-xs text-slate-600">
+                    {t(
+                      'Advisor, Studio, Work e Chorus — marque o que esta pessoa pode abrir.',
+                      'Advisor, Studio, Work y Chorus — marque lo que esta persona puede abrir.',
+                      'Advisor, Studio, Work and Chorus — mark what this person can open.',
+                    )}
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {WORKSPACE_TOOL_KEYS.map((k) => (
+                      <label
+                        key={k}
+                        className={cn(
+                          'flex cursor-pointer items-center gap-2 rounded-lg border bg-white px-2.5 py-2 text-sm transition',
+                          toolSel[k]
+                            ? 'border-teal-400 ring-1 ring-teal-400/50'
+                            : 'border-slate-200 hover:border-slate-300',
+                          !companyTools.includes(k) && 'opacity-50',
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={toolSel[k]}
+                          disabled={!companyTools.includes(k)}
+                          onChange={(e) => setToolSel((s) => ({ ...s, [k]: e.target.checked }))}
+                          className="rounded border-slate-300 text-teal-700 focus:ring-teal-600"
+                        />
+                        <span className="font-medium text-slate-800">{toolDisplayName(k)}</span>
+                      </label>
+                    ))}
                   </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={clearSelection}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    disabled={saving}
+                    onClick={() => void save()}
+                    className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
                   >
-                    <X className="h-3.5 w-3.5" />
-                    {t('Fechar', 'Cerrar', 'Close')}
+                    {saving
+                      ? t('A guardar…', 'Guardando…', 'Saving…')
+                      : t('Guardar acesso', 'Guardar acceso', 'Save access')}
                   </button>
+                  {selectedGrant?.enabled && (
+                    <button
+                      type="button"
+                      onClick={() => void remove(targetUser)}
+                      className="rounded-lg border border-transparent px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                    >
+                      {t('Remover acesso', 'Quitar acceso', 'Remove access')}
+                    </button>
+                  )}
                 </div>
-
-                <div className="grid gap-4 xl:grid-cols-2">
-                  <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-800">
-                      {t('Sistemas', 'Sistemas', 'Systems')}
-                    </h3>
-                    <p className="mt-1 text-xs text-slate-600">
-                      {t(
-                        'Sistemas e Etholys Tools que esta pessoa pode abrir.',
-                        'Sistemas y Etholys Tools que puede abrir esta persona.',
-                        'Systems and Etholys Tools this person can open.',
-                      )}
-                    </p>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      {WORKSPACE_SYSTEM_KEYS.map((k) => (
-                        <label
-                          key={k}
-                          className={cn(
-                            'flex cursor-pointer items-center gap-2 rounded-lg border bg-white px-2.5 py-2 text-sm transition',
-                            sel[k]
-                              ? 'border-teal-400 ring-1 ring-teal-400/50'
-                              : 'border-slate-200 hover:border-slate-300',
-                          )}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={sel[k]}
-                            onChange={(e) => setSel((s) => ({ ...s, [k]: e.target.checked }))}
-                            className="rounded border-slate-300 text-teal-700 focus:ring-teal-600"
-                          />
-                          <span className="font-medium text-slate-800">{systemDisplayName(k)}</span>
-                        </label>
-                      ))}
-                    </div>
-
-                    <div className="mt-5 border-t border-slate-200 pt-4">
-                      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-800">
-                        {t('Etholys Tools', 'Etholys Tools', 'Etholys Tools')}
-                      </h4>
-                      <p className="mt-1 text-xs text-slate-600">
-                        {t(
-                          'Advisor, Studio, Work e Chorus — marque o que esta pessoa pode abrir.',
-                          'Advisor, Studio, Work y Chorus — marque lo que esta persona puede abrir.',
-                          'Advisor, Studio, Work and Chorus — mark what this person can open.',
-                        )}
-                      </p>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        {WORKSPACE_TOOL_KEYS.map((k) => (
-                          <label
-                            key={k}
-                            className={cn(
-                              'flex cursor-pointer items-center gap-2 rounded-lg border bg-white px-2.5 py-2 text-sm transition',
-                              toolSel[k]
-                                ? 'border-teal-400 ring-1 ring-teal-400/50'
-                                : 'border-slate-200 hover:border-slate-300',
-                              !companyTools.includes(k) && 'opacity-50',
-                            )}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={toolSel[k]}
-                              disabled={!companyTools.includes(k)}
-                              onChange={(e) => setToolSel((s) => ({ ...s, [k]: e.target.checked }))}
-                              className="rounded border-slate-300 text-teal-700 focus:ring-teal-600"
-                            />
-                            <span className="font-medium text-slate-800">{toolDisplayName(k)}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => void save()}
-                        className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
-                      >
-                        {saving
-                          ? t('A guardar…', 'Guardando…', 'Saving…')
-                          : t('Guardar acesso', 'Guardar acceso', 'Save access')}
-                      </button>
-                      {selectedGrant?.enabled && (
-                        <button
-                          type="button"
-                          onClick={() => void remove(targetUser)}
-                          className="rounded-lg border border-transparent px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-                        >
-                          {t('Remover acesso', 'Quitar acceso', 'Remove access')}
-                        </button>
-                      )}
-                    </div>
-                    {msg && <p className="mt-2 text-sm font-medium text-slate-800">{msg}</p>}
-                  </div>
-
-                  <div className="rounded-lg border border-slate-200 bg-white p-4">
-                    <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-800">
-                      <Lock className="h-3.5 w-3.5 text-slate-600" />
-                      {t('Permissões SIEP', 'Permisos SIEP', 'SIEP permissions')}
-                    </h3>
-                    <p className="mt-1 text-xs text-slate-600">
-                      {t(
-                        'O que vê no SIEP: orçamento, extrato, reportes de campo, etc.',
-                        'Qué ve en SIEP: montos, extracto, reportes de campo, etc.',
-                        'What they see in SIEP: budget, ledger, field reports, etc.',
-                      )}
-                    </p>
-                    {!siepSelected ? (
-                      <p className="mt-4 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-600">
-                        {t(
-                          'Marque SIEP nos sistemas para editar estas permissões.',
-                          'Marque SIEP en los sistemas para editar estos permisos.',
-                          'Enable SIEP in systems to edit these permissions.',
-                        )}
-                      </p>
-                    ) : (
-                      <div className="mt-3 max-h-[22rem] space-y-3 overflow-y-auto pr-1">
-                        {siepPermGroups.map((group) => (
-                          <div key={group.id}>
-                            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
-                              {group.label}
-                            </p>
-                            <div className="grid gap-1.5">
-                              {group.permissions.map((perm) => (
-                                <label
-                                  key={perm.key}
-                                  className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50/40 px-2.5 py-2 text-sm hover:border-slate-300"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={siepPerms[perm.key]}
-                                    onChange={(e) =>
-                                      setSiepPerms((s) => ({ ...s, [perm.key]: e.target.checked }))
-                                    }
-                                    className="mt-0.5 rounded border-slate-300 text-teal-700 focus:ring-teal-600"
-                                  />
-                                  <span>
-                                    <span className="font-medium text-slate-800">{perm.label}</span>
-                                    {perm.description && (
-                                      <span className="mt-0.5 block text-[11px] text-slate-600">
-                                        {perm.description}
-                                      </span>
-                                    )}
-                                  </span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                        <button
-                          type="button"
-                          disabled={siepSaving}
-                          onClick={() => void saveSiepPermissions()}
-                          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
-                        >
-                          {siepSaving
-                            ? t('A guardar…', 'Guardando…', 'Saving…')
-                            : t('Guardar permissões SIEP', 'Guardar permisos SIEP', 'Save SIEP permissions')}
-                        </button>
-                      </div>
-                    )}
-                    {siepMsg && <p className="mt-2 text-sm font-medium text-slate-800">{siepMsg}</p>}
-                  </div>
-                </div>
+                {msg && <p className="mt-2 text-sm font-medium text-slate-800">{msg}</p>}
               </div>
-            )}
-          </section>
-        </div>
 
-        {/* Active grants — compact summary, no step numbers */}
-        {grants.length > 0 && (
-          <section className={cn(PANEL, 'p-4 sm:p-5')}>
-            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-900">
-                  {t('Acessos activos', 'Accesos activos', 'Active grants')}
-                </h2>
-                <p className="text-xs text-slate-600">
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-800">
+                  <Lock className="h-3.5 w-3.5 text-slate-600" />
+                  {t('Permissões SIEP', 'Permisos SIEP', 'SIEP permissions')}
+                </h3>
+                <p className="mt-1 text-xs text-slate-600">
                   {t(
-                    'Quem já tem sistemas no centro integrado.',
-                    'Quién ya tiene sistemas en el centro integrado.',
-                    'Who already has systems in the integrated workspace.',
+                    'O que vê no SIEP: orçamento, extrato, reportes de campo, etc.',
+                    'Qué ve en SIEP: montos, extracto, reportes de campo, etc.',
+                    'What they see in SIEP: budget, ledger, field reports, etc.',
                   )}
                 </p>
+                {!siepSelected ? (
+                  <p className="mt-4 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-600">
+                    {t(
+                      'Marque SIEP nos sistemas para editar estas permissões.',
+                      'Marque SIEP en los sistemas para editar estos permisos.',
+                      'Enable SIEP in systems to edit these permissions.',
+                    )}
+                  </p>
+                ) : (
+                  <div className="mt-3 max-h-[22rem] space-y-3 overflow-y-auto pr-1">
+                    {siepPermGroups.map((group) => (
+                      <div key={group.id}>
+                        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
+                          {group.label}
+                        </p>
+                        <div className="grid gap-1.5">
+                          {group.permissions.map((perm) => (
+                            <label
+                              key={perm.key}
+                              className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50/40 px-2.5 py-2 text-sm hover:border-slate-300"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={siepPerms[perm.key]}
+                                onChange={(e) =>
+                                  setSiepPerms((s) => ({ ...s, [perm.key]: e.target.checked }))
+                                }
+                                className="mt-0.5 rounded border-slate-300 text-teal-700 focus:ring-teal-600"
+                              />
+                              <span>
+                                <span className="font-medium text-slate-800">{perm.label}</span>
+                                {perm.description && (
+                                  <span className="mt-0.5 block text-[11px] text-slate-600">
+                                    {perm.description}
+                                  </span>
+                                )}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={siepSaving}
+                      onClick={() => void saveSiepPermissions()}
+                      className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      {siepSaving
+                        ? t('A guardar…', 'Guardando…', 'Saving…')
+                        : t('Guardar permissões SIEP', 'Guardar permisos SIEP', 'Save SIEP permissions')}
+                    </button>
+                  </div>
+                )}
+                {siepMsg && <p className="mt-2 text-sm font-medium text-slate-800">{siepMsg}</p>}
               </div>
             </div>
-            <ul className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
-              {grants.map((g) => (
-                <li
-                  key={g.userId}
-                  className="flex flex-wrap items-center justify-between gap-3 bg-white px-3 py-2.5 sm:px-4"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">{g.name || g.email}</p>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {g.systems.map((sys) => (
-                        <SystemChip
-                          key={sys}
-                          label={systemDisplayName(sys as WorkspaceSystemKey)}
-                          active
-                        />
-                      ))}
-                      {(g.tools || []).map((tool) => (
-                        <SystemChip key={tool} label={toolDisplayName(tool)} active />
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => selectMember(g.userId)}
-                      className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-50"
-                    >
-                      {t('Editar', 'Editar', 'Edit')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void remove(g.userId)}
-                      className="rounded-md px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
-                    >
-                      {t('Remover', 'Quitar', 'Remove')}
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
           </section>
         )}
       </div>

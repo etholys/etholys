@@ -6,8 +6,7 @@ import {
   Building2,
   Check,
   CreditCard,
-  Shield,
-  UserPlus,
+  Users,
   ArrowRight,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
@@ -152,30 +151,18 @@ export function AdminSetupGuide({ companyId, onGoToStep }: Props) {
     {
       id: 'team',
       n: 2,
-      title: t('Convidar equipa', 'Invitar equipo', 'Invite team'),
+      title: t('Utilizadores e permissões', 'Usuarios y permisos', 'Users & permissions'),
       hint: t(
-        'Envie convites para colegas entrarem na organização.',
-        'Envíe invitaciones para que colegas entren a la organización.',
-        'Send invites so colleagues can join the organization.',
+        'Convide a equipa e defina sistemas e Tools de cada pessoa.',
+        'Invite al equipo y defina sistemas y Tools de cada persona.',
+        'Invite the team and set systems and Tools for each person.',
       ),
-      done: status.team,
+      done: status.team && status.systems,
       href: '/hub/admin?s=users',
     },
     {
-      id: 'systems',
-      n: 3,
-      title: t('Sistemas e permissões', 'Sistemas y permisos', 'Systems & permissions'),
-      hint: t(
-        'Defina que módulos cada pessoa pode abrir.',
-        'Defina qué módulos puede abrir cada persona.',
-        'Choose which modules each person can open.',
-      ),
-      done: status.systems,
-      href: '/hub/admin?s=access',
-    },
-    {
       id: 'billing',
-      n: 4,
+      n: 3,
       title: t('Licenças e pagamentos', 'Licencias y pagos', 'Licenses & billing'),
       hint: t(
         'Contrate produtos e veja o plano da empresa.',
@@ -206,9 +193,9 @@ export function AdminSetupGuide({ companyId, onGoToStep }: Props) {
                   'Organization ready. Come back here whenever you need.',
                 )
               : t(
-                  'Siga estes 4 passos na ordem — comece pela empresa, depois a equipa.',
-                  'Siga estos 4 pasos en orden — empiece por la empresa, luego el equipo.',
-                  'Follow these 4 steps in order — start with the company, then the team.',
+                  'Siga estes passos na ordem — comece pela empresa, depois a equipa.',
+                  'Siga estos pasos en orden — empiece por la empresa, luego el equipo.',
+                  'Follow these steps in order — start with the company, then the team.',
                 )}
           </p>
         </div>
@@ -233,13 +220,7 @@ export function AdminSetupGuide({ companyId, onGoToStep }: Props) {
       <ol className="space-y-2">
         {steps.map((step) => {
           const Icon =
-            step.id === 'organization'
-              ? Building2
-              : step.id === 'team'
-                ? UserPlus
-                : step.id === 'systems'
-                  ? Shield
-                  : CreditCard;
+            step.id === 'organization' ? Building2 : step.id === 'team' ? Users : CreditCard;
           const isNext = next?.id === step.id;
           return (
             <li

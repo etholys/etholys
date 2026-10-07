@@ -10,9 +10,8 @@ import {
   LayoutDashboard,
   Layers,
   Menu,
-  Shield,
+  Users,
   User,
-  UserPlus,
   X,
   ClipboardList,
 } from 'lucide-react';
@@ -20,6 +19,8 @@ import { useApp } from '@/app/providers';
 import { AdminAccessGuard } from '@/components/hub/AdminAccessGuard';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
+import { CompanyPicker } from '@/components/hub/CompanyPicker';
+import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { sysTheme } from '@/lib/system-shell';
 import { cn } from '@/lib/utils';
 import {
@@ -38,8 +39,8 @@ function navLabel(section: AdminSection, locale: string) {
       en: 'Organization profile',
     },
     areas: { pt: 'Áreas / sectores', es: 'Áreas / sectores', en: 'Areas / sectors' },
-    users: { pt: 'Utilizadores e convites', es: 'Usuarios e invitaciones', en: 'Users & invites' },
-    access: { pt: 'Permissões e sistemas', es: 'Permisos y sistemas', en: 'Permissions & systems' },
+    users: { pt: 'Utilizadores', es: 'Usuarios', en: 'Users' },
+    access: { pt: 'Utilizadores', es: 'Usuarios', en: 'Users' },
     billing: { pt: 'Licenças e pagamentos', es: 'Licencias y pagos', en: 'Licenses & billing' },
     account: { pt: 'Conta pessoal', es: 'Cuenta personal', en: 'Personal account' },
   };
@@ -52,14 +53,19 @@ const NAV: { id: AdminSection; icon: typeof Building2; group: 'org' | 'people' |
   { id: 'companies', icon: Building2, group: 'org' },
   { id: 'org-profile', icon: ClipboardList, group: 'org' },
   { id: 'areas', icon: Layers, group: 'org' },
-  { id: 'users', icon: UserPlus, group: 'people' },
-  { id: 'access', icon: Shield, group: 'people' },
+  { id: 'users', icon: Users, group: 'people' },
   { id: 'billing', icon: CreditCard, group: 'commerce' },
   { id: 'account', icon: User, group: 'you' },
 ];
 
 function AdminShellInner({ children }: { children: React.ReactNode }) {
-  const { locale, activeCompanyId } = useApp();
+  const { locale, activeCompanyId, setActiveCompanyId } = useApp();
+  const {
+    companies,
+    companiesReady,
+    companiesLoadError,
+    reloadCompanies,
+  } = useEnsureActiveCompany();
   const search = useSearchParams();
   const pathname = usePathname();
   const section = parseAdminSection(search.get('s'));
@@ -150,6 +156,22 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
             <ArrowLeft className="h-3 w-3" />
             {t('Voltar ao Hub', 'Volver al Hub', 'Back to Hub')}
           </Link>
+          <div className="mt-3 px-0.5">
+            <p className="mb-1.5 px-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35">
+              {t('Empresa activa', 'Empresa activa', 'Active company')}
+            </p>
+            <CompanyPicker
+              companies={companies}
+              activeCompanyId={String(activeCompanyId || '')}
+              onSelect={(id) => setActiveCompanyId(id)}
+              ready={companiesReady}
+              error={companiesLoadError}
+              onRetry={() => void reloadCompanies()}
+              tone="dark"
+              locale={locale}
+              className="w-full"
+            />
+          </div>
         </div>
         {Nav}
         <div className="flex-shrink-0 border-t border-white/10 p-3">
@@ -173,7 +195,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
           </span>
         </div>
         <main className="sys-canvas min-w-0 flex-1 overflow-auto p-4 md:p-6">
-          <div className={cn('mx-auto', section === 'access' ? 'max-w-6xl' : 'max-w-5xl')}>
+          <div className={cn('mx-auto', section === 'users' ? 'max-w-6xl' : 'max-w-5xl')}>
             <AdminAccessGuard companyId={activeCompanyId}>{children}</AdminAccessGuard>
           </div>
         </main>

@@ -8,8 +8,7 @@ import {
   Building2,
   ClipboardList,
   CreditCard,
-  Shield,
-  UserPlus,
+  Users,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { EtholysSettingsContent } from '@/components/etholys-admin/EtholysSettingsContent';
@@ -43,7 +42,7 @@ function OverviewPanel() {
     const map: Record<AdminSetupStepId, AdminSection> = {
       organization: 'companies',
       team: 'users',
-      systems: 'access',
+      systems: 'users',
       billing: 'billing',
     };
     router.push(adminHref(map[step]));
@@ -62,28 +61,18 @@ function OverviewPanel() {
     },
     {
       s: 'users',
-      icon: UserPlus,
+      icon: Users,
       title: t('2. Utilizadores', '2. Usuarios', '2. Users'),
       body: t(
-        'Convide membros para a empresa activa.',
-        'Invite miembros a la empresa activa.',
-        'Invite members to the active company.',
-      ),
-    },
-    {
-      s: 'access',
-      icon: Shield,
-      title: t('3. Permissões', '3. Permisos', '3. Permissions'),
-      body: t(
-        'Decida que sistemas cada pessoa pode abrir.',
-        'Defina qué sistemas puede abrir cada persona.',
-        'Decide which systems each person can open.',
+        'Equipa, convites e permissões (sistemas e Tools) num só sítio.',
+        'Equipo, invitaciones y permisos (sistemas y Tools) en un solo lugar.',
+        'Team, invites and permissions (systems and Tools) in one place.',
       ),
     },
     {
       s: 'billing',
       icon: CreditCard,
-      title: t('4. Licenças', '4. Licencias', '4. Licenses'),
+      title: t('3. Licenças', '3. Licencias', '3. Licenses'),
       body: t(
         'Contrate produtos e gerencie faturas.',
         'Contrate productos y gestione facturas.',
@@ -223,32 +212,16 @@ function AdminSectionBody() {
 
   if (section === 'users') {
     return (
-      <div>
-        <SectionTitle
-          title={t('Utilizadores e convites', 'Usuarios e invitaciones', 'Users & invites')}
-          subtitle={t(
-            'Convide pessoas para a empresa activa.',
-            'Invite personas a la empresa activa.',
-            'Invite people to the active company.',
-          )}
-        />
-        <EtholysSettingsContent accent="slate" hideHeader title="" sections={['invitations']} />
-      </div>
-    );
-  }
-
-  if (section === 'access') {
-    return (
       <div className="space-y-4">
         <SectionTitle
-          title={t('Permissões e sistemas', 'Permisos y sistemas', 'Permissions & systems')}
+          title={t('Utilizadores', 'Usuarios', 'Users')}
           subtitle={t(
-            'Equipa, convites e grants do centro integrado — vivem aqui, não no Centro.',
-            'Equipo, invitaciones y grants del centro integrado — viven aquí, no en el Centro.',
-            'Team, invites and integrated workspace grants live here, not in the Centro.',
+            'Equipa da empresa activa: convide, veja o resumo e administre permissões de cada pessoa.',
+            'Equipo de la empresa activa: invite, vea el resumen y administre permisos de cada persona.',
+            'Active company team: invite, review summaries, and manage each person’s permissions.',
           )}
         />
-        <WorkspaceAccessManager />
+        <WorkspaceAccessManager embedded />
       </div>
     );
   }
