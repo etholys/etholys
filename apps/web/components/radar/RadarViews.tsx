@@ -9,7 +9,7 @@ import {
   type ParcelAction,
 } from '@/lib/radar/agriculture';
 import { RadarChainBoard } from '@/components/radar/RadarChainBoard';
-import { RadarSiteMap } from '@/components/radar/RadarSiteMap';
+import { RadarSpatialTwin } from '@/components/radar/RadarSpatialTwin';
 import { TRACE_STAGES, TRACE_STAGE_LABEL, type TraceStage } from '@/lib/radar/trace';
 
 type Loc = 'pt' | 'es' | 'en';
@@ -326,17 +326,14 @@ export function RadarOpsView({
         </section>
       )}
 
-      {/* Planta 2D */}
-      <RadarSiteMap
-        companyId={companyId}
-        engagementId={engagementId}
+      <RadarSpatialTwin
         locale={loc}
         moduleId="agriculture"
-        mode="ops"
         parcels={parcels}
         sensors={mapSensors}
         focusedId={focus?.id || null}
         onFocus={setFocusedId}
+        hero
       />
 
       {/* Métricas + espaços */}

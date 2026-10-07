@@ -10,6 +10,7 @@ import type { PropertyStepId, PropertyStepState } from '@/lib/radar/property-pro
 import { RadarProgressRail } from '@/components/radar/RadarProgressRail';
 import { RadarGeoPin } from '@/components/radar/RadarGeoPin';
 import { RadarSiteMap } from '@/components/radar/RadarSiteMap';
+import { RadarSpatialTwin } from '@/components/radar/RadarSpatialTwin';
 import { RadarCropsPanel } from '@/components/radar/RadarCropsPanel';
 import { RadarAddParcelForm } from '@/components/radar/RadarAddParcelForm';
 import { RadarFocusSheet } from '@/components/radar/RadarFocusSheet';
@@ -246,30 +247,20 @@ export function RadarPropertyWorkspace({
               focusedId={focusedId}
               onFocus={setFocusedId}
             />
-            <div className="space-y-2">
-              <p className="text-xs text-white/45">
-                {radarT(loc, 'Planta — toca uma zona ou escolhe na árvore.', 'Planta — tocá una zona o elegí en el árbol.', 'Plant — tap a zone or pick from the tree.')}
-              </p>
-              <RadarSiteMap
-                companyId={companyId}
-                engagementId={engagementId}
-                propertyId={propertyId}
-                locale={loc}
-                moduleId={data.moduleId}
-                mode="ops"
-                parcels={mapParcels}
-                sensors={data.sensors.map((s) => ({
-                  id: s.id,
-                  name: s.name,
-                  unitId: s.unitId,
-                  lastValue: s.lastValue ?? null,
-                }))}
-                focusedId={focusedId}
-                onFocus={setFocusedId}
-                onSaved={() => void load()}
-                hero
-              />
-            </div>
+            <RadarSpatialTwin
+              locale={loc}
+              moduleId={data.moduleId}
+              parcels={mapParcels}
+              sensors={data.sensors.map((s) => ({
+                id: s.id,
+                name: s.name,
+                unitId: s.unitId,
+                lastValue: s.lastValue ?? null,
+              }))}
+              focusedId={focusedId}
+              onFocus={setFocusedId}
+              hero
+            />
             <RadarFocusSheet
               companyId={companyId}
               engagementId={engagementId}
