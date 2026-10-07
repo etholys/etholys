@@ -12,6 +12,8 @@ export {
   reconcileStaleLiveMeetSessions,
   meetJoinSessionId,
   assertMeetPrismaReady,
+  isMeetSessionOwner,
+  claimMeetSessionOnJoin,
 } from '@/lib/meet/create-session';
 export {
   expandMeetOccurrences,
@@ -27,6 +29,8 @@ export {
   meetRoomSlug,
   isMeetMirror,
   meetHubJoinPath,
+  meetPublicJoinUrl,
+  meetRoomResolvePath,
   meetJoinTargetId,
   meetRecapPath,
   meetRecapsPath,

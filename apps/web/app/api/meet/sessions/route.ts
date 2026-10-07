@@ -8,6 +8,7 @@ import { isMeetRecurrenceFrequency } from '@/lib/meet/recurrence';
 import { sendMeetInviteEmail } from '@/lib/meet/send-meet-email';
 import { pushMeetSessionToGoogle } from '@/lib/meet/calendar-google-sync';
 import { getGoogleCalendarAccessToken } from '@/lib/meet/calendar-google';
+import { meetPublicJoinUrl } from '@/lib/meet/types';
 
 export async function GET(req: Request) {
   try {
@@ -101,14 +102,15 @@ export async function POST(req: Request) {
     });
 
     const inviteResults: { email: string; sent: boolean; error?: string }[] = [];
-    if (body.sendInvites && body.inviteEmails?.length && session.meetingUrl) {
+    if (body.sendInvites && body.inviteEmails?.length) {
+      const joinUrl = meetPublicJoinUrl(session.id, companyId);
       for (const raw of body.inviteEmails) {
         const email = raw.trim().toLowerCase();
         if (!email.includes('@')) continue;
         const r = await sendMeetInviteEmail({
           to: email,
           title: session.title,
-          meetingUrl: session.meetingUrl,
+          meetingUrl: joinUrl,
           sessionId: session.id,
           scheduledAt: session.scheduledAt,
           endsAt: session.endsAt,

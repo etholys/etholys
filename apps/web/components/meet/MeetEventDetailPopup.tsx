@@ -22,7 +22,14 @@ import {
 import { useRouter } from 'next/navigation';
 import { MeetExternalJoinPrompt } from '@/components/meet/MeetExternalJoinPrompt';
 import { MeetGuestPicker } from '@/components/meet/MeetGuestPicker';
-import { meetHubJoinPath, meetJoinTargetId, meetRecapPath, meetCapturePath, isGoogleImportedMeetSession } from '@/lib/meet/types';
+import {
+  meetHubJoinPath,
+  meetJoinTargetId,
+  meetPublicJoinUrl,
+  meetRecapPath,
+  meetCapturePath,
+  isGoogleImportedMeetSession,
+} from '@/lib/meet/types';
 import {
   MEET_TIMEZONE_OPTIONS,
   browserTimeZone,
@@ -253,10 +260,11 @@ export function MeetEventDetailPopup({
     }
   }
 
+  const inviteJoinUrl = meetPublicJoinUrl(meetJoinTargetId(session), companyId);
+
   async function copyLink() {
-    if (!session.meetingUrl) return;
     try {
-      await navigator.clipboard.writeText(session.meetingUrl);
+      await navigator.clipboard.writeText(inviteJoinUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -630,12 +638,10 @@ export function MeetEventDetailPopup({
                 </div>
               </div>
 
-              {session.meetingUrl && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                  <p className="font-medium text-slate-700">CHORUS</p>
-                  <p className="mt-1 break-all">{session.meetingUrl}</p>
-                </div>
-              )}
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                <p className="font-medium text-slate-700">CHORUS</p>
+                <p className="mt-1 break-all">{inviteJoinUrl}</p>
+              </div>
 
               {inSeries && !session.isPermanent && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800">
@@ -699,16 +705,14 @@ export function MeetEventDetailPopup({
                 <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">CHORUS</p>
-                  {session.meetingUrl && (
-                    <button
-                      type="button"
-                      onClick={() => void copyLink()}
-                      className="mt-1 inline-flex max-w-full items-center gap-1.5 truncate text-xs text-sky-700 hover:underline"
-                    >
-                      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      <span className="truncate">{session.meetingUrl}</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => void copyLink()}
+                    className="mt-1 inline-flex max-w-full items-center gap-1.5 truncate text-xs text-sky-700 hover:underline"
+                  >
+                    {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    <span className="truncate">{inviteJoinUrl}</span>
+                  </button>
                 </div>
               </div>
 
@@ -900,16 +904,14 @@ export function MeetEventDetailPopup({
                 <FileText className="h-4 w-4" />
                 {t('Transcrição e resumo', 'Transcripción y resumen', 'Transcript & summary')}
               </Link>
-              {session.meetingUrl && (
-                <button
-                  type="button"
-                  onClick={() => void copyLink()}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {t('Copiar link', 'Copiar enlace', 'Copy link')}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => void copyLink()}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {t('Copiar link', 'Copiar enlace', 'Copy link')}
+              </button>
               {isOwner && googleCalendarReady && (
                 <button
                   type="button"

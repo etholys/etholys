@@ -56,12 +56,12 @@ export async function POST(req: Request, ctx: Ctx) {
     }
 
     const refreshed = await getMeetSessionForCompany(id, companyId);
-    const meetingUrl = refreshed?.meetingUrl || session.meetingUrl;
     const results = await sendMeetSessionInvites({
+      companyId,
       session: {
         id: masterId,
         title: session.title,
-        meetingUrl,
+        meetingUrl: refreshed?.meetingUrl || session.meetingUrl,
         scheduledAt: session.scheduledAt,
         endsAt: session.endsAt,
       },

@@ -41,13 +41,46 @@ export function meetHubJoinPath(sessionId: string, companyId: string): string {
   return `/hub/meet/${sessionId}?companyId=${encodeURIComponent(companyId)}`;
 }
 
+/** Base pública da app (convites, calendário, links partilhados). */
+export function meetAppBaseUrl(): string {
+  const raw =
+    process.env.NEXTAUTH_URL?.trim() ||
+    process.env.APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    'https://app.etholys.com';
+  return raw.replace(/\/$/, '');
+}
+
+/**
+ * Link de convite / calendário — SEMPRE o Hub CHORUS (identifica a conta e o host).
+ * Nunca enviar só o URL da sala de vídeo: o utilizador entra anónimo e perde o host.
+ */
+export function meetPublicJoinUrl(sessionId: string, companyId: string): string {
+  const path = meetHubJoinPath(sessionId, companyId);
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}${path}`;
+  }
+  return `${meetAppBaseUrl()}${path}`;
+}
+
+/** Resolver sala de vídeo → Hub (links antigos meet.etholys.com/…). */
+export function meetRoomResolvePath(roomSlug: string): string {
+  return `/hub/meet/r/${encodeURIComponent(roomSlug)}`;
+}
+
 /** Captura externa (Zoom/Teams/outro) ligada a uma sessão Meet. */
 export function meetCapturePath(opts: {
   companyId: string;
   sessionId?: string | null;
+  /** Abrir o link da call após carregar a página de captura */
+  openMeetingUrl?: string | null;
+  /** Arrancar o picker de ecrã automaticamente */
+  autoRecord?: boolean;
 }): string {
   const params = new URLSearchParams({ companyId: opts.companyId });
   if (opts.sessionId) params.set('sessionId', opts.sessionId);
+  if (opts.openMeetingUrl) params.set('openUrl', opts.openMeetingUrl);
+  if (opts.autoRecord) params.set('autoRecord', '1');
   return `/hub/meet/capture?${params.toString()}`;
 }
 

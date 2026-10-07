@@ -12,6 +12,7 @@ import {
 } from '@/lib/meet/calendar-google';
 import { upsertExternalCalendarMeetSession, collectMeetGuestEmails } from '@/lib/meet/create-session';
 import { meetRecurrenceToRrule, isMeetRecurrenceFrequency } from '@/lib/meet/recurrence';
+import { meetPublicJoinUrl } from '@/lib/meet/types';
 
 export function googleMeetRoomSlug(googleEventId: string): string {
   const safe = googleEventId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 48);
@@ -783,10 +784,12 @@ export async function pushMeetSessionToGoogle(opts: {
       : 'none';
   const recurrenceRule = meetRecurrenceToRrule(recurrence, session.recurrenceUntil);
 
+  // Convite Google → Hub CHORUS (conta + host). meetingUrl da sala fica só no embed.
+  const joinUrl = meetPublicJoinUrl(session.id, session.companyId);
   const eventInput: MeetCalendarEventInput = {
     title: session.title,
-    description: [session.description, session.meetingUrl].filter(Boolean).join('\n\n') || undefined,
-    locationUrl: session.meetingUrl || undefined,
+    description: [session.description, joinUrl].filter(Boolean).join('\n\n') || undefined,
+    locationUrl: joinUrl,
     startsAt: session.scheduledAt,
     endsAt,
     timeZone: opts.timeZone || 'UTC',

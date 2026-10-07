@@ -43,7 +43,15 @@ import {
   type MeetEventDetail,
 } from '@/components/meet/MeetEventDetailPopup';
 import { MeetExternalJoinPrompt } from '@/components/meet/MeetExternalJoinPrompt';
-import { meetHubJoinPath, meetJoinTargetId, meetRecapPath, meetRecapsPath, meetCapturePath, isGoogleImportedMeetSession } from '@/lib/meet/types';
+import {
+  meetHubJoinPath,
+  meetJoinTargetId,
+  meetPublicJoinUrl,
+  meetRecapPath,
+  meetRecapsPath,
+  meetCapturePath,
+  isGoogleImportedMeetSession,
+} from '@/lib/meet/types';
 
 type MeetSessionRow = MeetEventDetail & {
   mirror: string;
@@ -378,7 +386,10 @@ function MeetHubContent() {
         }
         setScheduleOpen(false);
         if (draft.isPermanent) {
-          setShareSession({ id: d.session.id, meetingUrl: d.session.meetingUrl || '' });
+          setShareSession({
+            id: d.session.id,
+            meetingUrl: meetPublicJoinUrl(d.session.id, companyId),
+          });
         } else {
           setSelectedDate(new Date(draft.startsAt));
           setMainView('calendar');
@@ -388,8 +399,11 @@ function MeetHubContent() {
         return;
       }
 
-      if ((mode === 'later' || mode === 'permanent') && d.session?.id && d.session.meetingUrl) {
-        setShareSession({ id: d.session.id, meetingUrl: d.session.meetingUrl });
+      if ((mode === 'later' || mode === 'permanent') && d.session?.id) {
+        setShareSession({
+          id: d.session.id,
+          meetingUrl: meetPublicJoinUrl(d.session.id, companyId),
+        });
         await load();
         return;
       }
@@ -1402,20 +1416,18 @@ function MeetingGroup({
                   </Link>
 
                   <div className="flex items-center gap-1 opacity-70 transition group-hover:opacity-100">
-                    {s.meetingUrl && (
-                      <button
-                        type="button"
-                        onClick={() => onCopy(s.meetingUrl!, s.id)}
-                        title={t('Copiar link', 'Copiar enlace', 'Copy link')}
-                        className="rounded-full p-2 text-slate-500 hover:bg-white hover:text-slate-800"
-                      >
-                        {copiedId === s.id ? (
-                          <Check className="h-3.5 w-3.5" />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" />
-                        )}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => onCopy(meetPublicJoinUrl(meetJoinTargetId(s), companyId), s.id)}
+                      title={t('Copiar link', 'Copiar enlace', 'Copy link')}
+                      className="rounded-full p-2 text-slate-500 hover:bg-white hover:text-slate-800"
+                    >
+                      {copiedId === s.id ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </button>
                     {companyId && (
                       <>
                         <a

@@ -9,6 +9,7 @@ import {
   updateMeetSessionScoped,
   syncMeetParticipants,
   isMeetSessionOwner,
+  claimMeetSessionOnJoin,
   meetSeriesMasterId,
   collectMeetGuestEmails,
 } from '@/lib/meet/create-session';
@@ -37,9 +38,25 @@ export async function GET(req: Request, ctx: Ctx) {
       return NextResponse.json({ error: 'companyId inválido' }, { status: 400 });
     }
 
-    const session = await getMeetSessionForCompany(id, companyId);
+    const user = await prisma.user.findUnique({
+      where: { id: tenant.userId },
+      select: { email: true, name: true },
+    });
+
+    // Sempre reclamar host se fores o criador — mesmo ao reentrar a meio da call.
+    const claimed = await claimMeetSessionOnJoin({
+      sessionId: id,
+      companyId,
+      userId: tenant.userId,
+      email: user?.email,
+      name: user?.name,
+    });
+    const session = claimed || (await getMeetSessionForCompany(id, companyId));
     if (!session) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
-    return NextResponse.json({ session });
+    return NextResponse.json({
+      session,
+      isHost: isMeetSessionOwner(session, tenant.userId, user?.email),
+    });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Error interno';
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -226,9 +243,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
     const inviteResults: { email: string; sent: boolean; error?: string }[] = [];
     const masterId = meetSeriesMasterId(session);
     const master = await getMeetSessionForCompany(masterId, companyId);
-    const meetingUrl = master?.meetingUrl || session.meetingUrl;
 
-    if (meetingUrl && (body.sendInvites || body.notifyAttendees)) {
+    if (body.sendInvites || body.notifyAttendees) {
       const hostName = session.createdBy?.name || session.createdBy?.email || null;
       const newEmails = (body.inviteEmails ?? [])
         .map((e) => e.trim().toLowerCase())
@@ -246,10 +262,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
         const inviteSession = master || session;
         inviteResults.push(
           ...(await sendMeetSessionInvites({
+            companyId,
             session: {
               id: masterId,
               title: inviteSession.title,
-              meetingUrl,
+              meetingUrl: inviteSession.meetingUrl,
               scheduledAt: inviteSession.scheduledAt,
               endsAt: inviteSession.endsAt,
             },

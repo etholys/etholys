@@ -190,7 +190,7 @@ export function MeetRoomClient({ sessionId }: Props) {
     [joinPrefs.language, locale],
   );
 
-  const isHost = Boolean(currentUserId && session?.createdById === currentUserId);
+  const [isHost, setIsHost] = useState(false);
   const displayName =
     (authSession?.user as { name?: string | null } | undefined)?.name?.trim() ||
     (authSession?.user as { email?: string | null } | undefined)?.email?.trim() ||
@@ -255,7 +255,7 @@ export function MeetRoomClient({ sessionId }: Props) {
       const r = await fetch(
         `/api/meet/sessions/${sessionId}?companyId=${encodeURIComponent(companyId)}`,
       );
-      const d = (await r.json()) as { session?: SessionRow; error?: string };
+      const d = (await r.json()) as { session?: SessionRow; isHost?: boolean; error?: string };
       if (!r.ok) throw new Error(d.error || 'Error');
       if (d.session?.seriesParentId && d.session.seriesParentId !== sessionId) {
         router.replace(
@@ -264,13 +264,19 @@ export function MeetRoomClient({ sessionId }: Props) {
         return;
       }
       setSession(d.session ?? null);
+      setIsHost(
+        Boolean(
+          d.isHost ||
+            (currentUserId && d.session?.createdById && d.session.createdById === currentUserId),
+        ),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
       setSession(null);
     } finally {
       setLoading(false);
     }
-  }, [companyId, sessionId, locale]);
+  }, [companyId, sessionId, locale, currentUserId, router]);
 
   useEffect(() => {
     void load();

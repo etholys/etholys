@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { getMeetSessionForCompany } from '@/lib/meet/create-session';
 import { buildMeetIcs } from '@/lib/meet/ics';
+import { meetPublicJoinUrl } from '@/lib/meet/types';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -23,11 +24,12 @@ export async function GET(req: Request, ctx: Ctx) {
 
     const starts = session.scheduledAt ?? session.createdAt;
     const ends = session.endsAt ?? new Date(starts.getTime() + 60 * 60 * 1000);
+    const joinUrl = meetPublicJoinUrl(session.id, companyId);
     const ics = buildMeetIcs({
       uid: `${session.id}@etholys.meet`,
       title: session.title,
-      description: session.meetingUrl || session.description || undefined,
-      locationUrl: session.meetingUrl || undefined,
+      description: [session.description, joinUrl].filter(Boolean).join('\n\n') || joinUrl,
+      locationUrl: joinUrl,
       startsAt: starts,
       endsAt: ends,
     });

@@ -381,11 +381,81 @@ export function meetSeriesMasterId(session: {
 }
 
 export function isMeetSessionOwner(
-  session: { createdById: string | null; participants: { userId: string | null; role: string }[] },
+  session: {
+    createdById: string | null;
+    createdBy?: { email?: string | null } | null;
+    participants: { userId: string | null; role: string; email?: string | null }[];
+  },
   userId: string,
+  email?: string | null,
 ): boolean {
   if (session.createdById === userId) return true;
-  return session.participants.some((p) => p.userId === userId && (p.role === 'host' || p.role === 'cohost'));
+  const mail = email?.trim().toLowerCase();
+  if (mail && session.createdBy?.email?.trim().toLowerCase() === mail) return true;
+  return session.participants.some(
+    (p) =>
+      (p.userId === userId || (mail && p.email?.trim().toLowerCase() === mail)) &&
+      (p.role === 'host' || p.role === 'cohost'),
+  );
+}
+
+/**
+ * Ao abrir a sala no Hub: liga a conta ao participante e devolve host ao criador.
+ * Corrige o caso «entrei pelo link e fiquei anónimo / sem host».
+ */
+export async function claimMeetSessionOnJoin(opts: {
+  sessionId: string;
+  companyId: string;
+  userId: string;
+  email?: string | null;
+  name?: string | null;
+}) {
+  assertMeetPrismaReady();
+  const session = await prisma.meetSession.findFirst({
+    where: { id: opts.sessionId, companyId: opts.companyId },
+    include: {
+      participants: true,
+      createdBy: { select: { id: true, email: true } },
+    },
+  });
+  if (!session) return null;
+
+  const mail = opts.email?.trim().toLowerCase() || null;
+  const isOwner =
+    session.createdById === opts.userId ||
+    Boolean(mail && session.createdBy?.email?.trim().toLowerCase() === mail);
+
+  const existing = session.participants.find(
+    (p) =>
+      p.userId === opts.userId ||
+      (mail && p.email?.trim().toLowerCase() === mail),
+  );
+
+  if (existing) {
+    await prisma.meetParticipant.update({
+      where: { id: existing.id },
+      data: {
+        userId: opts.userId,
+        joinedAt: existing.joinedAt ?? new Date(),
+        ...(opts.name ? { displayName: opts.name } : {}),
+        ...(mail && !existing.email ? { email: mail } : {}),
+        ...(isOwner ? { role: 'host' } : {}),
+      },
+    });
+  } else {
+    await prisma.meetParticipant.create({
+      data: {
+        sessionId: session.id,
+        userId: opts.userId,
+        email: mail,
+        displayName: opts.name || null,
+        role: isOwner ? 'host' : 'guest',
+        joinedAt: new Date(),
+      },
+    });
+  }
+
+  return getMeetSessionForCompany(opts.sessionId, opts.companyId);
 }
 
 /** Ocorrências filhas herdam convidados do mestre da série. */
