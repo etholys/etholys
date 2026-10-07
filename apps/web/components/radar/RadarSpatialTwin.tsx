@@ -32,21 +32,21 @@ type Props = {
 
 type Slot = { x: number; y: number; w: number; h: number };
 
-/** Fixed room slots on the isometric platform (viewBox 0–100). */
 function slotsFor(n: number): Slot[] {
   if (n <= 1) return [{ x: 22, y: 28, w: 56, h: 44 }];
-  if (n === 2)
+  if (n === 2) {
     return [
       { x: 10, y: 30, w: 38, h: 42 },
       { x: 52, y: 30, w: 38, h: 42 },
     ];
-  if (n === 3)
+  }
+  if (n === 3) {
     return [
       { x: 8, y: 18, w: 40, h: 34 },
       { x: 52, y: 18, w: 40, h: 34 },
       { x: 28, y: 56, w: 44, h: 30 },
     ];
-  // 4+
+  }
   return [
     { x: 8, y: 16, w: 40, h: 32 },
     { x: 52, y: 16, w: 40, h: 32 },
@@ -70,7 +70,6 @@ const PIN = {
   critical: '#e11d48',
 } as const;
 
-/** Mini props inside a room — matches ref style (objects, not metrics). */
 function ZoneProps({
   moduleId,
   x,
@@ -101,13 +100,22 @@ function ZoneProps({
   if (moduleId === 'livestock') {
     return (
       <g opacity={0.9}>
-        <rect x={x + 5} y={y + 10} width={w - 10} height={h - 18} rx={2} fill="#fde68a" fillOpacity={0.35} stroke="#fbbf24" strokeWidth={0.4} />
+        <rect
+          x={x + 5}
+          y={y + 10}
+          width={w - 10}
+          height={h - 18}
+          rx={2}
+          fill="#fde68a"
+          fillOpacity={0.35}
+          stroke="#fbbf24"
+          strokeWidth={0.4}
+        />
         <ellipse cx={cx - 6} cy={cy} rx={3.2} ry={2.2} fill="#fbbf24" />
         <ellipse cx={cx + 7} cy={cy + 2} rx={2.8} ry={2} fill="#f59e0b" />
       </g>
     );
   }
-  // agriculture — rows + crates
   const rows = [0, 1, 2].map((r) => y + 12 + r * (h * 0.18));
   return (
     <g opacity={0.92}>
@@ -139,23 +147,18 @@ function SensorBeacon({
   label: string;
 }) {
   return (
-    <g transform={`translate(${cx} ${cy})`} style={{ pointerEvents: 'none' }}>
+    <g transform={`translate(${cx} ${cy})`} pointerEvents="none">
       <title>{label}</title>
-      {/* concentric rings — like the refs */}
       <circle r={9} fill="none" stroke={color} strokeWidth={0.55} opacity={0.22} />
       <circle r={6.2} fill="none" stroke={color} strokeWidth={0.65} opacity={0.4} />
       <circle r={3.6} fill="none" stroke={color} strokeWidth={0.75} opacity={0.65} />
-      {/* device body */}
       <rect x={-2.2} y={-2.2} width={4.4} height={4.4} rx={0.7} fill="#1e293b" stroke="#0f172a" strokeWidth={0.35} />
       <rect x={-1.2} y={-1.2} width={2.4} height={2.4} rx={0.35} fill={color} opacity={0.95} />
     </g>
   );
 }
 
-/**
- * BlueIoT-style spatial twin: one isometric platform, rooms with props,
- * sensors with signal rings. Click a room to focus — metrics live in Tasks.
- */
+/** Isometric platform with rooms, props, and sensor rings (BlueIoT-style). */
 export function RadarSpatialTwin({
   locale,
   moduleId,
@@ -168,12 +171,15 @@ export function RadarSpatialTwin({
   const loc = radarLoc(locale);
   const shown = parcels.slice(0, 4);
   const slots = slotsFor(Math.max(1, shown.length));
+  const tall = hero
+    ? 'min-h-[300px] sm:min-h-[400px] md:min-h-[460px]'
+    : 'min-h-[280px] sm:min-h-[360px]';
 
   if (shown.length === 0) {
     return (
-      <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-white/10 bg-[#dbeafe]/
+      <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-white/10 bg-[#dbeafe]">
         <p className="text-sm text-slate-600">
-          {radarT(loc, 'Ainda sem espaços na planta.', 'Aún sin espacios en la planta.', 'No spaces on the plant yet.')}
+          {radarT(loc, 'Ainda sem espacos na planta.', 'Aun sin espacios en la planta.', 'No spaces on the plant yet.')}
         </p>
       </div>
     );
@@ -181,9 +187,7 @@ export function RadarSpatialTwin({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border border-slate-200/80 ${
-        hero ? 'min-h-[300px] sm:min-h-[400px] md:min-h-[460px]' : 'min-h-[280px] sm:min-h-[360px]'
-      }`}
+      className={`relative overflow-hidden rounded-xl border border-slate-200/80 ${tall}`}
       style={{
         background: 'radial-gradient(ellipse at 50% 30%, #e0f2fe 0%, #bfdbfe 45%, #93c5fd 100%)',
       }}
@@ -194,10 +198,8 @@ export function RadarSpatialTwin({
         role="img"
         aria-label={radarT(loc, 'Planta espacial', 'Planta espacial', 'Spatial plant')}
       >
-        {/* soft shadow under platform */}
         <ellipse cx={50} cy={92} rx={34} ry={4.5} fill="#1e3a5f" opacity={0.18} />
 
-        {/* isometric platform (parallelogram-ish via transform) */}
         <g transform="translate(50 52) scale(1 0.58) rotate(-28) translate(-50 -50)">
           <rect
             x={6}
@@ -209,10 +211,9 @@ export function RadarSpatialTwin({
             stroke="#cbd5e1"
             strokeWidth={0.8}
           />
-          {/* floor grid */}
           {Array.from({ length: 9 }).map((_, i) => (
             <line
-              key={`v${i}`}
+              key={`v-${i}`}
               x1={14 + i * 9}
               y1={16}
               x2={14 + i * 9}
@@ -224,7 +225,7 @@ export function RadarSpatialTwin({
           ))}
           {Array.from({ length: 8 }).map((_, i) => (
             <line
-              key={`h${i}`}
+              key={`h-${i}`}
               x1={10}
               y1={18 + i * 9}
               x2={90}
@@ -241,14 +242,16 @@ export function RadarSpatialTwin({
             const tone = toneOf(parcel);
             const pinColor = PIN[tone];
             const roomSensors = sensors.filter((s) => s.unitId === parcel.id);
-            const beacon =
-              roomSensors[0] ||
-              ({
-                id: `zone-${parcel.id}`,
-                name: parcel.name,
-                lastValue: parcel.moisture,
-                unitId: parcel.id,
-              } satisfies TwinSensor);
+            const fallback: TwinSensor = {
+              id: `zone-${parcel.id}`,
+              name: parcel.name,
+              lastValue: parcel.moisture,
+              unitId: parcel.id,
+            };
+            const beacon = roomSensors[0] || fallback;
+            const shortName = parcel.name.length > 16 ? `${parcel.name.slice(0, 15)}...` : parcel.name;
+            const beaconLabel =
+              beacon.lastValue != null ? `${beacon.name}: ${beacon.lastValue}` : beacon.name;
 
             return (
               <g key={parcel.id}>
@@ -270,14 +273,13 @@ export function RadarSpatialTwin({
                     if (e.key === 'Enter' || e.key === ' ') onFocus(parcel.id);
                   }}
                 />
-                {/* low wall accents */}
                 <path
                   d={`M${slot.x} ${slot.y + 6} L${slot.x} ${slot.y} L${slot.x + slot.w} ${slot.y} L${slot.x + slot.w} ${slot.y + 6}`}
                   fill="none"
                   stroke="#cbd5e1"
                   strokeWidth={0.9}
                   opacity={0.9}
-                  style={{ pointerEvents: 'none' }}
+                  pointerEvents="none"
                 />
                 <ZoneProps moduleId={moduleId} x={slot.x} y={slot.y} w={slot.w} h={slot.h} i={i} />
                 <text
@@ -286,19 +288,15 @@ export function RadarSpatialTwin({
                   fill="#0f172a"
                   fontSize={3.2}
                   fontWeight={600}
-                  style={{ pointerEvents: 'none' }}
+                  pointerEvents="none"
                 >
-                  {parcel.name.length > 16 ? `${parcel.name.slice(0, 15)}…` : parcel.name}
+                  {shortName}
                 </text>
                 <SensorBeacon
                   cx={slot.x + slot.w * 0.72}
                   cy={slot.y + slot.h * 0.38}
                   color={pinColor}
-                  label={
-                    beacon.lastValue != null
-                      ? `${beacon.name}: ${beacon.lastValue}`
-                      : beacon.name
-                  }
+                  label={beaconLabel}
                 />
                 {roomSensors.slice(1, 3).map((s, si) => (
                   <SensorBeacon
@@ -315,11 +313,11 @@ export function RadarSpatialTwin({
         </g>
       </svg>
 
-      {parcels.length > 4 && (
+      {parcels.length > 4 ? (
         <p className="absolute bottom-2 right-3 text-[10px] font-medium text-slate-600/80">
-          +{parcels.length - 4} {radarT(loc, 'na árvore', 'en el árbol', 'in the tree')}
+          +{parcels.length - 4} {radarT(loc, 'na arvore', 'en el arbol', 'in the tree')}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
