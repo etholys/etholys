@@ -40,6 +40,7 @@ import {
   hydrateProposalAttachedFiles,
   mergeDraftIntoMarkdown,
   persistableProposalFiles,
+  resolveCanvasEditTarget,
   seedDocumentMarkdown,
   seedUnderstandMarkdown,
   sectionsFromMarkdown,
@@ -131,7 +132,8 @@ export default function FundHubProposalEditorPage() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
-  const [composerMode, setComposerMode] = useState<'talk' | 'write'>('talk');
+  /** Default Write: document is the draft; chat edits it (Gemini/ChatGPT canvas). */
+  const [composerMode, setComposerMode] = useState<'talk' | 'write'>('write');
   const [showChatAttachMenu, setShowChatAttachMenu] = useState(false);
   const [attachAsRole, setAttachAsRole] = useState<ProposalFileRole>('turn');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -480,7 +482,11 @@ export default function FundHubProposalEditorPage() {
   }, [workspaceId, companyId, documentMarkdown]);
 
   const assistantBody = useCallback(
-    (mode: string, userMessage: string) => ({
+    (
+      mode: string,
+      userMessage: string,
+      section?: { title: string; content: string } | null,
+    ) => ({
       mode,
       userMessage,
       companyId,
@@ -489,6 +495,8 @@ export default function FundHubProposalEditorPage() {
       editalLink: editalLink || fund?.linkOficial || fund?.callUrl,
       editalSummary: intakeNotes,
       documentMarkdown,
+      sectionTitle: section?.title,
+      sectionContent: section?.content,
       sourceExcerpt: fund?.sourceExcerpt,
       basesText: fund?.basesText,
       workspaceFilesBlock: formatProposalFileContext(attachedFiles.filter((f) => f.role !== 'turn')),
@@ -591,10 +599,10 @@ export default function FundHubProposalEditorPage() {
           role: 'assistant',
           content:
             locale === 'en'
-              ? 'Call read. Use «Structure» for sections. Then switch to «Write» so the AI edits the document — «Talk» is Q&A only.'
+              ? 'The document on the right is the draft. Chat edits that canvas (like Gemini/ChatGPT). Use «Talk» only for Q&A about the call.'
               : locale === 'pt'
-                ? 'Edital lido. Use «Estrutura» para as secções. Depois mude para «Redigir» para a IA escrever no documento — «Conversar» só tira dúvidas.'
-                : 'Convocatoria leída. Use «Estructura» para las secciones. Luego cambie a «Redactar» para que la IA escriba en el documento — «Conversar» es solo para dudas.',
+                ? 'O documento à direita é o rascunho. O chat edita esse canvas (como no Gemini/ChatGPT). Use «Conversar» só para dúvidas sobre o edital.'
+                : 'El documento a la derecha es el borrador. El chat edita ese canvas (como Gemini/ChatGPT). Use «Conversar» solo para dudas del edital.',
           createdAt: new Date().toISOString(),
         },
       ];
@@ -630,6 +638,10 @@ export default function FundHubProposalEditorPage() {
     chatEndRef.current?.scrollIntoView({ block: 'end' });
   }, [chatMessages, chatLoading, understanding]);
 
+  useEffect(() => {
+    if (stage === 'write') setComposerMode('write');
+  }, [stage]);
+
   const handleSendChat = useCallback(async () => {
     let message = chatInput.trim();
     if (
@@ -643,16 +655,21 @@ export default function FundHubProposalEditorPage() {
       message = message.replace(/^\s*\/(redactar|escribir|write|redige)\s*/i, '').trim();
       setComposerMode('write');
     }
-    const isWrite = (composerMode === 'write' || slashWrite) && stage === 'write';
+    const editTarget = stage === 'write' ? resolveCanvasEditTarget(documentMarkdown, message) : null;
+    const forceWrite =
+      slashWrite ||
+      looksLikeRevisionRequest(message) ||
+      Boolean(editTarget) ||
+      /\b(item\s*por\s*item|desarroll|redact|complet[ae]|formulari|postulaci[oó]n|escribir|escrev|preench|vamos\s+item|empez|arran[ck]|punto\s+[a-z0-9]|ítem\s*\d)/i.test(
+        message,
+      );
+    const isWrite = stage === 'write' && (composerMode === 'write' || forceWrite);
+    if (isWrite && composerMode !== 'write') setComposerMode('write');
 
     const turnFiles = attachedFiles.filter((f) => f.role === 'turn');
     const attachBlock = formatProposalFileContext(turnFiles);
 
-    const wantsDraftHint =
-      isWrite ||
-      /\b(item\s*por\s*item|desarroll|redact|complet[ae]|formulari|postulaci[oó]n|escribir|escrev|preench|vamos\s+item|empez|arran[ck])/i.test(
-        message,
-      );
+    const wantsDraftHint = isWrite;
     const sectionCount = sectionsFromMarkdown(documentMarkdown).filter(
       (s) => !/lectura|leitura|call reading|elegib|bases oficial/i.test(s.title),
     ).length;
@@ -669,14 +686,21 @@ export default function FundHubProposalEditorPage() {
 
     const draftDirective = isWrite
       ? locale === 'en'
-        ? '\n\n[WRITE TO DOCUMENT] Output ONLY the section/punto the user asked for (## heading + text). If they name the applicant org or paste its text, that entity is the applicant — do NOT use the Hub company as proponent. If they are correcting a wrong org, rewrite THAT section only — do not jump to other canvas sections.'
+        ? '\n\n[CANVAS EDIT] The document is the living draft. Edit ONLY the requested section (## matching the canvas). Applicant org from the user message wins over Hub company. Do not invent another section.'
         : locale === 'pt'
-          ? '\n\n[ESCREVER NO DOCUMENTO] Saída APENAS da secção/ponto pedido (## título + texto). Se nomearem a postulante ou colarem o texto dela, essa entidade é a postulante — NÃO uses a empresa do Hub. Se corrigirem a org errada, reescreve SÓ essa secção — não saltes para outras do canvas.'
-          : '\n\n[ESCRIBIR EN EL DOCUMENTO] Salida SOLO del punto/sección pedido (## título + texto). Si nombran a la postulante o pegan su texto, ESA entidad es la postulante — NO uses la empresa del Hub. Si corrigen la org equivocada, reescribe SOLO esa sección — no saltes a otras del canvas.'
+          ? '\n\n[EDIÇÃO DO CANVAS] O documento é o rascunho vivo. Edita SÓ a secção pedida (## igual ao canvas). A postulante da mensagem manda sobre a empresa do Hub. Não inventes outra secção.'
+          : '\n\n[EDICIÓN DEL CANVAS] El documento es el borrador vivo. Edita SOLO la sección pedida (## igual al canvas). La postulante del mensaje manda sobre la empresa del Hub. No inventes otra sección.'
       : '';
 
     let reviseAnchor = '';
-    if (looksLikeRevisionRequest(message)) {
+    if (editTarget?.content?.trim()) {
+      reviseAnchor =
+        locale === 'en'
+          ? `\n\n[CANVAS SECTION TO EDIT — rewrite this section only]\n## ${editTarget.title}\n\n${editTarget.content.slice(0, 6000)}`
+          : locale === 'pt'
+            ? `\n\n[SECÇÃO DO CANVAS A EDITAR — reescreve só esta]\n## ${editTarget.title}\n\n${editTarget.content.slice(0, 6000)}`
+            : `\n\n[SECCIÓN DEL CANVAS A EDITAR — reescribe solo esta]\n## ${editTarget.title}\n\n${editTarget.content.slice(0, 6000)}`;
+    } else if (looksLikeRevisionRequest(message)) {
       const lastAssistant = [...chatMessages].reverse().find((m) => m.role === 'assistant');
       if (lastAssistant?.content?.trim()) {
         const prior = lastAssistant.content
@@ -735,7 +759,7 @@ export default function FundHubProposalEditorPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...assistantBody(isWrite ? 'draft_section' : 'chat', fullMessage),
+          ...assistantBody(isWrite ? 'draft_section' : 'chat', fullMessage, editTarget),
           chatHistory: historyForApi,
           fileParts,
         }),
@@ -1661,15 +1685,15 @@ export default function FundHubProposalEditorPage() {
                     : composerMode === 'write'
                       ? ui(
                           locale,
-                          'Redactar: p. ej. «ítem 1 — contexto» — entra en el documento.',
-                          'Redigir: p.ex. «item 1 — contexto» — entra no documento.',
-                          'Write: e.g. «item 1 — context» — goes into the document.',
+                          'Edita el documento: «punto c — acorta» o pega datos. El canvas a la derecha es el borrador.',
+                          'Edita o documento: «ponto c — encurta» ou cola dados. O canvas à direita é o rascunho.',
+                          'Edit the document: «point c — shorten» or paste facts. The right canvas is the draft.',
                         )
                       : ui(
                           locale,
-                          'Conversar sobre el edital, o cambie a Redactar para escribir.',
-                          'Conversar sobre o edital, ou mude para Redigir para escrever.',
-                          'Talk about the call, or switch to Write to draft.',
+                          'Solo dudas del edital. Para escribir/editar el documento, use Redactar.',
+                          'Só dúvidas do edital. Para escrever/editar o documento, use Redigir.',
+                          'Call Q&A only. To write/edit the document, use Write.',
                         )
                 }
                 className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"

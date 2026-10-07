@@ -358,6 +358,78 @@ function splitH2(md: string): { lead: string; sections: Array<{ title: string; c
   return { lead, sections };
 }
 
+/** Leading marker like "c)", "C.", "1.", "1.1" — used to match canvas sections fuzzily. */
+export function sectionMarkerKey(title: string): string {
+  const m = title
+    .trim()
+    .toLowerCase()
+    .match(/^([a-z]|\d+(?:\.\d+)*)[.)]\s*/);
+  return m ? m[1]! : '';
+}
+
+function isMetaProposalSection(title: string): boolean {
+  return /leitura|lectura|call reading|chuva|lluvia|ideia geral|idea general|general idea|bases oficial|elegib/i.test(
+    title,
+  );
+}
+
+/**
+ * Pick which canvas section a chat message is editing (Gemini/ChatGPT-canvas style).
+ * Prefers explicit punto/título matches; on "mejorar/reescribir" falls back to the last real section.
+ */
+export function resolveCanvasEditTarget(
+  documentMarkdown: string,
+  userMessage: string,
+): { title: string; content: string } | null {
+  const sections = sectionsFromMarkdown(documentMarkdown).filter((s) => s.title.trim());
+  if (!sections.length) return null;
+  const msg = userMessage.trim();
+  if (!msg) return null;
+  const msgLower = msg.toLowerCase();
+
+  const markerFromMsg =
+    msgLower.match(
+      /\b(?:punto|punto\s+del\s+formulario|ítem|item|secci[oó]n|campo|letra)\s*([a-z]|\d+(?:\.\d+)*)[.)]?\b/i,
+    )?.[1] ||
+    msgLower.match(/\b([a-z])\)\s/)?.[1] ||
+    '';
+
+  if (markerFromMsg) {
+    const hit = sections.find((s) => sectionMarkerKey(s.title) === markerFromMsg.toLowerCase());
+    if (hit) return { title: hit.title, content: hit.content };
+  }
+
+  let best: { title: string; content: string; score: number } | null = null;
+  for (const s of sections) {
+    const t = s.title.toLowerCase();
+    if (t.length < 4) continue;
+    if (msgLower.includes(t)) {
+      const score = 100 + t.length;
+      if (!best || score > best.score) best = { title: s.title, content: s.content, score };
+      continue;
+    }
+    const words = t.split(/[^a-záéíóúñü0-9]+/i).filter((w) => w.length >= 5);
+    const hits = words.filter((w) => msgLower.includes(w)).length;
+    if (hits >= 2 || (hits === 1 && words.length === 1)) {
+      const score = hits * 20 + Math.min(t.length, 40);
+      if (!best || score > best.score) best = { title: s.title, content: s.content, score };
+    }
+  }
+  if (best) return { title: best.title, content: best.content };
+
+  const revise =
+    /\b(mejor(a|ar|e)|melhor(a|ar)?|improve|revis(a|ar|e)|reescri|reescrev|reescrit|corrig|ajust|anterior|última\s+respuesta|ultima\s+resposta)\b/i.test(
+      msg,
+    );
+  if (revise) {
+    const withContent = [...sections]
+      .reverse()
+      .find((s) => s.content.trim().length > 40 && !isMetaProposalSection(s.title));
+    if (withContent) return { title: withContent.title, content: withContent.content };
+  }
+  return null;
+}
+
 /**
  * Merge AI draft into the canvas: matching ## titles are replaced; new titles are appended.
  * Draft without headings is appended as a new block.
@@ -376,20 +448,31 @@ export function mergeDraftIntoMarkdown(existing: string, draft: string): string 
     return parsedIn.lead ? `${parsedIn.lead}\n\n${body}\n` : `${body}\n`;
   }
   const parsedCur = splitH2(cur);
-  const replacements = new Map(parsedIn.sections.map((s) => [s.title.toLowerCase(), s]));
-  const seen = new Set<string>();
+  const byExact = new Map(parsedIn.sections.map((s) => [s.title.toLowerCase(), s]));
+  const byMarker = new Map<string, { title: string; content: string }>();
+  for (const s of parsedIn.sections) {
+    const marker = sectionMarkerKey(s.title);
+    if (marker && !byMarker.has(marker)) byMarker.set(marker, s);
+  }
+  const seenExact = new Set<string>();
+  const seenMarker = new Set<string>();
   const out: Array<{ title: string; content: string }> = [];
   for (const s of parsedCur.sections) {
     const key = s.title.toLowerCase();
-    const next = replacements.get(key) ?? s;
-    out.push({ title: next.title, content: next.content });
-    seen.add(key);
+    const marker = sectionMarkerKey(s.title);
+    const next = byExact.get(key) ?? (marker ? byMarker.get(marker) : undefined) ?? s;
+    out.push({ title: s.title, content: next.content });
+    seenExact.add(key);
+    if (marker) seenMarker.add(marker);
   }
   for (const s of parsedIn.sections) {
     const key = s.title.toLowerCase();
-    if (seen.has(key)) continue;
+    const marker = sectionMarkerKey(s.title);
+    if (seenExact.has(key)) continue;
+    if (marker && seenMarker.has(marker)) continue;
     out.push(s);
-    seen.add(key);
+    seenExact.add(key);
+    if (marker) seenMarker.add(marker);
   }
   const lead = parsedCur.lead || parsedIn.lead;
   const body = out.map((s) => `## ${s.title}\n\n${s.content}`).join('\n\n');

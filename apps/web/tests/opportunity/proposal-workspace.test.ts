@@ -8,6 +8,7 @@ import {
   hydrateProposalAttachedFiles,
   persistableProposalFiles,
   mergeDraftIntoMarkdown,
+  resolveCanvasEditTarget,
   seedDocumentMarkdown,
   seedUnderstandMarkdown,
   sectionsFromMarkdown,
@@ -184,6 +185,25 @@ test('mergeDraftIntoMarkdown replaces matching headings and appends new ones', (
   assert.match(next, /## Presupuesto/);
   assert.match(next, /## Duración/);
   assert.match(next, /18 meses/);
+});
+
+test('canvas edit target and fuzzy c) merge keep the living draft', () => {
+  const doc =
+    '# PPD\n\n## c) Objetivo y actividades de la organización\n\nTexto viejo Rural Commerce.\n\n## D. Clasificación\n\nAlgo.\n';
+  const target = resolveCanvasEditTarget(doc, 'mejorar el punto c — es sobre Frutalcoop');
+  assert.ok(target);
+  assert.match(target!.title, /c\)/i);
+  assert.match(target!.content, /Rural Commerce/);
+  const merged = mergeDraftIntoMarkdown(
+    doc,
+    '## c) Objetivo\n\nFrutalcoop acopia frutas de Los Santos.\n',
+  );
+  assert.match(merged, /## c\) Objetivo y actividades/);
+  assert.match(merged, /Frutalcoop/);
+  assert.equal(merged.includes('Rural Commerce'), false);
+  assert.match(merged, /## D\. Clasificación/);
+  const sys = buildFundhubProposalSystemPrompt('draft_section', 'es');
+  assert.match(sys, /canvas — como ChatGPT\/Gemini/i);
 });
 
 test('understand seed follows Spanish hub locale', () => {

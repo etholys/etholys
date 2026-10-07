@@ -1,6 +1,6 @@
 import { INSTITUTIONAL_PROSE_RULE } from '@/lib/agents/prose-rules';
 
-const PROMPT_VERSION = 'fundhub-proposal-v8';
+const PROMPT_VERSION = 'fundhub-proposal-v9';
 
 export type FundhubProposalMode = 'chat' | 'structure' | 'draft_section' | 'brainstorm' | 'understand';
 export type FundhubLocale = 'es' | 'pt' | 'en';
@@ -147,17 +147,17 @@ Propõe a estrutura de secções da candidatura — alinhada ao FORMATO DO EDITA
   if (mode === 'draft_section') {
     return `${rules}
 
-## TRABALHO (redigir no documento)
-O utilizador está em modo REDACTAR: o teu texto vai para o canvas, não é só conversa.
-- SAÍDA: markdown com ## títulos que coincidam com o documento / formulário do edital.
-- UMA secção / um ponto do formulário por resposta (salvo pedirem várias explicitamente).
-- Se pedirem o ponto «c)» / um campo concreto: título ## desse ponto + texto. PROIBIDO preencher C, D, E ou outras secções na mesma resposta.
-- Se corrigirem («é sobre X», «a postulante é Y»): reescreve APENAS essa secção errada com a entidade correcta. Não «continues» noutras partes do canvas.
-- Se colarem material de base (antecedentes, missão, actividades): sintetiza ESSE material no ponto pedido — não inventes outra organização a partir do perfil Hub.
-- Se pedirem melhorar a resposta anterior / um rascunho já dado: reescreve ESSA secção (mesmo ##). Não abras um ponto novo.
-- Se o canvas já tem essa ##, reescreve o conteúdo (substituição), não acrescentes outro título.
-- Marca [FALTA: …] inline; no máximo 1–2. Não bloqueies com perguntas — redige com hipóteses.
-- Sem preâmbulo («perfecto, vamos…»), sem tutorial, sem «ajustaré todas las secciones». No máximo uma linha no fim: «Siguiente: [título do MESMO bloco se ainda faltar]».
+## TRABALHO (canvas — como ChatGPT/Gemini)
+O DOCUMENTO NO CANVAS é a verdade. A mensagem do utilizador é uma INSTRUÇÃO DE EDIÇÃO desse documento.
+- Não «converses» um ensaio novo: EDITA o texto que já está (ou cria só o ponto pedido se ainda estiver vazio).
+- SAÍDA: markdown com ## títulos que coincidam com o canvas / formulário. O sistema substitui essas secções no documento.
+- UMA secção / um ponto por resposta (salvo pedirem várias explicitamente).
+- Se CONTEXTO tiver «Secção activa», essa é o alvo: reescreve-a com o MESMO ## (ou o título exacto do canvas).
+- Se pedirem o ponto «c)» / um campo concreto: só esse ponto. PROIBIDO preencher C, D, E ou outras secções na mesma resposta.
+- Se pedirem melhorar / encurtar / corrigir: parte do texto actual da secção (activa ou no canvas). PROIBIDO inventar outro tema.
+- Se corrigirem a postulante («é sobre X»): reescreve só a secção errada com essa entidade.
+- Se colarem material de base: sintetiza ESSE material no ponto pedido — não inventes outra org a partir do perfil Hub.
+- Marca [FALTA: …] inline; no máximo 1–2. Sem preâmbulo, sem tutorial. No máximo uma linha no fim: «Siguiente: [título]».
 - EXCEPÇÃO à regra de forma: neste modo USA ## (o canvas mapeia secções por estes títulos).`;
   }
 
@@ -223,9 +223,9 @@ ${userMessage.trim() ? `Nota do utilizador: ${userMessage.trim()}` : ''}`.trim()
   if (mode === 'draft_section') {
     return `${block}
 
-Pedido de rascunho / melhoria — cumpre EXACTAMENTE o que a mensagem pede (ponto/campo/correção). Não uses a empresa do Hub como postulante se a mensagem nomear outra entidade. Não redijas secções não pedidas.
+Modelo canvas: o documento acima é o rascunho vivo. A mensagem abaixo é o pedido de edição. Cumpre EXACTAMENTE esse pedido (ponto/campo/correção). Não uses a empresa do Hub como postulante se a mensagem nomear outra entidade. Não redijas secções não pedidas. Se houver «Secção activa», edita essa.
 
-Mensagem do utilizador:
+Instrução do utilizador:
 ${userMessage.trim()}`;
   }
   if (mode === 'understand') {
