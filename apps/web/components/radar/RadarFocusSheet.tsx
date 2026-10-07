@@ -128,51 +128,45 @@ export function RadarFocusSheet({
     .filter((l) => l.unitId === focus.id || (!l.unitId && l.unitName === focus.name))
     .slice(0, 3);
 
-  return (
-    <section className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 sm:px-5">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
-            {radarT(loc, 'Espaço seleccionado', 'Espacio seleccionado', 'Selected space')}
-          </p>
-          <h2 className="truncate text-xl font-medium text-white">{focus.name}</h2>
-          <p className="mt-0.5 text-sm text-white/50">
-            {[focus.crop, focus.areaHa != null ? `${focus.areaHa} ${meta.areaUnit[loc]}` : null]
-              .filter(Boolean)
-              .join(' · ') || '—'}
-          </p>
-        </div>
-        {moisture != null && (
-          <div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-right">
-            <p className="text-[10px] uppercase tracking-wide text-white/40">
-              {radarT(loc, 'Humidade', 'Humedad', 'Moisture')}
-            </p>
-            <p className="font-serif text-2xl text-white">{moisture}%</p>
-          </div>
-        )}
-      </div>
+  const priority = holdHarvest || needIrrigate
+    ? radarT(loc, 'Prioridade alta', 'Prioridad alta', 'High priority')
+    : radarT(loc, 'Em dia', 'Al día', 'On track');
 
-      <p
-        className={`mt-3 rounded-xl px-3 py-2.5 text-sm leading-relaxed ${
-          holdHarvest || needIrrigate
-            ? 'border border-amber-400/30 bg-amber-500/10 text-amber-50'
-            : 'border border-white/8 bg-black/20 text-white/70'
-        }`}
-      >
-        {cue}
+  return (
+    <section className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-4 sm:px-5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
+        {radarT(loc, 'Tarefas', 'Tareas', 'Tasks')}
+      </p>
+      <h2 className="mt-1 truncate text-lg font-medium text-white">{focus.name}</h2>
+      <p className="text-xs text-white/45">
+        {[focus.crop, focus.areaHa != null ? `${focus.areaHa} ${meta.areaUnit[loc]}` : null, moisture != null ? `${moisture}%` : null]
+          .filter(Boolean)
+          .join(' · ') || '—'}
       </p>
 
-      {err && <p className="mt-2 text-sm text-rose-200">{err}</p>}
-      {ok && <p className="mt-2 text-sm text-emerald-200">{radarT(loc, 'Guardado', 'Guardado', 'Saved')}</p>}
-
-      <div className="mt-3 flex flex-wrap gap-2">
+      {/* BlueIoT-style task card */}
+      <div
+        className={`mt-3 rounded-lg border px-3 py-3 ${
+          holdHarvest || needIrrigate
+            ? 'border-amber-400/35 bg-amber-500/10'
+            : 'border-white/10 bg-black/25'
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-medium text-white">{cue}</p>
+        </div>
+        <p className="mt-2 text-[11px] text-white/45">
+          <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${holdHarvest || needIrrigate ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+          {priority}
+          {moduleId === 'agriculture' ? ` · ${radarT(loc, 'Preventivo / campo', 'Preventivo / campo', 'Field / preventive')}` : ''}
+        </p>
         {needIrrigate && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <input
               value={mm}
               onChange={(e) => setMm(e.target.value)}
               inputMode="decimal"
-              className="w-16 rounded-xl border border-white/15 bg-black/30 px-2 py-2 text-sm text-white"
+              className="w-16 rounded-lg border border-white/15 bg-black/30 px-2 py-1.5 text-sm text-white"
             />
             <span className="text-xs text-white/45">mm</span>
             <button
@@ -186,7 +180,7 @@ export function RadarFocusSheet({
                   mm: Number(mm) || DEFAULT_IRRIGATION_MM,
                 })
               }
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#04110c] disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Droplets className="h-4 w-4" />}
               {radarT(loc, 'Irriguei', 'Regué', 'Irrigated')}
@@ -195,19 +189,22 @@ export function RadarFocusSheet({
         )}
       </div>
 
+      {err && <p className="mt-2 text-sm text-rose-200">{err}</p>}
+      {ok && <p className="mt-2 text-sm text-emerald-200">{radarT(loc, 'Guardado', 'Guardado', 'Saved')}</p>}
+
       <div className="mt-4 border-t border-white/10 pt-3">
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={2}
           placeholder={radarT(loc, 'O que viste neste espaço…', 'Qué viste en este espacio…', 'What you saw here…')}
-          className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+          className="w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-sky-500/40"
         />
         <button
           type="button"
           disabled={busy || note.trim().length < 2}
           onClick={() => void post({ action: 'line', kind: 'scout', unitId: focus.id, note: note.trim() })}
-          className="mt-2 inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+          className="mt-2 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
           {radarT(loc, 'Guardar nota', 'Guardar nota', 'Save note')}

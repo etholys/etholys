@@ -53,7 +53,7 @@ export function RadarSpaceTree({
   return (
     <aside className="rounded-2xl border border-white/10 bg-white/[0.03] px-2 py-3">
       <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">
-        {radarT(loc, 'Lista de espaços', 'Lista de espacios', 'Space list')}
+        {radarT(loc, 'Lista árvore', 'Lista árbol', 'Tree list')}
       </p>
 
       <button

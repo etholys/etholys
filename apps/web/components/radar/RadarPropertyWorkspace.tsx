@@ -248,12 +248,7 @@ export function RadarPropertyWorkspace({
             />
             <div className="space-y-2">
               <p className="text-xs text-white/45">
-                {radarT(
-                  loc,
-                  'Mapa do sítio — toca um espaço ou escolhe na lista.',
-                  'Mapa del sitio — tocá un espacio o elegí en la lista.',
-                  'Site map — tap a space or pick from the list.',
-                )}
+                {radarT(loc, 'Planta — toca uma zona ou escolhe na árvore.', 'Planta — tocá una zona o elegí en el árbol.', 'Plant — tap a zone or pick from the tree.')}
               </p>
               <RadarSiteMap
                 companyId={companyId}
@@ -272,7 +267,6 @@ export function RadarPropertyWorkspace({
                 focusedId={focusedId}
                 onFocus={setFocusedId}
                 onSaved={() => void load()}
-                trailUnitIds={openLot ? mapParcels.map((p) => p.id) : undefined}
                 hero
               />
             </div>

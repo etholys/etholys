@@ -35,9 +35,8 @@ export type MapSensor = {
 function mapCopy(loc: Loc, moduleId?: string | null) {
   const kind = spaceKindMeta(moduleId);
   const unit = kind.unitLabel[loc].toLowerCase();
-  const unitCap = kind.unitLabel[loc];
   return {
-    plant: kind.drawTitle[loc],
+    plant: radarT(loc, 'Planta do sítio', 'Planta del sitio', 'Site plant'),
     arrange: radarT(
       loc,
       'Arrastar para organizar · canto para redimensionar',
@@ -49,18 +48,14 @@ function mapCopy(loc: Loc, moduleId?: string | null) {
     saved: radarT(loc, 'Planta guardada', 'Planta guardada', 'Layout saved'),
     emptyTitle: radarT(
       loc,
-      `Ainda sem ${kind.unitLabelPlural.pt.toLowerCase()} no mapa`,
-      `Aún sin ${kind.unitLabelPlural.es.toLowerCase()} en el mapa`,
-      `No ${kind.unitLabelPlural.en.toLowerCase()} on the map yet`,
+      `Ainda sem ${kind.unitLabelPlural.pt.toLowerCase()} na planta`,
+      `Aún sin ${kind.unitLabelPlural.es.toLowerCase()} en la planta`,
+      `No ${kind.unitLabelPlural.en.toLowerCase()} on the plant yet`,
     ),
     emptyBody: kind.hint[loc],
     emptyCta: radarT(loc, `Nova ${unit}`, `Nueva ${unit}`, `New ${kind.unitLabel.en.toLowerCase()}`),
     addParcel: radarT(loc, `Nova ${unit}`, `Nueva ${unit}`, `New ${kind.unitLabel.en.toLowerCase()}`),
-    focus: radarT(loc, 'Em foco', 'En foco', 'Focused'),
-    moisture: radarT(loc, 'Humidade', 'Humedad', 'Moisture'),
     sensor: radarT(loc, 'Sensor', 'Sensor', 'Sensor'),
-    secondary: kind.secondaryLabel[loc],
-    unitCap,
   };
 }
 
@@ -71,52 +66,34 @@ function actionTone(action: ParcelAction, harvestBlocked: boolean, moisture: num
   return 'ok' as const;
 }
 
-function tileClasses(tone: 'ok' | 'warn' | 'critical', focused: boolean, dimmed: boolean) {
-  const base =
-    tone === 'critical'
-      ? 'border-rose-400/45 bg-gradient-to-br from-rose-500/35 to-rose-950/40'
-      : tone === 'warn'
-        ? 'border-amber-400/40 bg-gradient-to-br from-amber-500/25 to-emerald-950/50'
-        : 'border-emerald-400/30 bg-gradient-to-br from-emerald-500/25 to-emerald-950/55';
-  const ring = focused ? 'ring-2 ring-emerald-300/80 shadow-[0_0_24px_rgba(52,211,153,0.25)]' : '';
-  const dim = dimmed && !focused ? 'opacity-35 scale-[0.98]' : 'opacity-100';
-  return `${base} ${ring} ${dim}`;
-}
-
-function labelAction(action: ParcelAction, loc: Loc) {
-  if (action === 'irrigate') return radarT(loc, 'Irrigar', 'Irrigar', 'Irrigate');
-  if (action === 'hold_harvest') return radarT(loc, 'Não colher', 'No cosechar', 'Hold');
-  if (action === 'scout') return radarT(loc, 'Percorrer', 'Recorrer', 'Walk');
-  if (action === 'await_signal') return radarT(loc, 'Ouvir', 'Escuchar', 'Listen');
-  return 'OK';
-}
-
 type Props = {
   companyId: string;
   engagementId?: string | null;
   propertyId?: string | null;
   locale: string;
-  /** agriculture | agroindustry | livestock | carbon — drives empty-state vocabulary */
   moduleId?: string | null;
   parcels: MapParcel[];
   sensors: MapSensor[];
   focusedId: string | null;
   onFocus: (id: string) => void;
-  /** Full plant + metrics surface (single ops UI for all roles). */
   mode?: 'ops' | 'empresa' | 'preview';
   onSaved?: () => void;
-  /** Show CTA to create a new parcel (parent owns the form). */
   onRequestAddParcel?: () => void;
-  /** Unit ids to connect with a dashed path (centers). */
+  /** @deprecated trail removed — kept so callers compile; ignored */
   trailUnitIds?: string[];
-  /** Taller board when home shows a single site as the hero. */
   hero?: boolean;
 };
 
 function HeaderIcon({ moduleId }: { moduleId?: string | null }) {
-  if (moduleId === 'agroindustry') return <Factory className="h-4 w-4 text-slate-200" />;
-  if (moduleId === 'livestock') return <Package className="h-4 w-4 text-amber-200" />;
-  return <Leaf className="h-4 w-4 text-emerald-300" />;
+  if (moduleId === 'agroindustry') return <Factory className="h-4 w-4 text-slate-600" />;
+  if (moduleId === 'livestock') return <Package className="h-4 w-4 text-amber-700" />;
+  return <Leaf className="h-4 w-4 text-emerald-700" />;
+}
+
+function pinColor(tone: 'ok' | 'warn' | 'critical') {
+  if (tone === 'critical') return { fill: '#e11d48', ring: 'rgba(225,29,72,0.35)' };
+  if (tone === 'warn') return { fill: '#d97706', ring: 'rgba(217,119,6,0.35)' };
+  return { fill: '#0284c7', ring: 'rgba(2,132,199,0.35)' };
 }
 
 export function RadarSiteMap({
@@ -132,13 +109,11 @@ export function RadarSiteMap({
   mode = 'ops',
   onSaved,
   onRequestAddParcel,
-  trailUnitIds,
   hero = false,
 }: Props) {
   const loc = radarLoc(locale);
   const canEdit = mode === 'empresa';
   const copy = mapCopy(loc, moduleId);
-  const showMoisture = !moduleId || moduleId === 'agriculture';
   const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -287,17 +262,16 @@ export function RadarSiteMap({
 
   if (parcels.length === 0) {
     return (
-      <section className="relative overflow-hidden rounded-[1.75rem] border border-dashed border-emerald-400/25 bg-[radial-gradient(ellipse_at_30%_20%,rgba(16,185,129,0.12),transparent_55%),linear-gradient(160deg,#06140f_0%,#0a1f18_45%,#04110c_100%)] px-5 py-10">
-        <Silhouette />
+      <section className="relative overflow-hidden rounded-xl border border-white/15 bg-[#eef1ef] px-5 py-10">
         <div className="relative mx-auto max-w-md text-center">
-          <MapPinned className="mx-auto h-8 w-8 text-emerald-300/80" />
-          <h3 className="mt-3 font-serif text-2xl text-white">{copy.emptyTitle}</h3>
-          <p className="mt-2 text-sm text-white/55">{copy.emptyBody}</p>
+          <MapPinned className="mx-auto h-8 w-8 text-slate-500" />
+          <h3 className="mt-3 text-xl font-semibold text-slate-800">{copy.emptyTitle}</h3>
+          <p className="mt-2 text-sm text-slate-500">{copy.emptyBody}</p>
           {onRequestAddParcel && (
             <button
               type="button"
               onClick={onRequestAddParcel}
-              className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-[#04110c]"
+              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white"
             >
               <Plus className="h-4 w-4" />
               {copy.emptyCta}
@@ -310,54 +284,33 @@ export function RadarSiteMap({
 
   const parcelById = new Map(parcels.map((p) => [p.id, p]));
 
-  const trailPoints = (() => {
-    const ids =
-      trailUnitIds && trailUnitIds.length > 0
-        ? trailUnitIds
-        : layout.spaces.map((s) => s.id).slice(0, 4);
-    const pts: Array<{ x: number; y: number }> = [];
-    for (const id of ids) {
-      const rect = layout.spaces.find((s) => s.id === id);
-      if (!rect) continue;
-      pts.push({ x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 });
-    }
-    return pts;
-  })();
-
-  const trailPath =
-    trailPoints.length >= 2
-      ? trailPoints
-          .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
-          .join(' ')
-      : null;
-
   return (
-    <section className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[radial-gradient(ellipse_at_top_left,rgba(16,185,129,0.14),transparent_50%),linear-gradient(165deg,#071812_0%,#0a1a14_50%,#050f0c_100%)]">
+    <section className="overflow-hidden rounded-xl border border-white/15 bg-[#eef1ef] shadow-sm">
       {canEdit && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 px-4 py-2.5 sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 bg-white/70 px-4 py-2.5 sm:px-5">
           <div className="flex items-center gap-2">
             <HeaderIcon moduleId={moduleId} />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">{copy.plant}</p>
-            <span className="hidden text-[11px] text-white/35 sm:inline">· {copy.arrange}</span>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{copy.plant}</p>
+            <span className="hidden text-[11px] text-slate-400 sm:inline">· {copy.arrange}</span>
           </div>
           <div className="flex items-center gap-2">
             {onRequestAddParcel && (
               <button
                 type="button"
                 onClick={onRequestAddParcel}
-                className="inline-flex items-center gap-1 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100"
+                className="inline-flex items-center gap-1 rounded-lg border border-sky-600/30 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-800"
               >
                 <Plus className="h-3.5 w-3.5" />
                 {copy.addParcel}
               </button>
             )}
-            {savedFlash && <span className="text-[11px] text-emerald-200/80">{copy.saved}</span>}
+            {savedFlash && <span className="text-[11px] text-emerald-700">{copy.saved}</span>}
             {dirty && (
               <button
                 type="button"
                 disabled={saving}
                 onClick={() => void save()}
-                className="rounded-xl bg-emerald-500/90 px-3 py-1.5 text-xs font-semibold text-[#04110c] disabled:opacity-40"
+                className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
               >
                 {saving ? copy.saving : copy.save}
               </button>
@@ -377,59 +330,78 @@ export function RadarSiteMap({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
+        {/* Floor grid — plant, not dashboard */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.12]"
+          className="pointer-events-none absolute inset-0"
           style={{
+            backgroundColor: '#e8ece9',
             backgroundImage:
-              'linear-gradient(rgba(167,243,208,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(167,243,208,0.35) 1px, transparent 1px)',
-            backgroundSize: '12% 12%',
+              'linear-gradient(rgba(100,116,139,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(100,116,139,0.12) 1px, transparent 1px)',
+            backgroundSize: '8% 8%',
           }}
         />
-        <div className="pointer-events-none absolute inset-6 rounded-[2rem] border border-emerald-400/10" />
-
-        {trailPath && (
-          <svg
-            className="pointer-events-none absolute inset-0 z-[5] h-full w-full"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            aria-hidden
-          >
-            <path
-              d={trailPath}
-              fill="none"
-              stroke="rgba(52,211,153,0.65)"
-              strokeWidth="0.8"
-              strokeDasharray="2.2 1.6"
-              strokeLinecap="round"
-            />
-            {trailPoints.map((p, i) => (
-              <circle key={i} cx={p.x} cy={p.y} r="1.3" fill="#34d399" />
-            ))}
-          </svg>
-        )}
+        <div className="pointer-events-none absolute inset-3 rounded-lg border border-slate-300/60 sm:inset-4" />
 
         {layout.spaces.map((rect) => {
           const parcel = parcelById.get(rect.id);
           if (!parcel) return null;
           const tone = actionTone(parcel.nextAction, parcel.harvestBlocked, parcel.moisture);
           const focused = focusedId === parcel.id;
-          const dimmed = Boolean(focusedId) && !focused;
-          const alertPulse = tone === 'critical' || parcel.alerts.some((a) => a.severity === 'critical');
           const spaceSensors = layout.sensors.filter((s) => s.spaceId === rect.id);
           const extraSensors = sensors.filter(
             (s) => s.unitId === rect.id && !spaceSensors.some((p) => p.id === s.id),
           );
+          const pins = [
+            ...spaceSensors.map((pin) => {
+              const sens = sensors.find((s) => s.id === pin.id);
+              return {
+                id: pin.id,
+                name: sens?.name || copy.sensor,
+                lastValue: sens?.lastValue ?? null,
+                x: pin.x,
+                y: pin.y,
+                absolute: false as const,
+              };
+            }),
+            ...extraSensors.map((sens, idx) => ({
+              id: sens.id,
+              name: sens.name,
+              lastValue: sens.lastValue,
+              x: 70 + idx * 12,
+              y: 28,
+              absolute: false as const,
+            })),
+          ];
+          // If no sensors, still show one status pin at center so the plant reads as spatial ops
+          if (pins.length === 0) {
+            pins.push({
+              id: `zone-${parcel.id}`,
+              name: parcel.name,
+              lastValue: parcel.moisture,
+              x: 50,
+              y: 55,
+              absolute: false,
+            });
+          }
 
           return (
             <button
               key={rect.id}
               type="button"
               aria-pressed={focused}
-              aria-label={`${parcel.name}${parcel.crop ? `, ${parcel.crop}` : ''}`}
+              aria-label={parcel.name}
               onClick={() => onFocus(parcel.id)}
               onPointerDown={(e) => onPointerDown(e, rect)}
-              className={`absolute overflow-hidden rounded-2xl border text-left transition-all duration-300 ease-out ${tileClasses(tone, focused, dimmed)} ${
-                dragging === rect.id || resizing === rect.id ? 'z-20 cursor-grabbing' : canEdit ? 'cursor-grab' : 'cursor-pointer'
+              className={`absolute overflow-visible rounded-md border text-left transition-[box-shadow,border-color,background-color] duration-150 ${
+                focused
+                  ? 'z-10 border-sky-600 bg-white shadow-[0_0_0_2px_rgba(2,132,199,0.35)]'
+                  : 'border-slate-400/70 bg-white/85 hover:border-sky-500/70 hover:bg-white'
+              } ${
+                dragging === rect.id || resizing === rect.id
+                  ? 'z-20 cursor-grabbing'
+                  : canEdit
+                    ? 'cursor-grab'
+                    : 'cursor-pointer'
               }`}
               style={{
                 left: `${rect.x}%`,
@@ -438,108 +410,42 @@ export function RadarSiteMap({
                 height: `${rect.h}%`,
               }}
             >
-              {alertPulse && (
-                <span className="pointer-events-none absolute inset-0 animate-pulse bg-rose-400/10" />
-              )}
-              <span className="pointer-events-none absolute inset-0 opacity-40">
-                <TileScene moduleId={moduleId} />
+              {/* Zone label only — metrics live in the action panel */}
+              <span className="absolute left-1.5 top-1.5 max-w-[90%] truncate rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-semibold text-slate-800 shadow-sm sm:text-xs">
+                {parcel.name}
               </span>
-              <div className="relative flex h-full flex-col justify-between p-2.5 sm:p-3">
-                <div>
-                  <p className="truncate text-sm font-semibold text-white sm:text-base">{parcel.name}</p>
-                  <p className="truncate text-[10px] text-white/55 sm:text-xs">
-                    {[parcel.crop, parcel.areaHa != null ? `${parcel.areaHa}` : null].filter(Boolean).join(' · ') || '—'}
-                  </p>
-                </div>
-                <div className="flex items-end justify-between gap-1">
-                  <div>
-                    <p className="text-[9px] uppercase tracking-wide text-white/40">
-                      {showMoisture ? copy.moisture : copy.secondary}
-                    </p>
-                    <p className="font-serif text-lg leading-none text-white sm:text-xl">
-                      {showMoisture
-                        ? parcel.moisture == null
-                          ? '—'
-                          : `${parcel.moisture}%`
-                        : parcel.crop || '—'}
-                    </p>
-                  </div>
-                  {showMoisture && (
-                    <span className="rounded-full border border-white/20 bg-black/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-white/75">
-                      {labelAction(parcel.nextAction, loc)}
-                    </span>
-                  )}
-                </div>
-                {spaceSensors.map((pin) => {
-                  const sens = sensors.find((s) => s.id === pin.id);
-                  const live = sens?.lastValue;
-                  const label =
-                    live != null
-                      ? `${sens?.name || copy.sensor}: ${Number.isInteger(live) ? live : live.toFixed(1)}`
-                      : sens?.name || copy.sensor;
-                  return (
-                    <span
-                      key={pin.id}
-                      title={label}
-                      className="pointer-events-none absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
-                      style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
-                    >
-                      <span className="relative flex h-4 w-4 items-center justify-center">
-                        <span
-                          className={`absolute inline-flex h-full w-full animate-ping rounded-full ${
-                            live != null ? 'bg-sky-300/55' : 'bg-white/25'
-                          }`}
-                        />
-                        <span
-                          className={`relative flex h-3 w-3 items-center justify-center rounded-full shadow-[0_0_10px_rgba(125,211,252,0.8)] ${
-                            live != null ? 'bg-sky-300 text-[#04110c]' : 'bg-white/30 text-white/70'
-                          }`}
-                        >
-                          <Radio className="h-2 w-2" />
-                        </span>
-                      </span>
-                      {live != null && (
-                        <span className="mt-0.5 rounded bg-black/55 px-1 text-[9px] font-semibold tabular-nums text-sky-100">
-                          {Number.isInteger(live) ? live : live.toFixed(0)}
-                        </span>
-                      )}
-                    </span>
-                  );
-                })}
-                {extraSensors.map((sens, idx) => (
+
+              {pins.map((pin) => {
+                const colors = pinColor(tone);
+                const live = pin.lastValue;
+                return (
                   <span
-                    key={sens.id}
-                    title={sens.lastValue != null ? `${sens.name}: ${sens.lastValue}` : sens.name}
-                    className="pointer-events-none absolute z-10 flex flex-col items-center"
-                    style={{ right: `${8 + idx * 18}%`, top: '12%' }}
+                    key={pin.id}
+                    title={live != null ? `${pin.name}: ${live}` : pin.name}
+                    className="pointer-events-none absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+                    style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
                   >
-                    <span className="relative flex h-4 w-4 items-center justify-center">
+                    <span className="relative flex h-5 w-5 items-center justify-center sm:h-6 sm:w-6">
                       <span
-                        className={`absolute inline-flex h-full w-full animate-ping rounded-full ${
-                          sens.lastValue != null ? 'bg-sky-300/55' : 'bg-white/25'
-                        }`}
+                        className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-40"
+                        style={{ backgroundColor: colors.ring }}
                       />
                       <span
-                        className={`relative flex h-3 w-3 items-center justify-center rounded-full ${
-                          sens.lastValue != null ? 'bg-sky-300 text-[#04110c]' : 'bg-white/30 text-white/70'
-                        }`}
+                        className="relative flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white shadow-md sm:h-4 sm:w-4"
+                        style={{ backgroundColor: colors.fill }}
                       >
-                        <Radio className="h-2 w-2" />
+                        <Radio className="h-2 w-2 text-white" />
                       </span>
                     </span>
-                    {sens.lastValue != null && (
-                      <span className="mt-0.5 rounded bg-black/55 px-1 text-[9px] font-semibold tabular-nums text-sky-100">
-                        {Number.isInteger(sens.lastValue) ? sens.lastValue : sens.lastValue.toFixed(0)}
-                      </span>
-                    )}
                   </span>
-                ))}
-              </div>
+                );
+              })}
+
               {canEdit && focused && (
                 <span
                   role="presentation"
                   onPointerDown={(e) => onResizeDown(e, rect)}
-                  className="absolute bottom-1 right-1 z-30 h-4 w-4 cursor-se-resize rounded-sm border border-emerald-200/60 bg-emerald-400/80"
+                  className="absolute bottom-1 right-1 z-30 h-3.5 w-3.5 cursor-se-resize rounded-sm border border-sky-700 bg-sky-500"
                   title={radarT(loc, 'Redimensionar', 'Redimensionar', 'Resize')}
                 />
               )}
@@ -548,62 +454,5 @@ export function RadarSiteMap({
         })}
       </div>
     </section>
-  );
-}
-
-function TileScene({ moduleId }: { moduleId?: string | null }) {
-  if (moduleId === 'agroindustry') {
-    return (
-      <svg viewBox="0 0 120 80" className="h-full w-full" aria-hidden>
-        <rect x="8" y="48" width="80" height="8" rx="2" fill="rgba(148,163,184,0.45)" />
-        <rect x="14" y="34" width="16" height="12" rx="1" fill="rgba(167,243,208,0.4)" />
-        <rect x="38" y="32" width="16" height="14" rx="1" fill="rgba(167,243,208,0.35)" />
-        <rect x="62" y="34" width="16" height="12" rx="1" fill="rgba(167,243,208,0.4)" />
-        <rect x="90" y="22" width="22" height="36" rx="3" fill="rgba(56,189,248,0.22)" />
-      </svg>
-    );
-  }
-  if (moduleId === 'livestock') {
-    return (
-      <svg viewBox="0 0 120 80" className="h-full w-full" aria-hidden>
-        <rect x="10" y="18" width="44" height="48" rx="4" fill="rgba(251,191,36,0.18)" />
-        <rect x="62" y="18" width="44" height="48" rx="4" fill="rgba(251,191,36,0.12)" />
-        <ellipse cx="30" cy="44" rx="7" ry="5" fill="rgba(253,224,71,0.45)" />
-        <ellipse cx="82" cy="46" rx="7" ry="5" fill="rgba(253,224,71,0.35)" />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 120 80" className="h-full w-full" aria-hidden>
-      {[22, 36, 50, 64].map((y) => (
-        <path
-          key={y}
-          d={`M6 ${y} Q36 ${y - 4} 64 ${y} T114 ${y}`}
-          stroke="rgba(52,211,153,0.45)"
-          strokeWidth="2"
-          fill="none"
-        />
-      ))}
-    </svg>
-  );
-}
-
-function Silhouette() {
-  return (
-    <svg
-      className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.18]"
-      viewBox="0 0 400 220"
-      fill="none"
-      aria-hidden
-    >
-      <rect x="28" y="40" width="110" height="70" rx="10" stroke="#6ee7b7" strokeWidth="2" />
-      <rect x="150" y="30" width="90" height="90" rx="10" stroke="#6ee7b7" strokeWidth="2" />
-      <rect x="255" y="55" width="120" height="80" rx="10" stroke="#6ee7b7" strokeWidth="2" />
-      <rect x="60" y="130" width="160" height="55" rx="10" stroke="#6ee7b7" strokeWidth="2" />
-      <rect x="240" y="145" width="100" height="40" rx="10" stroke="#6ee7b7" strokeWidth="2" />
-      <circle cx="80" cy="70" r="4" fill="#7dd3fc" />
-      <circle cx="195" cy="70" r="4" fill="#7dd3fc" />
-      <circle cx="300" cy="90" r="4" fill="#7dd3fc" />
-    </svg>
   );
 }
