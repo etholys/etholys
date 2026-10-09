@@ -1,104 +1,78 @@
 /**
- * Document Picture-in-Picture: janela flutuante do sistema (Chrome/Edge 116+).
- * Move o contentor da sala sem recriar o iframe da reunião.
+ * Janela flutuante do sistema (por cima das outras apps).
+ * Não move o iframe da reunião: isso recarrega a sala e derruba a chamada.
+ * Espelha o palco num <video> e usa Picture-in-Picture do browser.
  */
 
-export function supportsDocumentPictureInPicture(): boolean {
-  return typeof window !== 'undefined' && 'documentPictureInPicture' in window;
+export function supportsSystemFloat(): boolean {
+  return (
+    typeof document !== 'undefined' &&
+    typeof HTMLVideoElement !== 'undefined' &&
+    'requestPictureInPicture' in HTMLVideoElement.prototype &&
+    document.pictureInPictureEnabled !== false
+  );
 }
 
-type PipApi = {
-  requestWindow: (opts?: { width?: number; height?: number }) => Promise<Window>;
-  window?: Window | null;
+type CropCapableTrack = MediaStreamTrack & {
+  cropTo?: (target: unknown) => Promise<void>;
 };
 
-function copyStylesToPipWindow(pipWindow: Window) {
-  const head = pipWindow.document.head;
-  for (const link of Array.from(document.querySelectorAll('link[rel="stylesheet"]'))) {
-    const href = link.getAttribute('href');
-    if (!href) continue;
-    const clone = pipWindow.document.createElement('link');
-    clone.rel = 'stylesheet';
-    clone.href = href;
-    head.appendChild(clone);
-  }
-  try {
-    for (const sheet of Array.from(document.styleSheets)) {
-      try {
-        const rules = sheet.cssRules;
-        if (!rules) continue;
-        const style = pipWindow.document.createElement('style');
-        let text = '';
-        for (const rule of Array.from(rules)) text += `${rule.cssText}\n`;
-        style.textContent = text;
-        head.appendChild(style);
-      } catch {
-        /* CSS cross-origin */
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-}
+type CaptureOpts = DisplayMediaStreamOptions & {
+  preferCurrentTab?: boolean;
+  selfBrowserSurface?: 'include' | 'exclude';
+  monitorTypeSurfaces?: 'include' | 'exclude';
+  surfaceSwitching?: 'include' | 'exclude';
+};
 
-export async function openMeetDocumentPip(opts: {
-  stageEl: HTMLElement;
-  homeEl: HTMLElement;
-  onClose?: () => void;
-  width?: number;
-  height?: number;
-}): Promise<Window> {
-  const api = (window as Window & { documentPictureInPicture?: PipApi }).documentPictureInPicture;
-  if (!api) {
-    throw new Error('Document Picture-in-Picture not supported');
-  }
+export async function captureMeetStage(stageEl: HTMLElement): Promise<MediaStream> {
+  const stream = await navigator.mediaDevices.getDisplayMedia({
+    audio: false,
+    video: { displaySurface: 'browser' },
+    preferCurrentTab: true,
+    selfBrowserSurface: 'include',
+    monitorTypeSurfaces: 'exclude',
+    surfaceSwitching: 'exclude',
+  } as CaptureOpts);
 
-  if (api.window && !api.window.closed) {
-    api.window.focus();
-    return api.window;
-  }
-
-  const pipWindow = await api.requestWindow({
-    width: opts.width ?? 420,
-    height: opts.height ?? 280,
-  });
-  const { stageEl, homeEl, onClose } = opts;
-
-  copyStylesToPipWindow(pipWindow);
-
-  pipWindow.document.documentElement.style.height = '100%';
-  pipWindow.document.body.style.margin = '0';
-  pipWindow.document.body.style.height = '100%';
-  pipWindow.document.body.style.background = '#0f172a';
-  pipWindow.document.body.style.overflow = 'hidden';
-
-  stageEl.style.width = '100%';
-  stageEl.style.height = '100%';
-  stageEl.style.position = 'relative';
-  stageEl.style.inset = '';
-  pipWindow.document.body.appendChild(stageEl);
-
-  const restore = () => {
-    if (stageEl.parentElement !== homeEl) {
-      homeEl.appendChild(stageEl);
-      stageEl.style.width = '';
-      stageEl.style.height = '';
-      stageEl.style.position = '';
-      stageEl.style.inset = '';
-    }
-    onClose?.();
-  };
-
-  pipWindow.addEventListener('pagehide', restore, { once: true });
-  return pipWindow;
-}
-
-export function closeMeetDocumentPipWindow(pipWindow: Window | null | undefined) {
-  if (pipWindow && !pipWindow.closed) {
+  const [track] = stream.getVideoTracks();
+  const cropTarget = (
+    window as Window & { CropTarget?: { fromElement: (el: Element) => Promise<unknown> } }
+  ).CropTarget;
+  const cropTrack = track as CropCapableTrack | undefined;
+  if (track && cropTarget && cropTrack?.cropTo) {
     try {
-      pipWindow.close();
+      const target = await cropTarget.fromElement(stageEl);
+      await cropTrack.cropTo(target);
+    } catch {
+      /* Sem recorte: a janela mostra o separador inteiro. A chamada continua. */
+    }
+  }
+  return stream;
+}
+
+export function stopMeetStageCapture(stream: MediaStream | null | undefined) {
+  stream?.getTracks().forEach((track) => {
+    try {
+      track.stop();
     } catch {
       /* ignore */
     }
+  });
+}
+
+export async function enterVideoPictureInPicture(video: HTMLVideoElement): Promise<void> {
+  if (document.pictureInPictureElement === video) return;
+  if (document.pictureInPictureElement) {
+    await document.exitPictureInPicture();
+  }
+  await video.requestPictureInPicture();
+}
+
+export async function exitVideoPictureInPicture(): Promise<void> {
+  if (!document.pictureInPictureElement) return;
+  try {
+    await document.exitPictureInPicture();
+  } catch {
+    /* já fechada */
   }
 }

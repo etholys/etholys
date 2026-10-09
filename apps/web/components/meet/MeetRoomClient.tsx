@@ -39,19 +39,12 @@ import { PendingMeetRecordingBanner } from '@/components/meet/PendingMeetRecordi
 import { resolveMeetSpeechLanguage, type MeetSpeechLanguage } from '@/lib/meet/language';
 import { queueMeetRecordingUpload } from '@/lib/meet/flush-pending-recording';
 import {
-  openMeetDocumentPip,
-  supportsDocumentPictureInPicture,
+  captureMeetStage,
+  enterVideoPictureInPicture,
+  exitVideoPictureInPicture,
+  stopMeetStageCapture,
+  supportsSystemFloat,
 } from '@/lib/meet/document-pip';
-
-function closePipWindow(pipWindow: Window | null | undefined) {
-  if (pipWindow && !pipWindow.closed) {
-    try {
-      pipWindow.close();
-    } catch {
-      /* ignore */
-    }
-  }
-}
 
 type SessionRow = {
   id: string;
@@ -196,7 +189,6 @@ export function MeetRoomClient({ sessionId }: Props) {
     (authSession?.user as { email?: string | null } | undefined)?.email?.trim() ||
     '';
   const [pipActive, setPipActive] = useState(false);
-  const [pipMode, setPipMode] = useState<'none' | 'document' | 'css'>('none');
   const [conferenceReady, setConferenceReady] = useState(false);
   const [autoFloat, setAutoFloat] = useState(true);
   const [layoutMode, setLayoutMode] = useState<MeetLayoutMode>('speaker');
@@ -214,11 +206,14 @@ export function MeetRoomClient({ sessionId }: Props) {
   const stageSlotRef = useRef<HTMLDivElement>(null);
   const stageHomeRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
-  const pipWindowRef = useRef<Window | null>(null);
-  const pipModeRef = useRef<'none' | 'document' | 'css'>('none');
+  const floatVideoRef = useRef<HTMLVideoElement>(null);
+  const mirrorStreamRef = useRef<MediaStream | null>(null);
+  const pipActiveRef = useRef(false);
   const conferenceReadyRef = useRef(false);
-  const autoFloatRef = useRef(false);
+  const autoFloatRef = useRef(true);
   const pipEnteringRef = useRef(false);
+  const wasHiddenRef = useRef(false);
+  const floatGuardUntilRef = useRef(0);
   /** Evita encerrar a reunião só porque o utilizador mudou de aba (falsos videoConferenceLeft). */
   const lastHiddenAtRef = useRef(0);
   const segmentsRef = useRef<TranscriptSegment[]>([]);
@@ -416,143 +411,147 @@ export function MeetRoomClient({ sessionId }: Props) {
     conferenceReadyRef.current = conferenceReady;
   }, [conferenceReady]);
 
-  const restoreStageFromPip = useCallback(() => {
-    const stage = stageHomeRef.current;
-    const slot = stageSlotRef.current;
-    if (stage && slot && stage.parentElement !== slot) {
-      slot.appendChild(stage);
-      stage.style.width = '';
-      stage.style.height = '';
-      stage.style.position = '';
-      stage.style.inset = '';
-    }
-    closePipWindow(pipWindowRef.current);
-    pipWindowRef.current = null;
-    pipModeRef.current = 'none';
-    setPipMode('none');
-    setPipActive(false);
+  const releaseMirror = useCallback(() => {
+    stopMeetStageCapture(mirrorStreamRef.current);
+    mirrorStreamRef.current = null;
+    const video = floatVideoRef.current;
+    if (video) video.srcObject = null;
   }, []);
 
-  const enterDocumentPip = useCallback(
+  const exitFloating = useCallback(
+    async (opts?: { stopMirror?: boolean }) => {
+      floatGuardUntilRef.current = Date.now() + 4000;
+      await exitVideoPictureInPicture();
+      pipActiveRef.current = false;
+      setPipActive(false);
+      if (opts?.stopMirror !== false) releaseMirror();
+    },
+    [releaseMirror],
+  );
+
+  const enterSystemFloat = useCallback(
     async (opts?: { silent?: boolean }) => {
-      const stage = stageHomeRef.current;
-      const slot = stageSlotRef.current;
-      if (!stage || !slot || !conferenceReadyRef.current) return false;
+      const stage = stageRef.current;
+      const video = floatVideoRef.current;
+      if (!stage || !video || !conferenceReadyRef.current) return false;
       if (pipEnteringRef.current) return false;
-      if (pipModeRef.current === 'document' && pipWindowRef.current && !pipWindowRef.current.closed) {
-        pipWindowRef.current.focus();
+      if (document.pictureInPictureElement === video) {
+        pipActiveRef.current = true;
+        setPipActive(true);
         return true;
       }
-
-      pipEnteringRef.current = true;
-      try {
-        if (supportsDocumentPictureInPicture()) {
-          try {
-            const pipWin = await openMeetDocumentPip({
-              stageEl: stage,
-              homeEl: slot,
-              onClose: restoreStageFromPip,
-            });
-            pipWindowRef.current = pipWin;
-            pipModeRef.current = 'document';
-            setPipMode('document');
-            setPipActive(true);
-            setPanelOpen(false);
-            return true;
-          } catch (err) {
-            if (!opts?.silent) {
-              const msg = err instanceof Error ? err.message : '';
-              setError(
-                t(
-                  `Flutuante do sistema indisponível (${msg || 'sem permissão'}). Usa Chrome/Edge ou clica outra vez.`,
-                  `Flotante del sistema no disponible (${msg || 'sin permiso'}). Usa Chrome/Edge o pulsa otra vez.`,
-                  `System float unavailable (${msg || 'no permission'}). Use Chrome/Edge or try again.`,
-                ),
-              );
-            }
-          }
-        }
-
-        pipModeRef.current = 'css';
-        setPipMode('css');
-        setPipActive(true);
-        setPanelOpen(false);
-        if (!opts?.silent && !supportsDocumentPictureInPicture()) {
+      if (!supportsSystemFloat()) {
+        if (!opts?.silent) {
           setError(
             t(
-              'Este browser não suporta janela flutuante fora do separador. Usa Chrome ou Edge para flutuante automático.',
-              'Este navegador no soporta ventana flotante fuera de la pestaña. Usa Chrome o Edge para flotante automático.',
-              'This browser does not support floating outside the tab. Use Chrome or Edge for auto float.',
+              'Este browser não abre janela flutuante do sistema. Usa Chrome ou Edge no computador.',
+              'Este navegador no abre una ventana flotante del sistema. Usa Chrome o Edge en el ordenador.',
+              'This browser cannot open a system floating window. Use Chrome or Edge on desktop.',
             ),
           );
         }
+        return false;
+      }
+
+      pipEnteringRef.current = true;
+      floatGuardUntilRef.current = Date.now() + 8000;
+      try {
+        if (!mirrorStreamRef.current) {
+          const stream = await captureMeetStage(stage);
+          mirrorStreamRef.current = stream;
+          video.srcObject = stream;
+          video.muted = true;
+          await video.play();
+          stream.getVideoTracks()[0]?.addEventListener('ended', () => {
+            void exitFloating({ stopMirror: true });
+          });
+        }
+        await enterVideoPictureInPicture(video);
+        pipActiveRef.current = true;
+        setPipActive(true);
+        setPanelOpen(false);
         return true;
+      } catch (err) {
+        if (!opts?.silent) {
+          const denied = err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError');
+          setError(
+            denied
+              ? t(
+                  'Para flutuar por cima das outras janelas, aceita partilhar este separador. A chamada não se desliga.',
+                  'Para flotar encima de las otras ventanas, acepta compartir esta pestaña. La llamada no se corta.',
+                  'To float above other windows, allow sharing this tab. The call stays connected.',
+                )
+              : t(
+                  'Não foi possível abrir a janela flutuante do sistema.',
+                  'No se pudo abrir la ventana flotante del sistema.',
+                  'Could not open the system floating window.',
+                ),
+          );
+        }
+        if (!document.pictureInPictureElement) releaseMirror();
+        return false;
       } finally {
         pipEnteringRef.current = false;
       }
     },
-    [restoreStageFromPip, t],
+    [exitFloating, releaseMirror, t],
   );
 
-  const exitFloating = useCallback(() => {
-    if (pipModeRef.current === 'document') {
-      closePipWindow(pipWindowRef.current);
-      restoreStageFromPip();
-      return;
-    }
-    restoreStageFromPip();
-  }, [restoreStageFromPip]);
-
   useEffect(() => {
-    const tryAutoFloat = () => {
-      if (!autoFloatRef.current || !conferenceReadyRef.current) return;
-      if (pipModeRef.current !== 'none') return;
-      void enterDocumentPip({ silent: true });
-    };
-
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
         lastHiddenAtRef.current = Date.now();
-        // Flutuante automático é OPCIONAL (desligado por omissão).
-        // Nunca encerrar reunião/gravação só por mudar de aba.
-        tryAutoFloat();
+        wasHiddenRef.current = true;
         return;
       }
-      if (
-        document.visibilityState === 'visible' &&
-        pipModeRef.current === 'document' &&
-        pipWindowRef.current &&
-        !pipWindowRef.current.closed
-      ) {
-        closePipWindow(pipWindowRef.current);
-        restoreStageFromPip();
-      }
-    };
-
-    const onBlur = () => {
-      window.setTimeout(() => {
-        // Minimizar / outra app. Não reagir a blur do iframe (clique na sala).
-        if (document.visibilityState === 'hidden') {
-          lastHiddenAtRef.current = Date.now();
-          tryAutoFloat();
-        }
-      }, 80);
+      if (!wasHiddenRef.current) return;
+      wasHiddenRef.current = false;
+      if (!pipActiveRef.current && !document.pictureInPictureElement) return;
+      void exitFloating({ stopMirror: !autoFloatRef.current });
     };
 
     document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('blur', onBlur);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [exitFloating]);
+
+  useEffect(() => {
+    if (!autoFloat || !conferenceReady || !supportsSystemFloat()) return;
+    const media = navigator.mediaSession;
+    if (!media?.setActionHandler) return;
+    try {
+      media.setActionHandler('enterpictureinpicture' as MediaSessionAction, async () => {
+        if (!autoFloatRef.current) return;
+        await enterSystemFloat({ silent: true });
+      });
+    } catch {
+      /* este browser não expõe a ação */
+    }
     return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('blur', onBlur);
+      try {
+        media.setActionHandler('enterpictureinpicture' as MediaSessionAction, null);
+      } catch {
+        /* ignore */
+      }
     };
-  }, [enterDocumentPip, restoreStageFromPip]);
+  }, [autoFloat, conferenceReady, enterSystemFloat]);
+
+  useEffect(() => {
+    const video = floatVideoRef.current;
+    if (!video) return;
+    const onLeave = () => {
+      pipActiveRef.current = false;
+      setPipActive(false);
+    };
+    video.addEventListener('leavepictureinpicture', onLeave);
+    return () => video.removeEventListener('leavepictureinpicture', onLeave);
+  }, [conferenceReady]);
 
   useEffect(() => {
     return () => {
-      closePipWindow(pipWindowRef.current);
-      pipWindowRef.current = null;
+      void exitVideoPictureInPicture();
+      releaseMirror();
     };
-  }, []);
+  }, [releaseMirror]);
 
   useEffect(() => {
     if (!layoutMenuOpen) return;
@@ -844,11 +843,11 @@ export function MeetRoomClient({ sessionId }: Props) {
 
   async function openFloatingWindow() {
     setError(null);
-    if (pipActive) {
-      exitFloating();
+    if (pipActive || document.pictureInPictureElement) {
+      await exitFloating({ stopMirror: true });
       return;
     }
-    await enterDocumentPip();
+    await enterSystemFloat();
   }
 
   const endInFlight = useRef(false);
@@ -1198,19 +1197,11 @@ export function MeetRoomClient({ sessionId }: Props) {
                 ? 'bg-teal-400 text-slate-950 hover:bg-teal-300'
                 : 'bg-slate-800/95 text-white/90 hover:bg-slate-700'
             }`}
-            title={
-              supportsDocumentPictureInPicture()
-                ? t(
-                    'Janela flutuante do sistema (Chrome/Edge). Activa automaticamente ao mudar de separador.',
-                    'Ventana flotante del sistema (Chrome/Edge). Se activa al cambiar de pestaña.',
-                    'System floating window (Chrome/Edge). Auto-activates when you switch tabs.',
-                  )
-                : t(
-                    'Flutuante nesta página (browser limitado)',
-                    'Flotante en esta página (navegador limitado)',
-                    'Float on this page (limited browser)',
-                  )
-            }
+            title={t(
+              'Janela flutuante por cima das outras aplicações. Ao voltares a este separador, a reunião regressa ao tamanho normal.',
+              'Ventana flotante encima de las otras aplicaciones. Al volver a esta pestaña, la reunión vuelve al tamaño normal.',
+              'Floating window above other apps. Coming back to this tab restores the full meeting.',
+            )}
           >
             <PictureInPicture2 className="h-3.5 w-3.5" strokeWidth={1.75} />
             <span className="hidden sm:inline">
@@ -1319,19 +1310,15 @@ export function MeetRoomClient({ sessionId }: Props) {
             </div>
           )}
           {pipActive && (
-            <div className="mb-3 shrink-0 rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-xs text-white/60">
-              {pipMode === 'document'
-                ? t(
-                    'Sala na janela flutuante do sistema. Volta a este separador para repor o ecrã completo.',
-                    'Sala en la ventana flotante del sistema. Vuelve a esta pestaña para pantalla completa.',
-                    'Meeting is in the system floating window. Return to this tab for full screen.',
-                  )
-                : t(
-                    'Flutuante limitado nesta página — usa Chrome/Edge para janela fora do browser.',
-                    'Flotante limitado en esta página — usa Chrome/Edge para ventana fuera del navegador.',
-                    'Limited float on this page — use Chrome/Edge for a window outside the browser.',
-                  )}
-              <label className="mt-2 flex items-center gap-2 text-[11px] text-white/50">
+            <div className="mb-3 flex shrink-0 items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-900 px-4 py-2 text-[11px] text-white/55">
+              <span>
+                {t(
+                  'Janela flutuante do sistema, por cima das outras apps. Ao voltares a este separador, a reunião volta ao ecrã completo.',
+                  'Ventana flotante del sistema, encima de las otras apps. Al volver a esta pestaña, la reunión vuelve a pantalla completa.',
+                  'System floating window above other apps. Coming back to this tab restores the full meeting.',
+                )}
+              </span>
+              <label className="flex shrink-0 items-center gap-2">
                 <input
                   type="checkbox"
                   checked={autoFloat}
@@ -1339,40 +1326,16 @@ export function MeetRoomClient({ sessionId }: Props) {
                   className="rounded border-white/20"
                 />
                 {t(
-                  'Flutuante automático ao mudar de separador ou app',
-                  'Flotante automático al cambiar de pestaña o app',
-                  'Auto float when switching tab or app',
+                  'Automático ao mudar de janela',
+                  'Automático al cambiar de ventana',
+                  'Automatic when switching windows',
                 )}
               </label>
             </div>
           )}
-          <div
-            ref={stageSlotRef}
-            className={
-              pipMode === 'document' && pipActive
-                ? 'relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/15 bg-slate-950/80'
-                : 'relative min-h-0 w-full flex-1'
-            }
-          >
-            {pipMode === 'document' && pipActive && (
-              <p className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-white/45">
-                {t(
-                  'A reunião está na janela flutuante CHORUS',
-                  'La reunión está en la ventana flotante CHORUS',
-                  'The meeting is in the CHORUS floating window',
-                )}
-              </p>
-            )}
-            <div
-              ref={stageHomeRef}
-              className={
-                pipMode === 'css' && pipActive
-                  ? `fixed bottom-4 z-50 h-[220px] w-[min(92vw,360px)] overflow-hidden rounded-2xl bg-slate-950 shadow-2xl ring-2 ring-teal-400/50 ${
-                      panelOpen ? 'right-[23.5rem]' : 'right-14'
-                    }`
-                  : 'relative h-full min-h-0 w-full overflow-hidden rounded-2xl bg-slate-950'
-              }
-            >
+          <video ref={floatVideoRef} muted playsInline autoPlay className="pointer-events-none fixed h-px w-px opacity-0" />
+          <div ref={stageSlotRef} className="relative min-h-0 w-full flex-1">
+            <div ref={stageHomeRef} className="relative h-full min-h-0 w-full overflow-hidden rounded-2xl bg-slate-950">
             <div ref={stageRef} className="relative h-full min-h-0 w-full">
               {session.meetingUrl && canEmbedChorusRoom(session.meetingUrl) ? (
                 <MeetConferenceFrame
@@ -1410,8 +1373,9 @@ export function MeetRoomClient({ sessionId }: Props) {
                       leaveQuietRef.current = false;
                       return;
                     }
-                    // Desligar na barra = sair desta pessoa. Não marca a reunião como encerrada.
-                    if (pipEnteringRef.current || pipModeRef.current !== 'none') return;
+                    // Desligar na barra = sair desta pessoa. Flutuar nunca encerra a chamada.
+                    if (pipEnteringRef.current || pipActiveRef.current || document.pictureInPictureElement) return;
+                    if (Date.now() < floatGuardUntilRef.current) return;
                     if (document.visibilityState === 'hidden') return;
                     if (Date.now() - lastHiddenAtRef.current < 15_000) return;
                     void leaveToMeetHome();
