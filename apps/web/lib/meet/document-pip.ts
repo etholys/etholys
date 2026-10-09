@@ -1,77 +1,57 @@
 /**
- * Janela flutuante do sistema (por cima das outras apps).
- * Não move o iframe da reunião: isso recarrega a sala e derruba a chamada.
- * Espelha o palco num <video> e usa Picture-in-Picture do browser.
+ * Janela flutuante do sistema (Document Picture-in-Picture).
+ * Fica por cima das outras aplicações. Não se move o iframe já ligado:
+ * isso recarrega a sala e derruba a chamada.
  */
 
-export function supportsSystemFloat(): boolean {
-  return (
-    typeof document !== 'undefined' &&
-    typeof HTMLVideoElement !== 'undefined' &&
-    'requestPictureInPicture' in HTMLVideoElement.prototype &&
-    document.pictureInPictureEnabled !== false
-  );
-}
-
-type CropCapableTrack = MediaStreamTrack & {
-  cropTo?: (target: unknown) => Promise<void>;
+type PipApi = {
+  requestWindow: (opts?: { width?: number; height?: number }) => Promise<Window>;
+  window?: Window | null;
 };
 
-type CaptureOpts = DisplayMediaStreamOptions & {
-  preferCurrentTab?: boolean;
-  selfBrowserSurface?: 'include' | 'exclude';
-  monitorTypeSurfaces?: 'include' | 'exclude';
-  surfaceSwitching?: 'include' | 'exclude';
-};
+export function supportsDocumentFloat(): boolean {
+  return typeof window !== 'undefined' && 'documentPictureInPicture' in window;
+}
 
-export async function captureMeetStage(stageEl: HTMLElement): Promise<MediaStream> {
-  const stream = await navigator.mediaDevices.getDisplayMedia({
-    audio: false,
-    video: { displaySurface: 'browser' },
-    preferCurrentTab: true,
-    selfBrowserSurface: 'include',
-    monitorTypeSurfaces: 'exclude',
-    surfaceSwitching: 'exclude',
-  } as CaptureOpts);
+function pipApi(): PipApi | null {
+  if (!supportsDocumentFloat()) return null;
+  return (window as Window & { documentPictureInPicture?: PipApi }).documentPictureInPicture ?? null;
+}
 
-  const [track] = stream.getVideoTracks();
-  const cropTarget = (
-    window as Window & { CropTarget?: { fromElement: (el: Element) => Promise<unknown> } }
-  ).CropTarget;
-  const cropTrack = track as CropCapableTrack | undefined;
-  if (track && cropTarget && cropTrack?.cropTo) {
-    try {
-      const target = await cropTarget.fromElement(stageEl);
-      await cropTrack.cropTo(target);
-    } catch {
-      /* Sem recorte: a janela mostra o separador inteiro. A chamada continua. */
-    }
+function copyStyles(pipWindow: Window) {
+  const head = pipWindow.document.head;
+  for (const link of Array.from(document.querySelectorAll('link[rel="stylesheet"]'))) {
+    const href = link.getAttribute('href');
+    if (!href) continue;
+    const clone = pipWindow.document.createElement('link');
+    clone.rel = 'stylesheet';
+    clone.href = href;
+    head.appendChild(clone);
   }
-  return stream;
 }
 
-export function stopMeetStageCapture(stream: MediaStream | null | undefined) {
-  stream?.getTracks().forEach((track) => {
-    try {
-      track.stop();
-    } catch {
-      /* ignore */
-    }
-  });
-}
-
-export async function enterVideoPictureInPicture(video: HTMLVideoElement): Promise<void> {
-  if (document.pictureInPictureElement === video) return;
-  if (document.pictureInPictureElement) {
-    await document.exitPictureInPicture();
+export async function openDocumentFloatWindow(width = 420, height = 280): Promise<Window> {
+  const api = pipApi();
+  if (!api) throw new Error('unsupported');
+  if (api.window && !api.window.closed) {
+    api.window.focus();
+    return api.window;
   }
-  await video.requestPictureInPicture();
+  const pipWindow = await api.requestWindow({ width, height });
+  copyStyles(pipWindow);
+  const doc = pipWindow.document;
+  doc.documentElement.style.height = '100%';
+  doc.body.style.margin = '0';
+  doc.body.style.height = '100%';
+  doc.body.style.background = '#202124';
+  doc.body.style.overflow = 'hidden';
+  return pipWindow;
 }
 
-export async function exitVideoPictureInPicture(): Promise<void> {
-  if (!document.pictureInPictureElement) return;
+export function closeDocumentFloatWindow(pipWindow: Window | null | undefined) {
+  if (!pipWindow || pipWindow.closed) return;
   try {
-    await document.exitPictureInPicture();
+    pipWindow.close();
   } catch {
     /* já fechada */
   }

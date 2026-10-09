@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -39,11 +40,9 @@ import { PendingMeetRecordingBanner } from '@/components/meet/PendingMeetRecordi
 import { resolveMeetSpeechLanguage, type MeetSpeechLanguage } from '@/lib/meet/language';
 import { queueMeetRecordingUpload } from '@/lib/meet/flush-pending-recording';
 import {
-  captureMeetStage,
-  enterVideoPictureInPicture,
-  exitVideoPictureInPicture,
-  stopMeetStageCapture,
-  supportsSystemFloat,
+  closeDocumentFloatWindow,
+  openDocumentFloatWindow,
+  supportsDocumentFloat,
 } from '@/lib/meet/document-pip';
 
 type SessionRow = {
@@ -189,6 +188,7 @@ export function MeetRoomClient({ sessionId }: Props) {
     (authSession?.user as { email?: string | null } | undefined)?.email?.trim() ||
     '';
   const [pipActive, setPipActive] = useState(false);
+  const [floatHost, setFloatHost] = useState<'stage' | 'pip'>('stage');
   const [conferenceReady, setConferenceReady] = useState(false);
   const [autoFloat, setAutoFloat] = useState(true);
   const [layoutMode, setLayoutMode] = useState<MeetLayoutMode>('speaker');
@@ -203,17 +203,18 @@ export function MeetRoomClient({ sessionId }: Props) {
   const localRecorderRef = useRef<MeetLocalRecorder | null>(null);
   const recordingFinalizeRef = useRef(false);
   const hadParticipantsRef = useRef(false);
-  const stageSlotRef = useRef<HTMLDivElement>(null);
-  const stageHomeRef = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const floatVideoRef = useRef<HTMLVideoElement>(null);
-  const mirrorStreamRef = useRef<MediaStream | null>(null);
+  const pipWindowRef = useRef<Window | null>(null);
+  const pipRootRef = useRef<Root | null>(null);
   const pipActiveRef = useRef(false);
+  const floatHostRef = useRef<'stage' | 'pip'>('stage');
   const conferenceReadyRef = useRef(false);
   const autoFloatRef = useRef(true);
   const pipEnteringRef = useRef(false);
-  const wasHiddenRef = useRef(false);
+  const restoringFloatRef = useRef(false);
+  const floatOpenedAtRef = useRef(0);
   const floatGuardUntilRef = useRef(0);
+  const floatHandoffRef = useRef(false);
+  const leaveRef = useRef<() => void>(() => {});
   /** Evita encerrar a reunião só porque o utilizador mudou de aba (falsos videoConferenceLeft). */
   const lastHiddenAtRef = useRef(0);
   const segmentsRef = useRef<TranscriptSegment[]>([]);
@@ -411,42 +412,39 @@ export function MeetRoomClient({ sessionId }: Props) {
     conferenceReadyRef.current = conferenceReady;
   }, [conferenceReady]);
 
-  const releaseMirror = useCallback(() => {
-    stopMeetStageCapture(mirrorStreamRef.current);
-    mirrorStreamRef.current = null;
-    const video = floatVideoRef.current;
-    if (video) video.srcObject = null;
+  const restoreFloat = useCallback(() => {
+    if (restoringFloatRef.current) return;
+    if (floatHostRef.current !== 'pip' && !pipWindowRef.current) return;
+    restoringFloatRef.current = true;
+    floatHandoffRef.current = true;
+    floatGuardUntilRef.current = Date.now() + 12_000;
+    floatHostRef.current = 'stage';
+    pipActiveRef.current = false;
+    setFloatHost('stage');
+    setPipActive(false);
+    const pipWindow = pipWindowRef.current;
+    pipWindowRef.current = null;
+    closeDocumentFloatWindow(pipWindow);
+    window.setTimeout(() => {
+      restoringFloatRef.current = false;
+    }, 400);
   }, []);
-
-  const exitFloating = useCallback(
-    async (opts?: { stopMirror?: boolean }) => {
-      floatGuardUntilRef.current = Date.now() + 4000;
-      await exitVideoPictureInPicture();
-      pipActiveRef.current = false;
-      setPipActive(false);
-      if (opts?.stopMirror !== false) releaseMirror();
-    },
-    [releaseMirror],
-  );
 
   const enterSystemFloat = useCallback(
     async (opts?: { silent?: boolean }) => {
-      const stage = stageRef.current;
-      const video = floatVideoRef.current;
-      if (!stage || !video || !conferenceReadyRef.current) return false;
+      if (!conferenceReadyRef.current) return false;
       if (pipEnteringRef.current) return false;
-      if (document.pictureInPictureElement === video) {
-        pipActiveRef.current = true;
-        setPipActive(true);
+      if (floatHostRef.current === 'pip' && pipWindowRef.current && !pipWindowRef.current.closed) {
+        pipWindowRef.current.focus();
         return true;
       }
-      if (!supportsSystemFloat()) {
+      if (!supportsDocumentFloat()) {
         if (!opts?.silent) {
           setError(
             t(
-              'Este browser não abre janela flutuante do sistema. Usa Chrome ou Edge no computador.',
-              'Este navegador no abre una ventana flotante del sistema. Usa Chrome o Edge en el ordenador.',
-              'This browser cannot open a system floating window. Use Chrome or Edge on desktop.',
+              'A janela flutuante por cima do sistema só abre no Chrome ou Edge, no computador.',
+              'La ventana flotante encima del sistema solo abre en Chrome o Edge, en el ordenador.',
+              'The system floating window only opens in Chrome or Edge on a computer.',
             ),
           );
         }
@@ -454,32 +452,37 @@ export function MeetRoomClient({ sessionId }: Props) {
       }
 
       pipEnteringRef.current = true;
-      floatGuardUntilRef.current = Date.now() + 8000;
+      floatHandoffRef.current = true;
+      floatGuardUntilRef.current = Date.now() + 12_000;
       try {
-        if (!mirrorStreamRef.current) {
-          const stream = await captureMeetStage(stage);
-          mirrorStreamRef.current = stream;
-          video.srcObject = stream;
-          video.muted = true;
-          await video.play();
-          stream.getVideoTracks()[0]?.addEventListener('ended', () => {
-            void exitFloating({ stopMirror: true });
-          });
-        }
-        await enterVideoPictureInPicture(video);
+        const pipWindow = await openDocumentFloatWindow();
+        pipWindowRef.current = pipWindow;
+        floatOpenedAtRef.current = Date.now();
+        floatHostRef.current = 'pip';
         pipActiveRef.current = true;
+        setFloatHost('pip');
         setPipActive(true);
         setPanelOpen(false);
+        pipWindow.addEventListener(
+          'pagehide',
+          () => {
+            restoreFloat();
+          },
+          { once: true },
+        );
         return true;
       } catch (err) {
+        floatHandoffRef.current = false;
+        floatHostRef.current = 'stage';
         if (!opts?.silent) {
-          const denied = err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError');
+          const denied =
+            err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError');
           setError(
             denied
               ? t(
-                  'Para flutuar por cima das outras janelas, aceita partilhar este separador. A chamada não se desliga.',
-                  'Para flotar encima de las otras ventanas, acepta compartir esta pestaña. La llamada no se corta.',
-                  'To float above other windows, allow sharing this tab. The call stays connected.',
+                  'O browser bloqueou a janela flutuante. Clica em Flutuante outra vez, sem mudar de separador.',
+                  'El navegador bloqueó la ventana flotante. Pulsa Flotante otra vez, sin cambiar de pestaña.',
+                  'The browser blocked the floating window. Click Float again without switching tabs.',
                 )
               : t(
                   'Não foi possível abrir a janela flutuante do sistema.',
@@ -488,34 +491,39 @@ export function MeetRoomClient({ sessionId }: Props) {
                 ),
           );
         }
-        if (!document.pictureInPictureElement) releaseMirror();
         return false;
       } finally {
         pipEnteringRef.current = false;
       }
     },
-    [exitFloating, releaseMirror, t],
+    [restoreFloat, t],
   );
 
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
         lastHiddenAtRef.current = Date.now();
-        wasHiddenRef.current = true;
+        if (
+          autoFloatRef.current &&
+          conferenceReadyRef.current &&
+          floatHostRef.current === 'stage' &&
+          !pipEnteringRef.current
+        ) {
+          void enterSystemFloat({ silent: true });
+        }
         return;
       }
-      if (!wasHiddenRef.current) return;
-      wasHiddenRef.current = false;
-      if (!pipActiveRef.current && !document.pictureInPictureElement) return;
-      void exitFloating({ stopMirror: !autoFloatRef.current });
+      if (Date.now() - floatOpenedAtRef.current < 1200) return;
+      if (Date.now() - lastHiddenAtRef.current < 400) return;
+      if (floatHostRef.current === 'pip') restoreFloat();
     };
 
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [exitFloating]);
+  }, [enterSystemFloat, restoreFloat]);
 
   useEffect(() => {
-    if (!autoFloat || !conferenceReady || !supportsSystemFloat()) return;
+    if (!autoFloat || !conferenceReady || !supportsDocumentFloat()) return;
     const media = navigator.mediaSession;
     if (!media?.setActionHandler) return;
     try {
@@ -536,22 +544,11 @@ export function MeetRoomClient({ sessionId }: Props) {
   }, [autoFloat, conferenceReady, enterSystemFloat]);
 
   useEffect(() => {
-    const video = floatVideoRef.current;
-    if (!video) return;
-    const onLeave = () => {
-      pipActiveRef.current = false;
-      setPipActive(false);
-    };
-    video.addEventListener('leavepictureinpicture', onLeave);
-    return () => video.removeEventListener('leavepictureinpicture', onLeave);
-  }, [conferenceReady]);
-
-  useEffect(() => {
     return () => {
-      void exitVideoPictureInPicture();
-      releaseMirror();
+      closeDocumentFloatWindow(pipWindowRef.current);
+      pipWindowRef.current = null;
     };
-  }, [releaseMirror]);
+  }, []);
 
   useEffect(() => {
     if (!layoutMenuOpen) return;
@@ -843,8 +840,8 @@ export function MeetRoomClient({ sessionId }: Props) {
 
   async function openFloatingWindow() {
     setError(null);
-    if (pipActive || document.pictureInPictureElement) {
-      await exitFloating({ stopMirror: true });
+    if (floatHostRef.current === 'pip') {
+      restoreFloat();
       return;
     }
     await enterSystemFloat();
@@ -853,7 +850,7 @@ export function MeetRoomClient({ sessionId }: Props) {
   const endInFlight = useRef(false);
 
   function tearDownConference() {
-    exitFloating();
+    restoreFloat();
     try {
       conferenceRef.current?.stopTranscription();
     } catch {
@@ -1008,6 +1005,51 @@ export function MeetRoomClient({ sessionId }: Props) {
     setLayoutMenuOpen(false);
     conferenceRef.current?.setLayoutMode(mode);
   }
+
+  leaveRef.current = () => {
+    void leaveToMeetHome();
+  };
+
+  useEffect(() => {
+    if (floatHost !== 'pip') return;
+    const pipWindow = pipWindowRef.current;
+    const meetingUrl = session?.meetingUrl;
+    if (!pipWindow || pipWindow.closed || !meetingUrl || !canEmbedChorusRoom(meetingUrl)) return;
+
+    const mount = pipWindow.document.createElement('div');
+    mount.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
+    pipWindow.document.body.appendChild(mount);
+    const root = createRoot(mount);
+    pipRootRef.current = root;
+    root.render(
+      <MeetConferenceFrame
+        meetingUrl={meetingUrl}
+        title={session?.title || 'CHORUS'}
+        locale={locale}
+        displayName={displayName}
+        transcriptionLanguage={meetingSpeechLang}
+        onReady={() => {
+          floatHandoffRef.current = false;
+          setConferenceReady(true);
+        }}
+        onParticipantCountChange={setParticipantCount}
+        onDominantSpeakerChanged={(name) => {
+          dominantSpeakerRef.current = name;
+          setDominantSpeaker(name);
+        }}
+        onConferenceLeft={() => {
+          if (floatHandoffRef.current || restoringFloatRef.current) return;
+          leaveRef.current();
+        }}
+      />,
+    );
+    return () => {
+      floatHandoffRef.current = true;
+      pipRootRef.current = null;
+      root.unmount();
+      mount.remove();
+    };
+  }, [floatHost, session?.meetingUrl, session?.title, displayName, locale, meetingSpeechLang]);
 
   async function copyLiveTranscript() {
     const text = buildTranscriptText(segmentsRef.current);
@@ -1309,35 +1351,33 @@ export function MeetRoomClient({ sessionId }: Props) {
               </button>
             </div>
           )}
-          {pipActive && (
-            <div className="mb-3 flex shrink-0 items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-900 px-4 py-2 text-[11px] text-white/55">
-              <span>
-                {t(
-                  'Janela flutuante do sistema, por cima das outras apps. Ao voltares a este separador, a reunião volta ao ecrã completo.',
-                  'Ventana flotante del sistema, encima de las otras apps. Al volver a esta pestaña, la reunión vuelve a pantalla completa.',
-                  'System floating window above other apps. Coming back to this tab restores the full meeting.',
-                )}
-              </span>
-              <label className="flex shrink-0 items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={autoFloat}
-                  onChange={(event) => setAutoFloat(event.target.checked)}
-                  className="rounded border-white/20"
-                />
-                {t(
-                  'Automático ao mudar de janela',
-                  'Automático al cambiar de ventana',
-                  'Automatic when switching windows',
-                )}
-              </label>
-            </div>
-          )}
-          <video ref={floatVideoRef} muted playsInline autoPlay className="pointer-events-none fixed h-px w-px opacity-0" />
-          <div ref={stageSlotRef} className="relative min-h-0 w-full flex-1">
-            <div ref={stageHomeRef} className="relative h-full min-h-0 w-full overflow-hidden rounded-2xl bg-slate-950">
-            <div ref={stageRef} className="relative h-full min-h-0 w-full">
-              {session.meetingUrl && canEmbedChorusRoom(session.meetingUrl) ? (
+          <div className="relative min-h-0 w-full flex-1">
+            <div className="relative h-full min-h-0 w-full overflow-hidden rounded-2xl bg-slate-950">
+            <div className="relative h-full min-h-0 w-full">
+              {floatHost === 'pip' ? (
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                  <p className="max-w-md text-sm text-white/70">
+                    {t(
+                      'A reunião está numa janela por cima das outras aplicações. Ao voltares a este separador, regressa ao tamanho normal.',
+                      'La reunión está en una ventana encima de las otras aplicaciones. Al volver a esta pestaña, vuelve al tamaño normal.',
+                      'The meeting is in a window above your other apps. Coming back to this tab restores the full size.',
+                    )}
+                  </p>
+                  <label className="flex items-center gap-2 text-[11px] text-white/45">
+                    <input
+                      type="checkbox"
+                      checked={autoFloat}
+                      onChange={(event) => setAutoFloat(event.target.checked)}
+                      className="rounded border-white/20"
+                    />
+                    {t(
+                      'Abrir ao minimizar ou mudar de janela',
+                      'Abrir al minimizar o cambiar de ventana',
+                      'Open when minimizing or switching windows',
+                    )}
+                  </label>
+                </div>
+              ) : session.meetingUrl && canEmbedChorusRoom(session.meetingUrl) ? (
                 <MeetConferenceFrame
                   ref={conferenceRef}
                   meetingUrl={session.meetingUrl}
@@ -1346,6 +1386,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                   displayName={displayName}
                   transcriptionLanguage={meetingSpeechLang}
                   onReady={() => {
+                    floatHandoffRef.current = false;
                     setConferenceReady(true);
                   }}
                   onTranscriptionChunk={handleTranscriptionChunk}
@@ -1374,7 +1415,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                       return;
                     }
                     // Desligar na barra = sair desta pessoa. Flutuar nunca encerra a chamada.
-                    if (pipEnteringRef.current || pipActiveRef.current || document.pictureInPictureElement) return;
+                    if (pipEnteringRef.current || floatHandoffRef.current || floatHostRef.current === 'pip') return;
                     if (Date.now() < floatGuardUntilRef.current) return;
                     if (document.visibilityState === 'hidden') return;
                     if (Date.now() - lastHiddenAtRef.current < 15_000) return;

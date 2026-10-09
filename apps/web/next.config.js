@@ -51,7 +51,7 @@ const nextConfig = {
           {
             key: 'Permissions-Policy',
             value:
-              'camera=*, microphone=*, display-capture=*, autoplay=*, fullscreen=*',
+              'camera=*, microphone=*, display-capture=*, autoplay=*, fullscreen=*, picture-in-picture=*',
           },
         ],
       },
