@@ -51,12 +51,19 @@ export function meetAppBaseUrl(): string {
   return raw.replace(/\/$/, '');
 }
 
+/** Entrada pública no browser — sem conta Etholys e sem app móvel. */
+export function meetGuestJoinPath(sessionId: string, companyId?: string | null): string {
+  const path = `/meet/join/${encodeURIComponent(sessionId)}`;
+  if (!companyId) return path;
+  return `${path}?companyId=${encodeURIComponent(companyId)}`;
+}
+
 /**
- * Link de convite / calendário — SEMPRE o Hub CHORUS (identifica a conta e o host).
- * Nunca enviar só o URL da sala de vídeo: o utilizador entra anónimo e perde o host.
+ * Link de convite / calendário.
+ * Quem tem sessão Etholys é enviado ao Hub (host). Quem não tem entra no browser com o nome.
  */
 export function meetPublicJoinUrl(sessionId: string, companyId: string): string {
-  const path = meetHubJoinPath(sessionId, companyId);
+  const path = meetGuestJoinPath(sessionId, companyId);
   if (typeof window !== 'undefined' && window.location?.origin) {
     return `${window.location.origin}${path}`;
   }

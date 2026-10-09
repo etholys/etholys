@@ -85,7 +85,6 @@ const MEET_TOOLBAR_BUTTONS = [
   'noisesuppression',
   'shortcuts',
   'videoquality',
-  'invite',
   'whiteboard',
   'highlight',
 ] as const;
@@ -425,6 +424,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             configOverwrite: {
               subject: title,
               disableDeepLinking: true,
+              deeplinking: { disabled: true },
               // Hub já tem MeetJoinSetupDialog — pré-sala do motor deixa 0 participantes
               // e ecrã preto se o utilizador nunca clica «Entrar» / UI falha.
               prejoinConfig: {

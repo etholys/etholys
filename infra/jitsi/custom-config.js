@@ -28,8 +28,10 @@ config.liveStreamingEnabled = false;
 
 config.disableInviteFunctions = false;
 config.enableWelcomePage = false;
-// Permite entrar no browser móvel (sem página “use desktop / app”).
+// Browser móvel: sem página «abrir na app» (o flag novo e o legado).
 config.disableDeepLinking = true;
+config.deeplinking = config.deeplinking || {};
+config.deeplinking.disabled = true;
 config.hideConferenceSubject = true;
 config.hideConferenceTimer = false;
 config.prejoinConfig = config.prejoinConfig || {};

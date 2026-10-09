@@ -53,7 +53,6 @@ interfaceConfig.TOOLBAR_BUTTONS = [
   'noisesuppression',
   'shortcuts',
   'videoquality',
-  'invite',
   'whiteboard',
   'highlight',
 ];

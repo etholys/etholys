@@ -198,7 +198,7 @@ export function MeetRoomClient({ sessionId }: Props) {
   const [pipActive, setPipActive] = useState(false);
   const [pipMode, setPipMode] = useState<'none' | 'document' | 'css'>('none');
   const [conferenceReady, setConferenceReady] = useState(false);
-  const [autoFloat, setAutoFloat] = useState(false);
+  const [autoFloat, setAutoFloat] = useState(true);
   const [layoutMode, setLayoutMode] = useState<MeetLayoutMode>('speaker');
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
   const [transcriptCopied, setTranscriptCopied] = useState(false);
@@ -531,6 +531,7 @@ export function MeetRoomClient({ sessionId }: Props) {
 
     const onBlur = () => {
       window.setTimeout(() => {
+        // Minimizar / outra app. Não reagir a blur do iframe (clique na sala).
         if (document.visibilityState === 'hidden') {
           lastHiddenAtRef.current = Date.now();
           tryAutoFloat();
@@ -1409,12 +1410,11 @@ export function MeetRoomClient({ sessionId }: Props) {
                       leaveQuietRef.current = false;
                       return;
                     }
-                    // Nunca encerrar só por blur/PiP/falsos leaves da sala
+                    // Desligar na barra = sair desta pessoa. Não marca a reunião como encerrada.
                     if (pipEnteringRef.current || pipModeRef.current !== 'none') return;
                     if (document.visibilityState === 'hidden') return;
                     if (Date.now() - lastHiddenAtRef.current < 15_000) return;
-                    // Só encerra se a página está visível e o leave parece deliberado
-                    void endMeeting({ skipHangup: true });
+                    void leaveToMeetHome();
                   }}
                   onRecordingStatus={(state) => {
                     if (state.transcription) {
