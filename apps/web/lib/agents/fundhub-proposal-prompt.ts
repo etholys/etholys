@@ -300,6 +300,9 @@ export function looksLikeCallQuestion(message: string): boolean {
     /\b(qu[eé]|cu[aá]les?|quais|which|what)\b[\s\S]{0,60}\b(documentos?|anexos?|requisitos?|envi|adjunt|entreg)\b/i.test(
       message,
     ) ||
-    /\b(documentos?|anexos?)\b[\s\S]{0,40}\b(envi|entreg|adjunt|present|deben|devem|must)\b/i.test(message)
+    /\b(documentos?|anexos?)\b[\s\S]{0,40}\b(envi|entreg|adjunt|present|deben|devem|must)\b/i.test(message) ||
+    /\b(documentos?|anexos?)\b[\s\S]{0,48}\b(bases?|edital|pdf)\b/i.test(message) ||
+    /\b(exactamente|exatamente|literal|lo que piden|o que pedem)\b/i.test(message) ||
+    /\bno es lo que general/i.test(message)
   );
 }

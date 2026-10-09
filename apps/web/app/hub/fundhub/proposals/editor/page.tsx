@@ -144,6 +144,7 @@ export default function FundHubProposalEditorPage() {
   const [rightRailTab, setRightRailTab] = useState<'review' | 'document'>('document');
   const [rightRailMenuOpen, setRightRailMenuOpen] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const fileBlobsRef = useRef<Map<string, File>>(new Map());
   const mediaChunksRef = useRef<Blob[]>([]);
   const chatFileInputRef = useRef<HTMLInputElement | null>(null);
   const [coalitionPool, setCoalitionPool] = useState<Array<{ id: string; orgName: string; role: string }>>([]);
@@ -650,6 +651,36 @@ export default function FundHubProposalEditorPage() {
       chatLoading
     )
       return;
+    let sourceFiles = attachedFiles;
+    const unread = sourceFiles.filter(
+      (f) =>
+        (f.role === 'bases' || f.role === 'reference') && (f.textExcerpt?.trim().length ?? 0) < 200,
+    );
+    if (unread.length) {
+      setChatLoading(true);
+      const refreshed = await Promise.all(
+        sourceFiles.map(async (f) => {
+          if ((f.textExcerpt?.trim().length ?? 0) >= 200) return f;
+          if (f.role === 'turn') return f;
+          const blob = fileBlobsRef.current.get(`${f.name}:${f.size}`);
+          if (!blob || !/\.(pdf|docx?|xlsx?|xls)$/i.test(f.name)) return f;
+          try {
+            const fd = new FormData();
+            fd.append('file', blob, f.name);
+            const r = await fetch('/api/proposals/extract-text', { method: 'POST', body: fd });
+            const d = (await r.json()) as { text?: string };
+            const text = d.text?.trim()?.slice(0, 20000);
+            return text ? { ...f, textExcerpt: text } : f;
+          } catch {
+            return f;
+          }
+        }),
+      );
+      sourceFiles = refreshed;
+      setAttachedFiles(refreshed);
+      setChatLoading(false);
+    }
+
     const slashWrite = /^\s*\/(redactar|escribir|write|redige)\b/i.test(message);
     if (slashWrite) {
       message = message.replace(/^\s*\/(redactar|escribir|write|redige)\s*/i, '').trim();
@@ -669,7 +700,30 @@ export default function FundHubProposalEditorPage() {
     const isWrite = stage === 'write' && !callQuestion && (composerMode === 'write' || forceWrite);
     if (isWrite && composerMode !== 'write') setComposerMode('write');
 
-    const turnFiles = attachedFiles.filter((f) => f.role === 'turn');
+    const basesReady =
+      Boolean(fund?.basesText?.trim() && fund.basesText.trim().length > 200) ||
+      sourceFiles.some((f) => (f.textExcerpt?.trim().length ?? 0) > 200);
+    if (callQuestion && !basesReady) {
+      setError(
+        ui(
+          locale,
+          'El PDF de bases está adjunto pero sin texto. Volvé a anexarlo como «Bases / edital» y esperá a que se lea.',
+          'O PDF das bases está anexado mas sem texto. Volta a anexá-lo como «Bases / edital» e espera que seja lido.',
+          'The bases PDF is attached but has no text. Re-attach it as «RFP / bases» and wait until it is read.',
+        ),
+      );
+      return;
+    }
+    if (callQuestion) {
+      message +=
+        locale === 'en'
+          ? '\n\n[READ THE BASES ONLY] Answer only with what the BASES file text says. Quote the section. Do not use the web or a typical checklist.'
+          : locale === 'pt'
+            ? '\n\n[SÓ AS BASES] Responde só com o que está escrito no texto das BASES. Cita a secção. Não uses a web nem uma lista típica.'
+            : '\n\n[SOLO LAS BASES] Respondé solo con lo que está escrito en el texto de las BASES. Citá la sección. No uses la web ni una lista típica.';
+    }
+
+    const turnFiles = sourceFiles.filter((f) => f.role === 'turn');
     const attachBlock = formatProposalFileContext(turnFiles);
 
     const wantsDraftHint = isWrite;
@@ -749,7 +803,7 @@ export default function FundHubProposalEditorPage() {
     }
     setChatLoading(true);
     try {
-      const fileParts = [...turnFiles, ...attachedFiles.filter((f) => f.role !== 'turn' && f.dataBase64)]
+      const fileParts = [...turnFiles, ...sourceFiles.filter((f) => f.role !== 'turn' && f.dataBase64)]
         .filter((f) => f.dataBase64)
         .slice(0, 3)
         .map((f) => ({
@@ -763,6 +817,7 @@ export default function FundHubProposalEditorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...assistantBody(isWrite ? 'draft_section' : 'chat', fullMessage, editTarget),
+          workspaceFilesBlock: formatProposalFileContext(sourceFiles.filter((f) => f.role !== 'turn')),
           chatHistory: historyForApi,
           fileParts,
         }),
@@ -834,6 +889,7 @@ export default function FundHubProposalEditorPage() {
     rfpChecklist,
     composerMode,
     stage,
+    fund,
   ]);
 
   const insertIntoDocument = useCallback(
@@ -1046,6 +1102,7 @@ export default function FundHubProposalEditorPage() {
     const additions: AttachedFile[] = [];
     for (const file of files) {
       if (!ACCEPTED_EXT.test(file.name) || file.size > MAX_FILE_BYTES) continue;
+      fileBlobsRef.current.set(`${file.name}:${file.size}`, file);
       let textExcerpt: string | undefined;
       let dataBase64: string | undefined;
       if (TEXT_EXT.test(file.name) && file.size < 400_000) {

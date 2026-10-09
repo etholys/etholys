@@ -11,6 +11,7 @@ import {
   buildFundhubProposalUserPrompt,
   fundhubLanguageName,
   normalizeFundhubLocale,
+  looksLikeCallQuestion,
   normalizeFundhubMode,
   sanitizeFundhubChatHistory,
   type FundhubProposalContext,
@@ -169,7 +170,9 @@ export async function POST(req: NextRequest) {
 
     const excerptLen = contextChars(ctx);
     const thin = excerptLen < 400;
+    const aboutBases = looksLikeCallQuestion(userMessage);
     const wantSearch =
+      !aboutBases &&
       Boolean(ctx.editalLink?.trim()) &&
       (mode === 'understand' || ((mode === 'brainstorm' || mode === 'chat') && thin));
 

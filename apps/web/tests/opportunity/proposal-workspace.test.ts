@@ -251,6 +251,12 @@ test('call questions stay factual and are not treated as a draft', () => {
   const q =
     'leyendo las bases de la convocatoria, cuales documentos deben ser enviados por el proponente?';
   assert.equal(looksLikeCallQuestion(q), true);
+  assert.equal(
+    looksLikeCallQuestion(
+      'no es lo que generalmente solicita. tenés los documentos de la base. decí exactamente lo que piden',
+    ),
+    true,
+  );
   assert.equal(looksLikeCallQuestion('escribe el punto c en el documento'), false);
   const sys = buildFundhubProposalSystemPrompt('chat', 'es');
   assert.match(sys, /típicamente|geralmente/);
