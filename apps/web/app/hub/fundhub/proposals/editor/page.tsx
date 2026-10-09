@@ -48,7 +48,7 @@ import {
   type ProposalFileRole,
   type ProposalFundSeed,
 } from '@/lib/opportunity/proposal-workspace';
-import { looksLikeRevisionRequest } from '@/lib/agents/fundhub-proposal-prompt';
+import { looksLikeCallQuestion, looksLikeRevisionRequest } from '@/lib/agents/fundhub-proposal-prompt';
 import {
   checklistFromCandidateFields,
   appendChecklistSections,
@@ -655,15 +655,18 @@ export default function FundHubProposalEditorPage() {
       message = message.replace(/^\s*\/(redactar|escribir|write|redige)\s*/i, '').trim();
       setComposerMode('write');
     }
-    const editTarget = stage === 'write' ? resolveCanvasEditTarget(documentMarkdown, message) : null;
+    const callQuestion = looksLikeCallQuestion(message);
+    const editTarget =
+      stage === 'write' && !callQuestion ? resolveCanvasEditTarget(documentMarkdown, message) : null;
     const forceWrite =
-      slashWrite ||
-      looksLikeRevisionRequest(message) ||
-      Boolean(editTarget) ||
-      /\b(item\s*por\s*item|desarroll|redact|complet[ae]|formulari|postulaci[oó]n|escribir|escrev|preench|vamos\s+item|empez|arran[ck]|punto\s+[a-z0-9]|ítem\s*\d)/i.test(
-        message,
-      );
-    const isWrite = stage === 'write' && (composerMode === 'write' || forceWrite);
+      !callQuestion &&
+      (slashWrite ||
+        looksLikeRevisionRequest(message) ||
+        Boolean(editTarget) ||
+        /\b(item\s*por\s*item|desarroll|redact|complet[ae]|formulari|postulaci[oó]n|escribir|escrev|preench|vamos\s+item|empez|arran[ck]|punto\s+[a-z0-9]|ítem\s*\d)/i.test(
+          message,
+        ));
+    const isWrite = stage === 'write' && !callQuestion && (composerMode === 'write' || forceWrite);
     if (isWrite && composerMode !== 'write') setComposerMode('write');
 
     const turnFiles = attachedFiles.filter((f) => f.role === 'turn');
@@ -1038,6 +1041,7 @@ export default function FundHubProposalEditorPage() {
     const ACCEPTED_EXT =
       /\.(pdf|docx?|xlsx?|pptx?|txt|md|csv|rtf|odt|ods|odp|zip|rar|7z|png|jpe?g|gif|webp)$/i;
     const TEXT_EXT = /\.(txt|md|csv|rtf)$/i;
+    const EXTRACT_EXT = /\.(pdf|docx?|xlsx?|xls)$/i;
     const INLINE_EXT = /\.(png|jpe?g|gif|webp|pdf)$/i;
     const additions: AttachedFile[] = [];
     for (const file of files) {
@@ -1046,7 +1050,17 @@ export default function FundHubProposalEditorPage() {
       let dataBase64: string | undefined;
       if (TEXT_EXT.test(file.name) && file.size < 400_000) {
         try {
-          textExcerpt = (await file.text()).slice(0, 12_000);
+          textExcerpt = (await file.text()).slice(0, 20_000);
+        } catch {
+          textExcerpt = undefined;
+        }
+      } else if (EXTRACT_EXT.test(file.name) && file.size < 15_000_000) {
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          const r = await fetch('/api/proposals/extract-text', { method: 'POST', body: fd });
+          const d = (await r.json()) as { text?: string };
+          textExcerpt = d.text?.trim()?.slice(0, 20_000) || undefined;
         } catch {
           textExcerpt = undefined;
         }

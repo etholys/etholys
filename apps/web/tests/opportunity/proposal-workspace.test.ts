@@ -21,6 +21,7 @@ import {
   normalizeFundhubLocale,
   buildFundhubProposalSystemPrompt,
   buildFundhubProposalUserPrompt,
+  looksLikeCallQuestion,
   looksLikeRevisionRequest,
   sanitizeFundhubChatHistory,
 } from '../../lib/agents/fundhub-proposal-prompt';
@@ -244,6 +245,16 @@ test('chat prompt distinguishes file roles', () => {
   assert.match(sys, /BASES/);
   assert.match(sys, /REFERÊNCIA/);
   assert.match(sys, /DESTA MENSAGEM/);
+});
+
+test('call questions stay factual and are not treated as a draft', () => {
+  const q =
+    'leyendo las bases de la convocatoria, cuales documentos deben ser enviados por el proponente?';
+  assert.equal(looksLikeCallQuestion(q), true);
+  assert.equal(looksLikeCallQuestion('escribe el punto c en el documento'), false);
+  const sys = buildFundhubProposalSystemPrompt('chat', 'es');
+  assert.match(sys, /típicamente|geralmente/);
+  assert.match(sys, /PROIBIDO listar/);
 });
 
 test('chat history sanitize and revision intent keep prior draft', () => {

@@ -59,7 +59,7 @@ function buildContextBlock(ctx: FundhubProposalContext): string {
   }
   if (ctx.sourceExcerpt?.trim()) lines.push(`Texto da página oficial:\n${ctx.sourceExcerpt.trim().slice(0, 7000)}`);
   if (ctx.basesText?.trim()) lines.push(`Texto das bases / PDFs:\n${ctx.basesText.trim().slice(0, 10000)}`);
-  if (ctx.workspaceFilesBlock?.trim()) lines.push(ctx.workspaceFilesBlock.trim().slice(0, 18000));
+  if (ctx.workspaceFilesBlock?.trim()) lines.push(ctx.workspaceFilesBlock.trim().slice(0, 24000));
   if (ctx.orgProfile?.trim()) {
     lines.push(
       `Empresa do Hub (tenant) — NÃO assumas que é a organização postulante. Só usa se a mensagem do utilizador confirmar, ou se não houver outra entidade nomeada:\n${ctx.orgProfile.trim()}`,
@@ -112,6 +112,7 @@ ${INSTITUTIONAL_PROSE_RULE}
 - Se o utilizador corrige o nome da postulante, REESCREVE só a secção/ponto pedido com essa entidade. Não saltes para outras secções do canvas.
 - CONTINUIDADE DO CHAT: o histórico de mensagens faz parte do pedido. Se pedirem melhorar / reescrever / corrigir «a resposta anterior» ou um ponto já redigido, PARTE desse texto (histórico ou ## no canvas). PROIBIDO inventar outro tema ou outra secção.
 - Não inventes factos, números, nomes de org, locais ou actividades que não estejam no CONTEXTO, no histórico ou na mensagem actual. Se não houver base, [FALTA: …] — não improvises.
+- PERGUNTA SOBRE AS BASES (documentos a enviar, anexos, requisitos, prazos): responde SÓ com o que está escrito no texto das bases / PDF no CONTEXTO. Se esse texto não estiver no CONTEXTO, diz claramente que não tens o texto e pede o PDF. PROIBIDO listar o que «geralmente», «típicamente» ou «o padrão PPD/GEF» pede. Isso é invenção.
 - Não faças diagnóstico de negócio NEXUS, informes SIEP, layout Studio nem prioridades do Workspace Advisor.
 - Não menciones nomes internos de produto (FUNDHUB, OPPORTUNITY, license keys). Diz FundHub se precisares de te nomear.
 - Tom profissional, claro, alinhado ao doador quando o edital o permitir.`;
@@ -282,5 +283,23 @@ export function sanitizeFundhubChatHistory(raw: unknown, limit = 14): FundhubCha
 export function looksLikeRevisionRequest(message: string): boolean {
   return /\b(mejor(?:a|ar|e)?|melhor(?:a|ar)?|improve|revis(?:a|ar|e)?|reescri[bv]\w*|reescrev\w*|reescrit\w*|corrig\w*|ajust\w*|rehaz|refaz|más\s+corto|mais\s+curto|anterior|última\s+respuesta|ultima\s+resposta|previous\s+(?:answer|reply|draft))\b/i.test(
     message,
+  );
+}
+
+/** Factual question about the call — answer in chat, do not invent a "typical" checklist, do not write the canvas. */
+export function looksLikeCallQuestion(message: string): boolean {
+  const explicitWrite =
+    /\b(escrib|redact|redig|escrev|pon(?:er|é|e)\s+(?:esto\s+)?en\s+el\s+documento|mete\s+no\s+documento|completa(?:r)?\s+el\s+formul)/i.test(
+      message,
+    );
+  if (explicitWrite) return false;
+  return (
+    /\b(leyendo|lendo|reading|seg[uú]n|segundo|conforme)\b[\s\S]{0,80}\b(bases|edital|convocatoria|convocat[oó]ria|pdf)\b/i.test(
+      message,
+    ) ||
+    /\b(qu[eé]|cu[aá]les?|quais|which|what)\b[\s\S]{0,60}\b(documentos?|anexos?|requisitos?|envi|adjunt|entreg)\b/i.test(
+      message,
+    ) ||
+    /\b(documentos?|anexos?)\b[\s\S]{0,40}\b(envi|entreg|adjunt|present|deben|devem|must)\b/i.test(message)
   );
 }

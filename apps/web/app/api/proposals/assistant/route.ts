@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
       sourceExcerpt: body.sourceExcerpt,
       basesText: body.basesText,
       workspaceFilesBlock:
-        typeof body.workspaceFilesBlock === 'string' ? body.workspaceFilesBlock.slice(0, 18000) : undefined,
+        typeof body.workspaceFilesBlock === 'string' ? body.workspaceFilesBlock.slice(0, 24000) : undefined,
       documents,
       locale,
     };

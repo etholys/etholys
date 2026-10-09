@@ -162,8 +162,11 @@ export function formatProposalFileContext(
     const body = list
       .map((file) => {
         const excerpt = file.textExcerpt?.trim();
+        const cap = role === 'bases' ? 18000 : 6000;
         return `--- ${role.toUpperCase()}: ${file.name} ---\n${
-          excerpt ? excerpt.slice(0, 6000) : '(sem texto extraído — há um anexo visual ou binário; não inventes o conteúdo)'
+          excerpt
+            ? excerpt.slice(0, cap)
+            : '(sem texto extraído — NÃO inventes o conteúdo nem uma lista típica. Diz que o ficheiro não foi lido.)'
         }`;
       })
       .join('\n\n');
