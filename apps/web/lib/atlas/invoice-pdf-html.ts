@@ -1,5 +1,5 @@
 import { dateOnlyIso } from '@/lib/atlas/date-only';
-import { invoiceCurrencyViews, type InvoiceAmountView } from '@/lib/atlas/invoice-ops';
+import { invoiceAmountLayout, type InvoiceAmountLayout } from '@/lib/atlas/invoice-ops';
 import { tableCss, type InvoiceTheme } from '@/lib/atlas/invoice-theme';
 
 export type InvoicePdfItem = {
@@ -100,18 +100,22 @@ function partyLines(lines: string[]): string {
     .join('');
 }
 
+function amountHeader(theme: InvoiceTheme, currency: string): string {
+  return `${esc(theme.labels.amount)} (${esc(currency)})`;
+}
+
 function renderInvoiceDocument(opts: {
   invoice: InvoicePdfModel;
   theme: InvoiceTheme;
-  view: InvoiceAmountView;
+  layout: InvoiceAmountLayout;
   bannerSrc?: string;
   logoSrc?: string;
   signatureSrc?: string;
 }): string {
-  const { invoice, theme, view } = opts;
+  const { invoice, theme, layout } = opts;
   const isReceivable = invoice.type === 'RECEIVABLE' || invoice.type === 'DEBIT_NOTE';
   const title = isReceivable ? theme.documentTitleReceivable : theme.documentTitlePayable;
-  const money = (n: number) => formatInvoiceMoney(n, view.currency, theme.numberLocale);
+  const money = (n: number, currency: string) => formatInvoiceMoney(n, currency, theme.numberLocale);
   const issue = formatInvoiceLongDate(invoice.issueDate, theme.dateLocale);
   const fromName = theme.letterhead.legalName || '';
   const toName = invoice.contactName || invoice.supplierName || '—';
@@ -139,24 +143,31 @@ function renderInvoiceDocument(opts: {
     invoice.contactExtra || '',
   ]);
 
-  const items = view.items || [];
-  const amountCol = `${theme.labels.amount} (${esc(view.currency)})`;
+  const items = layout.items || [];
+  const amountHeads = layout.columns
+    .map((col) => `<th class="text-right" style="width:160px">${amountHeader(theme, col.currency)}</th>`)
+    .join('');
   let tableHead: string;
   let tableBody: string;
+  const colCount = theme.tableLayout === 'amount' ? 1 + layout.columns.length : 4 + layout.columns.length;
   if (theme.tableLayout === 'amount') {
-    tableHead = `<tr><th>${esc(theme.labels.item)}</th><th class="text-right" style="width:160px">${amountCol}</th></tr>`;
+    tableHead = `<tr><th>${esc(theme.labels.item)}</th>${amountHeads}</tr>`;
     tableBody = items
       .map((item) => {
-        const total = item.total ?? (item.quantity || 1) * (item.unitPrice || 0);
-        return `<tr><td class="item-desc">${nl(item.description || '')}</td><td class="text-right amount">${esc(money(total))}</td></tr>`;
+        const cells = item.amounts
+          .map((amt) => `<td class="text-right amount">${esc(money(amt.total, amt.currency))}</td>`)
+          .join('');
+        return `<tr><td class="item-desc">${nl(item.description || '')}</td>${cells}</tr>`;
       })
       .join('');
   } else {
-    tableHead = `<tr><th>#</th><th>${esc(theme.labels.item)}</th><th class="text-right">${esc(theme.labels.qty)}</th><th class="text-right">${esc(theme.labels.unitPrice)}</th><th class="text-right">${esc(theme.labels.total)}</th></tr>`;
+    tableHead = `<tr><th>#</th><th>${esc(theme.labels.item)}</th><th class="text-right">${esc(theme.labels.qty)}</th><th class="text-right">${esc(theme.labels.unitPrice)}</th>${amountHeads}</tr>`;
     tableBody = items
       .map((item, i) => {
-        const total = item.total ?? (item.quantity || 1) * (item.unitPrice || 0);
-        return `<tr><td>${i + 1}</td><td>${nl(item.description || '')}</td><td class="text-right">${item.quantity ?? 1}</td><td class="text-right">${esc(money(item.unitPrice || 0))}</td><td class="text-right">${esc(money(total))}</td></tr>`;
+        const cells = item.amounts
+          .map((amt) => `<td class="text-right">${esc(money(amt.total, amt.currency))}</td>`)
+          .join('');
+        return `<tr><td>${i + 1}</td><td>${nl(item.description || '')}</td><td class="text-right">${item.quantity ?? 1}</td><td class="text-right">${esc(money(item.unitPrice || 0, layout.columns[0].currency))}</td>${cells}</tr>`;
       })
       .join('');
   }
@@ -164,9 +175,9 @@ function renderInvoiceDocument(opts: {
   const showTotals = theme.tableLayout === 'detailed' || (invoice.taxRate || 0) > 0;
   const totals = showTotals
     ? `<div class="totals">
-        <div class="total-row"><span>Subtotal</span><span>${esc(money(view.subtotal))}</span></div>
-        ${(invoice.taxRate || 0) > 0 ? `<div class="total-row"><span>IVA (${invoice.taxRate}%)</span><span>${esc(money(view.taxAmount))}</span></div>` : ''}
-        <div class="total-row total-final"><span>${esc(theme.labels.total)}</span><span>${esc(money(view.total))}</span></div>
+        <div class="total-row"><span>Subtotal</span>${layout.columns.map((col) => `<span>${esc(money(col.subtotal, col.currency))}</span>`).join('')}</div>
+        ${(invoice.taxRate || 0) > 0 ? `<div class="total-row"><span>IVA (${invoice.taxRate}%)</span>${layout.columns.map((col) => `<span>${esc(money(col.taxAmount, col.currency))}</span>`).join('')}</div>` : ''}
+        <div class="total-row total-final"><span>${esc(theme.labels.total)}</span>${layout.columns.map((col) => `<span>${esc(money(col.total, col.currency))}</span>`).join('')}</div>
       </div>`
     : '';
 
@@ -207,8 +218,8 @@ function renderInvoiceDocument(opts: {
   const status = theme.showStatusBadge
     ? `<div class="status status-${esc(invoice.status)}">${esc(STATUS_LABEL[invoice.status] || invoice.status)}</div>`
     : '';
-  const rateNote = view.exchangeNote
-    ? `<div class="rate-note">${nl(view.exchangeNote)}</div>`
+  const rateNote = layout.exchangeNote
+    ? `<div class="rate-note">${nl(layout.exchangeNote)}</div>`
     : '';
 
   return `<div class="doc">
@@ -237,7 +248,7 @@ function renderInvoiceDocument(opts: {
     ${rateNote}
     <table class="items">
       <thead>${tableHead}</thead>
-      <tbody>${tableBody || `<tr><td colspan="5">—</td></tr>`}</tbody>
+      <tbody>${tableBody || `<tr><td colspan="${colCount}">—</td></tr>`}</tbody>
     </table>
     ${totals}
     ${invoice.notes ? `<div class="notes"><strong>Notas:</strong> ${nl(invoice.notes)}</div>` : ''}
@@ -256,26 +267,21 @@ export function buildInvoicePdfHtml(opts: {
   signatureSrc?: string;
 }): string {
   const { invoice, theme } = opts;
-  const views = invoiceCurrencyViews(invoice);
-  const pages = views
-    .map((view) =>
-      renderInvoiceDocument({
-        invoice,
-        theme,
-        view,
-        bannerSrc: opts.bannerSrc,
-        logoSrc: opts.logoSrc,
-        signatureSrc: opts.signatureSrc,
-      }),
-    )
-    .join('');
+  const layout = invoiceAmountLayout(invoice);
+  const page = renderInvoiceDocument({
+    invoice,
+    theme,
+    layout,
+    bannerSrc: opts.bannerSrc,
+    logoSrc: opts.logoSrc,
+    signatureSrc: opts.signatureSrc,
+  });
 
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><style>
   * { box-sizing: border-box; }
   body { font-family: Calibri, 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; color: ${theme.bodyText}; font-size: 13px; background: #fff; }
-  .doc { page-break-after: always; }
-  .doc:last-child { page-break-after: auto; }
+  .doc { page-break-after: auto; }
   .banner { color: ${theme.bannerText}; padding: 28px 40px 32px; min-height: 220px; background-size: cover; background-position: center right; }
   .banner-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
   .logo { height: 64px; max-width: 280px; object-fit: contain; }
@@ -291,8 +297,8 @@ export function buildInvoicePdfHtml(opts: {
   ${tableCss(theme)}
   .text-right { text-align: right; }
   .amount { color: ${theme.headingText}; font-weight: 600; white-space: nowrap; }
-  .totals { margin-left: auto; width: 280px; margin-bottom: 28px; }
-  .total-row { display: flex; justify-content: space-between; padding: 6px 0; }
+  .totals { margin-left: auto; min-width: 280px; width: max-content; margin-bottom: 28px; }
+  .total-row { display: flex; justify-content: space-between; gap: 24px; padding: 6px 0; }
   .total-final { font-size: 16px; font-weight: 700; border-top: 2px solid ${theme.primary}; padding-top: 8px; margin-top: 4px; color: ${theme.headingText}; }
   table.pay { width: 62%; border-collapse: collapse; margin: 12px 0 36px; }
   table.pay th { background: ${theme.paymentHeaderBg}; color: ${theme.paymentHeaderText}; text-align: left; padding: 8px 12px; font-size: 14px; }
@@ -311,6 +317,6 @@ export function buildInvoicePdfHtml(opts: {
   .status-OVERDUE { background: #FEE2E2; color: #991B1B; }
   .status-CANCELLED { background: #F3F4F6; color: #6B7280; }
 </style></head><body>
-${pages}
+${page}
 </body></html>`;
 }

@@ -6,6 +6,7 @@ import {
   clientToInvoiceParty,
   convertAmount,
   formatExchangeNote,
+  invoiceAmountLayout,
   invoiceCurrencyViews,
   nextInvoiceNumber,
   planInvoiceDuplicates,
@@ -48,7 +49,7 @@ test('duplicate plan shifts dates and item text for N months', () => {
 });
 
 test('dual currency views keep USD and convert CRC', () => {
-  const views = invoiceCurrencyViews({
+  const sample = {
     currency: 'USD',
     altCurrency: 'CRC',
     exchangeRate: 500,
@@ -56,7 +57,16 @@ test('dual currency views keep USD and convert CRC', () => {
     taxAmount: 0,
     total: 10,
     items: [{ description: 'Fee', quantity: 1, unitPrice: 10, total: 10 }],
-  });
+  };
+  const layout = invoiceAmountLayout(sample);
+  assert.equal(layout.columns.length, 2);
+  assert.equal(layout.columns[0].currency, 'USD');
+  assert.equal(layout.columns[1].currency, 'CRC');
+  assert.equal(layout.columns[1].total, 5000);
+  assert.equal(layout.items[0].amounts.length, 2);
+  assert.equal(layout.items[0].amounts[0].total, 10);
+  assert.equal(layout.items[0].amounts[1].total, 5000);
+  const views = invoiceCurrencyViews(sample);
   assert.equal(views.length, 2);
   assert.equal(views[0].currency, 'USD');
   assert.equal(views[1].currency, 'CRC');
@@ -64,7 +74,7 @@ test('dual currency views keep USD and convert CRC', () => {
   assert.equal(convertAmount(8.14, 500), 4070);
 });
 
-test('PDF with two currencies renders two documents', () => {
+test('PDF with two currencies renders one document with amount columns', () => {
   const html = buildInvoicePdfHtml({
     invoice: {
       number: 'INV-0002',
@@ -84,9 +94,9 @@ test('PDF with two currencies renders two documents', () => {
   });
   assert.match(html, /Amount \(USD\)/);
   assert.match(html, /Amount \(CRC\)/);
-  assert.match(html, /page-break-after: always/);
+  assert.doesNotMatch(html, /page-break-after:\s*always/);
   assert.match(html, /Quotation: 1 USD = 500 CRC/);
-  assert.equal((html.match(/class="doc"/g) || []).length, 2);
+  assert.equal((html.match(/class="doc"/g) || []).length, 1);
 });
 
 test('invoice numbers pad from existing count', () => {
@@ -171,7 +181,11 @@ test('PDF prints chosen number and quotation details', () => {
     theme: RURAL_COMMERCE_INVOICE_THEME,
   });
   assert.match(html, /Invoice Number: INV-2608097/);
+  assert.match(html, /Amount \(USD\)/);
+  assert.match(html, /Amount \(CRC\)/);
   assert.match(html, /Quotation: 1 USD = 500 CRC/);
   assert.match(html, /Date: 2026-09-08/);
   assert.match(html, /Source: BCCR/);
+  assert.equal((html.match(/class="doc"/g) || []).length, 1);
+  assert.doesNotMatch(html, /page-break-after:\s*always/);
 });

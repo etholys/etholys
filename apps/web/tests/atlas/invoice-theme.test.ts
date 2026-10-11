@@ -71,6 +71,20 @@ test('Tiago / Rural Commerce companies match the preset owner', () => {
   assert.equal(isRuralCommerceCompany({ name: 'Acme', emails: ['other@x.com'] }), false);
 });
 
+test('RC dual-currency PDF is one document with amount columns', () => {
+  const html = buildInvoicePdfHtml({
+    invoice: { ...sampleInvoice, altCurrency: 'CRC', exchangeRate: 500 },
+    theme: RURAL_COMMERCE_INVOICE_THEME,
+  });
+  assert.equal((html.match(/class="doc"/g) || []).length, 1);
+  assert.match(html, /Amount \(USD\)/);
+  assert.match(html, /Amount \(CRC\)/);
+  assert.doesNotMatch(html, /page-break-after:\s*always/);
+  assert.match(html, /Quotation: 1 USD = 500 CRC/);
+  assert.match(html, /From:.*Rural Commerce LLC/s);
+  assert.match(html, /Payment Instructions/);
+});
+
 test('RC HTML matches payment-request structure', () => {
   const html = buildInvoicePdfHtml({
     invoice: sampleInvoice,
@@ -99,12 +113,16 @@ test('classic detailed layout still has qty columns and FACTURA title', () => {
     tableStyle: 'classic',
   });
   const html = buildInvoicePdfHtml({
-    invoice: { ...sampleInvoice, taxRate: 22, taxAmount: 1790.76, total: 9930.56 },
+    invoice: { ...sampleInvoice, altCurrency: 'CRC', exchangeRate: 500, taxRate: 22, taxAmount: 1790.76, total: 9930.56 },
     theme,
   });
   assert.match(html, /FACTURA/);
   assert.match(html, /Cant\./);
   assert.match(html, /IVA \(22%\)/);
+  assert.match(html, /Amount \(USD\)/);
+  assert.match(html, /Amount \(CRC\)/);
+  assert.equal((html.match(/class="doc"/g) || []).length, 1);
+  assert.doesNotMatch(html, /page-break-after:\s*always/);
 });
 
 test('branded table CSS uses primary header', () => {

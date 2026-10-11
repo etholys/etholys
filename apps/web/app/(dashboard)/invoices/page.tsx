@@ -591,7 +591,7 @@ export default function InvoicesPage() {
                 setShowNewBank={setShowNewBank}
               />
               {form.altCurrency && parseFloat(form.exchangeRate) > 0 ? (
-                <p className="text-xs text-teal-700">{L(ml('The PDF will include two documents, one per currency.','El PDF incluirá dos documentos, uno por moneda.','O PDF incluirá dois documentos, um por moeda.'))}</p>
+                <p className="text-xs text-teal-700">{L(ml('The PDF will add an amount column per currency.','El PDF añadirá una columna de importe por cada moneda.','O PDF adicionará uma coluna de valor por moeda.'))}</p>
               ) : null}
               <div className="grid grid-cols-3 gap-3">
                 <div>

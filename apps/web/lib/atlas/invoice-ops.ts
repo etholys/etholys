@@ -139,6 +139,33 @@ export function formatExchangeNote(inv: {
   return lines.join('\n');
 }
 
+export type InvoiceCurrencyColumn = {
+  currency: string;
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+};
+
+export type InvoiceLineAmount = {
+  currency: string;
+  unitPrice: number;
+  total: number;
+};
+
+export type InvoiceLineWithColumns = {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  amounts: InvoiceLineAmount[];
+};
+
+export type InvoiceAmountLayout = {
+  columns: InvoiceCurrencyColumn[];
+  items: InvoiceLineWithColumns[];
+  exchangeNote: string;
+};
+
 export type InvoiceAmountView = {
   currency: string;
   subtotal: number;
@@ -148,7 +175,7 @@ export type InvoiceAmountView = {
   exchangeNote?: string;
 };
 
-export function invoiceCurrencyViews(inv: {
+export function invoiceAmountLayout(inv: {
   currency?: string | null;
   altCurrency?: string | null;
   exchangeRate?: number | null;
@@ -158,7 +185,7 @@ export function invoiceCurrencyViews(inv: {
   taxAmount: number;
   total: number;
   items: { description?: string | null; quantity?: number | null; unitPrice?: number | null; total?: number | null }[];
-}): InvoiceAmountView[] {
+}): InvoiceAmountLayout {
   const primary = String(inv.currency || 'USD').toUpperCase();
   const items = (inv.items || []).map((it) => {
     const qty = it.quantity ?? 1;
@@ -169,35 +196,57 @@ export function invoiceCurrencyViews(inv: {
       quantity: qty,
       unitPrice: unit,
       total,
+      amounts: [{ currency: primary, unitPrice: unit, total }] as InvoiceLineAmount[],
     };
   });
-  const views: InvoiceAmountView[] = [
+  const columns: InvoiceCurrencyColumn[] = [
     {
       currency: primary,
       subtotal: inv.subtotal,
       taxAmount: inv.taxAmount,
       total: inv.total,
-      items,
     },
   ];
   const alt = String(inv.altCurrency || '').trim().toUpperCase();
   const rate = Number(inv.exchangeRate);
-  if (!alt || alt === primary || !(rate > 0)) return views;
-  const note = formatExchangeNote(inv);
-  views[0].exchangeNote = note;
-  views.push({
-    currency: alt,
-    subtotal: convertAmount(inv.subtotal, rate),
-    taxAmount: convertAmount(inv.taxAmount, rate),
-    total: convertAmount(inv.total, rate),
-    items: items.map((it) => ({
-      ...it,
-      unitPrice: convertAmount(it.unitPrice, rate),
-      total: convertAmount(it.total, rate),
-    })),
-    exchangeNote: note,
-  });
-  return views;
+  const exchangeNote = formatExchangeNote(inv);
+  if (alt && alt !== primary && rate > 0) {
+    columns.push({
+      currency: alt,
+      subtotal: convertAmount(inv.subtotal, rate),
+      taxAmount: convertAmount(inv.taxAmount, rate),
+      total: convertAmount(inv.total, rate),
+    });
+    for (const it of items) {
+      it.amounts.push({
+        currency: alt,
+        unitPrice: convertAmount(it.unitPrice, rate),
+        total: convertAmount(it.total, rate),
+      });
+    }
+  }
+  return { columns, items, exchangeNote };
+}
+
+/** Conversion snapshot per currency. Not used to split the PDF into pages. */
+export function invoiceCurrencyViews(inv: Parameters<typeof invoiceAmountLayout>[0]): InvoiceAmountView[] {
+  const layout = invoiceAmountLayout(inv);
+  return layout.columns.map((col) => ({
+    currency: col.currency,
+    subtotal: col.subtotal,
+    taxAmount: col.taxAmount,
+    total: col.total,
+    items: layout.items.map((it) => {
+      const amt = it.amounts.find((a) => a.currency === col.currency) || it.amounts[0];
+      return {
+        description: it.description,
+        quantity: it.quantity,
+        unitPrice: amt.unitPrice,
+        total: amt.total,
+      };
+    }),
+    exchangeNote: layout.exchangeNote || undefined,
+  }));
 }
 
 export function nextInvoiceNumber(type: string, existingCount: number): string {
