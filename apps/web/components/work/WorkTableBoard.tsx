@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { getInitials } from '@/lib/utils';
-import { WORK_KANBAN, WORK_PRIORITIES, PRIORITY_STYLE, STATUS_STYLE, parseTags } from './work-ui';
+import { WORK_KANBAN, WORK_PRIORITIES, PRIORITY_STYLE, STATUS_STYLE } from './work-ui';
 
 type UserOpt = { id: string; name: string | null; email?: string };
 type GroupOpt = { id: string; name: string; color: string | null };
@@ -20,6 +20,7 @@ type TaskRow = {
   assignee?: UserOpt | null;
   project?: { name?: string } | null;
   department?: { name?: string } | null;
+  folder?: { name?: string } | null;
   _count?: { comments?: number; subtasks?: number };
 };
 
@@ -314,7 +315,7 @@ export function WorkTableBoard({
                       <th className="w-[14%] px-2 py-2">{t('Person', 'Persona', 'Pessoa')}</th>
                       <th className="w-[12%] px-2 py-2">{t('Priority', 'Prioridad', 'Prioridade')}</th>
                       <th className="w-[12%] px-2 py-2">{t('Due', 'Fecha', 'Prazo')}</th>
-                      <th className="w-[12%] px-2 py-2">{t('Tags', 'Etiquetas', 'Tags')}</th>
+                      <th className="w-[14%] px-2 py-2">{t('Origin', 'Origen', 'Origem')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -448,22 +449,19 @@ export function WorkTableBoard({
                               type="date"
                               value={task.dueDate ? String(task.dueDate).slice(0, 10) : ''}
                               onChange={(e) => onPatch(task.id, { dueDate: e.target.value || null })}
-                              className="w-full max-w-[130px] cursor-pointer rounded-md border border-transparent bg-transparent px-1 py-1 text-[11px] text-slate-600 outline-none hover:border-slate-200 hover:bg-white"
+                              className={`w-full max-w-[130px] cursor-pointer rounded-md border border-transparent bg-transparent px-1 py-1 text-[11px] outline-none hover:border-slate-200 hover:bg-white ${
+                                task.dueDate &&
+                                !['DONE', 'CANCELLED'].includes(task.status) &&
+                                new Date(task.dueDate).getTime() < Date.now()
+                                  ? 'font-semibold text-rose-600'
+                                  : 'text-slate-600'
+                              }`}
                             />
                           </td>
-                          <td className="px-2 py-1.5">
-                            <div className="flex flex-wrap gap-1">
-                              {parseTags(task.tags)
-                                .slice(0, 3)
-                                .map((tag) => (
-                                  <span
-                                    key={tag}
-                                    className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                            </div>
+                          <td className="px-2 py-1.5 text-[11px] text-slate-500">
+                            <span className="block truncate">
+                              {task.project?.name || task.department?.name || task.folder?.name || '—'}
+                            </span>
                           </td>
                         </tr>
                       );

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Check } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
-import { PRIORITY_STYLE, STATUS_STYLE } from './work-ui';
+import { PRIORITY_STYLE, STATUS_STYLE, workPriorityLabel, workStatusLabel } from './work-ui';
 import { WorkBulkBar } from './WorkBulkBar';
 
 type Task = {
@@ -13,6 +13,9 @@ type Task = {
   priority: string;
   dueDate?: string | null;
   assignee?: { name?: string | null } | null;
+  project?: { name?: string } | null;
+  department?: { name?: string } | null;
+  folder?: { name?: string } | null;
   parentId?: string | null;
   _count?: { subtasks?: number; comments?: number };
 };
@@ -101,7 +104,7 @@ export function WorkList({
           t={t}
         />
       )}
-      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="bg-white">
         <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
           <div className="flex items-center gap-3">
             {onBulk && (
@@ -183,7 +186,7 @@ export function WorkList({
                 <button
                   type="button"
                   onClick={() => onSelect(task.id)}
-                  className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left"
+                  className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left"
                 >
                   {!onToggleDone && !onBulk && (
                     <span className={cn('h-2 w-2 shrink-0 rounded-full', st.dot)} />
@@ -201,11 +204,14 @@ export function WorkList({
                       </span>
                     )}
                   </span>
-                  <span className={cn('hidden rounded-md px-1.5 py-0.5 text-[10px] font-semibold sm:inline', pr.bg, pr.text)}>
-                    {task.priority}
+                  <span className={cn('hidden rounded-md px-1.5 py-0.5 text-[11px] font-semibold sm:inline', pr.bg, pr.text)}>
+                    {workPriorityLabel(task.priority, t)}
                   </span>
-                  <span className={cn('hidden rounded-md px-1.5 py-0.5 text-[10px] font-medium md:inline', st.bg, st.text)}>
-                    {task.status.replace('_', ' ')}
+                  <span className={cn('hidden rounded-md px-1.5 py-0.5 text-[11px] font-medium md:inline', st.bg, st.text)}>
+                    {workStatusLabel(task.status, t)}
+                  </span>
+                  <span className="hidden w-28 truncate text-xs text-slate-500 lg:block">
+                    {task.project?.name || task.department?.name || task.folder?.name || '—'}
                   </span>
                   <span className="hidden w-24 truncate text-xs text-slate-500 sm:block">
                     {task.assignee?.name || '—'}

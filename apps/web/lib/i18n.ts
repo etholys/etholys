@@ -95,13 +95,13 @@ const translations: Record<Locale, Record<string, string>> = {
     // Status
     'status.draft': 'Draft',
     'status.planning': 'Planning',
-    'status.in_progress': 'In Progress',
+    'status.in_progress': 'In progress',
     'status.on_hold': 'On Hold',
     'status.completed': 'Completed',
     'status.cancelled': 'Cancelled',
     'status.backlog': 'Backlog',
-    'status.todo': 'To Do',
-    'status.in_review': 'In Review',
+    'status.todo': 'To do',
+    'status.in_review': 'In review',
     'status.done': 'Done',
     // Priority
     'priority.low': 'Low',
@@ -251,12 +251,12 @@ const translations: Record<Locale, Record<string, string>> = {
     // Status
     'status.draft': 'Borrador',
     'status.planning': 'Planificación',
-    'status.in_progress': 'En Progreso',
+    'status.in_progress': 'En curso',
     'status.on_hold': 'En Pausa',
     'status.completed': 'Completado',
     'status.cancelled': 'Cancelado',
     'status.backlog': 'Backlog',
-    'status.todo': 'Por Hacer',
+    'status.todo': 'Por hacer',
     'status.in_review': 'En Revisión',
     'status.done': 'Hecho',
     // Priority
@@ -376,12 +376,12 @@ const translations: Record<Locale, Record<string, string>> = {
     // Status
     'status.draft': 'Rascunho',
     'status.planning': 'Planejamento',
-    'status.in_progress': 'Em Progresso',
+    'status.in_progress': 'Em curso',
     'status.on_hold': 'Em Pausa',
     'status.completed': 'Concluído',
     'status.cancelled': 'Cancelado',
     'status.backlog': 'Backlog',
-    'status.todo': 'A Fazer',
+    'status.todo': 'Por fazer',
     'status.in_review': 'Em Revisão',
     'status.done': 'Feito',
     // Priority

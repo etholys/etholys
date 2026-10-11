@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { GROUP_COLORS } from './work-ui';
 import {
@@ -17,7 +16,6 @@ import {
   PanelLeftClose,
   PanelLeft,
   Plus,
-  Settings,
   Share2,
   UserRound,
   Users,
@@ -28,6 +26,8 @@ export type WorkNav =
   | { kind: 'all' }
   | { kind: 'mine' }
   | { kind: 'overdue' }
+  | { kind: 'unassigned' }
+  | { kind: 'week' }
   | { kind: 'company' }
   | { kind: 'department'; id: string; name: string }
   | { kind: 'project'; id: string; name: string }
@@ -68,7 +68,7 @@ export function WorkSidebar({
   currentUserId?: string | null;
   collapsed: boolean;
   onToggle: () => void;
-  counts: { open: number; overdue: number; mine: number };
+  counts: { open: number; overdue: number; mine: number; unassigned: number; week: number };
   onCreateFolder: (input: { name: string; visibility: 'PERSONAL' | 'SHARED'; color?: string }) => Promise<void>;
   onShareFolder?: (folder: { id: string; name: string }) => void;
   t: (en: string, es: string, pt: string) => string;
@@ -357,6 +357,20 @@ export function WorkSidebar({
                 <Building2 className="h-4 w-4" />,
                 t('Operations', 'Operaciones', 'Operações'),
               )}
+              {item(
+                nav.kind === 'unassigned',
+                () => onNav({ kind: 'unassigned' }),
+                <UserRound className="h-4 w-4" />,
+                t('Unassigned', 'Sin asignar', 'Sem responsável'),
+                counts.unassigned,
+              )}
+              {item(
+                nav.kind === 'week',
+                () => onNav({ kind: 'week' }),
+                <CalendarRange className="h-4 w-4" />,
+                t('This week', 'Esta semana', 'Esta semana'),
+                counts.week,
+              )}
               {departments.map((d) =>
                 item(
                   nav.kind === 'department' && nav.id === d.id,
@@ -379,19 +393,6 @@ export function WorkSidebar({
         </div>
       </nav>
 
-      <div className="border-t border-[color:var(--sys-line)] p-2">
-        <Link
-          href="/hub/work/settings"
-          className={cn(
-            'flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] text-[color:var(--sys-nav-idle)] transition hover:bg-[color:var(--sys-nav-hover)]',
-            collapsed && 'justify-center px-2',
-          )}
-          title={t('Settings', 'Ajustes', 'Definições')}
-        >
-          <Settings className="h-4 w-4 shrink-0 text-[color:var(--sys-icon,#94a3b8)]" />
-          {!collapsed && <span>{t('Settings', 'Ajustes', 'Definições')}</span>}
-        </Link>
-      </div>
     </aside>
   );
 }

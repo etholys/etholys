@@ -48,7 +48,7 @@ export default function HubWorkPage() {
         </div>
       </header>
 
-      <main className="relative z-10 flex min-h-0 flex-1 flex-col px-3 py-4 sm:px-5">
+      <main className="relative z-10 flex min-h-0 flex-1 flex-col">
         <Suspense
           fallback={
             <div className="flex justify-center py-24">

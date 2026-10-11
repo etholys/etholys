@@ -26,6 +26,42 @@ export const STARTER_GROUPS = [
   { name: 'Done', color: '#16a34a' },
 ] as const;
 
+type LabelFn = (en: string, es: string, pt: string) => string;
+
+export function workStatusLabel(code: string, t: LabelFn): string {
+  switch (code) {
+    case 'BACKLOG':
+      return t('Backlog', 'Backlog', 'Backlog');
+    case 'TODO':
+      return t('To do', 'Por hacer', 'Por fazer');
+    case 'IN_PROGRESS':
+      return t('In progress', 'En curso', 'Em curso');
+    case 'IN_REVIEW':
+      return t('In review', 'En revisión', 'Em revisão');
+    case 'DONE':
+      return t('Done', 'Hecho', 'Feito');
+    case 'CANCELLED':
+      return t('Cancelled', 'Cancelada', 'Cancelada');
+    default:
+      return code.replace(/_/g, ' ');
+  }
+}
+
+export function workPriorityLabel(code: string, t: LabelFn): string {
+  switch (code) {
+    case 'LOW':
+      return t('Low', 'Baja', 'Baixa');
+    case 'MEDIUM':
+      return t('Medium', 'Media', 'Média');
+    case 'HIGH':
+      return t('High', 'Alta', 'Alta');
+    case 'CRITICAL':
+      return t('Critical', 'Crítica', 'Crítica');
+    default:
+      return code;
+  }
+}
+
 export function parseTags(raw: unknown): string[] {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.map(String).map((t) => t.trim()).filter(Boolean);

@@ -15,7 +15,7 @@ import { WorkWorkload } from './WorkWorkload';
 import { WorkTaskPanel } from './WorkTaskPanel';
 import { WorkFolderShareDialog } from './WorkFolderShareDialog';
 import { WorkQuickAdd } from './WorkQuickAdd';
-import { WORK_KANBAN, WORK_PRIORITIES } from './work-ui';
+import { WORK_KANBAN, WORK_PRIORITIES, workPriorityLabel, workStatusLabel } from './work-ui';
 import {
   Calendar,
   CalendarRange,
@@ -23,11 +23,9 @@ import {
   List,
   ListTree,
   Search,
-  Settings,
   Users,
   X,
 } from 'lucide-react';
-import Link from 'next/link';
 
 type ML = { es: string; pt: string; en: string };
 const ml = (en: string, es: string, pt: string): ML => ({ en, es, pt });
@@ -55,6 +53,8 @@ function parseNavFromParams(
   if (kind === 'company') return { kind: 'company' };
   if (kind === 'mine') return { kind: 'mine' };
   if (kind === 'overdue') return { kind: 'overdue' };
+  if (kind === 'unassigned') return { kind: 'unassigned' };
+  if (kind === 'week') return { kind: 'week' };
   if (kind === 'department' && id) {
     const d = departments.find((x) => x.id === id);
     return { kind: 'department', id, name: d?.name || sp.get('name') || id };
@@ -111,6 +111,7 @@ export default function WorkShell() {
   const [query, setQuery] = useState('');
   const [statusChip, setStatusChip] = useState('');
   const [priorityChip, setPriorityChip] = useState('');
+  const [personFocus, setPersonFocus] = useState('');
 
   const currentUserId = (session?.user as { id?: string } | undefined)?.id || null;
 
@@ -204,7 +205,7 @@ export default function WorkShell() {
     let v = parseView(fromUrl);
     if (!fromUrl && typeof window !== 'undefined') {
       const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
-      if (stored && VIEW_SET.has(stored as BoardView)) v = stored as BoardView;
+      if (stored && stored !== 'workload' && VIEW_SET.has(stored as BoardView)) v = stored as BoardView;
     }
     const n = parseNavFromParams(searchParams, folders, departments, projects);
     setBoardView(v);
@@ -220,6 +221,11 @@ export default function WorkShell() {
         setSelectedId(null);
         return;
       }
+      if (!typing && (e.key === 'x' || e.key === 'X') && selectedId) {
+        e.preventDefault();
+        setSelectedId(null);
+        return;
+      }
       if (!typing && e.key === '/' && nav.kind !== 'dashboard') {
         e.preventDefault();
         searchRef.current?.focus();
@@ -227,13 +233,23 @@ export default function WorkShell() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [nav.kind]);
+  }, [nav.kind, selectedId]);
 
   const changeNav = (n: WorkNav) => {
     setNav(n);
     setSelectedId(null);
     setQuery('');
-    syncUrl(n, boardView);
+    setPersonFocus('');
+    const view: BoardView = n.kind === 'dashboard' ? boardView : 'table';
+    if (n.kind !== 'dashboard') {
+      setBoardView('table');
+      try {
+        window.localStorage.setItem(VIEW_STORAGE_KEY, 'table');
+      } catch {
+        /* ignore */
+      }
+    }
+    syncUrl(n, view);
   };
 
   const changeView = (v: BoardView) => {
@@ -260,7 +276,22 @@ export default function WorkShell() {
       list = top.filter(
         (t: any) => OPEN.has(t.status) && t.dueDate && new Date(t.dueDate).getTime() < now,
       );
+    } else if (nav.kind === 'unassigned') {
+      list = top.filter((t: any) => OPEN.has(t.status) && !t.assigneeId);
+    } else if (nav.kind === 'week') {
+      const now = new Date();
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+      const end = new Date(start);
+      end.setDate(end.getDate() + 7);
+      list = top.filter((t: any) => {
+        if (!OPEN.has(t.status) || !t.dueDate) return false;
+        const d = new Date(t.dueDate);
+        return d >= start && d < end;
+      });
     }
+    if (personFocus) list = list.filter((t: any) => t.assigneeId === personFocus);
     const q = query.trim().toLowerCase();
     if (statusChip) list = list.filter((t: any) => t.status === statusChip);
     if (priorityChip) list = list.filter((t: any) => t.priority === priorityChip);
@@ -269,16 +300,27 @@ export default function WorkShell() {
       const hay = `${t.title || ''} ${t.assignee?.name || ''} ${t.status || ''} ${t.priority || ''}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [tasks, nav, currentUserId, query, statusChip, priorityChip]);
+  }, [tasks, nav, currentUserId, query, statusChip, priorityChip, personFocus]);
 
   const counts = useMemo(() => {
     const top = (tasks ?? []).filter((t: any) => !t.parentId);
     const open = top.filter((t: any) => OPEN.has(t.status));
     const now = new Date();
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+    const end = new Date(start);
+    end.setDate(end.getDate() + 7);
     return {
       open: open.length,
       overdue: open.filter((t: any) => t.dueDate && new Date(t.dueDate) < now).length,
       mine: open.filter((t: any) => currentUserId && t.assigneeId === currentUserId).length,
+      unassigned: open.filter((t: any) => !t.assigneeId).length,
+      week: open.filter((t: any) => {
+        if (!t.dueDate) return false;
+        const d = new Date(t.dueDate);
+        return d >= start && d < end;
+      }).length,
     };
   }, [tasks, currentUserId]);
 
@@ -287,6 +329,8 @@ export default function WorkShell() {
     if (nav.kind === 'all') return t3('All tasks', 'Todas las tareas', 'Todas as tarefas');
     if (nav.kind === 'mine') return t3('My tasks', 'Mis tareas', 'As minhas tarefas');
     if (nav.kind === 'overdue') return t3('Overdue', 'Atrasadas', 'Atrasadas');
+    if (nav.kind === 'unassigned') return t3('Unassigned', 'Sin asignar', 'Sem responsável');
+    if (nav.kind === 'week') return t3('This week', 'Esta semana', 'Esta semana');
     if (nav.kind === 'company') return t3('Team operations', 'Operaciones del equipo', 'Operações da equipa');
     if (nav.kind === 'department') return nav.name;
     if (nav.kind === 'project') return nav.name;
@@ -405,7 +449,7 @@ export default function WorkShell() {
                   folderId: '',
                   assigneeId: currentUserId || '',
                 }
-              : nav.kind === 'overdue' || nav.kind === 'all'
+              : nav.kind === 'overdue' || nav.kind === 'unassigned' || nav.kind === 'week' || nav.kind === 'all'
                 ? { taskScope: '' as const, projectId: '', departmentId: '', folderId: '', assigneeId: '' }
                 : null;
 
@@ -435,7 +479,7 @@ export default function WorkShell() {
   );
 
   return (
-    <div className="flex min-h-[calc(100vh-5.5rem)] overflow-hidden rounded-2xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] shadow-sm">
+    <div className="flex min-h-0 flex-1 overflow-hidden bg-[color:var(--sys-panel)]">
       <WorkSidebar
         nav={nav}
         onNav={changeNav}
@@ -459,14 +503,6 @@ export default function WorkShell() {
               {contextHint && <p className="mt-0.5 text-[11px] text-[color:var(--sys-faint)]">{contextHint}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href="/hub/work/settings"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
-                title={t3('Settings', 'Ajustes', 'Definições')}
-              >
-                <Settings className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{t3('Settings', 'Ajustes', 'Definições')}</span>
-              </Link>
               {nav.kind !== 'dashboard' && (
                 <div className="flex max-w-full flex-wrap rounded-lg bg-[color:var(--sys-panel-soft)] p-0.5">
                   {viewBtn('table', <ListTree className="h-4 w-4" />, t3('Board', 'Tablero', 'Quadro'), 'Board')}
@@ -521,7 +557,7 @@ export default function WorkShell() {
                 <option value="">{t3('Any status', 'Cualquier estado', 'Qualquer estado')}</option>
                 {WORK_KANBAN.map((s) => (
                   <option key={s} value={s}>
-                    {s.replace(/_/g, ' ')}
+                    {workStatusLabel(s, t3)}
                   </option>
                 ))}
               </select>
@@ -533,7 +569,7 @@ export default function WorkShell() {
                 <option value="">{t3('Any priority', 'Cualquier prioridad', 'Qualquer prioridade')}</option>
                 {WORK_PRIORITIES.map((p) => (
                   <option key={p} value={p}>
-                    {p}
+                    {workPriorityLabel(p, t3)}
                   </option>
                 ))}
               </select>
@@ -542,7 +578,7 @@ export default function WorkShell() {
         </div>
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <div className="min-w-0 flex-1 overflow-y-auto p-3 sm:p-4">
+          <div className="min-w-0 flex-1 overflow-y-auto">
             {nav.kind === 'dashboard' ? (
               loadingDash ? (
                 <div className="flex justify-center py-16">
@@ -590,25 +626,27 @@ export default function WorkShell() {
               <WorkWorkload
                 tasks={scopedTasks}
                 onOpenTask={setSelectedId}
-                onSelectPerson={(assigneeId) => {
-                  if (assigneeId && assigneeId === currentUserId) changeNav({ kind: 'mine' });
-                  else if (!assigneeId) changeNav({ kind: 'all' });
-                }}
-                t={t3}
-              />
-            ) : nav.kind === 'overdue' ? (
-              <WorkList
-                tasks={scopedTasks}
-                users={users}
-                onSelect={setSelectedId}
-                onBulk={runBulk}
-                onToggleDone={async (id, next) => {
-                  await fetch(`/api/tasks/${id}`, {
+                onReassign={async (taskId, assigneeId) => {
+                  await fetch(`/api/tasks/${taskId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: next }),
+                    body: JSON.stringify({ assigneeId }),
                   });
                   fetchAllTasks({ silent: true });
+                }}
+                onSelectPerson={(assigneeId) => {
+                  if (!assigneeId) {
+                    changeNav({ kind: 'unassigned' });
+                    return;
+                  }
+                  setPersonFocus(assigneeId);
+                  setBoardView('table');
+                  try {
+                    window.localStorage.setItem(VIEW_STORAGE_KEY, 'table');
+                  } catch {
+                    /* ignore */
+                  }
+                  syncUrl(nav, 'table');
                 }}
                 t={t3}
               />
@@ -623,7 +661,13 @@ export default function WorkShell() {
                 initialDepartmentId={scopeProps?.departmentId || ''}
                 initialTaskScope={scopeProps?.taskScope || ''}
                 initialFolderId={scopeProps?.folderId || ''}
-                initialAssigneeId={scopeProps?.assigneeId || ''}
+                initialAssigneeId={personFocus || scopeProps?.assigneeId || ''}
+                queue={
+                  nav.kind === 'overdue' ? 'overdue' : nav.kind === 'unassigned' ? 'unassigned' : nav.kind === 'week' ? 'week' : ''
+                }
+                externalSearch={query}
+                externalStatus={statusChip}
+                externalPriority={priorityChip}
                 onTasksChanged={() => fetchAllTasks({ silent: true })}
                 externalSelectedId={selectedId}
                 onExternalSelect={setSelectedId}

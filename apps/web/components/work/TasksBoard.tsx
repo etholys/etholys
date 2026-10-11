@@ -23,6 +23,10 @@ export type TasksBoardProps = {
   initialTaskScope?: string;
   initialFolderId?: string;
   initialAssigneeId?: string;
+  queue?: '' | 'overdue' | 'unassigned' | 'week';
+  externalSearch?: string;
+  externalStatus?: string;
+  externalPriority?: string;
   onTasksChanged?: () => void;
   externalSelectedId?: string | null;
   onExternalSelect?: (id: string | null) => void;
@@ -56,6 +60,10 @@ export default function TasksBoard({
   initialTaskScope = '',
   initialFolderId = '',
   initialAssigneeId = '',
+  queue = '',
+  externalSearch = '',
+  externalStatus = '',
+  externalPriority = '',
   onTasksChanged,
   externalSelectedId,
   onExternalSelect,
@@ -329,6 +337,47 @@ export default function TasksBoard({
     }
   };
 
+  const applyPack = async (
+    groupsToCreate: Array<{ name: string; color: string; tasks: string[] }>,
+  ) => {
+    if (!activeCompanyId || seedingStarter) return;
+    setSeedingStarter(true);
+    try {
+      for (const group of groupsToCreate) {
+        const res = await fetch('/api/task-groups', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyId: activeCompanyId, name: group.name, color: group.color }),
+        });
+        const data = await res.json().catch(() => ({}));
+        const groupId = data?.group?.id as string | undefined;
+        for (const title of group.tasks) {
+          const body: Record<string, unknown> = {
+            title,
+            status: 'TODO',
+            priority: 'MEDIUM',
+            companyId: activeCompanyId,
+            groupId,
+          };
+          if (projectFilter) body.projectId = projectFilter;
+          if (departmentFilter) body.departmentId = departmentFilter;
+          if (folderFilter) body.folderId = folderFilter;
+          if (assigneeFilter) body.assigneeId = assigneeFilter;
+          await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+        }
+      }
+      fetchGroups();
+      fetchTasks();
+      notifyChanged();
+    } finally {
+      setSeedingStarter(false);
+    }
+  };
+
   const moveTask = async (taskId: string, targetGroupId: string | null, beforeTaskId: string | null) => {
     const moving = tasks.find((t) => t.id === taskId);
     if (!moving) return;
@@ -384,16 +433,34 @@ export default function TasksBoard({
 
   const filtered = (tasks ?? []).filter((task: any) => {
     if (task?.parentId) return false;
+    const q = (embedded ? externalSearch : search).trim().toLowerCase();
     if (
-      search &&
-      !(task?.title ?? '').toLowerCase().includes(search.toLowerCase()) &&
-      !(task?.description ?? '').toLowerCase().includes(search.toLowerCase()) &&
-      !parseTags(task?.tags).some((tag) => tag.toLowerCase().includes(search.toLowerCase()))
+      q &&
+      !(task?.title ?? '').toLowerCase().includes(q) &&
+      !(task?.description ?? '').toLowerCase().includes(q) &&
+      !parseTags(task?.tags).some((tag) => tag.toLowerCase().includes(q))
     ) {
       return false;
     }
-    if (priorityFilter && task?.priority !== priorityFilter) return false;
-    if (statusFilter && task?.status !== statusFilter) return false;
+    const status = embedded ? externalStatus : statusFilter;
+    const priority = embedded ? externalPriority : priorityFilter;
+    if (priority && task?.priority !== priority) return false;
+    if (status && task?.status !== status) return false;
+    if (queue === 'unassigned' && task?.assigneeId) return false;
+    if (queue === 'overdue' || queue === 'week') {
+      const open = ['BACKLOG', 'TODO', 'IN_PROGRESS', 'IN_REVIEW'].includes(task?.status);
+      if (!open || !task?.dueDate) return false;
+      const due = new Date(task.dueDate);
+      if (queue === 'overdue' && due.getTime() >= Date.now()) return false;
+      if (queue === 'week') {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+        const end = new Date(start);
+        end.setDate(end.getDate() + 7);
+        if (due < start || due >= end) return false;
+      }
+    }
     if (assigneeFilter && task?.assigneeId !== assigneeFilter) return false;
     if (dateFromFilter && task?.dueDate && new Date(task.dueDate) < new Date(dateFromFilter)) return false;
     if (dateToFilter && task?.dueDate && new Date(task.dueDate) > new Date(`${dateToFilter}T23:59:59`)) {
@@ -477,7 +544,7 @@ export default function TasksBoard({
         </div>
       </div>
 
-      <div className="mb-4 space-y-2">
+      {!embedded && <div className="mb-4 space-y-2">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -612,13 +679,62 @@ export default function TasksBoard({
             )}
           </div>
         )}
-      </div>
+      </div>}
 
-      <div className="flex min-h-0 flex-1 gap-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50/50">
+      <div className={cn('flex min-h-0 flex-1 gap-0 overflow-hidden', embedded ? '' : 'rounded-2xl border border-slate-200/80 bg-slate-50/50')}>
         <div className="min-w-0 flex-1 overflow-y-auto p-3 sm:p-4">
           {loading ? (
             <div className="flex justify-center py-16">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-600/30 border-t-cyan-600" />
+            </div>
+          ) : !loading && (tasks ?? []).filter((task: any) => !task?.parentId).length === 0 && embedded ? (
+            <div className="px-6 py-12">
+              <p className="text-sm font-medium text-slate-700">
+                {t3('This board is empty', 'Este tablero está vacío', 'Este quadro está vazio')}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {t3(
+                  'Create a task above, or start from a pack.',
+                  'Crea una tarea arriba, o empieza con un paquete.',
+                  'Cria uma tarefa acima, ou começa com um pack.',
+                )}
+              </p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                {[
+                  {
+                    title: t3('Weekly operations', 'Operación semanal', 'Operação semanal'),
+                    groups: [
+                      { name: t3('This week', 'Esta semana', 'Esta semana'), color: '#0d9488', tasks: [t3('Team check-in', 'Revisión del equipo', 'Ponto da equipa')] },
+                      { name: t3('Waiting', 'En espera', 'À espera'), color: '#ea580c', tasks: [t3('Unblock a request', 'Desbloquear un pedido', 'Desbloquear um pedido')] },
+                    ],
+                  },
+                  {
+                    title: t3('Onboarding', 'Incorporación', 'Integração'),
+                    groups: [
+                      { name: t3('Welcome', 'Bienvenida', 'Boas-vindas'), color: '#2563eb', tasks: [t3('Access and tools', 'Accesos y herramientas', 'Acessos e ferramentas')] },
+                      { name: t3('First week', 'Primera semana', 'Primeira semana'), color: '#7c3aed', tasks: [t3('First delivery', 'Primera entrega', 'Primeira entrega')] },
+                    ],
+                  },
+                  {
+                    title: t3('Project phases', 'Fases de proyecto', 'Fases de projeto'),
+                    groups: [
+                      { name: t3('Plan', 'Plan', 'Plano'), color: '#0891b2', tasks: [t3('Agree the scope', 'Acordar el alcance', 'Acordar o âmbito')] },
+                      { name: t3('Deliver', 'Entrega', 'Entrega'), color: '#ea580c', tasks: [t3('Build the work', 'Construir el trabajo', 'Construir o trabalho')] },
+                      { name: t3('Close', 'Cierre', 'Fecho'), color: '#16a34a', tasks: [t3('Hand over', 'Entregar', 'Entregar')] },
+                    ],
+                  },
+                ].map((pack) => (
+                  <button
+                    key={pack.title}
+                    type="button"
+                    disabled={seedingStarter}
+                    onClick={() => void applyPack(pack.groups)}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-medium text-slate-800 hover:border-teal-300 hover:bg-teal-50 disabled:opacity-50"
+                  >
+                    {pack.title}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : view === 'table' ? (
             <>
