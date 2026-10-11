@@ -194,6 +194,7 @@ test('PDF prints chosen number and quotation details', () => {
 test('PDF user errors stay generic and never leak secrets', () => {
   assert.equal(invoicePdfUserError(500, { error: 'Timeout generando PDF' }), 'Timeout generando PDF');
   assert.equal(invoicePdfUserError(500, { error: 'PDF API not configured' }), 'PDF API not configured');
+  assert.equal(invoicePdfUserError(500, { error: 'Servicio PDF no disponible' }), 'Servicio PDF no disponible');
   assert.equal(invoicePdfUserError(401, { error: 'No autorizado' }), 'No autorizado');
   assert.equal(invoicePdfUserError(500, { error: 'apikey=sk-secret token=abc' }), 'Error al generar PDF');
 });
@@ -230,6 +231,7 @@ test('PDF images embed small files and skip huge banners', async () => {
     fetchImpl,
     apiKey: 'test-key',
     sleepMs: 0,
+    chromiumBin: '',
     baseUrl: 'https://app.etholys.com',
   });
   assert.equal(calls[0].url, 'https://apps.abacus.ai/api/createConvertHtmlToPdfRequest');
@@ -237,4 +239,65 @@ test('PDF images embed small files and skip huge banners', async () => {
   assert.equal(calls[0].body.deployment_token, 'test-key');
   assert.doesNotMatch(String(calls[0].url), /api\.abacus\.ai/);
   assert.equal(pdf.toString('utf8'), '%PDF-1.4');
+});
+
+test('html preview template has Item/Amount columns on one document', () => {
+  const html = buildInvoicePdfHtml({
+    invoice: {
+      number: 'INV-2610098',
+      type: 'RECEIVABLE',
+      status: 'SENT',
+      currency: 'USD',
+      altCurrency: 'UYU',
+      exchangeRate: 40,
+      subtotal: 10,
+      taxRate: 0,
+      taxAmount: 0,
+      total: 10,
+      issueDate: '2026-10-01',
+      items: [{ description: 'Fee', quantity: 1, unitPrice: 10, total: 10 }],
+    },
+    theme: RURAL_COMMERCE_INVOICE_THEME,
+  });
+  assert.match(html, /<html/);
+  assert.match(html, />Item</);
+  assert.match(html, /Amount \(USD\)/);
+  assert.match(html, /Amount \(UYU\)/);
+  assert.equal((html.match(/class="doc"/g) || []).length, 1);
+  assert.match(html, /@page/);
+});
+
+test('invoice PDF prefers local printer over Abacus', async () => {
+  const { convertHtmlToPdf } = await import('../../lib/atlas/invoice-pdf-convert');
+  let fetched = false;
+  const fetchImpl = (async () => {
+    fetched = true;
+    throw new Error('Abacus should not run');
+  }) as typeof fetch;
+  const pdf = await convertHtmlToPdf('<html>invoice</html>', {
+    fetchImpl,
+    apiKey: 'test-key',
+    chromiumBin: '',
+    printImpl: async () => Buffer.from('%PDF-1.4 local'),
+  });
+  assert.equal(pdf.toString('utf8'), '%PDF-1.4 local');
+  assert.equal(fetched, false);
+});
+
+test('Abacus 402 surfaces a useful PDF error', async () => {
+  const { convertHtmlToPdf, InvoicePdfError, invoicePdfRemoteError } = await import('../../lib/atlas/invoice-pdf-convert');
+  assert.equal(
+    invoicePdfRemoteError(402, JSON.stringify({ success: false, error: 'Your subscription has ended. Please renew it to continue.' })),
+    'Servicio PDF no disponible',
+  );
+  const fetchImpl = (async () => ({
+    ok: false,
+    status: 402,
+    text: async () => JSON.stringify({ success: false, error: 'Your subscription has ended. Please renew it to continue.' }),
+    json: async () => ({}),
+  })) as typeof fetch;
+  await assert.rejects(
+    () => convertHtmlToPdf('<html>invoice</html>', { fetchImpl, apiKey: 'test-key', sleepMs: 0, chromiumBin: '' }),
+    (err: unknown) => err instanceof InvoicePdfError && err.message === 'Servicio PDF no disponible',
+  );
 });

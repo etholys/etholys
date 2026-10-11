@@ -99,7 +99,12 @@ export async function GET(req: Request) {
     });
 
     if (searchParams.get('html') === '1') {
-      return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+      return new NextResponse(html, {
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'private, no-store',
+        },
+      });
     }
 
     console.info('Invoice PDF html bytes', html.length, invoice.number);

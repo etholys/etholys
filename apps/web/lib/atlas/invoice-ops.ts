@@ -67,6 +67,8 @@ const SAFE_PDF_ERRORS = new Set([
   'Missing id',
   'Factura no encontrada',
   'PDF API not configured',
+  'PDF renderer not installed',
+  'Servicio PDF no disponible',
   'Error al crear PDF',
   'Timeout generando PDF',
   'Error interno',

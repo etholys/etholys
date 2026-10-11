@@ -77,6 +77,7 @@ test('RC dual-currency PDF is one document with amount columns', () => {
     theme: RURAL_COMMERCE_INVOICE_THEME,
   });
   assert.equal((html.match(/class="doc"/g) || []).length, 1);
+  assert.match(html, />Item</);
   assert.match(html, /Amount \(USD\)/);
   assert.match(html, /Amount \(CRC\)/);
   assert.doesNotMatch(html, /page-break-after:\s*always/);

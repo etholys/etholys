@@ -4,10 +4,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/app/providers';
 import InvoiceThemePanel from '@/components/atlas/InvoiceThemePanel';
 import InvoiceIssueFields, { type InvoiceIssueForm } from '@/components/atlas/InvoiceIssueFields';
+import InvoicePdfPreviewModal from '@/components/atlas/InvoicePdfPreviewModal';
 import {
   FileText, Plus, Trash2, Search, X, Send, CheckCircle2,
   AlertCircle, ArrowUpRight, ArrowDownRight, Download, Clock, Eye, Pencil,
-  RotateCcw, FilePlus2, Copy, CalendarPlus
+  RotateCcw, FilePlus2, Copy, CalendarPlus, FileSearch
 } from 'lucide-react';
 import { dateOnlyIso } from '@/lib/atlas/date-only';
 import { clientToInvoiceParty, convertAmount, INVOICE_CURRENCIES, invoicePdfUserError } from '@/lib/atlas/invoice-ops';
@@ -59,6 +60,7 @@ export default function InvoicesPage() {
   const [searchText, setSearchText] = useState('');
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [detailInvoice, setDetailInvoice] = useState<any>(null);
+  const [previewInvoice, setPreviewInvoice] = useState<any>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [repeatFor, setRepeatFor] = useState<any>(null);
   const [repeatMonths, setRepeatMonths] = useState('1');
@@ -439,6 +441,7 @@ export default function InvoicesPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => setDetailInvoice(inv)} className="p-1.5 rounded hover:bg-gray-100" title="Ver detalle"><Eye className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => setPreviewInvoice(inv)} className="p-1.5 rounded hover:bg-slate-100 text-slate-700" title={L(ml('Preview','Vista previa','Pré-visualizar'))}><FileSearch className="w-4 h-4" /></button>
                         <button onClick={() => openEdit(inv)} className="p-1.5 rounded hover:bg-teal-50 text-teal-600" title="Editar"><Pencil className="w-4 h-4" /></button>
                         <button onClick={() => duplicateInvoice(inv, 1)} disabled={duplicating} className="p-1.5 rounded hover:bg-indigo-50 text-indigo-600" title={L(ml('Duplicate next month','Duplicar al mes siguiente','Duplicar para o mês seguinte'))}><Copy className="w-4 h-4" /></button>
                         <button onClick={() => { setRepeatMonths('3'); setRepeatFor(inv); }} className="p-1.5 rounded hover:bg-indigo-50 text-indigo-600" title={L(ml('Repeat monthly','Repetir mensualmente','Repetir mensalmente'))}><CalendarPlus className="w-4 h-4" /></button>
@@ -534,6 +537,9 @@ export default function InvoicesPage() {
               </button>
               <button onClick={() => { setDetailInvoice(null); openEdit(detailInvoice); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm flex items-center gap-2">
                 <Pencil className="w-4 h-4" /> Editar
+              </button>
+              <button type="button" onClick={() => setPreviewInvoice(detailInvoice)} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm flex items-center gap-2">
+                <FileSearch className="w-4 h-4" /> {L(ml('Preview','Vista previa','Pré-visualizar'))}
               </button>
               <button onClick={() => downloadPDF(detailInvoice)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-2">
                 <Download className="w-4 h-4" /> Descargar PDF
@@ -632,6 +638,16 @@ export default function InvoicesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {previewInvoice && (
+        <InvoicePdfPreviewModal
+          invoice={previewInvoice}
+          locale={locale}
+          downloading={downloadingId === previewInvoice.id}
+          onClose={() => setPreviewInvoice(null)}
+          onDownload={() => downloadPDF(previewInvoice)}
+        />
       )}
 
       {repeatFor && (

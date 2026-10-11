@@ -279,8 +279,10 @@ export function buildInvoicePdfHtml(opts: {
 
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><style>
+  @page { size: Letter; margin: 0; }
   * { box-sizing: border-box; }
-  body { font-family: Calibri, 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; color: ${theme.bodyText}; font-size: 13px; background: #fff; }
+  html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: Calibri, 'Segoe UI', Arial, 'Liberation Sans', sans-serif; margin: 0; padding: 0; color: ${theme.bodyText}; font-size: 13px; background: #fff; }
   .doc { page-break-after: auto; }
   .banner { color: ${theme.bannerText}; padding: 28px 40px 32px; min-height: 220px; background-size: cover; background-position: center right; }
   .banner-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }

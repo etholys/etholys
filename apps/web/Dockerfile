@@ -19,9 +19,15 @@ FROM base AS runner
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
+# Evita OOM ao processar gravações (áudio extrai-se em disco; heap só para STT)
+ENV NODE_OPTIONS=--max-old-space-size=1536
 
-RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates wget ffmpeg \
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+    openssl ca-certificates wget ffmpeg \
+    chromium fonts-liberation fonts-dejavu-core \
   && rm -rf /var/lib/apt/lists/*
+
+ENV CHROMIUM_PATH=/usr/bin/chromium
 
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
