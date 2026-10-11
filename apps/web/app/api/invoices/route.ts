@@ -58,6 +58,9 @@ export async function POST(req: NextRequest) {
         description: body.description || '',
         contactName: body.counterpartyName || body.contactName || '',
         contactEmail: body.contactEmail || '',
+        contactPhone: body.contactPhone || '',
+        contactAddress: body.contactAddress || '',
+        contactExtra: body.contactExtra || '',
         currency: body.currency || 'USD',
         subtotal,
         taxRate: body.taxRate || 0,
@@ -97,6 +100,9 @@ export async function PUT(req: NextRequest) {
     if (body.status === 'PAID') updateData.paidDate = new Date();
     if (body.contactName !== undefined) updateData.contactName = body.contactName;
     if (body.contactEmail !== undefined) updateData.contactEmail = body.contactEmail;
+    if (body.contactPhone !== undefined) updateData.contactPhone = body.contactPhone;
+    if (body.contactAddress !== undefined) updateData.contactAddress = body.contactAddress;
+    if (body.contactExtra !== undefined) updateData.contactExtra = body.contactExtra;
     if (body.description !== undefined) updateData.description = body.description;
     if (body.dueDate !== undefined) updateData.dueDate = body.dueDate ? new Date(body.dueDate) : null;
     if (body.notes !== undefined) updateData.notes = body.notes;

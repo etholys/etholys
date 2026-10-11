@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/app/providers';
+import InvoiceThemePanel from '@/components/atlas/InvoiceThemePanel';
 import {
   FileText, Plus, Trash2, Search, X, Send, CheckCircle2,
   AlertCircle, ArrowUpRight, ArrowDownRight, Download, Clock, Eye, Pencil,
@@ -29,6 +30,7 @@ function formatMoney(amount: number, currency: string = 'USD') {
 
 const EMPTY_FORM = {
   companyId: '', type: 'RECEIVABLE', counterpartyName: '', contactEmail: '',
+  contactPhone: '', contactAddress: '', contactExtra: '',
   issueDate: '', dueDate: '', currency: 'USD', taxRate: '0', notes: '',
   relatedInvoiceId: '',
   items: [{ description: '', quantity: 1, unitPrice: 0 }] as { description: string; quantity: number; unitPrice: number }[]
@@ -117,6 +119,9 @@ export default function InvoicesPage() {
       type: inv.type || 'RECEIVABLE',
       counterpartyName: inv.contactName || '',
       contactEmail: inv.contactEmail || '',
+      contactPhone: inv.contactPhone || '',
+      contactAddress: inv.contactAddress || '',
+      contactExtra: inv.contactExtra || '',
       issueDate: inv.issueDate ? new Date(inv.issueDate).toISOString().slice(0, 10) : '',
       dueDate: inv.dueDate ? new Date(inv.dueDate).toISOString().slice(0, 10) : '',
       currency: inv.currency || 'USD',
@@ -140,6 +145,9 @@ export default function InvoicesPage() {
       relatedInvoiceId: inv.id,
       counterpartyName: inv.contactName || '',
       contactEmail: inv.contactEmail || '',
+      contactPhone: inv.contactPhone || '',
+      contactAddress: inv.contactAddress || '',
+      contactExtra: inv.contactExtra || '',
       currency: inv.currency || 'USD',
       taxRate: String(inv.taxRate ?? 0),
       items: (inv.items && inv.items.length > 0)
@@ -251,6 +259,7 @@ export default function InvoicesPage() {
           <option value="">{L(ml('All statuses','Todos los estados','Todos os status'))}</option>
           {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
+        {activeCompanyId ? <InvoiceThemePanel companyId={activeCompanyId} locale={locale} /> : null}
         <button onClick={openNew} className="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-teal-700">
           <Plus className="w-4 h-4" /> Factura
         </button>
@@ -423,6 +432,9 @@ export default function InvoicesPage() {
                 <input className="border rounded-lg px-3 py-2 text-sm" placeholder="Cliente/Proveedor" value={form.counterpartyName} onChange={e => setForm({ ...form, counterpartyName: e.target.value })} />
                 <input className="border rounded-lg px-3 py-2 text-sm" placeholder="Email contacto" value={form.contactEmail} onChange={e => setForm({ ...form, contactEmail: e.target.value })} />
               </div>
+              <input className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Teléfono (To)" value={form.contactPhone} onChange={e => setForm({ ...form, contactPhone: e.target.value })} />
+              <textarea className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Dirección (To)" value={form.contactAddress} onChange={e => setForm({ ...form, contactAddress: e.target.value })} />
+              <input className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="UEI / extra (To)" value={form.contactExtra} onChange={e => setForm({ ...form, contactExtra: e.target.value })} />
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Emisi&oacute;n</label>

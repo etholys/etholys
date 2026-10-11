@@ -186,6 +186,8 @@ model Company {
   businessActivityCode        String?
   businessActivity            String?
   entityType                  String?
+  /// Pele do PDF de facturas (banner, logo, cores, tabela, letterhead). A estrutura do documento é fixa.
+  invoiceThemeJson            Json?
   /// Respostas do assistente de contexto (sector, comércio, metas) — aciona módulos e memória de IA; não substitui aconselhamento legal.
   contextSetupJson            Json?
   contextSetupAt              DateTime?
@@ -1035,6 +1037,9 @@ model Invoice {
   description      String?
   contactName      String?
   contactEmail     String?
+  contactPhone     String?
+  contactAddress   String?
+  contactExtra     String?
   currency         String        @default("USD")
   subtotal         Float         @default(0)
   taxRate          Float         @default(0)
