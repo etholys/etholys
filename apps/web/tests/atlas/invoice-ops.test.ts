@@ -8,6 +8,7 @@ import {
   formatExchangeNote,
   invoiceAmountLayout,
   invoiceCurrencyViews,
+  invoicePdfUserError,
   nextInvoiceNumber,
   planInvoiceDuplicates,
   shiftPeriodLabels,
@@ -188,4 +189,52 @@ test('PDF prints chosen number and quotation details', () => {
   assert.match(html, /Source: BCCR/);
   assert.equal((html.match(/class="doc"/g) || []).length, 1);
   assert.doesNotMatch(html, /page-break-after:\s*always/);
+});
+
+test('PDF user errors stay generic and never leak secrets', () => {
+  assert.equal(invoicePdfUserError(500, { error: 'Timeout generando PDF' }), 'Timeout generando PDF');
+  assert.equal(invoicePdfUserError(500, { error: 'PDF API not configured' }), 'PDF API not configured');
+  assert.equal(invoicePdfUserError(401, { error: 'No autorizado' }), 'No autorizado');
+  assert.equal(invoicePdfUserError(500, { error: 'apikey=sk-secret token=abc' }), 'Error al generar PDF');
+});
+
+test('PDF images embed small files and skip huge banners', async () => {
+  const { resolvePdfImage, convertHtmlToPdf } = await import('../../lib/atlas/invoice-pdf-convert');
+  const small = resolvePdfImage('/logo.png', 'https://app.etholys.com', () => Buffer.from('tiny-logo'));
+  assert.match(small, /^data:image\/png;base64,/);
+  const huge = resolvePdfImage('/banner.png', 'https://app.etholys.com', () => Buffer.alloc(500_000));
+  assert.equal(huge, 'https://app.etholys.com/banner.png');
+
+  const calls: { url: string; body: Record<string, unknown> }[] = [];
+  const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
+    const href = String(url);
+    const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+    calls.push({ url: href, body });
+    if (href.includes('createConvertHtmlToPdfRequest')) {
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ request_id: 'req-1' }),
+        json: async () => ({ request_id: 'req-1' }),
+      } as Response;
+    }
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ status: 'SUCCESS', result: { result: Buffer.from('%PDF-1.4').toString('base64') } }),
+      json: async () => ({ status: 'SUCCESS', result: { result: Buffer.from('%PDF-1.4').toString('base64') } }),
+    } as Response;
+  }) as typeof fetch;
+
+  const pdf = await convertHtmlToPdf('<html>invoice</html>', {
+    fetchImpl,
+    apiKey: 'test-key',
+    sleepMs: 0,
+    baseUrl: 'https://app.etholys.com',
+  });
+  assert.equal(calls[0].url, 'https://apps.abacus.ai/api/createConvertHtmlToPdfRequest');
+  assert.equal(calls[0].body.html_content, '<html>invoice</html>');
+  assert.equal(calls[0].body.deployment_token, 'test-key');
+  assert.doesNotMatch(String(calls[0].url), /api\.abacus\.ai/);
+  assert.equal(pdf.toString('utf8'), '%PDF-1.4');
 });

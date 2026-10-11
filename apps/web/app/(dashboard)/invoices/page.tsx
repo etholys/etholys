@@ -10,7 +10,7 @@ import {
   RotateCcw, FilePlus2, Copy, CalendarPlus
 } from 'lucide-react';
 import { dateOnlyIso } from '@/lib/atlas/date-only';
-import { clientToInvoiceParty, convertAmount, INVOICE_CURRENCIES } from '@/lib/atlas/invoice-ops';
+import { clientToInvoiceParty, convertAmount, INVOICE_CURRENCIES, invoicePdfUserError } from '@/lib/atlas/invoice-ops';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   DRAFT: { label: 'Borrador', color: 'text-gray-600', bg: 'bg-gray-100' },
@@ -334,7 +334,10 @@ export default function InvoicesPage() {
     setDownloadingId(inv.id);
     try {
       const res = await fetch(`/api/invoices/pdf?id=${inv.id}`);
-      if (!res.ok) throw new Error(L(ml('Error generating PDF','Error generando PDF','Erro ao gerar PDF')));
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(invoicePdfUserError(res.status, payload));
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -343,7 +346,7 @@ export default function InvoicesPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert(L(ml('Error generating PDF','Error al generar PDF','Erro ao gerar PDF')));
+      alert(e instanceof Error && e.message ? e.message : L(ml('Error generating PDF','Error al generar PDF','Erro ao gerar PDF')));
     } finally {
       setDownloadingId(null);
     }

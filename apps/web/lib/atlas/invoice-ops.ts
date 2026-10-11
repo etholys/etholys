@@ -62,6 +62,27 @@ export function hasAltCurrency(inv: { altCurrency?: string | null; exchangeRate?
   return Boolean(String(inv.altCurrency || '').trim()) && Number(inv.exchangeRate) > 0;
 }
 
+const SAFE_PDF_ERRORS = new Set([
+  'No autorizado',
+  'Missing id',
+  'Factura no encontrada',
+  'PDF API not configured',
+  'Error al crear PDF',
+  'Timeout generando PDF',
+  'Error interno',
+]);
+
+export function invoicePdfUserError(status: number, payload: unknown): string {
+  const raw =
+    payload && typeof payload === 'object' && 'error' in payload
+      ? String((payload as { error?: unknown }).error || '').trim()
+      : '';
+  if (SAFE_PDF_ERRORS.has(raw)) return raw;
+  if (status === 401) return 'No autorizado';
+  if (status === 404) return 'Factura no encontrada';
+  return 'Error al generar PDF';
+}
+
 export type InvoicePaymentRow = { label: string; value: string };
 
 export type InvoiceBankAccountInput = {
