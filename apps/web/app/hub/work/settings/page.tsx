@@ -16,6 +16,10 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
+import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
+import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
+import { sysTheme } from '@/lib/system-shell';
+import { cn } from '@/lib/utils';
 import { STARTER_GROUPS } from '@/components/work/work-ui';
 
 export default function HubWorkSettingsPage() {
@@ -159,8 +163,9 @@ export default function HubWorkSettingsPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-50 via-slate-50 to-white">
-      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur-md">
+    <div className={cn(sysTheme.root, 'etholys-etask min-h-screen flex-col')} data-accent="teal">
+      <SystemAtmosphere accent="teal" />
+      <header className="relative z-30 border-b border-[color:var(--sys-line)] bg-[color:var(--sys-aside-bg)] backdrop-blur-md">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <Link
@@ -186,17 +191,20 @@ export default function HubWorkSettingsPage() {
               </p>
             </div>
           </div>
+          <div className="flex items-center gap-1">
+            <AppearanceToggle collapsed />
           <Link
             href="/hub/work"
-            className="hidden items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-xs font-medium text-cyan-800 hover:bg-cyan-100 sm:inline-flex"
+            className="hidden items-center gap-1.5 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)] sm:inline-flex"
           >
             <CheckSquare className="h-3.5 w-3.5" />
             {t('Open board', 'Abrir tablero', 'Abrir quadro')}
           </Link>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6 sm:px-6">
+      <main className="relative z-10 mx-auto w-full max-w-4xl space-y-6 px-4 py-6 sm:px-6">
         {!activeCompanyId && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {t(

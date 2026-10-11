@@ -114,16 +114,32 @@ export function WorkDashboard({
   return (
     <div className="space-y-6 p-1 sm:p-2">
       <div className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-teal-50/40 px-5 py-5">
-        <h2 className="text-xl font-bold tracking-tight text-slate-900">
-          {t('Work dashboard', 'Panel de Work', 'Painel Work')}
+        <h2 className="font-[family-name:var(--font-etholys-display)] text-xl font-bold tracking-tight text-[color:var(--sys-ink,#0f172a)]">
+          {t('eTask', 'eTask', 'eTask')}
         </h2>
-        <p className="mt-1 max-w-xl text-sm text-slate-500">
+        <p className="mt-1 max-w-xl text-sm text-[color:var(--sys-muted,#475569)]">
           {t(
-            'See load, overdue work and what needs attention — click through to act.',
-            'Carga, atrasos y lo que necesita atención — clic para actuar.',
-            'Carga, atrasos e o que precisa de atenção — clica para agir.',
+            'Your work on the left. Team operations, departments and projects on the right of the sidebar. One task engine for the company.',
+            'Tu trabajo a la izquierda. Operaciones, sectores y proyectos del equipo en la barra. Un solo motor de tareas para la empresa.',
+            'O teu trabalho à esquerda. Operações, setores e projetos da equipa na barra. Um só motor de tarefas para a empresa.',
           )}
         </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => onNav({ kind: 'mine' })}
+            className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-500"
+          >
+            {t('My work', 'Mi trabajo', 'O meu trabalho')}
+          </button>
+          <button
+            type="button"
+            onClick={() => onNav({ kind: 'company' })}
+            className="rounded-lg border border-[color:var(--sys-line,#cbd5e1)] bg-[color:var(--sys-panel,#fff)] px-3 py-1.5 text-xs font-semibold text-[color:var(--sys-ink,#0f172a)] hover:bg-[color:var(--sys-nav-hover)]"
+          >
+            {t('Team operations', 'Operaciones del equipo', 'Operações da equipa')}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

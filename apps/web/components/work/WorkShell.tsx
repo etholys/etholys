@@ -287,7 +287,7 @@ export default function WorkShell() {
     if (nav.kind === 'all') return t3('All tasks', 'Todas las tareas', 'Todas as tarefas');
     if (nav.kind === 'mine') return t3('My tasks', 'Mis tareas', 'As minhas tarefas');
     if (nav.kind === 'overdue') return t3('Overdue', 'Atrasadas', 'Atrasadas');
-    if (nav.kind === 'company') return t3('Company operations', 'Operaciones de empresa', 'Operações da empresa');
+    if (nav.kind === 'company') return t3('Team operations', 'Operaciones del equipo', 'Operações da equipa');
     if (nav.kind === 'department') return nav.name;
     if (nav.kind === 'project') return nav.name;
     if (nav.kind === 'folder') return nav.name;
@@ -303,6 +303,13 @@ export default function WorkShell() {
     }
     if (nav.kind === 'folder') {
       return t3('A board in your workspace', 'Un tablero de tu espacio', 'Um quadro do teu espaço');
+    }
+    if (nav.kind === 'company') {
+      return t3(
+        'Open demands across the company — not tied to one person',
+        'Demandas abiertas de la empresa — no atadas a una persona',
+        'Demandas abertas da empresa — sem ficar presas a uma pessoa',
+      );
     }
     return null;
   })();
@@ -415,7 +422,9 @@ export default function WorkShell() {
       onClick={() => changeView(v)}
       className={cn(
         'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition',
-        boardView === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+        boardView === v
+          ? 'bg-[color:var(--sys-panel,#fff)] text-[color:var(--sys-ink,#0f172a)] shadow-sm'
+          : 'text-[color:var(--sys-faint,#64748b)] hover:text-[color:var(--sys-ink,#0f172a)]',
       )}
       title={label}
     >
@@ -426,7 +435,7 @@ export default function WorkShell() {
   );
 
   return (
-    <div className="flex min-h-[calc(100vh-5.5rem)] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+    <div className="flex min-h-[calc(100vh-5.5rem)] overflow-hidden rounded-2xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] shadow-sm">
       <WorkSidebar
         nav={nav}
         onNav={changeNav}
@@ -443,23 +452,23 @@ export default function WorkShell() {
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="space-y-2.5 border-b border-slate-100 bg-white/90 px-4 py-3 backdrop-blur-sm">
+        <div className="space-y-2.5 border-b border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] px-4 py-3">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-bold tracking-tight text-slate-900">{contextTitle}</h2>
-              {contextHint && <p className="mt-0.5 text-[11px] text-slate-400">{contextHint}</p>}
+              <h2 className="truncate font-[family-name:var(--font-etholys-display)] text-lg font-bold tracking-tight text-[color:var(--sys-ink)]">{contextTitle}</h2>
+              {contextHint && <p className="mt-0.5 text-[11px] text-[color:var(--sys-faint)]">{contextHint}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/hub/work/settings"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
                 title={t3('Settings', 'Ajustes', 'Definições')}
               >
                 <Settings className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">{t3('Settings', 'Ajustes', 'Definições')}</span>
               </Link>
               {nav.kind !== 'dashboard' && (
-                <div className="flex max-w-full flex-wrap rounded-lg bg-slate-100/90 p-0.5">
+                <div className="flex max-w-full flex-wrap rounded-lg bg-[color:var(--sys-panel-soft)] p-0.5">
                   {viewBtn('table', <ListTree className="h-4 w-4" />, t3('Board', 'Tablero', 'Quadro'), 'Board')}
                   {viewBtn('list', <List className="h-4 w-4" />, t3('List', 'Lista', 'Lista'), 'List')}
                   {viewBtn('kanban', <LayoutGrid className="h-4 w-4" />, 'Kanban')}
@@ -485,13 +494,13 @@ export default function WorkShell() {
                 onSubmit={(title) => quickCreate(title)}
               />
               <div className="relative w-full sm:w-56">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--sys-faint)]" />
                 <input
                   ref={searchRef}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t3('Filter… /', 'Filtrar… /', 'Filtrar… /')}
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-8 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  className="w-full rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] py-2 pl-8 pr-8 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-500"
                 />
                 {query && (
                   <button
@@ -507,7 +516,7 @@ export default function WorkShell() {
               <select
                 value={statusChip}
                 onChange={(e) => setStatusChip(e.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-600"
+                className="rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-2.5 py-2 text-xs text-[color:var(--sys-ink)]"
               >
                 <option value="">{t3('Any status', 'Cualquier estado', 'Qualquer estado')}</option>
                 {WORK_KANBAN.map((s) => (
@@ -519,7 +528,7 @@ export default function WorkShell() {
               <select
                 value={priorityChip}
                 onChange={(e) => setPriorityChip(e.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-600"
+                className="rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-2.5 py-2 text-xs text-[color:var(--sys-ink)]"
               >
                 <option value="">{t3('Any priority', 'Cualquier prioridad', 'Qualquer prioridade')}</option>
                 {WORK_PRIORITIES.map((p) => (

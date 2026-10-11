@@ -1623,3 +1623,57 @@ html[data-appearance='light'] .hub-company-picker-dark button {
   color: #0f172a !important;
 }
 
+/* eTask — o interior segue a pele do Hub (não uma ilha branca) */
+html:not([data-appearance='light']) .etholys-etask .bg-white,
+html:not([data-appearance='light']) .etholys-etask .bg-white\/70,
+html:not([data-appearance='light']) .etholys-etask .bg-white\/80,
+html:not([data-appearance='light']) .etholys-etask .bg-white\/90,
+html:not([data-appearance='light']) .etholys-etask .bg-slate-50,
+html:not([data-appearance='light']) .etholys-etask .bg-slate-50\/80,
+html:not([data-appearance='light']) .etholys-etask .bg-slate-50\/90 {
+  background-color: var(--sys-panel) !important;
+}
+html:not([data-appearance='light']) .etholys-etask .bg-slate-100,
+html:not([data-appearance='light']) .etholys-etask .bg-slate-100\/90,
+html:not([data-appearance='light']) .etholys-etask .bg-slate-200\/80 {
+  background-color: var(--sys-panel-soft) !important;
+}
+html:not([data-appearance='light']) .etholys-etask .text-slate-900,
+html:not([data-appearance='light']) .etholys-etask .text-slate-800 {
+  color: var(--sys-ink) !important;
+}
+html:not([data-appearance='light']) .etholys-etask .text-slate-700,
+html:not([data-appearance='light']) .etholys-etask .text-slate-600,
+html:not([data-appearance='light']) .etholys-etask .text-slate-500 {
+  color: var(--sys-muted) !important;
+}
+html:not([data-appearance='light']) .etholys-etask .text-slate-400 {
+  color: var(--sys-faint) !important;
+}
+html:not([data-appearance='light']) .etholys-etask .border-slate-100,
+html:not([data-appearance='light']) .etholys-etask .border-slate-200,
+html:not([data-appearance='light']) .etholys-etask .border-slate-200\/80,
+html:not([data-appearance='light']) .etholys-etask .border-slate-200\/90,
+html:not([data-appearance='light']) .etholys-etask .border-cyan-100 {
+  border-color: var(--sys-line) !important;
+}
+html:not([data-appearance='light']) .etholys-etask .from-cyan-50,
+html:not([data-appearance='light']) .etholys-etask .to-teal-50\/40,
+html:not([data-appearance='light']) .etholys-etask .via-white {
+  --tw-gradient-from: transparent;
+  --tw-gradient-to: transparent;
+  background-image: none !important;
+  background-color: rgba(13, 148, 136, 0.12) !important;
+}
+
+html[data-appearance='light'] .etholys-etask .bg-white\/10 {
+  background-color: rgba(15, 23, 42, 0.06) !important;
+}
+html[data-appearance='light'] .etholys-etask .text-teal-200,
+html[data-appearance='light'] .etholys-etask .text-teal-300 {
+  color: #0f766e !important;
+}
+html[data-appearance='light'] .etholys-etask .text-rose-200 {
+  color: #be123c !important;
+}
+

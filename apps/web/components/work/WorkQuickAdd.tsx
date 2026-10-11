@@ -37,7 +37,7 @@ export function WorkQuickAdd({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-xl border border-slate-200/90 bg-white px-3 py-2 shadow-sm focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-100',
+        'flex items-center gap-2 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-3 py-2 focus-within:border-teal-500',
         className,
       )}
     >
@@ -54,13 +54,13 @@ export function WorkQuickAdd({
           }
         }}
         placeholder={placeholder}
-        className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50"
+        className="min-w-0 flex-1 bg-transparent text-sm text-[color:var(--sys-ink)] outline-none placeholder:text-[color:var(--sys-faint)] disabled:opacity-50"
       />
       <button
         type="button"
         disabled={disabled || busy || !value.trim()}
         onClick={() => void submit()}
-        className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
+        className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-teal-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-teal-500 disabled:opacity-40"
       >
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
         {addLabel}

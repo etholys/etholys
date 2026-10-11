@@ -78,7 +78,7 @@ export function WorkSidebar({
   const [color, setColor] = useState<string>(GROUP_COLORS[0]);
   const [visibility, setVisibility] = useState<'PERSONAL' | 'SHARED'>('PERSONAL');
   const [creating, setCreating] = useState(false);
-  const [companyOpen, setCompanyOpen] = useState(false);
+  const [companyOpen, setCompanyOpen] = useState(true);
   const composerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -102,7 +102,7 @@ export function WorkSidebar({
     <div
       className={cn(
         'group flex w-full items-center gap-0.5 rounded-lg transition',
-        active ? 'bg-teal-500/15' : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.06]',
+        active ? 'bg-teal-500/15' : 'hover:bg-[color:var(--sys-nav-hover)]',
       )}
     >
       <button
@@ -110,18 +110,18 @@ export function WorkSidebar({
         onClick={onClick}
         className={cn(
           'flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition',
-          active ? 'font-semibold text-teal-800' : 'text-slate-600',
+          active ? 'font-semibold text-[color:var(--sys-ink)]' : 'text-[color:var(--sys-nav-idle)]',
           collapsed && 'justify-center px-2',
         )}
         title={label}
       >
-        <span className={cn('shrink-0', active ? 'text-teal-700' : 'text-slate-500')}>{icon}</span>
+        <span className={cn('shrink-0', active ? 'text-teal-300' : 'text-[color:var(--sys-icon,#94a3b8)]')}>{icon}</span>
         {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
         {!collapsed && badge != null && badge > 0 && (
           <span
             className={cn(
               'rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
-              badgeTone === 'danger' ? 'bg-rose-100 text-rose-700' : 'bg-slate-200/80 text-slate-600',
+              badgeTone === 'danger' ? 'bg-rose-500/20 text-rose-200' : 'bg-white/10 text-[color:var(--sys-muted)]',
             )}
           >
             {badge}
@@ -163,7 +163,7 @@ export function WorkSidebar({
             e.stopPropagation();
             onShareFolder({ id: f.id, name: f.name });
           }}
-          className="mr-1 rounded-md p-1 text-slate-400 opacity-0 transition hover:bg-white hover:text-teal-700 group-hover:opacity-100"
+          className="mr-1 rounded-md p-1 text-[color:var(--sys-faint)] opacity-0 transition hover:bg-teal-500/15 hover:text-teal-300 group-hover:opacity-100"
           title={t('Share', 'Compartir', 'Partilhar')}
         >
           <Share2 className="h-3.5 w-3.5" />
@@ -192,7 +192,7 @@ export function WorkSidebar({
   return (
     <aside
       className={cn(
-        'flex shrink-0 flex-col border-r border-slate-200/90 bg-slate-50/90 transition-all',
+        'flex shrink-0 flex-col border-r border-[color:var(--sys-line)] bg-[color:var(--sys-aside-bg)] transition-all',
         collapsed ? 'w-[52px]' : 'w-[232px]',
       )}
     >
@@ -200,7 +200,7 @@ export function WorkSidebar({
         <button
           type="button"
           onClick={onToggle}
-          className="rounded-md p-1.5 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700"
+          className="rounded-md p-1.5 text-[color:var(--sys-faint)] hover:bg-[color:var(--sys-nav-hover)] hover:text-[color:var(--sys-ink)]"
           aria-label="Toggle sidebar"
         >
           {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
@@ -209,7 +209,11 @@ export function WorkSidebar({
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-2 pb-3">
         <div className="space-y-0.5">
-          {item(nav.kind === 'dashboard', () => onNav({ kind: 'dashboard' }), <LayoutDashboard className="h-4 w-4" />, t('Home', 'Inicio', 'Início'))}
+          {!collapsed && (
+            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)]">
+              {t('Me', 'Yo', 'Eu')}
+            </p>
+          )}
           {item(nav.kind === 'mine', () => onNav({ kind: 'mine' }), <UserRound className="h-4 w-4" />, t('My work', 'Mi trabajo', 'O meu trabalho'), counts.mine)}
           {item(
             nav.kind === 'overdue',
@@ -220,29 +224,39 @@ export function WorkSidebar({
             undefined,
             'danger',
           )}
+          {folders.filter((f) => f.visibility !== 'SHARED' && (f.members?.length ?? f._count?.members ?? 0) === 0).map((f) => folderRow(f))}
+        </div>
+
+        <div className="space-y-0.5">
+          {!collapsed && (
+            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)]">
+              {t('Overview', 'Visión', 'Visão')}
+            </p>
+          )}
+          {item(nav.kind === 'dashboard', () => onNav({ kind: 'dashboard' }), <LayoutDashboard className="h-4 w-4" />, t('Home', 'Inicio', 'Início'))}
           {item(nav.kind === 'all', () => onNav({ kind: 'all' }), <ListTodo className="h-4 w-4" />, t('Everything', 'Todo', 'Tudo'), counts.open)}
         </div>
 
         <div>
           <div className={cn('mb-1 flex items-center', collapsed ? 'justify-center' : 'justify-between px-2')}>
             {!collapsed && (
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                {t('Boards', 'Tableros', 'Quadros')}
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)]">
+                {t('Team boards', 'Tableros de equipo', 'Quadros da equipa')}
               </p>
             )}
             <div className="relative" ref={composerRef}>
               <button
                 type="button"
                 onClick={() => (composerOpen ? setComposerOpen(false) : openComposer())}
-                className="rounded-md p-1 text-slate-400 hover:bg-teal-50 hover:text-teal-700"
+                className="rounded-md p-1 text-[color:var(--sys-faint)] hover:bg-teal-500/15 hover:text-teal-200"
                 title={t('New board', 'Nuevo tablero', 'Novo quadro')}
                 aria-label={t('New board', 'Nuevo tablero', 'Novo quadro')}
               >
                 <Plus className="h-3.5 w-3.5" />
               </button>
               {composerOpen && !collapsed && (
-                <div className="absolute right-0 top-8 z-40 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
-                  <p className="mb-2 text-xs font-semibold text-slate-800">
+                <div className="absolute right-0 top-8 z-40 w-56 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-3 shadow-lg">
+                  <p className="mb-2 text-xs font-semibold text-[color:var(--sys-ink)]">
                     {t('New board', 'Nuevo tablero', 'Novo quadro')}
                   </p>
                   <input
@@ -257,7 +271,7 @@ export function WorkSidebar({
                       if (e.key === 'Escape') setComposerOpen(false);
                     }}
                     placeholder={t('Name', 'Nombre', 'Nome')}
-                    className="mb-2 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-teal-500"
+                    className="mb-2 w-full rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-500"
                   />
                   <div className="mb-2 flex flex-wrap gap-1.5">
                     {GROUP_COLORS.map((c) => (
@@ -280,7 +294,7 @@ export function WorkSidebar({
                       onClick={() => setVisibility('PERSONAL')}
                       className={cn(
                         'rounded-md px-2 py-1 text-[11px] font-semibold',
-                        visibility === 'PERSONAL' ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-600',
+                        visibility === 'PERSONAL' ? 'bg-teal-600 text-white' : 'bg-white/10 text-[color:var(--sys-muted)]',
                       )}
                     >
                       {t('Only me', 'Solo yo', 'Só eu')}
@@ -290,7 +304,7 @@ export function WorkSidebar({
                       onClick={() => setVisibility('SHARED')}
                       className={cn(
                         'rounded-md px-2 py-1 text-[11px] font-semibold',
-                        visibility === 'SHARED' ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-600',
+                        visibility === 'SHARED' ? 'bg-teal-600 text-white' : 'bg-white/10 text-[color:var(--sys-muted)]',
                       )}
                     >
                       {t('Share', 'Compartir', 'Partilhar')}
@@ -309,13 +323,15 @@ export function WorkSidebar({
             </div>
           </div>
           <div className="space-y-0.5">
-            {folders.map((f) => folderRow(f))}
-            {!collapsed && folders.length === 0 && (
-              <p className="px-2 py-1 text-[11px] leading-snug text-slate-400">
+            {folders
+              .filter((f) => f.visibility === 'SHARED' || (f.members?.length ?? f._count?.members ?? 0) > 0)
+              .map((f) => folderRow(f))}
+            {!collapsed && folders.filter((f) => f.visibility === 'SHARED' || (f.members?.length ?? 0) > 0).length === 0 && (
+              <p className="px-2 py-1 text-[11px] leading-snug text-[color:var(--sys-faint)]">
                 {t(
-                  'A board is just a place to group work — private or shared.',
-                  'Un tablero es solo un lugar para agrupar trabajo — privado o compartido.',
-                  'Um quadro é só um sítio para agrupar trabalho — privado ou partilhado.',
+                  'Shared boards keep team demands in one place.',
+                  'Los tableros compartidos agrupan las demandas del equipo.',
+                  'Quadros partilhados agrupam as demandas da equipa.',
                 )}
               </p>
             )}
@@ -327,9 +343,9 @@ export function WorkSidebar({
             <button
               type="button"
               onClick={() => setCompanyOpen((v) => !v)}
-              className="mb-1 flex w-full items-center justify-between px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 hover:text-slate-600"
+              className="mb-1 flex w-full items-center justify-between px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)] hover:text-[color:var(--sys-ink)]"
             >
-              {t('Company', 'Empresa', 'Empresa')}
+              {t('Team', 'Equipo', 'Equipa')}
               <ChevronDown className={cn('h-3 w-3 transition', companyOpen && 'rotate-180')} />
             </button>
           ) : null}
@@ -363,16 +379,16 @@ export function WorkSidebar({
         </div>
       </nav>
 
-      <div className="border-t border-slate-200/80 p-2">
+      <div className="border-t border-[color:var(--sys-line)] p-2">
         <Link
           href="/hub/work/settings"
           className={cn(
-            'flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] text-slate-600 transition hover:bg-slate-200/60',
+            'flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] text-[color:var(--sys-nav-idle)] transition hover:bg-[color:var(--sys-nav-hover)]',
             collapsed && 'justify-center px-2',
           )}
           title={t('Settings', 'Ajustes', 'Definições')}
         >
-          <Settings className="h-4 w-4 shrink-0 text-slate-500" />
+          <Settings className="h-4 w-4 shrink-0 text-[color:var(--sys-icon,#94a3b8)]" />
           {!collapsed && <span>{t('Settings', 'Ajustes', 'Definições')}</span>}
         </Link>
       </div>
