@@ -1041,6 +1041,10 @@ model Invoice {
   contactAddress   String?
   contactExtra     String?
   currency         String        @default("USD")
+  /// Segunda moeda no PDF (documento espelhado com exchangeRate).
+  altCurrency      String?
+  /// Unidades da altCurrency por 1 unidade da currency.
+  exchangeRate     Float?
   subtotal         Float         @default(0)
   taxRate          Float         @default(0)
   taxAmount        Float         @default(0)

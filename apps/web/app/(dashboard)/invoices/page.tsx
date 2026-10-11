@@ -6,8 +6,10 @@ import InvoiceThemePanel from '@/components/atlas/InvoiceThemePanel';
 import {
   FileText, Plus, Trash2, Search, X, Send, CheckCircle2,
   AlertCircle, ArrowUpRight, ArrowDownRight, Download, Clock, Eye, Pencil,
-  RotateCcw, FilePlus2
+  RotateCcw, FilePlus2, Copy, CalendarPlus
 } from 'lucide-react';
+import { dateOnlyIso } from '@/lib/atlas/date-only';
+import { convertAmount, INVOICE_CURRENCIES } from '@/lib/atlas/invoice-ops';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   DRAFT: { label: 'Borrador', color: 'text-gray-600', bg: 'bg-gray-100' },
@@ -31,7 +33,8 @@ function formatMoney(amount: number, currency: string = 'USD') {
 const EMPTY_FORM = {
   companyId: '', type: 'RECEIVABLE', counterpartyName: '', contactEmail: '',
   contactPhone: '', contactAddress: '', contactExtra: '',
-  issueDate: '', dueDate: '', currency: 'USD', taxRate: '0', notes: '',
+  issueDate: '', dueDate: '', currency: 'USD', altCurrency: '', exchangeRate: '',
+  taxRate: '0', notes: '',
   relatedInvoiceId: '',
   items: [{ description: '', quantity: 1, unitPrice: 0 }] as { description: string; quantity: number; unitPrice: number }[]
 };
@@ -53,6 +56,9 @@ export default function InvoicesPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [detailInvoice, setDetailInvoice] = useState<any>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [repeatFor, setRepeatFor] = useState<any>(null);
+  const [repeatMonths, setRepeatMonths] = useState('1');
+  const [duplicating, setDuplicating] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -122,9 +128,11 @@ export default function InvoicesPage() {
       contactPhone: inv.contactPhone || '',
       contactAddress: inv.contactAddress || '',
       contactExtra: inv.contactExtra || '',
-      issueDate: inv.issueDate ? new Date(inv.issueDate).toISOString().slice(0, 10) : '',
-      dueDate: inv.dueDate ? new Date(inv.dueDate).toISOString().slice(0, 10) : '',
+      issueDate: dateOnlyIso(inv.issueDate),
+      dueDate: inv.dueDate ? dateOnlyIso(inv.dueDate) : '',
       currency: inv.currency || 'USD',
+      altCurrency: inv.altCurrency || '',
+      exchangeRate: inv.exchangeRate ? String(inv.exchangeRate) : '',
       taxRate: String(inv.taxRate ?? 0),
       notes: inv.notes || '',
       relatedInvoiceId: inv.relatedInvoiceId || '',
@@ -149,6 +157,8 @@ export default function InvoicesPage() {
       contactAddress: inv.contactAddress || '',
       contactExtra: inv.contactExtra || '',
       currency: inv.currency || 'USD',
+      altCurrency: inv.altCurrency || '',
+      exchangeRate: inv.exchangeRate ? String(inv.exchangeRate) : '',
       taxRate: String(inv.taxRate ?? 0),
       items: (inv.items && inv.items.length > 0)
         ? inv.items.map((it: any) => ({ description: it.description || '', quantity: it.quantity || 1, unitPrice: it.unitPrice || 0 }))
@@ -164,6 +174,8 @@ export default function InvoicesPage() {
       ...form,
       companyId: compId,
       taxRate: parseFloat(form.taxRate) || 0,
+      altCurrency: form.altCurrency || null,
+      exchangeRate: parseFloat(form.exchangeRate) || null,
       items: form.items.filter(i => i.description),
     };
     if (editingId) {
@@ -199,6 +211,25 @@ export default function InvoicesPage() {
     if (!confirm('\u00bfEliminar esta factura?')) return;
     await fetch(`/api/invoices?id=${id}`, { method: 'DELETE' });
     fetchData();
+  };
+
+  const duplicateInvoice = async (inv: any, months = 1) => {
+    setDuplicating(true);
+    try {
+      const res = await fetch('/api/invoices/duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: inv.id, months }),
+      });
+      if (!res.ok) throw new Error('dup');
+      setRepeatFor(null);
+      setDetailInvoice(null);
+      await fetchData();
+    } catch {
+      alert(L(ml('Could not duplicate', 'No se pudo duplicar', 'Não foi possível duplicar')));
+    } finally {
+      setDuplicating(false);
+    }
   };
 
   const downloadPDF = async (inv: any) => {
@@ -297,12 +328,19 @@ export default function InvoicesPage() {
                     <td className="px-4 py-3">{inv.contactName || inv.supplier?.name || '\u2014'}</td>
                     <td className="px-4 py-3 text-gray-500">{new Date(inv.issueDate).toLocaleDateString('es-UY')}</td>
                     <td className="px-4 py-3 text-gray-500">{inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('es-UY') : '\u2014'}</td>
-                    <td className="px-4 py-3 text-right font-bold">{formatMoney(inv.total, inv.currency)}</td>
+                    <td className="px-4 py-3 text-right font-bold">
+                      {formatMoney(inv.total, inv.currency)}
+                      {inv.altCurrency && Number(inv.exchangeRate) > 0 ? (
+                        <span className="block text-xs font-medium text-gray-500">{formatMoney(convertAmount(inv.total, inv.exchangeRate), inv.altCurrency)}</span>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-3"><span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${st.bg} ${st.color}`}>{st.label}</span></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => setDetailInvoice(inv)} className="p-1.5 rounded hover:bg-gray-100" title="Ver detalle"><Eye className="w-4 h-4" /></button>
                         <button onClick={() => openEdit(inv)} className="p-1.5 rounded hover:bg-teal-50 text-teal-600" title="Editar"><Pencil className="w-4 h-4" /></button>
+                        <button onClick={() => duplicateInvoice(inv, 1)} disabled={duplicating} className="p-1.5 rounded hover:bg-indigo-50 text-indigo-600" title={L(ml('Duplicate next month','Duplicar al mes siguiente','Duplicar para o mês seguinte'))}><Copy className="w-4 h-4" /></button>
+                        <button onClick={() => { setRepeatMonths('3'); setRepeatFor(inv); }} className="p-1.5 rounded hover:bg-indigo-50 text-indigo-600" title={L(ml('Repeat monthly','Repetir mensualmente','Repetir mensalmente'))}><CalendarPlus className="w-4 h-4" /></button>
                         <button onClick={() => downloadPDF(inv)} disabled={downloadingId === inv.id} className="p-1.5 rounded hover:bg-blue-50 text-blue-600" title="Descargar PDF">
                           {downloadingId === inv.id ? <Clock className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                         </button>
@@ -358,6 +396,12 @@ export default function InvoicesPage() {
                   <div>IVA ({detailInvoice.taxRate}%): <b>{formatMoney(detailInvoice.taxAmount, detailInvoice.currency)}</b></div>
                 )}
                 <div className="text-lg">Total: <b>{formatMoney(detailInvoice.total, detailInvoice.currency)}</b></div>
+                {detailInvoice.altCurrency && Number(detailInvoice.exchangeRate) > 0 ? (
+                  <div className="text-xs text-gray-500">
+                    {detailInvoice.altCurrency}: <b>{formatMoney(convertAmount(detailInvoice.total, detailInvoice.exchangeRate), detailInvoice.altCurrency)}</b>
+                    <span className="ml-1">(1 {detailInvoice.currency} = {detailInvoice.exchangeRate} {detailInvoice.altCurrency})</span>
+                  </div>
+                ) : null}
               </div>
               {detailInvoice.relatedInvoice && (
                 <div className="bg-purple-50 rounded-lg p-3 text-xs flex items-center gap-2">
@@ -384,6 +428,9 @@ export default function InvoicesPage() {
                   <RotateCcw className="w-4 h-4" /> Nota Cr&eacute;dito
                 </button>
               )}
+              <button onClick={() => duplicateInvoice(detailInvoice, 1)} disabled={duplicating} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm flex items-center gap-2">
+                <Copy className="w-4 h-4" /> {L(ml('Duplicate','Duplicar','Duplicar'))}
+              </button>
               <button onClick={() => { setDetailInvoice(null); openEdit(detailInvoice); }} className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm flex items-center gap-2">
                 <Pencil className="w-4 h-4" /> Editar
               </button>
@@ -425,9 +472,25 @@ export default function InvoicesPage() {
                   <option value="DEBIT_NOTE">Nota D&eacute;bito</option>
                 </select>
                 <select className="border rounded-lg px-3 py-2 text-sm" value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })}>
-                  <option value="USD">USD</option><option value="UYU">UYU</option><option value="BRL">BRL</option><option value="EUR">EUR</option>
+                  {INVOICE_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">{L(ml('Second currency (PDF)','Segunda moneda (PDF)','Segunda moeda (PDF)'))}</label>
+                  <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.altCurrency} onChange={e => setForm({ ...form, altCurrency: e.target.value })}>
+                    <option value="">{L(ml('None','Ninguna','Nenhuma'))}</option>
+                    {INVOICE_CURRENCIES.filter((c) => c !== form.currency).map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">1 {form.currency} =</label>
+                  <input className="w-full border rounded-lg px-3 py-2 text-sm" type="number" min="0" step="0.0001" placeholder={form.altCurrency || '—'} disabled={!form.altCurrency} value={form.exchangeRate} onChange={e => setForm({ ...form, exchangeRate: e.target.value })} />
+                </div>
+              </div>
+              {form.altCurrency && parseFloat(form.exchangeRate) > 0 ? (
+                <p className="text-xs text-teal-700">{L(ml('The PDF will include two documents, one per currency.','El PDF incluirá dos documentos, uno por moneda.','O PDF incluirá dois documentos, um por moeda.'))}</p>
+              ) : null}
               <div className="grid grid-cols-2 gap-3">
                 <input className="border rounded-lg px-3 py-2 text-sm" placeholder="Cliente/Proveedor" value={form.counterpartyName} onChange={e => setForm({ ...form, counterpartyName: e.target.value })} />
                 <input className="border rounded-lg px-3 py-2 text-sm" placeholder="Email contacto" value={form.contactEmail} onChange={e => setForm({ ...form, contactEmail: e.target.value })} />
@@ -467,6 +530,37 @@ export default function InvoicesPage() {
               <button onClick={() => { setShowForm(false); setEditingId(null); }} className="px-4 py-2 border rounded-lg text-sm">{L(ml("Cancel","Cancelar","Cancelar"))}</button>
               <button onClick={handleSubmit} className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm hover:bg-teal-700 flex items-center gap-1.5">
                 {editingId ? <><Pencil className="w-3.5 h-3.5" />Guardar cambios</> : <><Plus className="w-3.5 h-3.5" />Crear</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {repeatFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 dark:bg-gray-900">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-lg font-bold">{L(ml('Repeat monthly','Repetir mensualmente','Repetir mensalmente'))}</h3>
+              <button type="button" onClick={() => setRepeatFor(null)}><X className="h-5 w-5" /></button>
+            </div>
+            <p className="mb-3 text-sm text-gray-600">
+              {L(ml(
+                `Create drafts from ${repeatFor.number}. Same amounts; dates and month names move forward.`,
+                `Crea borradores a partir de ${repeatFor.number}. Mismos montos; fechas y meses avanzan.`,
+                `Cria rascunhos a partir de ${repeatFor.number}. Os mesmos valores; datas e meses avançam.`,
+              ))}
+            </p>
+            <label className="block text-xs text-gray-500 mb-1">{L(ml('How many extra months?','¿Cuántos meses extra?','Quantos meses extra?'))}</label>
+            <input className="mb-4 w-full rounded-lg border px-3 py-2 text-sm" type="number" min="1" max="24" value={repeatMonths} onChange={(e) => setRepeatMonths(e.target.value)} />
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setRepeatFor(null)} className="rounded-lg border px-4 py-2 text-sm">{L(ml('Cancel','Cancelar','Cancelar'))}</button>
+              <button
+                type="button"
+                disabled={duplicating}
+                onClick={() => duplicateInvoice(repeatFor, parseInt(repeatMonths, 10) || 1)}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white"
+              >
+                {duplicating ? '…' : L(ml('Create drafts','Crear borradores','Criar rascunhos'))}
               </button>
             </div>
           </div>

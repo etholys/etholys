@@ -1,0 +1,86 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  addCalendarMonths,
+  convertAmount,
+  invoiceCurrencyViews,
+  nextInvoiceNumber,
+  planInvoiceDuplicates,
+  shiftPeriodLabels,
+} from '../../lib/atlas/invoice-ops';
+import { buildInvoicePdfHtml } from '../../lib/atlas/invoice-pdf-html';
+import { RURAL_COMMERCE_INVOICE_THEME } from '../../lib/atlas/invoice-theme';
+
+test('calendar months clamp end-of-month', () => {
+  assert.equal(addCalendarMonths('2026-01-31', 1), '2026-02-28');
+  assert.equal(addCalendarMonths('2026-10-01', 1), '2026-11-01');
+});
+
+test('period labels advance in English and Spanish', () => {
+  assert.match(shiftPeriodLabels('Q2 (September 2026): reimbursement', 1), /October 2026/);
+  assert.match(shiftPeriodLabels('Servicio de septiembre', 1), /octubre/i);
+});
+
+test('duplicate plan shifts dates and item text for N months', () => {
+  const plans = planInvoiceDuplicates(
+    {
+      issueDate: '2026-09-01',
+      dueDate: '2026-09-15',
+      items: [{ description: 'September 2026 services', quantity: 1, unitPrice: 100 }],
+    },
+    3,
+  );
+  assert.equal(plans.length, 3);
+  assert.equal(plans[0].issueDate, '2026-10-01');
+  assert.equal(plans[1].issueDate, '2026-11-01');
+  assert.equal(plans[2].issueDate, '2026-12-01');
+  assert.match(plans[0].items[0].description, /October 2026/);
+  assert.match(plans[2].items[0].description, /December 2026/);
+});
+
+test('dual currency views keep USD and convert CRC', () => {
+  const views = invoiceCurrencyViews({
+    currency: 'USD',
+    altCurrency: 'CRC',
+    exchangeRate: 500,
+    subtotal: 10,
+    taxAmount: 0,
+    total: 10,
+    items: [{ description: 'Fee', quantity: 1, unitPrice: 10, total: 10 }],
+  });
+  assert.equal(views.length, 2);
+  assert.equal(views[0].currency, 'USD');
+  assert.equal(views[1].currency, 'CRC');
+  assert.equal(views[1].total, 5000);
+  assert.equal(convertAmount(8.14, 500), 4070);
+});
+
+test('PDF with two currencies renders two documents', () => {
+  const html = buildInvoicePdfHtml({
+    invoice: {
+      number: 'INV-0002',
+      type: 'RECEIVABLE',
+      status: 'DRAFT',
+      currency: 'USD',
+      altCurrency: 'CRC',
+      exchangeRate: 500,
+      subtotal: 10,
+      taxRate: 0,
+      taxAmount: 0,
+      total: 10,
+      issueDate: '2026-10-01',
+      items: [{ description: 'Fee', quantity: 1, unitPrice: 10, total: 10 }],
+    },
+    theme: RURAL_COMMERCE_INVOICE_THEME,
+  });
+  assert.match(html, /Amount \(USD\)/);
+  assert.match(html, /Amount \(CRC\)/);
+  assert.match(html, /page-break-after: always/);
+  assert.match(html, /Exchange rate: 1 USD = 500 CRC/);
+  assert.equal((html.match(/class="doc"/g) || []).length, 2);
+});
+
+test('invoice numbers pad from existing count', () => {
+  assert.equal(nextInvoiceNumber('RECEIVABLE', 0), 'INV-0001');
+  assert.equal(nextInvoiceNumber('PAYABLE', 11), 'BILL-0012');
+});

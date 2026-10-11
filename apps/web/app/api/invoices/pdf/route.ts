@@ -56,6 +56,8 @@ export async function GET(req: Request) {
         type: invoice.type,
         status: invoice.status,
         currency: invoice.currency,
+        altCurrency: invoice.altCurrency,
+        exchangeRate: invoice.exchangeRate,
         subtotal: invoice.subtotal,
         taxRate: invoice.taxRate,
         taxAmount: invoice.taxAmount,

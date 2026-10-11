@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
+import { nextInvoiceNumber } from '@/lib/atlas/invoice-ops';
 
 export async function GET(req: NextRequest) {
   try {
@@ -39,8 +40,7 @@ export async function POST(req: NextRequest) {
     if (!tenant.companyIds.includes(body.companyId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const count = await prisma.invoice.count({ where: { companyId: body.companyId } });
-    const prefixMap: Record<string, string> = { RECEIVABLE: 'INV', PAYABLE: 'BILL', CREDIT_NOTE: 'NC', DEBIT_NOTE: 'ND' };
-    const number = `${prefixMap[body.type] || 'DOC'}-${String(count + 1).padStart(4, '0')}`;
+    const number = nextInvoiceNumber(body.type, count);
 
     const items = body.items || [];
     const subtotal = items.reduce((s: number, i: any) => s + (i.quantity || 1) * (i.unitPrice || 0), 0);
@@ -62,6 +62,8 @@ export async function POST(req: NextRequest) {
         contactAddress: body.contactAddress || '',
         contactExtra: body.contactExtra || '',
         currency: body.currency || 'USD',
+        altCurrency: body.altCurrency || null,
+        exchangeRate: body.exchangeRate ? Number(body.exchangeRate) : null,
         subtotal,
         taxRate: body.taxRate || 0,
         taxAmount,
@@ -108,6 +110,11 @@ export async function PUT(req: NextRequest) {
     if (body.notes !== undefined) updateData.notes = body.notes;
     if (body.type !== undefined) updateData.type = body.type;
     if (body.currency !== undefined) updateData.currency = body.currency;
+    if (body.altCurrency !== undefined) updateData.altCurrency = body.altCurrency || null;
+    if (body.exchangeRate !== undefined) {
+      const rate = Number(body.exchangeRate);
+      updateData.exchangeRate = rate > 0 ? rate : null;
+    }
     if (body.taxRate !== undefined) updateData.taxRate = body.taxRate;
     if (body.issueDate !== undefined) updateData.issueDate = new Date(body.issueDate);
     if (body.supplierId !== undefined) updateData.supplierId = body.supplierId || null;

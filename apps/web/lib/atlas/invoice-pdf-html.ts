@@ -1,4 +1,5 @@
 import { dateOnlyIso } from '@/lib/atlas/date-only';
+import { invoiceCurrencyViews, type InvoiceAmountView } from '@/lib/atlas/invoice-ops';
 import { tableCss, type InvoiceTheme } from '@/lib/atlas/invoice-theme';
 
 export type InvoicePdfItem = {
@@ -13,6 +14,8 @@ export type InvoicePdfModel = {
   type: string;
   status: string;
   currency: string;
+  altCurrency?: string | null;
+  exchangeRate?: number | null;
   subtotal: number;
   taxRate: number;
   taxAmount: number;
@@ -90,17 +93,18 @@ function partyLines(lines: string[]): string {
     .join('');
 }
 
-export function buildInvoicePdfHtml(opts: {
+function renderInvoiceDocument(opts: {
   invoice: InvoicePdfModel;
   theme: InvoiceTheme;
+  view: InvoiceAmountView;
   bannerSrc?: string;
   logoSrc?: string;
   signatureSrc?: string;
 }): string {
-  const { invoice, theme } = opts;
+  const { invoice, theme, view } = opts;
   const isReceivable = invoice.type === 'RECEIVABLE' || invoice.type === 'DEBIT_NOTE';
   const title = isReceivable ? theme.documentTitleReceivable : theme.documentTitlePayable;
-  const money = (n: number) => formatInvoiceMoney(n, invoice.currency, theme.numberLocale);
+  const money = (n: number) => formatInvoiceMoney(n, view.currency, theme.numberLocale);
   const issue = formatInvoiceLongDate(invoice.issueDate, theme.dateLocale);
   const fromName = theme.letterhead.legalName || '';
   const toName = invoice.contactName || invoice.supplierName || '—';
@@ -128,8 +132,8 @@ export function buildInvoicePdfHtml(opts: {
     invoice.contactExtra || '',
   ]);
 
-  const items = invoice.items || [];
-  const amountCol = `${theme.labels.amount} (${esc(invoice.currency)})`;
+  const items = view.items || [];
+  const amountCol = `${theme.labels.amount} (${esc(view.currency)})`;
   let tableHead: string;
   let tableBody: string;
   if (theme.tableLayout === 'amount') {
@@ -153,9 +157,9 @@ export function buildInvoicePdfHtml(opts: {
   const showTotals = theme.tableLayout === 'detailed' || (invoice.taxRate || 0) > 0;
   const totals = showTotals
     ? `<div class="totals">
-        <div class="total-row"><span>Subtotal</span><span>${esc(money(invoice.subtotal))}</span></div>
-        ${(invoice.taxRate || 0) > 0 ? `<div class="total-row"><span>IVA (${invoice.taxRate}%)</span><span>${esc(money(invoice.taxAmount))}</span></div>` : ''}
-        <div class="total-row total-final"><span>${esc(theme.labels.total)}</span><span>${esc(money(invoice.total))}</span></div>
+        <div class="total-row"><span>Subtotal</span><span>${esc(money(view.subtotal))}</span></div>
+        ${(invoice.taxRate || 0) > 0 ? `<div class="total-row"><span>IVA (${invoice.taxRate}%)</span><span>${esc(money(view.taxAmount))}</span></div>` : ''}
+        <div class="total-row total-final"><span>${esc(theme.labels.total)}</span><span>${esc(money(view.total))}</span></div>
       </div>`
     : '';
 
@@ -190,12 +194,76 @@ export function buildInvoicePdfHtml(opts: {
   const status = theme.showStatusBadge
     ? `<div class="status status-${esc(invoice.status)}">${esc(STATUS_LABEL[invoice.status] || invoice.status)}</div>`
     : '';
+  const rateNote = view.exchangeNote
+    ? `<div class="rate-note">Exchange rate: ${esc(view.exchangeNote)}</div>`
+    : '';
+
+  return `<div class="doc">
+  <div class="banner" style="${bannerBg}color:${theme.bannerText}">
+    <div class="banner-top">
+      <div>${logo}</div>
+      <div class="meta">
+        ${theme.showDocumentTitle ? `<div class="doc-title">${esc(title)}</div>` : ''}
+        <div>${esc(theme.labels.invoiceNumber)}: ${esc(invoice.number)}</div>
+        <div>${esc(theme.labels.invoiceDate)}: ${esc(issue)}</div>
+        ${status}
+      </div>
+    </div>
+    <div class="parties">
+      <div>
+        <div class="party-label">${esc(theme.labels.from)}: <span>${esc(fromName || '—')}</span></div>
+        ${fromBody}
+      </div>
+      <div>
+        <div class="party-label">${esc(theme.labels.to)}: <span>${esc(toName)}</span></div>
+        ${toBody}
+      </div>
+    </div>
+  </div>
+  <div class="sheet">
+    ${rateNote}
+    <table class="items">
+      <thead>${tableHead}</thead>
+      <tbody>${tableBody || `<tr><td colspan="5">—</td></tr>`}</tbody>
+    </table>
+    ${totals}
+    ${invoice.notes ? `<div class="notes"><strong>Notas:</strong> ${nl(invoice.notes)}</div>` : ''}
+    ${invoice.description ? `<div style="margin-top:8px;color:#6B7280;font-size:12px;">${nl(invoice.description)}</div>` : ''}
+    ${payment}
+    ${signature}
+  </div>
+</div>`;
+}
+
+export function buildInvoicePdfHtml(opts: {
+  invoice: InvoicePdfModel;
+  theme: InvoiceTheme;
+  bannerSrc?: string;
+  logoSrc?: string;
+  signatureSrc?: string;
+}): string {
+  const { invoice, theme } = opts;
+  const views = invoiceCurrencyViews(invoice);
+  const pages = views
+    .map((view) =>
+      renderInvoiceDocument({
+        invoice,
+        theme,
+        view,
+        bannerSrc: opts.bannerSrc,
+        logoSrc: opts.logoSrc,
+        signatureSrc: opts.signatureSrc,
+      }),
+    )
+    .join('');
 
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><style>
   * { box-sizing: border-box; }
   body { font-family: Calibri, 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; color: ${theme.bodyText}; font-size: 13px; background: #fff; }
-  .banner { ${bannerBg} color: ${theme.bannerText}; padding: 28px 40px 32px; min-height: 220px; }
+  .doc { page-break-after: always; }
+  .doc:last-child { page-break-after: auto; }
+  .banner { color: ${theme.bannerText}; padding: 28px 40px 32px; min-height: 220px; background-size: cover; background-position: center right; }
   .banner-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
   .logo { height: 64px; max-width: 280px; object-fit: contain; }
   .company-name { font-size: 26px; font-weight: 700; color: ${theme.bannerText}; }
@@ -205,6 +273,7 @@ export function buildInvoicePdfHtml(opts: {
   .party-label { color: ${theme.accent}; font-weight: 700; margin-bottom: 4px; }
   .party-label span { font-weight: 700; }
   .sheet { padding: 36px 48px 48px; }
+  .rate-note { font-size: 12px; color: ${theme.accent}; font-weight: 700; margin-bottom: 12px; }
   table.items { width: 100%; border-collapse: collapse; margin: 8px 0 28px; }
   ${tableCss(theme)}
   .text-right { text-align: right; }
@@ -228,39 +297,7 @@ export function buildInvoicePdfHtml(opts: {
   .status-DRAFT { background: #F3F4F6; color: #374151; }
   .status-OVERDUE { background: #FEE2E2; color: #991B1B; }
   .status-CANCELLED { background: #F3F4F6; color: #6B7280; }
-  .footer { margin-top: 36px; text-align: center; font-size: 10px; color: #9CA3AF; }
 </style></head><body>
-  <div class="banner">
-    <div class="banner-top">
-      <div>${logo}</div>
-      <div class="meta">
-        ${theme.showDocumentTitle ? `<div class="doc-title">${esc(title)}</div>` : ''}
-        <div>${esc(theme.labels.invoiceNumber)}: ${esc(invoice.number)}</div>
-        <div>${esc(theme.labels.invoiceDate)}: ${esc(issue)}</div>
-        ${status}
-      </div>
-    </div>
-    <div class="parties">
-      <div>
-        <div class="party-label">${esc(theme.labels.from)}: <span>${esc(fromName || '—')}</span></div>
-        ${fromBody}
-      </div>
-      <div>
-        <div class="party-label">${esc(theme.labels.to)}: <span>${esc(toName)}</span></div>
-        ${toBody}
-      </div>
-    </div>
-  </div>
-  <div class="sheet">
-    <table class="items">
-      <thead>${tableHead}</thead>
-      <tbody>${tableBody || `<tr><td colspan="5">—</td></tr>`}</tbody>
-    </table>
-    ${totals}
-    ${invoice.notes ? `<div class="notes"><strong>Notas:</strong> ${nl(invoice.notes)}</div>` : ''}
-    ${invoice.description ? `<div style="margin-top:8px;color:#6B7280;font-size:12px;">${nl(invoice.description)}</div>` : ''}
-    ${payment}
-    ${signature}
-  </div>
+${pages}
 </body></html>`;
 }
