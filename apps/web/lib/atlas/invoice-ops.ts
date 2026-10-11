@@ -62,6 +62,83 @@ export function hasAltCurrency(inv: { altCurrency?: string | null; exchangeRate?
   return Boolean(String(inv.altCurrency || '').trim()) && Number(inv.exchangeRate) > 0;
 }
 
+export type InvoicePaymentRow = { label: string; value: string };
+
+export type InvoiceBankAccountInput = {
+  label?: string | null;
+  bankName?: string | null;
+  bankAddress?: string | null;
+  accountLabel?: string | null;
+  accountNumber?: string | null;
+  routingLabel?: string | null;
+  routingNumber?: string | null;
+};
+
+export function bankAccountToPaymentRows(bank: InvoiceBankAccountInput | null | undefined): InvoicePaymentRow[] {
+  if (!bank) return [];
+  return [
+    { label: 'Bank Name', value: String(bank.bankName || '').trim() },
+    { label: 'Bank Address', value: String(bank.bankAddress || '').trim() },
+    {
+      label: String(bank.accountLabel || 'IBAN / Account Number').trim() || 'Account',
+      value: String(bank.accountNumber || '').trim(),
+    },
+    {
+      label: String(bank.routingLabel || 'ABA / Routing Number').trim() || 'Routing',
+      value: String(bank.routingNumber || '').trim(),
+    },
+  ].filter((r) => r.value);
+}
+
+export function clientToInvoiceParty(client: {
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  country?: string | null;
+  taxId?: string | null;
+  extra?: string | null;
+}): {
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  contactAddress: string;
+  contactExtra: string;
+} {
+  const address = [client.address, [client.city, client.country].filter(Boolean).join(' ')].filter(Boolean).join(',\n');
+  const extraBits = [
+    client.taxId ? `Tax ID: ${client.taxId}` : '',
+    client.extra || '',
+  ].filter(Boolean);
+  return {
+    contactName: client.name || '',
+    contactEmail: client.email || '',
+    contactPhone: client.phone || '',
+    contactAddress: address,
+    contactExtra: extraBits.join('\n'),
+  };
+}
+
+export function formatExchangeNote(inv: {
+  currency?: string | null;
+  altCurrency?: string | null;
+  exchangeRate?: number | null;
+  exchangeRateDate?: Date | string | null;
+  exchangeRateSource?: string | null;
+}): string {
+  const primary = String(inv.currency || 'USD').toUpperCase();
+  const alt = String(inv.altCurrency || '').trim().toUpperCase();
+  const rate = Number(inv.exchangeRate);
+  if (!alt || !(rate > 0)) return '';
+  const lines = [`Quotation: 1 ${primary} = ${rate} ${alt}`];
+  const date = dateOnlyIso(inv.exchangeRateDate);
+  if (date) lines.push(`Date: ${date}`);
+  const source = String(inv.exchangeRateSource || '').trim();
+  if (source) lines.push(`Source: ${source}`);
+  return lines.join('\n');
+}
+
 export type InvoiceAmountView = {
   currency: string;
   subtotal: number;
@@ -75,6 +152,8 @@ export function invoiceCurrencyViews(inv: {
   currency?: string | null;
   altCurrency?: string | null;
   exchangeRate?: number | null;
+  exchangeRateDate?: Date | string | null;
+  exchangeRateSource?: string | null;
   subtotal: number;
   taxAmount: number;
   total: number;
@@ -104,6 +183,8 @@ export function invoiceCurrencyViews(inv: {
   const alt = String(inv.altCurrency || '').trim().toUpperCase();
   const rate = Number(inv.exchangeRate);
   if (!alt || alt === primary || !(rate > 0)) return views;
+  const note = formatExchangeNote(inv);
+  views[0].exchangeNote = note;
   views.push({
     currency: alt,
     subtotal: convertAmount(inv.subtotal, rate),
@@ -114,7 +195,7 @@ export function invoiceCurrencyViews(inv: {
       unitPrice: convertAmount(it.unitPrice, rate),
       total: convertAmount(it.total, rate),
     })),
-    exchangeNote: `1 ${primary} = ${rate} ${alt}`,
+    exchangeNote: note,
   });
   return views;
 }

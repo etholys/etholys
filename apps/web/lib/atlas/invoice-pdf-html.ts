@@ -16,6 +16,13 @@ export type InvoicePdfModel = {
   currency: string;
   altCurrency?: string | null;
   exchangeRate?: number | null;
+  exchangeRateDate?: Date | string | null;
+  exchangeRateSource?: string | null;
+  paymentRows?: { label: string; value: string }[] | null;
+  paymentTitle?: string | null;
+  signerName?: string | null;
+  signerTitle?: string | null;
+  signerCompany?: string | null;
   subtotal: number;
   taxRate: number;
   taxAmount: number;
@@ -163,11 +170,14 @@ function renderInvoiceDocument(opts: {
       </div>`
     : '';
 
-  const payRows = (theme.payment.rows || []).filter((r) => r.label || r.value);
-  const payment =
-    theme.payment.enabled && payRows.length
-      ? `<table class="pay">
-          <thead><tr><th colspan="2">${esc(theme.payment.title)}</th></tr></thead>
+  const payRows = (invoice.paymentRows && invoice.paymentRows.length
+    ? invoice.paymentRows
+    : theme.payment.rows || []
+  ).filter((r) => r.label || r.value);
+  const showPayment = payRows.length > 0 && (Boolean(invoice.paymentRows?.length) || theme.payment.enabled);
+  const payment = showPayment
+    ? `<table class="pay">
+          <thead><tr><th colspan="2">${esc(invoice.paymentTitle || theme.payment.title)}</th></tr></thead>
           <tbody>${payRows
             .map(
               (r) =>
@@ -175,19 +185,22 @@ function renderInvoiceDocument(opts: {
             )
             .join('')}</tbody>
         </table>`
-      : '';
+    : '';
 
+  const signerName = invoice.signerName || theme.signature.name;
+  const signerTitle = invoice.signerTitle || theme.signature.title;
+  const signerCompany = invoice.signerCompany || theme.signature.companyLine;
   const sigImg = opts.signatureSrc
     ? `<img class="sig-img" src="${opts.signatureSrc}" alt="" />`
     : '';
   const signature =
-    theme.signature.enabled && (theme.signature.name || theme.signature.imageUrl)
+    signerName || opts.signatureSrc
       ? `<div class="sig">
           ${sigImg}
           <div class="sig-line"></div>
-          <div class="sig-name">${esc(theme.signature.name)}</div>
-          <div class="sig-title">${esc(theme.signature.title)}</div>
-          <div class="sig-co">${esc(theme.signature.companyLine)}</div>
+          <div class="sig-name">${esc(signerName)}</div>
+          <div class="sig-title">${esc(signerTitle)}</div>
+          <div class="sig-co">${esc(signerCompany)}</div>
         </div>`
       : '';
 
@@ -195,7 +208,7 @@ function renderInvoiceDocument(opts: {
     ? `<div class="status status-${esc(invoice.status)}">${esc(STATUS_LABEL[invoice.status] || invoice.status)}</div>`
     : '';
   const rateNote = view.exchangeNote
-    ? `<div class="rate-note">Exchange rate: ${esc(view.exchangeNote)}</div>`
+    ? `<div class="rate-note">${nl(view.exchangeNote)}</div>`
     : '';
 
   return `<div class="doc">
@@ -273,7 +286,7 @@ export function buildInvoicePdfHtml(opts: {
   .party-label { color: ${theme.accent}; font-weight: 700; margin-bottom: 4px; }
   .party-label span { font-weight: 700; }
   .sheet { padding: 36px 48px 48px; }
-  .rate-note { font-size: 12px; color: ${theme.accent}; font-weight: 700; margin-bottom: 12px; }
+  .rate-note { font-size: 12px; color: ${theme.accent}; font-weight: 600; margin-bottom: 12px; line-height: 1.45; }
   table.items { width: 100%; border-collapse: collapse; margin: 8px 0 28px; }
   ${tableCss(theme)}
   .text-right { text-align: right; }

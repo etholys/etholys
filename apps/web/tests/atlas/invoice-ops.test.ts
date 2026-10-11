@@ -2,12 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addCalendarMonths,
+  bankAccountToPaymentRows,
+  clientToInvoiceParty,
   convertAmount,
+  formatExchangeNote,
   invoiceCurrencyViews,
   nextInvoiceNumber,
   planInvoiceDuplicates,
   shiftPeriodLabels,
 } from '../../lib/atlas/invoice-ops';
+import {
+  allocateInvoiceNumbers,
+  extractSeqFromNumber,
+  formatInvoiceNumber,
+  RURAL_COMMERCE_INVOICE_NUMBERING,
+} from '../../lib/atlas/invoice-numbering';
 import { buildInvoicePdfHtml } from '../../lib/atlas/invoice-pdf-html';
 import { RURAL_COMMERCE_INVOICE_THEME } from '../../lib/atlas/invoice-theme';
 
@@ -76,11 +85,93 @@ test('PDF with two currencies renders two documents', () => {
   assert.match(html, /Amount \(USD\)/);
   assert.match(html, /Amount \(CRC\)/);
   assert.match(html, /page-break-after: always/);
-  assert.match(html, /Exchange rate: 1 USD = 500 CRC/);
+  assert.match(html, /Quotation: 1 USD = 500 CRC/);
   assert.equal((html.match(/class="doc"/g) || []).length, 2);
 });
 
 test('invoice numbers pad from existing count', () => {
   assert.equal(nextInvoiceNumber('RECEIVABLE', 0), 'INV-0001');
   assert.equal(nextInvoiceNumber('PAYABLE', 11), 'BILL-0012');
+});
+
+test('RC numbering formats INV-YY + padded sequence', () => {
+  const when = new Date('2026-08-09T12:00:00.000Z');
+  assert.equal(formatInvoiceNumber(RURAL_COMMERCE_INVOICE_NUMBERING, 8097, when), 'INV-2608097');
+  assert.equal(extractSeqFromNumber('INV-2608097', RURAL_COMMERCE_INVOICE_NUMBERING, when), 8097);
+  const { numbers, nextCfg } = allocateInvoiceNumbers({
+    cfg: { ...RURAL_COMMERCE_INVOICE_NUMBERING, nextSeq: 8098 },
+    existingNumbers: ['INV-2608097'],
+    count: 2,
+    when,
+  });
+  assert.deepEqual(numbers, ['INV-2608098', 'INV-2608099']);
+  assert.equal(nextCfg.nextSeq, 8100);
+});
+
+test('default numbering is INV-{seq} with 4-digit pad', () => {
+  const { numbers } = allocateInvoiceNumbers({
+    cfg: { prefix: 'INV', pattern: '{PREFIX}-{SEQ}', seqPadding: 4, nextSeq: 1 },
+    existingNumbers: [],
+    count: 1,
+    when: new Date('2026-01-01T00:00:00.000Z'),
+  });
+  assert.equal(numbers[0], 'INV-0001');
+});
+
+test('quotation note includes date and source', () => {
+  const note = formatExchangeNote({
+    currency: 'USD',
+    altCurrency: 'CRC',
+    exchangeRate: 500,
+    exchangeRateDate: '2026-09-08',
+    exchangeRateSource: 'BCCR',
+  });
+  assert.match(note, /Quotation: 1 USD = 500 CRC/);
+  assert.match(note, /Date: 2026-09-08/);
+  assert.match(note, /Source: BCCR/);
+});
+
+test('client and bank helpers fill invoice parties', () => {
+  const party = clientToInvoiceParty({
+    name: 'Wildlife Habitat Council',
+    email: 'a@b.com',
+    phone: '1',
+    address: '7200 Wisconsin',
+    extra: 'UEI NUMBER: WMB6H1ME8GR6',
+  });
+  assert.equal(party.contactName, 'Wildlife Habitat Council');
+  assert.match(party.contactExtra, /UEI NUMBER/);
+  const rows = bankAccountToPaymentRows({
+    bankName: 'Choice Financial Group (Mercury)',
+    accountNumber: '2026990037610',
+    routingNumber: '091311229',
+  });
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0].value, 'Choice Financial Group (Mercury)');
+});
+
+test('PDF prints chosen number and quotation details', () => {
+  const html = buildInvoicePdfHtml({
+    invoice: {
+      number: 'INV-2608097',
+      type: 'RECEIVABLE',
+      status: 'SENT',
+      currency: 'USD',
+      altCurrency: 'CRC',
+      exchangeRate: 500,
+      exchangeRateDate: '2026-09-08',
+      exchangeRateSource: 'BCCR',
+      subtotal: 10,
+      taxRate: 0,
+      taxAmount: 0,
+      total: 10,
+      issueDate: '2026-10-01',
+      items: [{ description: 'Fee', quantity: 1, unitPrice: 10, total: 10 }],
+    },
+    theme: RURAL_COMMERCE_INVOICE_THEME,
+  });
+  assert.match(html, /Invoice Number: INV-2608097/);
+  assert.match(html, /Quotation: 1 USD = 500 CRC/);
+  assert.match(html, /Date: 2026-09-08/);
+  assert.match(html, /Source: BCCR/);
 });

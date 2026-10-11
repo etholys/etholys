@@ -3,13 +3,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/app/providers';
 import InvoiceThemePanel from '@/components/atlas/InvoiceThemePanel';
+import InvoiceIssueFields, { type InvoiceIssueForm } from '@/components/atlas/InvoiceIssueFields';
 import {
   FileText, Plus, Trash2, Search, X, Send, CheckCircle2,
   AlertCircle, ArrowUpRight, ArrowDownRight, Download, Clock, Eye, Pencil,
   RotateCcw, FilePlus2, Copy, CalendarPlus
 } from 'lucide-react';
 import { dateOnlyIso } from '@/lib/atlas/date-only';
-import { convertAmount, INVOICE_CURRENCIES } from '@/lib/atlas/invoice-ops';
+import { clientToInvoiceParty, convertAmount, INVOICE_CURRENCIES } from '@/lib/atlas/invoice-ops';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   DRAFT: { label: 'Borrador', color: 'text-gray-600', bg: 'bg-gray-100' },
@@ -30,13 +31,16 @@ function formatMoney(amount: number, currency: string = 'USD') {
   return new Intl.NumberFormat('es-UY', { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount);
 }
 
-const EMPTY_FORM = {
-  companyId: '', type: 'RECEIVABLE', counterpartyName: '', contactEmail: '',
+const EMPTY_FORM: InvoiceIssueForm = {
+  companyId: '', type: 'RECEIVABLE', clientId: '', counterpartyName: '', contactEmail: '',
   contactPhone: '', contactAddress: '', contactExtra: '',
+  number: '', numberMode: 'auto',
   issueDate: '', dueDate: '', currency: 'USD', altCurrency: '', exchangeRate: '',
+  exchangeRateDate: '', exchangeRateSource: '',
+  bankAccountId: '', signatureId: '', signatureImage: '',
   taxRate: '0', notes: '',
   relatedInvoiceId: '',
-  items: [{ description: '', quantity: 1, unitPrice: 0 }] as { description: string; quantity: number; unitPrice: number }[]
+  items: [{ description: '', quantity: 1, unitPrice: 0 }]
 };
 
 
@@ -59,6 +63,13 @@ export default function InvoicesPage() {
   const [repeatFor, setRepeatFor] = useState<any>(null);
   const [repeatMonths, setRepeatMonths] = useState('1');
   const [duplicating, setDuplicating] = useState(false);
+  const [clients, setClients] = useState<any[]>([]);
+  const [banks, setBanks] = useState<any[]>([]);
+  const [signatures, setSignatures] = useState<any[]>([]);
+  const [previewNumber, setPreviewNumber] = useState('');
+  const [numberingHint, setNumberingHint] = useState('');
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [showNewBank, setShowNewBank] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -90,6 +101,30 @@ export default function InvoicesPage() {
 
   useEffect(() => { fetchData(); }, [activeCompanyId]);
 
+  const loadCatalog = async (companyId: string, issueDate?: string) => {
+    if (!companyId) return;
+    try {
+      const q = `companyId=${encodeURIComponent(companyId)}`;
+      const [cl, bk, sg, nm] = await Promise.all([
+        fetch(`/api/clients?${q}`).then((r) => r.json()),
+        fetch(`/api/invoices/banks?${q}`).then((r) => r.json()),
+        fetch(`/api/invoices/signatures?${q}`).then((r) => r.json()),
+        fetch(`/api/invoices/numbering?${q}${issueDate ? `&date=${issueDate}` : ''}`).then((r) => r.json()),
+      ]);
+      setClients(cl?.clients ?? []);
+      setBanks(bk?.banks ?? []);
+      setSignatures(sg?.signatures ?? []);
+      setPreviewNumber(nm?.preview || '');
+      const n = nm?.numbering;
+      setNumberingHint(n ? `${n.pattern} · ${n.prefix}` : '');
+    } catch {}
+  };
+
+  useEffect(() => {
+    const companyId = form.companyId || activeCompanyId;
+    if (showForm && companyId) loadCatalog(companyId, form.issueDate);
+  }, [showForm, form.companyId, form.issueDate, activeCompanyId]);
+
   const filtered = useMemo(() => {
     return invoices.filter(inv => {
       if (filterType && inv.type !== filterType) return false;
@@ -118,64 +153,127 @@ export default function InvoicesPage() {
     setShowForm(true);
   };
 
+  const invoiceToForm = (inv: any, extras: Partial<InvoiceIssueForm> = {}): InvoiceIssueForm => ({
+    ...EMPTY_FORM,
+    companyId: inv.companyId || activeCompanyId || companies[0]?.id || '',
+    type: inv.type || 'RECEIVABLE',
+    clientId: inv.clientId || '',
+    counterpartyName: inv.contactName || '',
+    contactEmail: inv.contactEmail || '',
+    contactPhone: inv.contactPhone || '',
+    contactAddress: inv.contactAddress || '',
+    contactExtra: inv.contactExtra || '',
+    number: inv.number || '',
+    numberMode: 'manual',
+    issueDate: dateOnlyIso(inv.issueDate),
+    dueDate: inv.dueDate ? dateOnlyIso(inv.dueDate) : '',
+    currency: inv.currency || 'USD',
+    altCurrency: inv.altCurrency || '',
+    exchangeRate: inv.exchangeRate ? String(inv.exchangeRate) : '',
+    exchangeRateDate: inv.exchangeRateDate ? dateOnlyIso(inv.exchangeRateDate) : '',
+    exchangeRateSource: inv.exchangeRateSource || '',
+    bankAccountId: inv.bankAccountId || '',
+    signatureId: inv.signatureId || '',
+    signatureImage: inv.signatureImage || '',
+    taxRate: String(inv.taxRate ?? 0),
+    notes: inv.notes || '',
+    relatedInvoiceId: inv.relatedInvoiceId || '',
+    items: (inv.items && inv.items.length > 0)
+      ? inv.items.map((it: any) => ({ description: it.description || '', quantity: it.quantity || 1, unitPrice: it.unitPrice || 0 }))
+      : [{ description: '', quantity: 1, unitPrice: 0 }],
+    ...extras,
+  });
+
   const openEdit = (inv: any) => {
     setEditingId(inv.id);
-    setForm({
-      companyId: inv.companyId || '',
-      type: inv.type || 'RECEIVABLE',
-      counterpartyName: inv.contactName || '',
-      contactEmail: inv.contactEmail || '',
-      contactPhone: inv.contactPhone || '',
-      contactAddress: inv.contactAddress || '',
-      contactExtra: inv.contactExtra || '',
-      issueDate: dateOnlyIso(inv.issueDate),
-      dueDate: inv.dueDate ? dateOnlyIso(inv.dueDate) : '',
-      currency: inv.currency || 'USD',
-      altCurrency: inv.altCurrency || '',
-      exchangeRate: inv.exchangeRate ? String(inv.exchangeRate) : '',
-      taxRate: String(inv.taxRate ?? 0),
-      notes: inv.notes || '',
-      relatedInvoiceId: inv.relatedInvoiceId || '',
-      items: (inv.items && inv.items.length > 0)
-        ? inv.items.map((it: any) => ({ description: it.description || '', quantity: it.quantity || 1, unitPrice: it.unitPrice || 0 }))
-        : [{ description: '', quantity: 1, unitPrice: 0 }],
-    });
+    setForm(invoiceToForm(inv, { numberMode: 'manual' }));
     setShowForm(true);
   };
 
-  // Open new credit/debit note referencing an existing invoice
   const openNote = (inv: any, noteType: 'CREDIT_NOTE' | 'DEBIT_NOTE') => {
     setEditingId(null);
-    setForm({
-      ...EMPTY_FORM,
-      companyId: inv.companyId || activeCompanyId || companies[0]?.id || '',
+    setForm(invoiceToForm(inv, {
       type: noteType,
       relatedInvoiceId: inv.id,
-      counterpartyName: inv.contactName || '',
-      contactEmail: inv.contactEmail || '',
-      contactPhone: inv.contactPhone || '',
-      contactAddress: inv.contactAddress || '',
-      contactExtra: inv.contactExtra || '',
-      currency: inv.currency || 'USD',
-      altCurrency: inv.altCurrency || '',
-      exchangeRate: inv.exchangeRate ? String(inv.exchangeRate) : '',
-      taxRate: String(inv.taxRate ?? 0),
-      items: (inv.items && inv.items.length > 0)
-        ? inv.items.map((it: any) => ({ description: it.description || '', quantity: it.quantity || 1, unitPrice: it.unitPrice || 0 }))
-        : [{ description: '', quantity: 1, unitPrice: 0 }],
-    });
+      number: '',
+      numberMode: 'auto',
+    }));
     setShowForm(true);
+  };
+
+  const createClient = async (draft: { name: string; email: string; phone: string; address: string; extra: string }) => {
+    const companyId = form.companyId || activeCompanyId;
+    if (!companyId || !draft.name.trim()) return;
+    const res = await fetch('/api/clients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, ...draft }),
+    });
+    const d = await res.json();
+    if (!d?.client) return;
+    const party = clientToInvoiceParty(d.client);
+    setClients((prev) => [...prev, d.client].sort((a, b) => String(a.name).localeCompare(String(b.name))));
+    setForm({
+      ...form,
+      clientId: d.client.id,
+      counterpartyName: party.contactName,
+      contactEmail: party.contactEmail,
+      contactPhone: party.contactPhone,
+      contactAddress: party.contactAddress,
+      contactExtra: party.contactExtra,
+    });
+  };
+
+  const createBank = async (draft: { label: string; bankName: string; bankAddress: string; accountNumber: string; routingNumber: string }) => {
+    const companyId = form.companyId || activeCompanyId;
+    if (!companyId || !draft.bankName.trim()) return;
+    const res = await fetch('/api/invoices/banks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, ...draft }),
+    });
+    const d = await res.json();
+    if (!d?.bank) return;
+    setBanks((prev) => [...prev, d.bank]);
+    setForm({ ...form, bankAccountId: d.bank.id });
+  };
+
+  const createSignature = async () => {
+    const companyId = form.companyId || activeCompanyId;
+    if (!companyId || !form.signatureImage) return;
+    const res = await fetch('/api/invoices/signatures', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyId,
+        name: form.counterpartyName ? `Firma` : 'Firma',
+        imageUrl: form.signatureImage,
+      }),
+    });
+    const d = await res.json();
+    if (!d?.signature) return;
+    setSignatures((prev) => [...prev, d.signature]);
+    setForm({ ...form, signatureId: d.signature.id, signatureImage: d.signature.imageUrl || form.signatureImage });
   };
 
   const handleSubmit = async () => {
     const compId = form.companyId || activeCompanyId || companies[0]?.id;
     if (!compId) return;
+    const numberMode = editingId ? 'manual' : form.numberMode;
     const payload: any = {
       ...form,
       companyId: compId,
+      numberMode,
+      number: numberMode === 'auto' ? (previewNumber || form.number) : form.number,
       taxRate: parseFloat(form.taxRate) || 0,
       altCurrency: form.altCurrency || null,
       exchangeRate: parseFloat(form.exchangeRate) || null,
+      exchangeRateDate: form.exchangeRateDate || null,
+      exchangeRateSource: form.exchangeRateSource || null,
+      clientId: form.clientId || null,
+      bankAccountId: form.bankAccountId || null,
+      signatureId: form.signatureId || null,
+      signatureImage: form.signatureImage || null,
       items: form.items.filter(i => i.description),
     };
     if (editingId) {
@@ -446,7 +544,7 @@ export default function InvoicesPage() {
       {/* Create / Edit Form Modal - NO click-outside-close */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold">{editingId ? 'Editar Factura' : L(ml('New Invoice', 'Nueva Factura', 'Nova Fatura'))}</h3>
               <button onClick={() => { setShowForm(false); setEditingId(null); }}><X className="w-5 h-5" /></button>
@@ -475,29 +573,26 @@ export default function InvoicesPage() {
                   {INVOICE_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">{L(ml('Second currency (PDF)','Segunda moneda (PDF)','Segunda moeda (PDF)'))}</label>
-                  <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.altCurrency} onChange={e => setForm({ ...form, altCurrency: e.target.value })}>
-                    <option value="">{L(ml('None','Ninguna','Nenhuma'))}</option>
-                    {INVOICE_CURRENCIES.filter((c) => c !== form.currency).map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">1 {form.currency} =</label>
-                  <input className="w-full border rounded-lg px-3 py-2 text-sm" type="number" min="0" step="0.0001" placeholder={form.altCurrency || '—'} disabled={!form.altCurrency} value={form.exchangeRate} onChange={e => setForm({ ...form, exchangeRate: e.target.value })} />
-                </div>
-              </div>
+              <InvoiceIssueFields
+                form={form}
+                setForm={setForm}
+                locale={locale}
+                clients={clients}
+                banks={banks}
+                signatures={signatures}
+                previewNumber={previewNumber}
+                numberingHint={numberingHint}
+                onCreateClient={createClient}
+                onCreateBank={createBank}
+                onCreateSignature={createSignature}
+                showNewClient={showNewClient}
+                setShowNewClient={setShowNewClient}
+                showNewBank={showNewBank}
+                setShowNewBank={setShowNewBank}
+              />
               {form.altCurrency && parseFloat(form.exchangeRate) > 0 ? (
                 <p className="text-xs text-teal-700">{L(ml('The PDF will include two documents, one per currency.','El PDF incluirá dos documentos, uno por moneda.','O PDF incluirá dois documentos, um por moeda.'))}</p>
               ) : null}
-              <div className="grid grid-cols-2 gap-3">
-                <input className="border rounded-lg px-3 py-2 text-sm" placeholder="Cliente/Proveedor" value={form.counterpartyName} onChange={e => setForm({ ...form, counterpartyName: e.target.value })} />
-                <input className="border rounded-lg px-3 py-2 text-sm" placeholder="Email contacto" value={form.contactEmail} onChange={e => setForm({ ...form, contactEmail: e.target.value })} />
-              </div>
-              <input className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Teléfono (To)" value={form.contactPhone} onChange={e => setForm({ ...form, contactPhone: e.target.value })} />
-              <textarea className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Dirección (To)" value={form.contactAddress} onChange={e => setForm({ ...form, contactAddress: e.target.value })} />
-              <input className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="UEI / extra (To)" value={form.contactExtra} onChange={e => setForm({ ...form, contactExtra: e.target.value })} />
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Emisi&oacute;n</label>

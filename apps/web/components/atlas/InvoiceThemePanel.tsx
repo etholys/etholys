@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Palette, X, Upload } from 'lucide-react';
 import type { InvoiceTheme, InvoiceTableStyle, InvoiceTableLayout } from '@/lib/atlas/invoice-theme';
+import type { InvoiceNumbering } from '@/lib/atlas/invoice-numbering';
+import { DEFAULT_INVOICE_NUMBERING, formatInvoiceNumber } from '@/lib/atlas/invoice-numbering';
 
 type ML = { es: string; pt: string; en: string };
 
@@ -112,16 +114,23 @@ export default function InvoiceThemePanel({
   const L = (m: ML) => m[locale] || m.en;
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<InvoiceTheme | null>(null);
+  const [numbering, setNumbering] = useState<InvoiceNumbering>({ ...DEFAULT_INVOICE_NUMBERING });
+  const [numPreview, setNumPreview] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
     if (!open || !companyId) return;
     let cancelled = false;
-    fetch(`/api/invoices/theme?companyId=${encodeURIComponent(companyId)}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (!cancelled && d?.theme) setTheme(d.theme);
+    Promise.all([
+      fetch(`/api/invoices/theme?companyId=${encodeURIComponent(companyId)}`).then((r) => r.json()),
+      fetch(`/api/invoices/numbering?companyId=${encodeURIComponent(companyId)}`).then((r) => r.json()),
+    ])
+      .then(([themeData, numData]) => {
+        if (cancelled) return;
+        if (themeData?.theme) setTheme(themeData.theme);
+        if (numData?.numbering) setNumbering(numData.numbering);
+        if (numData?.preview) setNumPreview(numData.preview);
       })
       .catch(() => {});
     return () => {
@@ -147,6 +156,18 @@ export default function InvoiceThemePanel({
       const d = await res.json();
       if (!res.ok) throw new Error(d?.error || 'save');
       setTheme(d.theme);
+      try {
+        const numRes = await fetch('/api/invoices/numbering', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyId, numbering }),
+        });
+        const numData = await numRes.json();
+        if (numData?.numbering) {
+          setNumbering(numData.numbering);
+          setNumPreview(formatInvoiceNumber(numData.numbering, numData.numbering.nextSeq));
+        }
+      } catch {}
       setMsg(L({ en: 'Saved', es: 'Guardado', pt: 'Guardado' }));
     } catch {
       setMsg(L({ en: 'Could not save', es: 'No se pudo guardar', pt: 'Não foi possível guardar' }));
@@ -204,6 +225,40 @@ export default function InvoiceThemePanel({
                   pt: 'Usar modelo Rural Commerce',
                 })}
               </button>
+              <div className="space-y-2 rounded-xl border p-3">
+                <p className="text-xs font-semibold text-gray-500">
+                  {L({ en: 'Invoice numbering', es: 'Numeración de facturas', pt: 'Numeração de faturas' })}
+                </p>
+                <p className="text-[11px] text-gray-400">
+                  {L({
+                    en: 'Tokens: {PREFIX} {YYYY} {YY} {MM} {DD} {SEQ}. Example RC: INV-{YY}{SEQ} → INV-2608097.',
+                    es: 'Tokens: {PREFIX} {YYYY} {YY} {MM} {DD} {SEQ}. Ejemplo RC: INV-{YY}{SEQ} → INV-2608097.',
+                    pt: 'Tokens: {PREFIX} {YYYY} {YY} {MM} {DD} {SEQ}. Exemplo RC: INV-{YY}{SEQ} → INV-2608097.',
+                  })}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-gray-500">
+                    {L({ en: 'Prefix', es: 'Prefijo', pt: 'Prefixo' })}
+                    <input className="mt-1 w-full rounded-lg border px-3 py-2 font-mono text-sm" value={numbering.prefix} onChange={(e) => setNumbering({ ...numbering, prefix: e.target.value.toUpperCase() })} />
+                  </label>
+                  <label className="text-xs text-gray-500">
+                    {L({ en: 'Next sequence', es: 'Próxima secuencia', pt: 'Próxima sequência' })}
+                    <input className="mt-1 w-full rounded-lg border px-3 py-2 font-mono text-sm" type="number" min={1} value={numbering.nextSeq} onChange={(e) => setNumbering({ ...numbering, nextSeq: Math.max(1, parseInt(e.target.value, 10) || 1) })} />
+                  </label>
+                </div>
+                <label className="text-xs text-gray-500">
+                  {L({ en: 'Pattern', es: 'Formato', pt: 'Formato' })}
+                  <input className="mt-1 w-full rounded-lg border px-3 py-2 font-mono text-sm" value={numbering.pattern} onChange={(e) => setNumbering({ ...numbering, pattern: e.target.value })} />
+                </label>
+                <label className="text-xs text-gray-500">
+                  {L({ en: 'Sequence padding', es: 'Ceros del número', pt: 'Zeros da sequência' })}
+                  <input className="mt-1 w-full rounded-lg border px-3 py-2 font-mono text-sm" type="number" min={1} max={8} value={numbering.seqPadding} onChange={(e) => setNumbering({ ...numbering, seqPadding: Math.min(8, Math.max(1, parseInt(e.target.value, 10) || 4)) })} />
+                </label>
+                <p className="font-mono text-xs text-teal-700">
+                  {L({ en: 'Next number', es: 'Próximo número', pt: 'Próximo número' })}:{' '}
+                  {numPreview || formatInvoiceNumber(numbering, numbering.nextSeq)}
+                </p>
+              </div>
               {theme && (
                 <>
                   <div
@@ -225,7 +280,7 @@ export default function InvoiceThemePanel({
                         </span>
                       )}
                       <span className="text-[11px] font-semibold" style={{ color: theme.bannerText }}>
-                        INV-0001
+                        {numPreview || formatInvoiceNumber(numbering, numbering.nextSeq)}
                       </span>
                     </div>
                   </div>

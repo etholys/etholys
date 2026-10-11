@@ -188,6 +188,8 @@ model Company {
   entityType                  String?
   /// Pele do PDF de facturas (banner, logo, cores, tabela, letterhead). A estrutura do documento é fixa.
   invoiceThemeJson            Json?
+  /// Formato do número: prefix, pattern ({PREFIX}{YY}{MM}{SEQ}), padding, nextSeq.
+  invoiceNumberingJson        Json?
   /// Respostas do assistente de contexto (sector, comércio, metas) — aciona módulos e memória de IA; não substitui aconselhamento legal.
   contextSetupJson            Json?
   contextSetupAt              DateTime?
@@ -217,6 +219,8 @@ model Company {
   fundingOpportunityFeedbacks FundingOpportunityFeedback[]
   invitations                 Invitation[]
   invoices                    Invoice[]
+  invoiceBankAccounts         CompanyBankAccount[]
+  invoiceSignatures           CompanyInvoiceSignature[]
   leaveRequests               LeaveRequest[]
   museSuggestions             MuseSuggestion[]
   nexusNetworksAnchored       NexusNetwork[]               @relation("NexusNetworkAnchor")
@@ -1040,11 +1044,18 @@ model Invoice {
   contactPhone     String?
   contactAddress   String?
   contactExtra     String?
+  clientId         String?
   currency         String        @default("USD")
   /// Segunda moeda no PDF (documento espelhado com exchangeRate).
   altCurrency      String?
   /// Unidades da altCurrency por 1 unidade da currency.
   exchangeRate     Float?
+  exchangeRateDate DateTime?
+  exchangeRateSource String?
+  bankAccountId    String?
+  signatureId      String?
+  /// Assinatura deste documento (data URL), se desenhada na emissão.
+  signatureImage   String?
   subtotal         Float         @default(0)
   taxRate          Float         @default(0)
   taxAmount        Float         @default(0)
@@ -1057,11 +1068,52 @@ model Invoice {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   relatedInvoiceId String?
-  company          Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  relatedInvoice   Invoice?      @relation("InvoiceNotes", fields: [relatedInvoiceId], references: [id])
-  creditDebitNotes Invoice[]     @relation("InvoiceNotes")
-  supplier         Supplier?     @relation(fields: [supplierId], references: [id])
+  company          Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client           Client?                    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  bankAccount      CompanyBankAccount?        @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  invoiceSignature CompanyInvoiceSignature?   @relation(fields: [signatureId], references: [id], onDelete: SetNull)
+  relatedInvoice   Invoice?                   @relation("InvoiceNotes", fields: [relatedInvoiceId], references: [id])
+  creditDebitNotes Invoice[]                  @relation("InvoiceNotes")
+  supplier         Supplier?                  @relation(fields: [supplierId], references: [id])
   items            InvoiceItem[]
+}
+
+model CompanyBankAccount {
+  id            String    @id @default(cuid())
+  companyId     String
+  label         String
+  bankName      String
+  bankAddress   String?
+  accountLabel  String    @default("IBAN / Account Number")
+  accountNumber String?
+  routingLabel  String    @default("ABA / Routing Number")
+  routingNumber String?
+  currency      String?
+  isDefault     Boolean   @default(false)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices      Invoice[]
+
+  @@index([companyId])
+}
+
+model CompanyInvoiceSignature {
+  id          String    @id @default(cuid())
+  companyId   String
+  name        String
+  title       String?
+  companyLine String?
+  imageUrl    String?
+  isDefault   Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices    Invoice[]
+
+  @@index([companyId])
 }
 
 model InvoiceItem {
@@ -1259,7 +1311,9 @@ model Client {
   city         String?
   country      String?
   taxId        String?
+  extra        String?
   type         String              @default("company")
+  invoices     Invoice[]
   segment      String?
   rating       Int?
   notes        String?

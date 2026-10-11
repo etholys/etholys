@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic';
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { nextInvoiceNumber } from '@/lib/atlas/invoice-ops';
+import { parseDateOnlyToUtc } from '@/lib/atlas/date-only';
+import { takeInvoiceNumbers } from '@/lib/atlas/invoice-issue';
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
 
     const invoices = await prisma.invoice.findMany({
       where,
-      include: { company: true, supplier: true, items: { orderBy: { order: 'asc' } }, relatedInvoice: { select: { id: true, number: true, type: true } }, creditDebitNotes: { select: { id: true, number: true, type: true, total: true, status: true }, where: { isActive: true } } },
+      include: { company: true, supplier: true, client: true, bankAccount: true, invoiceSignature: true, items: { orderBy: { order: 'asc' } }, relatedInvoice: { select: { id: true, number: true, type: true } }, creditDebitNotes: { select: { id: true, number: true, type: true, total: true, status: true }, where: { isActive: true } } },
       orderBy: { createdAt: 'desc' },
     });
     return NextResponse.json({ invoices });
@@ -39,8 +40,20 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     if (!tenant.companyIds.includes(body.companyId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    const count = await prisma.invoice.count({ where: { companyId: body.companyId } });
-    const number = nextInvoiceNumber(body.type, count);
+    const numberMode = body.numberMode === 'manual' ? 'manual' : 'auto';
+    if (numberMode === 'manual' && String(body.number || '').trim()) {
+      const clash = await prisma.invoice.findFirst({
+        where: { companyId: body.companyId, number: String(body.number).trim(), isActive: true },
+        select: { id: true },
+      });
+      if (clash) return NextResponse.json({ error: 'Ese número de factura ya existe' }, { status: 409 });
+    }
+    const [number] = await takeInvoiceNumbers({
+      companyId: body.companyId,
+      count: 1,
+      when: body.issueDate,
+      manualNumber: numberMode === 'manual' ? body.number : null,
+    });
 
     const items = body.items || [];
     const subtotal = items.reduce((s: number, i: any) => s + (i.quantity || 1) * (i.unitPrice || 0), 0);
@@ -61,9 +74,15 @@ export async function POST(req: NextRequest) {
         contactPhone: body.contactPhone || '',
         contactAddress: body.contactAddress || '',
         contactExtra: body.contactExtra || '',
+        clientId: body.clientId || null,
         currency: body.currency || 'USD',
         altCurrency: body.altCurrency || null,
         exchangeRate: body.exchangeRate ? Number(body.exchangeRate) : null,
+        exchangeRateDate: body.exchangeRateDate ? parseDateOnlyToUtc(body.exchangeRateDate) : null,
+        exchangeRateSource: body.exchangeRateSource || null,
+        bankAccountId: body.bankAccountId || null,
+        signatureId: body.signatureId || null,
+        signatureImage: body.signatureImage || null,
         subtotal,
         taxRate: body.taxRate || 0,
         taxAmount,
@@ -114,6 +133,17 @@ export async function PUT(req: NextRequest) {
     if (body.exchangeRate !== undefined) {
       const rate = Number(body.exchangeRate);
       updateData.exchangeRate = rate > 0 ? rate : null;
+    }
+    if (body.exchangeRateDate !== undefined) {
+      updateData.exchangeRateDate = body.exchangeRateDate ? parseDateOnlyToUtc(body.exchangeRateDate) : null;
+    }
+    if (body.exchangeRateSource !== undefined) updateData.exchangeRateSource = body.exchangeRateSource || null;
+    if (body.clientId !== undefined) updateData.clientId = body.clientId || null;
+    if (body.bankAccountId !== undefined) updateData.bankAccountId = body.bankAccountId || null;
+    if (body.signatureId !== undefined) updateData.signatureId = body.signatureId || null;
+    if (body.signatureImage !== undefined) updateData.signatureImage = body.signatureImage || null;
+    if (body.number && typeof body.number === 'string' && body.number.trim()) {
+      updateData.number = body.number.trim();
     }
     if (body.taxRate !== undefined) updateData.taxRate = body.taxRate;
     if (body.issueDate !== undefined) updateData.issueDate = new Date(body.issueDate);

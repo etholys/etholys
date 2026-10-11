@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { nextInvoiceNumber, planInvoiceDuplicates } from '@/lib/atlas/invoice-ops';
+import { planInvoiceDuplicates } from '@/lib/atlas/invoice-ops';
+import { takeInvoiceNumbers } from '@/lib/atlas/invoice-issue';
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +23,11 @@ export async function POST(req: NextRequest) {
     }
 
     const plans = planInvoiceDuplicates(source, body.months ?? 1);
-    const startCount = await prisma.invoice.count({ where: { companyId: source.companyId } });
+    const numbers = await takeInvoiceNumbers({
+      companyId: source.companyId,
+      count: plans.length,
+      when: plans[0]?.issueDate,
+    });
 
     const created = await prisma.$transaction(
       plans.map((plan, i) =>
@@ -33,16 +38,22 @@ export async function POST(req: NextRequest) {
             projectId: source.projectId,
             type: source.type,
             status: 'DRAFT',
-            number: nextInvoiceNumber(source.type, startCount + i),
+            number: numbers[i] || `${source.number}-${plan.offset}`,
             description: plan.description,
             contactName: source.contactName,
             contactEmail: source.contactEmail,
             contactPhone: source.contactPhone,
             contactAddress: source.contactAddress,
             contactExtra: source.contactExtra,
+            clientId: source.clientId,
             currency: source.currency,
             altCurrency: source.altCurrency,
             exchangeRate: source.exchangeRate,
+            exchangeRateDate: source.exchangeRateDate,
+            exchangeRateSource: source.exchangeRateSource,
+            bankAccountId: source.bankAccountId,
+            signatureId: source.signatureId,
+            signatureImage: source.signatureImage,
             subtotal: source.subtotal,
             taxRate: source.taxRate,
             taxAmount: source.taxAmount,

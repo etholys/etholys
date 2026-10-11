@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { buildInvoicePdfHtml } from '@/lib/atlas/invoice-pdf-html';
 import { loadInvoiceTheme } from '@/lib/atlas/invoice-theme-store';
+import { bankAccountToPaymentRows } from '@/lib/atlas/invoice-ops';
 
 function resolvePdfImage(src: string, baseUrl: string): string {
   const s = String(src || '').trim();
@@ -42,7 +43,13 @@ export async function GET(req: Request) {
 
     const invoice = await prisma.invoice.findUnique({
       where: { id: invoiceId },
-      include: { items: { orderBy: { order: 'asc' } }, company: true, supplier: true },
+      include: {
+        items: { orderBy: { order: 'asc' } },
+        company: true,
+        supplier: true,
+        bankAccount: true,
+        invoiceSignature: true,
+      },
     });
     if (!invoice || !tenant.companyIds.includes(invoice.companyId)) {
       return NextResponse.json({ error: 'Factura no encontrada' }, { status: 404 });
@@ -58,6 +65,12 @@ export async function GET(req: Request) {
         currency: invoice.currency,
         altCurrency: invoice.altCurrency,
         exchangeRate: invoice.exchangeRate,
+        exchangeRateDate: invoice.exchangeRateDate,
+        exchangeRateSource: invoice.exchangeRateSource,
+        paymentRows: bankAccountToPaymentRows(invoice.bankAccount),
+        signerName: invoice.invoiceSignature?.name,
+        signerTitle: invoice.invoiceSignature?.title,
+        signerCompany: invoice.invoiceSignature?.companyLine,
         subtotal: invoice.subtotal,
         taxRate: invoice.taxRate,
         taxAmount: invoice.taxAmount,
@@ -78,7 +91,10 @@ export async function GET(req: Request) {
       theme,
       bannerSrc: resolvePdfImage(theme.bannerUrl, baseUrl),
       logoSrc: resolvePdfImage(theme.logoUrl, baseUrl),
-      signatureSrc: resolvePdfImage(theme.signature.imageUrl, baseUrl),
+      signatureSrc: resolvePdfImage(
+        invoice.signatureImage || invoice.invoiceSignature?.imageUrl || theme.signature.imageUrl,
+        baseUrl,
+      ),
     });
 
     if (searchParams.get('html') === '1') {
