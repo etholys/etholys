@@ -34,7 +34,7 @@ export function WorkHotButton() {
   if (pathname === '/tasks' || pathname.startsWith('/tasks/')) return null;
 
   const label =
-    locale === 'es' ? 'Work — tareas' : locale === 'pt' ? 'Work — tarefas' : 'Work — tasks';
+    locale === 'es' ? 'eTask — tareas' : locale === 'pt' ? 'eTask — tarefas' : 'eTask — tasks';
 
   return (
     <Link
@@ -45,7 +45,7 @@ export function WorkHotButton() {
     >
       <CheckSquare className="h-5 w-5 shrink-0" />
       <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-semibold opacity-0 transition-all duration-200 group-hover:max-w-[9rem] group-hover:opacity-100">
-        Work
+        eTask
       </span>
     </Link>
   );

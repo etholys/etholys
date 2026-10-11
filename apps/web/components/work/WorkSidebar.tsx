@@ -1,16 +1,19 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { GROUP_COLORS } from './work-ui';
 import {
   AlertTriangle,
   Building2,
   CalendarRange,
+  ChevronDown,
   Folder,
   FolderKanban,
   LayoutDashboard,
   ListTodo,
+  Lock,
   PanelLeftClose,
   PanelLeft,
   Plus,
@@ -66,16 +69,26 @@ export function WorkSidebar({
   collapsed: boolean;
   onToggle: () => void;
   counts: { open: number; overdue: number; mine: number };
-  onCreateFolder: (input: { name: string; visibility: 'PERSONAL' | 'SHARED' }) => Promise<void>;
+  onCreateFolder: (input: { name: string; visibility: 'PERSONAL' | 'SHARED'; color?: string }) => Promise<void>;
   onShareFolder?: (folder: { id: string; name: string }) => void;
   t: (en: string, es: string, pt: string) => string;
 }) {
+  const [composerOpen, setComposerOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const [color, setColor] = useState<string>(GROUP_COLORS[0]);
   const [visibility, setVisibility] = useState<'PERSONAL' | 'SHARED'>('PERSONAL');
   const [creating, setCreating] = useState(false);
+  const [companyOpen, setCompanyOpen] = useState(false);
+  const composerRef = useRef<HTMLDivElement>(null);
 
-  const personalFolders = folders.filter((f) => f.ownerId === currentUserId && f.visibility === 'PERSONAL');
-  const otherFolders = folders.filter((f) => !personalFolders.some((p) => p.id === f.id));
+  useEffect(() => {
+    if (!composerOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!composerRef.current?.contains(e.target as Node)) setComposerOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [composerOpen]);
 
   const item = (
     active: boolean,
@@ -89,20 +102,20 @@ export function WorkSidebar({
     <div
       className={cn(
         'group flex w-full items-center gap-0.5 rounded-lg transition',
-        active ? 'bg-cyan-50 ring-1 ring-cyan-100' : 'hover:bg-slate-100/90',
+        active ? 'bg-teal-500/15' : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.06]',
       )}
     >
       <button
         type="button"
         onClick={onClick}
         className={cn(
-          'flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition',
-          active ? 'font-semibold text-cyan-900' : 'text-slate-600',
+          'flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition',
+          active ? 'font-semibold text-teal-800' : 'text-slate-600',
           collapsed && 'justify-center px-2',
         )}
         title={label}
       >
-        <span className={cn('shrink-0', active ? 'text-cyan-700' : 'text-slate-500')}>{icon}</span>
+        <span className={cn('shrink-0', active ? 'text-teal-700' : 'text-slate-500')}>{icon}</span>
         {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
         {!collapsed && badge != null && badge > 0 && (
           <span
@@ -124,16 +137,24 @@ export function WorkSidebar({
     if (!name || creating) return;
     setCreating(true);
     try {
-      await onCreateFolder({ name, visibility });
+      await onCreateFolder({ name, visibility, color });
       setDraft('');
+      setComposerOpen(false);
+      setVisibility('PERSONAL');
     } finally {
       setCreating(false);
     }
   };
 
+  const openComposer = () => {
+    if (collapsed) onToggle();
+    setComposerOpen(true);
+  };
+
   const folderRow = (f: WorkFolderRow) => {
     const isOwner = f.ownerId === currentUserId;
     const memberCount = f.members?.length ?? f._count?.members ?? 0;
+    const shared = f.visibility === 'SHARED' || memberCount > 0;
     const shareBtn =
       isOwner && onShareFolder ? (
         <button
@@ -142,19 +163,19 @@ export function WorkSidebar({
             e.stopPropagation();
             onShareFolder({ id: f.id, name: f.name });
           }}
-          className="mr-1 rounded-md p-1.5 text-slate-400 opacity-0 transition hover:bg-white hover:text-cyan-700 group-hover:opacity-100"
+          className="mr-1 rounded-md p-1 text-slate-400 opacity-0 transition hover:bg-white hover:text-teal-700 group-hover:opacity-100"
           title={t('Share', 'Compartir', 'Partilhar')}
         >
           <Share2 className="h-3.5 w-3.5" />
         </button>
-      ) : memberCount > 0 ? (
-        <span className="mr-2 text-[10px] font-medium text-slate-400">{memberCount}</span>
       ) : null;
     const icon = (
       <span className="relative inline-flex">
-        <Folder className="h-4 w-4" style={f.color ? { color: f.color } : undefined} />
-        {f.visibility === 'PERSONAL' && memberCount === 0 && (
-          <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-slate-400" title="Private" />
+        <Folder className="h-4 w-4" style={{ color: f.color || '#0d9488' }} />
+        {shared ? (
+          <Users className="absolute -bottom-1 -right-1.5 h-2.5 w-2.5 rounded-full bg-white text-slate-500" />
+        ) : (
+          <Lock className="absolute -bottom-1 -right-1.5 h-2.5 w-2.5 rounded-full bg-white text-slate-400" />
         )}
       </span>
     );
@@ -171,31 +192,25 @@ export function WorkSidebar({
   return (
     <aside
       className={cn(
-        'flex shrink-0 flex-col border-r border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50/80 transition-all',
-        collapsed ? 'w-[52px]' : 'w-[248px]',
+        'flex shrink-0 flex-col border-r border-slate-200/90 bg-slate-50/90 transition-all',
+        collapsed ? 'w-[52px]' : 'w-[232px]',
       )}
     >
-      <div className={cn('flex items-center border-b border-slate-100 px-2 py-2.5', collapsed ? 'justify-center' : 'justify-between')}>
-        {!collapsed && (
-          <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-            {t('Workspace', 'Espacio', 'Espaço')}
-          </p>
-        )}
+      <div className={cn('flex items-center px-2 py-2', collapsed ? 'justify-center' : 'justify-end')}>
         <button
           type="button"
           onClick={onToggle}
-          className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          className="rounded-md p-1.5 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700"
           aria-label="Toggle sidebar"
         >
           {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
         </button>
       </div>
 
-      <nav className="flex-1 space-y-4 overflow-y-auto p-2">
+      <nav className="flex-1 space-y-5 overflow-y-auto px-2 pb-3">
         <div className="space-y-0.5">
-          {item(nav.kind === 'dashboard', () => onNav({ kind: 'dashboard' }), <LayoutDashboard className="h-4 w-4" />, t('Dashboard', 'Panel', 'Painel'))}
-          {item(nav.kind === 'all', () => onNav({ kind: 'all' }), <ListTodo className="h-4 w-4" />, t('All tasks', 'Todas las tareas', 'Todas as tarefas'), counts.open)}
-          {item(nav.kind === 'mine', () => onNav({ kind: 'mine' }), <UserRound className="h-4 w-4" />, t('My tasks', 'Mis tareas', 'As minhas'), counts.mine)}
+          {item(nav.kind === 'dashboard', () => onNav({ kind: 'dashboard' }), <LayoutDashboard className="h-4 w-4" />, t('Home', 'Inicio', 'Início'))}
+          {item(nav.kind === 'mine', () => onNav({ kind: 'mine' }), <UserRound className="h-4 w-4" />, t('My work', 'Mi trabajo', 'O meu trabalho'), counts.mine)}
           {item(
             nav.kind === 'overdue',
             () => onNav({ kind: 'overdue' }),
@@ -205,141 +220,154 @@ export function WorkSidebar({
             undefined,
             'danger',
           )}
-          {item(nav.kind === 'company', () => onNav({ kind: 'company' }), <Building2 className="h-4 w-4" />, t('Company ops', 'Ops empresa', 'Ops empresa'))}
+          {item(nav.kind === 'all', () => onNav({ kind: 'all' }), <ListTodo className="h-4 w-4" />, t('Everything', 'Todo', 'Tudo'), counts.open)}
         </div>
 
         <div>
-          {!collapsed && (
-            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-              {t('My folders', 'Mis carpetas', 'As minhas pastas')}
-            </p>
-          )}
-          <div className="space-y-0.5">
-            {personalFolders.map((f) => folderRow(f))}
-            {!collapsed && personalFolders.length === 0 && (
-              <p className="px-2 py-1 text-[11px] text-slate-400">
-                {t('Private lists you own', 'Listas privadas tuyas', 'Listas privadas tuas')}
+          <div className={cn('mb-1 flex items-center', collapsed ? 'justify-center' : 'justify-between px-2')}>
+            {!collapsed && (
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                {t('Boards', 'Tableros', 'Quadros')}
               </p>
             )}
-          </div>
-        </div>
-
-        <div>
-          {!collapsed && (
-            <p className="mb-1 flex items-center gap-1 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-              <Users className="h-3 w-3" />
-              {t('Shared folders', 'Carpetas compartidas', 'Pastas partilhadas')}
-            </p>
-          )}
-          <div className="space-y-0.5">
-            {otherFolders.map((f) => folderRow(f))}
-            {!collapsed && otherFolders.length === 0 && (
-              <p className="px-2 py-1 text-[11px] text-slate-400">
-                {t('Invite people — Drive-style', 'Invita personas — estilo Drive', 'Convida pessoas — estilo Drive')}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {!collapsed && (
-          <div className="rounded-xl border border-dashed border-cyan-200/70 bg-cyan-50/30 p-2">
-            <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-800/70">
-              {t('New folder', 'Nueva carpeta', 'Nova pasta')}
-            </p>
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), void submitFolder())}
-              placeholder={t('Name…', 'Nombre…', 'Nome…')}
-              className="mb-1.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-cyan-400"
-            />
-            <div className="mb-1.5 flex gap-1">
+            <div className="relative" ref={composerRef}>
               <button
                 type="button"
-                onClick={() => setVisibility('PERSONAL')}
-                className={cn(
-                  'flex-1 rounded-md px-1.5 py-1 text-[10px] font-semibold',
-                  visibility === 'PERSONAL' ? 'bg-cyan-100 text-cyan-800' : 'bg-white text-slate-500',
-                )}
+                onClick={() => (composerOpen ? setComposerOpen(false) : openComposer())}
+                className="rounded-md p-1 text-slate-400 hover:bg-teal-50 hover:text-teal-700"
+                title={t('New board', 'Nuevo tablero', 'Novo quadro')}
+                aria-label={t('New board', 'Nuevo tablero', 'Novo quadro')}
               >
-                {t('Personal', 'Personal', 'Pessoal')}
+                <Plus className="h-3.5 w-3.5" />
               </button>
-              <button
-                type="button"
-                onClick={() => setVisibility('SHARED')}
-                className={cn(
-                  'flex-1 rounded-md px-1.5 py-1 text-[10px] font-semibold',
-                  visibility === 'SHARED' ? 'bg-cyan-100 text-cyan-800' : 'bg-white text-slate-500',
-                )}
-              >
-                {t('Team', 'Equipo', 'Equipa')}
-              </button>
+              {composerOpen && !collapsed && (
+                <div className="absolute right-0 top-8 z-40 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+                  <p className="mb-2 text-xs font-semibold text-slate-800">
+                    {t('New board', 'Nuevo tablero', 'Novo quadro')}
+                  </p>
+                  <input
+                    autoFocus
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void submitFolder();
+                      }
+                      if (e.key === 'Escape') setComposerOpen(false);
+                    }}
+                    placeholder={t('Name', 'Nombre', 'Nome')}
+                    className="mb-2 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-teal-500"
+                  />
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {GROUP_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setColor(c)}
+                        className={cn(
+                          'h-5 w-5 rounded-full ring-offset-2',
+                          color === c ? 'ring-2 ring-slate-800' : 'ring-0',
+                        )}
+                        style={{ backgroundColor: c }}
+                        aria-label={c}
+                      />
+                    ))}
+                  </div>
+                  <div className="mb-2 grid grid-cols-2 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setVisibility('PERSONAL')}
+                      className={cn(
+                        'rounded-md px-2 py-1 text-[11px] font-semibold',
+                        visibility === 'PERSONAL' ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-600',
+                      )}
+                    >
+                      {t('Only me', 'Solo yo', 'Só eu')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVisibility('SHARED')}
+                      className={cn(
+                        'rounded-md px-2 py-1 text-[11px] font-semibold',
+                        visibility === 'SHARED' ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-600',
+                      )}
+                    >
+                      {t('Share', 'Compartir', 'Partilhar')}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={creating || !draft.trim()}
+                    onClick={() => void submitFolder()}
+                    className="w-full rounded-lg bg-teal-700 px-2 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-40"
+                  >
+                    {t('Create', 'Crear', 'Criar')}
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
+          <div className="space-y-0.5">
+            {folders.map((f) => folderRow(f))}
+            {!collapsed && folders.length === 0 && (
+              <p className="px-2 py-1 text-[11px] leading-snug text-slate-400">
+                {t(
+                  'A board is just a place to group work — private or shared.',
+                  'Un tablero es solo un lugar para agrupar trabajo — privado o compartido.',
+                  'Um quadro é só um sítio para agrupar trabalho — privado ou partilhado.',
+                )}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div>
+          {!collapsed ? (
             <button
               type="button"
-              disabled={creating || !draft.trim()}
-              onClick={() => void submitFolder()}
-              className="inline-flex w-full items-center justify-center gap-1 rounded-lg bg-slate-900 px-2 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-40"
+              onClick={() => setCompanyOpen((v) => !v)}
+              className="mb-1 flex w-full items-center justify-between px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 hover:text-slate-600"
             >
-              <Plus className="h-3 w-3" />
-              {t('Create', 'Crear', 'Criar')}
+              {t('Company', 'Empresa', 'Empresa')}
+              <ChevronDown className={cn('h-3 w-3 transition', companyOpen && 'rotate-180')} />
             </button>
-          </div>
-        )}
-
-        <div>
-          {!collapsed && (
-            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-              {t('Departments', 'Sectores', 'Setores')}
-            </p>
+          ) : null}
+          {(collapsed || companyOpen) && (
+            <div className="space-y-0.5">
+              {item(
+                nav.kind === 'company',
+                () => onNav({ kind: 'company' }),
+                <Building2 className="h-4 w-4" />,
+                t('Operations', 'Operaciones', 'Operações'),
+              )}
+              {departments.map((d) =>
+                item(
+                  nav.kind === 'department' && nav.id === d.id,
+                  () => onNav({ kind: 'department', id: d.id, name: d.name }),
+                  <FolderKanban className="h-4 w-4" />,
+                  d.name,
+                ),
+              )}
+              {projects.slice(0, 30).map((p) =>
+                item(
+                  nav.kind === 'project' && nav.id === p.id,
+                  () => onNav({ kind: 'project', id: p.id, name: p.name }),
+                  <CalendarRange className="h-4 w-4" />,
+                  p.name,
+                  p._count?.tasks,
+                ),
+              )}
+            </div>
           )}
-          <div className="space-y-0.5">
-            {departments.length === 0 && !collapsed && (
-              <div className="px-2 py-1">
-                <p className="text-[11px] text-slate-400">
-                  {t('Company structure (admin)', 'Estructura (admin)', 'Estrutura (admin)')}
-                </p>
-                <Link href="/hub/work/settings" className="mt-1 inline-block text-[11px] font-semibold text-cyan-700 hover:underline">
-                  {t('Manage in settings', 'Gestionar en ajustes', 'Gerir nas definições')}
-                </Link>
-              </div>
-            )}
-            {departments.map((d) =>
-              item(
-                nav.kind === 'department' && nav.id === d.id,
-                () => onNav({ kind: 'department', id: d.id, name: d.name }),
-                <FolderKanban className="h-4 w-4" />,
-                d.name,
-              ),
-            )}
-          </div>
-        </div>
-
-        <div>
-          {!collapsed && (
-            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-              {t('Projects', 'Proyectos', 'Projetos')}
-            </p>
-          )}
-          <div className="space-y-0.5">
-            {projects.slice(0, 30).map((p) =>
-              item(
-                nav.kind === 'project' && nav.id === p.id,
-                () => onNav({ kind: 'project', id: p.id, name: p.name }),
-                <CalendarRange className="h-4 w-4" />,
-                p.name,
-                p._count?.tasks,
-              ),
-            )}
-          </div>
         </div>
       </nav>
 
-      <div className="border-t border-slate-100 p-2">
+      <div className="border-t border-slate-200/80 p-2">
         <Link
           href="/hub/work/settings"
           className={cn(
-            'flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-slate-600 transition hover:bg-slate-100',
+            'flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] text-slate-600 transition hover:bg-slate-200/60',
             collapsed && 'justify-center px-2',
           )}
           title={t('Settings', 'Ajustes', 'Definições')}

@@ -24,7 +24,7 @@ export const WORKSPACE_SYSTEM_DISPLAY: Record<WorkspaceSystemKey, string> = {
 export const WORKSPACE_TOOL_DISPLAY: Record<WorkspaceToolKey, string> = {
   ADVISOR: 'Advisor',
   STUDIO: 'Studio',
-  WORK: 'Work',
+  WORK: 'eTask',
   CHORUS: 'Chorus',
 };
 

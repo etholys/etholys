@@ -168,20 +168,20 @@ export default function HubWorkSettingsPage() {
               className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
             >
               <ArrowLeft className="h-4 w-4" />
-              Work
+              eTask
             </Link>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-teal-700 text-white">
               <Settings className="h-5 w-5" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-lg font-bold text-slate-900">
-                {t('Work settings', 'Ajustes de Work', 'Definições Work')}
+                {t('eTask settings', 'Ajustes de eTask', 'Definições eTask')}
               </h1>
               <p className="truncate text-xs text-slate-500">
                 {t(
-                  'Departments, board sections and links — without leaving Work',
-                  'Sectores, secciones del tablero y atajos — sin salir de Work',
-                  'Setores, secções do quadro e atalhos — sem sair do Work',
+                  'Departments, board sections and links — without leaving eTask',
+                  'Sectores, secciones del tablero y atajos — sin salir de eTask',
+                  'Setores, secções do quadro e atalhos — sem sair do eTask',
                 )}
               </p>
             </div>
@@ -200,7 +200,7 @@ export default function HubWorkSettingsPage() {
         {!activeCompanyId && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {t(
-              'Select an active company in the Hub to manage Work structure.',
+              'Select an active company in the Hub to manage eTask.',
               'Selecciona una empresa activa en el Hub para gestionar la estructura.',
               'Seleciona uma empresa ativa no Hub para gerir a estrutura.',
             )}
@@ -223,13 +223,13 @@ export default function HubWorkSettingsPage() {
               </h2>
               <p className="text-sm text-cyan-900/80">
                 {t(
-                  'Anyone can create folders from the Work sidebar — Personal (only you) or Team (shared with the company). No admin required.',
-                  'Cualquiera crea carpetas desde la barra de Work — Personal (solo tú) o Equipo (empresa). Sin ser admin.',
-                  'Qualquer pessoa cria pastas na barra do Work — Pessoal (só tu) ou Equipa (empresa). Sem ser admin.',
+                  'Anyone can create a board from the eTask sidebar — only you, or shared. No admin required.',
+                  'Cualquiera crea un tablero desde la barra de eTask — solo tú, o compartido. Sin ser admin.',
+                  'Qualquer pessoa cria um quadro na barra do eTask — só tu, ou partilhado. Sem ser admin.',
                 )}
               </p>
               <Link href="/hub/work" className="mt-3 inline-flex text-sm font-semibold text-cyan-800 hover:underline">
-                {t('Open Work →', 'Abrir Work →', 'Abrir Work →')}
+                {t('Open eTask →', 'Abrir eTask →', 'Abrir eTask →')}
               </Link>
             </section>
 
@@ -242,9 +242,9 @@ export default function HubWorkSettingsPage() {
                   </h2>
                   <p className="mt-1 text-xs text-slate-500">
                     {t(
-                      'Same company departments used across Etholys. They appear in the Work sidebar.',
-                      'Los mismos sectores de la empresa en Etholys. Aparecen en la barra de Work.',
-                      'Os mesmos setores da empresa no Etholys. Aparecem na barra do Work.',
+                      'Same company departments used across Etholys. They appear in the eTask sidebar.',
+                      'Los mismos sectores de la empresa en Etholys. Aparecen en la barra de eTask.',
+                      'Os mesmos setores da empresa no Etholys. Aparecem na barra do eTask.',
                     )}
                   </p>
                 </div>
@@ -399,9 +399,9 @@ export default function HubWorkSettingsPage() {
               </h2>
               <p className="mb-4 text-xs text-slate-500">
                 {t(
-                  'Projects stay in SIEP. Create or edit them there; they show in the Work sidebar.',
-                  'Los proyectos se gestionan en SIEP. Créalos allí; aparecen en la barra de Work.',
-                  'Os projetos gerem-se no SIEP. Cria-os lá; aparecem na barra do Work.',
+                  'Projects stay in SIEP. Create or edit them there; they show in the eTask sidebar.',
+                  'Los proyectos se gestionan en SIEP. Créalos allí; aparecen en la barra de eTask.',
+                  'Os projetos gerem-se no SIEP. Cria-os lá; aparecem na barra do eTask.',
                 )}
               </p>
               <ul className="mb-4 space-y-1">
@@ -437,9 +437,9 @@ export default function HubWorkSettingsPage() {
                 </div>
                 <p className="mt-2 text-sm text-slate-600">
                   {t(
-                    'Who can open Work and other Etholys systems.',
-                    'Quién puede abrir Work y otros sistemas.',
-                    'Quem pode abrir Work e outros sistemas.',
+                    'Who can open eTask and other Etholys systems.',
+                    'Quién puede abrir eTask y otros sistemas.',
+                    'Quem pode abrir eTask e outros sistemas.',
                   )}
                 </p>
               </Link>

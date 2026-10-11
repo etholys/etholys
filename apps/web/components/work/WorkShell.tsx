@@ -291,7 +291,7 @@ export default function WorkShell() {
     if (nav.kind === 'department') return nav.name;
     if (nav.kind === 'project') return nav.name;
     if (nav.kind === 'folder') return nav.name;
-    return 'Work';
+    return 'eTask';
   })();
 
   const contextHint = (() => {
@@ -302,12 +302,12 @@ export default function WorkShell() {
       return t3('Assigned to you', 'Asignadas a ti', 'Atribuídas a ti');
     }
     if (nav.kind === 'folder') {
-      return t3('Folder tasks — share from the sidebar', 'Tareas de carpeta — comparte desde el panel', 'Tarefas da pasta — partilha na barra lateral');
+      return t3('A board in your workspace', 'Un tablero de tu espacio', 'Um quadro do teu espaço');
     }
     return null;
   })();
 
-  const createFolder = async (input: { name: string; visibility: 'PERSONAL' | 'SHARED' }) => {
+  const createFolder = async (input: { name: string; visibility: 'PERSONAL' | 'SHARED'; color?: string }) => {
     if (!activeCompanyId) return;
     const res = await fetch('/api/work-folders', {
       method: 'POST',
@@ -316,6 +316,7 @@ export default function WorkShell() {
         companyId: activeCompanyId,
         name: input.name,
         visibility: input.visibility,
+        color: input.color,
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -425,7 +426,7 @@ export default function WorkShell() {
   );
 
   return (
-    <div className="flex min-h-[calc(100vh-7.5rem)] overflow-hidden rounded-2xl border border-slate-200/80 bg-white/60 shadow-sm ring-1 ring-slate-900/5">
+    <div className="flex min-h-[calc(100vh-5.5rem)] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
       <WorkSidebar
         nav={nav}
         onNav={changeNav}
@@ -445,9 +446,6 @@ export default function WorkShell() {
         <div className="space-y-2.5 border-b border-slate-100 bg-white/90 px-4 py-3 backdrop-blur-sm">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700">
-                Etholys Work
-              </p>
               <h2 className="truncate text-lg font-bold tracking-tight text-slate-900">{contextTitle}</h2>
               {contextHint && <p className="mt-0.5 text-[11px] text-slate-400">{contextHint}</p>}
             </div>
@@ -493,7 +491,7 @@ export default function WorkShell() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t3('Filter… /', 'Filtrar… /', 'Filtrar… /')}
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-8 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-8 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
                 />
                 {query && (
                   <button

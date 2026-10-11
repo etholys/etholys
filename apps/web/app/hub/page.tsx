@@ -63,7 +63,7 @@ const systems: HubEntry[] = [
   },
   {
     id: 'work',
-    name: 'Work',
+    name: 'eTask',
     tagline: {
       es: 'Gestor de tareas del equipo',
       pt: 'Gestor de tarefas da equipa',

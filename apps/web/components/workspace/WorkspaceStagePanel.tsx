@@ -530,7 +530,7 @@ export function WorkspaceStagePanel({
     const b = overview.blocks.WORK;
     if (!b) return null;
     return (
-      <StageShell title="Work" icon={<ListTodo className="h-3.5 w-3.5" />} accent="teal" openHref={b.link} openLabel={open('Work')}>
+      <StageShell title="eTask" icon={<ListTodo className="h-3.5 w-3.5" />} accent="teal" openHref={b.link} openLabel={open('eTask')}>
         {b.tasks.length === 0 ? (
           <EmptyHint>
             {t('Sem tarefas operacionais.', 'Sin tareas operativas.', 'No operational tasks.')}{' '}

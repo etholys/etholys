@@ -66,7 +66,7 @@ const NEXUS_FAMILY: WorkspaceRailDef[] = [
 ];
 
 const TOOL_RAILS: WorkspaceRailDef[] = [
-  { id: 'WORK', label: 'Work', href: '/hub/work', accent: 'teal', kind: 'tool' },
+  { id: 'WORK', label: 'eTask', href: '/hub/work', accent: 'teal', kind: 'tool' },
   { id: 'MEET', label: 'Chorus', href: '/hub/meet', accent: 'indigo', kind: 'tool' },
   { id: 'STUDIO', label: 'Studio', href: '/hub/studio', accent: 'violet', kind: 'tool' },
 ];
