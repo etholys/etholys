@@ -1,7 +1,7 @@
 /**
  * Caps de yield da descoberta FundHub.
  *
- * Limite principal em produção de teste: FUNDHUB_SCAN_BUDGET_USD (default $1)
+ * Limite principal em produção de teste: FUNDHUB_SCAN_BUDGET_USD (default $3)
  * + cooldown de hosts FUNDHUB_SOURCE_COOLDOWN_DAYS (default 7).
  * Sem tecto artificial de quantidade de candidatos quando unlimited.
  *

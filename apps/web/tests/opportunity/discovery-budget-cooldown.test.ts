@@ -15,8 +15,8 @@ import {
 import { buildDiscoveryBudgetExpansionPacks } from '../../lib/opportunity/discovery-queries';
 
 describe('discovery-budget', () => {
-  it('defaults to $1 scan budget', () => {
-    assert.equal(scanBudgetUsd(), 1);
+  it('defaults to $3 scan budget', () => {
+    assert.equal(scanBudgetUsd(), 3);
     assert.ok(structureReserveUsd() > 0);
     assert.ok(structureReserveUsd() < scanBudgetUsd());
   });

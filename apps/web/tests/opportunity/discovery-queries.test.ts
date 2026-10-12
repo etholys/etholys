@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import {
   applyBriefingDiversity,
   briefingRequestsIfad,
+  buildDiscoveryBudgetExpansionPacks,
   buildDiscoveryQueryPacks,
   buildDiscoverySearchQueries,
   detectDiscoveryRegions,
+  isWorldwideBriefing,
   dropUnrequestedIfad,
   isHomogeneousInstitutionSet,
   isIfadCandidate,
@@ -97,6 +99,35 @@ test('open-web pack is first and is not a closed site: list', () => {
   const openBlob = packs[0]?.queries.join('\n') ?? '';
   assert.match(openBlob, /convocatoria abierta/);
   assert.equal(/^site:/m.test(openBlob), false);
+});
+
+test('worldwide briefing searches Africa and Asia, not only Latin America', () => {
+  assert.equal(isWorldwideBriefing(['Global']), true);
+  assert.equal(isWorldwideBriefing(['qualquer lugar do mundo']), true);
+  assert.equal(isWorldwideBriefing(['Brasil']), false);
+  const regions = detectDiscoveryRegions(['Global'], ['agricultura familiar']);
+  assert.ok(regions.includes('africa'));
+  assert.ok(regions.includes('asia'));
+  assert.ok(regions.includes('eu'));
+  const queries = buildDiscoverySearchQueries({
+    themes: ['agricultura familiar'],
+    countries: ['Global'],
+    kinds: ['grant'],
+  });
+  const blob = queries.join('\n');
+  assert.match(blob, /Africa/);
+  assert.match(blob, /Asia/);
+  assert.match(blob, /afdb\.org/);
+  assert.match(blob, /adb\.org/);
+  const packs = buildDiscoveryBudgetExpansionPacks({
+    themes: ['agricultura'],
+    countries: ['todo el mundo'],
+    kinds: ['grant'],
+  });
+  assert.ok(packs.some((p) => /africa/i.test(p.label)));
+  assert.ok(packs.some((p) => /asia/i.test(p.label)));
+  assert.ok(packs.some((p) => /pacific/i.test(p.label)));
+  assert.equal(packs.some((p) => p.label.startsWith('Expand: ')), false);
 });
 
 test('Brazil-only rural briefing still searches LATAM portals and foundations', () => {

@@ -1,7 +1,32 @@
 import type { OpportunityBriefing } from '@/lib/opportunity/scan-types';
 import { isDiscoveryUnlimited, maxPerInstitution } from '@/lib/opportunity/discovery-caps';
 
-export type DiscoveryRegion = 'br' | 'us' | 'latam' | 'eu' | 'global';
+export type DiscoveryRegion = 'br' | 'us' | 'latam' | 'eu' | 'africa' | 'asia' | 'global';
+
+/** Lugares que uma varredura "todos os países" tem de percorrer — não um sinónimo de América Latina. */
+export const WORLD_SCAN_PLACES = [
+  'Africa',
+  'Asia',
+  'Europe',
+  'Latin America and Caribbean',
+  'Middle East and North Africa',
+  'Pacific',
+  'North America',
+  'East Africa',
+  'South Asia',
+  'Southeast Asia',
+  'West Africa',
+  'Central Asia',
+] as const;
+
+const WORLDWIDE_TOKEN =
+  /^(global|worldwide|mundo|world|internacional|international)$|qualquer lugar|todos os paises|todos los paises|todo el mundo|all countries|mundo inteiro|worldwide/;
+
+export function isWorldwideBriefing(countries: string[]): boolean {
+  const parts = countries.map((c) => fold(c.trim())).filter(Boolean);
+  if (!parts.length) return false;
+  return parts.every((p) => WORLDWIDE_TOKEN.test(p));
+}
 
 function fold(s: string): string {
   return s
@@ -17,6 +42,9 @@ export function themeQueryBlob(themes: string[]): string {
 }
 
 export function countryQueryBlob(countries: string[]): string {
+  if (isWorldwideBriefing(countries)) {
+    return 'Africa OR Asia OR Europe OR "Latin America" OR "Middle East" OR Pacific OR "North America"';
+  }
   const parts = countries.map((c) => c.trim()).filter(Boolean).slice(0, 8);
   return parts.join(' OR ') || 'América Latina OR Brasil OR global';
 }
@@ -25,6 +53,9 @@ export function detectDiscoveryRegions(
   countries: string[],
   themes: string[] = [],
 ): DiscoveryRegion[] {
+  if (isWorldwideBriefing(countries)) {
+    return ['br', 'us', 'latam', 'eu', 'africa', 'asia', 'global'];
+  }
   const blob = fold(countries.join(' '));
   const themeBlob = fold(themes.join(' '));
   const out = new Set<DiscoveryRegion>();
@@ -80,6 +111,18 @@ const PORTAL_BUILDERS: Record<DiscoveryRegion, (themes: string) => string[]> = {
     `site:ec.europa.eu LIFE "call for proposals"`,
     `Horizon Europe open call (${t}) funding-tenders.europa.eu`,
   ],
+  africa: (t) => [
+    `site:afdb.org (call OR RFP OR "call for proposals") (${t})`,
+    `site:au.int (grant OR "call for proposals") (${t}) open`,
+    `site:nepad.org (grant OR call) (${t})`,
+    `"call for proposals" (Kenya OR Nigeria OR Ghana OR Senegal OR Ethiopia) (${t}) open grant`,
+  ],
+  asia: (t) => [
+    `site:adb.org (grant OR "call for proposals") (${t})`,
+    `site:theglobalfund.org (RFP OR funding) open`,
+    `"call for proposals" (India OR Indonesia OR Vietnam OR Philippines) (${t}) open grant`,
+    `site:jica.go.jp (grant OR call) (${t})`,
+  ],
   global: (t) => [
     `site:greenclimate.fund (RFP OR RFA OR "call for") (${t})`,
     `site:thegef.org "call for proposals"`,
@@ -119,15 +162,16 @@ function uniqueQueries(items: string[]): string[] {
 /** Pacotes: internet aberta primeiro; portais oficiais só para fechar o URL. */
 export function buildDiscoveryQueryPacks(briefing: OpportunityBriefing): DiscoveryQueryPack[] {
   const themes = themeQueryBlob(briefing.themes);
+  const worldwide = isWorldwideBriefing(briefing.countries);
   const places = countryQueryBlob(briefing.countries);
   const year = new Date().getFullYear();
   const regions = detectDiscoveryRegions(briefing.countries, briefing.themes);
   const grantHint = briefing.kinds.includes('grant') || briefing.kinds.length === 0;
   const packs: DiscoveryQueryPack[] = [];
   const loose = isDiscoveryUnlimited();
-  const qOpen = loose ? 16 : 10;
+  const qOpen = loose ? (worldwide ? 24 : 16) : 10;
   const qInst = loose ? 12 : 8;
-  const qOfficial = loose ? 28 : 16;
+  const qOfficial = loose ? (worldwide ? 40 : 28) : 16;
 
   const openWeb: string[] = [];
   if (briefing.searchFeedback?.trim()) {
@@ -135,6 +179,11 @@ export function buildDiscoveryQueryPacks(briefing: OpportunityBriefing): Discove
   }
   if (briefing.scanName?.trim()) {
     openWeb.push(`${briefing.scanName.trim()} convocatoria abierta OR open call ${year}`);
+  }
+  if (worldwide) {
+    for (const place of WORLD_SCAN_PLACES.slice(0, 7)) {
+      openWeb.push(`${themes} "call for proposals" OR convocatoria abierta open ${year} ${place}`);
+    }
   }
   openWeb.push(
     `${themes} convocatoria abierta ${year} ${places}`,
@@ -168,14 +217,15 @@ export function buildDiscoveryQueryPacks(briefing: OpportunityBriefing): Discove
   });
 
   const official: string[] = [];
-  for (const region of ['br', 'us', 'eu'] as const) {
+  const portalTake = worldwide ? 3 : 2;
+  for (const region of ['br', 'us', 'eu', 'africa', 'asia'] as const) {
     if (!regions.includes(region)) continue;
-    official.push(...PORTAL_BUILDERS[region](themes).slice(0, 2));
+    official.push(...PORTAL_BUILDERS[region](themes).slice(0, portalTake));
   }
   if (regions.includes('latam')) {
-    official.push(...PORTAL_BUILDERS.latam(themes).slice(0, 6));
+    official.push(...PORTAL_BUILDERS.latam(themes).slice(0, worldwide ? 4 : 6));
   }
-  official.push(...PORTAL_BUILDERS.global(themes).slice(0, 4));
+  official.push(...PORTAL_BUILDERS.global(themes).slice(0, worldwide ? 6 : 4));
   if (grantHint) official.push(...FOUNDATION_QUERIES(themes).slice(0, 3));
   if (briefingRequestsIfad(briefing)) {
     official.push(`site:ifad.org "call for proposals" (${themes})`);
@@ -200,9 +250,25 @@ export function buildDiscoveryBudgetExpansionPacks(briefing: OpportunityBriefing
   const countries = briefing.countries.map((c) => c.trim()).filter(Boolean).slice(0, 12);
   const themeFallback = themeQueryBlob(briefing.themes);
   const packs: DiscoveryQueryPack[] = [];
+  const themesOr = themes.length ? themes : [themeFallback];
+
+  if (isWorldwideBriefing(briefing.countries)) {
+    const themeBlob = themesOr.slice(0, 3).join(' OR ');
+    for (const place of WORLD_SCAN_PLACES) {
+      packs.push({
+        id: `expand_${fold(place).slice(0, 32)}`.replace(/\s+/g, '_'),
+        label: `Expand worldwide: ${place}`,
+        queries: uniqueQueries([
+          `${themeBlob} "call for proposals" OR convocatoria abierta ${year} ${place}`,
+          `${themeBlob} open grant OR edital OR RFP deadline ${year} ${place}`,
+          `official "call for proposals" site:.org OR site:.gov ${themeBlob} ${year} ${place}`,
+        ]).slice(0, 3),
+      });
+    }
+    return packs;
+  }
 
   const countriesOr = countries.length ? countries : ['América Latina', 'Brasil'];
-  const themesOr = themes.length ? themes : [themeFallback];
 
   for (const country of countriesOr) {
     for (const theme of themesOr.slice(0, 3)) {

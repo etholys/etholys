@@ -472,7 +472,7 @@ async function runPackWebSearch(opts: {
       model: opts.pack.id === 'open_web' ? fundhubScoutModel() : FUNDHUB_DISCOVERY_MODEL,
       maxOutputTokens: 8192,
       timeoutMs: 150_000,
-      webSearchMaxUses: opts.pack.id === 'open_web' ? 6 : 4,
+      webSearchMaxUses: Math.min(20, Math.max(8, opts.pack.queries.length)),
     });
     return { text, searchQueries };
   } catch (e) {
@@ -518,12 +518,12 @@ async function secondPassOpusDiscovery(opts: {
         model: FUNDHUB_DISCOVERY_MODEL,
         maxOutputTokens: 8192,
         timeoutMs: 150_000,
-        webSearchMaxUses: 6,
+        webSearchMaxUses: 12,
       },
     );
     const jsonText = await llmCompleteJsonText(
       STRUCTURE_SYSTEM,
-      `RESEARCH REPORT:\n${truncateForStructure(research, 14_000)}\n\nBRIEFING:\n${briefingLines(opts.briefing)}\n\nSkip ALREADY FOUND and EXISTING. Max 8 candidates, short fields.`,
+      `RESEARCH REPORT:\n${truncateForStructure(research, 14_000)}\n\nBRIEFING:\n${briefingLines(opts.briefing)}\n\nSkip ALREADY FOUND and EXISTING. Return every distinct verified open call. No artificial cap. Short fields.`,
       { maxOutputTokens: 8000, model: FUNDHUB_DISCOVERY_MODEL, allowTruncated: true },
     );
     const parsed = JSON.parse(salvageJsonText(jsonText)) as { candidates?: unknown[] };

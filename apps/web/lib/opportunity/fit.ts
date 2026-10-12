@@ -102,8 +102,19 @@ function countryKeys(raw: string): string[] {
   return [...keys];
 }
 
+function profileWantsWorldwide(profile: string[]): boolean {
+  const parts = profile.map((p) => fold(p.trim())).filter(Boolean);
+  if (!parts.length) return false;
+  return parts.every((p) =>
+    /^(global|worldwide|mundo|world|internacional|international)$|qualquer lugar|todos os paises|todos los paises|todo el mundo|all countries|mundo inteiro/.test(
+      p,
+    ),
+  );
+}
+
 function countriesOverlap(profile: string[], candidateText: string): 'go' | 'caution' | 'no_go' | 'unknown' {
   if (!profile.length) return 'unknown';
+  if (profileWantsWorldwide(profile)) return 'go';
   const blob = fold(candidateText);
   if (!blob) return 'unknown';
   if (GLOBAL_TOKENS.some((t) => blob.includes(t))) return 'go';

@@ -1,6 +1,6 @@
 /**
  * Orçamento por varredura FundHub — o tecto é USD, não quantidade de candidatos.
- * Default $1.00 para medir custo real do produto sem caps artificiais de yield.
+ * Default $3.00 para a fila mundial (vários pacotes regionais) caber depois da descoberta aberta.
  */
 
 import { getActiveLlmUsage } from '@/lib/llm-usage';
@@ -14,7 +14,7 @@ function envFloat(name: string, fallback: number): number {
 
 /** Tecto USD por varredura (tokens + web_search estimados). */
 export function scanBudgetUsd(): number {
-  return envFloat('FUNDHUB_SCAN_BUDGET_USD', 1);
+  return envFloat('FUNDHUB_SCAN_BUDGET_USD', 3);
 }
 
 /** Reserva para o passo de estruturação JSON no fim. */
