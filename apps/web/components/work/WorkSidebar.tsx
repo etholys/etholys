@@ -326,15 +326,6 @@ export function WorkSidebar({
             {folders
               .filter((f) => f.visibility === 'SHARED' || (f.members?.length ?? f._count?.members ?? 0) > 0)
               .map((f) => folderRow(f))}
-            {!collapsed && folders.filter((f) => f.visibility === 'SHARED' || (f.members?.length ?? 0) > 0).length === 0 && (
-              <p className="px-2 py-1 text-[11px] leading-snug text-[color:var(--sys-faint)]">
-                {t(
-                  'Shared boards keep team demands in one place.',
-                  'Los tableros compartidos agrupan las demandas del equipo.',
-                  'Quadros partilhados agrupam as demandas da equipa.',
-                )}
-              </p>
-            )}
           </div>
         </div>
 

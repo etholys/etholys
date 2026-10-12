@@ -104,131 +104,132 @@ export function WorkList({
           t={t}
         />
       )}
-      <div className="bg-white">
-        <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
-          <div className="flex items-center gap-3">
-            {onBulk && (
+      <div className="overflow-x-auto">
+        <div className="min-w-[760px]">
+          <div className="flex items-center justify-end border-b border-[color:var(--sys-line)] px-3 py-2">
+            <label className="flex items-center gap-2 text-[11px] font-medium text-[color:var(--sys-muted)]">
+              <input
+                type="checkbox"
+                checked={hideDone}
+                onChange={(e) => setHideDone(e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              {t('Hide done', 'Ocultar hechas', 'Ocultar concluídas')}
+            </label>
+          </div>
+          <div
+            className="grid items-center gap-4 border-b border-[color:var(--sys-line)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--sys-faint)]"
+            style={{ gridTemplateColumns: '28px 28px minmax(240px,1fr) 96px 120px 160px 96px' }}
+          >
+            {onBulk ? (
               <input
                 type="checkbox"
                 checked={allVisibleSelected}
                 onChange={() =>
                   setSelected(allVisibleSelected ? new Set() : new Set(rows.map((r) => r.id)))
                 }
-                className="h-4 w-4 rounded border-slate-300 text-cyan-600"
+                className="h-4 w-4 justify-self-center rounded border-slate-300 text-teal-600"
+                aria-label={t('Select all', 'Seleccionar todo', 'Selecionar tudo')}
               />
+            ) : (
+              <span />
             )}
-            <div>
-              <h3 className="text-sm font-semibold text-slate-800">{t('List', 'Lista', 'Lista')}</h3>
-              <p className="text-[11px] text-slate-400">
-                {rows.length} {t('tasks', 'tareas', 'tarefas')}
-              </p>
-            </div>
+            <span />
+            <span>{t('Task', 'Tarea', 'Tarefa')}</span>
+            <span>{t('Priority', 'Prioridad', 'Prioridade')}</span>
+            <span>{t('Status', 'Estado', 'Estado')}</span>
+            <span>{t('Assignee', 'Responsable', 'Responsável')}</span>
+            <span className="text-right">{t('Due', 'Fecha', 'Prazo')}</span>
           </div>
-          <label className="flex items-center gap-2 text-xs text-slate-600">
-            <input
-              type="checkbox"
-              checked={hideDone}
-              onChange={(e) => setHideDone(e.target.checked)}
-              className="rounded border-slate-300"
-            />
-            {t('Hide done', 'Ocultar hechas', 'Ocultar concluídas')}
-          </label>
-        </div>
-        <ul className="divide-y divide-slate-100">
-          {rows.map((task) => {
-            const st = STATUS_STYLE[task.status] || STATUS_STYLE.TODO;
-            const pr = PRIORITY_STYLE[task.priority] || PRIORITY_STYLE.MEDIUM;
-            const overdue =
-              task.dueDate && OPEN.has(task.status) && new Date(task.dueDate).getTime() < now;
-            const done = task.status === 'DONE';
-            const isSel = selected.has(task.id);
-            return (
-              <li
-                key={task.id}
-                className={cn(
-                  'group flex items-center gap-1 pr-2 hover:bg-slate-50/80',
-                  isSel && 'bg-cyan-50/60',
-                )}
-              >
-                {onBulk && (
-                  <input
-                    type="checkbox"
-                    checked={isSel}
-                    onChange={() => toggle(task.id)}
-                    className="ml-3 h-4 w-4 shrink-0 rounded border-slate-300 text-cyan-600"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                )}
-                {onToggleDone && (
+          <ul>
+            {rows.map((task) => {
+              const st = STATUS_STYLE[task.status] || STATUS_STYLE.TODO;
+              const pr = PRIORITY_STYLE[task.priority] || PRIORITY_STYLE.MEDIUM;
+              const overdue =
+                task.dueDate && OPEN.has(task.status) && new Date(task.dueDate).getTime() < now;
+              const done = task.status === 'DONE';
+              const isSel = selected.has(task.id);
+              return (
+                <li
+                  key={task.id}
+                  className={cn(
+                    'grid items-center gap-3 border-b border-[color:var(--sys-line)] px-3 py-2.5 hover:bg-[color:var(--sys-nav-hover)]',
+                    isSel && 'bg-teal-500/10',
+                  )}
+                  style={{ gridTemplateColumns: '28px 28px minmax(240px,1fr) 96px 120px 160px 96px' }}
+                >
+                  {onBulk ? (
+                    <input
+                      type="checkbox"
+                      checked={isSel}
+                      onChange={() => toggle(task.id)}
+                      className="h-4 w-4 justify-self-center rounded border-slate-300 text-teal-600"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span />
+                  )}
+                  {onToggleDone ? (
+                    <button
+                      type="button"
+                      disabled={busyId === task.id}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        setBusyId(task.id);
+                        try {
+                          await onToggleDone(task.id, done ? 'TODO' : 'DONE');
+                        } finally {
+                          setBusyId(null);
+                        }
+                      }}
+                      className={cn(
+                        'flex h-5 w-5 items-center justify-center justify-self-center rounded-full border transition',
+                        done
+                          ? 'border-emerald-500 bg-emerald-500 text-white'
+                          : 'border-[color:var(--sys-line)] text-transparent hover:border-teal-400 hover:text-teal-300',
+                      )}
+                      title={done ? t('Reopen', 'Reabrir', 'Reabrir') : t('Mark done', 'Marcar hecha', 'Marcar concluída')}
+                    >
+                      <Check className="h-3 w-3" />
+                    </button>
+                  ) : (
+                    <span className={cn('h-2 w-2 justify-self-center rounded-full', st.dot)} />
+                  )}
                   <button
                     type="button"
-                    disabled={busyId === task.id}
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      setBusyId(task.id);
-                      try {
-                        await onToggleDone(task.id, done ? 'TODO' : 'DONE');
-                      } finally {
-                        setBusyId(null);
-                      }
-                    }}
-                    className={cn(
-                      'ml-2 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition',
-                      done
-                        ? 'border-emerald-500 bg-emerald-500 text-white'
-                        : 'border-slate-300 text-transparent hover:border-cyan-500 hover:text-cyan-600',
-                    )}
-                    title={done ? t('Reopen', 'Reabrir', 'Reabrir') : t('Mark done', 'Marcar hecha', 'Marcar concluída')}
+                    onClick={() => onSelect(task.id)}
+                    className="min-w-0 truncate text-left text-sm font-medium text-[color:var(--sys-ink)]"
+                    title={task.title}
                   >
-                    <Check className="h-3 w-3" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => onSelect(task.id)}
-                  className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left"
-                >
-                  {!onToggleDone && !onBulk && (
-                    <span className={cn('h-2 w-2 shrink-0 rounded-full', st.dot)} />
-                  )}
-                  <span
-                    className={cn(
-                      'min-w-0 flex-1 truncate text-sm font-medium',
-                      done ? 'text-slate-400 line-through' : 'text-slate-800',
-                    )}
-                  >
-                    {task.title}
+                    <span className={cn(done && 'text-[color:var(--sys-faint)] line-through')}>{task.title}</span>
                     {(task._count?.subtasks || 0) > 0 && (
-                      <span className="ml-2 text-[10px] font-normal text-slate-400">
+                      <span className="ml-2 text-[10px] font-normal text-[color:var(--sys-faint)]">
                         {task._count?.subtasks} sub
                       </span>
                     )}
-                  </span>
-                  <span className={cn('hidden rounded-md px-1.5 py-0.5 text-[11px] font-semibold sm:inline', pr.bg, pr.text)}>
+                  </button>
+                  <span className={cn('w-fit max-w-full truncate rounded-md px-1.5 py-0.5 text-[11px] font-semibold', pr.bg, pr.text)}>
                     {workPriorityLabel(task.priority, t)}
                   </span>
-                  <span className={cn('hidden rounded-md px-1.5 py-0.5 text-[11px] font-medium md:inline', st.bg, st.text)}>
+                  <span className={cn('w-fit max-w-full truncate rounded-md px-1.5 py-0.5 text-[11px] font-medium', st.bg, st.text)}>
                     {workStatusLabel(task.status, t)}
                   </span>
-                  <span className="hidden w-28 truncate text-xs text-slate-500 lg:block">
-                    {task.project?.name || task.department?.name || task.folder?.name || '—'}
-                  </span>
-                  <span className="hidden w-24 truncate text-xs text-slate-500 sm:block">
+                  <span className="truncate text-xs text-[color:var(--sys-muted)]">
                     {task.assignee?.name || '—'}
                   </span>
                   <span
                     className={cn(
-                      'w-20 shrink-0 text-right text-xs tabular-nums',
-                      overdue ? 'font-semibold text-rose-600' : 'text-slate-500',
+                      'text-right text-xs tabular-nums',
+                      overdue ? 'font-semibold text-rose-400' : 'text-[color:var(--sys-muted)]',
                     )}
                   >
                     {task.dueDate ? formatDate(task.dueDate) : '—'}
                   </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </div>
     </div>
   );
