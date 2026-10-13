@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { createNotification } from '@/lib/notify';
 import { resolveTaskCommentMentions } from '@/lib/work/mentions';
+import { notifyTaskWatchers, wantsWorkNotify } from '@/lib/work/task-notify';
 
 async function assertTaskAccess(taskId: string, companyIds: string[]) {
   const task = await prisma.task.findFirst({
@@ -68,6 +69,20 @@ export async function POST(req: Request) {
 
     const link = `/hub/work`;
     const authorName = comment.user?.name || 'Alguien';
+    const company = access.resolvedCompanyId
+      ? await prisma.company.findUnique({
+          where: { id: access.resolvedCompanyId },
+          select: { workBoardJson: true },
+        })
+      : null;
+    notifyTaskWatchers({
+      actorId: tenant.userId,
+      type: 'task_update',
+      title: 'Actualización en una tarea',
+      message: `${authorName}: ${text.slice(0, 140)}`,
+      userIds: [access.assigneeId, access.creatorId],
+      enabled: wantsWorkNotify(company?.workBoardJson, 'comment'),
+    });
     await Promise.all(
       mentionIds.map((userId) =>
         createNotification({

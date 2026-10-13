@@ -1,5 +1,35 @@
 import { createNotification } from '@/lib/notify';
 
+export function wantsWorkNotify(json: unknown, key: 'comment' | 'assign' | 'status') {
+  if (!json || typeof json !== 'object') return true;
+  const notify = (json as { notify?: Record<string, boolean> }).notify;
+  if (!notify || notify[key] === undefined) return true;
+  return notify[key] !== false;
+}
+
+export function notifyTaskWatchers(opts: {
+  actorId: string;
+  title: string;
+  message: string;
+  type: string;
+  userIds: Array<string | null | undefined>;
+  enabled: boolean;
+}) {
+  if (!opts.enabled) return;
+  const seen = new Set<string>();
+  for (const id of opts.userIds) {
+    if (!id || id === opts.actorId || seen.has(id)) continue;
+    seen.add(id);
+    createNotification({
+      userId: id,
+      type: opts.type,
+      title: opts.title,
+      message: opts.message,
+      link: '/hub/work',
+    });
+  }
+}
+
 export function notifyTaskAssigned(opts: {
   assigneeId: string | null | undefined;
   actorId: string;

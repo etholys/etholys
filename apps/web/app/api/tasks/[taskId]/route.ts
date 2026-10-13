@@ -9,7 +9,7 @@ import {
   canReadFolder,
   getFolderAccess,
 } from '@/lib/work/folder-access';
-import { notifyTaskAssigned } from '@/lib/work/task-notify';
+import { notifyTaskAssigned, notifyTaskWatchers, wantsWorkNotify } from '@/lib/work/task-notify';
 
 async function assertTaskAccess(
   taskId: string,
@@ -155,6 +155,18 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
         data.groupId = group.id;
       }
     }
+    if (body.projectId !== undefined) {
+      if (body.projectId === null || body.projectId === '') {
+        data.projectId = null;
+      } else {
+        const project = await prisma.project.findFirst({
+          where: { id: String(body.projectId), companyId: { in: tenant.companyIds } },
+          select: { id: true },
+        });
+        if (!project) return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 });
+        data.projectId = project.id;
+      }
+    }
     if (body.folderId !== undefined) {
       if (body.folderId === null || body.folderId === '') {
         data.folderId = null;
@@ -165,6 +177,13 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
         }
         data.folderId = folderAccess.folder.id;
       }
+    }
+    if (body.customFields !== undefined && body.customFields && typeof body.customFields === 'object') {
+      const prev =
+        task.customFields && typeof task.customFields === 'object' && !Array.isArray(task.customFields)
+          ? (task.customFields as Record<string, unknown>)
+          : {};
+      data.customFields = { ...prev, ...(body.customFields as Record<string, unknown>) };
     }
     if (body.order !== undefined) {
       const n = parseInt(String(body.order), 10);
@@ -180,13 +199,27 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
       include: detailInclude,
     });
 
-    if (body.assigneeId !== undefined) {
+    const companyId = updated.companyId || updated.project?.companyId || null;
+    const company = companyId
+      ? await prisma.company.findUnique({ where: { id: companyId }, select: { workBoardJson: true } })
+      : null;
+    if (body.assigneeId !== undefined && wantsWorkNotify(company?.workBoardJson, 'assign')) {
       notifyTaskAssigned({
         assigneeId: updated.assigneeId,
         actorId: tenant.userId,
         title: updated.title,
         projectId: updated.projectId,
         prevAssigneeId: prevAssignee,
+      });
+    }
+    if (body.status !== undefined && body.status !== task.status) {
+      notifyTaskWatchers({
+        actorId: tenant.userId,
+        type: 'task_status',
+        title: 'Estado de una tarea',
+        message: `${updated.title}: ${String(body.status).replace(/_/g, ' ')}`,
+        userIds: [updated.assigneeId, updated.creatorId],
+        enabled: wantsWorkNotify(company?.workBoardJson, 'status'),
       });
     }
 

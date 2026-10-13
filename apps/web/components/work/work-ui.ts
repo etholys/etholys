@@ -18,6 +18,81 @@ export const PRIORITY_STYLE: Record<string, { bg: string; text: string }> = {
   CRITICAL: { bg: 'bg-red-50', text: 'text-red-800' },
 };
 
+export type WorkColumnKind =
+  | 'status'
+  | 'person'
+  | 'priority'
+  | 'due'
+  | 'start'
+  | 'estimate'
+  | 'origin'
+  | 'updates'
+  | 'text'
+  | 'number'
+  | 'checkbox'
+  | 'date';
+
+export type WorkColumn = { id: string; kind: WorkColumnKind; label: string };
+
+export type WorkNotifyPrefs = { comment: boolean; assign: boolean; status: boolean };
+
+export const DEFAULT_WORK_COLUMNS: WorkColumn[] = [
+  { id: 'status', kind: 'status', label: 'Status' },
+  { id: 'person', kind: 'person', label: 'Person' },
+  { id: 'priority', kind: 'priority', label: 'Priority' },
+  { id: 'due', kind: 'due', label: 'Due' },
+  { id: 'updates', kind: 'updates', label: 'Updates' },
+];
+
+export const DEFAULT_WORK_NOTIFY: WorkNotifyPrefs = { comment: true, assign: true, status: true };
+
+const SINGLETON_KINDS = new Set<WorkColumnKind>([
+  'status',
+  'person',
+  'priority',
+  'due',
+  'start',
+  'estimate',
+  'origin',
+  'updates',
+]);
+
+export function columnKindLabel(kind: WorkColumnKind, t: (en: string, es: string, pt: string) => string) {
+  switch (kind) {
+    case 'status':
+      return t('Status', 'Estado', 'Estado');
+    case 'person':
+      return t('Person', 'Persona', 'Pessoa');
+    case 'priority':
+      return t('Priority', 'Prioridad', 'Prioridade');
+    case 'due':
+      return t('Due', 'Fecha', 'Prazo');
+    case 'start':
+      return t('Start', 'Inicio', 'Início');
+    case 'estimate':
+      return t('Estimate', 'Estimación', 'Estimativa');
+    case 'origin':
+      return t('Origin', 'Origen', 'Origem');
+    case 'updates':
+      return t('Updates', 'Actualizaciones', 'Atualizações');
+    case 'text':
+      return t('Text', 'Texto', 'Texto');
+    case 'number':
+      return t('Number', 'Número', 'Número');
+    case 'checkbox':
+      return t('Checkbox', 'Casilla', 'Caixa');
+    case 'date':
+      return t('Date', 'Fecha', 'Data');
+    default:
+      return kind;
+  }
+}
+
+export function canAddColumnKind(columns: WorkColumn[], kind: WorkColumnKind) {
+  if (!SINGLETON_KINDS.has(kind)) return true;
+  return !columns.some((c) => c.kind === kind);
+}
+
 export const GROUP_COLORS = ['#0891b2', '#0d9488', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#65a30d'];
 
 export const STARTER_GROUPS = [

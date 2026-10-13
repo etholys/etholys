@@ -86,6 +86,8 @@ export async function GET(req: Request) {
         priority: true,
         dueDate: true,
         startDate: true,
+        estimatedHours: true,
+        customFields: true,
         order: true,
         projectId: true,
         companyId: true,

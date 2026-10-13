@@ -7,7 +7,7 @@ import { LayoutGrid, List, Plus, Search, X } from 'lucide-react';
 import { WorkTableBoard } from './WorkTableBoard';
 import { WorkTaskPanel } from './WorkTaskPanel';
 import { WorkBulkBar } from './WorkBulkBar';
-import { WORK_KANBAN, STARTER_GROUPS, parseTags } from './work-ui';
+import { WORK_KANBAN, STARTER_GROUPS, parseTags, DEFAULT_WORK_COLUMNS, DEFAULT_WORK_NOTIFY, type WorkColumn, type WorkNotifyPrefs } from './work-ui';
 
 type ML = { es: string; pt: string; en: string };
 const ml = (en: string, es: string, pt: string): ML => ({ en, es, pt });
@@ -92,6 +92,8 @@ export default function TasksBoard({
   const [form, setForm] = useState({ ...emptyForm });
   const [kanbanDragId, setKanbanDragId] = useState<string | null>(null);
   const [kanbanDropCol, setKanbanDropCol] = useState<string | null>(null);
+  const [boardColumns, setBoardColumns] = useState<WorkColumn[]>(DEFAULT_WORK_COLUMNS);
+  const [boardNotify, setBoardNotify] = useState<WorkNotifyPrefs>(DEFAULT_WORK_NOTIFY);
   const [bulkIds, setBulkIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
 
@@ -110,6 +112,30 @@ export default function TasksBoard({
   useEffect(() => {
     if (forcedView) setView(forcedView);
   }, [forcedView]);
+
+  const saveBoard = async (next: { columns?: WorkColumn[]; notify?: WorkNotifyPrefs }) => {
+    if (!activeCompanyId) return;
+    const columns = next.columns || boardColumns;
+    const notify = next.notify || boardNotify;
+    setBoardColumns(columns);
+    setBoardNotify(notify);
+    await fetch('/api/work-board', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId: activeCompanyId, columns, notify }),
+    });
+  };
+
+  useEffect(() => {
+    if (!activeCompanyId) return;
+    fetch(`/api/work-board?companyId=${encodeURIComponent(activeCompanyId)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d?.columns) && d.columns.length) setBoardColumns(d.columns);
+        if (d?.notify) setBoardNotify({ ...DEFAULT_WORK_NOTIFY, ...d.notify });
+      })
+      .catch(() => {});
+  }, [activeCompanyId]);
 
   useEffect(() => {
     setProjectFilter(initialProjectId);
@@ -195,6 +221,9 @@ export default function TasksBoard({
             body.assigneeId == null
               ? null
               : users.find((u: any) => u.id === body.assigneeId) || task.assignee;
+        }
+        if (body.customFields && typeof body.customFields === 'object') {
+          next.customFields = { ...(task.customFields || {}), ...(body.customFields as object) };
         }
         return next;
       }),
@@ -769,6 +798,14 @@ export default function TasksBoard({
               t={t3}
               statusLabel={(s) => tr(`status.${s.toLowerCase()}`)}
               priorityLabel={(p) => tr(`priority.${p.toLowerCase()}`)}
+              columns={boardColumns}
+              projects={projects}
+              departments={departments}
+              folders={folders}
+              notify={boardNotify}
+              onColumnsChange={(columns) => void saveBoard({ columns })}
+              onNotifyChange={(notifyPrefs) => void saveBoard({ notify: notifyPrefs })}
+              onCommentPosted={() => fetchTasks({ silent: true })}
             />
             </>
           ) : (

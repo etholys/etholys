@@ -1,9 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { getInitials } from '@/lib/utils';
-import { WORK_KANBAN, WORK_PRIORITIES, PRIORITY_STYLE, STATUS_STYLE } from './work-ui';
+import { WorkUpdates } from './WorkUpdates';
+import {
+  WORK_KANBAN,
+  WORK_PRIORITIES,
+  PRIORITY_STYLE,
+  STATUS_STYLE,
+  canAddColumnKind,
+  columnKindLabel,
+  DEFAULT_WORK_COLUMNS,
+  type WorkColumn,
+  type WorkColumnKind,
+  type WorkNotifyPrefs,
+} from './work-ui';
 
 type UserOpt = { id: string; name: string | null; email?: string };
 type GroupOpt = { id: string; name: string; color: string | null };
@@ -14,13 +26,19 @@ type TaskRow = {
   priority: string;
   order?: number;
   dueDate?: string | null;
+  startDate?: string | null;
+  estimatedHours?: number | null;
+  customFields?: Record<string, unknown> | null;
   tags?: unknown;
   assigneeId?: string | null;
+  projectId?: string | null;
+  departmentId?: string | null;
+  folderId?: string | null;
   groupId?: string | null;
   assignee?: UserOpt | null;
-  project?: { name?: string } | null;
-  department?: { name?: string } | null;
-  folder?: { name?: string } | null;
+  project?: { id?: string; name?: string } | null;
+  department?: { id?: string; name?: string } | null;
+  folder?: { id?: string; name?: string } | null;
   _count?: { comments?: number; subtasks?: number };
 };
 
@@ -58,6 +76,14 @@ export function WorkTableBoard({
   t,
   statusLabel,
   priorityLabel,
+  columns = DEFAULT_WORK_COLUMNS,
+  projects = [],
+  departments = [],
+  folders = [],
+  notify,
+  onColumnsChange,
+  onNotifyChange,
+  onCommentPosted,
 }: {
   groups: GroupOpt[];
   ungroupedTasks: TaskRow[];
@@ -80,6 +106,14 @@ export function WorkTableBoard({
   t: (en: string, es: string, pt: string) => string;
   statusLabel: (s: string) => string;
   priorityLabel: (p: string) => string;
+  columns?: WorkColumn[];
+  projects?: Array<{ id: string; name: string }>;
+  departments?: Array<{ id: string; name: string }>;
+  folders?: Array<{ id: string; name: string }>;
+  notify?: WorkNotifyPrefs;
+  onColumnsChange?: (columns: WorkColumn[]) => void;
+  onNotifyChange?: (notify: WorkNotifyPrefs) => void;
+  onCommentPosted?: () => void;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -89,6 +123,11 @@ export function WorkTableBoard({
   const [editName, setEditName] = useState('');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [titleDraft, setTitleDraft] = useState<{ id: string; value: string } | null>(null);
+  const [updatesFor, setUpdatesFor] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const colSpan = columns.length + (onToggleSelect ? 3 : 2);
 
   const toggle = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }));
 
@@ -195,6 +234,79 @@ export function WorkTableBoard({
           </button>
         )}
       </div>
+
+      {onColumnsChange && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setAddOpen((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-300"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {t('Column', 'Columna', 'Coluna')}
+            </button>
+            {addOpen && (
+              <div className="absolute left-0 z-20 mt-1 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                {(['status', 'person', 'priority', 'due', 'start', 'estimate', 'origin', 'updates', 'text', 'number', 'checkbox', 'date'] as WorkColumnKind[])
+                  .filter((kind) => canAddColumnKind(columns, kind))
+                  .map((kind) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() => {
+                        const label =
+                          kind === 'text' || kind === 'number' || kind === 'checkbox' || kind === 'date'
+                            ? window.prompt(t('Column name', 'Nombre de la columna', 'Nome da coluna'), columnKindLabel(kind, t)) || ''
+                            : columnKindLabel(kind, t);
+                        if (!label.trim()) return;
+                        onColumnsChange([
+                          ...columns,
+                          { id: kind === 'text' || kind === 'number' || kind === 'checkbox' || kind === 'date' ? `${kind}-${Date.now()}` : kind, kind, label: label.trim() },
+                        ]);
+                        setAddOpen(false);
+                      }}
+                      className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      {columnKindLabel(kind, t)}
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+          {onNotifyChange && notify && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setNotifyOpen((v) => !v)}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-300"
+              >
+                {t('Notifications', 'Notificaciones', 'Notificações')}
+              </button>
+              {notifyOpen && (
+                <div className="absolute left-0 z-20 mt-1 w-64 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lg">
+                  {(
+                    [
+                      ['comment', t('Updates on my tasks', 'Actualizaciones en mis tareas', 'Atualizações nas minhas tarefas')],
+                      ['assign', t('When a task is assigned to me', 'Cuando me asignan una tarea', 'Quando me atribuem uma tarefa')],
+                      ['status', t('When status changes', 'Cuando cambia el estado', 'Quando o estado muda')],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <label key={key} className="mb-2 flex items-center gap-2 text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={notify[key]}
+                        onChange={(e) => onNotifyChange({ ...notify, [key]: e.target.checked })}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <p className="text-[11px] text-slate-400">
         {t(
@@ -310,12 +422,26 @@ export function WorkTableBoard({
                         </th>
                       )}
                       <th className="w-8 px-1 py-2" />
-                      <th className="w-[34%] px-3 py-2 font-semibold">{t('Task', 'Tarea', 'Tarefa')}</th>
-                      <th className="w-[14%] px-2 py-2">{t('Status', 'Estado', 'Status')}</th>
-                      <th className="w-[14%] px-2 py-2">{t('Person', 'Persona', 'Pessoa')}</th>
-                      <th className="w-[12%] px-2 py-2">{t('Priority', 'Prioridad', 'Prioridade')}</th>
-                      <th className="w-[12%] px-2 py-2">{t('Due', 'Fecha', 'Prazo')}</th>
-                      <th className="w-[14%] px-2 py-2">{t('Origin', 'Origen', 'Origem')}</th>
+                      <th className="min-w-[220px] px-3 py-2 font-semibold">{t('Task', 'Tarea', 'Tarefa')}</th>
+                      {columns.map((col) => (
+                        <th key={col.id} className="min-w-[120px] px-2 py-2">
+                          <span className="inline-flex items-center gap-1">
+                            {col.kind === 'text' || col.kind === 'number' || col.kind === 'checkbox' || col.kind === 'date'
+                              ? col.label
+                              : columnKindLabel(col.kind, t)}
+                            {onColumnsChange && columns.length > 1 && (
+                              <button
+                                type="button"
+                                className="text-slate-300 hover:text-rose-600"
+                                onClick={() => onColumnsChange(columns.filter((c) => c.id !== col.id))}
+                                aria-label={t('Remove column', 'Quitar columna', 'Remover coluna')}
+                              >
+                                ×
+                              </button>
+                            )}
+                          </span>
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -328,10 +454,9 @@ export function WorkTableBoard({
                         Boolean(draggingId) &&
                         draggingId !== task.id;
                       return (
+                        <Fragment key={task.id}>
                         <tr
-                          key={task.id}
                           draggable={false}
-                          onClick={() => onSelect(task.id)}
                           onDragOver={(e) => {
                             if (!draggingId || draggingId === task.id) return;
                             e.preventDefault();
@@ -379,91 +504,194 @@ export function WorkTableBoard({
                               <GripVertical className="h-4 w-4" />
                             </button>
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-1.5" onClick={cellStop}>
                             <div className="flex items-center gap-2">
-                              <span
-                                className={`h-2 w-2 shrink-0 rounded-full ${STATUS_STYLE[task.status]?.dot || 'bg-slate-300'}`}
-                              />
-                              <span className="truncate font-medium text-slate-900">{task.title}</span>
-                              {(task._count?.subtasks || 0) > 0 && (
-                                <span className="shrink-0 text-[10px] text-slate-400">{task._count?.subtasks}</span>
-                              )}
-                            </div>
-                            {(task.project?.name || task.department?.name) && (
-                              <p className="mt-0.5 truncate pl-4 text-[11px] text-slate-400">
-                                {task.project?.name || task.department?.name}
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-2 py-1.5" onClick={cellStop}>
-                            <select
-                              value={task.status}
-                              onChange={(e) => onPatch(task.id, { status: e.target.value })}
-                              className={`w-full max-w-[130px] cursor-pointer rounded-md border-0 px-2 py-1 text-[11px] font-semibold outline-none ${STATUS_STYLE[task.status]?.bg || 'bg-slate-100'} ${STATUS_STYLE[task.status]?.text || ''}`}
-                            >
-                              {WORK_KANBAN.map((s) => (
-                                <option key={s} value={s}>
-                                  {statusLabel(s)}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-2 py-1.5" onClick={cellStop}>
-                            <div className="flex items-center gap-1.5">
-                              {task.assignee?.name ? (
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cyan-100 text-[9px] font-bold text-cyan-800">
-                                  {getInitials(task.assignee.name)}
-                                </span>
+                              <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_STYLE[task.status]?.dot || 'bg-slate-300'}`} />
+                              {titleDraft?.id === task.id ? (
+                                <input
+                                  autoFocus
+                                  value={titleDraft.value}
+                                  onChange={(e) => setTitleDraft({ id: task.id, value: e.target.value })}
+                                  onBlur={() => {
+                                    const next = titleDraft.value.trim();
+                                    if (next && next !== task.title) onPatch(task.id, { title: next });
+                                    setTitleDraft(null);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                    if (e.key === 'Escape') setTitleDraft(null);
+                                  }}
+                                  className="min-w-0 flex-1 rounded border border-teal-400 px-1.5 py-1 text-sm font-medium outline-none"
+                                />
                               ) : (
-                                <span className="h-5 w-5 shrink-0 rounded-full border border-dashed border-slate-200" />
+                                <button
+                                  type="button"
+                                  onClick={() => setTitleDraft({ id: task.id, value: task.title })}
+                                  className="min-w-0 flex-1 truncate text-left text-sm font-medium text-slate-900"
+                                >
+                                  {task.title}
+                                </button>
                               )}
-                              <select
-                                value={task.assigneeId || ''}
-                                onChange={(e) => onPatch(task.id, { assigneeId: e.target.value || null })}
-                                className="min-w-0 flex-1 cursor-pointer rounded-md border border-transparent bg-transparent px-1 py-1 text-[11px] text-slate-700 outline-none hover:border-slate-200 hover:bg-white"
+                              <button
+                                type="button"
+                                onClick={() => onSelect(task.id)}
+                                className="shrink-0 text-[10px] font-semibold text-slate-400 hover:text-teal-700"
                               >
-                                <option value="">{t('—', '—', '—')}</option>
-                                {users.map((u) => (
-                                  <option key={u.id} value={u.id}>
-                                    {u.name || u.email}
-                                  </option>
-                                ))}
-                              </select>
+                                {t('Open', 'Abrir', 'Abrir')}
+                              </button>
                             </div>
                           </td>
-                          <td className="px-2 py-1.5" onClick={cellStop}>
-                            <select
-                              value={task.priority}
-                              onChange={(e) => onPatch(task.id, { priority: e.target.value })}
-                              className={`w-full max-w-[110px] cursor-pointer rounded-md border-0 px-2 py-1 text-[11px] font-semibold outline-none ${PRIORITY_STYLE[task.priority]?.bg || ''} ${PRIORITY_STYLE[task.priority]?.text || ''}`}
-                            >
-                              {WORK_PRIORITIES.map((p) => (
-                                <option key={p} value={p}>
-                                  {priorityLabel(p)}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-2 py-1.5" onClick={cellStop}>
-                            <input
-                              type="date"
-                              value={task.dueDate ? String(task.dueDate).slice(0, 10) : ''}
-                              onChange={(e) => onPatch(task.id, { dueDate: e.target.value || null })}
-                              className={`w-full max-w-[130px] cursor-pointer rounded-md border border-transparent bg-transparent px-1 py-1 text-[11px] outline-none hover:border-slate-200 hover:bg-white ${
-                                task.dueDate &&
-                                !['DONE', 'CANCELLED'].includes(task.status) &&
-                                new Date(task.dueDate).getTime() < Date.now()
-                                  ? 'font-semibold text-rose-600'
-                                  : 'text-slate-600'
-                              }`}
-                            />
-                          </td>
-                          <td className="px-2 py-1.5 text-[11px] text-slate-500">
-                            <span className="block truncate">
-                              {task.project?.name || task.department?.name || task.folder?.name || '—'}
-                            </span>
-                          </td>
+                          {columns.map((col) => (
+                            <td key={col.id} className="px-2 py-1.5" onClick={cellStop}>
+                              {col.kind === 'status' && (
+                                <select
+                                  value={task.status}
+                                  onChange={(e) => onPatch(task.id, { status: e.target.value })}
+                                  className={`w-full cursor-pointer rounded-md border-0 px-2 py-1 text-[11px] font-semibold outline-none ${STATUS_STYLE[task.status]?.bg || 'bg-slate-100'} ${STATUS_STYLE[task.status]?.text || ''}`}
+                                >
+                                  {WORK_KANBAN.map((s) => (
+                                    <option key={s} value={s}>{statusLabel(s)}</option>
+                                  ))}
+                                </select>
+                              )}
+                              {col.kind === 'person' && (
+                                <div className="flex items-center gap-1.5">
+                                  {task.assignee?.name ? (
+                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-100 text-[9px] font-bold text-teal-800">
+                                      {getInitials(task.assignee.name)}
+                                    </span>
+                                  ) : (
+                                    <span className="h-5 w-5 shrink-0 rounded-full border border-dashed border-slate-200" />
+                                  )}
+                                  <select
+                                    value={task.assigneeId || ''}
+                                    onChange={(e) => onPatch(task.id, { assigneeId: e.target.value || null })}
+                                    className="min-w-0 flex-1 cursor-pointer bg-transparent text-[11px] text-slate-700 outline-none"
+                                  >
+                                    <option value="">{t('—', '—', '—')}</option>
+                                    {users.map((u) => (
+                                      <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                              {col.kind === 'priority' && (
+                                <select
+                                  value={task.priority}
+                                  onChange={(e) => onPatch(task.id, { priority: e.target.value })}
+                                  className={`w-full cursor-pointer rounded-md border-0 px-2 py-1 text-[11px] font-semibold outline-none ${PRIORITY_STYLE[task.priority]?.bg || ''} ${PRIORITY_STYLE[task.priority]?.text || ''}`}
+                                >
+                                  {WORK_PRIORITIES.map((p) => (
+                                    <option key={p} value={p}>{priorityLabel(p)}</option>
+                                  ))}
+                                </select>
+                              )}
+                              {col.kind === 'due' && (
+                                <input
+                                  type="date"
+                                  value={task.dueDate ? String(task.dueDate).slice(0, 10) : ''}
+                                  onChange={(e) => onPatch(task.id, { dueDate: e.target.value || null })}
+                                  className={`w-full bg-transparent text-[11px] outline-none ${
+                                    task.dueDate && !['DONE', 'CANCELLED'].includes(task.status) && new Date(task.dueDate).getTime() < Date.now()
+                                      ? 'font-semibold text-rose-600'
+                                      : 'text-slate-600'
+                                  }`}
+                                />
+                              )}
+                              {col.kind === 'start' && (
+                                <input
+                                  type="date"
+                                  value={task.startDate ? String(task.startDate).slice(0, 10) : ''}
+                                  onChange={(e) => onPatch(task.id, { startDate: e.target.value || null })}
+                                  className="w-full bg-transparent text-[11px] text-slate-600 outline-none"
+                                />
+                              )}
+                              {col.kind === 'estimate' && (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.5"
+                                  value={task.estimatedHours ?? ''}
+                                  onChange={(e) => onPatch(task.id, { estimatedHours: e.target.value === '' ? null : Number(e.target.value) })}
+                                  className="w-16 bg-transparent text-[11px] text-slate-700 outline-none"
+                                  placeholder="h"
+                                />
+                              )}
+                              {col.kind === 'origin' && (
+                                <div className="flex flex-col gap-1">
+                                  <select
+                                    value={task.projectId || task.project?.id || ''}
+                                    onChange={(e) => onPatch(task.id, { projectId: e.target.value || null })}
+                                    className="w-full bg-transparent text-[11px] text-slate-600 outline-none"
+                                  >
+                                    <option value="">{t('No project', 'Sin proyecto', 'Sem projeto')}</option>
+                                    {projects.map((p) => (
+                                      <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                  </select>
+                                  <select
+                                    value={task.departmentId || task.department?.id || ''}
+                                    onChange={(e) => onPatch(task.id, { departmentId: e.target.value || null })}
+                                    className="w-full bg-transparent text-[11px] text-slate-600 outline-none"
+                                  >
+                                    <option value="">{t('No department', 'Sin sector', 'Sem setor')}</option>
+                                    {departments.map((d) => (
+                                      <option key={d.id} value={d.id}>{d.name}</option>
+                                    ))}
+                                  </select>
+                                  <select
+                                    value={task.folderId || task.folder?.id || ''}
+                                    onChange={(e) => onPatch(task.id, { folderId: e.target.value || null })}
+                                    className="w-full bg-transparent text-[11px] text-slate-600 outline-none"
+                                  >
+                                    <option value="">{t('No board', 'Sin tablero', 'Sem quadro')}</option>
+                                    {folders.map((f) => (
+                                      <option key={f.id} value={f.id}>{f.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                              {col.kind === 'updates' && (
+                                <button
+                                  type="button"
+                                  onClick={() => setUpdatesFor((id) => (id === task.id ? null : task.id))}
+                                  className="text-[11px] font-semibold text-teal-800 hover:underline"
+                                >
+                                  {(task._count?.comments || 0) > 0
+                                    ? `${task._count?.comments} ${t('updates', 'act.', 'atu.')}`
+                                    : t('Write', 'Escribir', 'Escrever')}
+                                </button>
+                              )}
+                              {(col.kind === 'text' || col.kind === 'number' || col.kind === 'date') && (
+                                <input
+                                  type={col.kind === 'number' ? 'number' : col.kind === 'date' ? 'date' : 'text'}
+                                  value={task.customFields?.[col.id] == null ? '' : String(task.customFields[col.id])}
+                                  onChange={(e) =>
+                                    onPatch(task.id, {
+                                      customFields: { [col.id]: col.kind === 'number' ? Number(e.target.value) : e.target.value },
+                                    })
+                                  }
+                                  className="w-full min-w-[88px] bg-transparent text-[11px] text-slate-700 outline-none"
+                                />
+                              )}
+                              {col.kind === 'checkbox' && (
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(task.customFields?.[col.id])}
+                                  onChange={(e) => onPatch(task.id, { customFields: { [col.id]: e.target.checked } })}
+                                />
+                              )}
+                            </td>
+                          ))}
                         </tr>
+                        {updatesFor === task.id && (
+                          <tr>
+                            <td colSpan={colSpan}>
+                              <WorkUpdates taskId={task.id} onPosted={onCommentPosted} t={t} />
+                            </td>
+                          </tr>
+                        )}
+                        </Fragment>
                       );
                     })}
                     <tr
@@ -480,7 +708,7 @@ export function WorkTableBoard({
                         handleDrop();
                       }}
                     >
-                      <td colSpan={7} className="px-3 py-2">
+                      <td colSpan={colSpan} className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           <Plus className="h-3.5 w-3.5 text-slate-300" />
                           <input

@@ -193,6 +193,8 @@ model Company {
   /// Respostas do assistente de contexto (sector, comércio, metas) — aciona módulos e memória de IA; não substitui aconselhamento legal.
   contextSetupJson            Json?
   contextSetupAt              DateTime?
+  /// Colunas do quadro eTask e preferências de notificação da empresa.
+  workBoardJson               Json?
   /// Legado RADAR (producer|provider) — já não governa a UI; mantido só por compatibilidade.
   radarOrgRole                String?
   aiSessions                  AiAdvisorSession[]
@@ -663,6 +665,8 @@ model Task {
   estimatedHours   Float?
   order            Int              @default(0)
   tags             String?
+  /// Valores das colunas extra do quadro (texto, número, data, checkbox).
+  customFields     Json?
   isActive         Boolean          @default(true)
   isRecurring      Boolean          @default(false)
   recurrenceMonths Int?
