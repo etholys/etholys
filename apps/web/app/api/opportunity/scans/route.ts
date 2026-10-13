@@ -9,6 +9,7 @@ import { readOpportunityBriefing, writeOpportunityBriefing } from '@/lib/opportu
 import { pendingCandidates, readCompanyScanInbox, readScanResults } from '@/lib/opportunity/candidate-store';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import { runOpportunityScan } from '@/lib/opportunity/run-scan';
+import { isDiscoveryRunStale } from '@/lib/opportunity/scan-run-liveness';
 import type { OpportunityBriefing, ScanFocus } from '@/lib/opportunity/scan-types';
 import { isSystemAdmin } from '@/lib/platform-access';
 
@@ -177,9 +178,9 @@ export async function POST(req: NextRequest) {
     where: { companyId: ctx.companyId, status: 'running' },
   });
   if (running) {
-    const ageMs = Date.now() - new Date(running.startedAt).getTime();
-    // Varredura presa > 8 min → marcar falha e permitir nova
-    if (ageMs > 8 * 60 * 1000) {
+    // Sem heartbeat recente a varredura morreu (processo caiu). Idade total não conta:
+    // um barrido mundial segue em background bem depois dos 8 min.
+    if (isDiscoveryRunStale(running)) {
       await prisma.fundhubDiscoveryRun.update({
         where: { id: running.id },
         data: {

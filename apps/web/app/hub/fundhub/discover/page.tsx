@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useApp } from '@/app/providers';
@@ -174,6 +174,9 @@ export default function OpportunityDiscoverPage() {
   const [dueSoonOnly, setDueSoonOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [operatorHint, setOperatorHint] = useState<string | null>(null);
+  const [longScan, setLongScan] = useState(false);
+  const watchGen = useRef(0);
+  const activeWatchId = useRef<string | null>(null);
 
   const openDetail = (c: ScanCandidate, tab: 'overview' | 'analyze' = 'overview') => {
     setDetailTab(tab);
@@ -276,6 +279,141 @@ export default function OpportunityDiscoverPage() {
     void loadAll();
   }, [loadAll]);
 
+  const watchRun = useCallback(
+    async (runId: string, focus: ScanFocus, startedAt: number) => {
+      const gen = ++watchGen.current;
+      activeWatchId.current = runId;
+      setScanning(true);
+      setScanUi('running');
+      setLongScan(false);
+      try {
+        while (watchGen.current === gen) {
+          await new Promise((res) => setTimeout(res, 2000));
+          if (watchGen.current !== gen) return;
+          const elapsed = Date.now() - startedAt;
+          if (elapsed > 3 * 60 * 1000) setLongScan(true);
+          const pr = await fetch(q(`/api/opportunity/scans?runId=${encodeURIComponent(runId)}`), {
+            cache: 'no-store',
+          });
+          const pRaw = await pr.text();
+          let pd: {
+            run?: {
+              status: string;
+              created: number;
+              discoveryMode?: string | null;
+              errorCount?: number;
+              progressPct?: number | null;
+              phase?: string | null;
+              errorsJson?: string | null;
+            };
+          } = {};
+          try {
+            pd = JSON.parse(pRaw) as typeof pd;
+          } catch {
+            setScanPercent(estimateScanPercent(elapsed));
+            continue;
+          }
+          if (!pr.ok) {
+            setScanPercent(estimateScanPercent(elapsed));
+            continue;
+          }
+          const st = pd.run?.status;
+          setScanPercent(estimateScanPercent(elapsed, pd.run?.progressPct ?? null));
+          if (st === 'completed') {
+            setScanPercent(100);
+            setScanUi('done');
+            setLongScan(false);
+            const n = pd.run?.created ?? 0;
+            let fallbackReason = '';
+            try {
+              const ej = pd.run?.errorsJson
+                ? (JSON.parse(pd.run.errorsJson) as { fallbackReason?: string })
+                : {};
+              fallbackReason = ej.fallbackReason ?? '';
+            } catch {
+              fallbackReason = '';
+            }
+            const focusLabel =
+              focus === 'open_now'
+                ? t('Abertos agora', 'Abiertos ahora', 'Open now')
+                : t('Base de referência', 'Base de referencia', 'Reference base');
+            const modeNote =
+              pd.run?.discoveryMode === 'web'
+                ? t(' (pesquisa web)', ' (búsqueda web)', ' (web search)')
+                : t(' (base de conhecimento)', ' (base de conocimiento)', ' (knowledge base)');
+            setMsg(
+              n > 0
+                ? t(
+                    `${focusLabel}: ${n} candidatos${modeNote}.`,
+                    `${focusLabel}: ${n} candidatos${modeNote}.`,
+                    `${focusLabel}: ${n} candidates${modeNote}.`,
+                  )
+                : fallbackReason.startsWith('web_failed')
+                  ? t(
+                      'A pesquisa web falhou. Tente de novo daqui a um minuto.',
+                      'La búsqueda web falló. Intente de nuevo en un minuto.',
+                      'Web search failed. Try again in a minute.',
+                    )
+                  : t(
+                      'Pesquisa concluída sem convocatórias novas — as que já estão na mesa foram ignoradas de propósito. Guarde ou descarte as antigas, ou alargue temas.',
+                      'Búsqueda terminada sin convocatorias nuevas: las que ya están en la mesa se ignoraron a propósito. Guarde o descarte las antiguas, o amplíe temas.',
+                      'Search finished with no new calls — items already on the desk were skipped on purpose. Save or discard the old ones, or widen themes.',
+                    ),
+            );
+            await Promise.all([loadScan(), loadCatalog()]);
+            setTab('new');
+            setTimeout(() => {
+              setScanUi((s) => (s === 'done' ? 'idle' : s));
+              setScanPercent(0);
+            }, 1200);
+            return;
+          }
+          if (st === 'failed') {
+            throw new Error(
+              t(
+                'A varredura falhou. Verifique a chave LLM e tente de novo.',
+                'El barrido falló. Verifique la clave LLM.',
+                'Scan failed. Check LLM key and retry.',
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (watchGen.current !== gen) return;
+        setScanUi('error');
+        setLongScan(false);
+        setLatest((cur) => (cur && cur.id === runId ? { ...cur, status: 'failed' } : cur));
+        setMsg(e instanceof Error ? e.message : 'Erro');
+      } finally {
+        if (watchGen.current === gen) {
+          activeWatchId.current = null;
+          setScanning(false);
+          setScanningShortcutId(null);
+        }
+      }
+    },
+    [companyId, loadCatalog, loadScan, locale],
+  );
+
+  useEffect(() => {
+    if (!latest || latest.status !== 'running') return;
+    if (activeWatchId.current === latest.id) return;
+    const startedAt = new Date(latest.startedAt).getTime();
+    void watchRun(
+      latest.id,
+      latest.scanFocus ?? discoveryFocus,
+      Number.isFinite(startedAt) ? startedAt : Date.now(),
+    );
+  }, [latest, discoveryFocus, watchRun]);
+
+  useEffect(
+    () => () => {
+      watchGen.current += 1;
+      activeWatchId.current = null;
+    },
+    [],
+  );
+
   const saveBriefing = async () => {
     const payload: Briefing = {
       ...briefing,
@@ -313,7 +451,7 @@ export default function OpportunityDiscoverPage() {
       notes: notesInput.trim() || briefing.notes,
     };
     setLastScanArgs({ focus, briefing: briefingToUse, shortcutId });
-    const startedAt = Date.now();
+    setLongScan(false);
     try {
       const r = await fetch(q('/api/opportunity/scans'), {
         method: 'POST',
@@ -345,138 +483,31 @@ export default function OpportunityDiscoverPage() {
       const runId = d.runId;
       if (!runId) throw new Error(d.error || 'Sem runId');
 
-      setMsg(
-        t(
-          'A pesquisar… pode demorar 1–3 minutos.',
-          'Buscando… puede tardar 1–3 minutos.',
-          'Searching… may take 1–3 minutes.',
-        ),
-      );
-      setLatest({
-        id: runId,
-        status: 'running',
-        startedAt: new Date().toISOString(),
-        scanned: 0,
-        created: 0,
-        errorCount: 0,
-        scanFocus: focus,
+      let startedAt = Date.now();
+      setLatest((cur) => {
+        if (cur?.id === runId && cur.status === 'running') {
+          const prev = new Date(cur.startedAt).getTime();
+          if (Number.isFinite(prev)) startedAt = prev;
+          return cur;
+        }
+        return {
+          id: runId,
+          status: 'running',
+          startedAt: new Date(startedAt).toISOString(),
+          scanned: 0,
+          created: 0,
+          errorCount: 0,
+          scanFocus: focus,
+        };
       });
       setScanPercent(8);
-
-      // Poll até completed / failed — web search pode levar 5–8 min
-      let attempts = 0;
-      let finished = false;
-      while (attempts < 240) {
-        await new Promise((res) => setTimeout(res, 2000));
-        attempts += 1;
-        const pr = await fetch(q(`/api/opportunity/scans?runId=${encodeURIComponent(runId)}`), {
-          cache: 'no-store',
-        });
-        const pRaw = await pr.text();
-        let pd: {
-          run?: {
-            status: string;
-            created: number;
-            discoveryMode?: string | null;
-            errorCount?: number;
-            progressPct?: number | null;
-            phase?: string | null;
-            errorsJson?: string | null;
-          };
-          pendingOpen?: ScanCandidate[];
-          pendingReference?: ScanCandidate[];
-          error?: string;
-        } = {};
-        try {
-          pd = JSON.parse(pRaw) as typeof pd;
-        } catch {
-          setScanPercent(estimateScanPercent(Date.now() - startedAt));
-          continue;
-        }
-        if (!pr.ok) {
-          setScanPercent(estimateScanPercent(Date.now() - startedAt));
-          continue;
-        }
-        const st = pd.run?.status;
-        setScanPercent(
-          estimateScanPercent(Date.now() - startedAt, pd.run?.progressPct ?? null),
-        );
-        if (st === 'completed') {
-          setScanPercent(100);
-          setScanUi('done');
-          const n = pd.run?.created ?? 0;
-          let fallbackReason = '';
-          try {
-            const ej = pd.run?.errorsJson ? JSON.parse(pd.run.errorsJson) as { fallbackReason?: string } : {};
-            fallbackReason = ej.fallbackReason ?? '';
-          } catch {
-            fallbackReason = '';
-          }
-          const focusLabel =
-            focus === 'open_now'
-              ? t('Abertos agora', 'Abiertos ahora', 'Open now')
-              : t('Base de referência', 'Base de referencia', 'Reference base');
-          const modeNote =
-            pd.run?.discoveryMode === 'web'
-              ? t(' (pesquisa web)', ' (búsqueda web)', ' (web search)')
-              : t(' (base de conhecimento)', ' (base de conocimiento)', ' (knowledge base)');
-          setMsg(
-            n > 0
-              ? t(
-                  `${focusLabel}: ${n} candidatos${modeNote}.`,
-                  `${focusLabel}: ${n} candidatos${modeNote}.`,
-                  `${focusLabel}: ${n} candidates${modeNote}.`,
-                )
-              : fallbackReason.startsWith('web_failed')
-                ? t(
-                    'A pesquisa web falhou. Tente de novo daqui a um minuto.',
-                    'La búsqueda web falló. Intente de nuevo en un minuto.',
-                    'Web search failed. Try again in a minute.',
-                  )
-                : t(
-                    'Pesquisa concluída sem convocatórias novas — as que já estão na mesa foram ignoradas de propósito. Guarde ou descarte as antigas, ou alargue temas.',
-                    'Búsqueda terminada sin convocatorias nuevas: las que ya están en la mesa se ignoraron a propósito. Guarde o descarte las antiguas, o amplíe temas.',
-                    'Search finished with no new calls — items already on the desk were skipped on purpose. Save or discard the old ones, or widen themes.',
-                  ),
-          );
-          finished = true;
-          break;
-        }
-        if (st === 'failed') {
-          throw new Error(
-            t(
-              'A varredura falhou. Verifique a chave LLM e tente de novo.',
-              'El barrido falló. Verifique la clave LLM.',
-              'Scan failed. Check LLM key and retry.',
-            ),
-          );
-        }
-        if (attempts === 1 || attempts % 5 === 0) {
-          setMsg(t('A pesquisar…', 'Buscando…', 'Searching…'));
-        }
+      if (activeWatchId.current !== runId) {
+        void watchRun(runId, focus, startedAt);
       }
-
-      if (!finished) {
-        setScanUi('error');
-        setMsg(
-          t(
-            'A pesquisa ainda corre no servidor (5–8 min). Recarregue daqui a um minuto — os resultados aparecem quando terminar.',
-            'La búsqueda sigue en el servidor (5–8 min). Recargue en un minuto: los resultados aparecen al terminar.',
-            'Search is still running on the server (5–8 min). Reload in a minute — results appear when it finishes.',
-          ),
-        );
-      }
-
-      await Promise.all([loadScan(), loadCatalog()]);
-      setTab('new');
-      setTimeout(() => {
-        setScanUi((s) => (s === 'done' ? 'idle' : s));
-        setScanPercent(0);
-      }, 1200);
     } catch (e) {
       setScanUi('error');
+      setLongScan(false);
       setMsg(e instanceof Error ? e.message : 'Erro');
-    } finally {
       setScanning(false);
       setScanningShortcutId(null);
     }
@@ -699,7 +730,13 @@ export default function OpportunityDiscoverPage() {
           )}
           <p className="min-w-0 flex-1">
             {scanning && scanUi === 'running'
-              ? t(`A pesquisar… ${scanPercent}%`, `Buscando… ${scanPercent}%`, `Searching… ${scanPercent}%`)
+              ? longScan
+                ? t(
+                    `A pesquisar… ${scanPercent}% — os resultados aparecem aqui ao terminar.`,
+                    `Buscando… ${scanPercent}% — los resultados aparecen aquí al terminar.`,
+                    `Searching… ${scanPercent}% — results appear here when it finishes.`,
+                  )
+                : t(`A pesquisar… ${scanPercent}%`, `Buscando… ${scanPercent}%`, `Searching… ${scanPercent}%`)
               : msg}
           </p>
         </div>
@@ -869,7 +906,11 @@ export default function OpportunityDiscoverPage() {
               </h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-gray-600">
                 {scanning
-                  ? t('Um ou dois minutos. O anel mostra o avanço.', 'Uno o dos minutos. El anillo muestra el avance.', 'A minute or two. The ring shows progress.')
+                  ? t(
+                      'Pode demorar vários minutos. Os resultados aparecem nesta página quando a pesquisa terminar.',
+                      'Puede tardar varios minutos. Los resultados aparecen en esta página al terminar la búsqueda.',
+                      'This can take several minutes. Results show up on this page when the search finishes.',
+                    )
                   : discoveryFocus === 'open_now'
                     ? t('Clique em Buscar abertos agora.', 'Pulse Buscar abiertos ahora.', 'Click Find open calls.')
                     : t('Clique em Mapear programas.', 'Pulse Mapear programas.', 'Click Map programs.')}
