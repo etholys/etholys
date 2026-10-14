@@ -7,6 +7,7 @@ import type {
   OrgKindForFunding,
   RevenueYear,
 } from '@/lib/opportunity/scan-types';
+import { normalizeLegalCountries } from '@/lib/opportunity/legal-countries';
 import { OPPORTUNITY_KINDS } from '@/lib/opportunity/scan-types';
 
 type PreferencesJson = {
@@ -107,12 +108,12 @@ export async function readOpportunityBriefing(companyId: string): Promise<Opport
     themes.push(company.businessActivity);
   }
 
-  const legalCountries =
-    Array.isArray(prefs.legalCountries) && prefs.legalCountries.length
-      ? prefs.legalCountries.map(String).map((s) => s.trim()).filter(Boolean).slice(0, 20)
-      : company?.incorporationCountry
-        ? [company.incorporationCountry]
-        : [];
+  const storedLegal = normalizeLegalCountries(prefs.legalCountries);
+  const legalCountries = storedLegal.length
+    ? storedLegal
+    : company?.incorporationCountry
+      ? normalizeLegalCountries(company.incorporationCountry)
+      : [];
 
   return {
     themes,
@@ -166,7 +167,8 @@ export async function writeOpportunityBriefing(
     privateEligible: briefing.privateEligible,
     reimbursable: briefing.reimbursable,
     orgKind: briefing.orgKind,
-    legalCountries: briefing.legalCountries?.slice(0, 20),
+    legalCountries:
+      briefing.legalCountries == null ? undefined : normalizeLegalCountries(briefing.legalCountries),
     yearsOperating: briefing.yearsOperating,
     maturityLevel: briefing.maturityLevel,
     hasAuditLast5Years: briefing.hasAuditLast5Years,

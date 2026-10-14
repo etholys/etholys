@@ -177,6 +177,14 @@ export function EligibilityProfileForm() {
                 setBriefing({ ...briefing, legalCountries: next });
                 setCountryDraft('');
               }}
+              onBlur={() => {
+                if (!countryDraft.trim()) return;
+                setBriefing({
+                  ...briefing,
+                  legalCountries: mergeLegalCountries(briefing.legalCountries ?? [], countryDraft),
+                });
+                setCountryDraft('');
+              }}
               placeholder={t('Ex.: Uruguay', 'Ej.: Uruguay', 'e.g. Uruguay')}
             />
             <button

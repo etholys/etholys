@@ -17,3 +17,15 @@ export function mergeLegalCountries(current: string[], raw: string, max = MAX_LE
   }
   return next;
 }
+
+/** Lista persistida: array, texto com vírgulas, ou um único elemento que ainda traz vários países. */
+export function normalizeLegalCountries(raw: unknown, max = MAX_LEGAL_COUNTRIES): string[] {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) {
+    return raw.reduce<string[]>(
+      (acc, item) => mergeLegalCountries(acc, String(item ?? ''), max),
+      [],
+    );
+  }
+  return mergeLegalCountries([], String(raw), max);
+}
