@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ShieldCheck, Building2, ArrowRight, Radar, Network } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Building2, ArrowRight, Radar, Network, ChevronDown } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { MonitoredSourcesPanel } from '@/components/opportunity/MonitoredSourcesPanel';
 import { EligibilityProfileForm } from '@/components/fundhub/EligibilityProfileForm';
+import { CompanyIdentityForm } from '@/components/fundhub/CompanyIdentityForm';
 import { SuccessFeePanel } from '@/components/fundhub/SuccessFeePanel';
 
 export default function FundHubSettingsPage() {
@@ -24,18 +25,20 @@ export default function FundHubSettingsPage() {
             {t('Definições', 'Ajustes', 'Settings')}
           </h1>
           <p className="mt-2 text-sm text-gray-400">
-            {t('Elegibilidade, fontes e acesso.', 'Elegibilidad, fuentes y acceso.', 'Eligibility, sources, and access.')}
+            {t(
+              'Quem somos e a elegibilidade ficam à vista. O resto abre só quando precisares.',
+              'Quiénes somos y la elegibilidad quedan a la vista. El resto se abre solo cuando lo necesitas.',
+              'Who we are and eligibility stay in view. The rest opens only when you need it.',
+            )}
           </p>
         </div>
 
-        <div className="mb-8">
+        <div className="space-y-4">
+          <CompanyIdentityForm />
           <EligibilityProfileForm />
-          <div className="mt-4">
-            <SuccessFeePanel />
-          </div>
           <Link
             href="/hub/fundhub/crm"
-            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-amber-300 hover:underline"
+            className="inline-flex items-center gap-1 text-sm font-medium text-amber-300 hover:underline"
           >
             <Network className="h-4 w-4" />
             {t('Abrir Rede (perfil · aliados · doadores)', 'Abrir Red (perfil · aliados · donantes)', 'Open Network (profile · allies · donors)')}
@@ -43,14 +46,29 @@ export default function FundHubSettingsPage() {
           </Link>
         </div>
 
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-            {t('Extras opcionais', 'Extras opcionales', 'Optional extras')}
-          </h2>
-          <MonitoredSourcesPanel />
-        </section>
+        <details className="group mt-8 rounded-2xl border border-gray-200 bg-white">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+            <span>
+              <span className="block text-sm font-semibold text-gray-900">
+                {t('Extras opcionais', 'Extras opcionales', 'Optional extras')}
+              </span>
+              <span className="mt-0.5 block text-xs text-gray-500">
+                {t(
+                  'Success fee e portais oficiais — fechados para a página caber num olhar.',
+                  'Success fee y portales oficiales — cerrados para que la página se lea de un vistazo.',
+                  'Success fee and official portals — closed so the page stays scannable.',
+                )}
+              </span>
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 transition group-open:rotate-180" />
+          </summary>
+          <div className="space-y-4 border-t border-gray-100 px-5 py-4">
+            <SuccessFeePanel />
+            <MonitoredSourcesPanel />
+          </div>
+        </details>
 
-        <section className="mt-8 grid gap-4 sm:grid-cols-2">
+        <section className="mt-6 grid gap-4 sm:grid-cols-2">
           <Link
             href="/hub/admin?s=access"
             className="group rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md"
@@ -82,8 +100,8 @@ export default function FundHubSettingsPage() {
           </Link>
 
           <Link
-            href="/hub/admin"
-            className="group rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-slate-400 hover:shadow-md"
+            href="/hub/admin?s=org-profile"
+            className="group rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-slate-400 hover:shadow-md sm:col-span-2"
           >
             <div className="flex items-center gap-2 text-slate-800">
               <Building2 className="h-5 w-5" />
@@ -91,6 +109,13 @@ export default function FundHubSettingsPage() {
                 {t('Administração Etholys', 'Administración Etholys', 'Etholys administration')}
               </span>
             </div>
+            <p className="mt-2 text-sm text-gray-600">
+              {t(
+                'O mesmo perfil da empresa — quem somos, missão e visão.',
+                'El mismo perfil de la empresa — quiénes somos, misión y visión.',
+                'The same company profile — who we are, mission, and vision.',
+              )}
+            </p>
           </Link>
         </section>
       </main>

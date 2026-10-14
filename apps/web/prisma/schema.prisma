@@ -173,6 +173,9 @@ model Company {
   name                        String
   shortName                   String
   description                 String?
+  /// Missão e visão: um só registo (administração Etholys e espelho no FundHub).
+  mission                     String?                  @db.Text
+  vision                      String?                  @db.Text
   logo                        String?
   color                       String                       @default("#0D9488")
   currency                    String                       @default("USD")

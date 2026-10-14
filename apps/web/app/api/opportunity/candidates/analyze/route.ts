@@ -11,6 +11,7 @@ import {
 import { COMPANY_SECTORS, type CompanyContextSetup } from '@/lib/company-context-setup';
 import { formatApplicantProfileForAnalysis } from '@/lib/opportunity/applicant-profile';
 import { readOpportunityBriefing } from '@/lib/opportunity/briefing';
+import { loadCompanyIdentity } from '@/lib/fundhub/load-company-identity';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import type { ScanCandidate } from '@/lib/opportunity/scan-types';
 
@@ -28,13 +29,15 @@ function sectorLabels(ctx: CompanyContextSetup | null): string[] {
 }
 
 async function loadApplicantBlock(companyId: string): Promise<string> {
-  const [company, briefing] = await Promise.all([
+  const [company, briefing, identity] = await Promise.all([
     prisma.company.findUnique({
       where: { id: companyId },
       select: {
         name: true,
         shortName: true,
         description: true,
+        mission: true,
+        vision: true,
         businessActivity: true,
         incorporationCountry: true,
         entityType: true,
@@ -42,6 +45,7 @@ async function loadApplicantBlock(companyId: string): Promise<string> {
       },
     }),
     readOpportunityBriefing(companyId),
+    loadCompanyIdentity(companyId),
   ]);
   if (!company) return '';
   const ctx =
@@ -50,11 +54,15 @@ async function loadApplicantBlock(companyId: string): Promise<string> {
     (company.contextSetupJson as { v?: unknown }).v === 1
       ? (company.contextSetupJson as CompanyContextSetup)
       : null;
+  const sector = company.businessActivity?.trim() || identity?.atlas.sector || null;
   return formatApplicantProfileForAnalysis({
     name: company.name,
     shortName: company.shortName,
     description: company.description,
-    sector: company.businessActivity,
+    mission: company.mission,
+    vision: company.vision,
+    siepAtlasSummary: identity?.siepAtlasSummary,
+    sector,
     country: company.incorporationCountry,
     entityType: company.entityType,
     entityKind: ctx?.entityKind,
@@ -130,8 +138,10 @@ export async function POST(req: NextRequest) {
   const system = `És um analista sénior de captação de fundos (FundHub / Etholys).
 Responde SEMPRE em ${lang} (idioma da interface do Hub: ${locale}). Mesmo que a pergunta venha noutro idioma, responde em ${lang}.
 Baseia-te nos dados do candidato, na página da convocatória, nos documentos oficiais, no texto extraído das bases e no perfil da organização já registado.
-O perfil da empresa JÁ existe. Nunca digas que não sabes que empresa é, nem perguntes o tipo de organização, o sector ou o país se esses dados estiverem no perfil.
-Se faltar um campo, diz só qual parte do registo inicial completar para o encaixe ficar mais preciso.
+O perfil da empresa JÁ existe. Nunca digas que a empresa é desconhecida nem que não sabes quem é, se o nome estiver no perfil.
+Não perguntes de novo o tipo de organização, o sector, o país, a missão ou a visão se esses dados estiverem no perfil.
+Se um campo estiver vazio, nomeia só essa parte em falta (quem é a empresa, missão, visão, sector, países, tipo de organização ou sinais SIEP/ATLAS).
+Os projectos SIEP e a actividade ATLAS já vêm resumidos: não peças para os reescrever.
 Se o utilizador pedir para ver as bases, cita só o texto extraído.
 Se não houver página/documentos oficiais, diz que a oportunidade pode ser genérica ou não verificada.
 Não inventes deadlines, montantes, elegibilidade nem anexos.

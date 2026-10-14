@@ -185,35 +185,44 @@ export function MonitoredSourcesPanel({ compact }: { compact?: boolean }) {
           {t('Nenhum extra — a busca usa os critérios.', 'Sin extras — la búsqueda usa los criterios.', 'No extras — search uses your criteria.')}
         </p>
       ) : (
-        <ul className="mt-3 space-y-2">
-          {sources.map((s) => (
-            <li
-              key={s.id}
-              className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-gray-800">{s.label}</p>
-                <a
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="truncate text-xs text-amber-700 hover:underline"
-                >
-                  {s.url}
-                </a>
-              </div>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void remove(s.id)}
-                className="shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                title={t('Remover', 'Eliminar', 'Remove')}
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs font-medium text-gray-600">
+            {t(
+              `${sources.length} portal(is) na lista — abrir para ver ou remover`,
+              `${sources.length} portal(es) en la lista — abrir para ver o quitar`,
+              `${sources.length} portal(s) on the list — open to view or remove`,
+            )}
+          </summary>
+          <ul className="mt-2 space-y-2">
+            {sources.map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
               >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </li>
-          ))}
-        </ul>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-800">{s.label}</p>
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate text-xs text-amber-700 hover:underline"
+                  >
+                    {s.url}
+                  </a>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void remove(s.id)}
+                  className="shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                  title={t('Remover', 'Eliminar', 'Remove')}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );

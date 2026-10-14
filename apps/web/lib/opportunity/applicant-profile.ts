@@ -23,6 +23,9 @@ export type ApplicantProfileSource = {
   name: string;
   shortName?: string | null;
   description?: string | null;
+  mission?: string | null;
+  vision?: string | null;
+  siepAtlasSummary?: string | null;
   sector?: string | null;
   country?: string | null;
   entityType?: string | null;
@@ -56,6 +59,9 @@ export function formatApplicantProfileForAnalysis(src: ApplicantProfileSource): 
   hasProfile: boolean;
 } {
   const description = clean(src.description);
+  const mission = clean(src.mission);
+  const vision = clean(src.vision);
+  const siepAtlas = clean(src.siepAtlasSummary);
   const sector = clean(src.sector);
   const country = clean(src.country);
   const themes = src.briefing.themes.map((t) => t.trim()).filter(Boolean);
@@ -71,7 +77,9 @@ export function formatApplicantProfileForAnalysis(src: ApplicantProfileSource): 
     `Nome: ${clean(src.name) || 'organização da conta'}`,
     clean(src.shortName) && clean(src.shortName) !== clean(src.name) ? `Nome curto: ${clean(src.shortName)}` : '',
     orgType ? `Tipo de organização: ${orgType}` : '',
-    description ? `Descrição: ${description.slice(0, 1200)}` : '',
+    description ? `Quem é: ${description.slice(0, 1200)}` : '',
+    mission ? `Missão: ${mission.slice(0, 800)}` : '',
+    vision ? `Visão: ${vision.slice(0, 800)}` : '',
     sector ? `Sector / actividade: ${sector}` : '',
     sectors.length ? `Temáticas do registo: ${sectors.join(', ')}` : '',
     country ? `País de constituição: ${country}` : '',
@@ -88,16 +96,20 @@ export function formatApplicantProfileForAnalysis(src: ApplicantProfileSource): 
         ? 'Auditoria externa nos últimos 5 anos: não'
         : '',
     revenueLine(src.briefing.revenueByYear) ? `Faturamento: ${revenueLine(src.briefing.revenueByYear)}` : '',
+    siepAtlas ? `O que SIEP e ATLAS já registam:\n${siepAtlas.slice(0, 1200)}` : '',
     notes ? `Notas do registo: ${notes.slice(0, 800)}` : '',
     extraNotes ? `Notas de captação: ${extraNotes.slice(0, 800)}` : '',
   ].filter(Boolean);
 
   const missing = [
     orgType ? '' : 'tipo de organização',
-    description ? '' : 'descrição da organização',
+    description ? '' : 'quem é a empresa',
+    mission ? '' : 'missão',
+    vision ? '' : 'visão',
     sector || sectors.length ? '' : 'sector / actividade',
-    country || countries.length ? '' : 'país',
+    country || countries.length || src.briefing.legalCountries?.length ? '' : 'país',
     themes.length ? '' : 'temas de captação',
+    siepAtlas ? '' : 'sinais SIEP/ATLAS (projectos, sector, país, actividade)',
     src.briefing.yearsOperating != null ? '' : 'anos de operação',
     src.briefing.hasAuditLast5Years == null ? 'auditoria externa' : '',
     src.briefing.revenueByYear?.length ? '' : 'faturamento',
@@ -112,8 +124,8 @@ export function formatApplicantProfileForAnalysis(src: ApplicantProfileSource): 
     ...known,
     missingLine,
     hasProfile
-      ? 'Este perfil já está registado. Não perguntes de novo quem é a empresa nem o tipo de organização se isso já estiver acima. Se faltar um campo, indica só essa parte do registo inicial.'
-      : 'Há uma conta de empresa, mas o registo inicial está quase vazio. Não digas que a empresa não existe: pede para completar as partes em falta no registo.',
+      ? 'Este perfil já está registado. Não perguntes de novo quem é a empresa nem o tipo de organização se isso já estiver acima. Se um campo estiver vazio, nomeia só essa parte em falta (missão, visão, quem é, sector, países, tipo ou sinais SIEP/ATLAS). Não digas que a empresa é desconhecida.'
+      : 'Há uma conta de empresa e o nome está acima. O registo inicial está quase vazio. Não digas que a empresa não existe nem que é desconhecida: nomeia as partes em falta no registo.',
   ].join('\n');
 
   return { block, hasProfile };

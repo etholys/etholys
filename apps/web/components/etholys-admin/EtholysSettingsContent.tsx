@@ -74,6 +74,8 @@ export function EtholysSettingsContent({
     name: '',
     shortName: '',
     description: '',
+    mission: '',
+    vision: '',
     color: '#0D9488',
     currency: 'USD',
   });
@@ -186,6 +188,8 @@ export function EtholysSettingsContent({
       name: c.name,
       shortName: c.shortName,
       description: c.description || '',
+      mission: c.mission || '',
+      vision: c.vision || '',
       color: c.color || '#0D9488',
       currency: c.currency || 'USD',
     });
@@ -210,7 +214,7 @@ export function EtholysSettingsContent({
     }
     setShowAddCompany(false);
     setEditCompany(null);
-    setCompanyForm({ name: '', shortName: '', description: '', color: '#0D9488', currency: 'USD' });
+    setCompanyForm({ name: '', shortName: '', description: '', mission: '', vision: '', color: '#0D9488', currency: 'USD' });
     fetchData();
     setSaving(false);
   };
@@ -478,7 +482,7 @@ export function EtholysSettingsContent({
               type="button"
               onClick={() => {
                 setEditCompany(null);
-                setCompanyForm({ name: '', shortName: '', description: '', color: '#0D9488', currency: 'USD' });
+                setCompanyForm({ name: '', shortName: '', description: '', mission: '', vision: '', color: '#0D9488', currency: 'USD' });
                 setShowAddCompany(true);
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition ${btnSoft}`}
@@ -523,7 +527,9 @@ export function EtholysSettingsContent({
                 <input required placeholder="Nombre" value={companyForm.name} onChange={(e) => setCompanyForm({ ...companyForm, name: e.target.value })} className="px-3 py-2 rounded-lg border text-sm" />
                 <input required placeholder="Abreviación" value={companyForm.shortName} onChange={(e) => setCompanyForm({ ...companyForm, shortName: e.target.value })} className="px-3 py-2 rounded-lg border text-sm" />
               </div>
-              <input placeholder="Descripción" value={companyForm.description} onChange={(e) => setCompanyForm({ ...companyForm, description: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm" />
+              <textarea placeholder={locale === 'pt' ? 'Quem é a empresa' : locale === 'en' ? 'Who the company is' : 'Quién es la empresa'} value={companyForm.description} onChange={(e) => setCompanyForm({ ...companyForm, description: e.target.value })} rows={2} className="w-full px-3 py-2 rounded-lg border text-sm" />
+              <textarea placeholder={locale === 'pt' ? 'Missão' : locale === 'en' ? 'Mission' : 'Misión'} value={companyForm.mission} onChange={(e) => setCompanyForm({ ...companyForm, mission: e.target.value })} rows={2} className="w-full px-3 py-2 rounded-lg border text-sm" />
+              <textarea placeholder={locale === 'pt' ? 'Visão' : locale === 'en' ? 'Vision' : 'Visión'} value={companyForm.vision} onChange={(e) => setCompanyForm({ ...companyForm, vision: e.target.value })} rows={2} className="w-full px-3 py-2 rounded-lg border text-sm" />
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-2">
                   <label className="text-sm text-gray-600">Color:</label>

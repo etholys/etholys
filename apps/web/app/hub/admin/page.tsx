@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { EtholysSettingsContent } from '@/components/etholys-admin/EtholysSettingsContent';
+import { CompanyIdentityForm } from '@/components/fundhub/CompanyIdentityForm';
 import { BillingConsole } from '@/components/etholys-admin/BillingConsole';
 import { AdminSetupGuide, type AdminSetupStepId } from '@/components/etholys-admin/AdminSetupGuide';
 import { WorkspaceAccessManager } from '@/components/workspace/WorkspaceAccessManager';
@@ -190,6 +191,7 @@ function AdminSectionBody() {
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
+        <CompanyIdentityForm showSignals={false} />
       </div>
     );
   }
