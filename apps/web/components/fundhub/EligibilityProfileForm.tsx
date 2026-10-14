@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Plus, Save, X } from 'lucide-react';
+import { mergeLegalCountries } from '@/lib/opportunity/legal-countries';
 import type { OpportunityBriefing, OrgKindForFunding, RevenueYear } from '@/lib/opportunity/scan-types';
 
 const ORG_OPTIONS: Array<{ id: OrgKindForFunding; pt: string; es: string; en: string }> = [
@@ -26,6 +27,7 @@ export function EligibilityProfileForm() {
     locale === 'pt' ? pt : locale === 'es' ? es : en;
 
   const [briefing, setBriefing] = useState<OpportunityBriefing | null>(null);
+  const [countryDraft, setCountryDraft] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -48,13 +50,19 @@ export function EligibilityProfileForm() {
 
   const save = async () => {
     if (!companyId || !briefing) return;
+    const toSave: OpportunityBriefing = {
+      ...briefing,
+      legalCountries: mergeLegalCountries(briefing.legalCountries ?? [], countryDraft),
+    };
+    setBriefing(toSave);
+    setCountryDraft('');
     setSaving(true);
     setMsg(null);
     try {
       const r = await fetch(`/api/opportunity/briefing?companyId=${encodeURIComponent(companyId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ briefing }),
+        body: JSON.stringify({ briefing: toSave }),
       });
       if (!r.ok) throw new Error('save failed');
       const d = (await r.json()) as { briefing?: OpportunityBriefing };
@@ -123,25 +131,68 @@ export function EligibilityProfileForm() {
           </select>
         </label>
 
-        <label className="block text-sm">
+        <div className="block text-sm sm:col-span-2">
           <span className="font-medium text-gray-700">
             {t('Países de registo jurídico', 'Países de registro jurídico', 'Legal registration countries')}
           </span>
-          <input
-            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900"
-            value={(briefing.legalCountries ?? []).join(', ')}
-            onChange={(e) =>
-              setBriefing({
-                ...briefing,
-                legalCountries: e.target.value
-                  .split(/[,;]+/)
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              })
-            }
-            placeholder="Honduras, Guatemala, Perú"
-          />
-        </label>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {t(
+              'Podes acrescentar vários. Um país de cada vez, ou vários separados por vírgula.',
+              'Puedes agregar varios. Un país a la vez, o varios separados por coma.',
+              'You can add several. One country at a time, or several separated by commas.',
+            )}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(briefing.legalCountries ?? []).map((country) => (
+              <span
+                key={country}
+                className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-800 ring-1 ring-gray-200"
+              >
+                {country}
+                <button
+                  type="button"
+                  aria-label={t(`Remover ${country}`, `Quitar ${country}`, `Remove ${country}`)}
+                  onClick={() =>
+                    setBriefing({
+                      ...briefing,
+                      legalCountries: (briefing.legalCountries ?? []).filter((c) => c !== country),
+                    })
+                  }
+                  className="rounded-full p-0.5 text-gray-500 hover:text-gray-900"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="mt-2 flex gap-2">
+            <input
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900"
+              value={countryDraft}
+              onChange={(e) => setCountryDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' && e.key !== ',') return;
+                e.preventDefault();
+                const next = mergeLegalCountries(briefing.legalCountries ?? [], countryDraft);
+                setBriefing({ ...briefing, legalCountries: next });
+                setCountryDraft('');
+              }}
+              placeholder={t('Ex.: Uruguay', 'Ej.: Uruguay', 'e.g. Uruguay')}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const next = mergeLegalCountries(briefing.legalCountries ?? [], countryDraft);
+                setBriefing({ ...briefing, legalCountries: next });
+                setCountryDraft('');
+              }}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-100"
+            >
+              <Plus className="h-4 w-4" />
+              {t('Adicionar', 'Agregar', 'Add')}
+            </button>
+          </div>
+        </div>
 
         <label className="block text-sm">
           <span className="font-medium text-gray-700">
