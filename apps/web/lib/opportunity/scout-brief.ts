@@ -39,7 +39,7 @@ export function formatOpportunityScoutBrief(b: OpportunityBriefing): string {
         ? 'Auditoria externa nos últimos 5 anos: não'
         : '',
     b.revenueByYear?.length
-      ? `Faturamento (USD): ${b.revenueByYear.map((r) => `${r.year}=${r.amountUsd}`).join('; ')}`
+      ? 'Faturamento anual: registado na administração da empresa (não repetir valores).'
       : '',
     `Classificações a etiquetar: ${classes}`,
     b.notes

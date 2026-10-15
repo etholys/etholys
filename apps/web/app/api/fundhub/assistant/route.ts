@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
     `Registo jurídico: ${(briefing.legalCountries ?? []).join(', ') || '—'}`,
     `Auditoria 5 anos: ${briefing.hasAuditLast5Years == null ? '—' : briefing.hasAuditLast5Years ? 'sim' : 'não'}`,
     `Anos operação: ${briefing.yearsOperating ?? '—'} / maturidade: ${briefing.maturityLevel ?? '—'}`,
-    `Faturamento anos: ${briefing.revenueByYear?.map((r) => `${r.year}:${r.amountUsd}`).join(', ') || '—'}`,
+    `Faturamento: ${briefing.revenueByYear?.length ? 'registado na administração (valores não disponíveis aqui)' : 'ainda não registado na administração'}`,
     `Lacunas de perfil: ${profileGaps.join(', ') || 'nenhuma crítica'}`,
     `Inbox por decidir: ${inbox.pending.length} (open ${inbox.pendingOpen.length}, ref ${inbox.pendingReference.length}); mais tarde: ${inbox.later.length}`,
     `Fundos em catálogo/em curso: ${fundsCount}`,

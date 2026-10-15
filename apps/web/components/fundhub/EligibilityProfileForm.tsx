@@ -5,7 +5,7 @@ import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
 import { Loader2, Plus, Save, X } from 'lucide-react';
 import { mergeLegalCountries } from '@/lib/opportunity/legal-countries';
-import type { OpportunityBriefing, OrgKindForFunding, RevenueYear } from '@/lib/opportunity/scan-types';
+import type { OpportunityBriefing, OrgKindForFunding } from '@/lib/opportunity/scan-types';
 
 const ORG_OPTIONS: Array<{ id: OrgKindForFunding; pt: string; es: string; en: string }> = [
   { id: 'ngo', pt: 'ONG', es: 'ONG', en: 'NGO' },
@@ -84,15 +84,6 @@ export function EligibilityProfileForm() {
       </div>
     );
   }
-
-  const year = new Date().getFullYear();
-  const revenue: RevenueYear[] = briefing.revenueByYear?.length
-    ? briefing.revenueByYear
-    : [
-        { year: year - 1, amountUsd: 0 },
-        { year: year - 2, amountUsd: 0 },
-        { year: year - 3, amountUsd: 0 },
-      ];
 
   return (
     <section className="rounded-2xl border border-amber-500/30 bg-white p-5 shadow-sm">
@@ -265,32 +256,13 @@ export function EligibilityProfileForm() {
         </label>
       </div>
 
-      <div className="mt-4">
-        <p className="text-sm font-medium text-gray-700">
-          {t('Faturamento anual (USD)', 'Facturación anual (USD)', 'Annual revenue (USD)')}
-        </p>
-        <div className="mt-2 grid gap-2 sm:grid-cols-3">
-          {revenue.map((row, idx) => (
-            <div
-              key={row.year}
-              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5"
-            >
-              <span className="w-12 text-xs font-medium text-gray-600">{row.year}</span>
-              <input
-                type="number"
-                min={0}
-                className="w-full bg-transparent text-sm text-gray-900 outline-none"
-                value={row.amountUsd || ''}
-                onChange={(e) => {
-                  const next = [...revenue];
-                  next[idx] = { ...row, amountUsd: Number(e.target.value) || 0 };
-                  setBriefing({ ...briefing, revenueByYear: next });
-                }}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
+      <p className="mt-4 text-xs text-gray-500">
+        {t(
+          'O faturamento anual fica na administração da empresa. Não aparece aqui.',
+          'La facturación anual queda en la administración de la empresa. No aparece aquí.',
+          'Annual revenue stays in company administration. It does not appear here.',
+        )}
+      </p>
 
       <div className="mt-4 flex items-center gap-3">
         <button

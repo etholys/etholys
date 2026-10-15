@@ -5,12 +5,11 @@ import { useApp } from '@/app/providers';
 import { ArrowLeft } from 'lucide-react';
 
 const SUBS = [
-  { href: '/hub/fundhub/crm/perfil', pt: 'Perfil institucional', es: 'Perfil institucional', en: 'Institutional profile' },
   { href: '/hub/fundhub/crm/aliados', pt: 'Aliados', es: 'Aliados', en: 'Allies' },
   { href: '/hub/fundhub/crm/donantes', pt: 'Doadores / financiadores', es: 'Donantes / financiadores', en: 'Donors / funders' },
 ] as const;
 
-export function CrmSubnav({ active }: { active: 'dashboard' | 'perfil' | 'aliados' | 'donantes' }) {
+export function CrmSubnav({ active }: { active: 'dashboard' | 'aliados' | 'donantes' }) {
   const { locale } = useApp();
   const t = (pt: string, es: string, en: string) =>
     locale === 'pt' ? pt : locale === 'es' ? es : en;

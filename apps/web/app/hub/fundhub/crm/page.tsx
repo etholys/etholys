@@ -59,9 +59,9 @@ export default function FundHubCrmDashboardPage() {
 
   const pillars = [
     {
-      href: '/hub/fundhub/crm/perfil',
+      href: '/hub/fundhub/settings?s=eligibility',
       icon: Building2,
-      title: t('Perfil institucional', 'Perfil institucional', 'Institutional profile'),
+      title: t('Elegibilidade', 'Elegibilidad', 'Eligibility'),
       value: snap
         ? snap.profile.ready
           ? t('Pronto', 'Listo', 'Ready')

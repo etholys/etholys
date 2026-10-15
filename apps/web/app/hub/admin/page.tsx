@@ -13,6 +13,7 @@ import {
 import { useApp } from '@/app/providers';
 import { EtholysSettingsContent } from '@/components/etholys-admin/EtholysSettingsContent';
 import { CompanyIdentityForm } from '@/components/fundhub/CompanyIdentityForm';
+import { CompanyRevenueForm } from '@/components/hub/CompanyRevenueForm';
 import { BillingConsole } from '@/components/etholys-admin/BillingConsole';
 import { AdminSetupGuide, type AdminSetupStepId } from '@/components/etholys-admin/AdminSetupGuide';
 import { WorkspaceAccessManager } from '@/components/workspace/WorkspaceAccessManager';
@@ -192,6 +193,7 @@ function AdminSectionBody() {
           </Link>
         </div>
         <CompanyIdentityForm showSignals={false} />
+        <CompanyRevenueForm />
       </div>
     );
   }

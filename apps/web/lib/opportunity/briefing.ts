@@ -86,7 +86,13 @@ export async function readOpportunityBriefing(companyId: string): Promise<Opport
     prisma.fundingCaptureProfile.findUnique({ where: { companyId } }),
     prisma.company.findUnique({
       where: { id: companyId },
-      select: { businessActivity: true, incorporationCountry: true, description: true, entityType: true },
+      select: {
+        businessActivity: true,
+        incorporationCountry: true,
+        description: true,
+        entityType: true,
+        annualRevenueJson: true,
+      },
     }),
   ]);
 
@@ -147,8 +153,30 @@ export async function readOpportunityBriefing(companyId: string): Promise<Opport
     auditYears: Array.isArray(prefs.auditYears)
       ? prefs.auditYears.map(Number).filter((y) => Number.isFinite(y)).slice(0, 5)
       : undefined,
-    revenueByYear: parseRevenue(prefs.revenueByYear),
+    revenueByYear: await resolveAnnualRevenue(companyId, company?.annualRevenueJson, prefs.revenueByYear),
   };
+}
+
+/** Valores em USD ficam fora das respostas ao FundHub. O encaixe no servidor continua a usá-los. */
+export function briefingForClient(briefing: OpportunityBriefing): OpportunityBriefing {
+  const next = { ...briefing };
+  delete next.revenueByYear;
+  return next;
+}
+
+async function resolveAnnualRevenue(
+  companyId: string,
+  stored: unknown,
+  legacy: unknown,
+): Promise<RevenueYear[] | undefined> {
+  const fromCompany = parseRevenue(stored);
+  if (fromCompany?.length) return fromCompany;
+  const fromPrefs = parseRevenue(legacy);
+  if (!fromPrefs?.length) return undefined;
+  await prisma.company
+    .update({ where: { id: companyId }, data: { annualRevenueJson: fromPrefs } })
+    .catch(() => {});
+  return fromPrefs;
 }
 
 export async function writeOpportunityBriefing(
@@ -156,6 +184,27 @@ export async function writeOpportunityBriefing(
   briefing: OpportunityBriefing,
 ): Promise<OpportunityBriefing> {
   const existing = await prisma.fundingCaptureProfile.findUnique({ where: { companyId } });
+  let existingPrefs: PreferencesJson = {};
+  if (existing?.preferencesJson) {
+    try {
+      existingPrefs = JSON.parse(existing.preferencesJson) as PreferencesJson;
+    } catch {
+      existingPrefs = {};
+    }
+  }
+  const legacyRevenue = parseRevenue(existingPrefs.revenueByYear);
+  if (legacyRevenue?.length) {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { annualRevenueJson: true },
+    });
+    if (!parseRevenue(company?.annualRevenueJson)?.length) {
+      await prisma.company.update({
+        where: { id: companyId },
+        data: { annualRevenueJson: legacyRevenue },
+      });
+    }
+  }
   const prefs: PreferencesJson = {
     briefingNotes: briefing.notes?.trim() || undefined,
     amountMin: briefing.amountMin,
@@ -173,7 +222,6 @@ export async function writeOpportunityBriefing(
     maturityLevel: briefing.maturityLevel,
     hasAuditLast5Years: briefing.hasAuditLast5Years,
     auditYears: briefing.auditYears?.slice(0, 5),
-    revenueByYear: briefing.revenueByYear?.slice(0, 5),
   };
 
   const data = {
@@ -201,4 +249,18 @@ export async function writeOpportunityBriefing(
   }
 
   return readOpportunityBriefing(companyId);
+}
+
+export async function readAnnualRevenue(companyId: string): Promise<RevenueYear[]> {
+  const briefing = await readOpportunityBriefing(companyId);
+  return briefing.revenueByYear ?? [];
+}
+
+export async function writeAnnualRevenue(companyId: string, rows: unknown): Promise<RevenueYear[]> {
+  const clean = parseRevenue(rows) ?? [];
+  await prisma.company.update({
+    where: { id: companyId },
+    data: { annualRevenueJson: clean },
+  });
+  return clean;
 }

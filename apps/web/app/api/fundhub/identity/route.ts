@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { loadCompanyIdentity } from '@/lib/fundhub/load-company-identity';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
+import { isCompanyAdmin } from '@/lib/integrated-workspace';
 
 function textOrNull(value: unknown): string | null | undefined {
   if (value === undefined) return undefined;
@@ -23,6 +24,9 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const ctx = await resolveOpportunityCompanyId(req.nextUrl.searchParams.get('companyId'));
   if (!ctx) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+  if (!(await isCompanyAdmin(ctx.userId, ctx.companyId))) {
+    return NextResponse.json({ error: 'Só a administração da empresa edita este registo.' }, { status: 403 });
+  }
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });

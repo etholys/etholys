@@ -30,7 +30,7 @@ export function ContentLibraryPanel() {
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [kind, setKind] = useState<ContentLibrarySnippet['kind']>('mission');
+  const [kind, setKind] = useState<ContentLibrarySnippet['kind']>('capacity');
 
   const load = useCallback(async () => {
     if (!ok) return;

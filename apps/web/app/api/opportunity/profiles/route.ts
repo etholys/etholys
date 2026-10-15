@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { writeOpportunityBriefing } from '@/lib/opportunity/briefing';
+import { briefingForClient, writeOpportunityBriefing } from '@/lib/opportunity/briefing';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import {
   briefingFromOrientationText,
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     companyId: ctx.companyId,
-    profiles,
+    profiles: profiles.map((profile) => ({ ...profile, briefing: briefingForClient(profile.briefing) })),
     activeProfileId: activeId,
   });
 }
@@ -81,8 +81,8 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     companyId: ctx.companyId,
-    profile,
-    briefing,
+    profile: { ...profile, briefing: briefingForClient(profile.briefing) },
+    briefing: briefingForClient(briefing),
   });
 }
 
@@ -106,7 +106,11 @@ export async function PUT(req: NextRequest) {
     classifications: profile.classifications,
   });
 
-  return NextResponse.json({ companyId: ctx.companyId, profile, briefing: profile.briefing });
+  return NextResponse.json({
+    companyId: ctx.companyId,
+    profile: { ...profile, briefing: briefingForClient(profile.briefing) },
+    briefing: briefingForClient(profile.briefing),
+  });
 }
 
 export async function DELETE(req: NextRequest) {

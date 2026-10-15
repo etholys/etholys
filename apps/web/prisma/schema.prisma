@@ -176,6 +176,8 @@ model Company {
   /// Missão e visão: um só registo (administração Etholys e espelho no FundHub).
   mission                     String?                  @db.Text
   vision                      String?                  @db.Text
+  /// Faturamento anual em USD. Só a administração da empresa lê e grava.
+  annualRevenueJson           Json?
   logo                        String?
   color                       String                       @default("#0D9488")
   currency                    String                       @default("USD")

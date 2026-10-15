@@ -1,4 +1,4 @@
-import type { OpportunityBriefing, OrgKindForFunding, RevenueYear } from '@/lib/opportunity/scan-types';
+import type { OpportunityBriefing, OrgKindForFunding } from '@/lib/opportunity/scan-types';
 
 const ORG_KIND_LABEL: Record<OrgKindForFunding, string> = {
   ngo: 'ONG / organização sem fins lucrativos',
@@ -48,11 +48,6 @@ function orgTypeLine(src: ApplicantProfileSource): string {
   return '';
 }
 
-function revenueLine(rows: RevenueYear[] | undefined): string {
-  if (!rows?.length) return '';
-  return rows.map((r) => `${r.year}: ${r.amountUsd} USD`).join('; ');
-}
-
 /** Texto do registo da empresa para a análise de um fundo. */
 export function formatApplicantProfileForAnalysis(src: ApplicantProfileSource): {
   block: string;
@@ -95,7 +90,9 @@ export function formatApplicantProfileForAnalysis(src: ApplicantProfileSource): 
       : src.briefing.hasAuditLast5Years === false
         ? 'Auditoria externa nos últimos 5 anos: não'
         : '',
-    revenueLine(src.briefing.revenueByYear) ? `Faturamento: ${revenueLine(src.briefing.revenueByYear)}` : '',
+    src.briefing.revenueByYear?.length
+      ? 'Faturamento anual: registado na administração da empresa.'
+      : '',
     siepAtlas ? `O que SIEP e ATLAS já registam:\n${siepAtlas.slice(0, 1200)}` : '',
     notes ? `Notas do registo: ${notes.slice(0, 800)}` : '',
     extraNotes ? `Notas de captação: ${extraNotes.slice(0, 800)}` : '',
