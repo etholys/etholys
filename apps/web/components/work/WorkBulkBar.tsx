@@ -11,6 +11,7 @@ export function WorkBulkBar({
   onClear,
   onSelectAll,
   onBulk,
+  onDelete,
   busy,
   t,
 }: {
@@ -19,6 +20,7 @@ export function WorkBulkBar({
   onClear: () => void;
   onSelectAll?: () => void;
   onBulk: (patch: Record<string, unknown>) => Promise<void>;
+  onDelete?: () => void;
   busy?: boolean;
   t: (en: string, es: string, pt: string) => string;
 }) {
@@ -104,6 +106,16 @@ export function WorkBulkBar({
         className="rounded-lg border border-cyan-200 bg-white px-2 py-1 text-xs"
         title={t('Set due date', 'Fecha límite', 'Definir prazo')}
       />
+      {onDelete && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onDelete}
+          className="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-500 disabled:opacity-40"
+        >
+          {t('Delete', 'Eliminar', 'Excluir')}
+        </button>
+      )}
       <button
         type="button"
         disabled={busy}

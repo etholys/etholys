@@ -255,6 +255,40 @@ export default function TasksBoard({
     });
   };
 
+  const deleteTask = async (id: string, title: string) => {
+    if (!confirm(`${t3('Delete this task?', '¿Eliminar esta tarea?', 'Excluir esta tarefa?')} ${title}`)) return;
+    const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+    if (!res.ok) return;
+    setTasks((prev) => prev.filter((task) => task.id !== id));
+    setBulkIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    if (selectedId === id) setSelectedId(null);
+    notifyChanged();
+  };
+
+  const deleteSelected = async () => {
+    if (bulkIds.size === 0) return;
+    if (!confirm(t3(`Delete ${bulkIds.size} tasks?`, `¿Eliminar ${bulkIds.size} tareas?`, `Excluir ${bulkIds.size} tarefas?`))) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch('/api/tasks/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [...bulkIds], delete: true }),
+      });
+      if (res.ok) {
+        setBulkIds(new Set());
+        fetchTasks({ silent: true });
+        notifyChanged();
+      }
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const runBulk = async (patch: Record<string, unknown>) => {
     if (bulkIds.size === 0) return;
     setBulkBusy(true);
@@ -774,6 +808,7 @@ export default function TasksBoard({
                 onClear={() => setBulkIds(new Set())}
                 onSelectAll={() => setBulkIds(new Set(filtered.map((t: any) => t.id)))}
                 onBulk={runBulk}
+                onDelete={() => void deleteSelected()}
                 t={t3}
               />
               <WorkTableBoard
@@ -806,6 +841,7 @@ export default function TasksBoard({
               onColumnsChange={(columns) => void saveBoard({ columns })}
               onNotifyChange={(notifyPrefs) => void saveBoard({ notify: notifyPrefs })}
               onCommentPosted={() => fetchTasks({ silent: true })}
+              onDeleteTask={(id, title) => void deleteTask(id, title)}
             />
             </>
           ) : (

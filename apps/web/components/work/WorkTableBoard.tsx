@@ -84,6 +84,7 @@ export function WorkTableBoard({
   onColumnsChange,
   onNotifyChange,
   onCommentPosted,
+  onDeleteTask,
 }: {
   groups: GroupOpt[];
   ungroupedTasks: TaskRow[];
@@ -114,6 +115,7 @@ export function WorkTableBoard({
   onColumnsChange?: (columns: WorkColumn[]) => void;
   onNotifyChange?: (notify: WorkNotifyPrefs) => void;
   onCommentPosted?: () => void;
+  onDeleteTask?: (id: string, title: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -539,6 +541,16 @@ export function WorkTableBoard({
                               >
                                 {t('Open', 'Abrir', 'Abrir')}
                               </button>
+                              {onDeleteTask && (
+                                <button
+                                  type="button"
+                                  onClick={() => onDeleteTask(task.id, task.title)}
+                                  className="shrink-0 rounded p-1 text-slate-300 hover:bg-rose-50 hover:text-rose-600"
+                                  title={t('Delete', 'Eliminar', 'Excluir')}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                             </div>
                           </td>
                           {columns.map((col) => (

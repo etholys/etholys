@@ -58,8 +58,24 @@ export async function PUT(req: Request) {
     const body = await req.json();
     const ids: string[] = Array.isArray(body.ids) ? body.ids.map(String).filter(Boolean) : [];
     const patch = body.patch && typeof body.patch === 'object' ? body.patch : {};
+    const remove = body.delete === true;
     if (!ids.length) return NextResponse.json({ error: 'ids required' }, { status: 400 });
     if (ids.length > 100) return NextResponse.json({ error: 'max 100 tasks' }, { status: 400 });
+
+    if (remove) {
+      const updated: string[] = [];
+      const skipped: string[] = [];
+      for (const id of ids) {
+        const task = await assertEditable(id, tenant);
+        if (!task) {
+          skipped.push(id);
+          continue;
+        }
+        await prisma.task.update({ where: { id }, data: { isActive: false } });
+        updated.push(id);
+      }
+      return NextResponse.json({ updated: updated.length, skipped: skipped.length, ids: updated });
+    }
 
     const data: Record<string, unknown> = {};
     for (const key of Object.keys(patch)) {
