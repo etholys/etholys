@@ -3,6 +3,8 @@
  * Spec: docs/architecture/etholys-meet.md
  */
 
+import { meetShortCode } from '@/lib/meet/short-link';
+
 export const MEET_MIRRORS = ['loose', 'forge', 'siep', 'nexus'] as const;
 export type MeetMirror = (typeof MEET_MIRRORS)[number];
 
@@ -52,10 +54,9 @@ export function meetAppBaseUrl(): string {
 }
 
 /** Entrada pública no browser — sem conta Etholys e sem app móvel. */
-export function meetGuestJoinPath(sessionId: string, companyId?: string | null): string {
-  const path = `/meet/join/${encodeURIComponent(sessionId)}`;
-  if (!companyId) return path;
-  return `${path}?companyId=${encodeURIComponent(companyId)}`;
+export function meetGuestJoinPath(sessionId: string, _companyId?: string | null): string {
+  // Código curto reversível. A empresa vem da sessão; links antigos /meet/join/… continuam válidos.
+  return `/m/${meetShortCode(sessionId)}`;
 }
 
 /**

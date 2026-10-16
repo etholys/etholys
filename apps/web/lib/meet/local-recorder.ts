@@ -79,8 +79,8 @@ async function saveBlob(blob: Blob, fileName: string): Promise<boolean> {
 export type MeetLocalRecorderOptions = {
   suggestedTitle?: string;
   /**
-   * Sala CHORUS nativa: rejeita só a aba ACTUAL desta reunião (Chrome apaga o vídeo).
-   * Continua a permitir outras abas, janelas ou ecrã inteiro — como Meet/Zoom.
+   * Captura externa (Zoom/Teams): rejeita a aba do CHORUS.
+   * Na sala nativa a aba actual TEM de aparecer — é a chamada.
    */
   forbidSelfTab?: boolean;
   /** @deprecated use forbidSelfTab */
@@ -131,24 +131,24 @@ export async function startMeetLocalRecorder(opts?: MeetLocalRecorderOptions): P
 }> {
   const fileName = defaultFileName(opts?.suggestedTitle);
   const captureMode = opts?.captureMode || 'room';
+  const recordingThisCall = captureMode === 'room';
   const forbidSelfTab = Boolean(
     opts?.forbidSelfTab || opts?.forbidBrowserTab || captureMode === 'external',
   );
   const captureMicrophone = opts?.captureMicrophone !== false;
 
-  // Picker completo: Pestaña | Ventana | Toda la pantalla.
-  // NÃO usar preferCurrentTab — isso mostra só «¿Permitir ver esta pestaña?» (a do CHORUS).
-  // Em captura externa, displaySurface:'browser' abre na lista de abas para escolher Meet/Zoom.
+  // Sala CHORUS: a aba desta chamada entra na lista (preferCurrentTab + selfBrowserSurface).
+  // Captura externa: esconde a aba do CHORUS para gravar Meet/Zoom/Teams.
   const displayMediaOpts: DisplayMediaStreamOptions = {
     video: {
       frameRate: { ideal: 30 },
       width: { ideal: 1920 },
       height: { ideal: 1080 },
-      ...(captureMode === 'external' ? { displaySurface: 'browser' as const } : {}),
+      displaySurface: 'browser',
     },
     audio: true,
-    // Esconde a aba actual do CHORUS da lista quando o Chrome suporta
-    selfBrowserSurface: 'exclude',
+    preferCurrentTab: recordingThisCall,
+    selfBrowserSurface: recordingThisCall ? 'include' : 'exclude',
     systemAudio: 'include',
     monitorTypeSurfaces: 'include',
     surfaceSwitching: 'include',
@@ -162,7 +162,7 @@ export async function startMeetLocalRecorder(opts?: MeetLocalRecorderOptions): P
     throw new Error(
       captureMode === 'external'
         ? 'Escolheste a aba do CHORUS — isso não grava a reunião. Cancela e escolhe a aba do Google Meet, Zoom ou Teams (ou a janela / ecrã inteiro).'
-        : 'Essa é a aba desta reunião — o Chrome apaga o vídeo. Escolhe outra aba, uma janela ou o ecrã inteiro.',
+        : 'Escolhe a aba desta reunião CHORUS (com áudio da aba), uma janela ou o ecrã inteiro.',
     );
   }
 
@@ -198,7 +198,7 @@ export async function startMeetLocalRecorder(opts?: MeetLocalRecorderOptions): P
     throw new Error(
       captureMode === 'external'
         ? 'Sem vídeo. No diálogo do Chrome escolhe a aba do Meet/Zoom/Teams (com áudio da aba ligado), uma janela ou o ecrã inteiro — nunca a aba do CHORUS.'
-        : 'Partilha de ecrã sem vídeo. Escolhe uma aba, uma janela ou o ecrã inteiro no diálogo do browser.',
+        : 'Partilha sem vídeo. No diálogo escolhe esta aba do CHORUS (áudio da aba ligado), uma janela ou o ecrã inteiro.',
     );
   }
 

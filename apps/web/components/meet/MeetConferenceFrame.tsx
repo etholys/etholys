@@ -262,7 +262,8 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               /* tenta a seguinte */
             }
           }
-          // Convida o Jigasi/Vosk. Sem ENABLE_RECORDING no servidor isto falha em silêncio.
+          // Pede transcrição ao vivo ao motor da sala (ENABLE_RECORDING).
+          // Falha aqui não deve abrir o diálogo «o áudio não está a ser gravado».
           const payloads = [
             { mode: 'file', onlyTranscription: true },
             { mode: 'file', transcription: true, onlyTranscribe: true },
@@ -444,13 +445,20 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               disableTileEnlargement: false,
               defaultLogoUrl: 'https://app.etholys.com/meet-brand/etholys-mark.svg',
               defaultRemoteDisplayName: 'Participante',
-              // Desactivar gravação local do embed (getDisplayMedia da própria aba →
-              // ecrã preto). O botão CHORUS usa gravador com ecrã/janela + upload Whisper.
+              // Gravação local do embed fica desligada (picker próprio do CHORUS).
+              // O serviço tem de ficar activo para o botão Transcrever convidar o motor de texto.
               fileRecordingsEnabled: true,
               recordingService: {
-                enabled: false,
+                enabled: true,
                 hideStorageWarning: true,
               },
+              disabledNotifications: [
+                'dialog.recording',
+                'dialog.transcribing',
+                'recording.failedToStart',
+                'recording.unavailable',
+                'transcribing.failedToStart',
+              ],
               localRecording: {
                 disable: true,
                 disableSelfRecording: true,
@@ -519,14 +527,12 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
                 'dialog.maxUsersLimitReached',
                 'dialog.micNotSendingData',
                 'dialog.passwordNotSupportedTitle',
-                'dialog.recording',
                 'dialog.remoteControlTitle',
                 'dialog.reservationError',
                 'dialog.serviceUnavailable',
                 'dialog.sessTerminated',
                 'dialog.sessionRestarted',
                 'dialog.tokenAuthFailed',
-                'dialog.transcribing',
                 'notify.disconnected',
                 'notify.grantedTo',
                 'notify.invitedOneGuest',

@@ -30,6 +30,7 @@ export {
   isMeetMirror,
   meetHubJoinPath,
   meetPublicJoinUrl,
+  meetGuestJoinPath,
   meetRoomResolvePath,
   meetJoinTargetId,
   meetRecapPath,

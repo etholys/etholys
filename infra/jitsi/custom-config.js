@@ -14,11 +14,18 @@ config.localRecording = {
   disableSelfRecording: true,
 };
 
-// Sem Jibri / nuvem — a app CHORUS grava ecrã/janela e faz upload+Whisper.
-// ENABLE_RECORDING=1 no .env é obrigatório para o Jigasi (transcrição ao vivo) ser convidado.
+// ENABLE_RECORDING=1 no .env é obrigatório para a transcrição ao vivo ser convidada.
+// A gravação de vídeo da chamada no browser é o botão Gravar do CHORUS (aba actual).
 config.recordingService = config.recordingService || {};
-config.recordingService.enabled = false;
+config.recordingService.enabled = true;
 config.recordingService.hideStorageWarning = true;
+config.disabledNotifications = (config.disabledNotifications || []).concat([
+  'dialog.recording',
+  'dialog.transcribing',
+  'recording.failedToStart',
+  'recording.unavailable',
+  'transcribing.failedToStart',
+]);
 
 // Jibri (gravação ficheiro) ainda não está no VPS — mas tem de ficar `true`
 // para o cliente poder pedir transcrição ao vivo (convidar o transcriber/Vosk).

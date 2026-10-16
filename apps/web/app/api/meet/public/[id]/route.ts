@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { assertMeetPrismaReady } from '@/lib/meet/create-session';
+import { resolveMeetSessionKey } from '@/lib/meet/short-link';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -10,7 +11,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(_req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const sessionId = id?.trim();
+    const sessionId = resolveMeetSessionKey(id || '');
     if (!sessionId) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
 
     assertMeetPrismaReady();

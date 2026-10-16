@@ -33,6 +33,7 @@ import {
   type MeetLayoutMode,
 } from '@/components/meet/MeetConferenceFrame';
 import { startMeetLocalRecorder, type MeetLocalRecorder } from '@/lib/meet/local-recorder';
+import { browserLiveSttSupported, startBrowserLiveStt, type BrowserLiveStt } from '@/lib/meet/browser-live-stt';
 import { type MeetJoinSetupPrefs } from '@/components/meet/MeetJoinSetupDialog';
 import { PendingMeetRecordingBanner } from '@/components/meet/PendingMeetRecordingBanner';
 import { resolveMeetSpeechLanguage, type MeetSpeechLanguage } from '@/lib/meet/language';
@@ -196,6 +197,10 @@ export function MeetRoomClient({ sessionId }: Props) {
   const lastHiddenAtRef = useRef(0);
   const segmentsRef = useRef<TranscriptSegment[]>([]);
   const transcriptionStartedAtRef = useRef<number | null>(null);
+  const transcriptionWantedRef = useRef(false);
+  const browserSttRef = useRef<BrowserLiveStt | null>(null);
+  const serverTranscriptSeenRef = useRef(false);
+  const onBrowserTextRef = useRef<(text: string, isFinal: boolean) => void>(() => undefined);
 
   useEffect(() => {
     segmentsRef.current = segments;
@@ -344,7 +349,7 @@ export function MeetRoomClient({ sessionId }: Props) {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [segments]);
 
-  // Aguarda texto do motor de transcrição ao vivo; se não vier, avisa (Jigasi pode falhar).
+  // Indicador enquanto não chega texto. Não mostrar erro a pedir para carregar em Transcrever.
   useEffect(() => {
     if (!transcriptionOn) {
       setTranscriptionWaiting(false);
@@ -356,20 +361,8 @@ export function MeetRoomClient({ sessionId }: Props) {
       return;
     }
     setTranscriptionWaiting(true);
-    const started = transcriptionStartedAtRef.current || Date.now();
-    transcriptionStartedAtRef.current = started;
-    const timer = window.setTimeout(() => {
-      if (segmentsRef.current.some((s) => s.text.trim())) return;
-      setError(
-        t(
-          'A transcrição ao vivo ainda não recebeu áudio. Mantém «Transcrever» ligado ou usa «Gravar» (ecrã/janela) — ao sair o CHORUS gera a transcrição pela gravação.',
-          'La transcripción en vivo aún no recibió audio. Mantén «Transcribir» o usa «Grabar» (pantalla/ventana) — al salir CHORUS genera la transcripción desde la grabación.',
-          'Live transcription has no audio yet. Keep Transcribe on, or use Record (screen/window) — on leave CHORUS transcribes from the recording.',
-        ),
-      );
-    }, 25_000);
-    return () => window.clearTimeout(timer);
-  }, [transcriptionOn, segments, locale]);
+    if (!transcriptionStartedAtRef.current) transcriptionStartedAtRef.current = Date.now();
+  }, [transcriptionOn, segments]);
 
   useEffect(() => {
     return () => {
@@ -378,6 +371,8 @@ export function MeetRoomClient({ sessionId }: Props) {
         void rec.stop().catch(() => rec.destroy());
         localRecorderRef.current = null;
       }
+      browserSttRef.current?.stop();
+      browserSttRef.current = null;
     };
   }, []);
 
@@ -407,14 +402,24 @@ export function MeetRoomClient({ sessionId }: Props) {
   }, [layoutMenuOpen]);
 
   const handleTranscriptionChunk = useCallback(
-    (chunk: {
-      language?: string;
-      messageID?: string;
-      participant?: { id?: string; name?: string };
-      final?: string;
-      stable?: string;
-      unstable?: string;
-    }) => {
+    (
+      chunk: {
+        language?: string;
+        messageID?: string;
+        participant?: { id?: string; name?: string };
+        final?: string;
+        stable?: string;
+        unstable?: string;
+      },
+      source?: 'room' | 'browser',
+    ) => {
+      if (source === 'browser') {
+        if (serverTranscriptSeenRef.current) return;
+      } else {
+        serverTranscriptSeenRef.current = true;
+        browserSttRef.current?.stop();
+        browserSttRef.current = null;
+      }
       const isFinal = Boolean(chunk.final);
       const text = (chunk.final || chunk.stable || chunk.unstable || '').trim();
       if (!text) return;
@@ -527,19 +532,54 @@ export function MeetRoomClient({ sessionId }: Props) {
     [companyId, sessionId, locale],
   );
 
+  onBrowserTextRef.current = (text, isFinal) => {
+    if (!transcriptionWantedRef.current || serverTranscriptSeenRef.current) return;
+    const speaker = displayName.trim() || (locale === 'en' ? 'Me' : locale === 'pt' ? 'Eu' : 'Yo');
+    const lang = meetingSpeechLang === 'en' || meetingSpeechLang === 'es' ? meetingSpeechLang : 'pt';
+    handleTranscriptionChunk(
+      {
+        messageID: isFinal ? `browser-${Date.now()}-${text.slice(0, 12)}` : 'browser-interim',
+        participant: { id: 'local-mic', name: speaker },
+        language: lang,
+        final: isFinal ? text : undefined,
+        stable: isFinal ? undefined : text,
+      },
+      'browser',
+    );
+  };
+
+  function stopBrowserStt() {
+    browserSttRef.current?.stop();
+    browserSttRef.current = null;
+  }
+
+  function startBrowserStt() {
+    stopBrowserStt();
+    if (!browserLiveSttSupported()) return;
+    const lang = meetingSpeechLang === 'en' || meetingSpeechLang === 'es' ? meetingSpeechLang : 'pt';
+    browserSttRef.current = startBrowserLiveStt({
+      locale: lang,
+      onText: (text, isFinal) => onBrowserTextRef.current(text, isFinal),
+    });
+  }
+
   function toggleTranscription() {
     setError(null);
-    if (!features.liveTranscriptionEnabled) {
+    const browserOk = browserLiveSttSupported();
+    if (!features.liveTranscriptionEnabled && !browserOk) {
       setError(
         t(
-          'A transcrição ao vivo ainda não está activa no CHORUS.',
-          'La transcripción en vivo aún no está activa en CHORUS.',
-          'Live transcription is not enabled on CHORUS yet.',
+          'A transcrição ao vivo ainda não está activa neste browser.',
+          'La transcripción en vivo aún no está activa en este navegador.',
+          'Live transcription is not available in this browser yet.',
         ),
       );
       return;
     }
     if (transcriptionOn) {
+      transcriptionWantedRef.current = false;
+      serverTranscriptSeenRef.current = false;
+      stopBrowserStt();
       conferenceRef.current?.stopTranscription();
       setTranscriptionOn(false);
       setTranscriptionWaiting(false);
@@ -548,10 +588,13 @@ export function MeetRoomClient({ sessionId }: Props) {
     }
     setJoinPrefs((p) => ({ ...p, enableLiveTranscript: true }));
     setPanelOpen(true);
+    transcriptionWantedRef.current = true;
+    serverTranscriptSeenRef.current = false;
     transcriptionStartedAtRef.current = Date.now();
     setTranscriptionWaiting(true);
     setTranscriptionOn(true);
-    conferenceRef.current?.startTranscription();
+    if (features.liveTranscriptionEnabled) conferenceRef.current?.startTranscription();
+    startBrowserStt();
   }
 
   function startInRoomVideoRecording() {
@@ -564,7 +607,6 @@ export function MeetRoomClient({ sessionId }: Props) {
       try {
         const { recorder } = await startMeetLocalRecorder({
           suggestedTitle: session?.title || 'chorus',
-          forbidSelfTab: true,
           captureMode: 'room',
           captureMicrophone: false,
         });
@@ -573,9 +615,9 @@ export function MeetRoomClient({ sessionId }: Props) {
         setJoinPrefs((p) => ({ ...p, enableCloudRecording: true }));
         setError(
           t(
-            'A gravar. Escolheste bem o ecrã/janela. Ao sair da reunião a gravação sobe e a transcrição gera-se sozinha no CHORUS.',
-            'Grabando. Elegiste bien la pantalla/ventana. Al salir, la grabación sube y la transcripción se genera sola en CHORUS.',
-            'Recording. Good screen/window choice. When you leave, CHORUS uploads and transcribes automatically.',
+            'A gravar esta chamada. Se o browser pedir, escolhe a aba do CHORUS e liga o áudio da aba. Ao sair, a gravação sobe e a transcrição gera-se no CHORUS.',
+            'Grabando esta llamada. Si el navegador pregunta, elige la pestaña de CHORUS y activa el audio de la pestaña. Al salir, la grabación sube y la transcripción se genera en CHORUS.',
+            'Recording this call. If the browser asks, pick the CHORUS tab and share tab audio. When you leave, CHORUS uploads and transcribes.',
           ),
         );
       } catch (err) {
@@ -584,9 +626,9 @@ export function MeetRoomClient({ sessionId }: Props) {
           err instanceof Error
             ? err.message
             : t(
-                'Não foi possível iniciar a gravação. No Chrome escolhe «Ecrã inteiro» ou a janela — nunca esta aba.',
-                'No se pudo iniciar la grabación. En Chrome elige «Pantalla completa» o la ventana — nunca esta pestaña.',
-                'Could not start recording. In Chrome pick “Entire screen” or the window — never this tab.',
+                'Não foi possível iniciar a gravação. No diálogo escolhe esta aba do CHORUS, uma janela ou o ecrã inteiro.',
+                'No se pudo iniciar la grabación. En el diálogo elige esta pestaña de CHORUS, una ventana o la pantalla completa.',
+                'Could not start recording. In the dialog pick this CHORUS tab, a window, or the entire screen.',
               ),
         );
       } finally {
@@ -680,6 +722,8 @@ export function MeetRoomClient({ sessionId }: Props) {
   const endInFlight = useRef(false);
 
   function tearDownConference() {
+    transcriptionWantedRef.current = false;
+    stopBrowserStt();
     try {
       conferenceRef.current?.stopTranscription();
     } catch {
@@ -711,6 +755,8 @@ export function MeetRoomClient({ sessionId }: Props) {
     setEnding(true);
     try {
       if (transcriptionOn) {
+        transcriptionWantedRef.current = false;
+        stopBrowserStt();
         try {
           conferenceRef.current?.stopTranscription();
         } catch {
@@ -1006,9 +1052,9 @@ export function MeetRoomClient({ sessionId }: Props) {
               onClick={startInRoomVideoRecording}
               className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/95 px-2.5 py-1.5 text-xs font-medium text-white/90 shadow-sm hover:bg-slate-700"
               title={t(
-                'Gravar a reunião (escolhe ecrã ou janela — nunca esta aba). Ao sair, sobe à nuvem e gera transcrição.',
-                'Grabar la reunión (elige pantalla o ventana — nunca esta pestaña). Al salir, sube a la nube y genera transcripción.',
-                'Record the meeting (pick screen or window — never this tab). On leave, uploads and transcribes.',
+                'Gravar esta chamada (a aba do CHORUS aparece no diálogo). Ao sair, sobe à nuvem e gera transcrição.',
+                'Grabar esta llamada (la pestaña de CHORUS aparece en el diálogo). Al salir, sube a la nube y genera transcripción.',
+                'Record this call (the CHORUS tab is in the dialog). On leave, uploads and transcribes.',
               )}
             >
               <Cloud className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -1134,12 +1180,22 @@ export function MeetRoomClient({ sessionId }: Props) {
                   onTranscriptToolbarClick={() => {
                     setPanelOpen((open) => {
                       const next = !open;
-                      if (next && !transcriptionOn && features.liveTranscriptionEnabled) {
+                      if (
+                        next &&
+                        !transcriptionOn &&
+                        (features.liveTranscriptionEnabled || browserLiveSttSupported())
+                      ) {
                         window.setTimeout(() => {
+                          transcriptionWantedRef.current = true;
+                          serverTranscriptSeenRef.current = false;
                           transcriptionStartedAtRef.current = Date.now();
                           setTranscriptionWaiting(true);
                           setTranscriptionOn(true);
-                          conferenceRef.current?.startTranscription();
+                          setJoinPrefs((p) => ({ ...p, enableLiveTranscript: true }));
+                          if (features.liveTranscriptionEnabled) {
+                            conferenceRef.current?.startTranscription();
+                          }
+                          startBrowserStt();
                         }, 0);
                       }
                       return next;
@@ -1157,8 +1213,9 @@ export function MeetRoomClient({ sessionId }: Props) {
                   }}
                   onRecordingStatus={(state) => {
                     if (state.transcription) {
-                      setTranscriptionOn(state.on);
-                      if (!state.on) setTranscriptionWaiting(false);
+                      // Um falhanço do motor da sala não desliga o botão: o microfone local continua.
+                      if (state.on) setTranscriptionOn(true);
+                      else if (!transcriptionWantedRef.current) setTranscriptionOn(false);
                       return;
                     }
                     if (state.error) {
@@ -1287,17 +1344,17 @@ export function MeetRoomClient({ sessionId }: Props) {
               <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl bg-slate-950/80 p-3">
                 {segments.length === 0 ? (
                   <div className="flex h-full min-h-32 items-center justify-center px-3 text-center text-[11px] text-white/40">
-                    {!features.liveTranscriptionEnabled
+                    {transcriptionWaiting || transcriptionOn
                       ? t(
-                          'A transcrição ao vivo ainda está a ser activada no CHORUS.',
-                          'La transcripción en vivo aún se está activando en CHORUS.',
-                          'Live transcription is still being activated on CHORUS.',
+                          'Transcrição activa. Fala com o microfone ligado — o texto deve aparecer aqui em poucos segundos.',
+                          'Transcripción activa. Habla con el micrófono abierto — el texto debe aparecer aquí en pocos segundos.',
+                          'Transcription is on. Speak with the mic open — text should appear here in a few seconds.',
                         )
-                      : transcriptionWaiting || transcriptionOn
+                      : !features.liveTranscriptionEnabled && !browserLiveSttSupported()
                         ? t(
-                            'Transcrição activa. Fala com o microfone ligado — o texto deve aparecer aqui em poucos segundos.',
-                            'Transcripción activa. Habla con el micrófono abierto — el texto debe aparecer aquí en pocos segundos.',
-                            'Transcription is on. Speak with the mic open — text should appear here in a few seconds.',
+                            'A transcrição ao vivo ainda está a ser activada no CHORUS.',
+                            'La transcripción en vivo aún se está activando en CHORUS.',
+                            'Live transcription is still being activated on CHORUS.',
                           )
                         : t(
                             'Clique em «Transcrever». Os trechos aparecerão aqui com o nome de quem falou.',
