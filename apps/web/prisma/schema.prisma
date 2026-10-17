@@ -104,6 +104,7 @@ model User {
   activityReportsAuthored       TaskActivityReport[]         @relation("ActivityReportAuthor")
   activityReportsReviewed       TaskActivityReport[]         @relation("ActivityReportReviewer")
   auroraFieldVisits             AuroraFieldVisit[]           @relation("AuroraVisitAuthor")
+  auroraDroneImages             AuroraDroneImage[]           @relation("AuroraDroneAuthor")
   reportGuidesUploaded          ProjectReportGuide[]         @relation("ReportGuideUploader")
   meetSessionsCreated           MeetSession[]                @relation("MeetSessionCreator")
   meetGoogleCalendarSync        MeetGoogleCalendarSync?
@@ -257,6 +258,8 @@ model Company {
   businessRhythmNotes         BusinessRhythmNote[]
   auroraVisitsOperated        AuroraFieldVisit[]           @relation("AuroraVisitOperator")
   auroraVisitsAttended        AuroraFieldVisit[]           @relation("AuroraVisitAttended")
+  auroraDronesOperated        AuroraDroneImage[]           @relation("AuroraDroneOperator")
+  auroraDronesAttended        AuroraDroneImage[]           @relation("AuroraDroneAttended")
   /// Quem pode usar o Centro de trabalho integrado nesta empresa (não duplica lógica dos sistemas; só espelha APIs).
   integratedWorkspaceAccesses  IntegratedWorkspaceAccess[]
   products                    Product[]
@@ -1969,6 +1972,7 @@ model NexusAtEngagement {
   members           NexusAtEngagementMember[]
   projects          NexusAtProject[]
   fieldVisits       AuroraFieldVisit[]
+  droneImages       AuroraDroneImage[]
 
   @@index([operatorCompanyId])
   @@index([sponsorCompanyId])
@@ -2344,6 +2348,10 @@ model RadarProperty {
   lng       Float?
   /// Planta 2D local à propriedade (mesmo schema que RadarSiteLayout.layoutJson).
   layoutJson Json?
+  /// Anel externo da área (pontos lat/lng) importado ou desenhado.
+  polygonJson Json?
+  /// Elegibilidade territorial: UF, CAR, SIGEF, exclusões e liderança.
+  complianceJson Json?
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
   company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -2351,6 +2359,7 @@ model RadarProperty {
   units     NexusOpsUnit[]
   technicianScopes RadarTechnicianScope[]
   fieldVisits AuroraFieldVisit[]
+  droneImages AuroraDroneImage[]
 
   @@index([companyId, createdAt])
   @@index([clientId])
@@ -2369,6 +2378,8 @@ model AuroraFieldVisit {
   objectiveId       String?
   activityLabel     String
   whatDone          String            @default("")
+  /// Valor medido do indicador (hectares, famílias, etc.).
+  indicatorValue    String?
   lat               Float
   lng               Float
   accuracyM         Float?
@@ -2390,6 +2401,28 @@ model AuroraFieldVisit {
   @@index([engagementId, occurredAt])
   @@index([siepProjectId])
   @@index([objectiveId])
+}
+
+/// Imagem de drone enviada pela empresa de ATER, ligada a uma propriedade.
+model AuroraDroneImage {
+  id                String            @id @default(cuid())
+  operatorCompanyId String
+  attendedCompanyId String
+  engagementId      String
+  propertyId        String
+  authorUserId      String
+  fileName          String
+  contentType       String
+  cloudStoragePath  String
+  createdAt         DateTime          @default(now())
+  operatorCompany   Company           @relation("AuroraDroneOperator", fields: [operatorCompanyId], references: [id], onDelete: Cascade)
+  attendedCompany   Company           @relation("AuroraDroneAttended", fields: [attendedCompanyId], references: [id], onDelete: Cascade)
+  engagement        NexusAtEngagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  property          RadarProperty     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  author            User              @relation("AuroraDroneAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, createdAt])
+  @@index([engagementId])
 }
 
 /// Técnico RADAR — utilizador da empresa (lista de funcionários) com atribuições.

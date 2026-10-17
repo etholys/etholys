@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     accuracyM: Number.isFinite(accuracy) ? accuracy : null,
     photoData: typeof body.photoData === 'string' ? body.photoData : null,
     polygon: body.polygon,
+    indicatorValue: typeof body.indicatorValue === 'string' ? body.indicatorValue : null,
   });
   if (result.error === 'forbidden') return NextResponse.json({ error: 'Empresa inválida.' }, { status: 403 });
   if (result.error === 'geo') return NextResponse.json({ error: 'Falta a localização do técnico.' }, { status: 400 });
@@ -50,5 +51,9 @@ export async function POST(req: NextRequest) {
   if (result.error === 'photo') return NextResponse.json({ error: 'A foto tem de ser uma imagem pequena.' }, { status: 400 });
   if (result.error === 'property') return NextResponse.json({ error: 'Propriedade inválida.' }, { status: 400 });
   if (result.error === 'objective') return NextResponse.json({ error: 'Indicador inválido.' }, { status: 400 });
+  if (result.error === 'ineligible') {
+    const reasons = 'reasons' in result && Array.isArray(result.reasons) ? result.reasons.join(' ') : '';
+    return NextResponse.json({ error: `Finca não elegível. ${reasons}`.trim() }, { status: 400 });
+  }
   return NextResponse.json({ ok: true, visit: result.visit });
 }

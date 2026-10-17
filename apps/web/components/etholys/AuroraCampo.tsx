@@ -6,7 +6,28 @@ import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 
-type PropertyRow = { id: string; name: string; lat: number | null; lng: number | null; areaHa: number | null; crop: string | null };
+type PropertyRow = {
+  id: string;
+  name: string;
+  lat: number | null;
+  lng: number | null;
+  areaHa: number | null;
+  crop: string | null;
+  polygonPoints?: number;
+  compliance?: {
+    stateUf: string;
+    municipality: string;
+    fiscalModules: number | null;
+    carCode: string;
+    sigefCode: string;
+    inIndigenousLand: boolean;
+    inConservationUnit: boolean;
+    inLitigation: boolean;
+    deforestationAfter2008: boolean;
+    womenLed: boolean;
+    youthLed: boolean;
+  } | null;
+};
 type ObjectiveRow = { id: string; code: string | null; title: string; indicator: string | null; unitOfMeasure: string | null };
 type VisitRow = {
   id: string;
@@ -43,6 +64,8 @@ function CampoInner() {
   const [polygon, setPolygon] = useState<Array<{ lat: number; lng: number }>>([]);
   const [geo, setGeo] = useState<{ lat: number; lng: number; accuracyM: number | null } | null>(null);
   const [photoData, setPhotoData] = useState<string | null>(null);
+  const [indicatorValue, setIndicatorValue] = useState('');
+  const [gate, setGate] = useState<string>('');
 
   const copy =
     loc === 'es'
@@ -180,6 +203,7 @@ function CampoInner() {
           accuracyM: geo.accuracyM,
           photoData,
           polygon,
+          indicatorValue,
         }),
       });
       const d = await r.json();
@@ -228,6 +252,18 @@ function CampoInner() {
             </option>
           ))}
         </select>
+        {propertyId ? (
+          <TerritoryBox
+            companyId={companyId}
+            engagementId={engagementId}
+            property={properties.find((p) => p.id === propertyId) || null}
+            onSaved={(message) => {
+              setGate(message);
+              void load();
+            }}
+          />
+        ) : null}
+        {gate ? <p className="text-sm text-slate-700">{gate}</p> : null}
         {mode === 'project' && objectives.length ? (
           <>
             <label className="block text-xs font-semibold uppercase text-slate-400">Indicador</label>
@@ -240,6 +276,8 @@ function CampoInner() {
                 </option>
               ))}
             </select>
+            <label className="block text-xs font-semibold uppercase text-slate-400">Valor medido</label>
+            <input value={indicatorValue} onChange={(e) => setIndicatorValue(e.target.value)} className="w-full rounded-lg border px-2 py-1.5 text-sm" />
           </>
         ) : null}
         <label className="block text-xs font-semibold uppercase text-slate-400">{copy.activity}</label>
@@ -288,6 +326,14 @@ function CampoInner() {
         <button type="button" disabled={busy || !activityLabel.trim() || !geo} onClick={() => void save()} className="rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
           {copy.save}
         </button>
+        {mode === 'project' ? (
+          <a
+            className="ml-2 inline-block text-sm font-medium text-amber-900 underline"
+            href={`/api/aurora/gcf?companyId=${encodeURIComponent(companyId)}&engagementId=${encodeURIComponent(engagementId)}`}
+          >
+            {loc === 'en' ? 'Fund report' : loc === 'es' ? 'Informe al fondo' : 'Relatório ao fundo'}
+          </a>
+        ) : null}
       </section>
       <ul className="space-y-2">
         {visits.map((v) => (
@@ -311,5 +357,192 @@ export function AuroraCampo() {
     <Suspense fallback={<div className="flex min-h-[40vh] items-center justify-center" />}>
       <CampoInner />
     </Suspense>
+  );
+}
+
+function TerritoryBox({
+  companyId,
+  engagementId,
+  property,
+  onSaved,
+}: {
+  companyId: string;
+  engagementId: string;
+  property: PropertyRow | null;
+  onSaved: (message: string) => void;
+}) {
+  const c = property?.compliance;
+  const [stateUf, setStateUf] = useState(c?.stateUf || '');
+  const [municipality, setMunicipality] = useState(c?.municipality || '');
+  const [fiscalModules, setFiscalModules] = useState(c?.fiscalModules ? String(c.fiscalModules) : '');
+  const [carCode, setCarCode] = useState(c?.carCode || '');
+  const [sigefCode, setSigefCode] = useState(c?.sigefCode || '');
+  const [flags, setFlags] = useState({
+    inIndigenousLand: Boolean(c?.inIndigenousLand),
+    inConservationUnit: Boolean(c?.inConservationUnit),
+    inLitigation: Boolean(c?.inLitigation),
+    deforestationAfter2008: Boolean(c?.deforestationAfter2008),
+    womenLed: Boolean(c?.womenLed),
+    youthLed: Boolean(c?.youthLed),
+  });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setStateUf(c?.stateUf || '');
+    setMunicipality(c?.municipality || '');
+    setFiscalModules(c?.fiscalModules ? String(c.fiscalModules) : '');
+    setCarCode(c?.carCode || '');
+    setSigefCode(c?.sigefCode || '');
+    setFlags({
+      inIndigenousLand: Boolean(c?.inIndigenousLand),
+      inConservationUnit: Boolean(c?.inConservationUnit),
+      inLitigation: Boolean(c?.inLitigation),
+      deforestationAfter2008: Boolean(c?.deforestationAfter2008),
+      womenLed: Boolean(c?.womenLed),
+      youthLed: Boolean(c?.youthLed),
+    });
+  }, [property?.id, c]);
+
+  const save = async () => {
+    if (!property) return;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/aurora/territory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          engagementId,
+          propertyId: property.id,
+          compliance: { stateUf, municipality, fiscalModules: Number(fiscalModules), carCode, sigefCode, ...flags },
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Falha');
+      onSaved(d.eligibility?.eligible ? 'Finca elegível.' : `Não elegível. ${(d.eligibility?.reasons || []).join(' ')}`);
+    } catch (e) {
+      onSaved(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const uploadPolygon = async (file: File) => {
+    if (!property) return;
+    const data = await file.arrayBuffer();
+    const bytes = new Uint8Array(data);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+    const fileBase64 = btoa(binary);
+    const r = await fetch('/api/aurora/territory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, engagementId, propertyId: property.id, fileName: file.name, fileBase64 }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Falha');
+    onSaved(`Polígono com ${d.points} pontos.`);
+  };
+
+  const uploadDrone = async (file: File) => {
+    if (!property) return;
+    const presign = await fetch('/api/aurora/drone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyId,
+        engagementId,
+        propertyId: property.id,
+        fileName: file.name,
+        contentType: file.type || 'image/jpeg',
+      }),
+    });
+    const meta = await presign.json();
+    if (!presign.ok) throw new Error(meta.error || 'Upload');
+    const put = await fetch(meta.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type || 'image/jpeg' }, body: file });
+    if (!put.ok) throw new Error('O envio da imagem falhou.');
+    const commit = await fetch('/api/aurora/drone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'commit',
+        companyId,
+        engagementId,
+        propertyId: property.id,
+        fileName: file.name,
+        contentType: file.type || 'image/jpeg',
+        cloudStoragePath: meta.cloudStoragePath,
+      }),
+    });
+    const done = await commit.json();
+    if (!commit.ok) throw new Error(done.error || 'Falha');
+    onSaved('Imagem de drone guardada.');
+  };
+
+  const checks: Array<{ key: keyof typeof flags; label: string }> = [
+    { key: 'inIndigenousLand', label: 'Terra indígena' },
+    { key: 'inConservationUnit', label: 'Unidade de conservação' },
+    { key: 'inLitigation', label: 'Litígio' },
+    { key: 'deforestationAfter2008', label: 'Desmate após 22/07/2008' },
+    { key: 'womenLed', label: 'Liderança de mulheres' },
+    { key: 'youthLed', label: 'Liderança de jovens' },
+  ];
+
+  return (
+    <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <p className="text-xs font-semibold uppercase text-slate-500">
+        Elegibilidade {property?.polygonPoints ? `· ${property.polygonPoints} pts` : ''}
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <input value={stateUf} onChange={(e) => setStateUf(e.target.value.toUpperCase())} placeholder="UF (PA ou BA)" className="rounded-lg border px-2 py-1.5 text-sm" />
+        <input value={municipality} onChange={(e) => setMunicipality(e.target.value)} placeholder="Município" className="rounded-lg border px-2 py-1.5 text-sm" />
+        <input value={fiscalModules} onChange={(e) => setFiscalModules(e.target.value)} placeholder="Módulos fiscais" className="rounded-lg border px-2 py-1.5 text-sm" />
+        <input value={carCode} onChange={(e) => setCarCode(e.target.value)} placeholder="CAR" className="rounded-lg border px-2 py-1.5 text-sm" />
+        <input value={sigefCode} onChange={(e) => setSigefCode(e.target.value)} placeholder="SIGEF" className="rounded-lg border px-2 py-1.5 text-sm sm:col-span-2" />
+      </div>
+      <div className="flex flex-wrap gap-3 text-sm text-slate-700">
+        {checks.map((item) => (
+          <label key={item.key} className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={flags[item.key]}
+              onChange={(e) => setFlags({ ...flags, [item.key]: e.target.checked })}
+            />
+            {item.label}
+          </label>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg border px-3 py-1.5 text-sm">
+          Guardar checagem
+        </button>
+        <label className="rounded-lg border px-3 py-1.5 text-sm">
+          Polígono
+          <input
+            type="file"
+            accept=".zip,.json,.geojson,.shp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              void uploadPolygon(file).catch((err) => onSaved(err instanceof Error ? err.message : 'Erro'));
+            }}
+          />
+        </label>
+        <label className="rounded-lg border px-3 py-1.5 text-sm">
+          Drone
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              void uploadDrone(file).catch((err) => onSaved(err instanceof Error ? err.message : 'Erro'));
+            }}
+          />
+        </label>
+      </div>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 import { prisma } from './prisma';
 import { canMutateAuroraFlow } from './aurora-flow-turn';
 import { parsePolygon, visitPresence, type GeoPoint } from './aurora-visit';
+import { readCompliance, territorialEligibility } from './aurora-territory';
 
 const PHOTO_MAX = 700_000;
 
@@ -32,7 +33,7 @@ export async function loadAuroraCampo(opts: {
           { client: { linkedCompanyId: opts.attendedCompanyId } },
         ],
       },
-      select: { id: true, name: true, lat: true, lng: true, areaHa: true, crop: true },
+      select: { id: true, name: true, lat: true, lng: true, areaHa: true, crop: true, complianceJson: true, polygonJson: true },
       orderBy: { name: 'asc' },
       take: 80,
     }),
@@ -71,7 +72,16 @@ export async function loadAuroraCampo(opts: {
       mode: engagement.siepProjectId ? 'project' : 'permanent',
       project: engagement.siepProject,
     },
-    properties,
+    properties: properties.map((p) => ({
+      id: p.id,
+      name: p.name,
+      lat: p.lat,
+      lng: p.lng,
+      areaHa: p.areaHa,
+      crop: p.crop,
+      compliance: p.complianceJson ? readCompliance(p.complianceJson) : null,
+      polygonPoints: parsePolygon(p.polygonJson).length,
+    })),
     objectives,
     visits: visits.map((v) => ({ ...v, hasPhoto: Boolean(v.photoData), photoData: undefined, occurredAt: v.occurredAt.toISOString() })),
   };
@@ -91,6 +101,7 @@ export async function createAuroraVisit(opts: {
   accuracyM: number | null;
   photoData: string | null;
   polygon: unknown;
+  indicatorValue: string | null;
 }) {
   const campo = await loadAuroraCampo({
     tenantCompanyIds: opts.tenantCompanyIds,
@@ -115,8 +126,23 @@ export async function createAuroraVisit(opts: {
   if (opts.objectiveId && !objective) return { error: 'objective' as const };
 
   const polygon = parsePolygon(opts.polygon);
-  const propertyPoint: GeoPoint | null = property && property.lat != null && property.lng != null ? { lat: property.lat, lng: property.lng } : null;
-  const presence = visitPresence({ lat: opts.lat, lng: opts.lng, property: propertyPoint, polygon });
+  const stored = await prisma.radarProperty.findUnique({
+    where: { id: property?.id || '__none__' },
+    select: { polygonJson: true, complianceJson: true, lat: true, lng: true },
+  });
+  const areaRing = polygon.length >= 3 ? polygon : parsePolygon(stored?.polygonJson);
+  if (objective) {
+    if (!property) return { error: 'property' as const };
+    const gate = territorialEligibility(readCompliance(stored?.complianceJson));
+    if (!gate.eligible) return { error: 'ineligible' as const, reasons: gate.reasons };
+  }
+  const propertyPoint: GeoPoint | null =
+    stored && stored.lat != null && stored.lng != null
+      ? { lat: stored.lat, lng: stored.lng }
+      : property && property.lat != null && property.lng != null
+        ? { lat: property.lat, lng: property.lng }
+        : null;
+  const presence = visitPresence({ lat: opts.lat, lng: opts.lng, property: propertyPoint, polygon: areaRing });
 
   const engagement = await prisma.nexusAtEngagement.findUnique({
     where: { id: opts.engagementId },
@@ -135,13 +161,14 @@ export async function createAuroraVisit(opts: {
       objectiveId: objective?.id || null,
       activityLabel,
       whatDone: opts.whatDone.trim().slice(0, 2000),
+      indicatorValue: opts.indicatorValue?.trim().slice(0, 40) || null,
       lat: opts.lat,
       lng: opts.lng,
       accuracyM: opts.accuracyM,
       distanceM: presence.distanceM,
       onSite: presence.onSite,
       photoData: photo,
-      polygonJson: polygon.length >= 3 ? polygon : undefined,
+      polygonJson: areaRing.length >= 3 ? areaRing : undefined,
       occurredAt: new Date(),
     },
     select: { id: true, onSite: true, distanceM: true },
@@ -154,7 +181,7 @@ export async function createAuroraVisit(opts: {
         projectId: engagement.siepProjectId,
         objectiveId: objective.id,
         period,
-        value: '1',
+        value: opts.indicatorValue?.trim() || '1',
         notes: `${activityLabel}${opts.whatDone.trim() ? ` — ${opts.whatDone.trim().slice(0, 400)}` : ''}`.slice(0, 800),
         source: `aurora-visit:${visit.id}`,
         collectedBy: opts.userId,

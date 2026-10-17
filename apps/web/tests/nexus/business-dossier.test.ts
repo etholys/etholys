@@ -17,6 +17,8 @@ import { auroraToolHref } from '../../lib/aurora-attended-selection';
 import { answerDiagScript } from '../../lib/aurora-script';
 import { haversineMeters, visitPresence } from '../../lib/aurora-visit';
 import { draftAuroraPlan } from '../../lib/aurora-plan';
+import { territorialEligibility, carbonTonnesTo2030, corridorGroups } from '../../lib/aurora-territory';
+import { parseShpPolygons } from '../../lib/aurora-shp';
 import {
   applyDiagTurn,
   confirmDiagBlock,
@@ -480,5 +482,82 @@ test('AURORA viewer role prefers incubator when the company operates AT', async 
   assert.equal(pickAuroraViewerRole({ operates: true, attendedAs: true }), 'incubator');
   assert.equal(pickAuroraViewerRole({ operates: false, attendedAs: true }), 'attended');
   assert.equal(pickAuroraViewerRole({ operates: false, attendedAs: false }), 'incubator');
+});
+
+test('AURORA territory blocks ineligible farms and reads a shapefile ring', () => {
+  const blocked = territorialEligibility({
+    stateUf: 'PA',
+    municipality: 'Medicilândia',
+    fiscalModules: 2,
+    carCode: 'PA-1',
+    sigefCode: 'SIG-1',
+    inIndigenousLand: true,
+    inConservationUnit: false,
+    inLitigation: false,
+    deforestationAfter2008: false,
+    womenLed: true,
+    youthLed: false,
+    notes: '',
+  });
+  assert.equal(blocked.eligible, false);
+  assert.ok(blocked.reasons.some((r) => /indígena/i.test(r)));
+  assert.equal(
+    territorialEligibility({
+      stateUf: 'BA',
+      municipality: 'Ilhéus',
+      fiscalModules: 4,
+      carCode: 'BA-9',
+      sigefCode: 'SIG-9',
+      inIndigenousLand: false,
+      inConservationUnit: false,
+      inLitigation: false,
+      deforestationAfter2008: false,
+      womenLed: false,
+      youthLed: true,
+      notes: '',
+    }).eligible,
+    true,
+  );
+  assert.equal(carbonTonnesTo2030(2, new Date(2026, 5, 1)), 40);
+  const groups = corridorGroups([
+    { id: 'a', lat: 0, lng: 0 },
+    { id: 'b', lat: 0.01, lng: 0 },
+    { id: 'c', lat: 10, lng: 10 },
+  ]);
+  assert.ok(groups.connected.includes('a'));
+  assert.ok(groups.isolated.includes('c'));
+
+  const points: Array<[number, number]> = [
+    [0, 0],
+    [1, 0],
+    [1, 1],
+    [0, 0],
+  ];
+  const content = 4 + 32 + 4 + 4 + 4 + points.length * 16;
+  const fileLen = 100 + 8 + content;
+  const buf = Buffer.alloc(fileLen);
+  buf.writeInt32BE(9994, 0);
+  buf.writeInt32BE(fileLen / 2, 24);
+  buf.writeInt32LE(1000, 28);
+  buf.writeInt32LE(5, 32);
+  buf.writeInt32BE(1, 100);
+  buf.writeInt32BE(content / 2, 104);
+  buf.writeInt32LE(5, 108);
+  buf.writeDoubleLE(0, 112);
+  buf.writeDoubleLE(0, 120);
+  buf.writeDoubleLE(1, 128);
+  buf.writeDoubleLE(1, 136);
+  buf.writeInt32LE(1, 144);
+  buf.writeInt32LE(points.length, 148);
+  buf.writeInt32LE(0, 152);
+  let cursor = 156;
+  for (const [x, y] of points) {
+    buf.writeDoubleLE(x, cursor);
+    buf.writeDoubleLE(y, cursor + 8);
+    cursor += 16;
+  }
+  const rings = parseShpPolygons(buf);
+  assert.equal(rings.length, 1);
+  assert.equal(rings[0]!.length, 4);
 });
 
