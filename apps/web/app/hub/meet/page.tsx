@@ -891,6 +891,13 @@ function MeetHubContent() {
               <FileText className="mr-1.5 inline h-4 w-4" />
               {t('Transcrições', 'Transcripciones', 'Transcripts')}
             </Link>
+            <Link
+              href={companyId ? `/hub/meet/agenda?companyId=${encodeURIComponent(companyId)}` : '/hub/meet/agenda'}
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:text-teal-800"
+            >
+              <Link2 className="mr-1.5 inline h-4 w-4" />
+              {t('Agenda pública', 'Agenda pública', 'Public agenda')}
+            </Link>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {connections?.google.ready ? (

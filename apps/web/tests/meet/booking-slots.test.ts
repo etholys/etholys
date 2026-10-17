@@ -1,0 +1,61 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  DEFAULT_BOOKING_WINDOWS,
+  buildOpenSlots,
+  rangesOverlap,
+  weekdayOfYmd,
+} from '../../lib/meet/booking-slots';
+
+test('weekday of 2026-10-19 is Monday', () => {
+  assert.equal(weekdayOfYmd('2026-10-19'), 1);
+});
+
+test('default weekday window opens 09:00 America/Sao_Paulo and skips a busy hour', () => {
+  const now = new Date('2026-10-19T11:00:00.000Z');
+  const slots = buildOpenSlots({
+    timeZone: 'America/Sao_Paulo',
+    slotMinutes: 60,
+    windows: DEFAULT_BOOKING_WINDOWS,
+    days: 1,
+    now,
+    fromYmd: '2026-10-19',
+  });
+  assert.equal(slots[0]?.startsAt, '2026-10-19T12:00:00.000Z');
+  assert.equal(slots[0]?.endsAt, '2026-10-19T13:00:00.000Z');
+  assert.equal(slots.length, 9);
+
+  const blocked = buildOpenSlots({
+    timeZone: 'America/Sao_Paulo',
+    slotMinutes: 60,
+    windows: DEFAULT_BOOKING_WINDOWS,
+    days: 1,
+    now,
+    fromYmd: '2026-10-19',
+    busy: [
+      {
+        startsAt: new Date('2026-10-19T12:00:00.000Z'),
+        endsAt: new Date('2026-10-19T13:00:00.000Z'),
+      },
+    ],
+  });
+  assert.equal(blocked[0]?.startsAt, '2026-10-19T13:00:00.000Z');
+  assert.equal(blocked.length, 8);
+});
+
+test('ranges overlap on a shared edge only when they cross', () => {
+  assert.equal(rangesOverlap(0, 10, 10, 20), false);
+  assert.equal(rangesOverlap(0, 11, 10, 20), true);
+});
+
+test('Sunday has no default slots', () => {
+  const slots = buildOpenSlots({
+    timeZone: 'America/Sao_Paulo',
+    slotMinutes: 30,
+    windows: DEFAULT_BOOKING_WINDOWS,
+    days: 1,
+    now: new Date('2026-10-17T12:00:00.000Z'),
+    fromYmd: '2026-10-18',
+  });
+  assert.equal(slots.length, 0);
+});

@@ -59,6 +59,7 @@ Ver [etholys-tools.md](./etholys-tools.md) para a faixa de ferramentas.
 | **F6** | Agenda dia/semana/mês/ano + OAuth Google / Outlook | ✅ API + UI; ligação persistente em `Account`; requer `GOOGLE_CALENDAR_ENABLED=1` / Azure AD |
 | **F7** | Salas permanentes + recorrência (diária/semanal/dias úteis/mensal) | ✅ materializa ocorrências; mesmo link da série; apagar esta / seguintes / série |
 | **F8** | Captura externa (Zoom/Teams) | ✅ `/hub/meet/capture` + shell Electron `apps/meet-capture` |
+| **F9** | Agenda pública de reservas | ✅ `/hub/meet/agenda` + link `/a/{code}` sem conta; pedido → aceitar / recusar / propor; virtual cria sala; presencial guarda o local |
 
 ### Breakouts
 
@@ -100,6 +101,8 @@ flowchart TB
 ```
 apps/web/
   app/hub/meet/                 # espelho Hub
+  app/hub/meet/agenda/          # agenda pública do organizador
+  app/a/[code]/                 # reservas sem conta (/a/{code}/r/{token} = estado)
   app/hub/meet/[sessionId]/     # sala + transcrição ao vivo + gravação
   app/api/meet/sessions/        # CRUD, ics, invite, finalize, briefing
   app/api/meet/contacts/        # agenda de convites (guardar + autocomplete)
