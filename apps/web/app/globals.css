@@ -202,6 +202,13 @@
   }
 }
 
+/* Native dropdowns paint a white list. Dark screens set text-white, so the list was unreadable. */
+select option,
+select optgroup {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
 /* Etholys Studio — TipTap (modo Redação) */
 .studio-rich-editor.ProseMirror {
   min-height: 1.5em;

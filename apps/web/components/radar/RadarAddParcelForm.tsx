@@ -67,14 +67,14 @@ export function RadarAddParcelForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={meta.exampleName[loc]}
-          className="rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-3"
+          className="rounded-xl border border-slate-500 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-3"
           autoFocus
         />
         {crops.length > 0 ? (
           <select
             value={crop}
             onChange={(e) => setCrop(e.target.value)}
-            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
+            className="rounded-xl border border-slate-500 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2 [&>option]:bg-slate-950 [&>option]:text-slate-100"
           >
             <option value="">
               {meta.secondaryLabel[loc]} ({loc === 'en' ? 'optional' : 'opcional'})
@@ -91,7 +91,7 @@ export function RadarAddParcelForm({
             value={crop}
             onChange={(e) => setCrop(e.target.value)}
             placeholder={`${meta.secondaryLabel[loc]} (${loc === 'en' ? 'optional' : 'opcional'})`}
-            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
+            className="rounded-xl border border-slate-500 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2 [&>option]:bg-slate-950 [&>option]:text-slate-100"
           />
         )}
         <input
@@ -99,7 +99,7 @@ export function RadarAddParcelForm({
           onChange={(e) => setArea(e.target.value)}
           inputMode="decimal"
           placeholder={meta.areaUnit[loc]}
-          className="rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+          className="rounded-xl border border-slate-500 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-400/40"
         />
       </div>
       <div className="mt-3 flex flex-wrap gap-2">

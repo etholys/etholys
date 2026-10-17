@@ -365,9 +365,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     if (cropName.length < 2) return NextResponse.json({ error: 'Nome do cultivo obrigatório.' }, { status: 400 });
     const layout = parseRadarLayout(property.layoutJson) || emptyRadarLayout();
     const crops = cropsFromLayout(layout);
-    const id = `crop_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    const cropId = `crop_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
     crops.push({
-      id,
+      id: cropId,
       name: cropName.slice(0, 80),
       variety: String(body.variety || '').trim().slice(0, 80) || null,
       season: String(body.season || '').trim().slice(0, 80) || null,

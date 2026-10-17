@@ -39,6 +39,8 @@ export function RadarCropsPanel({
       setVariety('');
       setSeason('');
       setOpen(false);
+    } catch {
+      /* O ecrã do sítio mostra a mensagem. */
     } finally {
       setLocalBusy(false);
     }
@@ -78,20 +80,20 @@ export function RadarCropsPanel({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={loc === 'en' ? 'Crop name' : 'Nome do cultivo'}
-            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+            className="rounded-xl border border-slate-500 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-400/40"
             autoFocus
           />
           <input
             value={variety}
             onChange={(e) => setVariety(e.target.value)}
             placeholder={loc === 'en' ? 'Variety (optional)' : 'Variedade (opcional)'}
-            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+            className="rounded-xl border border-slate-500 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-400/40"
           />
           <input
             value={season}
             onChange={(e) => setSeason(e.target.value)}
             placeholder={loc === 'en' ? 'Season (optional)' : 'Época / safra (opcional)'}
-            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+            className="rounded-xl border border-slate-500 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-400/40"
           />
           <div className="flex gap-2 sm:col-span-3">
             <button
