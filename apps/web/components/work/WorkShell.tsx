@@ -10,7 +10,6 @@ import { WorkSidebar, type WorkNav } from './WorkSidebar';
 import { WorkDashboard } from './WorkDashboard';
 import { WorkGantt } from './WorkGantt';
 import { WorkCalendar } from './WorkCalendar';
-import { WorkList } from './WorkList';
 import { WorkWorkload } from './WorkWorkload';
 import { WorkTaskPanel } from './WorkTaskPanel';
 import { WorkFolderShareDialog } from './WorkFolderShareDialog';
@@ -414,15 +413,6 @@ export default function WorkShell() {
     if (data?.task?.id) setSelectedId(data.task.id);
   };
 
-  const runBulk = async (ids: string[], patch: Record<string, unknown>) => {
-    await fetch('/api/tasks/bulk', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids, patch }),
-    });
-    fetchAllTasks({ silent: true });
-  };
-
   const rescheduleTask = async (taskId: string, day: Date) => {
     await fetch(`/api/tasks/${taskId}`, {
       method: 'PUT',
@@ -604,22 +594,6 @@ export default function WorkShell() {
                   void quickCreate(label, toDateInputValue(day));
                 }}
                 onReschedule={(id, day) => void rescheduleTask(id, day)}
-                t={t3}
-              />
-            ) : boardView === 'list' ? (
-              <WorkList
-                tasks={scopedTasks}
-                users={users}
-                onSelect={setSelectedId}
-                onBulk={runBulk}
-                onToggleDone={async (id, next) => {
-                  await fetch(`/api/tasks/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: next }),
-                  });
-                  fetchAllTasks({ silent: true });
-                }}
                 t={t3}
               />
             ) : boardView === 'workload' ? (
