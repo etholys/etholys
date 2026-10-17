@@ -9,6 +9,7 @@ import {
 } from '@/components/radar/RadarClientScopeContext';
 import { RadarClientPicker } from '@/components/radar/RadarClientPicker';
 import { RadarCreatePanel } from '@/components/radar/RadarCreatePanel';
+import { RadarOpsBar } from '@/components/radar/RadarOpsBar';
 
 function RadarShellInner({ children }: { children: ReactNode }) {
   const { locale, activeCompanyId } = useApp();
@@ -29,10 +30,30 @@ function RadarShellInner({ children }: { children: ReactNode }) {
 
   const nav = useMemo(
     () => [
-      { href: '/hub/radar', label: es ? 'Sitio' : en ? 'Site' : 'Sítio' },
-      { href: '/hub/radar/cadeia', label: es ? 'Lotes' : en ? 'Lots' : 'Lotes' },
-      { href: '/hub/radar/tarefas', label: es ? 'Avisos' : en ? 'Alerts' : 'Avisos' },
-      { href: '/hub/radar/equipa', label: es ? 'Personas' : en ? 'People' : 'Pessoas' },
+      {
+        href: '/hub/radar',
+        group: es ? 'Ver' : en ? 'Look' : 'Ver',
+        label: es ? 'Mapa de la operación' : en ? 'Operations map' : 'Mapa da operação',
+        detail: es ? 'Entrá a un sitio para el mapa 3D' : en ? 'Open a site for the 3D map' : 'Entra num sítio para o mapa 3D',
+      },
+      {
+        href: '/hub/radar/cadeia',
+        group: es ? 'Seguir' : en ? 'Follow' : 'Seguir',
+        label: es ? 'Rastreo del lote' : en ? 'Lot trace' : 'Rastreio do lote',
+        detail: es ? 'Camino del producto y lo que pasó' : en ? 'Product path and what happened' : 'Caminho do produto e o que aconteceu',
+      },
+      {
+        href: '/hub/radar/tarefas',
+        group: es ? 'Hacer' : en ? 'Do' : 'Fazer',
+        label: es ? 'Tareas' : en ? 'Tasks' : 'Tarefas',
+        detail: es ? 'Qué hay que hacer ahora' : en ? 'What to do now' : 'O que há para fazer agora',
+      },
+      {
+        href: '/hub/radar/equipa',
+        group: es ? 'Quién' : en ? 'Who' : 'Quem',
+        label: es ? 'Equipo y clientes' : en ? 'Team and clients' : 'Equipa e clientes',
+        detail: es ? 'Técnicos y quién atiende cada sitio' : en ? 'Technicians and who covers each site' : 'Técnicos e quem trata de cada sítio',
+      },
     ],
     [es, en],
   );
@@ -47,6 +68,7 @@ function RadarShellInner({ children }: { children: ReactNode }) {
       resolveNavHref={resolveNavHref}
       sidebarAfterCompany={<RadarClientPicker />}
     >
+      <RadarOpsBar locale={loc} companyId={cid} engagementId={engagementId} tarefasHref={`/hub/radar/tarefas${qs}`} />
       <RadarCreatePanel locale={loc} />
       {children}
     </ProductAppShell>

@@ -28,7 +28,15 @@ import { sysTheme, type SystemAccent } from '@/lib/system-shell';
 import { ETHOLYS_PRODUCTS, type EtholysProductId } from '@/lib/etholys-products';
 import type { Locale } from '@/lib/i18n';
 
-type Nav = { href: string; label: string; requiresAttended?: boolean };
+type Nav = {
+  href: string;
+  label: string;
+  /** Uma linha que diz para que serve, por baixo do nome. */
+  detail?: string;
+  /** Agrupa itens seguidos com o mesmo nome. */
+  group?: string;
+  requiresAttended?: boolean;
+};
 
 const PRODUCT_ICON = {
   aurora: Sunrise,
@@ -130,6 +138,7 @@ export function ProductAppShell({
                   title={collapsed ? 'Expandir' : 'Minimizar'}
                 >
                   {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                  <span className="sr-only">{collapsed ? 'Expandir' : 'Minimizar'}</span>
                 </button>
                 <button
                   type="button"
@@ -175,24 +184,34 @@ export function ProductAppShell({
           )}
 
           <nav className={cn('flex-1 space-y-0.5 overflow-y-auto', collapsed ? 'p-1.5' : 'p-3')}>
-            {nav.map((item) => {
+            {nav.map((item, index) => {
               const href = resolveNavHref ? resolveNavHref(item) : item.href;
               const active = match?.href === item.href;
+              const showGroup = !collapsed && item.group && item.group !== nav[index - 1]?.group;
               return (
-                <Link
-                  key={item.href}
-                  href={href}
-                  onClick={() => setSidebarOpen(false)}
-                  title={collapsed ? item.label : undefined}
-                  className={cn(
-                    'flex items-center rounded-lg text-sm font-medium transition',
-                    collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
-                    active ? sysTheme.active[accent] : sysTheme.navIdle
+                <div key={item.href}>
+                  {showGroup && (
+                    <p className={cn('px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35', index > 0 && 'pt-3')}>
+                      {item.group}
+                    </p>
                   )}
-                >
-                  {!collapsed && item.label}
-                  {collapsed && <span className="text-[10px] font-semibold uppercase">{item.label.slice(0, 2)}</span>}
-                </Link>
+                  <Link
+                    href={href}
+                    onClick={() => setSidebarOpen(false)}
+                    title={collapsed ? item.label : item.detail || item.label}
+                    className={cn(
+                      'flex rounded-lg text-sm font-medium transition',
+                      collapsed ? 'justify-center px-2 py-2.5' : 'flex-col gap-0.5 px-3 py-2',
+                      active ? sysTheme.active[accent] : sysTheme.navIdle
+                    )}
+                  >
+                    {!collapsed && <span>{item.label}</span>}
+                    {!collapsed && item.detail && (
+                      <span className="text-[11px] font-normal leading-snug text-white/45">{item.detail}</span>
+                    )}
+                    {collapsed && <span className="text-[10px] font-semibold uppercase">{item.label.slice(0, 2)}</span>}
+                  </Link>
+                </div>
               );
             })}
           </nav>
