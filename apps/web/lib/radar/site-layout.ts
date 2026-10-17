@@ -28,12 +28,33 @@ export type RadarCrop = {
   season: string | null;
 };
 
+export type RadarDeviceBinding = {
+  sensorId: string;
+  sku: string;
+  devEui: string | null;
+  unitId: string | null;
+};
+
+export type RadarValveCommand = {
+  id: string;
+  sensorId: string;
+  devEui: string | null;
+  unitId: string | null;
+  action: 'open' | 'close';
+  status: 'pending' | 'acked';
+  at: string;
+};
+
 export type RadarSiteLayoutDoc = {
   version: typeof RADAR_LAYOUT_VERSION;
   spaces: RadarSpaceRect[];
   sensors: RadarSensorPin[];
   /** Cultivos da propriedade — persistidos com a planta (sem migration). */
   crops?: RadarCrop[];
+  /** Hardware kit ligado a esta propriedade (DevEUI → sensor). */
+  devices?: RadarDeviceBinding[];
+  /** Fila de downlink da válvula, consumida pelo gateway. */
+  commands?: RadarValveCommand[];
 };
 
 export function parseCrops(raw: unknown): RadarCrop[] {
@@ -57,6 +78,49 @@ export function parseCrops(raw: unknown): RadarCrop[] {
 
 export function cropsFromLayout(layout: RadarSiteLayoutDoc | null | undefined): RadarCrop[] {
   return parseCrops(layout?.crops);
+}
+
+export function parseDevices(raw: unknown): RadarDeviceBinding[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RadarDeviceBinding[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue;
+    const r = row as Record<string, unknown>;
+    const sensorId = String(r.sensorId || '').trim();
+    const sku = String(r.sku || '').trim();
+    if (!sensorId || !sku) continue;
+    const dev = String(r.devEui || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+    out.push({
+      sensorId,
+      sku: sku.slice(0, 32),
+      devEui: dev.length >= 8 ? dev.slice(0, 16) : null,
+      unitId: r.unitId == null || r.unitId === '' ? null : String(r.unitId),
+    });
+  }
+  return out;
+}
+
+export function parseCommands(raw: unknown): RadarValveCommand[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RadarValveCommand[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue;
+    const r = row as Record<string, unknown>;
+    const id = String(r.id || '').trim();
+    const sensorId = String(r.sensorId || '').trim();
+    const action = r.action === 'close' ? 'close' : r.action === 'open' ? 'open' : null;
+    if (!id || !sensorId || !action) continue;
+    out.push({
+      id: id.slice(0, 40),
+      sensorId,
+      devEui: r.devEui == null ? null : String(r.devEui).slice(0, 16),
+      unitId: r.unitId == null || r.unitId === '' ? null : String(r.unitId),
+      action,
+      status: r.status === 'acked' ? 'acked' : 'pending',
+      at: String(r.at || new Date().toISOString()).slice(0, 40),
+    });
+  }
+  return out.slice(-40);
 }
 
 export function withCrops(layout: RadarSiteLayoutDoc, crops: RadarCrop[]): RadarSiteLayoutDoc {
@@ -108,7 +172,14 @@ export function autoLayoutSpaces(
 
 export function parseRadarLayout(raw: unknown): RadarSiteLayoutDoc | null {
   if (!raw || typeof raw !== 'object') return null;
-  const row = raw as { version?: unknown; spaces?: unknown; sensors?: unknown; crops?: unknown };
+  const row = raw as {
+    version?: unknown;
+    spaces?: unknown;
+    sensors?: unknown;
+    crops?: unknown;
+    devices?: unknown;
+    commands?: unknown;
+  };
   if (!Array.isArray(row.spaces)) return null;
   const spaces: RadarSpaceRect[] = [];
   for (const s of row.spaces) {
@@ -145,6 +216,8 @@ export function parseRadarLayout(raw: unknown): RadarSiteLayoutDoc | null {
     spaces,
     sensors,
     crops: parseCrops(row.crops),
+    devices: parseDevices(row.devices),
+    commands: parseCommands(row.commands),
   };
 }
 
@@ -182,6 +255,8 @@ export function mergeLayoutWithSpaces(
     spaces,
     sensors,
     crops: cropsFromLayout(saved),
+    devices: saved?.devices || [],
+    commands: saved?.commands || [],
   };
 }
 
@@ -214,5 +289,7 @@ export function sanitizeLayoutPatch(
     spaces,
     sensors,
     crops: parseCrops((body as { crops?: unknown })?.crops ?? parsed.crops),
+    devices: parseDevices((body as { devices?: unknown })?.devices ?? parsed.devices),
+    commands: parseCommands((body as { commands?: unknown })?.commands ?? parsed.commands),
   };
 }

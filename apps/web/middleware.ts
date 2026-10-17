@@ -461,7 +461,7 @@ async function enforceApiLicense(
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
 
-  if (pathname === '/api/nexus/ingest/readings') {
+  if (pathname === '/api/nexus/ingest/readings' || pathname === '/api/radar/lorawan') {
     return NextResponse.next();
   }
 

@@ -40,6 +40,9 @@ export function RadarFocusSheet({
   moduleId,
   units,
   focusedId,
+  propertyId,
+  latest,
+  hasValve,
 }: {
   companyId: string;
   engagementId?: string | null;
@@ -47,6 +50,9 @@ export function RadarFocusSheet({
   moduleId: string | null;
   units: Unit[];
   focusedId: string | null;
+  propertyId?: string;
+  latest?: Record<string, number> | null;
+  hasValve?: boolean;
 }) {
   const loc = radarLoc(locale);
   const meta = spaceKindMeta(moduleId);
@@ -152,14 +158,43 @@ export function RadarFocusSheet({
             : 'border-white/10 bg-black/25'
         }`}
       >
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium text-white">{cue}</p>
-        </div>
+        <p className="text-sm font-medium text-white">{cue}</p>
         <p className="mt-2 text-[11px] text-white/45">
           <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${holdHarvest || needIrrigate ? 'bg-amber-400' : 'bg-emerald-400'}`} />
           {priority}
-          {moduleId === 'agriculture' ? ` · ${radarT(loc, 'Preventivo / campo', 'Preventivo / campo', 'Field / preventive')}` : ''}
         </p>
+        {latest && Object.keys(latest).length > 0 && (
+          <ul className="mt-2 space-y-0.5 text-xs text-white/70">
+            {Object.entries(latest).map(([metric, value]) => (
+              <li key={metric}>
+                {metric}: {value}
+              </li>
+            ))}
+          </ul>
+        )}
+        {hasValve && propertyId && (
+          <div className="mt-3 flex gap-2">
+            {(['open', 'close'] as const).map((valve) => (
+              <button
+                key={valve}
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void fetch(`/api/radar/properties/${propertyId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ companyId, engagementId, action: 'valve', unitId: focus.id, valve }),
+                  }).then(() => setOk(true))
+                }
+                className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+              >
+                {valve === 'open'
+                  ? radarT(loc, 'Abrir válvula', 'Abrir válvula', 'Open valve')
+                  : radarT(loc, 'Fechar válvula', 'Cerrar válvula', 'Close valve')}
+              </button>
+            ))}
+          </div>
+        )}
         {needIrrigate && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input

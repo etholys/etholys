@@ -31,34 +31,53 @@ export async function POST(req: NextRequest) {
   const auth = ingestCompanyForSensor(sensor, token);
   if (!auth.ok || !sensor) return NextResponse.json({ error: 'Token inválido.' }, { status: 401 });
 
-  const value = Number(body.value);
-  if (!Number.isFinite(value)) {
+  const recordedAt = body.recordedAt ? new Date(String(body.recordedAt)) : new Date();
+  const when = Number.isNaN(recordedAt.getTime()) ? new Date() : recordedAt;
+  const batchRaw = Array.isArray(body.readings) ? body.readings : null;
+  const batch = (batchRaw || [{ metric: body.metric, value: body.value, unit: body.unit }])
+    .map((row) => {
+      const item = row && typeof row === 'object' ? (row as Record<string, unknown>) : {};
+      const metric = String(item.metric || body.metric || sensor.metric || '').trim() || sensor.metric;
+      const value = Number(item.value);
+      return { metric: metric.slice(0, 40), value, unit: String(item.unit || '').slice(0, 16) };
+    })
+    .filter((row) => row.metric && Number.isFinite(row.value));
+  if (batch.length === 0) {
     return NextResponse.json({ error: 'value obrigatório.' }, { status: 400 });
   }
-  const metric = String(body.metric || sensor.metric || '').trim() || sensor.metric;
-  const recordedAt = body.recordedAt ? new Date(String(body.recordedAt)) : new Date();
 
-  const [reading] = await prisma.$transaction([
-    prisma.nexusReading.create({
-      data: {
-        companyId: sensor.companyId,
-        sensorId: sensor.id,
-        unitId: sensor.unitId,
-        metric: metric.slice(0, 40),
-        value,
-        unit: String(body.unit || (metric === 'soil_moisture' ? '%' : 'u')).slice(0, 16),
-        source: 'http',
-        recordedAt: Number.isNaN(recordedAt.getTime()) ? new Date() : recordedAt,
-      },
-      select: { id: true, recordedAt: true, metric: true, value: true },
-    }),
-    prisma.nexusSensor.update({
+  const readings = await prisma.$transaction(async (tx) => {
+    const created = [];
+    for (const row of batch) {
+      created.push(
+        await tx.nexusReading.create({
+          data: {
+            companyId: sensor.companyId,
+            sensorId: sensor.id,
+            unitId: sensor.unitId,
+            metric: row.metric,
+            value: row.value,
+            unit: (row.unit || (row.metric === 'soil_moisture' ? '%' : 'u')).slice(0, 16),
+            source: 'http',
+            recordedAt: when,
+          },
+          select: { id: true, recordedAt: true, metric: true, value: true },
+        }),
+      );
+    }
+    await tx.nexusSensor.update({
       where: { id: sensor.id },
       data: { lastSeenAt: new Date() },
-    }),
-  ]);
+    });
+    return created;
+  });
 
   void maybeNotifyWhatsappAlerts(sensor.companyId).catch(() => undefined);
 
-  return NextResponse.json({ ok: true, reading, companyId: sensor.companyId });
+  return NextResponse.json({
+    ok: true,
+    reading: readings[0],
+    readings,
+    companyId: sensor.companyId,
+  });
 }

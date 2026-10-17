@@ -17,6 +17,7 @@ import { RadarFocusSheet } from '@/components/radar/RadarFocusSheet';
 import { RadarSpaceTree } from '@/components/radar/RadarSpaceTree';
 import type { RadarCrop } from '@/lib/radar/site-layout';
 import { MOISTURE_THRESHOLD } from '@/lib/radar/agriculture';
+import { RADAR_DEVICE_CATALOG } from '@/lib/radar/devices';
 import { isTraceStage, TRACE_STAGE_LABEL, type TraceStage } from '@/lib/radar/trace';
 
 type Loc = 'pt' | 'es' | 'en';
@@ -47,6 +48,8 @@ type PropertyDetail = {
     lastValue?: number | null;
   }>;
   crops?: RadarCrop[];
+  latestByUnit?: Record<string, Record<string, number>>;
+  devices?: Array<{ sensorId: string; sku: string; devEui: string | null; unitId: string | null }>;
   steps: PropertyStepState[];
   nextStep: PropertyStepId;
   progressPercent: number;
@@ -81,6 +84,8 @@ export function RadarPropertyWorkspace({
   const [crop, setCrop] = useState('');
   const [area, setArea] = useState('');
   const [sensorName, setSensorName] = useState('');
+  const [sensorSku, setSensorSku] = useState('SE01-LB');
+  const [devEui, setDevEui] = useState('');
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [addingParcel, setAddingParcel] = useState(false);
   const [mode, setMode] = useState<'operate' | 'setup'>('operate');
@@ -264,10 +269,15 @@ export function RadarPropertyWorkspace({
             <RadarFocusSheet
               companyId={companyId}
               engagementId={engagementId}
+              propertyId={propertyId}
               locale={loc}
               moduleId={data.moduleId}
               units={data.units}
               focusedId={focusedId}
+              latest={focusedId ? data.latestByUnit?.[focusedId] : null}
+              hasValve={Boolean(
+                data.devices?.some((d) => d.unitId === focusedId && d.sku === 'SVC01-LS2'),
+              )}
             />
           </div>
         </div>
@@ -513,11 +523,28 @@ export function RadarPropertyWorkspace({
               </ul>
             )}
             <div className="flex flex-wrap gap-2">
+              <select
+                value={sensorSku}
+                onChange={(e) => setSensorSku(e.target.value)}
+                className="min-w-[14rem] rounded-2xl border border-white/15 bg-black/30 px-3 py-3 text-sm text-white"
+              >
+                {RADAR_DEVICE_CATALOG.map((d) => (
+                  <option key={d.sku} value={d.sku}>
+                    {d.sku} — {d.label[loc]}
+                  </option>
+                ))}
+              </select>
               <input
                 value={sensorName}
                 onChange={(e) => setSensorName(e.target.value)}
-                placeholder={loc === 'en' ? 'Sensor name' : 'Nome do sensor'}
+                placeholder={loc === 'en' ? 'Name on the site' : 'Nome no sítio'}
                 className="min-w-[12rem] flex-1 rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+              />
+              <input
+                value={devEui}
+                onChange={(e) => setDevEui(e.target.value)}
+                placeholder="DevEUI"
+                className="min-w-[10rem] rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
               />
               <button
                 type="button"
@@ -526,12 +553,14 @@ export function RadarPropertyWorkspace({
                   void patch({
                     action: 'sensor',
                     name: sensorName,
-                    metric: 'soil_moisture',
+                    sku: sensorSku,
+                    devEui,
                     unitId: focusedId || data.units[0]?.id,
                   })
                     .then((d) => {
-                      setTokenFlash(d.token as string);
+                      setTokenFlash(`${d.token as string}  →  ${d.ingestPath as string}`);
                       setSensorName('');
+                      setDevEui('');
                       return load();
                     })
                     .catch((e) => setErr(e.message))

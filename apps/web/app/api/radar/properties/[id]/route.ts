@@ -23,8 +23,10 @@ import {
 } from '@/lib/radar/site-layout';
 import { isRadarParcel } from '@/lib/radar/agriculture';
 import { AGRICULTURE_MODULE } from '@/lib/nexus-sector-modules';
+import { deviceBySku, normalizeDevEui, RADAR_INGEST_METRICS } from '@/lib/radar/devices';
+import type { RadarDeviceBinding, RadarSiteLayoutDoc, RadarValveCommand } from '@/lib/radar/site-layout';
 
-const SENSOR_METRICS = new Set(AGRICULTURE_MODULE.metrics.map((m) => m.id));
+const SENSOR_METRICS = new Set([...AGRICULTURE_MODULE.metrics.map((m) => m.id), ...RADAR_INGEST_METRICS]);
 
 async function authorize(companyId: string, engagementId: string | null) {
   const tenant = await getUserCompanyIds();
@@ -62,7 +64,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       OR: unitIds.length ? [{ unitId: { in: unitIds } }, { unitId: null }] : [{ unitId: null }],
     },
     orderBy: { createdAt: 'desc' },
-    take: 40,
+    take: 200,
     select: { id: true, name: true, metric: true, unitId: true, lastSeenAt: true },
   });
 
@@ -93,6 +95,13 @@ export async function GET(req: NextRequest, ctx: Ctx) {
           : null,
     };
   });
+
+  const latestByUnit: Record<string, Record<string, number>> = {};
+  for (const r of readings) {
+    if (!r.unitId) continue;
+    if (!latestByUnit[r.unitId]) latestByUnit[r.unitId] = {};
+    if (latestByUnit[r.unitId][r.metric] == null) latestByUnit[r.unitId][r.metric] = r.value;
+  }
 
   const moistureByUnit = new Map<string, number>();
   for (const r of readings) {
@@ -141,6 +150,8 @@ export async function GET(req: NextRequest, ctx: Ctx) {
         moisture: moistureByUnit.get(u.id) ?? null,
       })),
       sensors: liveSensors,
+      latestByUnit,
+      devices: saved.devices || [],
       layout,
       crops: cropsFromLayout(parseRadarLayout(property.layoutJson)),
       steps: buildPropertyProgress(progressInput),
@@ -257,16 +268,24 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     if (!patch || patch.spaces.length === 0) {
       return NextResponse.json({ error: 'Layout inválido.' }, { status: 400 });
     }
+    const existing = parseRadarLayout(property.layoutJson);
+    const merged = {
+      ...patch,
+      devices: existing?.devices || [],
+      commands: existing?.commands || [],
+    };
     await prisma.radarProperty.update({
       where: { id },
-      data: { layoutJson: patch as object },
+      data: { layoutJson: merged as object },
     });
-    return NextResponse.json({ ok: true, layout: patch });
+    return NextResponse.json({ ok: true, layout: merged });
   }
 
   if (action === 'sensor') {
-    const name = String(body.name || '').trim();
-    const metric = String(body.metric || 'soil_moisture').trim();
+    const sku = String(body.sku || '').trim().toUpperCase();
+    const profile = deviceBySku(sku);
+    const name = String(body.name || profile?.label.pt || '').trim();
+    const metric = String(body.metric || profile?.primaryMetric || 'soil_moisture').trim();
     if (name.length < 2) return NextResponse.json({ error: 'Nome do sensor obrigatório.' }, { status: 400 });
     if (!SENSOR_METRICS.has(metric)) return NextResponse.json({ error: 'Métrica inválida.' }, { status: 400 });
     let unitId = String(body.unitId || '').trim() || null;
@@ -275,7 +294,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
         where: { id: unitId, propertyId: id, companyId, isActive: true },
       });
       if (!unit) return NextResponse.json({ error: 'Espaço inválido.' }, { status: 400 });
-    } else {
+    } else if (profile?.role !== 'gateway') {
       const first = await prisma.nexusOpsUnit.findFirst({
         where: { propertyId: id, companyId, isActive: true },
         orderBy: { createdAt: 'asc' },
@@ -292,12 +311,52 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
         tokenHash: hash,
       },
     });
+    const devEui = normalizeDevEui(body.devEui);
+    const layout = parseRadarLayout(property.layoutJson) || emptyRadarLayout();
+    const binding: RadarDeviceBinding | null = profile
+      ? { sensorId: sensor.id, sku: profile.sku, devEui, unitId }
+      : null;
+    const nextLayout: RadarSiteLayoutDoc = {
+      ...layout,
+      devices: binding ? [...(layout.devices || []).filter((d) => d.sensorId !== sensor.id), binding] : layout.devices || [],
+    };
+    await prisma.radarProperty.update({
+      where: { id },
+      data: { layoutJson: nextLayout as object },
+    });
     return NextResponse.json({
       ok: true,
-      sensor: { id: sensor.id, name: sensor.name, metric: sensor.metric, unitId: sensor.unitId },
+      sensor: { id: sensor.id, name: sensor.name, metric: sensor.metric, unitId: sensor.unitId, sku: profile?.sku || null, devEui },
       token,
-      ingestPath: '/api/nexus/ingest/readings',
+      ingestPath: profile?.role === 'gateway' ? '/api/radar/lorawan' : '/api/nexus/ingest/readings',
     });
+  }
+
+  if (action === 'valve') {
+    const valveAction = body.valve === 'close' ? 'close' : body.valve === 'open' ? 'open' : null;
+    const unitId = String(body.unitId || '').trim();
+    if (!valveAction || !unitId) return NextResponse.json({ error: 'Válvula inválida.' }, { status: 400 });
+    const layout = parseRadarLayout(property.layoutJson) || emptyRadarLayout();
+    const device = (layout.devices || []).find((d) => d.unitId === unitId && deviceBySku(d.sku)?.role === 'actuator');
+    if (!device) return NextResponse.json({ error: 'Sem válvula neste espaço.' }, { status: 400 });
+    const command: RadarValveCommand = {
+      id: `cmd_${Date.now().toString(36)}`,
+      sensorId: device.sensorId,
+      devEui: device.devEui,
+      unitId,
+      action: valveAction,
+      status: 'pending',
+      at: new Date().toISOString(),
+    };
+    const nextLayout: RadarSiteLayoutDoc = {
+      ...layout,
+      commands: [...(layout.commands || []), command].slice(-40),
+    };
+    await prisma.radarProperty.update({
+      where: { id },
+      data: { layoutJson: nextLayout as object },
+    });
+    return NextResponse.json({ ok: true, command });
   }
 
   // generic rename / crop catalog
