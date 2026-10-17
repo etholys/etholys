@@ -1631,6 +1631,12 @@ html[data-appearance='light'] .hub-company-picker-dark button {
 }
 
 /* eTask — o interior segue a pele do Hub (não uma ilha branca) */
+html:not([data-appearance='light']) .etholys-etask {
+  color-scheme: dark;
+}
+html[data-appearance='light'] .etholys-etask {
+  color-scheme: light;
+}
 html:not([data-appearance='light']) .etholys-etask .bg-white,
 html:not([data-appearance='light']) .etholys-etask .bg-white\/70,
 html:not([data-appearance='light']) .etholys-etask .bg-white\/80,
@@ -1642,8 +1648,31 @@ html:not([data-appearance='light']) .etholys-etask .bg-slate-50\/90 {
 }
 html:not([data-appearance='light']) .etholys-etask .bg-slate-100,
 html:not([data-appearance='light']) .etholys-etask .bg-slate-100\/90,
-html:not([data-appearance='light']) .etholys-etask .bg-slate-200\/80 {
+html:not([data-appearance='light']) .etholys-etask .bg-slate-200\/80,
+html:not([data-appearance='light']) .etholys-etask .bg-cyan-50,
+html:not([data-appearance='light']) .etholys-etask .bg-cyan-50\/70,
+html:not([data-appearance='light']) .etholys-etask .bg-sky-50,
+html:not([data-appearance='light']) .etholys-etask .bg-amber-50,
+html:not([data-appearance='light']) .etholys-etask .bg-violet-50,
+html:not([data-appearance='light']) .etholys-etask .bg-emerald-50,
+html:not([data-appearance='light']) .etholys-etask .bg-rose-50,
+html:not([data-appearance='light']) .etholys-etask .bg-orange-50,
+html:not([data-appearance='light']) .etholys-etask .bg-teal-100 {
   background-color: var(--sys-panel-soft) !important;
+}
+html:not([data-appearance='light']) .etholys-etask .hover\:bg-slate-50\/80:hover,
+html:not([data-appearance='light']) .etholys-etask .hover\:bg-slate-100:hover {
+  background-color: var(--sys-nav-hover) !important;
+}
+html:not([data-appearance='light']) .etholys-etask .text-sky-800,
+html:not([data-appearance='light']) .etholys-etask .text-cyan-800,
+html:not([data-appearance='light']) .etholys-etask .text-teal-800,
+html:not([data-appearance='light']) .etholys-etask .text-amber-800,
+html:not([data-appearance='light']) .etholys-etask .text-violet-800,
+html:not([data-appearance='light']) .etholys-etask .text-emerald-800,
+html:not([data-appearance='light']) .etholys-etask .text-orange-800,
+html:not([data-appearance='light']) .etholys-etask .text-rose-700 {
+  color: var(--sys-ink) !important;
 }
 html:not([data-appearance='light']) .etholys-etask .text-slate-900,
 html:not([data-appearance='light']) .etholys-etask .text-slate-800 {

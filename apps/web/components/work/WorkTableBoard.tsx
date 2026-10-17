@@ -329,8 +329,8 @@ export function WorkTableBoard({
         return (
           <section
             key={section.key}
-            className={`overflow-hidden rounded-xl border bg-white shadow-sm transition ${
-              endActive ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-slate-200/90'
+            className={`overflow-hidden rounded-xl border bg-[color:var(--sys-panel)] transition ${
+              endActive ? 'border-teal-400' : 'border-[color:var(--sys-line)]'
             }`}
             onDragOver={(e) => {
               if (!draggingId) return;
@@ -470,10 +470,10 @@ export function WorkTableBoard({
                             e.stopPropagation();
                             handleDrop();
                           }}
-                          className={`group cursor-pointer border-b border-slate-50 transition ${
+                          className={`group cursor-pointer border-b border-[color:var(--sys-line)] transition ${
                             draggingId === task.id ? 'opacity-40' : ''
-                          } ${rowDrop ? 'border-t-2 border-t-cyan-500' : ''} ${
-                            selected || multiSelected ? 'bg-cyan-50/70' : 'hover:bg-slate-50/80'
+                          } ${rowDrop ? 'border-t-2 border-t-teal-400' : ''} ${
+                            selected || multiSelected ? 'bg-teal-500/15' : 'hover:bg-[color:var(--sys-nav-hover)]'
                           }`}
                         >
                           {onToggleSelect && (
@@ -529,7 +529,7 @@ export function WorkTableBoard({
                                 <button
                                   type="button"
                                   onClick={() => setTitleDraft({ id: task.id, value: task.title })}
-                                  className="min-w-0 flex-1 truncate text-left text-sm font-medium text-slate-900"
+                                  className="min-w-0 flex-1 truncate text-left text-sm font-medium text-[color:var(--sys-ink)]"
                                 >
                                   {task.title}
                                 </button>
@@ -559,7 +559,7 @@ export function WorkTableBoard({
                                 <select
                                   value={task.status}
                                   onChange={(e) => onPatch(task.id, { status: e.target.value })}
-                                  className={`w-full cursor-pointer rounded-md border-0 px-2 py-1 text-[11px] font-semibold outline-none ${STATUS_STYLE[task.status]?.bg || 'bg-slate-100'} ${STATUS_STYLE[task.status]?.text || ''}`}
+                                  className="w-full cursor-pointer rounded-md border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-2 py-1 text-[11px] font-semibold text-[color:var(--sys-ink)] outline-none"
                                 >
                                   {WORK_KANBAN.map((s) => (
                                     <option key={s} value={s}>{statusLabel(s)}</option>
@@ -578,7 +578,7 @@ export function WorkTableBoard({
                                   <select
                                     value={task.assigneeId || ''}
                                     onChange={(e) => onPatch(task.id, { assigneeId: e.target.value || null })}
-                                    className="min-w-0 flex-1 cursor-pointer bg-transparent text-[11px] text-slate-700 outline-none"
+                                    className="min-w-0 flex-1 cursor-pointer bg-transparent text-[11px] text-[color:var(--sys-ink)] outline-none"
                                   >
                                     <option value="">{t('—', '—', '—')}</option>
                                     {users.map((u) => (
@@ -591,7 +591,7 @@ export function WorkTableBoard({
                                 <select
                                   value={task.priority}
                                   onChange={(e) => onPatch(task.id, { priority: e.target.value })}
-                                  className={`w-full cursor-pointer rounded-md border-0 px-2 py-1 text-[11px] font-semibold outline-none ${PRIORITY_STYLE[task.priority]?.bg || ''} ${PRIORITY_STYLE[task.priority]?.text || ''}`}
+                                  className="w-full cursor-pointer rounded-md border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-2 py-1 text-[11px] font-semibold text-[color:var(--sys-ink)] outline-none"
                                 >
                                   {WORK_PRIORITIES.map((p) => (
                                     <option key={p} value={p}>{priorityLabel(p)}</option>
@@ -603,10 +603,10 @@ export function WorkTableBoard({
                                   type="date"
                                   value={task.dueDate ? String(task.dueDate).slice(0, 10) : ''}
                                   onChange={(e) => onPatch(task.id, { dueDate: e.target.value || null })}
-                                  className={`w-full bg-transparent text-[11px] outline-none ${
+                                  className={`w-full bg-transparent text-[11px] text-[color:var(--sys-ink)] outline-none [color-scheme:inherit] ${
                                     task.dueDate && !['DONE', 'CANCELLED'].includes(task.status) && new Date(task.dueDate).getTime() < Date.now()
-                                      ? 'font-semibold text-rose-600'
-                                      : 'text-slate-600'
+                                      ? 'font-semibold text-rose-400'
+                                      : ''
                                   }`}
                                 />
                               )}
