@@ -103,9 +103,11 @@ model User {
   forgeLiveAttendances          ForgeLiveAttendance[]
   activityReportsAuthored       TaskActivityReport[]         @relation("ActivityReportAuthor")
   activityReportsReviewed       TaskActivityReport[]         @relation("ActivityReportReviewer")
+  auroraFieldVisits             AuroraFieldVisit[]           @relation("AuroraVisitAuthor")
   reportGuidesUploaded          ProjectReportGuide[]         @relation("ReportGuideUploader")
   meetSessionsCreated           MeetSession[]                @relation("MeetSessionCreator")
   meetGoogleCalendarSync        MeetGoogleCalendarSync?
+  meetBookingPages              MeetBookingPage[]            @relation("MeetBookingPageOwner")
   meetParticipations            MeetParticipant[]
   labAnvilMembers               LabAnvilMember[]             @relation("LabAnvilMemberUser")
   labAnvilMembersInvited        LabAnvilMember[]             @relation("LabAnvilMemberInviter")
@@ -252,6 +254,8 @@ model Company {
   businessDossier             BusinessDossier?
   businessBets                BusinessBet[]
   businessRhythmNotes         BusinessRhythmNote[]
+  auroraVisitsOperated        AuroraFieldVisit[]           @relation("AuroraVisitOperator")
+  auroraVisitsAttended        AuroraFieldVisit[]           @relation("AuroraVisitAttended")
   /// Quem pode usar o Centro de trabalho integrado nesta empresa (não duplica lógica dos sistemas; só espelha APIs).
   integratedWorkspaceAccesses  IntegratedWorkspaceAccess[]
   products                    Product[]
@@ -294,6 +298,8 @@ model Company {
   platformInvoices            PlatformInvoice[]
   commissionEvents            BillingCommissionEvent[]
   meetContacts                MeetContact[]
+  meetBookingPages            MeetBookingPage[]
+  meetBookingRequests         MeetBookingRequest[]
 }
 
 /// Plano comercial Etholys (catálogo; Stripe price opcional).
@@ -549,6 +555,7 @@ model Objective {
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
   measurements    IndicatorMeasurement[]
+  fieldVisits     AuroraFieldVisit[]
   parent          Objective?             @relation("ObjectiveTree", fields: [parentId], references: [id])
   children        Objective[]            @relation("ObjectiveTree")
   project         Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -593,6 +600,7 @@ model Project {
   nexusAtEngagementsAsContext NexusAtEngagement[]   @relation("NexusAtSiepProject")
   nexusAtProjectsAsContext    NexusAtProject[]      @relation("NexusAtProjectSiep")
   objectives                 Objective[]
+  auroraFieldVisits          AuroraFieldVisit[]
   company                    Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   members                    ProjectMember[]
   risks                      Risk[]
@@ -1958,6 +1966,7 @@ model NexusAtEngagement {
   siepProject       Project?                   @relation("NexusAtSiepProject", fields: [siepProjectId], references: [id], onDelete: SetNull)
   members           NexusAtEngagementMember[]
   projects          NexusAtProject[]
+  fieldVisits       AuroraFieldVisit[]
 
   @@index([operatorCompanyId])
   @@index([sponsorCompanyId])
@@ -2339,9 +2348,46 @@ model RadarProperty {
   client    RadarClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   units     NexusOpsUnit[]
   technicianScopes RadarTechnicianScope[]
+  fieldVisits AuroraFieldVisit[]
 
   @@index([companyId, createdAt])
   @@index([clientId])
+}
+
+/// Visita de ATER. Prova com GPS de que o técnico esteve na propriedade e o que fez.
+/// Sem projeto SIEP é assistência permanente. Com objetivo, conta no indicador.
+model AuroraFieldVisit {
+  id                String            @id @default(cuid())
+  operatorCompanyId String
+  attendedCompanyId String
+  engagementId      String
+  propertyId        String?
+  authorUserId      String
+  siepProjectId     String?
+  objectiveId       String?
+  activityLabel     String
+  whatDone          String            @default("")
+  lat               Float
+  lng               Float
+  accuracyM         Float?
+  distanceM         Float?
+  onSite            Boolean           @default(false)
+  photoData         String?           @db.Text
+  polygonJson       Json?
+  occurredAt        DateTime          @default(now())
+  createdAt         DateTime          @default(now())
+  operatorCompany   Company           @relation("AuroraVisitOperator", fields: [operatorCompanyId], references: [id], onDelete: Cascade)
+  attendedCompany   Company           @relation("AuroraVisitAttended", fields: [attendedCompanyId], references: [id], onDelete: Cascade)
+  engagement        NexusAtEngagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  property          RadarProperty?    @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  author            User              @relation("AuroraVisitAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  siepProject       Project?          @relation(fields: [siepProjectId], references: [id], onDelete: SetNull)
+  objective         Objective?        @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
+
+  @@index([attendedCompanyId, occurredAt])
+  @@index([engagementId, occurredAt])
+  @@index([siepProjectId])
+  @@index([objectiveId])
 }
 
 /// Técnico RADAR — utilizador da empresa (lista de funcionários) com atribuições.
@@ -3368,6 +3414,7 @@ model MeetSession {
   participants       MeetParticipant[]
   actionItems        MeetActionItem[]
   transcriptSegments MeetTranscriptSegment[]
+  bookingRequest     MeetBookingRequest?
 
   @@index([companyId, scheduledAt])
   @@index([projectId])
@@ -3436,7 +3483,101 @@ model MeetContact {
   @@index([companyId, email])
 }
 
-/// Trecho de transcrição ao vivo enviado pelo Jigasi/Jitsi, atribuído ao participante.
+/// Agenda pública CHORUS: uma página de reservas por organizador e empresa.
+model MeetBookingPage {
+  id             String   @id @default(cuid())
+  companyId      String
+  ownerId        String
+  /// Código público imprevisível — /a/{publicCode}
+  publicCode     String   @unique
+  title          String
+  description    String?
+  timeZone       String   @default("America/Sao_Paulo")
+  slotMinutes    Int      @default(30)
+  locationText   String?
+  allowVirtual   Boolean  @default(true)
+  allowInPerson  Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner          User     @relation("MeetBookingPageOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  windows        MeetBookingWindow[]
+  blocks         MeetBookingBlock[]
+  requests       MeetBookingRequest[]
+
+  @@unique([companyId, ownerId])
+  @@index([companyId])
+  @@index([ownerId])
+}
+
+/// Horário semanal. weekday: 0 domingo … 6 sábado. Minutos desde meia-noite na zona da página.
+model MeetBookingWindow {
+  id       String          @id @default(cuid())
+  pageId   String
+  weekday  Int
+  startMin Int
+  endMin   Int
+  page     MeetBookingPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, weekday])
+}
+
+/// Intervalo fechado pelo organizador (não aparece na agenda pública).
+model MeetBookingBlock {
+  id       String          @id @default(cuid())
+  pageId   String
+  startsAt DateTime
+  endsAt   DateTime
+  page     MeetBookingPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, startsAt])
+}
+
+/// Pedido de reserva. publicToken autoriza o visitante sem conta.
+model MeetBookingRequest {
+  id                     String    @id @default(cuid())
+  pageId                 String
+  companyId              String
+  publicToken            String    @unique
+  bookerName             String
+  bookerEmail            String
+  /// virtual | presencial
+  mode                   String
+  /// pending | accepted | declined | counter_proposed | cancelled
+  status                 String    @default("pending")
+  startsAt               DateTime
+  endsAt                 DateTime
+  proposedStartsAt       DateTime?
+  proposedEndsAt         DateTime?
+  locationText           String?
+  note                   String?   @db.Text
+  meetSessionId          String?   @unique
+  googleCalendarEventId  String?
+  googleCalendarHtmlLink String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  page                   MeetBookingPage    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  company                Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  meetSession            MeetSession?       @relation(fields: [meetSessionId], references: [id], onDelete: SetNull)
+  guests                 MeetBookingGuest[]
+
+  @@index([pageId, startsAt])
+  @@index([companyId, status])
+  @@index([bookerEmail])
+}
+
+model MeetBookingGuest {
+  id        String             @id @default(cuid())
+  requestId String
+  name      String?
+  email     String
+  request   MeetBookingRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([email])
+}
+
+/// Trecho de transcrição ao vivo na sala CHORUS, atribuído ao participante.
 model MeetTranscriptSegment {
   id              String      @id @default(cuid())
   sessionId       String

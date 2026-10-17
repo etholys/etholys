@@ -28,7 +28,7 @@ function AuroraShellInner({ children }: { children: ReactNode }) {
   // Negócio atendido: só Avance — redireciona ferramentas de técnico
   useEffect(() => {
     if (loading || !isAttendedViewer) return;
-    const techPaths = ['/hub/aurora/diagnostico', '/hub/aurora/dossie', '/hub/aurora/programas', '/hub/aurora/contratos'];
+    const techPaths = ['/hub/aurora/diagnostico', '/hub/aurora/dossie', '/hub/aurora/programas', '/hub/aurora/contratos', '/hub/aurora/campo'];
     if (pathname === '/hub/aurora' || techPaths.some((p) => pathname?.startsWith(p))) {
       router.replace(hasSelection ? avanceHref : '/hub/aurora/avance');
     }
@@ -39,6 +39,11 @@ function AuroraShellInner({ children }: { children: ReactNode }) {
     {
       href: '/hub/aurora/diagnostico',
       label: es ? 'Acompañamiento' : en ? 'Accompaniment' : 'Acompanhamento',
+      requiresAttended: true,
+    },
+    {
+      href: '/hub/aurora/campo',
+      label: es ? 'Campo' : en ? 'Field' : 'Campo',
       requiresAttended: true,
     },
     {
@@ -69,8 +74,8 @@ function AuroraShellInner({ children }: { children: ReactNode }) {
       if (isAttendedViewer) {
         return hasSelection ? avanceHref : '/hub/aurora/avance';
       }
-      if (item.href === '/hub/aurora/diagnostico') {
-        return hasSelection ? diagnosticHref : '/hub/aurora?pick=1';
+      if (item.href === '/hub/aurora/diagnostico' || item.href === '/hub/aurora/campo') {
+        return hasSelection ? diagnosticHref.replace('/hub/aurora/diagnostico', item.href) : '/hub/aurora?pick=1';
       }
       if (item.href === '/hub/aurora/dossie') {
         return hasSelection ? dossierHref : '/hub/aurora?pick=1';

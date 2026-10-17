@@ -19,6 +19,7 @@ type AttendedPayload = {
   gaps: Array<{ text: string }>;
   potentials: Array<{ text: string }>;
   route: Array<{ id: string; title: string; status: string; why: string; indicator: string }>;
+  plan?: Array<{ id: string; title: string; detail: string; approxCost: number | null; currency: string; offer: string; status: string }>;
   progress: { activitiesDone: number; activitiesOpen: number; activitiesTotal: number; pct: number };
   lastRhythm: { happened: string; blocked: string; nextStep: string; createdAt: string } | null;
 };
@@ -230,6 +231,27 @@ export function AuroraAttendedHome() {
           </ul>
         )}
       </section>
+
+      {(data.plan || []).length ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="font-serif text-xl text-slate-900">
+            {loc === 'es' ? 'Plan de mejora' : loc === 'en' ? 'Improvement plan' : 'Plano de melhoria'}
+          </h2>
+          <ul className="mt-3 space-y-2">
+            {(data.plan || []).map((row) => (
+              <li key={row.id} className="rounded-xl border border-slate-100 px-3 py-2">
+                <p className="font-medium text-slate-900">{row.title}</p>
+                {row.detail ? <p className="mt-1 text-sm text-slate-600">{row.detail}</p> : null}
+                <p className="mt-1 text-xs text-slate-500">
+                  {row.offer}
+                  {row.approxCost != null ? ` · ${row.approxCost} ${row.currency}` : ''}
+                  {row.status === 'bought' ? (loc === 'en' ? ' · bought' : loc === 'es' ? ' · comprado' : ' · comprado') : ''}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {data.lastRhythm ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

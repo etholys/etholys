@@ -14,8 +14,10 @@ import {
   proposeAuroraRoute,
   saveAuroraRadiographyDraft,
   systematizeAuroraRadiography,
+  updateAuroraPlanAction,
   updateAuroraRouteBet,
   validateAuroraRadiography,
+  generateAuroraPlan,
 } from '@/lib/aurora-flow-turn';
 import { attendedAuroraView, normalizeAuroraBetStatus } from '@/lib/aurora-flow';
 
@@ -62,6 +64,7 @@ function publicBundle(bundle: Awaited<ReturnType<typeof loadAuroraFlowBundle>>) 
     gaps: Array.isArray(bundle.dossier?.gapsJson) ? bundle.dossier?.gapsJson : [],
     potentials: Array.isArray(bundle.dossier?.potentialsJson) ? bundle.dossier?.potentialsJson : [],
     bets: bundle.bets,
+    plan: bundle.plan,
     rhythm: bundle.rhythm,
   };
 }
@@ -109,6 +112,7 @@ export async function GET(req: NextRequest) {
               createdAt: last.createdAt.toISOString(),
             }
           : null,
+        plan: bundle.plan,
       }),
     });
   }
@@ -205,6 +209,36 @@ export async function POST(req: NextRequest) {
     }
     if (action === 'markLive') {
       const bundle = await markAuroraFlowLive({ companyId, userId: g.tenant.userId });
+      return NextResponse.json(publicBundle(bundle));
+    }
+    if (action === 'generatePlan') {
+      const bundle = await generateAuroraPlan({ companyId, userId: g.tenant.userId, locale });
+      return NextResponse.json(publicBundle(bundle));
+    }
+    if (action === 'updatePlan') {
+      const id = String(body.id || '').trim();
+      if (!id) return NextResponse.json({ error: 'Plano inválido.' }, { status: 400 });
+      const costRaw = body.approxCost;
+      const approxCost =
+        costRaw === null || costRaw === ''
+          ? null
+          : typeof costRaw === 'number'
+            ? costRaw
+            : costRaw != null && String(costRaw).trim()
+              ? Number(costRaw)
+              : undefined;
+      const bundle = await updateAuroraPlanAction({
+        companyId,
+        userId: g.tenant.userId,
+        action: {
+          id,
+          title: typeof body.title === 'string' ? body.title : undefined,
+          detail: typeof body.detail === 'string' ? body.detail : undefined,
+          approxCost: typeof approxCost === 'number' && Number.isFinite(approxCost) ? approxCost : approxCost === null ? null : undefined,
+          offer: typeof body.offer === 'string' ? (body.offer as 'purchase') : undefined,
+          status: typeof body.status === 'string' ? (body.status as 'proposed') : undefined,
+        },
+      });
       return NextResponse.json(publicBundle(bundle));
     }
     return NextResponse.json({ error: 'Acción inválida.' }, { status: 400 });

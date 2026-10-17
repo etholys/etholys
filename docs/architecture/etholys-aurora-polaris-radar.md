@@ -33,6 +33,8 @@ Método partilhado (AURORA e POLARIS): conversa → retrato editável → hipót
 
 RADAR começa com quatro módulos: agricultura, agroindústria, pecuária, carbono. Liga-se a AURORA/POLARIS por `GET /api/radar/bridge`. Arquitetura: [etholys-radar.md](./etholys-radar.md).
 
-Contratos AT em `/hub/aurora/contratos` e `/hub/aurora/at/[id]`. Programas em `/hub/aurora/programas`. Diagnóstico dinâmico em `/hub/aurora/diagnostico`. Dossiê em `/hub/aurora/dossie`.
+A assistência pode ser **permanente** (contrato sem projeto) ou **de projeto** (`NexusAtEngagement.siepProjectId`). As duas convivem. O técnico trabalha numa tela só, em `/hub/aurora/campo`: a visita grava GPS, foto e o que foi feito na propriedade RADAR; se o contrato tem projeto e um indicador, a visita vira medição nesse indicador. O plano de melhoria nasce do diagnóstico (perguntas fechadas), o técnico ajusta custo e oferta (compra, RADAR, FORGE, parceiro, FundHub) e a empresa atendida só vê o que foi marcado como revisto.
+
+Contratos AT em `/hub/aurora/contratos` e `/hub/aurora/at/[id]`. Programas em `/hub/aurora/programas`. Diagnóstico dinâmico em `/hub/aurora/diagnostico`. Dossiê em `/hub/aurora/dossie`. Campo em `/hub/aurora/campo`.
 
 `/hub/nexus/campo` redireciona para RADAR. Rotas NEXUS antigas continuam a funcionar.

@@ -2,6 +2,7 @@ import { prisma } from './prisma';
 import { llmCompleteJsonText, publicLlmErrorMessage } from './llm-client';
 import { loadDossier, upsertDossier } from './business-dossier';
 import type { AuroraLocale } from './aurora-interview';
+import { answerDiagScript } from './aurora-script';
 import {
   applyDiagTurn,
   auroraDiagSystemPrompt,
@@ -73,6 +74,49 @@ export async function runAuroraDiagTurn(opts: {
   }
   const block = diagnostic.blocks[opts.blockId];
   const def = getDiagBlockDef(opts.blockId);
+
+  if (block.scriptStep) {
+    const advanced = answerDiagScript({
+      blockId: opts.blockId,
+      stepId: block.scriptStep,
+      facts: block.facts || {},
+      answer: message,
+      locale: opts.locale,
+    });
+    if (advanced.error === 'invalid') {
+      diagnostic = applyDiagTurn(diagnostic, opts.blockId, '', {
+        reply: advanced.reply,
+        ready: false,
+        level: null,
+        situation: '',
+        gap: '',
+        potential: '',
+      });
+      diagnostic.blocks[opts.blockId].messages = diagnostic.blocks[opts.blockId].messages.filter((m) => m.text);
+      diagnostic.blocks[opts.blockId].scriptStep = advanced.nextStep;
+      diagnostic.blocks[opts.blockId].facts = advanced.facts;
+    } else {
+      diagnostic = applyDiagTurn(diagnostic, opts.blockId, advanced.echo || message, {
+        reply: advanced.reply,
+        ready: advanced.ready,
+        level: advanced.level,
+        situation: advanced.situation,
+        gap: advanced.gap,
+        potential: advanced.potential,
+      });
+      diagnostic.blocks[opts.blockId].facts = advanced.facts;
+      diagnostic.blocks[opts.blockId].scriptStep = advanced.nextStep;
+    }
+    await upsertDossier(opts.companyId, opts.userId, {
+      interviewJson: auroraDiagnosticPatch(diagnostic),
+    });
+    return {
+      companyName: loaded.companyName,
+      diagnostic,
+      progress: diagProgress(diagnostic),
+      pending: diagnostic.blocks[opts.blockId].pending,
+    };
+  }
 
   let raw = '';
   try {

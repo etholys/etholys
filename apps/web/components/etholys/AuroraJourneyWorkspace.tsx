@@ -24,6 +24,8 @@ import {
   type AuroraValidationState,
 } from '@/lib/aurora-flow';
 import { AuroraFlowRail } from '@/components/etholys/AuroraFlowRail';
+import { recentRevenueYears, scriptStep } from '@/lib/aurora-script';
+import { auroraPlanOfferLabel, type AuroraPlanAction } from '@/lib/aurora-plan';
 
 function levelTone(level: AuroraMaturity | null | undefined) {
   if (!level) return 'bg-slate-100 text-slate-500 border-slate-200';
@@ -61,6 +63,8 @@ export function AuroraJourneyWorkspace() {
   const [validation, setValidation] = useState<AuroraValidationState | null>(null);
   const [routeChat, setRouteChat] = useState<AuroraRouteChatMessage[]>([]);
   const [bets, setBets] = useState<BetRow[]>([]);
+  const [plan, setPlan] = useState<AuroraPlanAction[]>([]);
+  const [yearAmounts, setYearAmounts] = useState<Record<string, string>>({});
   const [radioBody, setRadioBody] = useState('');
   const [radioHypo, setRadioHypo] = useState('');
   const [techNotes, setTechNotes] = useState('');
@@ -181,7 +185,7 @@ export function AuroraJourneyWorkspace() {
             copyLink: 'Copiar link de avanço',
             copied: 'Link copiado',
             emptyRoute: 'Ainda não há atividades. Propõe a rota.',
-            diagHint: 'Uma área de cada vez. Confirma nível e situação real.',
+            diagHint: 'Uma pergunta de cada vez. Confirma a situação no fim do bloco.',
             weekTitle: 'Nota da semana',
             happened: 'O que aconteceu',
             blocked: 'O que trava',
@@ -207,6 +211,7 @@ export function AuroraJourneyWorkspace() {
     setValidation((d.validation as AuroraValidationState) || null);
     setRouteChat(Array.isArray(d.routeChat) ? (d.routeChat as AuroraRouteChatMessage[]) : []);
     setBets(Array.isArray(d.bets) ? (d.bets as BetRow[]) : []);
+    setPlan(Array.isArray(d.plan) ? (d.plan as AuroraPlanAction[]) : []);
   };
 
   const load = useCallback(async () => {
@@ -301,9 +306,9 @@ export function AuroraJourneyWorkspace() {
     }
   };
 
-  const sendDiag = async () => {
-    if (!activeId || !talk.trim() || busy) return;
-    const message = talk.trim();
+  const sendDiag = async (preset?: string) => {
+    const message = (preset ?? talk).trim();
+    if (!activeId || !message || busy) return;
     setBusy(true);
     setTalk('');
     try {
@@ -475,27 +480,42 @@ export function AuroraJourneyWorkspace() {
                   ))}
                   {busy ? <Loader2 className="h-4 w-4 animate-spin text-amber-700" /> : null}
                 </div>
-                <textarea
-                  value={talk}
-                  onChange={(e) => setTalk(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      void sendDiag();
-                    }
-                  }}
-                  placeholder={t.placeholder}
-                  rows={3}
-                  className="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                />
-                <button
-                  type="button"
-                  disabled={busy || !talk.trim()}
-                  onClick={() => void sendDiag()}
-                  className="mt-2 self-end rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                >
-                  {t.send}
-                </button>
+                {active.scriptStep && scriptStep(activeId, active.scriptStep) ? (
+                  <ScriptAnswer
+                    step={scriptStep(activeId, active.scriptStep)!}
+                    loc={loc}
+                    busy={busy}
+                    talk={talk}
+                    setTalk={setTalk}
+                    yearAmounts={yearAmounts}
+                    setYearAmounts={setYearAmounts}
+                    onSend={(value) => void sendDiag(value)}
+                  />
+                ) : (
+                  <>
+                    <textarea
+                      value={talk}
+                      onChange={(e) => setTalk(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          void sendDiag();
+                        }
+                      }}
+                      placeholder={t.placeholder}
+                      rows={3}
+                      className="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="button"
+                      disabled={busy || !talk.trim()}
+                      onClick={() => void sendDiag()}
+                      className="mt-2 self-end rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    >
+                      {t.send}
+                    </button>
+                  </>
+                )}
               </section>
               <aside className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
                 {confirm ? (
@@ -711,6 +731,13 @@ export function AuroraJourneyWorkspace() {
                   ) : null}
                 </div>
               </div>
+              <PlanPanel
+                plan={plan}
+                loc={loc}
+                busy={busy}
+                onGenerate={() => void flowPost({ action: 'generatePlan' })}
+                onPatch={(id, patch) => void flowPost({ action: 'updatePlan', id, ...patch })}
+              />
               <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                 <div className="h-full rounded-full bg-amber-700 transition-all" style={{ width: `${routePct}%` }} />
               </div>
@@ -826,5 +853,191 @@ export function AuroraJourneyWorkspace() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ScriptAnswer({
+  step,
+  loc,
+  busy,
+  talk,
+  setTalk,
+  yearAmounts,
+  setYearAmounts,
+  onSend,
+}: {
+  step: NonNullable<ReturnType<typeof scriptStep>>;
+  loc: 'pt' | 'es' | 'en';
+  busy: boolean;
+  talk: string;
+  setTalk: (v: string) => void;
+  yearAmounts: Record<string, string>;
+  setYearAmounts: (v: Record<string, string>) => void;
+  onSend: (value: string) => void;
+}) {
+  const yes = loc === 'es' ? 'Sí' : loc === 'en' ? 'Yes' : 'Sim';
+  const no = loc === 'es' ? 'No' : loc === 'en' ? 'No' : 'Não';
+  if (step.kind === 'yesno') {
+    return (
+      <div className="mt-3 flex gap-2">
+        <button type="button" disabled={busy} onClick={() => onSend('yes')} className="rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+          {yes}
+        </button>
+        <button type="button" disabled={busy} onClick={() => onSend('no')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 disabled:opacity-50">
+          {no}
+        </button>
+      </div>
+    );
+  }
+  if (step.kind === 'choice' && step.options) {
+    return (
+      <div className="mt-3 flex flex-wrap gap-2">
+        {step.options.map((opt) => (
+          <button key={opt.id} type="button" disabled={busy} onClick={() => onSend(opt.id)} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 disabled:opacity-50">
+            {opt.label[loc]}
+          </button>
+        ))}
+      </div>
+    );
+  }
+  if (step.kind === 'years') {
+    const years = recentRevenueYears();
+    return (
+      <div className="mt-3 space-y-2">
+        {years.map((year) => {
+          const key = String(year);
+          const on = key in yearAmounts;
+          return (
+            <label key={key} className="flex items-center gap-2 text-sm text-slate-800">
+              <input
+                type="checkbox"
+                checked={on}
+                onChange={(e) => {
+                  const next = { ...yearAmounts };
+                  if (e.target.checked) next[key] = next[key] || '';
+                  else delete next[key];
+                  setYearAmounts(next);
+                }}
+              />
+              <span className="w-12">{year}</span>
+              <input
+                value={yearAmounts[key] || ''}
+                disabled={!on}
+                onChange={(e) => setYearAmounts({ ...yearAmounts, [key]: e.target.value })}
+                placeholder={loc === 'en' ? 'Amount' : 'Valor'}
+                className="w-36 rounded-lg border px-2 py-1 disabled:bg-slate-50"
+              />
+            </label>
+          );
+        })}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            const payload: Record<string, string> = {};
+            for (const [year, amount] of Object.entries(yearAmounts)) {
+              if (amount.trim()) payload[year] = amount.trim();
+            }
+            onSend(JSON.stringify(payload));
+          }}
+          className="rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {loc === 'es' ? 'Guardar años' : loc === 'en' ? 'Save years' : 'Guardar anos'}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3">
+      <textarea value={talk} onChange={(e) => setTalk(e.target.value)} rows={3} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+      <button type="button" disabled={busy || talk.trim().length < 2} onClick={() => onSend(talk)} className="mt-2 rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+        {loc === 'es' ? 'Enviar' : loc === 'en' ? 'Send' : 'Enviar'}
+      </button>
+    </div>
+  );
+}
+
+function PlanPanel({
+  plan,
+  loc,
+  busy,
+  onGenerate,
+  onPatch,
+}: {
+  plan: AuroraPlanAction[];
+  loc: 'pt' | 'es' | 'en';
+  busy: boolean;
+  onGenerate: () => void;
+  onPatch: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const title = loc === 'es' ? 'Plan de mejora' : loc === 'en' ? 'Improvement plan' : 'Plano de melhoria';
+  const hint =
+    loc === 'es'
+      ? 'Sale del diagnóstico. Ajustalo, después revisalo con la empresa. Ella solo ve lo marcado como revisado.'
+      : loc === 'en'
+        ? 'It comes from the diagnosis. Adjust it, then review it with the business. They only see what you mark as reviewed.'
+        : 'Sai do diagnóstico. Ajusta, e depois revê com a empresa. Ela só vê o que marcares como revisto.';
+  return (
+    <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/40 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="font-medium text-slate-900">{title}</h3>
+          <p className="text-sm text-slate-600">{hint}</p>
+        </div>
+        <button type="button" disabled={busy} onClick={onGenerate} className="rounded-lg bg-amber-800 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
+          {loc === 'es' ? 'Generar desde el diagnóstico' : loc === 'en' ? 'Draft from diagnosis' : 'Gerar a partir do diagnóstico'}
+        </button>
+      </div>
+      {plan.length === 0 ? null : (
+        <ul className="space-y-3">
+          {plan.map((row) => (
+            <li key={row.id} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+              <input
+                defaultValue={row.title}
+                onBlur={(e) => {
+                  if (e.target.value.trim() && e.target.value.trim() !== row.title) onPatch(row.id, { title: e.target.value });
+                }}
+                className="w-full rounded-lg border px-2 py-1 text-sm font-medium"
+              />
+              <p className="text-sm text-slate-600">{row.detail}</p>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase text-slate-600">{auroraPlanOfferLabel(row.offer, loc)}</span>
+                <label className="text-slate-500">
+                  USD
+                  <input
+                    defaultValue={row.approxCost ?? ''}
+                    onBlur={(e) => {
+                      const raw = e.target.value.trim();
+                      const next = raw === '' ? null : Number(raw.replace(',', '.'));
+                      if (raw !== '' && !Number.isFinite(next)) return;
+                      if (next !== row.approxCost) onPatch(row.id, { approxCost: next });
+                    }}
+                    className="ml-1 w-24 rounded-lg border px-2 py-1"
+                  />
+                </label>
+                <span className="text-xs uppercase text-slate-400">{row.status}</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {row.status !== 'reviewed' ? (
+                  <button type="button" disabled={busy} onClick={() => onPatch(row.id, { status: 'reviewed' })} className="rounded-md border px-2 py-1 text-xs">
+                    {loc === 'es' ? 'Revisado con la empresa' : loc === 'en' ? 'Reviewed with the business' : 'Revisto com a empresa'}
+                  </button>
+                ) : null}
+                {row.offer === 'purchase' && row.status !== 'bought' ? (
+                  <button type="button" disabled={busy} onClick={() => onPatch(row.id, { status: 'bought' })} className="rounded-md border px-2 py-1 text-xs">
+                    {loc === 'es' ? 'Ya compraron' : loc === 'en' ? 'Already bought' : 'Já compraram'}
+                  </button>
+                ) : null}
+                {row.status !== 'dropped' ? (
+                  <button type="button" disabled={busy} onClick={() => onPatch(row.id, { status: 'dropped' })} className="rounded-md border px-2 py-1 text-xs text-slate-500">
+                    {loc === 'es' ? 'Quitar' : loc === 'en' ? 'Drop' : 'Tirar'}
+                  </button>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

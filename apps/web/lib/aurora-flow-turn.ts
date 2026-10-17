@@ -25,6 +25,14 @@ import {
   type AuroraValidationState,
 } from './aurora-flow';
 import { canAccessAtClientCompany, loadEngagementForTenant } from './nexus-at';
+import {
+  auroraPlanPatch,
+  draftAuroraPlan,
+  mergeAuroraPlan,
+  patchAuroraPlan,
+  readAuroraPlan,
+  type AuroraPlanAction,
+} from './aurora-plan';
 import { isAttendedMemberRole } from './nexus-at-shared';
 
 async function companyNameOf(companyId: string) {
@@ -101,6 +109,7 @@ export async function loadAuroraFlowBundle(companyId: string) {
     radiography,
     validation,
     routeChat: readAuroraRouteChat(interviewJson),
+    plan: readAuroraPlan(interviewJson),
     phase,
     stored,
   };
@@ -384,6 +393,25 @@ export async function logAuroraRouteWeek(opts: {
       flow: { phase: 'live', updatedAt: new Date().toISOString() },
     }),
   });
+  return loadAuroraFlowBundle(opts.companyId);
+}
+
+export async function generateAuroraPlan(opts: { companyId: string; userId: string; locale: AuroraLocale }) {
+  const bundle = await loadAuroraFlowBundle(opts.companyId);
+  const drafted = draftAuroraPlan(bundle.diagnostic, opts.locale);
+  const plan = mergeAuroraPlan(bundle.plan, drafted);
+  await upsertDossier(opts.companyId, opts.userId, { interviewJson: auroraPlanPatch(plan) });
+  return loadAuroraFlowBundle(opts.companyId);
+}
+
+export async function updateAuroraPlanAction(opts: {
+  companyId: string;
+  userId: string;
+  action: Partial<AuroraPlanAction> & { id: string };
+}) {
+  const bundle = await loadAuroraFlowBundle(opts.companyId);
+  const plan = patchAuroraPlan(bundle.plan, opts.action);
+  await upsertDossier(opts.companyId, opts.userId, { interviewJson: auroraPlanPatch(plan) });
   return loadAuroraFlowBundle(opts.companyId);
 }
 

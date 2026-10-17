@@ -5,6 +5,7 @@
  */
 
 import type { AuroraLocale, AuroraMessage } from './aurora-interview';
+import { firstScriptStep, type AuroraScriptFacts } from './aurora-script';
 
 export const AURORA_DIAGNOSTIC_KEY = '__auroraDiagnostic';
 
@@ -191,6 +192,10 @@ export type AuroraDiagBlockState = {
   messages: AuroraMessage[];
   pending: AuroraDiagPending | null;
   confirmedAt: string | null;
+  /** Respostas fechadas do guião (sim/não, anos, texto). */
+  facts: AuroraScriptFacts;
+  /** Passo atual do guião. Null quando o bloco já pode ser confirmado. */
+  scriptStep: string | null;
 };
 
 export type AuroraDiagnosticState = {
@@ -213,6 +218,8 @@ export function emptyDiagBlock(id: AuroraDiagBlockId): AuroraDiagBlockState {
     messages: [],
     pending: null,
     confirmedAt: null,
+    facts: {},
+    scriptStep: null,
   };
 }
 
@@ -263,6 +270,18 @@ function clip(value: unknown, max: number): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
+function readFacts(raw: unknown): AuroraScriptFacts {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: AuroraScriptFacts = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value !== 'string') continue;
+    const k = key.trim().slice(0, 40);
+    const v = value.trim().slice(0, 2000);
+    if (k && v) out[k] = v;
+  }
+  return out;
+}
+
 function asMessage(raw: unknown): AuroraMessage | null {
   if (!raw || typeof raw !== 'object') return null;
   const role = (raw as { role?: unknown }).role;
@@ -310,6 +329,8 @@ export function readAuroraDiagnostic(interviewJson: unknown): AuroraDiagnosticSt
           }
         : null,
       confirmedAt: clip(row.confirmedAt, 40) || null,
+      facts: readFacts(row.facts),
+      scriptStep: clip(row.scriptStep, 40) || null,
     };
   }
   base.activeBlockId = activeBlockId;
@@ -407,10 +428,13 @@ export function startDiagBlock(state: AuroraDiagnosticState, blockId: AuroraDiag
     if (b.status === 'active' && def.id !== blockId) b.status = b.level ? 'done' : 'empty';
   }
   const block = next.blocks[blockId];
-  const opening = getDiagBlockDef(blockId).opening[locale];
+  const wasDone = block.status === 'done';
+  const opening = firstScriptStep(blockId).prompt[locale];
   block.status = 'active';
   block.pending = null;
-  if (!block.messages.length) {
+  if (wasDone || !block.scriptStep) {
+    block.scriptStep = firstScriptStep(blockId).id;
+    if (wasDone) block.facts = {};
     block.messages = [{ role: 'assistant', text: opening }];
   }
   next.activeBlockId = blockId;

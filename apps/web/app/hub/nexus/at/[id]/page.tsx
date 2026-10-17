@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { ArrowLeft, FileSpreadsheet, Plus, Search, X } from 'lucide-react';
 import { useApp } from '@/app/providers';
+import { ui } from '@/lib/i18n';
 import { NexusAtCaseCard, type AtCaseCardModel } from '@/components/nexus/NexusAtCaseCard';
 import { NexusAtSectorPlaybook, sectorBadgeLabel } from '@/components/nexus/NexusAtSectorPlaybook';
 import { NexusAtClientDossier } from '@/components/nexus/NexusAtClientDossier';
@@ -70,7 +71,7 @@ export default function NexusAtServicePage() {
 
   const CASE_KINDS = (Object.keys(AT_CASE_KIND_LABELS) as AtCaseKind[]).map((kid) => ({
     id: kid,
-    label: AT_CASE_KIND_LABELS[kid][es ? 'es' : 'pt'],
+    label: AT_CASE_KIND_LABELS[kid][locale === 'en' ? 'en' : locale === 'pt' ? 'pt' : 'es'],
   }));
 
   const [service, setService] = useState<Service | null>(null);
@@ -120,7 +121,7 @@ export default function NexusAtServicePage() {
     try {
       const r = await fetch(`/api/nexus/at/engagements/${encodeURIComponent(id)}`);
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || (es ? 'No encontrado' : 'Não encontrado'));
+      if (!r.ok) throw new Error(d.error || (ui(locale, 'No encontrado', 'Não encontrado', 'Not found')));
       const eng = d.engagement as Service;
       setService(eng);
       setCases(d.cases || []);
@@ -554,7 +555,7 @@ export default function NexusAtServicePage() {
 
   const addMemberById = async (companyId: string) => {
     if (addSectorIds.length === 0) {
-      setError(es ? 'Elige al menos una temática del emprendimiento.' : 'Escolhe pelo menos uma temática do empreendimento.');
+      setError(ui(locale, 'Elige al menos una temática del emprendimiento.', 'Escolhe pelo menos uma temática do empreendimento.', 'Pick at least one venture topic.'));
       return;
     }
     setAddingMember(true);
@@ -587,7 +588,7 @@ export default function NexusAtServicePage() {
     const name = addQuery.trim();
     if (name.length < 2) return;
     if (addSectorIds.length === 0) {
-      setError(es ? 'Elige al menos una temática del emprendimiento.' : 'Escolhe pelo menos uma temática do empreendimento.');
+      setError(ui(locale, 'Elige al menos una temática del emprendimiento.', 'Escolhe pelo menos uma temática do empreendimento.', 'Pick at least one venture topic.'));
       return;
     }
     setAddingMember(true);
@@ -645,9 +646,9 @@ export default function NexusAtServicePage() {
     return (
       <div className="space-y-3">
         <Link href="/hub/aurora/contratos" className="inline-flex items-center gap-1 text-sm text-slate-600">
-          <ArrowLeft className="h-4 w-4" /> {es ? 'Volver' : 'Voltar'}
+          <ArrowLeft className="h-4 w-4" /> {ui(locale, 'Volver', 'Voltar', 'Back')}
         </Link>
-        <p className="text-sm text-red-600">{error || (es ? 'No encontrado' : 'Não encontrado')}</p>
+        <p className="text-sm text-red-600">{error || (ui(locale, 'No encontrado', 'Não encontrado', 'Not found'))}</p>
       </div>
     );
   }
@@ -656,7 +657,7 @@ return (
     <div className="mx-auto max-w-6xl space-y-4">
       <div>
         <Link href="/hub/aurora/contratos" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
-          <ArrowLeft className="h-4 w-4" /> {es ? 'Contratos' : 'Contratos'}
+          <ArrowLeft className="h-4 w-4" /> {ui(locale, 'Contratos', 'Contratos', 'Contracts')}
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -669,19 +670,19 @@ return (
               )}
               {service.primarySectorId && (
                 <span className="inline-block rounded-md bg-teal-50 px-2.5 py-0.5 text-xs font-medium text-teal-900">
-                  {es ? 'Ámbito' : 'Âmbito'}: {sectorBadgeLabel(service.primarySectorId, loc)}
+                  {ui(locale, 'Ámbito', 'Âmbito', 'Scope')}: {sectorBadgeLabel(service.primarySectorId, loc)}
                 </span>
               )}
             </div>
             <p className="mt-1 text-sm text-slate-500">
               {service.contractRef ? `${service.contractRef} · ` : ''}
-              {es ? 'Opera' : 'Opera'}: {service.operatorCompany.shortName || service.operatorCompany.name}
+              {ui(locale, 'Opera', 'Opera', 'Operates')}: {service.operatorCompany.shortName || service.operatorCompany.name}
               {service.sponsorCompany
-                ? ` · ${es ? 'Contrata' : 'Contrata'}: ${service.sponsorCompany.shortName || service.sponsorCompany.name}`
+                ? ` · ${ui(locale, 'Contrata', 'Contrata', 'Contracts')}: ${service.sponsorCompany.shortName || service.sponsorCompany.name}`
                 : ''}
               {service.siepProject
-                ? ` · ${service.siepProject.code ? `${service.siepProject.code} · ` : ''}${service.siepProject.name}`
-                : ''}
+                ? ` · ${ui(locale, 'Proyecto', 'Projeto', 'Project')}: ${service.siepProject.code ? `${service.siepProject.code} · ` : ''}${service.siepProject.name}`
+                : ` · ${ui(locale, 'Asistencia permanente', 'Assistência permanente', 'Standing assistance')}`}
             </p>
           </div>
         </div>
@@ -696,7 +697,7 @@ return (
         sectorId={selectedSectorId}
         hasOpenCases={cases.some((c) => c.isOpen !== false && !['DONE', 'CANCELLED'].includes(c.status))}
         hasDiagnosisHint={hasLocalDx}
-        es={es}
+        locale={loc}
         singleClient={isSingle}
       />
 
@@ -712,7 +713,7 @@ return (
           <div className="shrink-0 space-y-2 border-b border-slate-100 p-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {es ? 'MIPYMEs' : 'MIPYMEs'} · {clients.length}
+                {ui(locale, 'MIPYMEs', 'MIPYMEs', 'MSMEs')} · {clients.length}
               </p>
               {isOperator && (
                 <div className="flex gap-1.5">
@@ -723,7 +724,7 @@ return (
                       setShowAddCompany(false);
                     }}
                     className="rounded-md p-1 text-teal-800 hover:bg-teal-50"
-                    title={es ? 'Importar lista' : 'Importar lista'}
+                    title={ui(locale, 'Importar lista', 'Importar lista', 'Import list')}
                   >
                     <FileSpreadsheet className="h-4 w-4" />
                   </button>
@@ -734,7 +735,7 @@ return (
                       setShowBulkImport(false);
                     }}
                     className="rounded-md p-1 text-slate-600 hover:bg-slate-100"
-                    title={es ? 'Añadir empresa' : 'Adicionar empresa'}
+                    title={ui(locale, 'Añadir empresa', 'Adicionar empresa', 'Add company')}
                   >
                     <Plus className="h-4 w-4" />
                   </button>
@@ -748,7 +749,7 @@ return (
                   value={clientFilter}
                   onChange={(e) => setClientFilter(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 py-1.5 pl-7 pr-2 text-xs outline-none focus:border-slate-400"
-                  placeholder={es ? 'Buscar nombre o temática…' : 'Buscar nome ou temática…'}
+                  placeholder={ui(locale, 'Buscar nombre o temática…', 'Buscar nome ou temática…', 'Search name or topic…')}
                 />
               </div>
             )}
@@ -771,7 +772,7 @@ return (
             <div className="shrink-0 border-b border-slate-100 p-3">
               <NexusAtBulkImport
                 engagementId={id}
-                es={es}
+                locale={loc}
                 defaultSectorId={service.primarySectorId}
                 onDone={() => {
                   setShowBulkImport(false);
@@ -784,14 +785,14 @@ return (
           {showAddCompany && isOperator && (
             <div className="shrink-0 space-y-2 border-b border-slate-100 bg-slate-50 p-3">
               <p className="text-[11px] font-medium text-slate-700">
-                {es ? 'Temáticas (una o varias)' : 'Temáticas (uma ou várias)'}
+                {ui(locale, 'Temáticas (una o varias)', 'Temáticas (uma ou várias)', 'Topics (one or more)')}
               </p>
               <NexusSectorMultiSelect
                 options={sectorOptions}
                 value={addSectorIds}
                 onChange={setAddSectorIds}
-                placeholder={es ? 'Elegir temáticas…' : 'Escolher temáticas…'}
-                emptyLabel={es ? 'Ninguna' : 'Nenhuma'}
+                placeholder={ui(locale, 'Elegir temáticas…', 'Escolher temáticas…', 'Choose topics…')}
+                emptyLabel={ui(locale, 'Ninguna', 'Nenhuma', 'None')}
               />
               {isCollective && (
                 <select
@@ -801,9 +802,9 @@ return (
                   }
                   className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
                 >
-                  <option value="principal">{es ? 'Principal' : 'Principal'}</option>
-                  <option value="affiliate">{es ? 'Filial' : 'Filha'}</option>
-                  <option value="client">{es ? 'Miembro' : 'Membro'}</option>
+                  <option value="principal">{ui(locale, 'Principal', 'Principal', 'Primary')}</option>
+                  <option value="affiliate">{ui(locale, 'Filial', 'Filha', 'Affiliate')}</option>
+                  <option value="client">{ui(locale, 'Miembro', 'Membro', 'Member')}</option>
                 </select>
               )}
               <div className="relative">
@@ -819,7 +820,7 @@ return (
                   }}
                   disabled={addingMember}
                   className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-slate-400"
-                  placeholder={es ? 'Nombre…' : 'Nome…'}
+                  placeholder={ui(locale, 'Nombre…', 'Nome…', 'Name…')}
                 />
                 {addQuery.trim().length > 0 && (
                   <ul className="absolute z-20 mt-1 max-h-36 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
@@ -841,7 +842,7 @@ return (
                           onClick={addMemberByName}
                           className="w-full px-2 py-1.5 text-left text-xs font-medium text-emerald-800 hover:bg-slate-50"
                         >
-                          + {es ? 'Crear' : 'Criar'} «{addQuery.trim()}»
+                          + {ui(locale, 'Crear', 'Criar', 'Create')} «{addQuery.trim()}»
                         </button>
                       </li>
                     )}
@@ -860,7 +861,7 @@ return (
               </p>
             ) : filteredClients.length === 0 ? (
               <p className="px-2 py-4 text-center text-xs text-slate-400">
-                {es ? 'Sin coincidencias' : 'Sem resultados'}
+                {ui(locale, 'Sin coincidencias', 'Sem resultados', 'No matches')}
               </p>
             ) : (
               <ul className="space-y-0.5">
@@ -888,7 +889,7 @@ return (
                             onChange={() => toggleChecked(m.companyId)}
                             onClick={(e) => e.stopPropagation()}
                             className="mt-1.5 shrink-0 rounded border-slate-300"
-                            title={es ? 'Seleccionar para temática en lote' : 'Selecionar para temática em lote'}
+                            title={ui(locale, 'Seleccionar para temática en lote', 'Selecionar para temática em lote', 'Select for batch topic')}
                           />
                         )}
                         <button
@@ -908,13 +909,13 @@ return (
                               </span>
                             )}
                             {m.memberRole === 'affiliate' && (
-                              <span>{es ? 'filial' : 'filha'}</span>
+                              <span>{ui(locale, 'filial', 'filha', 'affiliate')}</span>
                             )}
                             {sectorLbl ? (
                               <span>{sectorLbl}</span>
                             ) : (
                               <span className={active ? 'text-amber-200' : 'text-amber-700'}>
-                                {es ? 'sin temática' : 'sem temática'}
+                                {ui(locale, 'sin temática', 'sem temática', 'no topic')}
                               </span>
                             )}
                             {n > 0 && <span>· {n}</span>}
@@ -923,7 +924,7 @@ return (
                         {isOperator && (
                           <button
                             type="button"
-                            title={es ? 'Quitar' : 'Remover'}
+                            title={ui(locale, 'Quitar', 'Remover', 'Remove')}
                             onClick={() => removeMember(m.companyId)}
                             className={`mt-0.5 shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 ${
                               active ? 'hover:bg-white/15' : 'hover:bg-slate-200'
@@ -956,7 +957,7 @@ return (
                   }}
                   className="shrink-0 text-[11px] font-medium text-teal-800 underline"
                 >
-                  {es ? 'Limpiar' : 'Limpar'}
+                  {ui(locale, 'Limpiar', 'Limpar', 'Clear')}
                 </button>
               </div>
             </div>
@@ -976,7 +977,7 @@ return (
             ) : showSingleOnboard ? (
               <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 className="text-base font-semibold text-slate-900">
-                  {es ? 'Registra la MIPYME atendida' : 'Regista a MIPYME atendida'}
+                  {ui(locale, 'Registra la MIPYME atendida', 'Regista a MIPYME atendida', 'Register the MSME being served')}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
                   {es
@@ -986,15 +987,15 @@ return (
                 <div className="mt-4 space-y-3">
                   <div>
                     <p className="text-[11px] font-medium text-slate-700">
-                      {es ? 'Temáticas (una o varias)' : 'Temáticas (uma ou várias)'}
+                      {ui(locale, 'Temáticas (una o varias)', 'Temáticas (uma ou várias)', 'Topics (one or more)')}
                     </p>
                     <div className="mt-1">
                       <NexusSectorMultiSelect
                         options={sectorOptions}
                         value={addSectorIds}
                         onChange={setAddSectorIds}
-                        placeholder={es ? 'Elegir temáticas…' : 'Escolher temáticas…'}
-                        emptyLabel={es ? 'Ninguna' : 'Nenhuma'}
+                        placeholder={ui(locale, 'Elegir temáticas…', 'Escolher temáticas…', 'Choose topics…')}
+                        emptyLabel={ui(locale, 'Ninguna', 'Nenhuma', 'None')}
                       />
                     </div>
                   </div>
@@ -1011,7 +1012,7 @@ return (
                       }}
                       disabled={addingMember}
                       className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400"
-                      placeholder={es ? 'Nombre de la MIPYME…' : 'Nome da MIPYME…'}
+                      placeholder={ui(locale, 'Nombre de la MIPYME…', 'Nome da MIPYME…', 'MSME name…')}
                     />
                     {addQuery.trim().length > 0 && (
                       <ul className="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
@@ -1033,7 +1034,7 @@ return (
                               onClick={addMemberByName}
                               className="w-full px-3 py-2 text-left text-sm font-medium text-emerald-800 hover:bg-slate-50"
                             >
-                              + {es ? 'Crear' : 'Criar'} «{addQuery.trim()}»
+                              + {ui(locale, 'Crear', 'Criar', 'Create')} «{addQuery.trim()}»
                             </button>
                           </li>
                         )}
@@ -1077,7 +1078,7 @@ return (
                         href={dossierHref}
                         className="inline-flex items-center rounded-lg bg-amber-800 px-3.5 py-2 text-sm font-medium text-white hover:bg-amber-900"
                       >
-                        {es ? 'Abrir dossier' : loc === 'en' ? 'Open dossier' : 'Abrir dossiê'}
+                        {ui(locale, 'Abrir dossier', 'Abrir dossiê', 'Open dossier')}
                       </Link>
                     )}
                     {hasLocalPlanDraft && continuePlanHref && (
@@ -1085,7 +1086,7 @@ return (
                         href={continuePlanHref}
                         className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
                       >
-                        {es ? 'Continuar plan' : 'Continuar plano'}
+                        {ui(locale, 'Continuar plan', 'Continuar plano', 'Continue plan')}
                       </Link>
                     )}
                     {diagnosisHref && (
@@ -1112,7 +1113,7 @@ return (
                         className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
                       >
                         <Plus className="h-4 w-4" />
-                        {es ? 'Nuevo caso' : 'Novo caso'}
+                        {ui(locale, 'Nuevo caso', 'Novo caso', 'New case')}
                       </button>
                     )}
                   </div>
@@ -1164,7 +1165,7 @@ return (
                               ? 'Elegir temáticas…'
                               : 'Escolher temáticas…'
                         }
-                        emptyLabel={es ? 'Ninguna' : 'Nenhuma'}
+                        emptyLabel={ui(locale, 'Ninguna', 'Nenhuma', 'None')}
                       />
                     </div>
                     {bulkMode ? (
@@ -1182,7 +1183,7 @@ return (
                     ) : null}
                   </label>
                   <label className="block text-xs font-medium text-slate-600">
-                    {es ? 'Proyecto / fase' : 'Projeto / fase'}
+                    {ui(locale, 'Proyecto / fase', 'Projeto / fase', 'Project / phase')}
                     <select
                       value={selectedProjectId}
                       onChange={(e) => setSelectedProjectId(e.target.value)}
@@ -1210,7 +1211,7 @@ return (
                         if (e.key === 'Enter') createProject();
                       }}
                       className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-slate-400"
-                      placeholder={es ? 'Nuevo proyecto…' : 'Novo projeto…'}
+                      placeholder={ui(locale, 'Nuevo proyecto…', 'Novo projeto…', 'New project…')}
                     />
                     <button
                       type="button"
@@ -1218,7 +1219,7 @@ return (
                       onClick={createProject}
                       className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
                     >
-                      {es ? 'Añadir' : 'Adicionar'}
+                      {ui(locale, 'Añadir', 'Adicionar', 'Add')}
                     </button>
                   </div>
                 )}
@@ -1230,7 +1231,6 @@ return (
                 sectorId={selectedSectorId}
                 sectorIds={selectedSectorIds}
                 locale={loc}
-                es={es}
                 engagementId={id}
                 hideDiagnosisCta
               />
@@ -1253,7 +1253,7 @@ return (
                 <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-900">
-                      {es ? 'Nuevo caso' : 'Novo caso'}
+                      {ui(locale, 'Nuevo caso', 'Novo caso', 'New case')}
                     </h3>
                     <button
                       type="button"
@@ -1284,10 +1284,10 @@ return (
                       onChange={(e) => setPriority(e.target.value)}
                       className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                     >
-                      <option value="LOW">{es ? 'Prioridad baja' : 'Prioridade baixa'}</option>
-                      <option value="MEDIUM">{es ? 'Media' : 'Média'}</option>
-                      <option value="HIGH">{es ? 'Alta' : 'Alta'}</option>
-                      <option value="CRITICAL">{es ? 'Crítica' : 'Crítica'}</option>
+                      <option value="LOW">{ui(locale, 'Prioridad baja', 'Prioridade baixa', 'Low priority')}</option>
+                      <option value="MEDIUM">{ui(locale, 'Media', 'Média', 'Medium')}</option>
+                      <option value="HIGH">{ui(locale, 'Alta', 'Alta', 'High')}</option>
+                      <option value="CRITICAL">{ui(locale, 'Crítica', 'Crítica', 'Critical')}</option>
                     </select>
                     <input
                       type="date"
@@ -1301,7 +1301,7 @@ return (
                         checked={assignToMe}
                         onChange={(e) => setAssignToMe(e.target.checked)}
                       />
-                      {es ? 'Asignarme' : 'Atribuir a mim'}
+                      {ui(locale, 'Asignarme', 'Atribuir a mim', 'Assign to me')}
                     </label>
                     <textarea
                       value={brief}
@@ -1317,7 +1317,7 @@ return (
                     {checklistPreview.length > 0 && (
                       <div className="rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2 sm:col-span-2">
                         <p className="text-[11px] font-medium uppercase text-teal-900">
-                          {es ? 'Checklist sectorial' : 'Checklist sectorial'}
+                          {ui(locale, 'Checklist sectorial', 'Checklist sectorial', 'Sector checklist')}
                         </p>
                         <ul className="mt-1 space-y-0.5 text-xs text-teal-950">
                           {checklistPreview.map((line, i) => (
@@ -1347,7 +1347,7 @@ return (
               <section className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-sm font-semibold text-slate-900">
-                    {es ? 'Cola de casos' : 'Fila de casos'} · {filteredCases.length}
+                    {ui(locale, 'Cola de casos', 'Fila de casos', 'Case queue')} · {filteredCases.length}
                   </h2>
                   <label className="flex items-center gap-1.5 text-xs text-slate-500">
                     <input
@@ -1355,7 +1355,7 @@ return (
                       checked={showClosed}
                       onChange={(e) => setShowClosed(e.target.checked)}
                     />
-                    {es ? 'Incluir cerrados' : 'Incluir concluídos'}
+                    {ui(locale, 'Incluir cerrados', 'Incluir concluídos', 'Include closed')}
                   </label>
                 </div>
                 {filteredCases.length === 0 ? (

@@ -14,6 +14,9 @@ import {
   AURORA_THREAD_KEY,
 } from '../../lib/aurora-interview';
 import { auroraToolHref } from '../../lib/aurora-attended-selection';
+import { answerDiagScript } from '../../lib/aurora-script';
+import { haversineMeters, visitPresence } from '../../lib/aurora-visit';
+import { draftAuroraPlan } from '../../lib/aurora-plan';
 import {
   applyDiagTurn,
   confirmDiagBlock,
@@ -332,6 +335,72 @@ test('AURORA drops the old meta opening and points talk stage at the diagnostic'
     diagnosticComplete: false,
   });
   assert.match(auroraNextAction(talk, 'es'), /diagnóstico/i);
+});
+
+test('AURORA finance script asks for revenue years and then how cash is controlled', () => {
+  let turn = answerDiagScript({ blockId: 'finance', stepId: 'makes_money', facts: {}, answer: 'sim', locale: 'pt' });
+  assert.equal(turn.nextStep, 'years');
+  assert.match(turn.reply, /anos/i);
+  turn = answerDiagScript({
+    blockId: 'finance',
+    stepId: 'years',
+    facts: turn.facts,
+    answer: JSON.stringify({ '2024': '12000', '2025': '18000' }),
+    locale: 'pt',
+  });
+  assert.equal(turn.nextStep, 'controls');
+  assert.match(turn.reply, /entra/i);
+  turn = answerDiagScript({ blockId: 'finance', stepId: 'controls', facts: turn.facts, answer: 'sim', locale: 'pt' });
+  assert.equal(turn.nextStep, 'how');
+  turn = answerDiagScript({
+    blockId: 'finance',
+    stepId: 'how',
+    facts: turn.facts,
+    answer: 'Caderno em casa.',
+    locale: 'pt',
+  });
+  assert.equal(turn.ready, true);
+  assert.equal(turn.level, 3);
+  assert.match(turn.situation, /2024: 12000/);
+  assert.equal(turn.facts.makes_money, 'yes');
+});
+
+test('AURORA field visit is on site inside 250m and inside a polygon', () => {
+  const farm = { lat: -15.78, lng: -47.93 };
+  const near = visitPresence({ lat: -15.7801, lng: -47.9301, property: farm, polygon: [] });
+  assert.equal(near.onSite, true);
+  assert.ok((near.distanceM || 0) < 250);
+  const far = visitPresence({ lat: -15.8, lng: -47.93, property: farm, polygon: [] });
+  assert.equal(far.onSite, false);
+  assert.ok(haversineMeters(farm, { lat: -15.8, lng: -47.93 }) > 250);
+  const box = [
+    { lat: 0, lng: 0 },
+    { lat: 0, lng: 1 },
+    { lat: 1, lng: 1 },
+    { lat: 1, lng: 0 },
+  ];
+  assert.equal(visitPresence({ lat: 0.5, lng: 0.5, property: null, polygon: box }).onSite, true);
+  assert.equal(visitPresence({ lat: 2, lng: 2, property: null, polygon: box }).onSite, false);
+});
+
+test('AURORA improvement plan offers radar, forge, partner and fundhub from weak blocks', () => {
+  let state = emptyAuroraDiagnostic();
+  for (const id of ['governance', 'finance', 'operations', 'people', 'commercial', 'systems'] as const) {
+    state = confirmDiagBlock(state, id, {
+      level: 2,
+      situation: `Situação real do bloco ${id} com detalhe suficiente para o plano.`,
+      gap: `Brecha de ${id}`,
+      potential: `Potencial de ${id}`,
+    });
+    if (id === 'finance') state.blocks.finance.facts = { makes_money: 'yes', controls: 'no' };
+  }
+  const plan = draftAuroraPlan(state, 'pt');
+  const offers = new Set(plan.map((row) => row.offer));
+  assert.ok(offers.has('fundhub'));
+  assert.ok(offers.has('radar'));
+  assert.ok(offers.has('forge'));
+  assert.ok(offers.has('partner'));
+  assert.ok(offers.has('purchase'));
 });
 
 test('AURORA tool href requires attended business and engagement', () => {

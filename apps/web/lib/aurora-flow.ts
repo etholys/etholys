@@ -392,6 +392,7 @@ export function attendedAuroraView(input: {
   bets: Array<{ id: string; title: string; status: string; why?: string; indicator?: string | null; dueAt?: string | null }>;
   phase: AuroraFlowPhase;
   lastRhythm?: { happened: string; blocked: string; nextStep: string; createdAt: string } | null;
+  plan?: Array<{ id: string; title: string; detail: string; approxCost: number | null; currency: string; offer: string; status: string }>;
 }) {
   const open = input.bets.filter((b) => b.status !== 'done' && b.status !== 'dropped');
   const done = input.bets.filter((b) => b.status === 'done');
@@ -424,6 +425,7 @@ export function attendedAuroraView(input: {
       pct: total ? Math.round((done.length / total) * 100) : 0,
     },
     lastRhythm: input.lastRhythm || null,
+    plan: (input.plan || []).filter((row) => row.status === 'reviewed' || row.status === 'bought'),
   };
 }
 
