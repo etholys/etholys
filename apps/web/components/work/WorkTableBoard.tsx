@@ -7,7 +7,6 @@ import { WorkUpdates } from './WorkUpdates';
 import {
   WORK_KANBAN,
   WORK_PRIORITIES,
-  PRIORITY_STYLE,
   STATUS_STYLE,
   canAddColumnKind,
   columnKindLabel,
