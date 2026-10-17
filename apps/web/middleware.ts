@@ -379,6 +379,14 @@ async function enforceFunctionOnlyScope(
 
   if (pathname === '/acesso' || pathname.startsWith('/acesso/')) return null;
 
+  // eCalendar é transversal: qualquer sessão com empresa, sem grant extra.
+  if (pathname === '/hub/calendar' || pathname.startsWith('/hub/calendar/')) {
+    if (scope.mode === 'none') {
+      return NextResponse.redirect(new URL('/acesso', req.url));
+    }
+    return null;
+  }
+
   // Etholys Tools — exige grant por utilizador (admins / full: passa acima).
   if (isEtholysToolPath(pathname)) {
     if (scope.mode === 'none') {

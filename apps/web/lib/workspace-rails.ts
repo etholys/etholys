@@ -11,7 +11,8 @@ export type WorkspaceRailId =
   | 'RADAR'
   | 'WORK'
   | 'MEET'
-  | 'STUDIO';
+  | 'STUDIO'
+  | 'CALENDAR';
 
 export type WorkspaceRailDef = {
   id: WorkspaceRailId;
@@ -67,6 +68,7 @@ const NEXUS_FAMILY: WorkspaceRailDef[] = [
 
 const TOOL_RAILS: WorkspaceRailDef[] = [
   { id: 'WORK', label: 'eTask', href: '/hub/work', accent: 'teal', kind: 'tool' },
+  { id: 'CALENDAR', label: 'eCalendar', href: '/hub/calendar', accent: 'indigo', kind: 'tool' },
   { id: 'MEET', label: 'Chorus', href: '/hub/meet', accent: 'indigo', kind: 'tool' },
   { id: 'STUDIO', label: 'Studio', href: '/hub/studio', accent: 'violet', kind: 'tool' },
 ];
@@ -85,8 +87,9 @@ export function buildWorkspaceRails(opts: {
     out.push(...NEXUS_FAMILY);
   }
   if (opts.tools?.work) out.push(TOOL_RAILS[0]);
-  if (opts.tools?.meet !== false) out.push(TOOL_RAILS[1]);
-  if (opts.tools?.studio) out.push(TOOL_RAILS[2]);
+  out.push(TOOL_RAILS[1]);
+  if (opts.tools?.meet !== false) out.push(TOOL_RAILS[2]);
+  if (opts.tools?.studio) out.push(TOOL_RAILS[3]);
 
   return out;
 }

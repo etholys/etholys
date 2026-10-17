@@ -17,7 +17,7 @@
 | Camada | Papel |
 |--------|--------|
 | **Sistemas** | ATLAS, SIEP, FUNDHUB, NEXUS, FORGE — produtos licenciáveis principais |
-| **Etholys Tools** | Advisor, Studio, Work, Chorus (Meet), Prism — ferramentas no Hub; atalhos / espelhos nos sistemas |
+| **Etholys Tools** | Advisor, Studio, Work, Chorus (Meet), eCalendar, Prism — ferramentas no Hub; atalhos / espelhos nos sistemas |
 | **Etholys Core** | SSO, chat, Docs S3, i18n, permissões, notif. — infraestrutura incluída |
 | **Etholys Lab** | Ferramentas internas da fábrica — [MUSE](./lab-muse.md) (o quê) + [ANVIL](./lab-anvil.md) (como); separados, com pipeline; não públicas |
 
@@ -35,6 +35,7 @@
 | **Studio** | `/hub/studio` | [etholys-studio.md](./etholys-studio.md) — redação e diagramação (docs, vídeo, gráfico) |
 | **Work** | `/hub/work` (+ atalho; ATLAS `/tasks`) | [etholys-work.md](./etholys-work.md) — gestor de tarefas |
 | **Chorus** (produto; rota Meet) | `/hub/meet` | [etholys-meet.md](./etholys-meet.md) — reuniões, vídeo, transcrição e gravação |
+| **eCalendar** | `/hub/calendar` | [etholys-ecalendar.md](./etholys-ecalendar.md) — calendário da empresa; os sistemas projetam as suas datas |
 | **Prism** | `/hub/prism` | Dados, progresso ESG e monitorização de impacto |
 
 Candidato futuro (Tools, fora de Work): **Board** — mural da empresa (links, docs, senhas).

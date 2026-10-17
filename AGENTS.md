@@ -7,7 +7,8 @@ Este ficheiro é o **ponto de entrada** para humanos e agentes que trabalham no 
 | Área | Documento | Quando ler |
 |------|-----------|------------|
 | **Ecossistema de produtos (visão geral)** | [ETHOLYS_Arquitectura_v2.md](./ETHOLYS_Arquitectura_v2.md) | Módulos, princípios, integrações entre sistemas |
-| **Etholys Tools — faixa de ferramentas** | [docs/architecture/etholys-tools.md](./docs/architecture/etholys-tools.md) | Advisor, Studio, Work, Chorus (Meet), Prism — não confundir com Core nem com Studio como guarda-chuva |
+| **Etholys Tools — faixa de ferramentas** | [docs/architecture/etholys-tools.md](./docs/architecture/etholys-tools.md) | Advisor, Studio, Work, Chorus (Meet), eCalendar, Prism — não confundir com Core nem com Studio como guarda-chuva |
+| **eCalendar — calendário transversal** | [docs/architecture/etholys-ecalendar.md](./docs/architecture/etholys-ecalendar.md) | `/hub/calendar`: eventos próprios + datas projetadas de eTask, projetos, Chorus, FORGE, FundHub, AURORA |
 | **Etholys Work — motor de tarefas** | [docs/architecture/etholys-work.md](./docs/architecture/etholys-work.md) | `Task` único, espelhos ATLAS/SIEP/Meet; vistas Board/List/Kanban/Calendar/Workload; pastas ACL tipo Drive; Integrated Workspace (F11) |
 | **FORGE — EAD unificado + jogos + gamificação** | [docs/architecture/forge-ead.md](./docs/architecture/forge-ead.md) | Qualquer trabalho em `/hub/forge`, APIs `forge`, LMS, jogos, IA geradora de jogos |
 | **Etholys Meet → CHORUS** | [docs/architecture/etholys-meet.md](./docs/architecture/etholys-meet.md) | Produto **CHORUS** (`/hub/meet`): salas, breakouts, convites, gravação, transcrição e pós-chamada. **Não** usar nomes de infra de vídeo na UI nem ao falar com o utilizador |

@@ -134,6 +134,7 @@ model User {
   radarLotEventsAuthored        RadarLotEvent[]              @relation("RadarLotEventAuthor")
   radarTechnicians              RadarTechnician[]            @relation("RadarTechnicianUser")
   meetContacts                  MeetContact[]                @relation("MeetContactOwner")
+  calendarEventsCreated         CalendarEvent[]              @relation("CalendarEventCreator")
 }
 
 model Account {
@@ -279,6 +280,7 @@ model Company {
   forgeCertificates           ForgeCertificate[]
   meetSessions                MeetSession[]
   meetGoogleCalendarSyncs     MeetGoogleCalendarSync[]
+  calendarEvents              CalendarEvent[]
   studioFolders               StudioFolder[]
   studioDocuments             StudioDocument[]
   studioTemplates             StudioTemplate[]
@@ -4061,4 +4063,22 @@ model StudioPageMold {
   createdBy   User?    @relation("StudioPageMoldCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([companyId])
+}
+
+/// Evento nativo do eCalendar. Datas dos outros sistemas não se copiam para aqui — o feed projeta-as.
+model CalendarEvent {
+  id          String    @id @default(cuid())
+  companyId   String
+  createdById String
+  title       String
+  description String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  allDay      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy   User      @relation("CalendarEventCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([companyId, startsAt])
 }

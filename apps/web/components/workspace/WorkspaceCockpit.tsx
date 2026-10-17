@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   BarChart3,
+  CalendarDays,
   Columns2,
   Compass,
   GraduationCap,
@@ -46,6 +47,7 @@ const ICONS: Record<WorkspaceRailId, typeof BarChart3> = {
   WORK: ListTodo,
   MEET: Video,
   STUDIO: PenLine,
+  CALENDAR: CalendarDays,
 };
 
 type Props = {

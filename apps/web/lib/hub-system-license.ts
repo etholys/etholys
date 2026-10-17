@@ -44,7 +44,7 @@ export function hubSystemIdToLicenseKey(systemId: string): WorkspaceSystemKey | 
 /** Advisor e Chorus — sem SKU próprio. Studio/Work exigem add-on quando há faturação. PRISM é sistema. */
 export function isHubLicenseExempt(systemId: string): boolean {
   const id = systemId.toUpperCase();
-  return id === 'ADVISOR' || id === 'MEET' || id === 'CHORUS';
+  return id === 'ADVISOR' || id === 'MEET' || id === 'CHORUS' || id === 'CALENDAR';
 }
 
 export type HubCardAccess = 'open' | 'locked' | 'coming_soon';

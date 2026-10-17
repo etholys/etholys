@@ -9,7 +9,7 @@ import type { Locale } from '@/lib/i18n';
 import Link from 'next/link';
 import {
   Layers, BarChart3, Sprout, HandCoins, Cpu, Target, LayoutGrid,
-  LogOut, Globe, ArrowRight, Lock, ExternalLink, BrainCircuit, Video, PenLine, CheckSquare,
+  LogOut, Globe, ArrowRight, Lock, ExternalLink, BrainCircuit, Video, PenLine, CheckSquare, CalendarDays,
   FlaskConical,
   Sunrise,
   Navigation,
@@ -71,6 +71,19 @@ const systems: HubEntry[] = [
     },
     icon: CheckSquare,
     href: '/hub/work',
+    active: true,
+    productTier: 'tool',
+  },
+  {
+    id: 'calendar',
+    name: 'eCalendar',
+    tagline: {
+      es: 'Calendario de la empresa: proyectos, tareas, reuniones y fechas de cada sistema',
+      pt: 'Calendário da empresa: projetos, tarefas, reuniões e datas de cada sistema',
+      en: 'Company calendar: projects, tasks, meetings and dates from every system',
+    },
+    icon: CalendarDays,
+    href: '/hub/calendar',
     active: true,
     productTier: 'tool',
   },
@@ -187,7 +200,7 @@ const systems: HubEntry[] = [
 ];
 
 /** Ferramentas transversais (PRISM deixou de ser sistema peer). */
-const TOOLS_IDS = new Set(['advisor', 'studio', 'meet', 'work', 'prism']);
+const TOOLS_IDS = new Set(['advisor', 'studio', 'meet', 'work', 'calendar', 'prism']);
 
 function isEtholysTool(sys: HubEntry): boolean {
   return TOOLS_IDS.has(sys.id) || sys.productTier === 'advisor' || sys.productTier === 'tool';
