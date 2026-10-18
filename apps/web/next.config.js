@@ -19,7 +19,7 @@ const nextConfig = {
   experimental: {
     ...(useTracingRoot ? { outputFileTracingRoot: path.join(__dirname, '../') } : {}),
     // Prisma deve carregar do node_modules em runtime — bundling quebra delegates (ex. forgeCourse).
-    serverComponentsExternalPackages: ['@prisma/client', 'pdf-parse'],
+    serverComponentsExternalPackages: ['@prisma/client', 'pdf-parse', 'date-holidays'],
   },
   webpack: (config, { isServer }) => {
     if (isServer) {

@@ -52,6 +52,30 @@ export function weekdayOfYmd(ymd: string): number {
   return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))).getUTCDay();
 }
 
+/** Segunda-feira da semana que contém `ymd`. */
+export function startOfWeekMonday(ymd: string): string {
+  const weekday = weekdayOfYmd(ymd);
+  if (weekday < 0) return ymd;
+  const delta = weekday === 0 ? -6 : 1 - weekday;
+  return addDaysYmd(ymd, delta);
+}
+
+export function addMonthsYmd(ymd: string, delta: number): string {
+  const match = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return ymd;
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1 + delta;
+  const day = Number(match[3]);
+  const first = new Date(Date.UTC(year, monthIndex, 1));
+  const dim = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  const clamped = Math.min(day, dim);
+  const dt = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), clamped));
+  const y = dt.getUTCFullYear();
+  const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(dt.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export function addDaysYmd(ymd: string, days: number): string {
   const match = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return ymd;

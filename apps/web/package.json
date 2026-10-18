@@ -107,6 +107,7 @@
     "cookie": "1.0.2",
     "csv": "6.3.11",
     "date-fns": "3.6.0",
+    "date-holidays": "^3.26.5",
     "dayjs": "1.11.13",
     "dotenv": "16.5.0",
     "embla-carousel-react": "8.3.0",

@@ -121,9 +121,27 @@
 .etholys-light-forms select,
 .etholys-light-forms textarea {
   color-scheme: light;
-  background-color: #ffffff;
-  color: #0f172a;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a;
   border-color: #cbd5e1;
+}
+.etholys-meet-light input:disabled,
+.etholys-meet-light select:disabled,
+.etholys-meet-light textarea:disabled,
+.etholys-light-forms input:disabled,
+.etholys-light-forms select:disabled,
+.etholys-light-forms textarea:disabled {
+  background-color: #e2e8f0 !important;
+  color: #1e293b !important;
+  -webkit-text-fill-color: #1e293b;
+  opacity: 1;
+}
+.etholys-meet-light input[type='time']::-webkit-datetime-edit,
+.etholys-meet-light input[type='datetime-local']::-webkit-datetime-edit,
+.etholys-light-forms input[type='time']::-webkit-datetime-edit,
+.etholys-light-forms input[type='datetime-local']::-webkit-datetime-edit {
+  color: #0f172a;
 }
 .etholys-meet-light input::placeholder,
 .etholys-meet-light textarea::placeholder,

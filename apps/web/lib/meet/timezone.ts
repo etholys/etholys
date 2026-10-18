@@ -7,6 +7,18 @@ export const MEET_TIMEZONE_OPTIONS = [
   'America/Bogota',
   'America/Mexico_City',
   'America/Lima',
+  'America/Managua',
+  'America/Guatemala',
+  'America/Costa_Rica',
+  'America/Panama',
+  'America/Tegucigalpa',
+  'America/El_Salvador',
+  'America/Santo_Domingo',
+  'America/Caracas',
+  'America/La_Paz',
+  'America/Asuncion',
+  'America/Montevideo',
+  'America/Havana',
   'America/New_York',
   'America/Chicago',
   'America/Los_Angeles',
@@ -15,6 +27,17 @@ export const MEET_TIMEZONE_OPTIONS = [
   'Europe/London',
   'Europe/Paris',
 ] as const;
+
+export function isValidTimeZone(zone: string): boolean {
+  const value = zone.trim();
+  if (!value || value.length > 80) return false;
+  try {
+    Intl.DateTimeFormat('en-US', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function browserTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';

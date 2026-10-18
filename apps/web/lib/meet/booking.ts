@@ -9,14 +9,19 @@ import { buildMeetIcs } from '@/lib/meet/ics';
 import { meetAppBaseUrl, meetPublicJoinUrl } from '@/lib/meet/types';
 import { sendMeetInviteEmail } from '@/lib/meet/send-meet-email';
 import {
+  addDaysYmd,
   buildOpenSlots,
   clampSlotMinutes,
   DEFAULT_BOOKING_WINDOWS,
   normalizeBookingWindows,
   rangesOverlap,
+  ymdInTimeZone,
   type BookingWindowInput,
   type BusyRange,
 } from '@/lib/meet/booking-slots';
+import { collectHolidayDays, type HolidayDay } from '@/lib/meet/holidays';
+import { normalizeHolidayCountries } from '@/lib/meet/holiday-countries';
+import { isValidTimeZone, meetWallTimeToUtc } from '@/lib/meet/timezone';
 import { bookingCalendarLinks } from '@/lib/meet/booking-calendar';
 import {
   bookingEmailHtml,
@@ -428,10 +433,13 @@ export async function getOrganizerAgenda(companyId: string, ownerId: string) {
         startMin: window.startMin,
         endMin: window.endMin,
       })),
+      holidayCountries: page.holidayCountries || [],
       blocks: page.blocks.map((block) => ({
         id: block.id,
         startsAt: block.startsAt.toISOString(),
         endsAt: block.endsAt.toISOString(),
+        source: block.source || 'manual',
+        label: block.label,
       })),
     },
     requests: requests.map((row) => serializeRequest(row, page.publicCode)),
@@ -449,6 +457,8 @@ export async function updateBookingPage(input: {
   allowVirtual: boolean;
   allowInPerson: boolean;
   windows: BookingWindowInput[];
+  holidayCountries?: unknown;
+  locale?: string | null;
 }) {
   const page = await ensureBookingPage(input.companyId, input.ownerId);
   const title = input.title.trim().slice(0, 160);
@@ -456,7 +466,13 @@ export async function updateBookingPage(input: {
   if (!input.allowVirtual && !input.allowInPerson) throw new BookingError('mode_invalid');
   const windows = normalizeBookingWindows(input.windows);
   if (windows.length === 0) throw new BookingError('windows_required');
-  const timeZone = input.timeZone.trim().slice(0, 80) || 'America/Sao_Paulo';
+  const requestedZone = input.timeZone.trim();
+  if (!isValidTimeZone(requestedZone)) throw new BookingError('timezone_invalid');
+  const timeZone = requestedZone;
+  const holidayCountries =
+    input.holidayCountries === undefined
+      ? normalizeHolidayCountries(page.holidayCountries)
+      : normalizeHolidayCountries(input.holidayCountries);
 
   await prisma.$transaction([
     prisma.meetBookingWindow.deleteMany({ where: { pageId: page.id } }),
@@ -470,11 +486,35 @@ export async function updateBookingPage(input: {
         locationText: (input.locationText || '').trim().slice(0, 500) || null,
         allowVirtual: input.allowVirtual,
         allowInPerson: input.allowInPerson,
+        holidayCountries,
         windows: { create: windows },
       },
     }),
   ]);
+  await replaceHolidayBlocks(page.id, holidayCountries, timeZone, input.locale);
   return getOrganizerAgenda(input.companyId, input.ownerId);
+}
+
+async function replaceHolidayBlocks(
+  pageId: string,
+  countries: string[],
+  timeZone: string,
+  locale?: string | null,
+) {
+  const year = Number(ymdInTimeZone(new Date(), timeZone).slice(0, 4)) || new Date().getUTCFullYear();
+  const days: HolidayDay[] = countries.length
+    ? collectHolidayDays(countries, year - 1, year + 2, locale || 'en')
+    : [];
+  await prisma.meetBookingBlock.deleteMany({ where: { pageId, source: 'holiday' } });
+  const data = days.flatMap((day) => {
+    const startsAt = meetWallTimeToUtc(`${day.ymd}T00:00`, timeZone);
+    const endsAt = meetWallTimeToUtc(`${addDaysYmd(day.ymd, 1)}T00:00`, timeZone);
+    if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime()) || endsAt <= startsAt) return [];
+    return [{ pageId, startsAt, endsAt, source: 'holiday', label: day.label }];
+  });
+  if (data.length > 0) {
+    await prisma.meetBookingBlock.createMany({ data });
+  }
 }
 
 export async function addBookingBlock(input: {
@@ -489,7 +529,7 @@ export async function addBookingBlock(input: {
   if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime()) || endsAt <= startsAt) {
     throw new BookingError('slot_invalid');
   }
-  if (endsAt.getTime() - startsAt.getTime() > 14 * 24 * 60 * 60 * 1000) {
+  if (endsAt.getTime() - startsAt.getTime() > 400 * 24 * 60 * 60 * 1000) {
     throw new BookingError('slot_invalid');
   }
   await prisma.meetBookingBlock.create({
@@ -500,7 +540,7 @@ export async function addBookingBlock(input: {
 
 export async function removeBookingBlock(companyId: string, ownerId: string, blockId: string) {
   const page = await ensureBookingPage(companyId, ownerId);
-  await prisma.meetBookingBlock.deleteMany({ where: { id: blockId, pageId: page.id } });
+  await prisma.meetBookingBlock.deleteMany({ where: { id: blockId, pageId: page.id, source: 'manual' } });
   return getOrganizerAgenda(companyId, ownerId);
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Loader2, Video } from 'lucide-react';
 import { useApp } from '@/app/providers';
+import ChorusAgendaOrganizer from '@/components/meet/ChorusAgendaOrganizer';
 
 type Slot = { date: string; startsAt: string; endsAt: string };
 type Agenda = {
@@ -48,16 +49,21 @@ export default function ChorusPublicAgenda() {
   const [note, setNote] = useState('');
   const [guests, setGuests] = useState<{ name: string; email: string }[]>([{ name: '', email: '' }]);
   const [saving, setSaving] = useState(false);
+  const [ownerCompanyId, setOwnerCompanyId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/meet/public/agenda/${encodeURIComponent(code)}`);
-        const data = (await res.json()) as Agenda & { error?: string };
+        const res = await fetch(`/api/meet/public/agenda/${encodeURIComponent(code)}`, { credentials: 'include' });
+        const data = (await res.json()) as Agenda & { error?: string; viewer?: string; companyId?: string };
         if (!res.ok) throw new Error(data.error || 'not_found');
         if (cancelled) return;
+        if (data.viewer === 'owner' && data.companyId) {
+          setOwnerCompanyId(data.companyId);
+          return;
+        }
         setAgenda(data);
         const firstMode = data.page.allowVirtual ? 'virtual' : 'presencial';
         setMode(firstMode);
@@ -139,8 +145,14 @@ export default function ChorusPublicAgenda() {
       : error
     : null;
 
+  if (ownerCompanyId) {
+    return <ChorusAgendaOrganizer lockedCompanyId={ownerCompanyId} />;
+  }
+
+  const field = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 [color-scheme:light]';
+
   return (
-    <div className="min-h-dvh bg-slate-50 text-slate-900">
+    <div className="etholys-meet-light min-h-dvh bg-slate-50 text-slate-900" style={{ colorScheme: 'light' }}>
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-4">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-700 to-slate-900">
@@ -197,8 +209,8 @@ export default function ChorusPublicAgenda() {
                         setDay(date);
                         setSlot(null);
                       }}
-                      className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium ${
-                        day === date ? 'bg-teal-800 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-200'
+                      className={`shrink-0 rounded-full px-3 py-2 text-sm font-semibold ${
+                        day === date ? 'bg-teal-800 text-white' : 'bg-white text-slate-900 ring-1 ring-slate-300'
                       }`}
                     >
                       {labelDay(date)}
@@ -214,7 +226,7 @@ export default function ChorusPublicAgenda() {
                       className={`rounded-xl px-3 py-3 text-sm font-semibold ${
                         slot?.startsAt === item.startsAt
                           ? 'bg-teal-800 text-white'
-                          : 'bg-white text-teal-900 ring-1 ring-slate-200 hover:bg-teal-50'
+                          : 'bg-white text-teal-950 ring-1 ring-slate-300 hover:bg-teal-50'
                       }`}
                     >
                       {labelTime(item.startsAt)}
@@ -240,8 +252,8 @@ export default function ChorusPublicAgenda() {
                     <button
                       type="button"
                       onClick={() => setMode('virtual')}
-                      className={`rounded-full px-3 py-2 text-sm font-medium ${
-                        mode === 'virtual' ? 'bg-teal-800 text-white' : 'bg-slate-100 text-slate-700'
+                      className={`rounded-full px-3 py-2 text-sm font-semibold ${
+                        mode === 'virtual' ? 'bg-teal-800 text-white' : 'bg-slate-200 text-slate-900'
                       }`}
                     >
                       {t('Virtual', 'Virtual', 'Virtual')}
@@ -249,8 +261,8 @@ export default function ChorusPublicAgenda() {
                     <button
                       type="button"
                       onClick={() => setMode('presencial')}
-                      className={`rounded-full px-3 py-2 text-sm font-medium ${
-                        mode === 'presencial' ? 'bg-teal-800 text-white' : 'bg-slate-100 text-slate-700'
+                      className={`rounded-full px-3 py-2 text-sm font-semibold ${
+                        mode === 'presencial' ? 'bg-teal-800 text-white' : 'bg-slate-200 text-slate-900'
                       }`}
                     >
                       {t('Presencial', 'Presencial', 'In person')}
@@ -277,7 +289,7 @@ export default function ChorusPublicAgenda() {
                     <input
                       value={locationText}
                       onChange={(event) => setLocationText(event.target.value)}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                      className={field}
                       placeholder={agenda.page.locationText || ''}
                     />
                   </label>
@@ -288,7 +300,7 @@ export default function ChorusPublicAgenda() {
                     required
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                    className={field}
                   />
                 </label>
                 <label className="block text-sm">
@@ -298,7 +310,7 @@ export default function ChorusPublicAgenda() {
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                    className={field}
                   />
                 </label>
                 <label className="block text-sm">
@@ -307,7 +319,7 @@ export default function ChorusPublicAgenda() {
                     value={note}
                     onChange={(event) => setNote(event.target.value)}
                     rows={3}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                    className={field}
                   />
                 </label>
                 <div className="space-y-2">
@@ -324,7 +336,7 @@ export default function ChorusPublicAgenda() {
                           setGuests(next);
                         }}
                         placeholder={t('Nome', 'Nombre', 'Name')}
-                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                        className={field}
                       />
                       <input
                         value={guest.email}
@@ -334,7 +346,7 @@ export default function ChorusPublicAgenda() {
                           setGuests(next);
                         }}
                         placeholder={t('E-mail', 'Correo', 'Email')}
-                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                        className={field}
                       />
                     </div>
                   ))}

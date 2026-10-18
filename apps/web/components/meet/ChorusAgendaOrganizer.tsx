@@ -1,13 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Check, Copy, Loader2, Video } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { CompanyPicker } from '@/components/hub/CompanyPicker';
-import { hmToMinutes, minutesToHm } from '@/lib/meet/booking-slots';
+import { hmToMinutes, minutesToHm, ymdInTimeZone } from '@/lib/meet/booking-slots';
 import { meetWallTimeToUtc } from '@/lib/meet/timezone';
+import { AGENDA_HOLIDAY_COUNTRIES } from '@/lib/meet/holiday-countries';
+import ChorusAgendaCalendar, { type AgendaCalEvent, type AgendaView } from '@/components/meet/ChorusAgendaCalendar';
 
 type WindowRow = { weekday: number; startMin: number; endMin: number; enabled: boolean };
 type RequestRow = {
@@ -36,8 +38,9 @@ type Agenda = {
     locationText: string | null;
     allowVirtual: boolean;
     allowInPerson: boolean;
+    holidayCountries?: string[];
     windows: { weekday: number; startMin: number; endMin: number }[];
-    blocks: { id: string; startsAt: string; endsAt: string }[];
+    blocks: { id: string; startsAt: string; endsAt: string; source?: string; label?: string | null }[];
   };
   requests: RequestRow[];
   timeZones?: string[];
@@ -73,12 +76,16 @@ function windowsFromPage(rows: { weekday: number; startMin: number; endMin: numb
   });
 }
 
-export default function ChorusAgendaOrganizer() {
+const FIELD =
+  'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 [color-scheme:light]';
+
+export default function ChorusAgendaOrganizer({ lockedCompanyId }: { lockedCompanyId?: string } = {}) {
   const { locale } = useApp();
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const intl = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
-  const { companies, companiesReady, companiesLoadError, companyId, setActiveCompanyId, reloadCompanies } =
-    useEnsureActiveCompany();
+  const ensured = useEnsureActiveCompany();
+  const { companies, companiesReady, companiesLoadError, setActiveCompanyId, reloadCompanies } = ensured;
+  const companyId = lockedCompanyId || ensured.companyId;
 
   const [agenda, setAgenda] = useState<Agenda | null>(null);
   const [loading, setLoading] = useState(false);
@@ -97,6 +104,13 @@ export default function ChorusAgendaOrganizer() {
   const [blockStart, setBlockStart] = useState('');
   const [blockEnd, setBlockEnd] = useState('');
   const [counter, setCounter] = useState<Record<string, { start: string; end: string }>>({});
+  const [holidayCountries, setHolidayCountries] = useState<string[]>([]);
+  const [view, setView] = useState<AgendaView>('week');
+  const [cursorYmd, setCursorYmd] = useState(() => ymdInTimeZone(new Date(), 'America/Sao_Paulo'));
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [closeMode, setCloseMode] = useState(false);
+  const [focusRequestId, setFocusRequestId] = useState<string | null>(null);
+  const cursorSet = useRef(false);
 
   const load = useCallback(async () => {
     if (!companyId) return;
@@ -114,7 +128,12 @@ export default function ChorusAgendaOrganizer() {
       setLocationText(data.page.locationText || '');
       setAllowVirtual(data.page.allowVirtual);
       setAllowInPerson(data.page.allowInPerson);
+      setHolidayCountries(data.page.holidayCountries || []);
       setWindows(windowsFromPage(data.page.windows));
+      if (!cursorSet.current) {
+        setCursorYmd(ymdInTimeZone(new Date(), data.page.timeZone));
+        cursorSet.current = true;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'error');
     } finally {
@@ -143,6 +162,8 @@ export default function ChorusAgendaOrganizer() {
           locationText,
           allowVirtual,
           allowInPerson,
+          holidayCountries,
+          locale,
           windows: windows
             .filter((row) => row.enabled)
             .map((row) => ({ weekday: row.weekday, startMin: row.startMin, endMin: row.endMin })),
@@ -151,6 +172,8 @@ export default function ChorusAgendaOrganizer() {
       const data = (await res.json()) as Agenda & { error?: string };
       if (!res.ok) throw new Error(data.error || 'error');
       setAgenda(data);
+      setTimeZone(data.page.timeZone);
+      setHolidayCountries(data.page.holidayCountries || []);
       setInfo(t('Agenda guardada.', 'Agenda guardada.', 'Agenda saved.'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'error');
@@ -245,8 +268,71 @@ export default function ChorusAgendaOrganizer() {
     });
   }
 
+  const calendarEvents: AgendaCalEvent[] = agenda
+    ? [
+        ...agenda.page.blocks.map((block) => ({
+          id: block.id,
+          kind: 'block' as const,
+          source: block.source || 'manual',
+          title:
+            block.source === 'holiday'
+              ? block.label || t('Feriado', 'Festivo', 'Holiday')
+              : t('Fechado', 'Cerrado', 'Closed'),
+          startsAt: block.startsAt,
+          endsAt: block.endsAt,
+        })),
+        ...agenda.requests
+          .filter((request) => request.status !== 'declined' && request.status !== 'cancelled')
+          .map((request) => {
+            const proposed = request.status === 'counter_proposed' && request.proposedStartsAt && request.proposedEndsAt;
+            return {
+              id: request.id,
+              kind: 'request' as const,
+              status: request.status,
+              title: request.bookerName,
+              startsAt: proposed ? request.proposedStartsAt! : request.startsAt,
+              endsAt: proposed ? request.proposedEndsAt! : request.endsAt,
+            };
+          }),
+      ]
+    : [];
+
+  function toggleCountry(code: string) {
+    setHolidayCountries((current) =>
+      current.includes(code) ? current.filter((item) => item !== code) : [...current, code],
+    );
+  }
+
+  async function commitRange(startWall: string, endWall: string) {
+    setBlockStart(startWall);
+    setBlockEnd(endWall);
+    if (!companyId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/meet/agenda', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          startsAt: meetWallTimeToUtc(startWall, timeZone).toISOString(),
+          endsAt: meetWallTimeToUtc(endWall, timeZone).toISOString(),
+        }),
+      });
+      const data = (await res.json()) as Agenda & { error?: string };
+      if (!res.ok) throw new Error(data.error || 'slot_invalid');
+      setAgenda(data);
+      setInfo(t('Horário fechado na agenda.', 'Horario cerrado en la agenda.', 'Time closed on the agenda.'));
+      setCloseMode(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'slot_invalid');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <div className="min-h-dvh bg-white text-slate-900">
+    <div className="etholys-meet-light min-h-dvh bg-white text-slate-900" style={{ colorScheme: 'light' }}>
       <header className="border-b border-slate-200">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
           <Link href="/hub/meet" className="inline-flex items-center gap-1 text-sm font-medium text-slate-600">
@@ -257,16 +343,22 @@ export default function ChorusAgendaOrganizer() {
             <Video className="h-4 w-4 text-teal-50" />
           </span>
           <h1 className="text-lg font-semibold">{t('Agenda pública', 'Agenda pública', 'Public agenda')}</h1>
-          <CompanyPicker
-            companies={companies}
-            activeCompanyId={companyId}
-            onSelect={setActiveCompanyId}
-            ready={companiesReady}
-            error={companiesLoadError}
-            onRetry={() => void reloadCompanies()}
-            locale={locale}
-            className="ml-auto"
-          />
+          {lockedCompanyId ? (
+            <Link href="/hub/meet/agenda" className="ml-auto text-sm font-medium text-teal-800">
+              {t('Abrir no CHORUS', 'Abrir en CHORUS', 'Open in CHORUS')}
+            </Link>
+          ) : (
+            <CompanyPicker
+              companies={companies}
+              activeCompanyId={companyId}
+              onSelect={setActiveCompanyId}
+              ready={companiesReady}
+              error={companiesLoadError}
+              onRetry={() => void reloadCompanies()}
+              locale={locale}
+              className="ml-auto"
+            />
+          )}
         </div>
       </header>
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
@@ -310,14 +402,91 @@ export default function ChorusAgendaOrganizer() {
               </p>
             </section>
 
-            <section className="grid gap-4 rounded-2xl border border-slate-200 p-4 md:grid-cols-2">
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="block min-w-[16rem] flex-1 text-sm">
+                <span className="mb-1 block font-medium text-slate-700">{t('Fuso horário', 'Zona horaria', 'Timezone')}</span>
+                <select value={timeZone} onChange={(e) => setTimeZone(e.target.value)} className={FIELD}>
+                  {(agenda.timeZones || [timeZone]).map((zone) => (
+                    <option key={zone} value={zone}>{zone}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setCloseMode((open) => !open);
+                  setSettingsOpen(false);
+                }}
+                className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                  closeMode ? 'bg-teal-800 text-white' : 'border border-slate-300 bg-white text-slate-900'
+                }`}
+              >
+                {t('Fechar horário', 'Cerrar horario', 'Close a time')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSettingsOpen(true);
+                  window.setTimeout(() => document.getElementById('agenda-holidays')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+                }}
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+              >
+                {t('Feriados', 'Festivos', 'Holidays')}
+                {holidayCountries.length ? ` (${holidayCountries.length})` : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettingsOpen((open) => !open)}
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+              >
+                {settingsOpen
+                  ? t('Ocultar definições', 'Ocultar ajustes', 'Hide settings')
+                  : t('Definições', 'Ajustes', 'Settings')}
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void saveSettings()}
+                className="rounded-full bg-teal-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {t('Guardar agenda', 'Guardar agenda', 'Save agenda')}
+              </button>
+            </div>
+            <p className="text-xs text-slate-600">
+              {t(
+                'O fuso muda já o calendário e os horários. A página pública usa o fuso depois de guardar. Os feriados escolhidos também fecham a página pública ao guardar.',
+                'La zona horaria ya cambia el calendario y los horarios. La página pública usa la zona después de guardar. Los festivos elegidos también cierran la página pública al guardar.',
+                'The timezone updates the calendar and times right away. The public page uses it after you save. Chosen holidays also close the public page when you save.',
+              )}
+            </p>
+            <ChorusAgendaCalendar
+              timeZone={timeZone}
+              locale={locale}
+              events={calendarEvents}
+              cursorYmd={cursorYmd}
+              view={view}
+              stepMin={slotMinutes}
+              closeMode={closeMode}
+              onCursorYmd={setCursorYmd}
+              onView={setView}
+              onCommitRange={(startWall, endWall) => void commitRange(startWall, endWall)}
+              onOpenRequest={(id) => {
+                setFocusRequestId(id);
+                window.setTimeout(() => document.getElementById(`agenda-request-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 30);
+              }}
+              onReopenBlock={(id) => void removeBlock(id)}
+            />
+
+            {settingsOpen ? (
+            <>
+            <section className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 md:grid-cols-2">
               <label className="block text-sm">
                 <span className="mb-1 block text-slate-600">{t('Título', 'Título', 'Title')}</span>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2" />
+                <input value={title} onChange={(e) => setTitle(e.target.value)} className={FIELD} />
               </label>
               <label className="block text-sm">
                 <span className="mb-1 block text-slate-600">{t('Fuso horário', 'Zona horaria', 'Timezone')}</span>
-                <select value={timeZone} onChange={(e) => setTimeZone(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2">
+                <select value={timeZone} onChange={(e) => setTimeZone(e.target.value)} className={FIELD}>
                   {(agenda.timeZones || [timeZone]).map((zone) => (
                     <option key={zone} value={zone}>{zone}</option>
                   ))}
@@ -325,11 +494,11 @@ export default function ChorusAgendaOrganizer() {
               </label>
               <label className="block text-sm md:col-span-2">
                 <span className="mb-1 block text-slate-600">{t('Descrição', 'Descripción', 'Description')}</span>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full rounded-xl border border-slate-200 px-3 py-2" />
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={FIELD} />
               </label>
               <label className="block text-sm">
                 <span className="mb-1 block text-slate-600">{t('Duração', 'Duración', 'Length')}</span>
-                <select value={slotMinutes} onChange={(e) => setSlotMinutes(Number(e.target.value))} className="w-full rounded-xl border border-slate-200 px-3 py-2">
+                <select value={slotMinutes} onChange={(e) => setSlotMinutes(Number(e.target.value))} className={FIELD}>
                   {[15, 30, 45, 60, 90].map((n) => (
                     <option key={n} value={n}>{n} min</option>
                   ))}
@@ -337,7 +506,7 @@ export default function ChorusAgendaOrganizer() {
               </label>
               <label className="block text-sm">
                 <span className="mb-1 block text-slate-600">{t('Local presencial', 'Lugar presencial', 'In-person place')}</span>
-                <input value={locationText} onChange={(e) => setLocationText(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2" />
+                <input value={locationText} onChange={(e) => setLocationText(e.target.value)} className={FIELD} />
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={allowVirtual} onChange={(e) => setAllowVirtual(e.target.checked)} />
@@ -376,7 +545,7 @@ export default function ChorusAgendaOrganizer() {
                           next[index] = { ...row, startMin };
                           setWindows(next);
                         }}
-                        className="rounded-lg border border-slate-200 px-2 py-1"
+                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-slate-900 disabled:bg-slate-200 disabled:text-slate-800 [color-scheme:light]"
                       />
                       <span>–</span>
                       <input
@@ -390,12 +559,36 @@ export default function ChorusAgendaOrganizer() {
                           next[index] = { ...row, endMin: endMin === 0 ? 24 * 60 : endMin };
                           setWindows(next);
                         }}
-                        className="rounded-lg border border-slate-200 px-2 py-1"
+                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-slate-900 disabled:bg-slate-200 disabled:text-slate-800 [color-scheme:light]"
                       />
                     </div>
                   );
                 })}
               </div>
+              <fieldset id="agenda-holidays" className="md:col-span-2 space-y-2">
+                <legend className="text-sm font-medium text-slate-900">
+                  {t('Feriados públicos', 'Festivos públicos', 'Public holidays')}
+                </legend>
+                <p className="text-xs text-slate-600">
+                  {t(
+                    'Escolha um ou mais países. Ao guardar, esses dias ficam fechados no calendário e na página pública.',
+                    'Elige uno o más países. Al guardar, esos días quedan cerrados en el calendario y en la página pública.',
+                    'Pick one or more countries. On save, those days are closed on the calendar and the public page.',
+                  )}
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {AGENDA_HOLIDAY_COUNTRIES.map((country) => (
+                    <label key={country.code} className="flex items-center gap-2 text-sm text-slate-900">
+                      <input
+                        type="checkbox"
+                        checked={holidayCountries.includes(country.code)}
+                        onChange={() => toggleCountry(country.code)}
+                      />
+                      {t(country.pt, country.es, country.en)}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
               <button
                 type="button"
                 disabled={saving}
@@ -406,32 +599,34 @@ export default function ChorusAgendaOrganizer() {
               </button>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 p-4">
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-900">
               <h2 className="text-base font-semibold">{t('Fechar horário', 'Cerrar horario', 'Close a time')}</h2>
               <div className="mt-3 flex flex-wrap items-end gap-2">
                 <label className="text-sm">
                   <span className="mb-1 block text-slate-600">{t('Início', 'Inicio', 'Start')}</span>
-                  <input type="datetime-local" value={blockStart} onChange={(e) => setBlockStart(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2" />
+                  <input type="datetime-local" value={blockStart} onChange={(e) => setBlockStart(e.target.value)} className={FIELD} />
                 </label>
                 <label className="text-sm">
                   <span className="mb-1 block text-slate-600">{t('Fim', 'Fin', 'End')}</span>
-                  <input type="datetime-local" value={blockEnd} onChange={(e) => setBlockEnd(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2" />
+                  <input type="datetime-local" value={blockEnd} onChange={(e) => setBlockEnd(e.target.value)} className={FIELD} />
                 </label>
                 <button type="button" onClick={() => void closeRange()} className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold">
                   {t('Fechar', 'Cerrar', 'Close')}
                 </button>
               </div>
               <ul className="mt-3 space-y-1 text-sm">
-                {agenda.page.blocks.map((block) => (
+                {agenda.page.blocks.filter((block) => block.source !== 'holiday').map((block) => (
                   <li key={block.id} className="flex items-center justify-between gap-2">
                     <span>{formatWhen(block.startsAt)} – {formatWhen(block.endsAt)}</span>
-                    <button type="button" onClick={() => void removeBlock(block.id)} className="text-teal-800">
+                    <button type="button" onClick={() => void removeBlock(block.id)} className="font-medium text-teal-800">
                       {t('Reabrir', 'Reabrir', 'Reopen')}
                     </button>
                   </li>
                 ))}
               </ul>
             </section>
+            </>
+            ) : null}
 
             <section className="space-y-3">
               <h2 className="text-base font-semibold">{t('Pedidos', 'Solicitudes', 'Requests')}</h2>
@@ -443,7 +638,7 @@ export default function ChorusAgendaOrganizer() {
                   const proposal = counter[request.id] || { start: '', end: '' };
                   const label = STATUS_LABEL[request.status];
                   return (
-                    <article key={request.id} className="rounded-2xl border border-slate-200 p-4">
+                    <article id={`agenda-request-${request.id}`} key={request.id} className={`rounded-2xl border bg-white p-4 text-slate-900 ${focusRequestId === request.id ? 'border-teal-700 ring-2 ring-teal-700' : 'border-slate-200'}`}>
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">
@@ -490,8 +685,8 @@ export default function ChorusAgendaOrganizer() {
                           <button type="button" disabled={saving} onClick={() => void act(request.id, 'close')} className="rounded-full border border-slate-300 px-3 py-2 text-sm font-semibold">
                             {t('Fechar horário', 'Cerrar horario', 'Close time')}
                           </button>
-                          <input type="datetime-local" value={proposal.start} onChange={(e) => setCounter({ ...counter, [request.id]: { ...proposal, start: e.target.value } })} className="rounded-xl border border-slate-200 px-2 py-2 text-sm" />
-                          <input type="datetime-local" value={proposal.end} onChange={(e) => setCounter({ ...counter, [request.id]: { ...proposal, end: e.target.value } })} className="rounded-xl border border-slate-200 px-2 py-2 text-sm" />
+                          <input type="datetime-local" value={proposal.start} onChange={(e) => setCounter({ ...counter, [request.id]: { ...proposal, start: e.target.value } })} className={FIELD} />
+                          <input type="datetime-local" value={proposal.end} onChange={(e) => setCounter({ ...counter, [request.id]: { ...proposal, end: e.target.value } })} className={FIELD} />
                           <button
                             type="button"
                             disabled={saving || !proposal.start || !proposal.end}

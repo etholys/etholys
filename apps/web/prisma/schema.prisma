@@ -3532,6 +3532,8 @@ model MeetBookingPage {
   locationText   String?
   allowVirtual   Boolean  @default(true)
   allowInPerson  Boolean  @default(true)
+  /// ISO 3166-1 alpha-2. Feriados públicos desses países ficam fechados.
+  holidayCountries String[] @default([])
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -3563,6 +3565,9 @@ model MeetBookingBlock {
   pageId   String
   startsAt DateTime
   endsAt   DateTime
+  /// manual | holiday
+  source   String          @default("manual")
+  label    String?
   page     MeetBookingPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
 
   @@index([pageId, startsAt])

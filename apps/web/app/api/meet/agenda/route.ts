@@ -55,6 +55,8 @@ export async function PUT(req: Request) {
       allowVirtual?: boolean;
       allowInPerson?: boolean;
       windows?: { weekday: number; startMin: number; endMin: number }[];
+      holidayCountries?: unknown;
+      locale?: string;
     };
     const gate = await tenantCompany(body.companyId);
     if ('error' in gate && gate.error) return gate.error;
@@ -63,12 +65,14 @@ export async function PUT(req: Request) {
       ownerId: gate.tenant.userId,
       title: body.title || '',
       description: body.description,
-      timeZone: body.timeZone || 'America/Sao_Paulo',
+      timeZone: body.timeZone || '',
       slotMinutes: Number(body.slotMinutes || 30),
       locationText: body.locationText,
       allowVirtual: Boolean(body.allowVirtual),
       allowInPerson: Boolean(body.allowInPerson),
       windows: Array.isArray(body.windows) ? body.windows : [],
+      holidayCountries: body.holidayCountries,
+      locale: body.locale,
     });
     return NextResponse.json(agenda);
   } catch (error) {

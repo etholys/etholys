@@ -109,7 +109,7 @@ export default function ChorusAgendaStatus() {
     : '';
 
   return (
-    <div className="min-h-dvh bg-slate-50 text-slate-900">
+    <div className="etholys-meet-light min-h-dvh bg-slate-50 text-slate-900" style={{ colorScheme: 'light' }}>
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-4">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-700 to-slate-900">
