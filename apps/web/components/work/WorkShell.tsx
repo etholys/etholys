@@ -568,7 +568,7 @@ export default function WorkShell() {
         </div>
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <div className="min-w-0 flex-1 overflow-y-auto">
+          <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
             {nav.kind === 'dashboard' ? (
               loadingDash ? (
                 <div className="flex justify-center py-16">

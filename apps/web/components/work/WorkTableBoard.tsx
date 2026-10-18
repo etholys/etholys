@@ -195,8 +195,8 @@ export function WorkTableBoard({
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="min-w-0 space-y-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <input
           value={newGroup}
           onChange={(e) => setNewGroup(e.target.value)}
@@ -209,7 +209,7 @@ export function WorkTableBoard({
             }
           }}
           placeholder={t('New group…', 'Nuevo grupo…', 'Novo grupo…')}
-          className="min-w-[200px] flex-1 rounded-lg border border-dashed border-slate-300 bg-white/80 px-3 py-2 text-sm outline-none focus:border-cyan-400"
+          className="w-44 max-w-full rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-3 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-500"
         />
         <button
           type="button"
@@ -219,9 +219,9 @@ export function WorkTableBoard({
             if (!name) return;
             void onCreateGroup(name).then(() => setNewGroup(''));
           }}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40"
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-semibold text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)] disabled:opacity-40"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-3.5 w-3.5" />
           {t('Add group', 'Añadir grupo', 'Adicionar grupo')}
         </button>
         {groups.length === 0 && (
@@ -229,20 +229,18 @@ export function WorkTableBoard({
             type="button"
             disabled={seedingStarter}
             onClick={onSeedStarter}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-800 hover:bg-cyan-100 disabled:opacity-40"
+            className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-teal-300 hover:bg-teal-500/10 disabled:opacity-40"
           >
             {t('Starter groups', 'Grupos iniciales', 'Grupos iniciais')}
           </button>
         )}
-      </div>
-
-      {onColumnsChange && (
+        {onColumnsChange && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <button
               type="button"
               onClick={() => setAddOpen((v) => !v)}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-300"
+              className="inline-flex items-center gap-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-semibold text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
             >
               <Plus className="h-3.5 w-3.5" />
               {t('Column', 'Columna', 'Coluna')}
@@ -280,7 +278,7 @@ export function WorkTableBoard({
               <button
                 type="button"
                 onClick={() => setNotifyOpen((v) => !v)}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-300"
+                className="rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-semibold text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
               >
                 {t('Notifications', 'Notificaciones', 'Notificações')}
               </button>
@@ -307,15 +305,8 @@ export function WorkTableBoard({
             </div>
           )}
         </div>
-      )}
-
-      <p className="text-[11px] text-slate-400">
-        {t(
-          'Drag the handle to move tasks between groups or reorder.',
-          'Arrastra el asa para mover tareas entre grupos o reordenar.',
-          'Arrasta a pega para mover tarefas entre grupos ou reordenar.',
         )}
-      </p>
+      </div>
 
       {sections.map((section) => {
         if (section.key === '__ungrouped' && section.tasks.length === 0 && groups.length > 0) return null;
@@ -402,8 +393,8 @@ export function WorkTableBoard({
             </div>
 
             {!isCollapsed && (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[800px] border-collapse text-sm">
+              <div className="min-w-0 overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                       {onToggleSelect && (
@@ -536,7 +527,7 @@ export function WorkTableBoard({
                               <button
                                 type="button"
                                 onClick={() => onSelect(task.id)}
-                                className="shrink-0 text-[10px] font-semibold text-slate-400 hover:text-teal-700"
+                                className="shrink-0 text-[10px] font-semibold text-[color:var(--sys-faint)] opacity-0 hover:text-teal-300 group-hover:opacity-100"
                               >
                                 {t('Open', 'Abrir', 'Abrir')}
                               </button>
@@ -544,7 +535,7 @@ export function WorkTableBoard({
                                 <button
                                   type="button"
                                   onClick={() => onDeleteTask(task.id, task.title)}
-                                  className="shrink-0 rounded p-1 text-slate-300 hover:bg-rose-50 hover:text-rose-600"
+                                  className="shrink-0 rounded p-1 text-[color:var(--sys-faint)] opacity-0 hover:text-rose-400 group-hover:opacity-100"
                                   title={t('Delete', 'Eliminar', 'Excluir')}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />

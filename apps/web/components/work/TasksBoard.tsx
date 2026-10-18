@@ -541,12 +541,12 @@ export default function TasksBoard({
   return (
     <div
       className={cn(
-        'flex flex-col',
+        'flex min-w-0 flex-col',
         embedded ? 'min-h-0' : 'min-h-[70vh]',
         variant === 'hub' && !embedded && 'min-h-[calc(100vh-7.5rem)]',
       )}
     >
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {!embedded && <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {variant === 'hub' || embedded ? (
           <p className="text-sm tabular-nums text-slate-500">
             {filtered.length} {tr('nav.tasks').toLowerCase()}
@@ -605,7 +605,7 @@ export default function TasksBoard({
             {tr('task.new')}
           </button>
         </div>
-      </div>
+      </div>}
 
       {!embedded && <div className="mb-4 space-y-2">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
