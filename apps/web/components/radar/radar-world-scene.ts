@@ -8,6 +8,12 @@ export type WorldParcel = {
   moisture: number | null;
   nextAction?: string;
   harvestBlocked?: boolean;
+  /** Site-plan percent. When every parcel has x/y, the rooms use that layout. */
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  rotation?: number;
 };
 
 export type WorldSensor = {
@@ -121,13 +127,45 @@ export function mountRadarWorld(host: HTMLElement, opts: MountOpts): () => void 
   sun.castShadow = true;
   scene.add(sun);
 
+  const laidOut =
+    opts.parcels.length > 0 && opts.parcels.every((p) => typeof p.x === 'number' && typeof p.y === 'number');
+  const SPAN = 26;
   const n = Math.max(1, opts.parcels.length);
   const cols = Math.ceil(Math.sqrt(n));
   const rows = Math.ceil(n / cols);
   const cell = 4.2;
   const gap = 0.7;
-  const spanX = cols * cell + (cols - 1) * gap;
-  const spanZ = rows * cell + (rows - 1) * gap;
+  const gridSpanX = cols * cell + (cols - 1) * gap;
+  const gridSpanZ = rows * cell + (rows - 1) * gap;
+  const rooms = opts.parcels.map((parcel, i) => {
+    if (laidOut) {
+      const w = Math.max(1.15, ((parcel.w ?? 18) / 100) * SPAN);
+      const d = Math.max(1.15, ((parcel.h ?? 14) / 100) * SPAN);
+      const x = (((parcel.x ?? 0) + (parcel.w ?? 18) / 2) / 100 - 0.5) * SPAN;
+      const z = (((parcel.y ?? 0) + (parcel.h ?? 14) / 2) / 100 - 0.5) * SPAN;
+      return { parcel, x, z, w, d, rotation: parcel.rotation ?? 0 };
+    }
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    return {
+      parcel,
+      x: -gridSpanX / 2 + cell / 2 + col * (cell + gap),
+      z: -gridSpanZ / 2 + cell / 2 + row * (cell + gap),
+      w: cell - 0.15,
+      d: cell - 0.15,
+      rotation: 0,
+    };
+  });
+  let spanX = gridSpanX;
+  let spanZ = gridSpanZ;
+  if (laidOut && rooms.length > 0) {
+    const minX = Math.min(...rooms.map((r) => r.x - r.w / 2));
+    const maxX = Math.max(...rooms.map((r) => r.x + r.w / 2));
+    const minZ = Math.min(...rooms.map((r) => r.z - r.d / 2));
+    const maxZ = Math.max(...rooms.map((r) => r.z + r.d / 2));
+    spanX = Math.max(8, maxX - minX + 3);
+    spanZ = Math.max(8, maxZ - minZ + 3);
+  }
 
   const frameCamera = () => {
     const w = host.clientWidth || 640;
@@ -179,24 +217,22 @@ export function mountRadarWorld(host: HTMLElement, opts: MountOpts): () => void 
   const wallMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0 });
   const focusMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xbae6fd, emissiveIntensity: 0.35 });
 
-  opts.parcels.forEach((parcel, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const x = -spanX / 2 + cell / 2 + col * (cell + gap);
-    const z = -spanZ / 2 + cell / 2 + row * (cell + gap);
+  rooms.forEach((room) => {
+    const { parcel } = room;
     const group = new THREE.Group();
-    group.position.set(x, 0, z);
+    group.position.set(room.x, 0, room.z);
+    group.rotation.y = THREE.MathUtils.degToRad(room.rotation || 0);
     group.userData.parcelId = parcel.id;
 
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(cell - 0.15, 0.08, cell - 0.15), opts.focusedId === parcel.id ? focusMat : roomMat);
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(room.w, 0.08, room.d), opts.focusedId === parcel.id ? focusMat : roomMat);
     floor.position.y = 0.06;
     floor.userData.parcelId = parcel.id;
     floor.receiveShadow = true;
     group.add(floor);
     pickables.push(floor);
 
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(cell - 0.15, 0.45, 0.08), wallMat);
-    wall.position.set(0, 0.28, -(cell - 0.2) / 2);
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(room.w, 0.45, 0.08), wallMat);
+    wall.position.set(0, 0.28, -room.d / 2);
     group.add(wall);
 
     if (opts.moduleId === 'agroindustry' || opts.moduleId === 'livestock') addFactory(group);

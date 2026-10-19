@@ -3,8 +3,12 @@ import assert from 'node:assert/strict';
 import {
   autoLayoutSpaces,
   mergeLayoutWithSpaces,
+  moveSpace,
   parseRadarLayout,
+  placeSpace,
+  rotateSpace,
   sanitizeLayoutPatch,
+  unplaceSpace,
 } from '../../lib/radar/site-layout';
 
 test('auto layout places all spaces on a grid', () => {
@@ -39,8 +43,48 @@ test('merge keeps saved positions and adds new spaces', () => {
     [{ id: 's1', spaceId: 'a' }],
   );
   assert.equal(merged.spaces.find((s) => s.id === 'a')?.x, 5);
+  assert.equal(merged.spaces.find((s) => s.id === 'b')?.placed, false);
   assert.ok(merged.spaces.find((s) => s.id === 'b'));
   assert.equal(merged.sensors[0]?.spaceId, 'a');
+});
+
+test('parse and sanitize keep rotation and explicit placement', () => {
+  const doc = parseRadarLayout({
+    spaces: [
+      { id: 'p1', x: 10, y: 12, w: 20, h: 16, rotation: 375, placed: true },
+      { id: 'p2', x: 30, y: 30, w: 20, h: 16 },
+    ],
+    sensors: [],
+  });
+  assert.ok(doc);
+  assert.equal(doc!.spaces[0].rotation, 15);
+  assert.equal(doc!.spaces[0].placed, true);
+  assert.equal(doc!.spaces[1].placed, false);
+  assert.equal(doc!.spaces[1].rotation, 0);
+  const patch = sanitizeLayoutPatch(doc, new Set(['p1', 'p2']), new Set());
+  assert.equal(patch!.spaces[0].rotation, 15);
+  assert.equal(patch!.spaces[0].placed, true);
+  assert.equal(patch!.spaces[1].placed, false);
+});
+
+test('place move rotate and unplace one space', () => {
+  const base = parseRadarLayout({
+    spaces: [{ id: 'a', x: 10, y: 10, w: 20, h: 16, placed: false }],
+    sensors: [],
+  })!;
+  const placed = placeSpace(base, 'a', 50, 40);
+  const spot = placed.spaces[0];
+  assert.equal(spot.placed, true);
+  assert.equal(spot.x, 40);
+  assert.equal(spot.y, 32);
+  const moved = moveSpace(placed, 'a', 20, 20);
+  assert.equal(moved.spaces[0].x, 10);
+  assert.equal(moved.spaces[0].y, 12);
+  const turned = rotateSpace(moved, 'a', 15);
+  assert.equal(turned.spaces[0].rotation, 15);
+  const cleared = unplaceSpace(turned, 'a');
+  assert.equal(cleared.spaces[0].placed, false);
+  assert.equal(cleared.spaces[0].id, 'a');
 });
 
 test('sanitizeLayoutPatch drops unknown ids', () => {

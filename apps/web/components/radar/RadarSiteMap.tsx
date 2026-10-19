@@ -6,6 +6,8 @@ import { MOISTURE_THRESHOLD, type ParcelAction } from '@/lib/radar/agriculture';
 import {
   emptyRadarLayout,
   mergeLayoutWithSpaces,
+  moveSpace,
+  placeSpace,
   type RadarSiteLayoutDoc,
   type RadarSpaceRect,
 } from '@/lib/radar/site-layout';
@@ -82,7 +84,12 @@ type Props = {
   /** @deprecated trail removed — kept so callers compile; ignored */
   trailUnitIds?: string[];
   hero?: boolean;
-  /** Real satellite/OSM surface. Spaces stay as an overlay around the property pin. */
+  /** When set, the parent owns the layout document (geo map edits). */
+  syncedLayout?: RadarSiteLayoutDoc;
+  editMode?: 'none' | 'place' | 'move';
+  onLayoutDraft?: (layout: RadarSiteLayoutDoc) => void;
+  onLayoutCommit?: (layout: RadarSiteLayoutDoc) => void;
+  /** OSM surface. Footprints appear only after an explicit place. */
   basemap?: {
     lat: number | null;
     lng: number | null;
@@ -120,9 +127,14 @@ export function RadarSiteMap({
   onRequestAddParcel,
   hero = false,
   basemap,
+  syncedLayout,
+  editMode = 'none',
+  onLayoutDraft,
+  onLayoutCommit,
 }: Props) {
   const loc = radarLoc(locale);
   const canEdit = mode === 'empresa';
+  const controlled = syncedLayout !== undefined;
   const copy = mapCopy(loc, moduleId);
   const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
   const [dirty, setDirty] = useState(false);
@@ -164,27 +176,47 @@ export function RadarSiteMap({
   }, [companyId, engagementId, propertyId, spaceKey, sensorKey]);
 
   useEffect(() => {
+    if (controlled) return;
     void load();
-  }, [load]);
+  }, [load, controlled]);
 
-  const save = async () => {
-    if (!companyId || !dirty) return;
+  const displayLayout = controlled ? syncedLayout : layout;
+
+  const save = async (doc?: RadarSiteLayoutDoc) => {
+    const payload = doc ?? displayLayout;
+    if (!companyId || (!doc && !dirty)) return;
     setSaving(true);
     try {
       const r = await fetch('/api/radar/layout', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, engagementId, propertyId, layout }),
+        body: JSON.stringify({ companyId, engagementId, propertyId, layout: payload }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'save');
-      setLayout(d.layout);
+      if (!controlled) setLayout(d.layout);
       setDirty(false);
       setSavedFlash(true);
       onSaved?.();
       window.setTimeout(() => setSavedFlash(false), 1800);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const pushDraft = (next: RadarSiteLayoutDoc) => {
+    if (controlled) onLayoutDraft?.(next);
+    else {
+      setLayout(next);
+      setDirty(true);
+    }
+  };
+
+  const pushCommit = (next: RadarSiteLayoutDoc) => {
+    if (controlled) onLayoutCommit?.(next);
+    else {
+      setLayout(next);
+      void save(next);
     }
   };
 
@@ -216,7 +248,7 @@ export function RadarSiteMap({
     const pctY = ((e.clientY - box.top) / box.height) * 100;
 
     if (resizing && resizeOrigin.current) {
-      const space = layout.spaces.find((s) => s.id === resizeOrigin.current!.id);
+      const space = displayLayout.spaces.find((s) => s.id === resizeOrigin.current!.id);
       if (!space) return;
       const dw = pctX - resizeOrigin.current.startX;
       const dh = pctY - resizeOrigin.current.startY;
@@ -224,7 +256,7 @@ export function RadarSiteMap({
       const nh = Math.min(100 - space.y, Math.max(12, resizeOrigin.current.h + dh));
       setLayout((prev) => ({
         ...prev,
-        spaces: prev.spaces.map((s) =>
+        spaces: (controlled ? displayLayout : prev).spaces.map((s) =>
           s.id === space.id ? { ...s, w: Math.round(nw * 10) / 10, h: Math.round(nh * 10) / 10 } : s,
         ),
       }));
@@ -233,7 +265,7 @@ export function RadarSiteMap({
     }
 
     if (!dragging || !dragOrigin.current) return;
-    const space = layout.spaces.find((s) => s.id === dragOrigin.current!.id);
+    const space = displayLayout.spaces.find((s) => s.id === dragOrigin.current!.id);
     if (!space) return;
     const nx = Math.min(100 - space.w, Math.max(0, pctX - dragOrigin.current.ox));
     const ny = Math.min(100 - space.h, Math.max(0, pctY - dragOrigin.current.oy));
@@ -275,7 +307,7 @@ export function RadarSiteMap({
       <RadarBasemap
         locale={loc}
         parcels={parcels}
-        layout={layout}
+        layout={displayLayout}
         focusedId={focusedId}
         onFocus={onFocus}
         lat={basemap.lat}
@@ -284,6 +316,10 @@ export function RadarSiteMap({
         onPin={basemap.onPin}
         placing={basemap.placing}
         query={basemap.query}
+        canEdit={canEdit}
+        editMode={editMode}
+        onDraft={pushDraft}
+        onCommit={pushCommit}
       />
     );
   }
@@ -370,12 +406,12 @@ export function RadarSiteMap({
         />
         <div className="pointer-events-none absolute inset-3 rounded-lg border border-slate-300/60 sm:inset-4" />
 
-        {layout.spaces.map((rect) => {
+        {displayLayout.spaces.map((rect) => {
           const parcel = parcelById.get(rect.id);
           if (!parcel) return null;
           const tone = actionTone(parcel.nextAction, parcel.harvestBlocked, parcel.moisture);
           const focused = focusedId === parcel.id;
-          const spaceSensors = layout.sensors.filter((s) => s.spaceId === rect.id);
+          const spaceSensors = displayLayout.sensors.filter((s) => s.spaceId === rect.id);
           const extraSensors = sensors.filter(
             (s) => s.unitId === rect.id && !spaceSensors.some((p) => p.id === s.id),
           );
@@ -485,9 +521,8 @@ export function RadarSiteMap({
   );
 }
 
-const ESRI_IMAGERY =
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const OSM_ATTRIBUTION = '© OpenStreetMap contributors';
 
 type LeafletNs = {
   map: (el: HTMLElement, opts?: Record<string, unknown>) => LeafletMap;
@@ -508,6 +543,7 @@ type LeafletMap = {
   off: (ev: string, fn: (e: { latlng: { lat: number; lng: number } }) => void) => void;
   invalidateSize: () => void;
   getContainer: () => HTMLElement;
+  dragging?: { enable: () => void; disable: () => void };
 };
 
 function loadLeaflet(): Promise<LeafletNs> {
@@ -563,12 +599,31 @@ function spaceRing(lat: number, lng: number, sideM: number, rect: RadarSpaceRect
   const east = west + (rect.w / 100) * sideM;
   const north = sideM / 2 - (rect.y / 100) * sideM;
   const south = north - (rect.h / 100) * sideM;
-  return [
-    offsetLatLng(lat, lng, west, north),
-    offsetLatLng(lat, lng, east, north),
-    offsetLatLng(lat, lng, east, south),
-    offsetLatLng(lat, lng, west, south),
+  const cx = (west + east) / 2;
+  const cy = (north + south) / 2;
+  const deg = ((rect.rotation || 0) * Math.PI) / 180;
+  const cos = Math.cos(deg);
+  const sin = Math.sin(deg);
+  const corners: Array<[number, number]> = [
+    [west, north],
+    [east, north],
+    [east, south],
+    [west, south],
   ];
+  return corners.map(([ex, ny]) => {
+    const dx = ex - cx;
+    const dy = ny - cy;
+    return offsetLatLng(lat, lng, cx + dx * cos - dy * sin, cy + dx * sin + dy * cos);
+  });
+}
+
+function latLngToPct(lat0: number, lng0: number, sideM: number, lat: number, lng: number) {
+  const northM = (lat - lat0) * 111320;
+  const eastM = (lng - lng0) * (111320 * Math.cos((lat0 * Math.PI) / 180));
+  return {
+    x: ((eastM + sideM / 2) / sideM) * 100,
+    y: ((sideM / 2 - northM) / sideM) * 100,
+  };
 }
 
 function RadarBasemap({
@@ -583,6 +638,10 @@ function RadarBasemap({
   onPin,
   placing,
   query,
+  canEdit,
+  editMode,
+  onDraft,
+  onCommit,
 }: {
   locale: Loc;
   parcels: MapParcel[];
@@ -595,21 +654,41 @@ function RadarBasemap({
   onPin?: (lat: number, lng: number) => void;
   placing?: boolean;
   query?: string;
+  canEdit: boolean;
+  editMode: 'none' | 'place' | 'move';
+  onDraft: (layout: RadarSiteLayoutDoc) => void;
+  onCommit: (layout: RadarSiteLayoutDoc) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const overlaysRef = useRef<{ clearLayers: () => void; addLayer: (layer: unknown) => void } | null>(null);
-  const satRef = useRef<{ addTo: (map: LeafletMap) => unknown; remove: () => void } | null>(null);
-  const osmRef = useRef<{ addTo: (map: LeafletMap) => unknown; remove: () => void } | null>(null);
-  const [imagery, setImagery] = useState<'sat' | 'map'>('sat');
   const [ready, setReady] = useState(false);
   const onPinRef = useRef(onPin);
   const onFocusRef = useRef(onFocus);
   const placingRef = useRef(placing);
   const fittedKey = useRef('');
+  const layoutRef = useRef(layout);
+  const editModeRef = useRef(editMode);
+  const focusedIdRef = useRef(focusedId);
+  const canEditRef = useRef(canEdit);
+  const onDraftRef = useRef(onDraft);
+  const onCommitRef = useRef(onCommit);
+  const latRef = useRef(lat);
+  const lngRef = useRef(lng);
+  const sideRef = useRef(80);
+  const dragRef = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
   onPinRef.current = onPin;
   onFocusRef.current = onFocus;
   placingRef.current = placing;
+  layoutRef.current = layout;
+  editModeRef.current = editMode;
+  focusedIdRef.current = focusedId;
+  canEditRef.current = canEdit;
+  onDraftRef.current = onDraft;
+  onCommitRef.current = onCommit;
+  latRef.current = lat;
+  lngRef.current = lng;
 
   const hasPin = lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
 
@@ -623,28 +702,56 @@ function RadarBasemap({
         if (cancelled || !hostRef.current) return;
         map = L.map(hostRef.current, { zoomControl: false, attributionControl: true });
         L.control.zoom({ position: 'bottomright' }).addTo(map);
-        const sat = L.tileLayer(ESRI_IMAGERY, {
-          attribution: 'Imagery © Esri',
+        L.tileLayer(OSM_TILES, {
+          attribution: OSM_ATTRIBUTION,
           maxZoom: 19,
-        });
-        const osm = L.tileLayer(OSM_TILES, {
-          attribution: '© OpenStreetMap',
-          maxZoom: 19,
-        });
-        sat.addTo(map);
+        }).addTo(map);
         const overlays = L.layerGroup();
         overlays.addTo(map);
         map.setView(hasPin ? [lat as number, lng as number] : [-15.8, -47.9], hasPin ? 17 : 12);
+        const finishDrag = () => {
+          const drag = dragRef.current;
+          if (!drag) return;
+          dragRef.current = null;
+          if (editModeRef.current !== 'move') mapRef.current?.dragging?.enable();
+          if (!drag.moved) return;
+          suppressClickRef.current = true;
+          onCommitRef.current(moveSpace(layoutRef.current, drag.id, drag.x, drag.y));
+        };
+        map.on('mousemove', (e) => {
+          const drag = dragRef.current;
+          const lat0 = latRef.current;
+          const lng0 = lngRef.current;
+          if (!drag || lat0 == null || lng0 == null) return;
+          const pct = latLngToPct(lat0, lng0, sideRef.current, e.latlng.lat, e.latlng.lng);
+          drag.x = pct.x;
+          drag.y = pct.y;
+          drag.moved = true;
+          onDraftRef.current(moveSpace(layoutRef.current, drag.id, pct.x, pct.y));
+        });
+        map.on('mouseup', finishDrag);
+        window.addEventListener('mouseup', finishDrag);
+        (map as LeafletMap & { __endDrag?: () => void }).__endDrag = finishDrag;
         map.on('click', (e) => {
-          if (!placingRef.current) return;
-          const pin = onPinRef.current;
-          if (!pin) return;
-          pin(Math.round(e.latlng.lat * 1e6) / 1e6, Math.round(e.latlng.lng * 1e6) / 1e6);
+          if (suppressClickRef.current) {
+            suppressClickRef.current = false;
+            return;
+          }
+          if (placingRef.current) {
+            const pin = onPinRef.current;
+            if (!pin) return;
+            pin(Math.round(e.latlng.lat * 1e6) / 1e6, Math.round(e.latlng.lng * 1e6) / 1e6);
+            return;
+          }
+          const lat0 = latRef.current;
+          const lng0 = lngRef.current;
+          const focus = focusedIdRef.current;
+          if (!canEditRef.current || editModeRef.current !== 'place' || !focus || lat0 == null || lng0 == null) return;
+          const pct = latLngToPct(lat0, lng0, sideRef.current, e.latlng.lat, e.latlng.lng);
+          onCommitRef.current(placeSpace(layoutRef.current, focus, pct.x, pct.y));
         });
         mapRef.current = map;
         overlaysRef.current = overlays;
-        satRef.current = sat;
-        osmRef.current = osm;
         setReady(true);
         const ro = new ResizeObserver(() => map?.invalidateSize());
         ro.observe(hostRef.current);
@@ -653,8 +760,9 @@ function RadarBasemap({
       .catch(() => undefined);
     return () => {
       cancelled = true;
-      const ro = (map as (LeafletMap & { __ro?: ResizeObserver }) | null)?.__ro;
-      ro?.disconnect();
+      const extra = map as (LeafletMap & { __ro?: ResizeObserver; __endDrag?: () => void }) | null;
+      extra?.__ro?.disconnect();
+      if (extra?.__endDrag) window.removeEventListener('mouseup', extra.__endDrag);
       map?.remove();
       mapRef.current = null;
       overlaysRef.current = null;
@@ -666,15 +774,10 @@ function RadarBasemap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready) return;
-    if (imagery === 'sat') {
-      osmRef.current?.remove();
-      satRef.current?.addTo(map);
-    } else {
-      satRef.current?.remove();
-      osmRef.current?.addTo(map);
-    }
-  }, [imagery, ready]);
+    if (!map?.dragging || !ready) return;
+    if (editMode === 'move') map.dragging.disable();
+    else map.dragging.enable();
+  }, [editMode, ready]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -688,9 +791,10 @@ function RadarBasemap({
         map.getContainer().style.cursor = placing ? 'crosshair' : '';
         return;
       }
-      map.getContainer().style.cursor = placing ? 'crosshair' : '';
+      map.getContainer().style.cursor = placing ? 'crosshair' : editMode === 'place' ? 'crosshair' : editMode === 'move' ? 'grab' : '';
       const ha = areaHa && areaHa > 0 ? areaHa : Math.max(0.4, parcels.length * 0.35 || 0.4);
       const side = Math.sqrt(ha * 10000);
+      sideRef.current = side;
       const q = (query || '').trim().toLowerCase();
       const bounds: [number, number][] = [];
       const outline = siteRing(lat, lng, side);
@@ -706,6 +810,7 @@ function RadarBasemap({
       );
       const parcelById = new Map(parcels.map((p) => [p.id, p]));
       for (const rect of layout.spaces) {
+        if (rect.placed !== true) continue;
         const parcel = parcelById.get(rect.id);
         if (!parcel) continue;
         const tone = actionTone(parcel.nextAction, parcel.harvestBlocked, parcel.moisture);
@@ -724,6 +829,17 @@ function RadarBasemap({
           if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
           onFocusRef.current(parcel.id);
         });
+        poly.on('mousedown', (e) => {
+          if (!canEditRef.current || editModeRef.current !== 'move' || focusedIdRef.current !== parcel.id) return;
+          if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
+          map.dragging?.disable();
+          dragRef.current = {
+            id: parcel.id,
+            x: rect.x + rect.w / 2,
+            y: rect.y + rect.h / 2,
+            moved: false,
+          };
+        });
         poly.bindTooltip(parcel.crop ? `${parcel.name} · ${parcel.crop}` : parcel.name, {
           permanent: true,
           direction: 'center',
@@ -741,7 +857,11 @@ function RadarBasemap({
           fillOpacity: 1,
         }),
       );
-      const geomKey = `${lat}|${lng}|${side}|${layout.spaces.map((s) => `${s.id}:${s.x}:${s.y}:${s.w}:${s.h}`).join(',')}`;
+      const placedKey = layout.spaces
+        .filter((s) => s.placed)
+        .map((s) => s.id)
+        .join(',');
+      const geomKey = `${lat}|${lng}|${side}|${placedKey}`;
       if (fittedKey.current !== geomKey) {
         fittedKey.current = geomKey;
         if (bounds.length > 0) {
@@ -754,7 +874,7 @@ function RadarBasemap({
     return () => {
       cancelled = true;
     };
-  }, [ready, hasPin, lat, lng, areaHa, layout, parcels, focusedId, query, placing]);
+  }, [ready, hasPin, lat, lng, areaHa, layout, parcels, focusedId, query, placing, editMode]);
 
   return (
     <div className="radar-basemap absolute inset-0">
@@ -787,26 +907,6 @@ function RadarBasemap({
         }
         .radar-space-tip::before { display: none; }
       `}</style>
-      <div className="absolute bottom-4 left-1/2 z-[500] flex -translate-x-1/2 rounded-full bg-[#07111A]/92 p-1 shadow-lg ring-1 ring-white/15">
-        <button
-          type="button"
-          onClick={() => setImagery('sat')}
-          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-            imagery === 'sat' ? 'bg-teal-300 text-slate-950' : 'text-white/75'
-          }`}
-        >
-          {radarT(locale, 'Satélite', 'Satélite', 'Satellite')}
-        </button>
-        <button
-          type="button"
-          onClick={() => setImagery('map')}
-          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-            imagery === 'map' ? 'bg-teal-300 text-slate-950' : 'text-white/75'
-          }`}
-        >
-          {radarT(locale, 'Mapa', 'Mapa', 'Map')}
-        </button>
-      </div>
       {!hasPin && (
         <p className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full bg-[#07111A]/90 px-4 py-2 text-sm text-white shadow-lg ring-1 ring-white/10">
           {radarT(locale, 'Clica no mapa para marcar o sítio', 'Clic en el mapa para marcar el sitio', 'Click the map to pin this site')}
@@ -815,6 +915,16 @@ function RadarBasemap({
       {hasPin && placing && (
         <p className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full bg-[#07111A]/90 px-4 py-2 text-sm text-white shadow-lg ring-1 ring-white/10">
           {radarT(locale, 'Clica para mover o sítio', 'Clic para mover el sitio', 'Click to move this site')}
+        </p>
+      )}
+      {hasPin && !placing && editMode === 'place' && (
+        <p className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg">
+          {radarT(locale, 'Clica no mapa para colocar só este espaço', 'Clic en el mapa para colocar solo este espacio', 'Click the map to place only this space')}
+        </p>
+      )}
+      {hasPin && editMode === 'move' && (
+        <p className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg">
+          {radarT(locale, 'Arrasta o espaço selecionado', 'Arrastra el espacio seleccionado', 'Drag the selected space')}
         </p>
       )}
     </div>

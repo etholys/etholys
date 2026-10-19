@@ -32,7 +32,9 @@ export function RadarSpatialTwin({
   const focusRef = useRef(onFocus);
   focusRef.current = onFocus;
 
-  const key = parcels.map((p) => `${p.id}:${p.moisture ?? ''}:${p.name}`).join('|');
+  const key = parcels
+    .map((p) => `${p.id}:${p.moisture ?? ''}:${p.name}:${p.x ?? ''}:${p.y ?? ''}:${p.w ?? ''}:${p.h ?? ''}:${p.rotation ?? ''}`)
+    .join('|');
   const sensorKey = sensors.map((s) => `${s.id}:${s.unitId || ''}:${s.lastValue ?? ''}`).join('|');
 
   useEffect(() => {
@@ -68,7 +70,9 @@ export function RadarSpatialTwin({
     return (
       <div className={`flex items-center justify-center ${fill ? 'absolute inset-0 bg-[#0b1c18]' : `rounded-xl border border-white/10 bg-[#c5d4b8] ${tall}`}`}>
         <p className={`text-sm ${fill ? 'text-white/60' : 'text-slate-600'}`}>
-          {radarT(loc, 'Ainda sem espaços na planta.', 'Aún sin espacios en la planta.', 'No spaces on the plant yet.')}
+          {fill
+            ? radarT(loc, 'Nenhum espaço colocado no mapa.', 'Ningún espacio colocado en el mapa.', 'No spaces placed on the map yet.')
+            : radarT(loc, 'Ainda sem espaços na planta.', 'Aún sin espacios en la planta.', 'No spaces on the plant yet.')}
         </p>
       </div>
     );

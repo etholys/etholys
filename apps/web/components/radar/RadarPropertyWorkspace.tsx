@@ -14,7 +14,13 @@ import { RadarCropsPanel } from '@/components/radar/RadarCropsPanel';
 import { RadarAddParcelForm } from '@/components/radar/RadarAddParcelForm';
 import { RadarFocusSheet } from '@/components/radar/RadarFocusSheet';
 import { RadarSpaceTree } from '@/components/radar/RadarSpaceTree';
-import type { RadarCrop } from '@/lib/radar/site-layout';
+import {
+  emptyRadarLayout,
+  rotateSpace,
+  unplaceSpace,
+  type RadarCrop,
+  type RadarSiteLayoutDoc,
+} from '@/lib/radar/site-layout';
 import { MOISTURE_THRESHOLD } from '@/lib/radar/agriculture';
 import { RADAR_DEVICE_CATALOG } from '@/lib/radar/devices';
 import { isTraceStage, TRACE_STAGE_LABEL, type TraceStage } from '@/lib/radar/trace';
@@ -49,6 +55,7 @@ type PropertyDetail = {
   crops?: RadarCrop[];
   latestByUnit?: Record<string, Record<string, number>>;
   devices?: Array<{ sensorId: string; sku: string; devEui: string | null; unitId: string | null }>;
+  layout?: RadarSiteLayoutDoc;
   steps: PropertyStepState[];
   nextStep: PropertyStepId;
   progressPercent: number;
@@ -91,6 +98,8 @@ export function RadarPropertyWorkspace({
   const [view, setView] = useState<'2d' | '3d'>('2d');
   const [query, setQuery] = useState('');
   const [railOpen, setRailOpen] = useState(false);
+  const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
+  const [editMode, setEditMode] = useState<'none' | 'place' | 'move'>('none');
   const frameRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -110,6 +119,7 @@ export function RadarPropertyWorkspace({
       setModuleId(p.moduleId && isRadarModuleId(p.moduleId) ? p.moduleId : null);
       setCrop(p.crop || '');
       setArea(p.areaHa != null ? String(p.areaHa) : '');
+      setLayout(p.layout && Array.isArray(p.layout.spaces) ? p.layout : emptyRadarLayout());
       const prefer =
         (initialUnitId && p.units.some((u) => u.id === initialUnitId) && initialUnitId) ||
         p.units[0]?.id ||
@@ -169,6 +179,32 @@ export function RadarPropertyWorkspace({
     };
   }, [companyId, engagementId, data?.id]);
 
+  const draftLayout = useCallback((next: RadarSiteLayoutDoc) => {
+    setLayout(next);
+  }, []);
+
+  const commitLayout = useCallback(
+    async (next: RadarSiteLayoutDoc) => {
+      setLayout(next);
+      setEditMode((cur) => (cur === 'place' ? 'none' : cur));
+      try {
+        const r = await fetch('/api/radar/layout', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyId, engagementId, propertyId, layout: next }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(typeof d.error === 'string' ? d.error : 'layout');
+        if (d.layout && Array.isArray((d.layout as RadarSiteLayoutDoc).spaces)) {
+          setLayout(d.layout as RadarSiteLayoutDoc);
+        }
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : 'Erro');
+      }
+    },
+    [companyId, engagementId, propertyId],
+  );
+
   const patch = async (payload: Record<string, unknown>) => {
     setBusy(true);
     setErr(null);
@@ -221,6 +257,8 @@ export function RadarPropertyWorkspace({
     });
 
   const next = data.steps.find((s) => !s.done) ?? null;
+  const focusedUnit = data.units.find((u) => u.id === focusedId) || null;
+  const focusedPlaced = Boolean(layout.spaces.some((s) => s.id === focusedId && s.placed === true));
   const companyQ = engagementId
     ? `company=${companyId}&engagement=${engagementId}`
     : `company=${companyId}`;
@@ -265,7 +303,11 @@ export function RadarPropertyWorkspace({
           <RadarSpatialTwin
             locale={loc}
             moduleId={data.moduleId}
-            parcels={mapParcels}
+            parcels={mapParcels.flatMap((p) => {
+              const rect = layout.spaces.find((s) => s.id === p.id && s.placed === true);
+              if (!rect) return [];
+              return [{ ...p, x: rect.x, y: rect.y, w: rect.w, h: rect.h, rotation: rect.rotation ?? 0 }];
+            })}
             sensors={data.sensors.map((s) => ({
               id: s.id,
               name: s.name,
@@ -294,6 +336,10 @@ export function RadarPropertyWorkspace({
             focusedId={focusedId}
             onFocus={setFocusedId}
             onSaved={() => void load()}
+            syncedLayout={layout}
+            editMode={editMode}
+            onLayoutDraft={draftLayout}
+            onLayoutCommit={(next) => void commitLayout(next)}
             basemap={{
               lat: data.lat,
               lng: data.lng,
@@ -414,6 +460,61 @@ export function RadarPropertyWorkspace({
             </button>
           </div>
           </div>
+          {focusedUnit && (
+            <div className="flex max-w-full flex-wrap items-center gap-1 self-start rounded-full bg-white p-1 shadow-lg ring-1 ring-slate-300">
+              <span className="max-w-[12rem] truncate px-2 text-xs font-semibold text-slate-950">{focusedUnit.name}</span>
+              {!focusedPlaced ? (
+                <button
+                  type="button"
+                  disabled={data.lat == null || data.lng == null}
+                  onClick={() => {
+                    setView('2d');
+                    setPanel(null);
+                    setTool(null);
+                    setEditMode((cur) => (cur === 'place' ? 'none' : 'place'));
+                  }}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40 ${
+                    editMode === 'place' ? 'bg-teal-800' : 'bg-slate-950 hover:bg-slate-800'
+                  }`}
+                >
+                  {radarT(loc, 'Colocar no mapa', 'Colocar en el mapa', 'Place on map')}
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setView('2d');
+                      setEditMode((cur) => (cur === 'move' ? 'none' : 'move'));
+                    }}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold text-white ${
+                      editMode === 'move' ? 'bg-teal-800' : 'bg-slate-950 hover:bg-slate-800'
+                    }`}
+                  >
+                    {radarT(loc, 'Mover', 'Mover', 'Move')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => focusedId && void commitLayout(rotateSpace(layout, focusedId))}
+                    className="rounded-full bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                  >
+                    {radarT(loc, 'Rodar', 'Girar', 'Rotate')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!focusedId) return;
+                      setEditMode('none');
+                      void commitLayout(unplaceSpace(layout, focusedId));
+                    }}
+                    className="rounded-full bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-800"
+                  >
+                    {radarT(loc, 'Apagar do mapa', 'Quitar del mapa', 'Remove from map')}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
           {err && (
             <p className="max-w-md rounded-xl border border-rose-400/30 bg-rose-950/90 px-3 py-2 text-sm text-rose-100">
               {err}
@@ -467,7 +568,11 @@ export function RadarPropertyWorkspace({
                 onSubmit={async (input) => {
                   const d = await patch({ action: 'parcel', ...input });
                   await load();
-                  if (d?.unit?.id) setFocusedId(d.unit.id as string);
+                  if (d?.unit?.id) {
+                    setFocusedId(d.unit.id as string);
+                    setView('2d');
+                    setEditMode('place');
+                  }
                   setTool(null);
                 }}
               />

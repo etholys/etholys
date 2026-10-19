@@ -11,6 +11,10 @@ export type RadarSpaceRect = {
   y: number;
   w: number;
   h: number;
+  /** Degrees counterclockwise when north is up. Omitted means 0. */
+  rotation?: number;
+  /** On the geo map only when the user placed this space. Auto-grid slots stay false. */
+  placed?: boolean;
 };
 
 export type RadarSensorPin = {
@@ -134,6 +138,17 @@ function num(v: unknown, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
+/** Wrap any angle into [0, 360). */
+export function normRotation(v: unknown): number {
+  const n = num(v, 0);
+  const wrapped = ((n % 360) + 360) % 360;
+  return round1(wrapped);
+}
+
 export function emptyRadarLayout(): RadarSiteLayoutDoc {
   return { version: RADAR_LAYOUT_VERSION, spaces: [], sensors: [], crops: [] };
 }
@@ -157,7 +172,13 @@ export function autoLayoutSpaces(
 
   return spaceIds.map((id, i) => {
     const prev = byId.get(id);
-    if (prev) return prev;
+    if (prev) {
+      return {
+        ...prev,
+        rotation: normRotation(prev.rotation),
+        placed: prev.placed === true,
+      };
+    }
     const col = i % cols;
     const row = Math.floor(i / cols);
     return {
@@ -166,6 +187,8 @@ export function autoLayoutSpaces(
       y: Math.round((gap + row * (cellH + gap)) * 10) / 10,
       w: Math.round(cellW * 10) / 10,
       h: Math.round(Math.max(18, cellH * 0.85) * 10) / 10,
+      rotation: 0,
+      placed: false,
     };
   });
 }
@@ -193,6 +216,8 @@ export function parseRadarLayout(raw: unknown): RadarSiteLayoutDoc | null {
       y: CLAMP(num(r.y, 0), 0, 95),
       w: CLAMP(num(r.w, 20), 8, 100),
       h: CLAMP(num(r.h, 20), 8, 100),
+      rotation: normRotation(r.rotation),
+      placed: r.placed === true,
     });
   }
   const sensors: RadarSensorPin[] = [];
@@ -270,11 +295,13 @@ export function sanitizeLayoutPatch(
   const spaces = parsed.spaces
     .filter((s) => allowedSpaceIds.has(s.id))
     .map((s) => ({
-      ...s,
+      id: s.id,
       x: CLAMP(s.x, 0, 92),
       y: CLAMP(s.y, 0, 92),
       w: CLAMP(s.w, 10, 100 - s.x),
       h: CLAMP(s.h, 10, 100 - s.y),
+      rotation: normRotation(s.rotation),
+      placed: s.placed === true,
     }));
   const sensors = parsed.sensors
     .filter((s) => allowedSensorIds.has(s.id))
@@ -291,5 +318,64 @@ export function sanitizeLayoutPatch(
     crops: parseCrops((body as { crops?: unknown })?.crops ?? parsed.crops),
     devices: parseDevices((body as { devices?: unknown })?.devices ?? parsed.devices),
     commands: parseCommands((body as { commands?: unknown })?.commands ?? parsed.commands),
+  };
+}
+
+function upsertSpace(layout: RadarSiteLayoutDoc, next: RadarSpaceRect): RadarSiteLayoutDoc {
+  const exists = layout.spaces.some((s) => s.id === next.id);
+  return {
+    ...layout,
+    spaces: exists ? layout.spaces.map((s) => (s.id === next.id ? next : s)) : [...layout.spaces, next],
+  };
+}
+
+/** Drop a footprint on the site square. Does not create or remove the unit. */
+export function placeSpace(
+  layout: RadarSiteLayoutDoc,
+  id: string,
+  centerX: number,
+  centerY: number,
+): RadarSiteLayoutDoc {
+  const prev = layout.spaces.find((s) => s.id === id);
+  const w = prev && prev.w >= 10 ? prev.w : 18;
+  const h = prev && prev.h >= 10 ? prev.h : 14;
+  const x = CLAMP(centerX - w / 2, 0, Math.max(0, 100 - w));
+  const y = CLAMP(centerY - h / 2, 0, Math.max(0, 100 - h));
+  return upsertSpace(layout, {
+    id,
+    x: round1(x),
+    y: round1(y),
+    w: round1(w),
+    h: round1(h),
+    rotation: normRotation(prev?.rotation),
+    placed: true,
+  });
+}
+
+/** Move a placed footprint so its center sits at the given site percent. */
+export function moveSpace(
+  layout: RadarSiteLayoutDoc,
+  id: string,
+  centerX: number,
+  centerY: number,
+): RadarSiteLayoutDoc {
+  const prev = layout.spaces.find((s) => s.id === id);
+  if (!prev || prev.placed !== true) return layout;
+  const x = CLAMP(centerX - prev.w / 2, 0, Math.max(0, 100 - prev.w));
+  const y = CLAMP(centerY - prev.h / 2, 0, Math.max(0, 100 - prev.h));
+  return upsertSpace(layout, { ...prev, x: round1(x), y: round1(y), placed: true });
+}
+
+export function rotateSpace(layout: RadarSiteLayoutDoc, id: string, deltaDeg = 15): RadarSiteLayoutDoc {
+  const prev = layout.spaces.find((s) => s.id === id);
+  if (!prev || prev.placed !== true) return layout;
+  return upsertSpace(layout, { ...prev, rotation: normRotation((prev.rotation ?? 0) + deltaDeg) });
+}
+
+/** Remove the drawing. The database unit stays. */
+export function unplaceSpace(layout: RadarSiteLayoutDoc, id: string): RadarSiteLayoutDoc {
+  return {
+    ...layout,
+    spaces: layout.spaces.map((s) => (s.id === id ? { ...s, placed: false } : s)),
   };
 }
