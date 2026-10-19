@@ -1788,6 +1788,7 @@ html:not([data-appearance='light']) .etholys-meet .text-red-800:not(.etholys-mee
 }
 html:not([data-appearance='light']) .etholys-meet .border-slate-100:not(.etholys-meet-light *),
 html:not([data-appearance='light']) .etholys-meet .border-slate-200:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .border-slate-300:not(.etholys-meet-light *),
 html:not([data-appearance='light']) .etholys-meet .border-teal-200:not(.etholys-meet-light *),
 html:not([data-appearance='light']) .etholys-meet .border-emerald-200:not(.etholys-meet-light *),
 html:not([data-appearance='light']) .etholys-meet .border-red-200:not(.etholys-meet-light *),

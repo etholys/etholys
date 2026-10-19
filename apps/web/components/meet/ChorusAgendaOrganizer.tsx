@@ -2,10 +2,29 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Check, Copy, Loader2, Mail, Share2, Video } from 'lucide-react';
+import {
+  ArrowLeft,
+  CalendarRange,
+  Check,
+  Clock,
+  Copy,
+  Loader2,
+  Mail,
+  Menu,
+  Ban,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings,
+  Sun,
+  Video,
+} from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
+import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
+import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 import { CompanyPicker } from '@/components/hub/CompanyPicker';
+import { sysTheme } from '@/lib/system-shell';
+import { cn } from '@/lib/utils';
 import { addDaysYmd, hmToMinutes, minutesToHm, startOfWeekMonday, ymdInTimeZone } from '@/lib/meet/booking-slots';
 import { meetWallTimeToUtc } from '@/lib/meet/timezone';
 import { AGENDA_HOLIDAY_COUNTRIES } from '@/lib/meet/holiday-countries';
@@ -93,7 +112,22 @@ function windowsFromPage(rows: { weekday: number; startMin: number; endMin: numb
 }
 
 const FIELD =
-  'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 [color-scheme:light]';
+  'w-full rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)]';
+
+function zoneCity(zone: string) {
+  return (zone.split('/').pop() || zone).replace(/_/g, ' ');
+}
+
+function zoneOffset(zone: string) {
+  try {
+    const part = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'shortOffset' })
+      .formatToParts(new Date())
+      .find((item) => item.type === 'timeZoneName');
+    return part?.value || '';
+  } catch {
+    return '';
+  }
+}
 
 export default function ChorusAgendaOrganizer({
   lockedCompanyId,
@@ -133,9 +167,9 @@ export default function ChorusAgendaOrganizer({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [closeMode, setCloseMode] = useState(false);
   const [focusRequestId, setFocusRequestId] = useState<string | null>(null);
-  const [shareOpen, setShareOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const cursorSet = useRef(false);
-  const shareMenuRef = useRef<HTMLDivElement>(null);
   const range = useMemo(() => visibleAgendaRange(view, cursorYmd), [view, cursorYmd]);
 
   const load = useCallback(async () => {
@@ -171,15 +205,6 @@ export default function ChorusAgendaOrganizer({
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    if (!shareOpen) return;
-    function onPointer(event: MouseEvent) {
-      if (!shareMenuRef.current?.contains(event.target as Node)) setShareOpen(false);
-    }
-    document.addEventListener('mousedown', onPointer);
-    return () => document.removeEventListener('mousedown', onPointer);
-  }, [shareOpen]);
 
   async function saveSettings() {
     if (!companyId) return;
@@ -392,31 +417,72 @@ export default function ChorusAgendaOrganizer({
     }
   }
 
+  const embedded = surface === 'calendar';
+  const views: { id: AgendaView; label: string }[] = [
+    { id: 'day', label: t('Dia', 'Día', 'Day') },
+    { id: 'week', label: t('Semana', 'Semana', 'Week') },
+    { id: 'month', label: t('Mês', 'Mes', 'Month') },
+    { id: 'year', label: t('Ano', 'Año', 'Year') },
+  ];
+  function sideItem(active: boolean) {
+    return cn(
+      'flex w-full items-center rounded-lg text-sm font-medium transition',
+      collapsed ? 'justify-center px-2 py-2.5' : 'gap-2 px-3 py-2',
+      active
+        ? 'bg-teal-500/15 text-[color:var(--sys-ink)]'
+        : 'text-[color:var(--sys-nav-idle)] hover:bg-[color:var(--sys-nav-hover)] hover:text-[color:var(--sys-ink)]',
+    );
+  }
+
   return (
-    <div className="etholys-meet-light min-h-dvh bg-white text-slate-900" style={{ colorScheme: 'light' }}>
-      <header className="border-b border-slate-200">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
-          <Link
-            href={surface === 'calendar' ? '/hub/calendar' : '/hub/meet'}
-            className="inline-flex items-center gap-1 text-sm font-medium text-slate-600"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {surface === 'calendar' ? 'eCalendar' : 'CHORUS'}
-          </Link>
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-700 to-slate-900">
-            <Video className="h-4 w-4 text-teal-50" />
+    <div
+      className={cn(
+        'etholys-system etholys-meet relative flex min-h-0 text-[color:var(--sys-ink)]',
+        embedded ? 'min-h-[70vh] flex-1' : 'etholys-hub isolate min-h-dvh bg-[color:var(--sys-canvas-bg,#07111A)]',
+      )}
+      data-accent="teal"
+    >
+      {embedded ? null : <SystemAtmosphere accent="teal" />}
+      {sidebarOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          aria-label={t('Fechar', 'Cerrar', 'Close')}
+          onClick={() => setSidebarOpen(false)}
+        />
+      ) : null}
+      <aside
+        className={cn(
+          embedded
+            ? 'absolute inset-y-0 left-0 z-20 flex flex-col border-r border-[color:var(--sys-line)] bg-[color:var(--sys-aside-bg)] lg:static'
+            : sysTheme.aside,
+          collapsed ? 'w-16' : 'w-60',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+        )}
+      >
+        <div className={cn('flex items-center gap-2 border-b border-[color:var(--sys-line)]', collapsed ? 'justify-center p-2' : 'p-3')}>
+          <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border', sysTheme.icon.teal)}>
+            <Video className="h-4 w-4" />
           </span>
-          <h1 className="text-lg font-semibold">{t('Agenda pública', 'Agenda pública', 'Public agenda')}</h1>
-          <div className="ml-auto flex flex-wrap items-center gap-3">
-            <Link
-              href={surface === 'calendar' ? '/hub/meet/agenda' : '/hub/calendar?view=agenda'}
-              className="text-sm font-medium text-teal-800"
-            >
-              {surface === 'calendar'
-                ? t('Abrir no Chorus', 'Abrir en Chorus', 'Open in Chorus')
-                : t('Abrir no eCalendar', 'Abrir en eCalendar', 'Open in eCalendar')}
-            </Link>
-            {lockedCompanyId ? null : (
+          {collapsed ? null : (
+            <div className="min-w-0">
+              <p className={sysTheme.brand}>CHORUS</p>
+              <p className="truncate text-[11px] text-[color:var(--sys-faint)]">{t('Agenda pública', 'Agenda pública', 'Public agenda')}</p>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setCollapsed((value) => !value)}
+            className="ml-auto hidden rounded-lg p-1.5 text-[color:var(--sys-faint)] hover:bg-[color:var(--sys-nav-hover)] hover:text-[color:var(--sys-ink)] lg:inline-flex"
+            title={collapsed ? t('Expandir', 'Expandir', 'Expand') : t('Minimizar', 'Minimizar', 'Collapse')}
+          >
+            {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
+          {!collapsed && !lockedCompanyId ? (
+            <div className="hub-company-picker-dark mb-2">
               <CompanyPicker
                 companies={companies}
                 activeCompanyId={companyId}
@@ -425,12 +491,149 @@ export default function ChorusAgendaOrganizer({
                 error={companiesLoadError}
                 onRetry={() => void reloadCompanies()}
                 locale={locale}
+                compact
+                tone="dark"
+                className="w-full"
               />
+            </div>
+          ) : null}
+
+          <p className={cn('px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)]', collapsed && 'sr-only')}>
+            {t('Vista', 'Vista', 'View')}
+          </p>
+          {views.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              title={item.label}
+              onClick={() => {
+                setView(item.id);
+                setSidebarOpen(false);
+              }}
+              className={sideItem(view === item.id)}
+            >
+              <CalendarRange className="h-4 w-4 shrink-0" />
+              {collapsed ? null : <span>{item.label}</span>}
+            </button>
+          ))}
+
+          <div className="my-2 border-t border-[color:var(--sys-line)]" />
+
+          {collapsed ? (
+            <button type="button" className={sideItem(false)} title={zoneCity(timeZone)} onClick={() => setCollapsed(false)}>
+              <Clock className="h-4 w-4" />
+            </button>
+          ) : (
+            <label className="block px-1 pb-2 text-xs text-[color:var(--sys-muted)]">
+              <span className="mb-1 flex items-center gap-1.5 font-medium">
+                <Clock className="h-3.5 w-3.5" />
+                {t('Fuso', 'Zona', 'Zone')}
+              </span>
+              <select value={timeZone} onChange={(e) => setTimeZone(e.target.value)} className={FIELD}>
+                {(agenda?.timeZones || [timeZone]).map((zone) => (
+                  <option key={zone} value={zone}>
+                    {zoneCity(zone)} {zoneOffset(zone)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <button
+            type="button"
+            disabled={!agenda}
+            title={t('Copiar enlace', 'Copiar enlace', 'Copy link')}
+            onClick={() => agenda && void copyText(agenda.page.publicUrl)}
+            className={sideItem(false)}
+          >
+            {copied && agenda && copied === agenda.page.publicUrl ? <Check className="h-4 w-4 shrink-0" /> : <Copy className="h-4 w-4 shrink-0" />}
+            {collapsed ? null : (
+              <span className="truncate">
+                {copied && agenda && copied === agenda.page.publicUrl
+                  ? t('Copiado', 'Copiado', 'Copied')
+                  : t('Copiar enlace', 'Copiar enlace', 'Copy link')}
+              </span>
             )}
-          </div>
+          </button>
+          {!collapsed && agenda ? (
+            <div className="flex gap-1 px-1">
+              <a
+                href={`mailto:?subject=${encodeURIComponent(t('Agenda pública', 'Agenda pública', 'Public agenda'))}&body=${encodeURIComponent(publicShareText(agenda.page.publicUrl))}`}
+                className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs text-[color:var(--sys-nav-idle)] hover:bg-[color:var(--sys-nav-hover)]"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                {t('E-mail', 'Correo', 'Email')}
+              </a>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(publicShareText(agenda.page.publicUrl))}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex flex-1 items-center justify-center rounded-lg px-2 py-1.5 text-xs text-[color:var(--sys-nav-idle)] hover:bg-[color:var(--sys-nav-hover)]"
+              >
+                WhatsApp
+              </a>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => {
+              setCloseMode((open) => !open);
+              setSettingsOpen(false);
+            }}
+            className={sideItem(closeMode)}
+          >
+            <Ban className="h-4 w-4 shrink-0" />
+            {collapsed ? null : <span>{t('Fechar horário', 'Cerrar horario', 'Close a time')}</span>}
+          </button>
         </div>
-      </header>
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
+
+        <div className="space-y-1 border-t border-[color:var(--sys-line)] p-2">
+          <button
+            type="button"
+            onClick={() => {
+              setSettingsOpen(true);
+              window.setTimeout(() => document.getElementById('agenda-holidays')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+            }}
+            className={sideItem(false)}
+            title={t('Feriados', 'Festivos', 'Holidays')}
+          >
+            <Sun className="h-4 w-4 shrink-0" />
+            {collapsed ? null : (
+              <span>
+                {t('Feriados', 'Festivos', 'Holidays')}
+                {holidayCountries.length ? ` (${holidayCountries.length})` : ''}
+              </span>
+            )}
+          </button>
+          <button type="button" onClick={() => setSettingsOpen((open) => !open)} className={sideItem(settingsOpen)} title={t('Definições', 'Ajustes', 'Settings')}>
+            <Settings className="h-4 w-4 shrink-0" />
+            {collapsed ? null : <span>{t('Definições', 'Ajustes', 'Settings')}</span>}
+          </button>
+          <button type="button" disabled={saving} onClick={() => void saveSettings()} className={cn(sideItem(false), 'text-teal-200')} title={t('Guardar', 'Guardar', 'Save')}>
+            <Check className="h-4 w-4 shrink-0" />
+            {collapsed ? null : <span>{saving ? '…' : t('Guardar', 'Guardar', 'Save')}</span>}
+          </button>
+          <AppearanceToggle collapsed={collapsed} />
+          <Link
+            href={embedded ? '/hub/meet' : '/hub/calendar?view=agenda'}
+            className={sideItem(false)}
+            title={embedded ? 'CHORUS' : 'eCalendar'}
+          >
+            <ArrowLeft className="h-4 w-4 shrink-0" />
+            {collapsed ? null : <span>{embedded ? 'CHORUS' : 'eCalendar'}</span>}
+          </Link>
+        </div>
+      </aside>
+
+      <div className={cn('relative z-10 flex min-w-0 flex-1 flex-col', collapsed ? 'lg:ml-16' : 'lg:ml-60', embedded && 'lg:ml-0')}>
+        <div className="flex items-center gap-2 border-b border-[color:var(--sys-line)] px-3 py-2 lg:hidden">
+          <button type="button" onClick={() => setSidebarOpen(true)} className="rounded-lg p-1.5 text-[color:var(--sys-ink)]">
+            <Menu className="h-5 w-5" />
+          </button>
+          <span className="text-sm font-semibold">{t('Agenda pública', 'Agenda pública', 'Public agenda')}</span>
+        </div>
+      <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-4">
         {error ? (
           <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
         ) : null}
@@ -443,110 +646,6 @@ export default function ChorusAgendaOrganizer({
           </div>
         ) : (
           <>
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="relative" ref={shareMenuRef}>
-                <button
-                  type="button"
-                  aria-expanded={shareOpen}
-                  aria-haspopup="menu"
-                  onClick={() => setShareOpen((open) => !open)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
-                >
-                  <Share2 className="h-4 w-4" />
-                  {t('Partilhar', 'Compartir', 'Share')}
-                </button>
-                {shareOpen ? (
-                  <div
-                    role="menu"
-                    className="absolute left-0 z-20 mt-1 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
-                  >
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => void copyText(agenda.page.publicUrl)}
-                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-slate-800 hover:bg-slate-50"
-                    >
-                      {copied === agenda.page.publicUrl ? <Check className="h-4 w-4 text-teal-800" /> : <Copy className="h-4 w-4" />}
-                      {copied === agenda.page.publicUrl ? t('Copiado', 'Copiado', 'Copied') : t('Copiar', 'Copiar', 'Copy')}
-                    </button>
-                    <a
-                      role="menuitem"
-                      href={`mailto:?subject=${encodeURIComponent(t('Agenda pública', 'Agenda pública', 'Public agenda'))}&body=${encodeURIComponent(publicShareText(agenda.page.publicUrl))}`}
-                      onClick={() => setShareOpen(false)}
-                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-800 hover:bg-slate-50"
-                    >
-                      <Mail className="h-4 w-4" />
-                      {t('E-mail', 'Correo', 'Email')}
-                    </a>
-                    <a
-                      role="menuitem"
-                      href={`https://wa.me/?text=${encodeURIComponent(publicShareText(agenda.page.publicUrl))}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={() => setShareOpen(false)}
-                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-800 hover:bg-slate-50"
-                    >
-                      {t('WhatsApp', 'WhatsApp', 'WhatsApp')}
-                    </a>
-                  </div>
-                ) : null}
-              </div>
-              <label className="block min-w-[16rem] flex-1 text-sm">
-                <span className="mb-1 block font-medium text-slate-700">{t('Fuso horário', 'Zona horaria', 'Timezone')}</span>
-                <select value={timeZone} onChange={(e) => setTimeZone(e.target.value)} className={FIELD}>
-                  {(agenda.timeZones || [timeZone]).map((zone) => (
-                    <option key={zone} value={zone}>{zone}</option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  setCloseMode((open) => !open);
-                  setSettingsOpen(false);
-                }}
-                className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                  closeMode ? 'bg-teal-800 text-white' : 'border border-slate-300 bg-white text-slate-900'
-                }`}
-              >
-                {t('Fechar horário', 'Cerrar horario', 'Close a time')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSettingsOpen(true);
-                  window.setTimeout(() => document.getElementById('agenda-holidays')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-                }}
-                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
-              >
-                {t('Feriados', 'Festivos', 'Holidays')}
-                {holidayCountries.length ? ` (${holidayCountries.length})` : ''}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettingsOpen((open) => !open)}
-                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
-              >
-                {settingsOpen
-                  ? t('Ocultar definições', 'Ocultar ajustes', 'Hide settings')
-                  : t('Definições', 'Ajustes', 'Settings')}
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void saveSettings()}
-                className="rounded-full bg-teal-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {t('Guardar agenda', 'Guardar agenda', 'Save agenda')}
-              </button>
-            </div>
-            <p className="text-xs text-slate-600">
-              {t(
-                'O fuso muda já o calendário e os horários. A página pública usa o fuso depois de guardar. Os feriados escolhidos também fecham a página pública ao guardar.',
-                'La zona horaria ya cambia el calendario y los horarios. La página pública usa la zona después de guardar. Los festivos elegidos también cierran la página pública al guardar.',
-                'The timezone updates the calendar and times right away. The public page uses it after you save. Chosen holidays also close the public page when you save.',
-              )}
-            </p>
             <ChorusAgendaCalendar
               timeZone={timeZone}
               locale={locale}
@@ -563,6 +662,7 @@ export default function ChorusAgendaOrganizer({
                 window.setTimeout(() => document.getElementById(`agenda-request-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 30);
               }}
               onReopenBlock={(id) => void removeBlock(id)}
+              hideViewSwitch
             />
 
             {settingsOpen ? (
@@ -571,14 +671,6 @@ export default function ChorusAgendaOrganizer({
               <label className="block text-sm">
                 <span className="mb-1 block text-slate-600">{t('Título', 'Título', 'Title')}</span>
                 <input value={title} onChange={(e) => setTitle(e.target.value)} className={FIELD} />
-              </label>
-              <label className="block text-sm">
-                <span className="mb-1 block text-slate-600">{t('Fuso horário', 'Zona horaria', 'Timezone')}</span>
-                <select value={timeZone} onChange={(e) => setTimeZone(e.target.value)} className={FIELD}>
-                  {(agenda.timeZones || [timeZone]).map((zone) => (
-                    <option key={zone} value={zone}>{zone}</option>
-                  ))}
-                </select>
               </label>
               <label className="block text-sm md:col-span-2">
                 <span className="mb-1 block text-slate-600">{t('Descrição', 'Descripción', 'Description')}</span>
@@ -633,7 +725,7 @@ export default function ChorusAgendaOrganizer({
                           next[index] = { ...row, startMin };
                           setWindows(next);
                         }}
-                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-slate-900 disabled:bg-slate-200 disabled:text-slate-800 [color-scheme:light]"
+                        className={cn(FIELD, 'w-auto disabled:opacity-50')}
                       />
                       <span>–</span>
                       <input
@@ -647,7 +739,7 @@ export default function ChorusAgendaOrganizer({
                           next[index] = { ...row, endMin: endMin === 0 ? 24 * 60 : endMin };
                           setWindows(next);
                         }}
-                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-slate-900 disabled:bg-slate-200 disabled:text-slate-800 [color-scheme:light]"
+                        className={cn(FIELD, 'w-auto disabled:opacity-50')}
                       />
                     </div>
                   );
@@ -798,6 +890,7 @@ export default function ChorusAgendaOrganizer({
           </>
         )}
       </main>
+      </div>
     </div>
   );
 }

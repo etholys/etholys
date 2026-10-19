@@ -124,6 +124,7 @@ export default function ChorusAgendaCalendar({
   onCommitRange,
   onOpenRequest,
   onReopenBlock,
+  hideViewSwitch,
 }: {
   timeZone: string;
   locale: string;
@@ -137,6 +138,7 @@ export default function ChorusAgendaCalendar({
   onCommitRange: (startWall: string, endWall: string) => void;
   onOpenRequest: (id: string) => void;
   onReopenBlock: (id: string) => void;
+  hideViewSwitch?: boolean;
 }) {
   const t = (pt: string, es: string, en: string) => tr(locale, pt, es, en);
   const intl = intlTag(locale);
@@ -202,7 +204,7 @@ export default function ChorusAgendaCalendar({
   const rowPx = 36;
 
   return (
-    <section className="rounded-2xl border border-slate-300 bg-white text-slate-900">
+    <section className="rounded-2xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] text-[color:var(--sys-ink)]">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-3">
         <button type="button" onClick={() => shift(-1)} className="rounded-full border border-slate-300 bg-white p-2 text-slate-800" aria-label={t('Anterior', 'Anterior', 'Previous')}>
           <ChevronLeft className="h-4 w-4" />
@@ -218,27 +220,29 @@ export default function ChorusAgendaCalendar({
           {t('Hoje', 'Hoy', 'Today')}
         </button>
         <h2 className="min-w-[12rem] flex-1 text-base font-semibold capitalize text-slate-900">{title}</h2>
-        <div className="flex flex-wrap gap-1">
-          {(
-            [
-              ['day', t('Dia', 'Día', 'Day')],
-              ['week', t('Semana', 'Semana', 'Week')],
-              ['month', t('Mês', 'Mes', 'Month')],
-              ['year', t('Ano', 'Año', 'Year')],
-            ] as [AgendaView, string][]
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onView(id)}
-              className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                view === id ? 'bg-teal-800 text-white' : 'bg-white text-slate-800 ring-1 ring-slate-300'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {hideViewSwitch ? null : (
+          <div className="flex flex-wrap gap-1">
+            {(
+              [
+                ['day', t('Dia', 'Día', 'Day')],
+                ['week', t('Semana', 'Semana', 'Week')],
+                ['month', t('Mês', 'Mes', 'Month')],
+                ['year', t('Ano', 'Año', 'Year')],
+              ] as [AgendaView, string][]
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => onView(id)}
+                className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+                  view === id ? 'bg-teal-800 text-white' : 'bg-white text-slate-800 ring-1 ring-slate-300'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {closeMode ? (
