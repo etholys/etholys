@@ -94,6 +94,9 @@ export type MeetLayoutMode = 'speaker' | 'gallery' | 'presentation' | 'stage' | 
 export type MeetConferenceHandle = {
   startTranscription: () => void;
   stopTranscription: () => void;
+  /** Grava a sala a partir do próprio vídeo (sem diálogo de ecrã). False se a ponte ainda não está na página. */
+  startRoomRecording: () => Promise<boolean>;
+  stopRoomRecording: () => Promise<Blob>;
   startRecording: (destination: 'local' | 'cloud') => void;
   stopRecording: (destination: 'local' | 'cloud') => void;
   hangup: () => void;
@@ -120,6 +123,8 @@ type Props = {
   /** Clique no botão Etholys da toolbar (abrir/fechar painel de transcrição). */
   onTranscriptToolbarClick?: () => void;
   onError?: (message: string) => void;
+  /** Resultado de convidar o transcritor da sala (não abre diálogo de gravação). */
+  onRoomTranscription?: (result: { ok: boolean; error?: string }) => void;
 };
 
 const JOIN_TIMEOUT_MS = 25_000;
@@ -206,6 +211,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       onConferenceLeft,
       onTranscriptToolbarClick,
       onError,
+      onRoomTranscription,
     },
     ref,
   ) {
@@ -224,9 +230,29 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       onConferenceLeft,
       onTranscriptToolbarClick,
       onError,
+      onRoomTranscription,
     });
     const [loading, setLoading] = useState(true);
     const [joinError, setJoinError] = useState<string | null>(null);
+    const roomRecRef = useRef<{
+      requestId: string;
+      chunks: ArrayBuffer[];
+      mime: string;
+      resolveStart?: (ok: boolean) => void;
+      resolveStop?: (blob: Blob) => void;
+    } | null>(null);
+
+    function postToRoom(payload: Record<string, unknown>) {
+      const api = apiRef.current;
+      if (!api) return;
+      let origin = '';
+      try {
+        origin = new URL(meetingUrl).origin;
+      } catch {
+        return;
+      }
+      api.getIFrame().contentWindow?.postMessage({ source: 'etholys-chorus', ...payload }, origin);
+    }
 
     callbacksRef.current = {
       onReady,
@@ -239,61 +265,65 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       onConferenceLeft,
       onTranscriptToolbarClick,
       onError,
+      onRoomTranscription,
     };
 
     useImperativeHandle(
       ref,
       () => ({
         startTranscription() {
-          const api = apiRef.current;
-          if (!api) return;
-          const lang = locale === 'pt' ? 'pt' : locale === 'en' ? 'en' : 'es';
-          // Vários builds aceitam assinaturas diferentes de setSubtitles.
-          for (const args of [
-            [true, true, lang],
-            [true, true, `translation-languages:${lang}`],
-            [true, true],
-            [true],
-          ] as unknown[][]) {
-            try {
-              api.executeCommand('setSubtitles', ...args);
-              break;
-            } catch {
-              /* tenta a seguinte */
-            }
-          }
-          // Pede transcrição ao vivo ao motor da sala (ENABLE_RECORDING).
-          // Falha aqui não deve abrir o diálogo «o áudio não está a ser gravado».
-          const payloads = [
-            { mode: 'file', onlyTranscription: true },
-            { mode: 'file', transcription: true, onlyTranscribe: true },
-            { mode: 'file', transcription: true },
-          ];
-          for (const payload of payloads) {
-            try {
-              api.executeCommand('startRecording', payload);
-              break;
-            } catch {
-              /* tenta a seguinte */
-            }
-          }
+          // Não chama startRecording: isso pede o gravador de ficheiro (ausente)
+          // e abre o diálogo «o áudio não está a ser gravado».
+          const lang =
+            transcriptionLanguage === 'pt' ||
+            transcriptionLanguage === 'en' ||
+            transcriptionLanguage === 'es'
+              ? transcriptionLanguage
+              : locale === 'pt'
+                ? 'pt'
+                : locale === 'en'
+                  ? 'en'
+                  : 'es';
+          postToRoom({ action: 'start-transcription', language: lang });
         },
         stopTranscription() {
-          const api = apiRef.current;
-          if (!api) return;
-          try {
-            api.executeCommand('setSubtitles', false);
-          } catch {
-            /* ignore */
-          }
-          for (const args of [['file', true], ['file'], ['local']] as unknown[][]) {
-            try {
-              api.executeCommand('stopRecording', ...args);
-              break;
-            } catch {
-              /* ignore */
-            }
-          }
+          postToRoom({ action: 'stop-transcription' });
+        },
+        startRoomRecording() {
+          const requestId = `rec-${Date.now()}`;
+          return new Promise<boolean>((resolve) => {
+            const timer = window.setTimeout(() => {
+              if (roomRecRef.current?.requestId === requestId) {
+                roomRecRef.current.resolveStart = undefined;
+              }
+              postToRoom({ action: 'stop-recording', requestId });
+              resolve(false);
+            }, 1800);
+            roomRecRef.current = {
+              requestId,
+              chunks: [],
+              mime: 'video/webm',
+              resolveStart: (ok) => {
+                window.clearTimeout(timer);
+                resolve(ok);
+              },
+            };
+            postToRoom({ action: 'start-recording', requestId });
+          });
+        },
+        stopRoomRecording() {
+          const current = roomRecRef.current;
+          if (!current) return Promise.resolve(new Blob());
+          return new Promise<Blob>((resolve) => {
+            const timer = window.setTimeout(() => {
+              resolve(new Blob());
+            }, 15000);
+            current.resolveStop = (blob) => {
+              window.clearTimeout(timer);
+              resolve(blob);
+            };
+            postToRoom({ action: 'stop-recording', requestId: current.requestId });
+          });
         },
         startRecording(_destination) {
           // Preferência: Jibri (gravação da chamada). Sem Jibri o cliente faz fallback local.
@@ -363,8 +393,67 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
           }
         },
       }),
-      [locale],
+      [locale, meetingUrl, transcriptionLanguage],
     );
+
+    useEffect(() => {
+      let origin = '';
+      try {
+        origin = new URL(meetingUrl).origin;
+      } catch {
+        return;
+      }
+      const onMessage = (ev: MessageEvent) => {
+        if (ev.origin !== origin) return;
+        const data = ev.data as {
+          source?: string;
+          action?: string;
+          requestId?: string;
+          ok?: boolean;
+          error?: string;
+          index?: number;
+          total?: number;
+          mime?: string;
+          buffer?: ArrayBuffer;
+        };
+        if (!data || data.source !== 'etholys-room') return;
+        if (data.action === 'transcription') {
+          callbacksRef.current.onRoomTranscription?.({
+            ok: Boolean(data.ok),
+            error: data.error,
+          });
+          return;
+        }
+        const session = roomRecRef.current;
+        if (!session || (data.requestId && data.requestId !== session.requestId)) return;
+        if (data.action === 'recording-started') {
+          session.resolveStart?.(true);
+          session.resolveStart = undefined;
+          return;
+        }
+        if (data.action === 'recording-error') {
+          session.resolveStart?.(false);
+          session.resolveStart = undefined;
+          session.resolveStop?.(new Blob());
+          return;
+        }
+        if (data.action === 'recording-chunk' && data.buffer && typeof data.index === 'number') {
+          session.chunks[data.index] = data.buffer;
+          if (data.mime) session.mime = data.mime;
+          return;
+        }
+        if (data.action === 'recording-stopped') {
+          const parts = session.chunks.filter(Boolean);
+          const blob = parts.length
+            ? new Blob(parts, { type: data.mime || session.mime || 'video/webm' })
+            : new Blob();
+          roomRecRef.current = null;
+          session.resolveStop?.(blob);
+        }
+      };
+      window.addEventListener('message', onMessage);
+      return () => window.removeEventListener('message', onMessage);
+    }, [meetingUrl]);
 
     useEffect(() => {
       let disposed = false;

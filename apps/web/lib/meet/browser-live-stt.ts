@@ -49,10 +49,13 @@ export type BrowserLiveStt = { stop: () => void };
 export function startBrowserLiveStt(opts: {
   locale: SpeechLocale;
   onText: (text: string, isFinal: boolean) => void;
+  /** Código do browser: not-allowed, audio-capture, network, service-not-allowed, start-failed. */
+  onError?: (code: string) => void;
 }): BrowserLiveStt {
   const Ctor = getRecognitionCtor();
   let stopped = false;
   let rec: WebSpeechRecognitionLike | null = null;
+  let networkRetries = 0;
 
   const clear = () => {
     if (!rec) return;
@@ -89,20 +92,33 @@ export function startBrowserLiveStt(opts: {
       if (live) opts.onText(live, false);
     };
     next.onerror = (ev) => {
-      const code = ev?.error || '';
-      if (code === 'not-allowed' || code === 'audio-capture' || code === 'service-not-allowed') {
+      const code = ev?.error || 'unknown';
+      if (code === 'no-speech' || code === 'aborted') return;
+      if (code === 'network' && networkRetries < 2) {
+        networkRetries += 1;
+        return;
+      }
+      if (
+        code === 'not-allowed' ||
+        code === 'audio-capture' ||
+        code === 'service-not-allowed' ||
+        code === 'language-not-supported' ||
+        code === 'network'
+      ) {
         stopped = true;
+        opts.onError?.(code);
       }
     };
     next.onend = () => {
       rec = null;
-      if (!stopped) window.setTimeout(arm, 250);
+      if (!stopped) window.setTimeout(arm, 400);
     };
     rec = next;
     try {
       next.start();
     } catch {
       stopped = true;
+      opts.onError?.('start-failed');
     }
   };
 

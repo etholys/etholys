@@ -149,9 +149,9 @@ export function MeetJoinSetupDialog({
                         'Records the room on the server (people + shares), then can transcribe.',
                       )
                     : t(
-                        'Ainda não disponível: a gravação de vídeo da própria chamada (como no Meet) precisa do Jibri no servidor. Por agora use «Transcrever» — não é preciso escolher ecrã.',
-                        'Aún no disponible: grabar el vídeo de la propia llamada (como en Meet) requiere Jibri en el servidor. Por ahora use «Transcribir» — no hace falta elegir pantalla.',
-                        'Not available yet: true in-call video recording (Meet-style) needs Jibri on the server. For now use «Transcribe» — no screen picker.',
+                        'Na sala, Gravar guarda o vídeo desta chamada. Transcrever mostra o texto enquanto se fala.',
+                        'En la sala, Grabar guarda el vídeo de esta llamada. Transcribir muestra el texto mientras se habla.',
+                        'In the room, Record saves this call’s video. Transcribe shows text while people speak.',
                       )}
                 </span>
               </span>

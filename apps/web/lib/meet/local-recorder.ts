@@ -58,7 +58,7 @@ function triggerDownload(blob: Blob, fileName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-async function saveBlob(blob: Blob, fileName: string): Promise<boolean> {
+export async function saveMeetRecordingBlob(blob: Blob, fileName: string): Promise<boolean> {
   if (blob.size <= 0) return false;
   const fileHandle = await pickSaveHandle(fileName);
   if (fileHandle) {
@@ -266,7 +266,7 @@ export async function startMeetLocalRecorder(opts?: MeetLocalRecorderOptions): P
       const blob = await finalizeRecording();
       cleanup();
       const saveToDisk = opts?.saveToDisk !== false;
-      const savedWithPicker = saveToDisk ? await saveBlob(blob, fileName) : false;
+      const savedWithPicker = saveToDisk ? await saveMeetRecordingBlob(blob, fileName) : false;
       return { blob, fileName, savedWithPicker };
     },
     destroy() {
