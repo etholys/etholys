@@ -15,6 +15,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
+  Share2,
   Sun,
   Video,
 } from 'lucide-react';
@@ -169,7 +170,11 @@ export default function ChorusAgendaOrganizer({
   const [focusRequestId, setFocusRequestId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [sharePos, setSharePos] = useState<{ top: number; left: number } | null>(null);
   const cursorSet = useRef(false);
+  const shareBtnRef = useRef<HTMLButtonElement>(null);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
   const range = useMemo(() => visibleAgendaRange(view, cursorYmd), [view, cursorYmd]);
 
   const load = useCallback(async () => {
@@ -205,6 +210,17 @@ export default function ChorusAgendaOrganizer({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!shareOpen) return;
+    function close(event: MouseEvent) {
+      const target = event.target as Node;
+      if (shareBtnRef.current?.contains(target) || shareMenuRef.current?.contains(target)) return;
+      setShareOpen(false);
+    }
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [shareOpen]);
 
   async function saveSettings() {
     if (!companyId) return;
@@ -498,24 +514,37 @@ export default function ChorusAgendaOrganizer({
             </div>
           ) : null}
 
-          <p className={cn('px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)]', collapsed && 'sr-only')}>
-            {t('Vista', 'Vista', 'View')}
-          </p>
-          {views.map((item) => (
+          {collapsed ? (
             <button
-              key={item.id}
               type="button"
-              title={item.label}
+              title={views.find((item) => item.id === view)?.label}
               onClick={() => {
-                setView(item.id);
-                setSidebarOpen(false);
+                const index = views.findIndex((item) => item.id === view);
+                setView(views[(index + 1) % views.length].id);
               }}
-              className={sideItem(view === item.id)}
+              className={sideItem(true)}
             >
               <CalendarRange className="h-4 w-4 shrink-0" />
-              {collapsed ? null : <span>{item.label}</span>}
             </button>
-          ))}
+          ) : (
+            <label className="block px-1 pb-1 text-xs text-[color:var(--sys-muted)]">
+              <span className="mb-1 flex items-center gap-1.5 font-medium uppercase tracking-[0.14em] text-[10px] text-[color:var(--sys-faint)]">
+                {t('Vista', 'Vista', 'View')}
+              </span>
+              <span className="flex items-center gap-2 rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-2">
+                <CalendarRange className="h-3.5 w-3.5 shrink-0 text-[color:var(--sys-faint)]" />
+                <select
+                  value={view}
+                  onChange={(event) => setView(event.target.value as AgendaView)}
+                  className="w-full bg-transparent py-1.5 text-sm text-[color:var(--sys-ink)] outline-none"
+                >
+                  {views.map((item) => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+              </span>
+            </label>
+          )}
 
           <div className="my-2 border-t border-[color:var(--sys-line)]" />
 
@@ -540,40 +569,26 @@ export default function ChorusAgendaOrganizer({
           )}
 
           <button
+            ref={shareBtnRef}
             type="button"
             disabled={!agenda}
-            title={t('Copiar enlace', 'Copiar enlace', 'Copy link')}
-            onClick={() => agenda && void copyText(agenda.page.publicUrl)}
-            className={sideItem(false)}
+            title={t('Partilhar', 'Compartir', 'Share')}
+            aria-expanded={shareOpen}
+            onClick={() => {
+              if (shareOpen) {
+                setShareOpen(false);
+                return;
+              }
+              const rect = shareBtnRef.current?.getBoundingClientRect();
+              if (!rect) return;
+              setSharePos({ top: rect.top, left: Math.min(rect.right + 8, window.innerWidth - 188) });
+              setShareOpen(true);
+            }}
+            className={sideItem(shareOpen)}
           >
-            {copied && agenda && copied === agenda.page.publicUrl ? <Check className="h-4 w-4 shrink-0" /> : <Copy className="h-4 w-4 shrink-0" />}
-            {collapsed ? null : (
-              <span className="truncate">
-                {copied && agenda && copied === agenda.page.publicUrl
-                  ? t('Copiado', 'Copiado', 'Copied')
-                  : t('Copiar enlace', 'Copiar enlace', 'Copy link')}
-              </span>
-            )}
+            <Share2 className="h-4 w-4 shrink-0" />
+            {collapsed ? null : <span>{t('Partilhar', 'Compartir', 'Share')}</span>}
           </button>
-          {!collapsed && agenda ? (
-            <div className="flex gap-1 px-1">
-              <a
-                href={`mailto:?subject=${encodeURIComponent(t('Agenda pública', 'Agenda pública', 'Public agenda'))}&body=${encodeURIComponent(publicShareText(agenda.page.publicUrl))}`}
-                className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs text-[color:var(--sys-nav-idle)] hover:bg-[color:var(--sys-nav-hover)]"
-              >
-                <Mail className="h-3.5 w-3.5" />
-                {t('E-mail', 'Correo', 'Email')}
-              </a>
-              <a
-                href={`https://wa.me/?text=${encodeURIComponent(publicShareText(agenda.page.publicUrl))}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex flex-1 items-center justify-center rounded-lg px-2 py-1.5 text-xs text-[color:var(--sys-nav-idle)] hover:bg-[color:var(--sys-nav-hover)]"
-              >
-                WhatsApp
-              </a>
-            </div>
-          ) : null}
 
           <button
             type="button"
@@ -891,6 +906,43 @@ export default function ChorusAgendaOrganizer({
         )}
       </main>
       </div>
+      {shareOpen && sharePos && agenda ? (
+        <div
+          role="menu"
+          ref={shareMenuRef}
+          className="fixed z-[70] w-44 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-1 shadow-lg"
+          style={{ top: sharePos.top, left: sharePos.left }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void copyText(agenda.page.publicUrl)}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+          >
+            {copied === agenda.page.publicUrl ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {copied === agenda.page.publicUrl ? t('Copiado', 'Copiado', 'Copied') : t('Copiar enlace', 'Copiar enlace', 'Copy link')}
+          </button>
+          <a
+            role="menuitem"
+            href={`mailto:?subject=${encodeURIComponent(t('Agenda pública', 'Agenda pública', 'Public agenda'))}&body=${encodeURIComponent(publicShareText(agenda.page.publicUrl))}`}
+            onClick={() => setShareOpen(false)}
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+          >
+            <Mail className="h-4 w-4" />
+            {t('E-mail', 'Correo', 'Email')}
+          </a>
+          <a
+            role="menuitem"
+            href={`https://wa.me/?text=${encodeURIComponent(publicShareText(agenda.page.publicUrl))}`}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => setShareOpen(false)}
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+          >
+            {t('WhatsApp', 'WhatsApp', 'WhatsApp')}
+          </a>
+        </div>
+      ) : null}
     </div>
   );
 }
