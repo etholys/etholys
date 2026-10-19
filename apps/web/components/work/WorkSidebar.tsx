@@ -31,7 +31,8 @@ export type WorkNav =
   | { kind: 'company' }
   | { kind: 'department'; id: string; name: string }
   | { kind: 'project'; id: string; name: string }
-  | { kind: 'folder'; id: string; name: string };
+  | { kind: 'folder'; id: string; name: string }
+  | { kind: 'person'; id: string; name: string };
 
 export type WorkFolderRow = {
   id: string;

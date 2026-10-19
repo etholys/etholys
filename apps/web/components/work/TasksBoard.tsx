@@ -30,6 +30,8 @@ export type TasksBoardProps = {
   onTasksChanged?: () => void;
   externalSelectedId?: string | null;
   onExternalSelect?: (id: string | null) => void;
+  /** Tasks already loaded by the shell. When set, the board does not wait on a second fetch. */
+  presetTasks?: any[] | null;
 };
 
 const emptyForm = {
@@ -67,18 +69,19 @@ export default function TasksBoard({
   onTasksChanged,
   externalSelectedId,
   onExternalSelect,
+  presetTasks = null,
 }: TasksBoardProps) {
   const { tr, activeCompanyId, locale } = useApp();
   const L = (m: ML) => m[locale] || m.en;
   const t3 = (en: string, es: string, pt: string) => L(ml(en, es, pt));
 
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>(presetTasks ?? []);
   const [projects, setProjects] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [folders, setFolders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(presetTasks == null);
   const [view, setView] = useState<'table' | 'kanban'>(forcedView || 'table');
   const [selectedIdInternal, setSelectedIdInternal] = useState<string | null>(null);
   const selectedId = onExternalSelect ? (externalSelectedId ?? null) : selectedIdInternal;
@@ -145,8 +148,14 @@ export default function TasksBoard({
     setAssigneeFilter(initialAssigneeId);
   }, [initialProjectId, initialDepartmentId, initialTaskScope, initialFolderId, initialAssigneeId]);
 
+  useEffect(() => {
+    if (presetTasks == null) return;
+    setTasks(presetTasks);
+    setLoading(false);
+  }, [presetTasks]);
+
   const fetchTasks = (opts?: { silent?: boolean }) => {
-    if (!opts?.silent) setLoading(true);
+    if (!opts?.silent && presetTasks == null) setLoading(true);
     const params = new URLSearchParams();
     if (activeCompanyId) params.set('companyId', activeCompanyId);
     if (projectFilter) params.set('projectId', projectFilter);
@@ -157,7 +166,7 @@ export default function TasksBoard({
     fetch(`/api/tasks?${params}`)
       .then((r) => r.json())
       .then((d) => {
-        setTasks(d?.tasks ?? []);
+        if (Array.isArray(d?.tasks)) setTasks(d.tasks);
         setLoading(false);
       })
       .catch(() => setLoading(false));

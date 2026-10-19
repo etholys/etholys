@@ -66,11 +66,14 @@ function parseNavFromParams(
     const f = folders.find((x) => x.id === id);
     return { kind: 'folder', id, name: f?.name || sp.get('name') || id };
   }
+  if (kind === 'person' && id) {
+    return { kind: 'person', id, name: sp.get('name') || id };
+  }
   return { kind: 'dashboard' };
 }
 
 function navToParams(nav: WorkNav): { nav: string; id?: string; name?: string } {
-  if (nav.kind === 'department' || nav.kind === 'project' || nav.kind === 'folder') {
+  if (nav.kind === 'department' || nav.kind === 'project' || nav.kind === 'folder' || nav.kind === 'person') {
     return { nav: nav.kind, id: nav.id, name: nav.name };
   }
   return { nav: nav.kind };
@@ -270,6 +273,8 @@ export default function WorkShell() {
     else if (nav.kind === 'folder') list = top.filter((t: any) => t.folderId === nav.id);
     else if (nav.kind === 'mine') {
       list = top.filter((t: any) => currentUserId && t.assigneeId === currentUserId);
+    } else if (nav.kind === 'person') {
+      list = top.filter((t: any) => t.assigneeId === nav.id);
     } else if (nav.kind === 'overdue') {
       const now = Date.now();
       list = top.filter(
@@ -334,6 +339,7 @@ export default function WorkShell() {
     if (nav.kind === 'department') return nav.name;
     if (nav.kind === 'project') return nav.name;
     if (nav.kind === 'folder') return nav.name;
+    if (nav.kind === 'person') return nav.name;
     return 'eTask';
   })();
 
@@ -398,6 +404,7 @@ export default function WorkShell() {
       /* company ops = no project */
     }
     if (nav.kind === 'mine' && currentUserId) body.assigneeId = currentUserId;
+    if (nav.kind === 'person') body.assigneeId = nav.id;
     return body;
   };
 
@@ -439,6 +446,8 @@ export default function WorkShell() {
                   folderId: '',
                   assigneeId: currentUserId || '',
                 }
+              : nav.kind === 'person'
+                ? { taskScope: '' as const, projectId: '', departmentId: '', folderId: '', assigneeId: nav.id }
               : nav.kind === 'overdue' || nav.kind === 'unassigned' || nav.kind === 'week' || nav.kind === 'all'
                 ? { taskScope: '' as const, projectId: '', departmentId: '', folderId: '', assigneeId: '' }
                 : null;
@@ -642,6 +651,7 @@ export default function WorkShell() {
                 externalSearch={query}
                 externalStatus={statusChip}
                 externalPriority={priorityChip}
+                presetTasks={loadingDash ? null : scopedTasks}
                 onTasksChanged={() => fetchAllTasks({ silent: true })}
                 externalSelectedId={selectedId}
                 onExternalSelect={setSelectedId}

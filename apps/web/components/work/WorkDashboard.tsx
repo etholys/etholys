@@ -203,11 +203,11 @@ export function WorkDashboard({
                 <button
                   type="button"
                   className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-slate-50"
-                  onClick={() =>
-                    p.id === currentUserId
-                      ? onNav({ kind: 'mine' })
-                      : onNav({ kind: 'all' })
-                  }
+                  onClick={() => {
+                    if (p.id === '__unassigned') onNav({ kind: 'unassigned' });
+                    else if (p.id === currentUserId) onNav({ kind: 'mine' });
+                    else onNav({ kind: 'person', id: p.id, name: p.name });
+                  }}
                 >
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-100 text-[10px] font-bold text-cyan-800">
                     {p.id === '__unassigned' ? '?' : getInitials(p.name)}
