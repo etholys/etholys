@@ -1731,6 +1731,74 @@ html[data-appearance='light'] .etholys-etask .text-rose-200 {
   color: #be123c !important;
 }
 
+/* CHORUS hub — mesma paleta do Hub. Formulários e agenda pública ficam em .etholys-meet-light. */
+html:not([data-appearance='light']) .etholys-meet {
+  color-scheme: dark;
+}
+html[data-appearance='light'] .etholys-meet {
+  color-scheme: light;
+}
+html:not([data-appearance='light']) .etholys-meet .bg-white:not(.etholys-meet-light):not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .bg-white\/95:not(.etholys-meet-light):not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .bg-slate-50:not(.etholys-meet-light):not(.etholys-meet-light *) {
+  background-color: var(--sys-panel) !important;
+}
+html:not([data-appearance='light']) .etholys-meet .bg-slate-100:not(.etholys-meet-light):not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .bg-teal-50:not(.etholys-meet-light):not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .bg-teal-100:not(.etholys-meet-light):not(.etholys-meet-light *) {
+  background-color: var(--sys-panel-soft) !important;
+}
+html:not([data-appearance='light']) .etholys-meet .bg-emerald-50:not(.etholys-meet-light):not(.etholys-meet-light *) {
+  background-color: rgba(16, 185, 129, 0.16) !important;
+}
+html:not([data-appearance='light']) .etholys-meet .bg-red-50:not(.etholys-meet-light):not(.etholys-meet-light *) {
+  background-color: rgba(244, 63, 94, 0.14) !important;
+}
+html:not([data-appearance='light']) .etholys-meet .hover\:bg-slate-50:hover:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .hover\:bg-slate-100:hover:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .hover\:bg-slate-100\/80:hover:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .hover\:bg-white:hover:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .hover\:bg-teal-50:hover:not(.etholys-meet-light *) {
+  background-color: var(--sys-nav-hover) !important;
+}
+html:not([data-appearance='light']) .etholys-meet .text-slate-900:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .text-slate-800:not(.etholys-meet-light *) {
+  color: var(--sys-ink) !important;
+}
+html:not([data-appearance='light']) .etholys-meet .text-slate-700:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .text-slate-600:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .text-slate-500:not(.etholys-meet-light *) {
+  color: var(--sys-muted) !important;
+}
+html:not([data-appearance='light']) .etholys-meet .text-slate-400:not(.etholys-meet-light *) {
+  color: var(--sys-faint) !important;
+}
+html:not([data-appearance='light']) .etholys-meet .text-teal-800:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .text-teal-700:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .text-teal-900:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .text-teal-950:not(.etholys-meet-light *) {
+  color: #5eead4 !important;
+}
+html:not([data-appearance='light']) .etholys-meet .text-emerald-700:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .text-emerald-900:not(.etholys-meet-light *) {
+  color: #6ee7b7 !important;
+}
+html:not([data-appearance='light']) .etholys-meet .text-red-800:not(.etholys-meet-light *) {
+  color: #fda4af !important;
+}
+html:not([data-appearance='light']) .etholys-meet .border-slate-100:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .border-slate-200:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .border-teal-200:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .border-emerald-200:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .border-red-200:not(.etholys-meet-light *),
+html:not([data-appearance='light']) .etholys-meet .divide-slate-100:not(.etholys-meet-light *) > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--sys-line) !important;
+}
+html[data-appearance='light'] .etholys-meet .text-teal-200,
+html[data-appearance='light'] .etholys-meet .text-teal-300 {
+  color: #0f766e !important;
+}
+
 /* eCalendar — fora do remap da sidebar (aside .bg-white → #0c1822 com texto escuro). */
 .ecalendar {
   --ec-bg: #ffffff;

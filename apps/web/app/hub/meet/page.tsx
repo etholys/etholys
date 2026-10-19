@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
+import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
+import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 import { CompanyPicker } from '@/components/hub/CompanyPicker';
 import { CompanyRequiredPanel } from '@/components/hub/CompanyRequiredPanel';
 import {
@@ -106,8 +108,8 @@ export default function MeetHubPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-white">
-          <Loader2 className="h-8 w-8 animate-spin text-teal-700" />
+        <div className="etholys-system etholys-meet flex min-h-screen items-center justify-center bg-[color:var(--sys-canvas-bg,#07111A)]">
+          <Loader2 className="h-8 w-8 animate-spin text-teal-300" />
         </div>
       }
     >
@@ -631,26 +633,30 @@ function MeetHubContent() {
   }
 
   return (
-    <div className="etholys-meet-light flex min-h-dvh flex-col bg-white pb-[env(safe-area-inset-bottom)]">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur">
+    <div
+      className="etholys-system etholys-hub etholys-meet relative isolate flex min-h-dvh flex-col bg-[color:var(--sys-canvas-bg,#07111A)] pb-[env(safe-area-inset-bottom)] text-[color:var(--sys-ink,#E8EEF2)]"
+      data-accent="teal"
+    >
+      <SystemAtmosphere accent="teal" />
+      <header className="sticky top-0 z-30 border-b border-[color:var(--sys-line)] bg-[color:var(--sys-aside-bg)] pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Link
             href="/hub"
-            className="inline-flex touch-manipulation items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            className="inline-flex touch-manipulation items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium text-[color:var(--sys-nav-idle)] hover:bg-[color:var(--sys-nav-hover)] hover:text-[color:var(--sys-ink)]"
           >
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Hub</span>
           </Link>
 
           <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:flex-none">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-700 to-slate-900 shadow-sm ring-1 ring-teal-600/30">
-              <Video className="h-4 w-4 text-teal-50" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-teal-400/30 bg-teal-500/15">
+              <Video className="h-4 w-4 text-teal-300" />
             </span>
             <div className="min-w-0 leading-tight">
-              <span className="block truncate text-lg font-semibold tracking-[0.08em] text-slate-900">
+              <span className="block truncate font-[family-name:var(--font-etholys-display)] text-lg font-semibold tracking-[0.08em] text-[color:var(--sys-brand,#fff)]">
                 CHORUS
               </span>
-              <span className="hidden text-[10px] font-medium uppercase tracking-[0.14em] text-teal-800/70 sm:block">
+              <span className="hidden text-[10px] font-medium uppercase tracking-[0.14em] text-[color:var(--sys-faint)] sm:block">
                 Etholys
               </span>
             </div>
@@ -664,12 +670,12 @@ function MeetHubContent() {
             error={companiesLoadError}
             onRetry={() => void reloadCompanies()}
             locale={locale}
-            className="ml-auto sm:ml-0"
+            className="hub-company-picker-dark ml-auto sm:ml-0"
           />
 
           <div className="order-last flex w-full items-center gap-2 sm:order-none sm:ml-auto sm:w-auto">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-slate-100 px-3 py-2.5 sm:w-72 sm:py-2">
-              <Keyboard className="h-4 w-4 shrink-0 text-slate-500" />
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-3 py-2.5 sm:w-72 sm:py-2">
+              <Keyboard className="h-4 w-4 shrink-0 text-[color:var(--sys-faint)]" />
               <input
                 value={joinInput}
                 onChange={(e) => setJoinInput(e.target.value)}
@@ -681,7 +687,7 @@ function MeetHubContent() {
                   'Ingresa un código o enlace',
                   'Enter a code or link',
                 )}
-                className="w-full bg-transparent text-base text-slate-800 outline-none placeholder:text-slate-500 sm:text-sm"
+                className="w-full bg-transparent text-base text-[color:var(--sys-ink)] outline-none placeholder:text-[color:var(--sys-faint)] sm:text-sm"
                 enterKeyHint="go"
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -691,11 +697,12 @@ function MeetHubContent() {
               type="button"
               onClick={joinByCode}
               disabled={!joinInput.trim()}
-              className="touch-manipulation rounded-full px-3 py-2.5 text-sm font-semibold text-teal-800 hover:bg-teal-50 disabled:text-slate-400 disabled:hover:bg-transparent sm:py-2"
+              className="touch-manipulation rounded-full px-3 py-2.5 text-sm font-semibold text-teal-300 hover:bg-teal-500/10 disabled:text-[color:var(--sys-faint)] disabled:hover:bg-transparent sm:py-2"
             >
               {t('Entrar', 'Unirse', 'Join')}
             </button>
 
+            <AppearanceToggle collapsed />
             <div className="relative">
               <button
                 type="button"
@@ -821,7 +828,7 @@ function MeetHubContent() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
+      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
         {!companyId && (
           <CompanyRequiredPanel
             locale={locale}
