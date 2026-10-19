@@ -63,8 +63,25 @@ test('agenda surfaces force light form colors', () => {
   assert.match(owner, /PanelLeftClose/);
   assert.match(owner, /ChorusAgendaCalendar/);
   assert.match(owner, /\/hub\/calendar\?view=agenda/);
-  assert.doesNotMatch(owner, /etholys-meet-light/);
+  assert.match(owner, /etholys-system etholys-meet relative/);
+  assert.match(owner, /role="dialog"/);
+  assert.match(owner, /etholys-meet-light/);
   assert.match(guest, /viewer === 'owner'/);
   assert.match(guest, /etholys-meet-light/);
   assert.doesNotMatch(`${owner}\n${guest}`, /jitsi|jibri|jigasi/i);
+});
+
+test('clicking an agenda hour opens the shared block dialog', () => {
+  const calendar = readFileSync(join(root, 'components/meet/ChorusAgendaCalendar.tsx'), 'utf8');
+  const owner = readFileSync(join(root, 'components/meet/ChorusAgendaOrganizer.tsx'), 'utf8');
+  const route = readFileSync(join(root, 'app/api/meet/agenda/route.ts'), 'utf8');
+  assert.match(calendar, /data-slot/);
+  assert.match(calendar, /commitRef\.current\(startWall, endWall\)/);
+  assert.match(calendar, /onPointerDown=\{onGridPointerDown\}/);
+  assert.match(owner, /setBlockDialogOpen\(true\)/);
+  assert.match(owner, /Motivo \(opcional\)/);
+  assert.match(owner, /type="datetime-local"/);
+  assert.match(owner, /Cancelar/);
+  assert.match(route, /label: body\.label/);
+  assert.doesNotMatch(`${calendar}\n${owner}`, /jitsi|jibri|jigasi/i);
 });

@@ -18,6 +18,7 @@ import {
   Share2,
   Sun,
   Video,
+  X,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
@@ -161,6 +162,8 @@ export default function ChorusAgendaOrganizer({
   const [windows, setWindows] = useState<WindowRow[]>(windowsFromPage([]));
   const [blockStart, setBlockStart] = useState('');
   const [blockEnd, setBlockEnd] = useState('');
+  const [blockLabel, setBlockLabel] = useState('');
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [counter, setCounter] = useState<Record<string, { start: string; end: string }>>({});
   const [holidayCountries, setHolidayCountries] = useState<string[]>([]);
   const [view, setView] = useState<AgendaView>('week');
@@ -280,8 +283,9 @@ export default function ChorusAgendaOrganizer({
   }
 
   async function closeRange() {
-    if (!companyId || !blockStart || !blockEnd) return;
+    if (!companyId || !blockStart || !blockEnd || blockEnd <= blockStart) return;
     setSaving(true);
+    setError(null);
     try {
       const res = await fetch('/api/meet/agenda', {
         method: 'POST',
@@ -290,6 +294,7 @@ export default function ChorusAgendaOrganizer({
           companyId,
           startsAt: wallToIso(blockStart),
           endsAt: wallToIso(blockEnd),
+          label: blockLabel.trim() || null,
           from: range.from,
           to: range.to,
         }),
@@ -299,6 +304,9 @@ export default function ChorusAgendaOrganizer({
       setAgenda(data);
       setBlockStart('');
       setBlockEnd('');
+      setBlockLabel('');
+      setBlockDialogOpen(false);
+      setInfo(t('Horário fechado na agenda.', 'Horario cerrado en la agenda.', 'Time closed on the agenda.'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'slot_invalid');
     } finally {
@@ -366,7 +374,7 @@ export default function ChorusAgendaOrganizer({
           title:
             block.source === 'holiday'
               ? block.label || t('Feriado', 'Festivo', 'Holiday')
-              : t('Fechado', 'Cerrado', 'Closed'),
+              : block.label || t('Fechado', 'Cerrado', 'Closed'),
           startsAt: block.startsAt,
           endsAt: block.endsAt,
         })),
@@ -403,34 +411,12 @@ export default function ChorusAgendaOrganizer({
     );
   }
 
-  async function commitRange(startWall: string, endWall: string) {
+  function commitRange(startWall: string, endWall: string) {
     setBlockStart(startWall);
     setBlockEnd(endWall);
-    if (!companyId) return;
-    setSaving(true);
+    setBlockLabel('');
+    setBlockDialogOpen(true);
     setError(null);
-    try {
-      const res = await fetch('/api/meet/agenda', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId,
-          startsAt: meetWallTimeToUtc(startWall, timeZone).toISOString(),
-          endsAt: meetWallTimeToUtc(endWall, timeZone).toISOString(),
-          from: range.from,
-          to: range.to,
-        }),
-      });
-      const data = (await res.json()) as Agenda & { error?: string };
-      if (!res.ok) throw new Error(data.error || 'slot_invalid');
-      setAgenda(data);
-      setInfo(t('Horário fechado na agenda.', 'Horario cerrado en la agenda.', 'Time closed on the agenda.'));
-      setCloseMode(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'slot_invalid');
-    } finally {
-      setSaving(false);
-    }
   }
 
   const embedded = surface === 'calendar';
@@ -941,6 +927,94 @@ export default function ChorusAgendaOrganizer({
           >
             {t('WhatsApp', 'WhatsApp', 'WhatsApp')}
           </a>
+        </div>
+      ) : null}
+      {blockDialogOpen ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-0 sm:items-center sm:p-4"
+          onClick={() => setBlockDialogOpen(false)}
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="agenda-block-title"
+            className="etholys-meet-light w-full max-w-md rounded-t-2xl bg-white p-5 text-slate-900 shadow-2xl sm:rounded-2xl"
+            style={{ colorScheme: 'light' }}
+            onClick={(event) => event.stopPropagation()}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void closeRange();
+            }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h2 id="agenda-block-title" className="text-lg font-semibold text-slate-900">
+                {t('Fechar horário', 'Cerrar horario', 'Close a time')}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setBlockDialogOpen(false)}
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+                aria-label={t('Cancelar', 'Cancelar', 'Cancel')}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-slate-600">
+              {t(
+                'Este horário deixa de aceitar marcações.',
+                'Este horario deja de aceptar reservas.',
+                'This time will no longer accept bookings.',
+              )}
+            </p>
+            <label className="mt-4 block text-sm font-medium text-slate-700">
+              {t('Motivo (opcional)', 'Motivo (opcional)', 'Reason (optional)')}
+              <input
+                value={blockLabel}
+                onChange={(event) => setBlockLabel(event.target.value)}
+                placeholder={t('Reunião interna', 'Reunión interna', 'Internal meeting')}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+              />
+            </label>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium text-slate-700">
+                {t('Início', 'Inicio', 'Start')}
+                <input
+                  type="datetime-local"
+                  required
+                  value={blockStart}
+                  onChange={(event) => setBlockStart(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                {t('Fim', 'Fin', 'End')}
+                <input
+                  type="datetime-local"
+                  required
+                  value={blockEnd}
+                  onChange={(event) => setBlockEnd(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+                />
+              </label>
+            </div>
+            {error ? <p className="mt-3 text-sm text-red-800">{error}</p> : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setBlockDialogOpen(false)}
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
+              >
+                {t('Cancelar', 'Cancelar', 'Cancel')}
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !blockStart || !blockEnd || blockEnd <= blockStart}
+                className="rounded-full bg-teal-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {saving ? '…' : t('Fechar horário', 'Cerrar horario', 'Close time')}
+              </button>
+            </div>
+          </form>
         </div>
       ) : null}
     </div>

@@ -674,6 +674,7 @@ export async function addBookingBlock(input: {
   ownerId: string;
   startsAt: string;
   endsAt: string;
+  label?: string | null;
   from?: string | null;
   to?: string | null;
 }) {
@@ -686,8 +687,9 @@ export async function addBookingBlock(input: {
   if (endsAt.getTime() - startsAt.getTime() > 400 * 24 * 60 * 60 * 1000) {
     throw new BookingError('slot_invalid');
   }
+  const label = (input.label || '').trim().slice(0, 180);
   await prisma.meetBookingBlock.create({
-    data: { pageId: page.id, startsAt, endsAt, source: 'manual' },
+    data: { pageId: page.id, startsAt, endsAt, source: 'manual', label: label || null },
   });
   return getOrganizerAgenda(input.companyId, input.ownerId, { from: input.from, to: input.to });
 }

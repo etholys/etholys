@@ -96,6 +96,7 @@ export async function POST(req: Request) {
       blockId?: string;
       startsAt?: string;
       endsAt?: string;
+      label?: string | null;
       from?: string | null;
       to?: string | null;
     };
@@ -113,6 +114,7 @@ export async function POST(req: Request) {
       ownerId: gate.tenant.userId,
       startsAt: body.startsAt || '',
       endsAt: body.endsAt || '',
+      label: body.label,
       from: body.from,
       to: body.to,
     });
