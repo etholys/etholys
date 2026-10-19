@@ -26,32 +26,109 @@ function LoginContent() {
     // fallback: produção pública Etholys
     (typeof window !== 'undefined' && window.location.hostname.includes('etholys.com'));
 
-  // Com código na URL: preferir login — quem já tem conta (ex. outro escritório) não deve cair em «Registrarse».
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(!inviteFromUrl);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [inviteLoading, setInviteLoading] = useState(Boolean(inviteFromUrl));
+  const [inviteCompany, setInviteCompany] = useState('');
+  const [emailLocked, setEmailLocked] = useState(false);
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [form, setForm] = useState({
     email: '',
     password: '',
+    passwordConfirm: '',
     name: '',
     inviteCode: inviteFromUrl,
   });
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    if (inviteFromUrl) {
-      setForm((f) => ({ ...f, inviteCode: inviteFromUrl }));
-      setIsLogin(true);
-      setSuccess(
-        locale === 'es'
-          ? 'Si ya tienes cuenta Etholys, inicia sesión. El código se aplicará al entrar.'
-          : locale === 'pt'
-            ? 'Se já tem conta Etholys, entre. O código será aplicado ao iniciar sessão.'
-            : 'If you already have an Etholys account, sign in. The code will be applied after login.',
-      );
-    }
+    if (!inviteFromUrl) return;
+    let cancelled = false;
+    setInviteLoading(true);
+    setForm((f) => ({ ...f, inviteCode: inviteFromUrl }));
+    fetch(`/api/invitations/preview?code=${encodeURIComponent(inviteFromUrl)}`)
+      .then((r) => r.json())
+      .then((data: {
+        status?: string;
+        email?: string;
+        hasAccount?: boolean;
+        companyName?: string | null;
+      }) => {
+        if (cancelled) return;
+        const company = data.companyName || '';
+        setInviteCompany(company);
+        if (data.email) {
+          setForm((f) => ({ ...f, email: data.email || f.email, inviteCode: inviteFromUrl }));
+          setEmailLocked(true);
+        }
+        if (data.status === 'expired') {
+          setIsLogin(true);
+          setError(
+            locale === 'es'
+              ? 'Este enlace de invitación expiró. Pide uno nuevo al administrador.'
+              : locale === 'pt'
+                ? 'Este link de convite expirou. Peça um novo ao administrador.'
+                : 'This invitation link expired. Ask an admin for a new one.',
+          );
+          return;
+        }
+        if (data.status === 'invalid') {
+          setIsLogin(true);
+          setError(
+            locale === 'es'
+              ? 'Código de invitación inválido.'
+              : locale === 'pt'
+                ? 'Código de convite inválido.'
+                : 'Invalid invitation code.',
+          );
+          return;
+        }
+        if (data.status === 'pending' && !data.hasAccount) {
+          setIsLogin(false);
+          setSuccess(
+            locale === 'es'
+              ? `Te invitaron${company ? ` a ${company}` : ''}. Crea tu contraseña para aceptar. No hay una contraseña previa.`
+              : locale === 'pt'
+                ? `Foi convidado${company ? ` para ${company}` : ''}. Crie a sua senha para aceitar. Não existe senha pré-definida.`
+                : `You were invited${company ? ` to ${company}` : ''}. Create a password to accept. There is no preset password.`,
+          );
+          return;
+        }
+        setIsLogin(true);
+        setSuccess(
+          data.status === 'accepted'
+            ? locale === 'es'
+              ? 'Esta invitación ya fue aceptada. Entra con tu contraseña.'
+              : locale === 'pt'
+                ? 'Este convite já foi aceite. Entre com a sua senha.'
+                : 'This invitation was already accepted. Sign in with your password.'
+            : locale === 'es'
+              ? 'Ya tienes cuenta Etholys. Entra con tu contraseña y el acceso se aplicará.'
+              : locale === 'pt'
+                ? 'Já tem conta Etholys. Entre com a sua senha e o acesso será aplicado.'
+                : 'You already have an Etholys account. Sign in and access will be applied.',
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsLogin(false);
+          setSuccess(
+            locale === 'es'
+              ? 'Crea tu contraseña para aceptar la invitación. No hay una contraseña previa.'
+              : locale === 'pt'
+                ? 'Crie a sua senha para aceitar o convite. Não existe senha pré-definida.'
+                : 'Create a password to accept the invitation. There is no preset password.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setInviteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [inviteFromUrl, locale]);
 
   // Handle NextAuth error redirects (e.g. from Google SSO failures)
@@ -116,10 +193,37 @@ function LoginContent() {
           await goAfterAuth();
         }
       } else {
+        if (form.password.length < 8) {
+          setError(
+            locale === 'es'
+              ? 'La contraseña debe tener al menos 8 caracteres.'
+              : locale === 'pt'
+                ? 'A senha deve ter pelo menos 8 caracteres.'
+                : 'Password must be at least 8 characters.',
+          );
+          setLoading(false);
+          return;
+        }
+        if (inviteFromUrl && form.password !== form.passwordConfirm) {
+          setError(
+            locale === 'es'
+              ? 'Las contraseñas no coinciden.'
+              : locale === 'pt'
+                ? 'As senhas não coincidem.'
+                : 'Passwords do not match.',
+          );
+          setLoading(false);
+          return;
+        }
         const res = await fetch('/api/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify({
+            email: form.email,
+            password: form.password,
+            name: form.name,
+            inviteCode: form.inviteCode,
+          }),
         });
         const data = await res.json().catch(() => ({} as { error?: string; code?: string }));
         if (!res.ok) {
@@ -258,10 +362,30 @@ function LoginContent() {
           </div>
 
           <h3 className="text-2xl font-bold text-gray-900 mb-1">
-            {isLogin ? tr('auth.welcome') : tr('auth.signup')}
+            {inviteFromUrl && !isLogin
+              ? locale === 'es'
+                ? 'Acepta la invitación'
+                : locale === 'pt'
+                  ? 'Aceite o convite'
+                  : 'Accept the invitation'
+              : isLogin
+                ? tr('auth.welcome')
+                : tr('auth.signup')}
           </h3>
           <p className="text-gray-500 mb-6">
-            {precommercial && !inviteFromUrl
+            {inviteFromUrl && !isLogin
+              ? locale === 'es'
+                ? inviteCompany
+                  ? `Crea tu acceso a ${inviteCompany}.`
+                  : 'Crea tu contraseña para entrar.'
+                : locale === 'pt'
+                  ? inviteCompany
+                    ? `Crie o seu acesso a ${inviteCompany}.`
+                    : 'Crie a sua senha para entrar.'
+                  : inviteCompany
+                    ? `Create your access to ${inviteCompany}.`
+                    : 'Create your password to sign in.'
+              : precommercial && !inviteFromUrl
               ? locale === 'es'
                 ? 'Acceso privado. Solo administradores o invitados por función.'
                 : locale === 'pt'
@@ -274,6 +398,12 @@ function LoginContent() {
                   : 'Access the ETHOLYS ecosystem'}
           </p>
 
+          {inviteLoading && (
+            <div className="mb-4 flex items-center gap-2 text-sm text-slate-500">
+              <div className="w-4 h-4 border-2 border-teal-200 border-t-teal-600 rounded-full animate-spin" />
+              {locale === 'es' ? 'Comprobando la invitación…' : locale === 'pt' ? 'A verificar o convite…' : 'Checking the invitation…'}
+            </div>
+          )}
           {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
           {success && <div className="mb-4 p-3 bg-emerald-50 text-emerald-700 rounded-lg text-sm">{success}</div>}
 
@@ -331,6 +461,7 @@ function LoginContent() {
                 <input
                   type="text"
                   required={!isLogin && precommercial}
+                  readOnly={Boolean(inviteFromUrl)}
                   value={form.inviteCode}
                   onChange={(e) => setForm({ ...form, inviteCode: e.target.value })}
                   placeholder={
@@ -346,10 +477,25 @@ function LoginContent() {
             )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{tr('auth.email')}</label>
-              <input type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition" />
+              <input
+                type="email"
+                required
+                readOnly={emailLocked}
+                value={form.email}
+                onChange={e => setForm({ ...form, email: e.target.value })}
+                className={`w-full px-4 py-2.5 rounded-lg border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition ${emailLocked ? 'bg-slate-100' : 'bg-white'}`}
+              />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{tr('auth.password')}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {inviteFromUrl && !isLogin
+                  ? locale === 'es'
+                    ? 'Crea tu contraseña'
+                    : locale === 'pt'
+                      ? 'Crie a sua senha'
+                      : 'Create your password'
+                  : tr('auth.password')}
+              </label>
               <div className="relative">
                 <input type={showPw ? 'text' : 'password'} required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition pr-10" />
                 <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -365,11 +511,27 @@ function LoginContent() {
                 </Link>
               )}
             </div>
-            <button type="submit" disabled={loading} className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition disabled:opacity-50">
+            {inviteFromUrl && !isLogin && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {locale === 'es' ? 'Confirma la contraseña' : locale === 'pt' ? 'Confirme a senha' : 'Confirm password'}
+                </label>
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  required
+                  value={form.passwordConfirm}
+                  onChange={(e) => setForm({ ...form, passwordConfirm: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition"
+                />
+              </div>
+            )}
+            <button type="submit" disabled={loading || inviteLoading} className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition disabled:opacity-50">
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : isLogin ? (
                 <><LogIn className="w-4 h-4" /> {tr('auth.login')}</>
+              ) : inviteFromUrl ? (
+                <><UserPlus className="w-4 h-4" /> {locale === 'es' ? 'Aceptar y crear acceso' : locale === 'pt' ? 'Aceitar e criar acesso' : 'Accept and create access'}</>
               ) : (
                 <><UserPlus className="w-4 h-4" /> {tr('auth.signup')}</>
               )}
