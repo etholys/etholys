@@ -19,7 +19,7 @@ type L = Record<AuroraLocale, string>;
 
 export type AuroraScriptStep = {
   id: string;
-  kind: 'yesno' | 'text' | 'years' | 'choice';
+  kind: 'yesno' | 'text' | 'number' | 'years' | 'choice';
   prompt: L;
   options?: { id: string; label: L }[];
 };
@@ -128,7 +128,7 @@ const OPERATIONS: AuroraScriptStep[] = [
 const PEOPLE: AuroraScriptStep[] = [
   {
     id: 'headcount',
-    kind: 'text',
+    kind: 'number',
     prompt: yn(
       'Quantas pessoas trabalham, além de quem decide?',
       '¿Cuántas personas trabajan, además de quien decide?',
@@ -435,6 +435,12 @@ export function answerDiagScript(input: {
     }
     stored = JSON.stringify(Object.fromEntries(rows.map((r) => [r.year, r.amount.slice(0, 40)])));
     echo = rows.map((r) => `${r.year}: ${r.amount}`).join('; ');
+  } else if (step.kind === 'number') {
+    if (!/^\d{1,6}$/.test(raw)) {
+      return fail(baseFacts, step.id, t(input.locale, 'Indica o número.', 'Indicá el número.', 'Enter the number.'));
+    }
+    stored = String(Number(raw));
+    echo = stored;
   } else if (step.kind === 'choice') {
     const opt = step.options?.find((o) => o.id === raw);
     if (!opt) return fail(baseFacts, step.id, t(input.locale, 'Escolhe uma opção.', 'Elegí una opción.', 'Pick one option.'));

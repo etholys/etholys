@@ -947,6 +947,22 @@ function ScriptAnswer({
       </div>
     );
   }
+  if (step.kind === 'number') {
+    const ready = /^\d{1,6}$/.test(talk.trim());
+    return (
+      <div className="mt-3">
+        <input
+          inputMode="numeric"
+          value={talk}
+          onChange={(e) => setTalk(e.target.value)}
+          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+        />
+        <button type="button" disabled={busy || !ready} onClick={() => onSend(talk.trim())} className="mt-2 rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+          {loc === 'es' ? 'Enviar' : loc === 'en' ? 'Send' : 'Enviar'}
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="mt-3">
       <textarea value={talk} onChange={(e) => setTalk(e.target.value)} rows={3} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />

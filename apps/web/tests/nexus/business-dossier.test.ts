@@ -369,6 +369,17 @@ test('AURORA finance script asks for revenue years and then how cash is controll
   assert.equal(turn.facts.makes_money, 'yes');
 });
 
+test('AURORA people script accepts a one-digit headcount', () => {
+  const turn = answerDiagScript({ blockId: 'people', stepId: 'headcount', facts: {}, answer: '2', locale: 'pt' });
+  assert.equal(turn.error, null);
+  assert.equal(turn.facts.headcount, '2');
+  assert.equal(turn.nextStep, 'stops');
+  const zero = answerDiagScript({ blockId: 'people', stepId: 'headcount', facts: {}, answer: '0', locale: 'pt' });
+  assert.equal(zero.facts.headcount, '0');
+  const bad = answerDiagScript({ blockId: 'people', stepId: 'headcount', facts: {}, answer: 'duas', locale: 'pt' });
+  assert.equal(bad.error, 'invalid');
+});
+
 test('AURORA field visit is on site inside 250m and inside a polygon', () => {
   const farm = { lat: -15.78, lng: -47.93 };
   const near = visitPresence({ lat: -15.7801, lng: -47.9301, property: farm, polygon: [] });
