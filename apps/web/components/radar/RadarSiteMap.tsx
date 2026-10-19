@@ -877,9 +877,13 @@ function RadarBasemap({
   }, [ready, hasPin, lat, lng, areaHa, layout, parcels, focusedId, query, placing, editMode]);
 
   return (
-    <div className="radar-basemap absolute inset-0">
-      <div ref={hostRef} className="absolute inset-0" />
+    <div className="radar-basemap absolute inset-0 z-0 isolate">
+      <div ref={hostRef} className="absolute inset-0 z-0" />
       <style>{`
+        .radar-basemap,
+        .radar-basemap .leaflet-container {
+          z-index: 0;
+        }
         .radar-basemap .leaflet-control-zoom a {
           background: #07111a;
           color: #ecfeff;

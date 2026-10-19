@@ -148,7 +148,8 @@ export function RadarPropertyWorkspace({
       el.style.left = `${r.left}px`;
       el.style.width = `${r.width}px`;
       el.style.height = `${r.height}px`;
-      el.style.zIndex = '25';
+      // Above hub chrome; map overlays use a higher sibling z-index inside this frame.
+      el.style.zIndex = '40';
     };
     apply();
     const ro = new ResizeObserver(apply);
@@ -297,8 +298,12 @@ export function RadarPropertyWorkspace({
   const cardOpen = Boolean(panel || tool);
 
   return (
-    <div ref={frameRef} className="relative overflow-hidden bg-[#07111A]">
-      <div className="absolute inset-0">
+    <div ref={frameRef} className="relative isolate overflow-hidden bg-[#07111A]">
+      {/*
+        Leaflet panes/controls use z-index 200–1000. Without a stacking context on the map
+        layer, those values compete with sibling overlays (z-10) and bury all map chrome.
+      */}
+      <div className="absolute inset-0 z-0">
         {view === '3d' ? (
           <RadarSpatialTwin
             locale={loc}
@@ -356,7 +361,7 @@ export function RadarPropertyWorkspace({
         )}
       </div>
 
-      <div className="pointer-events-none absolute inset-0 z-10">
+      <div className="pointer-events-none absolute inset-0 z-[1100]">
         <aside className="pointer-events-auto absolute bottom-3 left-3 top-3 flex items-start gap-2">
           <div className="flex w-12 flex-col items-center gap-1 rounded-2xl bg-[#07111A]/92 py-2 shadow-xl ring-1 ring-white/10">
             <Link
