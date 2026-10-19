@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { importPropertyPolygon, savePropertyTerritory } from '@/lib/aurora-territory-db';
+import { crossPropertyOfficial, importPropertyPolygon, savePropertyTerritory } from '@/lib/aurora-territory-db';
 
 export async function POST(req: NextRequest) {
   const tenant = await getUserCompanyIds();
@@ -19,6 +19,12 @@ export async function POST(req: NextRequest) {
     engagementId: String(body.engagementId || '').trim(),
     propertyId: String(body.propertyId || '').trim(),
   };
+  if (body.action === 'cross') {
+    const result = await crossPropertyOfficial(common);
+    if (result.error === 'forbidden') return NextResponse.json({ error: 'Propriedade inválida.' }, { status: 403 });
+    if (result.error === 'geometry') return NextResponse.json({ error: 'Falta o polígono ou o ponto da finca.' }, { status: 400 });
+    return NextResponse.json({ ok: true, eligibility: result.eligibility, summary: result.summary });
+  }
   if (body.fileBase64 && body.fileName) {
     const raw = String(body.fileBase64);
     const bytes = Buffer.from(raw.includes(',') ? raw.split(',')[1] || '' : raw, 'base64');

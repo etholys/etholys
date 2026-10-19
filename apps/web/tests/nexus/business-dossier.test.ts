@@ -18,6 +18,8 @@ import { answerDiagScript } from '../../lib/aurora-script';
 import { haversineMeters, visitPresence } from '../../lib/aurora-visit';
 import { draftAuroraPlan } from '../../lib/aurora-plan';
 import { territorialEligibility, carbonTonnesTo2030, corridorGroups } from '../../lib/aurora-territory';
+import { ringsOverlap } from '../../lib/aurora-intersect';
+import { crossOfficialLayers, ringsFromGeoJson } from '../../lib/aurora-official';
 import { parseShpPolygons } from '../../lib/aurora-shp';
 import {
   applyDiagTurn,
@@ -559,5 +561,65 @@ test('AURORA territory blocks ineligible farms and reads a shapefile ring', () =
   const rings = parseShpPolygons(buf);
   assert.equal(rings.length, 1);
   assert.equal(rings[0]!.length, 4);
+});
+
+test('AURORA official cross overlaps polygons and ignores deforestation before 2009', async () => {
+  const farm = [
+    { lat: 0, lng: 0 },
+    { lat: 0, lng: 2 },
+    { lat: 2, lng: 2 },
+    { lat: 2, lng: 0 },
+  ];
+  const outside = [
+    { lat: 5, lng: 5 },
+    { lat: 5, lng: 6 },
+    { lat: 6, lng: 6 },
+    { lat: 6, lng: 5 },
+  ];
+  assert.equal(ringsOverlap(farm, outside), false);
+  assert.equal(
+    ringsOverlap(farm, [
+      { lat: 1, lng: 1 },
+      { lat: 1, lng: 3 },
+      { lat: 3, lng: 3 },
+      { lat: 3, lng: 1 },
+    ]),
+    true,
+  );
+  const collection = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: { nome: 'TI teste', year: 2007 },
+        geometry: { type: 'Polygon', coordinates: [[[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]] },
+      },
+    ],
+  };
+  const parsed = ringsFromGeoJson(collection);
+  assert.equal(parsed[0]?.name, 'TI teste');
+  assert.equal(parsed[0]?.year, 2007);
+  const cross = await crossOfficialLayers({ uf: 'PA', ring: farm }, async (url) => {
+    const loss = String(url).includes('yearly_deforestation');
+    return {
+      ok: true,
+      json: async () =>
+        loss
+          ? {
+              type: 'FeatureCollection',
+              features: [
+                {
+                  type: 'Feature',
+                  properties: { class_name: 'd2007', year: 2007 },
+                  geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
+                },
+              ],
+            }
+          : { type: 'FeatureCollection', features: [] },
+    };
+  });
+  assert.equal(cross.deforestation.hit, false);
+  assert.equal(cross.indigenous.hit, false);
+  assert.match(cross.summary, /FUNAI: sem sobreposição/);
 });
 

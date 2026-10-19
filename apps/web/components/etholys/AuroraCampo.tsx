@@ -427,6 +427,25 @@ function TerritoryBox({
     }
   };
 
+  const crossBases = async () => {
+    if (!property) return;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/aurora/territory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cross', companyId, engagementId, propertyId: property.id }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Falha');
+      onSaved(d.summary || (d.eligibility?.eligible ? 'Finca elegível.' : 'Cruzamento concluído.'));
+    } catch (e) {
+      onSaved(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const uploadPolygon = async (file: File) => {
     if (!property) return;
     const data = await file.arrayBuffer();
@@ -515,6 +534,9 @@ function TerritoryBox({
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={busy} onClick={() => void save()} className="rounded-lg border px-3 py-1.5 text-sm">
           Guardar checagem
+        </button>
+        <button type="button" disabled={busy} onClick={() => void crossBases()} className="rounded-lg border px-3 py-1.5 text-sm">
+          Cruzar com FUNAI, UC e PRODES
         </button>
         <label className="rounded-lg border px-3 py-1.5 text-sm">
           Polígono

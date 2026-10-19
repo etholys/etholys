@@ -19,6 +19,8 @@ export type TerritorialCompliance = {
   womenLed: boolean;
   youthLed: boolean;
   notes: string;
+  /** Momento do último cruzamento com FUNAI, unidades de conservação e PRODES. */
+  crossAt?: string;
 };
 
 export const EMPTY_COMPLIANCE: TerritorialCompliance = {
@@ -61,6 +63,7 @@ export function readCompliance(raw: unknown): TerritorialCompliance {
     womenLed: bool(o.womenLed),
     youthLed: bool(o.youthLed),
     notes: String(o.notes || '').trim().slice(0, 500),
+    crossAt: String(o.crossAt || '').trim().slice(0, 40),
   };
 }
 

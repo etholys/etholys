@@ -1,6 +1,8 @@
 import { prisma } from './prisma';
 import { canMutateAuroraFlow } from './aurora-flow-turn';
 import { parsePolygon, type GeoPoint } from './aurora-visit';
+import { ringAround } from './aurora-intersect';
+import { crossOfficialLayers } from './aurora-official';
 import { readCompliance, ringCentroid, territorialEligibility, type TerritorialCompliance } from './aurora-territory';
 import { ringsFromUpload } from './aurora-shp';
 import { buildGcfWorkbook } from './aurora-gcf';
@@ -29,6 +31,8 @@ export async function savePropertyTerritory(opts: {
   const property = await ownedProperty(opts.tenantCompanyIds, opts.attendedCompanyId, opts.engagementId, opts.propertyId);
   if (!property) return { error: 'forbidden' as const };
   const compliance = readCompliance(opts.compliance);
+  const previous = readCompliance(property.complianceJson);
+  if (!compliance.crossAt && previous.crossAt) compliance.crossAt = previous.crossAt;
   const ring = parsePolygon(opts.polygon);
   const center = ring.length >= 3 ? ringCentroid(ring) : null;
   await prisma.radarProperty.update({
@@ -66,6 +70,35 @@ export async function importPropertyPolygon(opts: {
     },
   });
   return { error: null, points: ring.length };
+}
+
+export async function crossPropertyOfficial(opts: {
+  tenantCompanyIds: string[];
+  attendedCompanyId: string;
+  engagementId: string;
+  propertyId: string;
+}) {
+  const property = await ownedProperty(opts.tenantCompanyIds, opts.attendedCompanyId, opts.engagementId, opts.propertyId);
+  if (!property) return { error: 'forbidden' as const };
+  const stored = parsePolygon(property.polygonJson);
+  const pin = Number.isFinite(property.lat) && Number.isFinite(property.lng) ? { lat: property.lat as number, lng: property.lng as number } : null;
+  const ring = stored.length >= 3 ? stored : pin ? ringAround(pin) : [];
+  if (ring.length < 3) return { error: 'geometry' as const };
+  const previous = readCompliance(property.complianceJson);
+  const cross = await crossOfficialLayers({ uf: previous.stateUf, ring });
+  const compliance: TerritorialCompliance = {
+    ...previous,
+    inIndigenousLand: cross.indigenous.ok ? cross.indigenous.hit : previous.inIndigenousLand,
+    inConservationUnit: cross.conservation.ok ? cross.conservation.hit : previous.inConservationUnit,
+    deforestationAfter2008: cross.deforestation.ok ? cross.deforestation.hit : previous.deforestationAfter2008,
+    notes: cross.summary,
+    crossAt: cross.checkedAt,
+  };
+  await prisma.radarProperty.update({
+    where: { id: property.id },
+    data: { complianceJson: compliance },
+  });
+  return { error: null, compliance, eligibility: territorialEligibility(compliance), summary: cross.summary };
 }
 
 export async function presignDrone(opts: {
