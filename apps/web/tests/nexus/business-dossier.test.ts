@@ -378,6 +378,10 @@ test('AURORA people script accepts a one-digit headcount', () => {
   assert.equal(zero.facts.headcount, '0');
   const bad = answerDiagScript({ blockId: 'people', stepId: 'headcount', facts: {}, answer: 'duas', locale: 'pt' });
   assert.equal(bad.error, 'invalid');
+  let closed = answerDiagScript({ blockId: 'people', stepId: 'stops', facts: turn.facts, answer: 'sim', locale: 'pt' });
+  closed = answerDiagScript({ blockId: 'people', stepId: 'roles', facts: closed.facts, answer: 'sim', locale: 'pt' });
+  assert.equal(closed.ready, true);
+  assert.ok((closed.situation || '').length >= 12);
 });
 
 test('AURORA field visit is on site inside 250m and inside a polygon', () => {

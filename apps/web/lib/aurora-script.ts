@@ -357,7 +357,17 @@ function closeGeneric(
             ? t(locale, 'Clientes', 'Clientes', 'Customers')
             : t(locale, 'Dados', 'Datos', 'Data');
 
-  const situation = clip(`${label}: ${bits || t(locale, 'respostas registadas no diálogo.', 'respuestas registradas en el diálogo.', 'answers recorded in the dialogue.')}`, 2000);
+  const situation = clip(
+    bits
+      ? t(locale, `${label} ficou assim: ${bits}.`, `${label} quedó así: ${bits}.`, `${label} came out like this: ${bits}.`)
+      : t(
+          locale,
+          `${label}: as respostas deste bloco já chegam para fechar.`,
+          `${label}: las respuestas de este bloque ya alcanzan para cerrar.`,
+          `${label}: the answers in this block are enough to close it.`,
+        ),
+    2000,
+  );
   const gap =
     level <= 2
       ? t(locale, `${label} ainda depende de improviso.`, `${label} todavía depende de improvisación.`, `${label} still depends on improvisation.`)

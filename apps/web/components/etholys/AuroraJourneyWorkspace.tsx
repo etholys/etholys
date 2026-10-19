@@ -338,11 +338,14 @@ export function AuroraJourneyWorkspace() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ companyId, engagementId, blockId: activeId, confirm: true, locale: loc, ...confirm }),
+        signal: AbortSignal.timeout(20000),
       });
-      const d = await r.json();
+      const raw = await r.text();
+      const d = raw.trim().startsWith('{') ? (JSON.parse(raw) as { error?: string; diagnostic?: unknown; progress?: { complete?: boolean } }) : null;
+      if (!d) throw new Error(loc === 'en' ? 'The server did not answer. Try again.' : loc === 'es' ? 'El servidor no respondió. Intentá de nuevo.' : 'O servidor não respondeu. Tenta outra vez.');
       if (!r.ok) throw new Error(d.error || 'Falha');
-      if (d.diagnostic) setDiagnostic(d.diagnostic);
-      if (d.progress) setProgress(d.progress);
+      if (d.diagnostic) setDiagnostic(d.diagnostic as AuroraDiagnosticState);
+      if (d.progress) setProgress(d.progress as typeof progress);
       setConfirm(null);
       setTalk('');
       setErr(null);
@@ -491,7 +494,7 @@ export function AuroraJourneyWorkspace() {
                     setYearAmounts={setYearAmounts}
                     onSend={(value) => void sendDiag(value)}
                   />
-                ) : (
+                ) : confirm ? null : (
                   <>
                     <textarea
                       value={talk}
@@ -557,10 +560,11 @@ export function AuroraJourneyWorkspace() {
                       type="button"
                       disabled={busy}
                       onClick={() => void saveConfirm()}
-                      className="w-full rounded-lg bg-amber-800 px-3 py-2 text-sm font-medium text-white"
+                      className="w-full rounded-lg bg-amber-800 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
                     >
-                      {t.confirm}
+                      {busy ? (loc === 'en' ? 'Saving…' : loc === 'es' ? 'Guardando…' : 'A gravar…') : t.confirm}
                     </button>
+                    {err ? <p className="text-sm text-rose-700">{err}</p> : null}
                   </div>
                 ) : (
                   <div className="space-y-3 text-sm text-slate-600">

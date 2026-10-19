@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     if (!blockId) return NextResponse.json({ error: 'Bloco inválido.' }, { status: 400 });
     const level = levelOf(body.level);
     const situation = String(body.situation || '').trim();
-    if (!level || situation.length < 12) {
+    if (!level || !situation) {
       return NextResponse.json({ error: 'Confirma o nível e a situação real.' }, { status: 400 });
     }
     const result = await confirmAuroraDiagBlock({
