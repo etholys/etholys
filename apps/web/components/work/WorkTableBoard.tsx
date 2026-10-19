@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useState } from 'react';
-import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { getInitials } from '@/lib/utils';
 import { WorkUpdates } from './WorkUpdates';
 import {
@@ -84,6 +84,9 @@ export function WorkTableBoard({
   onNotifyChange,
   onCommentPosted,
   onDeleteTask,
+  subtasksOf,
+  onAddSubtask,
+  onDuplicate,
 }: {
   groups: GroupOpt[];
   ungroupedTasks: TaskRow[];
@@ -115,6 +118,9 @@ export function WorkTableBoard({
   onNotifyChange?: (notify: WorkNotifyPrefs) => void;
   onCommentPosted?: () => void;
   onDeleteTask?: (id: string, title: string) => void;
+  subtasksOf?: (parentId: string) => TaskRow[];
+  onAddSubtask?: (parentId: string, title: string) => Promise<void>;
+  onDuplicate?: (task: TaskRow) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -125,6 +131,8 @@ export function WorkTableBoard({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [titleDraft, setTitleDraft] = useState<{ id: string; value: string } | null>(null);
+  const [openSubs, setOpenSubs] = useState<Record<string, boolean>>({});
+  const [subDrafts, setSubDrafts] = useState<Record<string, string>>({});
   const [updatesFor, setUpdatesFor] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
@@ -498,6 +506,14 @@ export function WorkTableBoard({
                           </td>
                           <td className="px-3 py-1.5" onClick={cellStop}>
                             <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setOpenSubs((s) => ({ ...s, [task.id]: !s[task.id] }))}
+                                className="rounded p-0.5 text-[color:var(--sys-faint)] hover:bg-[color:var(--sys-nav-hover)]"
+                                title={t('Subitems', 'Subelementos', 'Subitens')}
+                              >
+                                <ChevronRight className={`h-3.5 w-3.5 transition ${openSubs[task.id] ? 'rotate-90' : ''}`} />
+                              </button>
                               <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_STYLE[task.status]?.dot || 'bg-slate-300'}`} />
                               {titleDraft?.id === task.id ? (
                                 <input
@@ -522,6 +538,21 @@ export function WorkTableBoard({
                                   className="min-w-0 flex-1 truncate text-left text-sm font-medium text-[color:var(--sys-ink)]"
                                 >
                                   {task.title}
+                                </button>
+                              )}
+                              {(subtasksOf?.(task.id).length || 0) > 0 && (
+                                <span className="shrink-0 text-[10px] tabular-nums text-[color:var(--sys-faint)]">
+                                  {subtasksOf!(task.id).filter((s) => s.status === 'DONE').length}/{subtasksOf!(task.id).length}
+                                </span>
+                              )}
+                              {onDuplicate && (
+                                <button
+                                  type="button"
+                                  onClick={() => onDuplicate(task)}
+                                  className="shrink-0 rounded p-1 text-[color:var(--sys-faint)] opacity-0 hover:text-teal-300 group-hover:opacity-100"
+                                  title={t('Duplicate', 'Duplicar', 'Duplicar')}
+                                >
+                                  <Copy className="h-3.5 w-3.5" />
                                 </button>
                               )}
                               <button
@@ -549,7 +580,7 @@ export function WorkTableBoard({
                                 <select
                                   value={task.status}
                                   onChange={(e) => onPatch(task.id, { status: e.target.value })}
-                                  className="w-full cursor-pointer rounded-md border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-2 py-1 text-[11px] font-semibold text-[color:var(--sys-ink)] outline-none"
+                                  className={`w-full cursor-pointer rounded-md border-0 px-2 py-1 text-[11px] font-semibold outline-none ${STATUS_STYLE[task.status]?.bg || 'bg-slate-100'} ${STATUS_STYLE[task.status]?.text || 'text-slate-700'}`}
                                 >
                                   {WORK_KANBAN.map((s) => (
                                     <option key={s} value={s}>{statusLabel(s)}</option>
@@ -690,6 +721,96 @@ export function WorkTableBoard({
                           <tr>
                             <td colSpan={colSpan}>
                               <WorkUpdates taskId={task.id} onPosted={onCommentPosted} t={t} />
+                            </td>
+                          </tr>
+                        )}
+                        {openSubs[task.id] && (subtasksOf?.(task.id) || []).map((sub) => (
+                          <tr key={sub.id} className="border-b border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)]/40">
+                            {onToggleSelect && <td />}
+                            <td />
+                            <td className="px-3 py-1.5" onClick={cellStop}>
+                              <div className="flex items-center gap-2 pl-6">
+                                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_STYLE[sub.status]?.dot || 'bg-slate-300'}`} />
+                                {titleDraft?.id === sub.id ? (
+                                  <input
+                                    autoFocus
+                                    value={titleDraft.value}
+                                    onChange={(e) => setTitleDraft({ id: sub.id, value: e.target.value })}
+                                    onBlur={() => {
+                                      const next = titleDraft.value.trim();
+                                      if (next && next !== sub.title) onPatch(sub.id, { title: next });
+                                      setTitleDraft(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                      if (e.key === 'Escape') setTitleDraft(null);
+                                    }}
+                                    className="min-w-0 flex-1 rounded border border-teal-400 px-1.5 py-1 text-[13px] outline-none"
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setTitleDraft({ id: sub.id, value: sub.title })}
+                                    className="min-w-0 flex-1 truncate text-left text-[13px] text-[color:var(--sys-ink)]"
+                                  >
+                                    {sub.title}
+                                  </button>
+                                )}
+                                {onDeleteTask && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteTask(sub.id, sub.title)}
+                                    className="rounded p-1 text-[color:var(--sys-faint)] hover:text-rose-400"
+                                    title={t('Delete', 'Eliminar', 'Excluir')}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-2 py-1" onClick={cellStop}>
+                              <select
+                                value={sub.status}
+                                onChange={(e) => onPatch(sub.id, { status: e.target.value })}
+                                className={`w-full cursor-pointer rounded-md border-0 px-2 py-1 text-[11px] font-semibold outline-none ${STATUS_STYLE[sub.status]?.bg || ''} ${STATUS_STYLE[sub.status]?.text || ''}`}
+                              >
+                                {WORK_KANBAN.map((s) => (
+                                  <option key={s} value={s}>{statusLabel(s)}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-2 py-1" onClick={cellStop}>
+                              <select
+                                value={sub.assigneeId || ''}
+                                onChange={(e) => onPatch(sub.id, { assigneeId: e.target.value || null })}
+                                className="w-full bg-transparent text-[11px] text-[color:var(--sys-ink)] outline-none"
+                              >
+                                <option value="">{t('—', '—', '—')}</option>
+                                {users.map((u) => (
+                                  <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td colSpan={Math.max(1, columns.length - 2)} />
+                          </tr>
+                        ))}
+                        {openSubs[task.id] && onAddSubtask && (
+                          <tr className="border-b border-[color:var(--sys-line)]">
+                            <td colSpan={colSpan} className="px-3 py-1.5">
+                              <input
+                                value={subDrafts[task.id] || ''}
+                                onChange={(e) => setSubDrafts((d) => ({ ...d, [task.id]: e.target.value }))}
+                                onKeyDown={(e) => {
+                                  if (e.key !== 'Enter') return;
+                                  const title = (subDrafts[task.id] || '').trim();
+                                  if (!title) return;
+                                  e.preventDefault();
+                                  setSubDrafts((d) => ({ ...d, [task.id]: '' }));
+                                  void onAddSubtask(task.id, title);
+                                }}
+                                placeholder={t('+ Add subitem', '+ Subelemento', '+ Subitem')}
+                                className="w-full bg-transparent py-1 pl-8 text-sm text-[color:var(--sys-ink)] outline-none placeholder:text-[color:var(--sys-faint)]"
+                              />
                             </td>
                           </tr>
                         )}

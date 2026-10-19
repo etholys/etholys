@@ -306,6 +306,14 @@ export default function WorkShell() {
     });
   }, [tasks, nav, currentUserId, query, statusChip, priorityChip, personFocus]);
 
+  const boardTasks = useMemo(() => {
+    const visible = new Set(scopedTasks.map((row: any) => row.id));
+    return (tasks ?? []).filter((task: any) => {
+      if (!task.parentId) return visible.has(task.id);
+      return visible.has(task.parentId);
+    });
+  }, [tasks, scopedTasks]);
+
   const counts = useMemo(() => {
     const top = (tasks ?? []).filter((t: any) => !t.parentId);
     const open = top.filter((t: any) => OPEN.has(t.status));
@@ -651,7 +659,7 @@ export default function WorkShell() {
                 externalSearch={query}
                 externalStatus={statusChip}
                 externalPriority={priorityChip}
-                presetTasks={loadingDash ? null : scopedTasks}
+                presetTasks={loadingDash ? null : boardTasks}
                 onTasksChanged={() => fetchAllTasks({ silent: true })}
                 externalSelectedId={selectedId}
                 onExternalSelect={setSelectedId}

@@ -349,6 +349,54 @@ export default function TasksBoard({
     fetchGroups();
   };
 
+  const addSubtask = async (parentId: string, title: string) => {
+    const parent = (tasks ?? []).find((task: any) => task.id === parentId);
+    const body: Record<string, unknown> = {
+      title,
+      parentId,
+      status: 'TODO',
+      priority: parent?.priority || 'MEDIUM',
+      groupId: parent?.groupId || undefined,
+      folderId: parent?.folderId || folderFilter || undefined,
+      assigneeId: parent?.assigneeId || undefined,
+      departmentId: parent?.departmentId || departmentFilter || undefined,
+    };
+    if (parent?.projectId || projectFilter) body.projectId = parent?.projectId || projectFilter;
+    else if (activeCompanyId) body.companyId = activeCompanyId;
+    await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    fetchTasks({ silent: true });
+    notifyChanged();
+  };
+
+  const duplicateTask = async (task: any) => {
+    const body: Record<string, unknown> = {
+      title: `${task.title} (copy)`,
+      status: task.status || 'TODO',
+      priority: task.priority || 'MEDIUM',
+      groupId: task.groupId || undefined,
+      folderId: task.folderId || undefined,
+      assigneeId: task.assigneeId || undefined,
+      departmentId: task.departmentId || undefined,
+      dueDate: task.dueDate || undefined,
+      startDate: task.startDate || undefined,
+      estimatedHours: task.estimatedHours || undefined,
+      customFields: task.customFields || undefined,
+    };
+    if (task.projectId) body.projectId = task.projectId;
+    else if (activeCompanyId) body.companyId = activeCompanyId;
+    await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    fetchTasks({ silent: true });
+    notifyChanged();
+  };
+
   const quickAdd = async (groupId: string | null, title: string) => {
     const body: Record<string, unknown> = {
       title,
@@ -851,6 +899,9 @@ export default function TasksBoard({
               onNotifyChange={(notifyPrefs) => void saveBoard({ notify: notifyPrefs })}
               onCommentPosted={() => fetchTasks({ silent: true })}
               onDeleteTask={(id, title) => void deleteTask(id, title)}
+              subtasksOf={(id) => (tasks ?? []).filter((task: any) => task?.parentId === id)}
+              onAddSubtask={addSubtask}
+              onDuplicate={(task) => void duplicateTask(task)}
             />
             </>
           ) : (
