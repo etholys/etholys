@@ -56,6 +56,7 @@ function LoginContent() {
         status?: string;
         email?: string;
         hasAccount?: boolean;
+        needsPassword?: boolean;
         companyName?: string | null;
       }) => {
         if (cancelled) return;
@@ -89,24 +90,25 @@ function LoginContent() {
         }
         setAccountExists(Boolean(data.hasAccount));
         setShowExistingLogin(false);
-        if (data.status === 'pending' && !data.hasAccount) {
+        const mustSetPassword = !data.hasAccount || data.needsPassword;
+        if ((data.status === 'pending' || data.status === 'accepted') && mustSetPassword) {
           setIsLogin(false);
           setSuccess(
             locale === 'es'
-              ? `Te invitaron${company ? ` a ${company}` : ''}. Crea tu contraseña para aceptar. No hay una contraseña previa.`
+              ? `Te invitaron${company ? ` a ${company}` : ''}. Crea tu contraseña para entrar. No hay una contraseña previa.`
               : locale === 'pt'
-                ? `Foi convidado${company ? ` para ${company}` : ''}. Crie a sua senha para aceitar. Não existe senha pré-definida.`
-                : `You were invited${company ? ` to ${company}` : ''}. Create a password to accept. There is no preset password.`,
+                ? `Foi convidado${company ? ` para ${company}` : ''}. Crie a sua senha para entrar. Não existe senha pré-definida.`
+                : `You were invited${company ? ` to ${company}` : ''}. Create a password to sign in. There is no preset password.`,
           );
           return;
         }
         setIsLogin(true);
         setSuccess(
           locale === 'es'
-            ? 'Este correo ya tiene cuenta. El convite no trae contraseña: crea una nueva para entrar.'
+            ? 'Ya tienes contraseña en Etholys. Entra con ella para usar este acceso.'
             : locale === 'pt'
-              ? 'Este e-mail já tem conta. O convite não traz senha: crie uma nova para entrar.'
-              : 'This email already has an account. The invite has no password: create a new one to sign in.',
+              ? 'Já tem senha no Etholys. Entre com ela para usar este acesso.'
+              : 'You already have an Etholys password. Sign in to use this access.',
         );
       })
       .catch(() => {
@@ -213,15 +215,24 @@ function LoginContent() {
           setLoading(false);
           return;
         }
-        const res = await fetch('/api/signup', {
+        const res = await fetch(inviteFromUrl ? '/api/invitations/set-password' : '/api/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: form.email,
-            password: form.password,
-            name: form.name,
-            inviteCode: form.inviteCode,
-          }),
+          body: JSON.stringify(
+            inviteFromUrl
+              ? {
+                  code: form.inviteCode,
+                  email: form.email,
+                  password: form.password,
+                  name: form.name,
+                }
+              : {
+                  email: form.email,
+                  password: form.password,
+                  name: form.name,
+                  inviteCode: form.inviteCode,
+                },
+          ),
         });
         const data = await res.json().catch(() => ({} as { error?: string; code?: string }));
         if (!res.ok) {
@@ -360,7 +371,7 @@ function LoginContent() {
           </div>
 
           <h3 className="text-2xl font-bold text-gray-900 mb-1">
-            {inviteFromUrl && accountExists && !showExistingLogin
+            {inviteFromUrl && accountExists && isLogin && !showExistingLogin
               ? locale === 'es'
                 ? 'Ya tienes cuenta'
                 : locale === 'pt'
@@ -377,7 +388,7 @@ function LoginContent() {
                 : tr('auth.signup')}
           </h3>
           <p className="text-gray-500 mb-6">
-            {inviteFromUrl && accountExists && !showExistingLogin
+            {inviteFromUrl && accountExists && isLogin && !showExistingLogin
               ? locale === 'es'
                 ? 'El convite no incluye contraseña. Crea una nueva con el correo de abajo.'
                 : locale === 'pt'
@@ -414,7 +425,7 @@ function LoginContent() {
               {locale === 'es' ? 'Comprobando la invitación…' : locale === 'pt' ? 'A verificar o convite…' : 'Checking the invitation…'}
             </div>
           )}
-          {inviteFromUrl && accountExists && !showExistingLogin && !inviteLoading && (
+          {inviteFromUrl && accountExists && isLogin && !showExistingLogin && !inviteLoading && (
             <div className="mb-4 space-y-3">
               <p className="text-sm text-slate-600">
                 {form.email}
@@ -438,7 +449,7 @@ function LoginContent() {
           {success && <div className="mb-4 p-3 bg-emerald-50 text-emerald-700 rounded-lg text-sm">{success}</div>}
 
           {/* Google Sign-In */}
-          {!(inviteFromUrl && accountExists && !showExistingLogin) && (
+          {!(inviteFromUrl && accountExists && isLogin && !showExistingLogin) && (
           <>
           <button
             onClick={handleGoogleSignIn}
@@ -469,7 +480,7 @@ function LoginContent() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
+            {!isLogin && !accountExists && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{tr('auth.name')}</label>
                 <input type="text" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition" />
@@ -572,7 +583,7 @@ function LoginContent() {
           </>
           )}
 
-          {!(precommercial && !inviteFromUrl) && !(inviteFromUrl && accountExists && !showExistingLogin) && (
+          {!(precommercial && !inviteFromUrl) && !(inviteFromUrl && accountExists && isLogin && !showExistingLogin) && (
           <p className="mt-6 text-center text-sm text-gray-500">
             {isLogin ? tr('auth.noAccount') : tr('auth.hasAccount')}{' '}
             <button onClick={() => { setIsLogin(!isLogin); setError(''); }} className="text-teal-600 font-medium hover:underline">

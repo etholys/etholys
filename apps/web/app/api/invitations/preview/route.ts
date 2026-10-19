@@ -24,16 +24,17 @@ export async function GET(req: Request) {
     if (!invitation) return NextResponse.json({ status: 'invalid' });
 
     const expired = Boolean(invitation.expiresAt && new Date() > invitation.expiresAt);
-    if (expired && invitation.status === 'pending') {
+    if (expired) {
       return NextResponse.json({
         status: 'expired',
         companyName: invitation.company?.name ?? null,
+        email: invitation.email,
       });
     }
 
     const existing = await prisma.user.findUnique({
       where: { email: invitation.email },
-      select: { id: true },
+      select: { id: true, password: true },
     });
 
     const status =
@@ -46,6 +47,7 @@ export async function GET(req: Request) {
       companyName: invitation.company?.name ?? null,
       email: invitation.email,
       hasAccount: Boolean(existing),
+      needsPassword: !existing?.password,
       inviterName: invitation.inviter?.name ?? null,
     });
   } catch (error: unknown) {

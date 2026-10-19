@@ -22,7 +22,8 @@ export async function POST(req: Request) {
     let resetUrl: string | null = null;
     let emailSent = false;
 
-    if (user?.isActive && user.password) {
+    // Password vazia (default do schema) também precisa de poder definir senha.
+    if (user?.isActive) {
       const token = newPasswordResetToken();
       const expires = new Date(Date.now() + 60 * 60 * 1000);
 
