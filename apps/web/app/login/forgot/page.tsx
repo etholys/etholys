@@ -1,13 +1,23 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { ArrowLeft, Mail } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { useApp } from '@/app/providers';
 
 export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+      <ForgotPasswordForm />
+    </Suspense>
+  );
+}
+
+function ForgotPasswordForm() {
   const { locale } = useApp();
-  const [email, setEmail] = useState('');
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState(searchParams.get('email') || '');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [resetUrl, setResetUrl] = useState<string | null>(null);

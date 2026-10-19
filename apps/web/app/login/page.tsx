@@ -32,6 +32,8 @@ function LoginContent() {
   const [inviteLoading, setInviteLoading] = useState(Boolean(inviteFromUrl));
   const [inviteCompany, setInviteCompany] = useState('');
   const [emailLocked, setEmailLocked] = useState(false);
+  const [accountExists, setAccountExists] = useState(false);
+  const [showExistingLogin, setShowExistingLogin] = useState(false);
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [form, setForm] = useState({
@@ -85,6 +87,8 @@ function LoginContent() {
           );
           return;
         }
+        setAccountExists(Boolean(data.hasAccount));
+        setShowExistingLogin(false);
         if (data.status === 'pending' && !data.hasAccount) {
           setIsLogin(false);
           setSuccess(
@@ -98,17 +102,11 @@ function LoginContent() {
         }
         setIsLogin(true);
         setSuccess(
-          data.status === 'accepted'
-            ? locale === 'es'
-              ? 'Esta invitación ya fue aceptada. Entra con tu contraseña.'
-              : locale === 'pt'
-                ? 'Este convite já foi aceite. Entre com a sua senha.'
-                : 'This invitation was already accepted. Sign in with your password.'
-            : locale === 'es'
-              ? 'Ya tienes cuenta Etholys. Entra con tu contraseña y el acceso se aplicará.'
-              : locale === 'pt'
-                ? 'Já tem conta Etholys. Entre com a sua senha e o acesso será aplicado.'
-                : 'You already have an Etholys account. Sign in and access will be applied.',
+          locale === 'es'
+            ? 'Este correo ya tiene cuenta. El convite no trae contraseña: crea una nueva para entrar.'
+            : locale === 'pt'
+              ? 'Este e-mail já tem conta. O convite não traz senha: crie uma nova para entrar.'
+              : 'This email already has an account. The invite has no password: create a new one to sign in.',
         );
       })
       .catch(() => {
@@ -362,7 +360,13 @@ function LoginContent() {
           </div>
 
           <h3 className="text-2xl font-bold text-gray-900 mb-1">
-            {inviteFromUrl && !isLogin
+            {inviteFromUrl && accountExists && !showExistingLogin
+              ? locale === 'es'
+                ? 'Ya tienes cuenta'
+                : locale === 'pt'
+                  ? 'Já tem conta'
+                  : 'You already have an account'
+              : inviteFromUrl && !isLogin
               ? locale === 'es'
                 ? 'Acepta la invitación'
                 : locale === 'pt'
@@ -373,7 +377,13 @@ function LoginContent() {
                 : tr('auth.signup')}
           </h3>
           <p className="text-gray-500 mb-6">
-            {inviteFromUrl && !isLogin
+            {inviteFromUrl && accountExists && !showExistingLogin
+              ? locale === 'es'
+                ? 'El convite no incluye contraseña. Crea una nueva con el correo de abajo.'
+                : locale === 'pt'
+                  ? 'O convite não inclui senha. Crie uma nova com o e-mail abaixo.'
+                  : 'The invite does not include a password. Create a new one with the email below.'
+              : inviteFromUrl && !isLogin
               ? locale === 'es'
                 ? inviteCompany
                   ? `Crea tu acceso a ${inviteCompany}.`
@@ -404,10 +414,31 @@ function LoginContent() {
               {locale === 'es' ? 'Comprobando la invitación…' : locale === 'pt' ? 'A verificar o convite…' : 'Checking the invitation…'}
             </div>
           )}
+          {inviteFromUrl && accountExists && !showExistingLogin && !inviteLoading && (
+            <div className="mb-4 space-y-3">
+              <p className="text-sm text-slate-600">
+                {form.email}
+              </p>
+              <Link
+                href={`/login/forgot?email=${encodeURIComponent(form.email)}`}
+                className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition"
+              >
+                {locale === 'es' ? 'Crear nueva contraseña' : locale === 'pt' ? 'Criar nova senha' : 'Create a new password'}
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowExistingLogin(true)}
+                className="w-full text-sm text-teal-700 hover:underline"
+              >
+                {locale === 'es' ? 'Ya recuerdo mi contraseña' : locale === 'pt' ? 'Já me lembro da senha' : 'I remember my password'}
+              </button>
+            </div>
+          )}
           {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
           {success && <div className="mb-4 p-3 bg-emerald-50 text-emerald-700 rounded-lg text-sm">{success}</div>}
 
           {/* Google Sign-In */}
+          {!(inviteFromUrl && accountExists && !showExistingLogin) && (
           <button
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
@@ -537,8 +568,9 @@ function LoginContent() {
               )}
             </button>
           </form>
+          )}
 
-          {!(precommercial && !inviteFromUrl) && (
+          {!(precommercial && !inviteFromUrl) && !(inviteFromUrl && accountExists && !showExistingLogin) && (
           <p className="mt-6 text-center text-sm text-gray-500">
             {isLogin ? tr('auth.noAccount') : tr('auth.hasAccount')}{' '}
             <button onClick={() => { setIsLogin(!isLogin); setError(''); }} className="text-teal-600 font-medium hover:underline">
