@@ -439,6 +439,7 @@ function LoginContent() {
 
           {/* Google Sign-In */}
           {!(inviteFromUrl && accountExists && !showExistingLogin) && (
+          <>
           <button
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
@@ -568,6 +569,7 @@ function LoginContent() {
               )}
             </button>
           </form>
+          </>
           )}
 
           {!(precommercial && !inviteFromUrl) && !(inviteFromUrl && accountExists && !showExistingLogin) && (
