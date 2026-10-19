@@ -17,7 +17,7 @@ Nomes anteriores (NIDO / RUMO / PULSO) redirecionam para estas rotas.
 
 Fluxo alvo (contínuo): diagnóstico inicial → documento/raio-x (`composeRadiographyFromDiagnostic`) → validação técnico↔IA (`/api/business-dossier/flow`) → rota de intervenção (atividades = `BusinessBet`) + chat do técnico → vista do atendido em `/hub/aurora/avance` (só raio-x, rota e avanço).
 
-UI do técnico: `/hub/aurora/diagnostico` = `AuroraJourneyWorkspace` com rail Diagnóstico → Radiografía → Validar → Ruta → En curso. Na rota: mudar estado das atividades, chat com IA (pode sugerir status/novas apostas), nota semanal. Mutações do fluxo (`POST /api/business-dossier/flow`) só pela **operadora** do contrato AT — o negócio atendido não edita. Vista do atendido: `/hub/aurora/avance` — se a empresa ativa do Hub **é** o negócio atendido (não opera AT), o shell AURORA fica limpo (só «Mi avance»), sem seletor de negócio nem menu de técnico.
+UI do técnico: `/hub/aurora/diagnostico` = `AuroraJourneyWorkspace` com rail Diagnóstico → Radiografía → Validar → Ruta → En curso. O **Acompanhamento** é o caminho principal; o dossiê legado fica fora do menu. Na rota: plano de melhoria com atalhos a RADAR/FORGE/FundHub/Campo, atividades, chat e nota semanal. Em «En curso» o técnico passa a Campo. Mutações do fluxo (`POST /api/business-dossier/flow`) só pela **operadora** do contrato AT — o negócio atendido não edita. Vista do atendido: `/hub/aurora/avance` — se a empresa ativa do Hub **é** o negócio atendido (não opera AT), o shell AURORA fica limpo (só «Mi avance»), sem seletor de negócio nem menu de técnico.
 
 ## Carteira e técnicos
 

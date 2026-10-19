@@ -25,7 +25,12 @@ import {
 } from '@/lib/aurora-flow';
 import { AuroraFlowRail } from '@/components/etholys/AuroraFlowRail';
 import { recentRevenueYears, scriptStep } from '@/lib/aurora-script';
-import { auroraPlanOfferLabel, type AuroraPlanAction } from '@/lib/aurora-plan';
+import {
+  auroraPlanOfferHref,
+  auroraPlanOfferLabel,
+  auroraPlanStatusLabel,
+  type AuroraPlanAction,
+} from '@/lib/aurora-plan';
 
 function levelTone(level: AuroraMaturity | null | undefined) {
   if (!level) return 'bg-slate-100 text-slate-500 border-slate-200';
@@ -402,6 +407,14 @@ export function AuroraJourneyWorkspace() {
               {progress.done} {t.of} {progress.total} {t.done}
             </p>
             <div className="mt-1 flex flex-wrap justify-end gap-3">
+              {(uiPhase === 'route' || uiPhase === 'live') && companyId && engagementId ? (
+                <Link
+                  href={`/hub/aurora/campo?${new URLSearchParams({ company: companyId, engagement: engagementId })}`}
+                  className="font-medium text-amber-900 hover:underline"
+                >
+                  {loc === 'es' ? 'Ir a Campo' : loc === 'en' ? 'Go to Field' : 'Ir a Campo'}
+                </Link>
+              ) : null}
               <Link href={avanceHref} className="text-amber-900 hover:underline">
                 {t.avance}
               </Link>
@@ -739,6 +752,8 @@ export function AuroraJourneyWorkspace() {
                 plan={plan}
                 loc={loc}
                 busy={busy}
+                companyId={companyId}
+                engagementId={engagementId}
                 onGenerate={() => void flowPost({ action: 'generatePlan' })}
                 onPatch={(id, patch) => void flowPost({ action: 'updatePlan', id, ...patch })}
               />
@@ -981,12 +996,16 @@ function PlanPanel({
   plan,
   loc,
   busy,
+  companyId,
+  engagementId,
   onGenerate,
   onPatch,
 }: {
   plan: AuroraPlanAction[];
   loc: 'pt' | 'es' | 'en';
   busy: boolean;
+  companyId: string;
+  engagementId: string;
   onGenerate: () => void;
   onPatch: (id: string, patch: Record<string, unknown>) => void;
 }) {
@@ -1035,7 +1054,15 @@ function PlanPanel({
                     className="ml-1 w-24 rounded-lg border px-2 py-1"
                   />
                 </label>
-                <span className="text-xs uppercase text-slate-400">{row.status}</span>
+                <span className="text-xs text-slate-500">{auroraPlanStatusLabel(row.status, loc)}</span>
+                {auroraPlanOfferHref(row.offer, companyId, engagementId) ? (
+                  <Link
+                    href={auroraPlanOfferHref(row.offer, companyId, engagementId)!}
+                    className="text-xs font-medium text-amber-900 underline"
+                  >
+                    {loc === 'es' ? 'Abrir' : loc === 'en' ? 'Open' : 'Abrir'} {auroraPlanOfferLabel(row.offer, loc)}
+                  </Link>
+                ) : null}
               </div>
               <div className="flex flex-wrap gap-1">
                 {row.status !== 'reviewed' ? (

@@ -172,6 +172,7 @@ export function AuroraAttendedProvider({ children }: { children: ReactNode }) {
       setSelectionState(ref);
       const onTool =
         pathname?.startsWith('/hub/aurora/diagnostico') ||
+        pathname?.startsWith('/hub/aurora/campo') ||
         pathname?.startsWith('/hub/aurora/dossie') ||
         pathname?.startsWith('/hub/aurora/avance');
       if (onTool) {
@@ -179,7 +180,9 @@ export function AuroraAttendedProvider({ children }: { children: ReactNode }) {
           router.push('/hub/aurora');
           return;
         }
-        if (pathname.startsWith('/hub/aurora/dossie')) {
+        if (pathname.startsWith('/hub/aurora/campo')) {
+          router.replace(auroraToolHref('/hub/aurora/campo', ref));
+        } else if (pathname.startsWith('/hub/aurora/dossie')) {
           router.replace(auroraToolHref('/hub/aurora/dossie', ref));
         } else if (pathname.startsWith('/hub/aurora/avance')) {
           const q = new URLSearchParams({ company: ref.companyId, engagement: ref.engagementId });

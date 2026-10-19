@@ -20,6 +20,7 @@ import { draftAuroraPlan } from '../../lib/aurora-plan';
 import { territorialEligibility, carbonTonnesTo2030, corridorGroups } from '../../lib/aurora-territory';
 import { ringsOverlap } from '../../lib/aurora-intersect';
 import { crossOfficialLayers, ringsFromGeoJson } from '../../lib/aurora-official';
+import { auroraPlanOfferHref, auroraPlanOfferLabel } from '../../lib/aurora-plan';
 import { parseShpPolygons } from '../../lib/aurora-shp';
 import {
   applyDiagTurn,
@@ -367,6 +368,14 @@ test('AURORA finance script asks for revenue years and then how cash is controll
   assert.equal(turn.level, 3);
   assert.match(turn.situation, /2024: 12000/);
   assert.equal(turn.facts.makes_money, 'yes');
+});
+
+test('AURORA plan offers link to RADAR, FORGE, FundHub and Campo', () => {
+  assert.match(auroraPlanOfferHref('radar', 'c1', 'e1') || '', /\/hub\/radar/);
+  assert.equal(auroraPlanOfferHref('forge', 'c1', 'e1'), '/hub/forge');
+  assert.equal(auroraPlanOfferHref('fundhub', 'c1', 'e1'), '/hub/fundhub');
+  assert.match(auroraPlanOfferHref('practice', 'c1', 'e1') || '', /\/hub\/aurora\/campo/);
+  assert.equal(auroraPlanOfferLabel('radar', 'pt'), 'RADAR');
 });
 
 test('AURORA people script accepts a one-digit headcount', () => {

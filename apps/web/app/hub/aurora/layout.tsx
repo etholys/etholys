@@ -18,7 +18,6 @@ function AuroraShellInner({ children }: { children: ReactNode }) {
   const router = useRouter();
   const {
     diagnosticHref,
-    dossierHref,
     avanceHref,
     hasSelection,
     isAttendedViewer,
@@ -51,11 +50,6 @@ function AuroraShellInner({ children }: { children: ReactNode }) {
       label: es ? 'Avance' : en ? 'Progress' : 'Avanço',
       requiresAttended: true,
     },
-    {
-      href: '/hub/aurora/dossie',
-      label: es ? 'Dossier' : en ? 'Dossier' : 'Dossiê',
-      requiresAttended: true,
-    },
     { href: '/hub/aurora/programas', label: es ? 'Programas' : en ? 'Programs' : 'Programas' },
     { href: '/hub/aurora/contratos', label: es ? 'Contratos' : en ? 'Contracts' : 'Contratos' },
   ];
@@ -77,15 +71,12 @@ function AuroraShellInner({ children }: { children: ReactNode }) {
       if (item.href === '/hub/aurora/diagnostico' || item.href === '/hub/aurora/campo') {
         return hasSelection ? diagnosticHref.replace('/hub/aurora/diagnostico', item.href) : '/hub/aurora?pick=1';
       }
-      if (item.href === '/hub/aurora/dossie') {
-        return hasSelection ? dossierHref : '/hub/aurora?pick=1';
-      }
       if (item.href === '/hub/aurora/avance') {
         return hasSelection ? avanceHref : '/hub/aurora?pick=1';
       }
       return item.href;
     },
-    [isAttendedViewer, hasSelection, avanceHref, diagnosticHref, dossierHref],
+    [isAttendedViewer, hasSelection, avanceHref, diagnosticHref],
   );
 
   return (

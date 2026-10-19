@@ -219,14 +219,20 @@ export async function validateAuroraRadiography(opts: {
   };
 
   const phase: AuroraFlowPhase = opts.accept ? 'route' : 'validate';
+  const plan = opts.accept
+    ? mergeAuroraPlan(bundle.plan, draftAuroraPlan(bundle.diagnostic, opts.locale))
+    : null;
   await upsertDossier(opts.companyId, opts.userId, {
     hypothesisAccepted: opts.accept,
     hypothesis: bundle.radiography.hypothesis,
     portraitText: bundle.radiography.body,
-    interviewJson: auroraFlowPatch({
-      flow: { phase, updatedAt: new Date().toISOString() },
-      validation,
-    }),
+    interviewJson: {
+      ...auroraFlowPatch({
+        flow: { phase, updatedAt: new Date().toISOString() },
+        validation,
+      }),
+      ...(plan ? auroraPlanPatch(plan) : {}),
+    },
   });
 
   return loadAuroraFlowBundle(opts.companyId);

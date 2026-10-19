@@ -275,3 +275,32 @@ export function auroraPlanOfferLabel(offer: AuroraPlanOffer, locale: AuroraLocal
   const row = map[offer];
   return t(locale, row.pt, row.es, row.en);
 }
+
+export function auroraPlanStatusLabel(status: AuroraPlanStatus, locale: AuroraLocale): string {
+  const map: Record<AuroraPlanStatus, L3> = {
+    proposed: { pt: 'Proposto', es: 'Propuesto', en: 'Proposed' },
+    adjusted: { pt: 'Ajustado', es: 'Ajustado', en: 'Adjusted' },
+    reviewed: { pt: 'Revisto', es: 'Revisado', en: 'Reviewed' },
+    bought: { pt: 'Comprado', es: 'Comprado', en: 'Bought' },
+    dropped: { pt: 'Retirado', es: 'Quitado', en: 'Dropped' },
+  };
+  const row = map[status];
+  return t(locale, row.pt, row.es, row.en);
+}
+
+/** Liga a oferta do plano à ferramenta Etholys correspondente. */
+export function auroraPlanOfferHref(
+  offer: AuroraPlanOffer,
+  companyId: string,
+  engagementId: string,
+): string | null {
+  const q = new URLSearchParams({ company: companyId });
+  if (engagementId) q.set('engagement', engagementId);
+  if (offer === 'radar') return `/hub/radar?${q}`;
+  if (offer === 'forge') return `/hub/forge`;
+  if (offer === 'fundhub') return `/hub/fundhub`;
+  if (offer === 'practice' || offer === 'purchase') {
+    return `/hub/aurora/campo?${q}`;
+  }
+  return null;
+}

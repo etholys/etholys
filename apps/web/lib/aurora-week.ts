@@ -39,18 +39,18 @@ export function auroraNextAction(item: AuroraPortfolioItem, locale: AuroraLocale
   }
   if (item.stage === 'talk') {
     if (!item.diagnosticComplete && (item.diagnosticDone ?? 0) === 0) {
-      if (locale === 'es') return 'Abrir el diagnóstico por áreas';
-      if (locale === 'en') return 'Open the area diagnostic';
-      return 'Abrir o diagnóstico por áreas';
+      if (locale === 'es') return 'Abrir el acompañamiento y el diagnóstico por áreas';
+      if (locale === 'en') return 'Open accompaniment and the area diagnostic';
+      return 'Abrir o acompanhamento e o diagnóstico por áreas';
     }
-    if (locale === 'es') return 'Seguir el diagnóstico o profundizar en el dossier';
-    if (locale === 'en') return 'Continue the diagnostic or go deeper in the dossier';
-    return 'Seguir o diagnóstico ou aprofundar no dossiê';
+    if (locale === 'es') return 'Seguir el diagnóstico en Acompañamiento';
+    if (locale === 'en') return 'Continue the diagnostic in Accompaniment';
+    return 'Seguir o diagnóstico no Acompanhamento';
   }
   if (item.stage === 'portrait') {
-    if (locale === 'es') return 'Corregir el retrato y aceptar la hipótesis';
-    if (locale === 'en') return 'Correct the portrait and accept the hypothesis';
-    return 'Corrigir o retrato e aceitar a hipótese';
+    if (locale === 'es') return 'Revisar la radiografía y validarla con la empresa';
+    if (locale === 'en') return 'Review the radiography and validate it with the business';
+    return 'Rever a radiografia e validá-la com a empresa';
   }
   if (item.stage === 'bets') {
     const need = Math.max(0, 2 - item.openBetCount);

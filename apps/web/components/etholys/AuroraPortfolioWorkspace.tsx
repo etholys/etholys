@@ -33,6 +33,11 @@ function dossierHref(row: AuroraPortfolioItem) {
   return `/hub/aurora/dossie?${q}`;
 }
 
+function campoHref(row: AuroraPortfolioItem) {
+  const q = new URLSearchParams({ company: row.companyId, engagement: row.engagementId });
+  return `/hub/aurora/campo?${q}`;
+}
+
 function avanceHref(row: AuroraPortfolioItem) {
   const q = new URLSearchParams({ company: row.companyId, engagement: row.engagementId });
   return `/hub/aurora/avance?${q}`;
@@ -94,8 +99,10 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
           contracts: 'Contratos AT',
           invite: 'Invitar técnicos',
           techAll: 'Todos los técnicos',
-          pickBanner: 'Elegí un negocio de la cartera para abrir Diagnóstico o Dossier.',
-          open: 'Abrir dossier',
+          pickBanner: 'Elegí un negocio de la cartera para abrir el acompañamiento.',
+          open: 'Legado',
+          accompany: 'Acompañar',
+          field: 'Campo',
           talkNow: 'Empezar conversación',
           diagnose: 'Diagnóstico',
           avance: 'Avance',
@@ -143,8 +150,10 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
             contracts: 'AT contracts',
             invite: 'Invite technicians',
             techAll: 'All technicians',
-            pickBanner: 'Pick a business from the portfolio to open Diagnostic or Dossier.',
-            open: 'Open dossier',
+            pickBanner: 'Pick a business from the portfolio to open accompaniment.',
+            open: 'Legacy',
+            accompany: 'Accompany',
+            field: 'Field',
             talkNow: 'Start conversation',
             diagnose: 'Diagnostic',
             avance: 'Progress',
@@ -191,8 +200,10 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
             contracts: 'Contratos AT',
             invite: 'Convidar técnicos',
             techAll: 'Todos os técnicos',
-            pickBanner: 'Escolhe um negócio da carteira para abrir Diagnóstico ou Dossiê.',
-            open: 'Abrir dossiê',
+            pickBanner: 'Escolhe um negócio da carteira para abrir o acompanhamento.',
+            open: 'Legado',
+            accompany: 'Acompanhar',
+            field: 'Campo',
             talkNow: 'Começar conversa',
             diagnose: 'Diagnóstico',
             avance: 'Avanço',
@@ -434,17 +445,17 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
             onClick={() => remember(row)}
             className="ml-auto font-medium text-amber-900 hover:underline"
           >
-            {copy.diagnose}
+            {copy.accompany}
             {typeof row.diagnosticDone === 'number'
               ? ` ${row.diagnosticDone}/${row.diagnosticTotal || 6}`
               : ''}
           </Link>
           <Link
-            href={dossierHref(row)}
+            href={campoHref(row)}
             onClick={() => remember(row)}
-            className="font-medium text-slate-600 hover:underline"
+            className="font-medium text-amber-900 hover:underline"
           >
-            {copy.open}
+            {copy.field}
           </Link>
           <Link
             href={avanceHref(row)}
@@ -452,6 +463,13 @@ export function AuroraPortfolioWorkspace({ initialView = 'week' }: { initialView
             className="font-medium text-slate-500 hover:underline"
           >
             {copy.avance}
+          </Link>
+          <Link
+            href={dossierHref(row)}
+            onClick={() => remember(row)}
+            className="font-medium text-slate-400 hover:underline"
+          >
+            {copy.open}
           </Link>
         </div>
         {opts?.log ? (

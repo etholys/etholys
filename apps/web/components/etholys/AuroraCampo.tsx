@@ -239,8 +239,30 @@ function CampoInner() {
         <p className="text-sm font-medium text-amber-950">
           {mode === 'project' ? `${copy.project}${projectName ? ` · ${projectName}` : ''}` : copy.permanent}
         </p>
+        <div className="flex flex-wrap gap-3 text-sm">
+          <Link href={`/hub/radar?company=${encodeURIComponent(companyId)}`} className="font-medium text-amber-900 underline">
+            {loc === 'es' ? 'Abrir RADAR' : loc === 'en' ? 'Open RADAR' : 'Abrir RADAR'}
+          </Link>
+          {propertyId ? (
+            <Link href={`/hub/radar?company=${encodeURIComponent(companyId)}`} className="text-slate-600 underline">
+              {loc === 'es' ? 'Ver finca en el mapa' : loc === 'en' ? 'See farm on the map' : 'Ver finca no mapa'}
+            </Link>
+          ) : null}
+        </div>
       </header>
       {err ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{err}</p> : null}
+      {!properties.length ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          {loc === 'es'
+            ? 'Todavía no hay finca. Configurala en RADAR y vuelve a registrar la visita.'
+            : loc === 'en'
+              ? 'There is no farm yet. Set it up in RADAR, then come back to log the visit.'
+              : 'Ainda não há finca. Configura-a no RADAR e volta a registar a visita.'}{' '}
+          <Link href={`/hub/radar?company=${encodeURIComponent(companyId)}`} className="font-medium underline">
+            RADAR
+          </Link>
+        </p>
+      ) : null}
       <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
         <label className="block text-xs font-semibold uppercase text-slate-400">{copy.property}</label>
         <select value={propertyId} onChange={(e) => setPropertyId(e.target.value)} className="w-full rounded-lg border px-2 py-1.5 text-sm">

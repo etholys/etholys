@@ -10,6 +10,7 @@ import {
   auroraFlowPhaseLabels,
   type AuroraFlowPhase,
 } from '@/lib/aurora-flow';
+import { auroraPlanOfferLabel, type AuroraPlanOffer } from '@/lib/aurora-plan';
 import { useAuroraAttendedOptional } from '@/components/etholys/AuroraAttendedContext';
 
 type AttendedPayload = {
@@ -243,7 +244,7 @@ export function AuroraAttendedHome() {
                 <p className="font-medium text-slate-900">{row.title}</p>
                 {row.detail ? <p className="mt-1 text-sm text-slate-600">{row.detail}</p> : null}
                 <p className="mt-1 text-xs text-slate-500">
-                  {row.offer}
+                  {auroraPlanOfferLabel(row.offer as AuroraPlanOffer, loc)}
                   {row.approxCost != null ? ` · ${row.approxCost} ${row.currency}` : ''}
                   {row.status === 'bought' ? (loc === 'en' ? ' · bought' : loc === 'es' ? ' · comprado' : ' · comprado') : ''}
                 </p>
