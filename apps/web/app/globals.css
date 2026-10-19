@@ -1731,3 +1731,51 @@ html[data-appearance='light'] .etholys-etask .text-rose-200 {
   color: #be123c !important;
 }
 
+/* eCalendar — fora do remap da sidebar (aside .bg-white → #0c1822 com texto escuro). */
+.ecalendar {
+  --ec-bg: #ffffff;
+  --ec-ink: #0f172a;
+  --ec-muted: #334155;
+  --ec-faint: #475569;
+  --ec-line: rgba(15, 23, 42, 0.14);
+  --ec-soft: #f1f5f9;
+  --ec-primary: #1a73e8;
+  --ec-on-primary: #ffffff;
+  background: var(--ec-bg);
+  color: var(--ec-ink);
+}
+html:not([data-appearance='light']) .ecalendar {
+  --ec-bg: #0b1520;
+  --ec-ink: #f8fafc;
+  --ec-muted: #e2e8f0;
+  --ec-faint: #cbd5e1;
+  --ec-line: rgba(255, 255, 255, 0.16);
+  --ec-soft: rgba(255, 255, 255, 0.06);
+  --ec-primary: #8ab4f8;
+  --ec-on-primary: #0b1520;
+}
+.etholys-system .ecalendar,
+.etholys-system .ecalendar aside,
+.etholys-system .ecalendar .ec-surface {
+  background-color: var(--ec-bg) !important;
+  color: var(--ec-ink) !important;
+}
+.etholys-system .ecalendar .ec-muted { color: var(--ec-muted) !important; }
+.etholys-system .ecalendar .ec-faint { color: var(--ec-faint) !important; }
+.etholys-system .ecalendar .ec-line { border-color: var(--ec-line) !important; }
+.etholys-system .ecalendar .ec-soft { background-color: var(--ec-soft) !important; }
+.etholys-system .ecalendar .ec-primary {
+  background-color: var(--ec-primary) !important;
+  color: var(--ec-on-primary) !important;
+}
+.etholys-system .ecalendar input,
+.etholys-system .ecalendar textarea {
+  background-color: var(--ec-bg) !important;
+  color: var(--ec-ink) !important;
+  border-color: var(--ec-line) !important;
+}
+.etholys-system .ecalendar input::placeholder,
+.etholys-system .ecalendar textarea::placeholder {
+  color: var(--ec-faint) !important;
+}
+

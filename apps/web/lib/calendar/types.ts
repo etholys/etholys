@@ -21,6 +21,7 @@ export type CalendarFeedEvent = {
   href: string | null;
   projectId: string | null;
   editable: boolean;
+  description?: string | null;
 };
 
 export const SOURCE_COLORS: Record<CalendarSource, string> = {

@@ -79,7 +79,7 @@ export async function loadCalendarFeed(companyId: string, from: Date, to: Date) 
         startsAt: { lt: to },
         OR: [{ endsAt: { gte: from } }, { endsAt: null, startsAt: { gte: from } }],
       },
-      select: { id: true, title: true, startsAt: true, endsAt: true, allDay: true },
+      select: { id: true, title: true, description: true, startsAt: true, endsAt: true, allDay: true },
       take: 400,
     }),
   ]);
@@ -99,6 +99,7 @@ export async function loadCalendarFeed(companyId: string, from: Date, to: Date) 
       href: null,
       projectId: null,
       editable: true,
+      description: ev.description,
     });
   }
 

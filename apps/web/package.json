@@ -19,6 +19,7 @@
     "seed:rikolto": "tsx --require dotenv/config scripts/seed-rikolto-pilot.ts",
     "preview:mail": "tsx scripts/preview-etholys-mail.ts",
     "test:unit": "tsx --test tests/forge/libro-ocr.test.ts tests/forge/invite-token.test.ts",
+    "test:calendar": "tsx --test tests/calendar-visibility.test.ts",
     "test:expedicion-v2": "tsx --test tests/forge/expedicion-v2*.test.ts tests/forge/feria-*.test.ts",
     "test:e2e:expedicion-v2": "playwright test e2e/expedicion-v2-sala.spec.ts",
     "verify:expedicion-v2": "tsx scripts/verify-expedicion-v2.ts",

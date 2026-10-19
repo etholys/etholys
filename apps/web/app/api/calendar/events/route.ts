@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { loadCalendarFeed } from '@/lib/calendar/feed';
+import { parseCalendarWrite } from '@/lib/calendar/payload';
 import { prisma } from '@/lib/prisma';
 
 function parseRange(searchParams: URLSearchParams) {
@@ -39,38 +40,18 @@ export async function POST(req: Request) {
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const body = (await req.json()) as {
-      companyId?: string;
-      title?: string;
-      description?: string;
-      startsAt?: string;
-      endsAt?: string | null;
-      allDay?: boolean;
-    };
-    const companyId = body.companyId?.trim();
-    const title = body.title?.trim();
-    const startsAt = new Date(body.startsAt || '');
+    const parsed = parseCalendarWrite(await req.json(), { companyRequired: true });
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+    const companyId = parsed.companyId;
     if (!companyId || !tenant.companyIds.includes(companyId)) {
       return NextResponse.json({ error: 'companyId inválido' }, { status: 400 });
-    }
-    if (!title) return NextResponse.json({ error: 'title requerido' }, { status: 400 });
-    if (!Number.isFinite(startsAt.getTime())) {
-      return NextResponse.json({ error: 'startsAt inválido' }, { status: 400 });
-    }
-    const endsAt = body.endsAt ? new Date(body.endsAt) : null;
-    if (endsAt && !Number.isFinite(endsAt.getTime())) {
-      return NextResponse.json({ error: 'endsAt inválido' }, { status: 400 });
     }
 
     const created = await prisma.calendarEvent.create({
       data: {
         companyId,
         createdById: tenant.userId,
-        title: title.slice(0, 200),
-        description: body.description?.trim()?.slice(0, 2000) || null,
-        startsAt,
-        endsAt,
-        allDay: Boolean(body.allDay),
+        ...parsed.data,
       },
     });
     return NextResponse.json({ id: created.id });
