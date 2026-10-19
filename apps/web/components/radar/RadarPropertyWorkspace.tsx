@@ -1,12 +1,12 @@
-'use client';
+﻿'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Radio, Sprout } from 'lucide-react';
+import { ArrowLeft, Loader2, Radio, Search, Sprout } from 'lucide-react';
 import { RADAR_MODULES, type RadarModuleId } from '@/lib/etholys-products';
 import { isRadarModuleId, spaceKindMeta } from '@/lib/radar/space';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
-import { PROPERTY_STEP_COPY, type PropertyStepId, type PropertyStepState } from '@/lib/radar/property-progress';
+import { type PropertyStepId, type PropertyStepState } from '@/lib/radar/property-progress';
 import { RadarGeoPin } from '@/components/radar/RadarGeoPin';
 import { RadarSiteMap } from '@/components/radar/RadarSiteMap';
 import { RadarSpatialTwin } from '@/components/radar/RadarSpatialTwin';
@@ -71,7 +71,6 @@ export function RadarPropertyWorkspace({
 }) {
   const loc = radarLoc(locale);
   const [data, setData] = useState<PropertyDetail | null>(null);
-  const [step, setStep] = useState<PropertyStepId>('characterize');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -86,10 +85,13 @@ export function RadarPropertyWorkspace({
   const [sensorSku, setSensorSku] = useState('SE01-LB');
   const [devEui, setDevEui] = useState('');
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [addingParcel, setAddingParcel] = useState(false);
   const [panel, setPanel] = useState<PropertyStepId | null>(null);
   const [tool, setTool] = useState<'crops' | 'space' | null>(null);
   const [openLot, setOpenLot] = useState<{ code: string; currentStage: TraceStage } | null>(null);
+  const [view, setView] = useState<'2d' | '3d'>('2d');
+  const [query, setQuery] = useState('');
+  const [railOpen, setRailOpen] = useState(false);
+  const frameRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     if (!companyId || !propertyId) return;
@@ -108,7 +110,6 @@ export function RadarPropertyWorkspace({
       setModuleId(p.moduleId && isRadarModuleId(p.moduleId) ? p.moduleId : null);
       setCrop(p.crop || '');
       setArea(p.areaHa != null ? String(p.areaHa) : '');
-      setStep((prev) => (p.steps.some((s) => s.id === prev) ? prev : p.nextStep));
       const prefer =
         (initialUnitId && p.units.some((u) => u.id === initialUnitId) && initialUnitId) ||
         p.units[0]?.id ||
@@ -125,6 +126,29 @@ export function RadarPropertyWorkspace({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const el = frameRef.current;
+    const main = el?.closest('main');
+    if (!el || !main) return;
+    const apply = () => {
+      const r = main.getBoundingClientRect();
+      el.style.position = 'fixed';
+      el.style.top = `${r.top}px`;
+      el.style.left = `${r.left}px`;
+      el.style.width = `${r.width}px`;
+      el.style.height = `${r.height}px`;
+      el.style.zIndex = '25';
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(main);
+    window.addEventListener('resize', apply);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', apply);
+    };
+  }, [data?.id]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -178,8 +202,6 @@ export function RadarPropertyWorkspace({
     return <p className="text-sm text-rose-200">{err || '—'}</p>;
   }
 
-  const characterized = data.steps.find((s) => s.id === 'characterize')?.done;
-  const kindMeta = spaceKindMeta(data.moduleId);
   const mapParcels = data.units
     .filter((u) => u.kind === 'parcel' || u.kind === 'lot' || u.kind === 'herd' || u.kind === 'generic')
     .map((u) => {
@@ -204,9 +226,14 @@ export function RadarPropertyWorkspace({
     : `company=${companyId}`;
   const chainHref = `/hub/radar/cadeia?${companyQ}`;
   const openStep = (id: PropertyStepId) => {
+    if (id === 'draw') {
+      setTool('space');
+      setPanel(null);
+      return;
+    }
     setPanel((cur) => (cur === id ? null : id));
-    setStep(id);
-    if (id !== 'draw') setTool(null);
+    setTool(null);
+    if (id === 'geolocate') setView('2d');
   };
   const nextLabel: Record<PropertyStepId, string> = {
     characterize: radarT(loc, 'Falta caracterizar o sítio', 'Falta caracterizar el sitio', 'Characterize this site'),
@@ -221,430 +248,427 @@ export function RadarPropertyWorkspace({
     sensors: radarT(loc, 'Ligar sensores', 'Conectar sensores', 'Connect sensors'),
   };
   const actionBtn = (on: boolean) =>
-    `rounded-lg px-3.5 py-2 text-sm font-semibold shadow-sm ${
-      on ? 'bg-emerald-400 text-slate-950' : 'bg-white text-slate-900 hover:bg-emerald-50'
+    `rounded-full px-3.5 py-2 text-sm font-semibold shadow-md backdrop-blur ${
+      on ? 'bg-teal-300 text-slate-950' : 'bg-[#07111A]/92 text-white ring-1 ring-white/15 hover:bg-[#12343c]'
     }`;
 
+  const q = query.trim().toLowerCase();
+  const treeUnits = q
+    ? data.units.filter((u) => u.name.toLowerCase().includes(q) || (u.crop || '').toLowerCase().includes(q))
+    : data.units;
+  const cardOpen = Boolean(panel || tool);
+
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <Link href={backHref} className="inline-flex items-center gap-1.5 text-xs text-white/45 hover:text-white/70">
-            <ArrowLeft className="h-3.5 w-3.5" />
-            {radarT(loc, 'Lugares', 'Lugares', 'Places')}
-          </Link>
-          <h1 className="mt-1 font-serif text-3xl text-white sm:text-4xl">{data.name}</h1>
-          {data.clientName && <p className="mt-0.5 text-sm text-white/45">{data.clientName}</p>}
-        </div>
-        {!next && (
-          <button type="button" onClick={() => openStep('characterize')} className={actionBtn(panel === 'characterize')}>
-            {radarT(loc, 'Ficha', 'Ficha', 'File')}
-          </button>
-        )}
-      </div>
-
-      {err && <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">{err}</p>}
-
-      {next && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-50 px-4 py-3 text-amber-950">
-          <p className="text-sm font-semibold">{nextLabel[next.id]}</p>
-          <button
-            type="button"
-            onClick={() => openStep(next.id)}
-            className="rounded-lg bg-slate-950 px-3.5 py-2 text-sm font-semibold text-white"
-          >
-            {panel === next.id
-              ? radarT(loc, 'Fechar', 'Cerrar', 'Close')
-              : nextButton[next.id]}
-          </button>
-        </div>
-      )}
-
-      <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setTool(tool === 'space' ? null : 'space');
-                setPanel(null);
-              }}
-              className={actionBtn(tool === 'space')}
-            >
-              {radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
-            </button>
-            {data.moduleId === 'agriculture' && (
-              <button
-                type="button"
-                onClick={() => {
-                  setTool(tool === 'crops' ? null : 'crops');
-                  setPanel(null);
-                }}
-                className={actionBtn(tool === 'crops')}
-              >
-                {radarT(loc, 'Cultivos', 'Cultivos', 'Crops')}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => openStep('sensors')}
-              className={actionBtn(panel === 'sensors')}
-            >
-              {radarT(loc, 'Sensores', 'Sensores', 'Sensors')}
-            </button>
-          </div>
-          {tool === 'crops' && data.moduleId === 'agriculture' && (
-            <RadarCropsPanel
-              locale={loc}
-              crops={data.crops || []}
-              busy={busy}
-              onAdd={async (input) => {
-                await patch({ action: 'crop_add', ...input });
-                await load();
-              }}
-              onRemove={async (cropId) => {
-                await patch({ action: 'crop_remove', cropId });
-                await load();
-              }}
-            />
-          )}
-          {tool === 'space' && (
-            <RadarAddParcelForm
-              locale={loc}
-              moduleId={data.moduleId}
-              crops={data.crops || []}
-              busy={busy}
-              onCancel={() => setTool(null)}
-              onSubmit={async (input) => {
-                const d = await patch({ action: 'parcel', ...input });
-                await load();
-                if (d?.unit?.id) setFocusedId(d.unit.id as string);
-                setTool(null);
-              }}
-            />
-          )}
-          {openLot && (
-            <Link href={chainHref} className="text-xs text-emerald-300/80 hover:text-emerald-200">
-              {radarT(loc, 'Lote', 'Lote', 'Lot')} {openLot.code} · {TRACE_STAGE_LABEL[openLot.currentStage][loc]} →
-            </Link>
-          )}
-          {/* Ref pattern: tree (nav) | plant map | what to do */}
-          <div className="grid gap-2 lg:grid-cols-[minmax(148px,188px)_minmax(0,1fr)_minmax(220px,260px)] lg:items-stretch">
-            <RadarSpaceTree
-              locale={loc}
-              moduleId={data.moduleId}
-              propertyName={data.name}
-              units={data.units}
-              sensors={data.sensors}
-              focusedId={focusedId}
-              onFocus={setFocusedId}
-            />
-            <div className="relative min-h-0 min-w-0">
-            <RadarSpatialTwin
-              locale={loc}
-              moduleId={data.moduleId}
-              parcels={mapParcels}
-              sensors={data.sensors.map((s) => ({
-                id: s.id,
-                name: s.name,
-                unitId: s.unitId,
-                lastValue: s.lastValue ?? null,
-              }))}
-              focusedId={focusedId}
-              onFocus={setFocusedId}
-              hero
-            />
-              {panel && (
-                <div className="absolute inset-x-3 top-3 z-20 max-h-[min(72%,34rem)] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 px-4 py-4 shadow-2xl">
-<div className="mb-4 flex flex-wrap gap-2">
-              {data.steps.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => {
-                    setPanel(s.id);
-                    setStep(s.id);
-                  }}
-                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
-                    panel === s.id ? 'bg-white text-slate-950' : 'bg-slate-800 text-slate-100'
-                  }`}
-                >
-                  {PROPERTY_STEP_COPY[s.id][loc].label}
-                </button>
-              ))}
-            </div>
-            {step === 'characterize' && (
-          <div className="space-y-5">
-            <div>
-              <h2 className="font-serif text-2xl text-white">
-                {loc === 'es' ? 'Caracterizar' : loc === 'en' ? 'Characterize' : 'Caracterizar'}
-              </h2>
-              <p className="mt-1 text-sm text-white/55">
-                {radarT(loc, 'Tipo, cultura e hectares.', 'Tipo, cultivo y hectáreas.', 'Type, crop and hectares.')}
-              </p>
-            </div>
-            <label className="block">
-              <span className="text-xs uppercase tracking-wide text-white/45">
-                {radarT(loc, 'Nome', 'Nombre', 'Name')}
-              </span>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mt-2 w-full rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
-              />
-            </label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {RADAR_MODULES.map((m) => {
-                const active = moduleId === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => isRadarModuleId(m.id) && setModuleId(m.id)}
-                    className={`rounded-2xl border px-4 py-4 text-left ${
-                      active ? 'border-emerald-400/50 bg-emerald-500/15' : 'border-white/10 bg-white/[0.03]'
-                    }`}
-                  >
-                    <p className="font-medium text-white">{m[loc]}</p>
-                    <p className="mt-1 text-xs text-white/45">{m.hint[loc]}</p>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-xs uppercase tracking-wide text-white/45">
-                  {moduleId ? spaceKindMeta(moduleId).secondaryLabel[loc] : loc === 'es' ? 'Cultivo' : loc === 'en' ? 'Crop' : 'Cultura'}
-                </span>
-                <input
-                  value={crop}
-                  onChange={(e) => setCrop(e.target.value)}
-                  className="mt-2 w-full rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs uppercase tracking-wide text-white/45">
-                  {moduleId ? spaceKindMeta(moduleId).areaUnit[loc] : 'ha'}
-                </span>
-                <input
-                  value={area}
-                  onChange={(e) => setArea(e.target.value)}
-                  inputMode="decimal"
-                  className="mt-2 w-full rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
-                />
-              </label>
-            </div>
-            <button
-              type="button"
-              disabled={busy || !moduleId || name.trim().length < 2}
-              onClick={() =>
-                void patch({
-                  action: 'characterize',
-                  name,
-                  moduleId,
-                  crop,
-                  areaHa: area ? Number(area) : null,
-                })
-                  .then(() => load())
-                  .then(() => setPanel(null))
-                  .catch((e) => setErr(e.message))
-              }
-              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 disabled:opacity-40"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sprout className="h-4 w-4" />}
-              {radarT(loc, 'Guardar', 'Guardar', 'Save')}
-            </button>
-          </div>
-        )}
-
-        {step === 'draw' && (
-          <div className="space-y-5">
-            <div>
-              <h2 className="font-serif text-2xl text-white">{kindMeta.drawTitle[loc]}</h2>
-              <p className="mt-1 text-sm text-white/55">{kindMeta.hint[loc]}</p>
-            </div>
-            {!characterized ? (
-              <EmptyHint
-                locale={loc}
-                text={radarT(loc, 'Caracteriza o sítio primeiro.', 'Caracterizá el sitio primero.', 'Characterize the site first.')}
-                onClick={() => {
-                  setPanel('characterize');
-                  setStep('characterize');
-                }}
-              />
-            ) : (
-              <>
-                {data.moduleId === 'agriculture' && (
-                  <RadarCropsPanel
-                    locale={loc}
-                    crops={data.crops || []}
-                    busy={busy}
-                    onAdd={async (input) => {
-                      await patch({ action: 'crop_add', ...input });
-                      await load();
-                    }}
-                    onRemove={async (cropId) => {
-                      await patch({ action: 'crop_remove', cropId });
-                      await load();
-                    }}
-                  />
-                )}
-
-                {addingParcel || mapParcels.length === 0 ? (
-                  <RadarAddParcelForm
-                    locale={loc}
-                    moduleId={data.moduleId}
-                    crops={data.crops || []}
-                    busy={busy}
-                    onCancel={mapParcels.length > 0 ? () => setAddingParcel(false) : undefined}
-                    onSubmit={async (input) => {
-                      const d = await patch({ action: 'parcel', ...input });
-                      setAddingParcel(false);
-                      await load();
-                      if (d?.unit?.id) setFocusedId(d.unit.id as string);
-                    }}
-                  />
-                ) : null}
-
-                <RadarSiteMap
-                  companyId={companyId}
-                  engagementId={engagementId}
-                  propertyId={propertyId}
-                  locale={loc}
-                  moduleId={data.moduleId}
-                  mode="empresa"
-                  parcels={mapParcels}
-                  sensors={data.sensors.map((s) => ({
-                    id: s.id,
-                    name: s.name,
-                    unitId: s.unitId,
-                    lastValue: s.lastValue ?? null,
-                  }))}
-                  focusedId={focusedId}
-                  onFocus={setFocusedId}
-                  onSaved={() => void load()}
-                  onRequestAddParcel={() => setAddingParcel(true)}
-                />
-
-                {focusedId && mapParcels.length > 0 && data.moduleId === 'agriculture' && (
-                  <ParcelAssignCrop
-                    locale={loc}
-                    unit={data.units.find((u) => u.id === focusedId)}
-                    crops={data.crops || []}
-                    busy={busy}
-                    onSave={async (cropName) => {
-                      await patch({ action: 'parcel_update', unitId: focusedId, crop: cropName });
-                      await load();
-                    }}
-                  />
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {step === 'geolocate' && (
-          <RadarGeoPin
+    <div ref={frameRef} className="relative overflow-hidden bg-[#07111A]">
+      <div className="absolute inset-0">
+        {view === '3d' ? (
+          <RadarSpatialTwin
             locale={loc}
-            lat={data.lat}
-            lng={data.lng}
-            busy={busy}
-            onSave={async (lat, lng) => {
-              await patch({ action: 'geolocate', lat, lng });
-              await load();
-              setPanel(null);
+            moduleId={data.moduleId}
+            parcels={mapParcels}
+            sensors={data.sensors.map((s) => ({
+              id: s.id,
+              name: s.name,
+              unitId: s.unitId,
+              lastValue: s.lastValue ?? null,
+            }))}
+            focusedId={focusedId}
+            onFocus={setFocusedId}
+            fill
+          />
+        ) : (
+          <RadarSiteMap
+            companyId={companyId}
+            engagementId={engagementId}
+            propertyId={propertyId}
+            locale={loc}
+            moduleId={data.moduleId}
+            mode="empresa"
+            parcels={mapParcels}
+            sensors={data.sensors.map((s) => ({
+              id: s.id,
+              name: s.name,
+              unitId: s.unitId,
+              lastValue: s.lastValue ?? null,
+            }))}
+            focusedId={focusedId}
+            onFocus={setFocusedId}
+            onSaved={() => void load()}
+            basemap={{
+              lat: data.lat,
+              lng: data.lng,
+              areaHa: data.areaHa,
+              query,
+              placing: panel === 'geolocate' || data.lat == null || data.lng == null,
+              onPin: (lat, lng) => {
+                void patch({ action: 'geolocate', lat, lng })
+                  .then(() => load())
+                  .catch((e) => setErr(e instanceof Error ? e.message : 'Erro'));
+              },
             }}
           />
         )}
+      </div>
 
-        {step === 'sensors' && (
-          <div className="space-y-5">
-            <div>
-              <h2 className="font-serif text-2xl text-white">
-                {radarT(loc, 'Sensores', 'Sensores', 'Sensors')}
-              </h2>
-              <p className="mt-1 text-sm text-white/55">
-                {radarT(
-                  loc,
-                  'Aparelho, espaço e DevEUI. O token aparece uma vez.',
-                  'Equipo, espacio y DevEUI. El token aparece una vez.',
-                  'Device, space and DevEUI. The token is shown once.',
-                )}
-              </p>
+      <div className="pointer-events-none absolute inset-0 z-10">
+        <aside className="pointer-events-auto absolute bottom-3 left-3 top-3 flex items-start gap-2">
+          <div className="flex w-12 flex-col items-center gap-1 rounded-2xl bg-[#07111A]/92 py-2 shadow-xl ring-1 ring-white/10">
+            <Link
+              href={backHref}
+              title={radarT(loc, 'Lugares', 'Lugares', 'Places')}
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-white/70 hover:bg-white/10 hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+            <button
+              type="button"
+              onClick={() => setRailOpen((v) => !v)}
+              className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                railOpen ? 'bg-teal-300 text-slate-950' : 'text-white/70 hover:bg-white/10'
+              }`}
+              title={radarT(loc, 'Espaços', 'Espacios', 'Spaces')}
+            >
+              <span className="text-[11px] font-bold">{data.units.length}</span>
+            </button>
+          </div>
+          {railOpen && (
+            <div className="max-h-full w-[min(16rem,calc(100vw-5rem))] overflow-y-auto rounded-2xl bg-[#07111A]/92 p-1 shadow-xl ring-1 ring-white/10">
+              <p className="truncate px-3 pb-1 pt-2 text-sm font-semibold text-white">{data.name}</p>
+              {data.clientName && <p className="truncate px-3 pb-1 text-[11px] text-white/45">{data.clientName}</p>}
+              <RadarSpaceTree
+                locale={loc}
+                moduleId={data.moduleId}
+                propertyName={data.name}
+                units={treeUnits}
+                sensors={data.sensors}
+                focusedId={focusedId}
+                onFocus={setFocusedId}
+              />
             </div>
-            {data.sensors.length > 0 && (
-              <ul className="space-y-2">
-                {data.sensors.map((s) => (
-                  <li
-                    key={s.id}
-                    className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80"
-                  >
-                    <Radio className="h-4 w-4 text-emerald-300" />
-                    <span>{s.name}</span>
-                    <span className="text-white/35">· {s.metric}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex flex-wrap gap-2">
-              <select
-                value={sensorSku}
-                onChange={(e) => setSensorSku(e.target.value)}
-                className="min-w-[14rem] rounded-2xl border border-slate-500 bg-slate-950 px-3 py-3 text-sm text-slate-100 [&>option]:bg-slate-950 [&>option]:text-slate-100"
-              >
-                {RADAR_DEVICE_CATALOG.map((d) => (
-                  <option key={d.sku} value={d.sku}>
-                    {d.sku} — {d.label[loc]}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={sensorName}
-                onChange={(e) => setSensorName(e.target.value)}
-                placeholder={radarT(loc, 'Nome no sítio', 'Nombre en el sitio', 'Name on the site')}
-                className="min-w-[12rem] flex-1 rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
-              />
-              <input
-                value={devEui}
-                onChange={(e) => setDevEui(e.target.value)}
-                placeholder="DevEUI"
-                className="min-w-[10rem] rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
-              />
+          )}
+        </aside>
+
+        <div
+          className={`pointer-events-auto absolute right-3 top-3 flex flex-col items-stretch gap-2 ${
+            railOpen ? 'left-[19.5rem]' : 'left-16'
+          }`}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+          <label className="flex min-w-[12rem] flex-1 items-center gap-2 rounded-full bg-[#07111A]/92 px-4 py-2.5 shadow-lg ring-1 ring-white/15">
+            <Search className="h-4 w-4 shrink-0 text-teal-200/80" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={radarT(loc, 'Buscar espaço', 'Buscar espacio', 'Search spaces')}
+              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/40"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              setTool(tool === 'space' ? null : 'space');
+              setPanel(null);
+            }}
+            className={actionBtn(tool === 'space')}
+          >
+            {radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
+          </button>
+          {data.moduleId === 'agriculture' && (
+            <button
+              type="button"
+              onClick={() => {
+                setTool(tool === 'crops' ? null : 'crops');
+                setPanel(null);
+              }}
+              className={actionBtn(tool === 'crops')}
+            >
+              {radarT(loc, 'Cultivos', 'Cultivos', 'Crops')}
+            </button>
+          )}
+          <button type="button" onClick={() => openStep('sensors')} className={actionBtn(panel === 'sensors')}>
+            {radarT(loc, 'Sensores', 'Sensores', 'Sensors')}
+          </button>
+          {!next && (
+            <button type="button" onClick={() => openStep('characterize')} className={actionBtn(panel === 'characterize')}>
+              {radarT(loc, 'Ficha', 'Ficha', 'File')}
+            </button>
+          )}
+          <div className="flex rounded-full bg-[#07111A]/92 p-1 shadow-lg ring-1 ring-white/15">
+            <button
+              type="button"
+              onClick={() => setView('2d')}
+              className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+                view === '2d' ? 'bg-teal-300 text-slate-950' : 'text-white/70'
+              }`}
+            >
+              2D
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('3d')}
+              className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+                view === '3d' ? 'bg-teal-300 text-slate-950' : 'text-white/70'
+              }`}
+            >
+              3D
+            </button>
+          </div>
+          </div>
+          {err && (
+            <p className="max-w-md rounded-xl border border-rose-400/30 bg-rose-950/90 px-3 py-2 text-sm text-rose-100">
+              {err}
+            </p>
+          )}
+          {next && (
+            <div className="flex max-w-xl items-center justify-between gap-3 self-start rounded-full bg-amber-50 px-4 py-2 text-amber-950 shadow-lg">
+              <p className="truncate text-sm font-semibold">{nextLabel[next.id]}</p>
               <button
                 type="button"
-                disabled={busy || sensorName.trim().length < 2}
-                onClick={() =>
-                  void patch({
-                    action: 'sensor',
-                    name: sensorName,
-                    sku: sensorSku,
-                    devEui,
-                    unitId: focusedId || data.units[0]?.id,
-                  })
-                    .then((d) => {
-                      setTokenFlash(`${d.token as string}  →  ${d.ingestPath as string}`);
-                      setSensorName('');
-                      setDevEui('');
-                      return load();
-                    })
-                    .catch((e) => setErr(e.message))
-                }
-                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 disabled:opacity-40"
+                onClick={() => openStep(next.id)}
+                className="shrink-0 rounded-full bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white"
               >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radio className="h-4 w-4" />}
-                {radarT(loc, 'Emitir token', 'Emitir token', 'Issue token')}
+                {panel === next.id || (next.id === 'draw' && tool === 'space')
+                  ? radarT(loc, 'Fechar', 'Cerrar', 'Close')
+                  : nextButton[next.id]}
               </button>
             </div>
-            {tokenFlash && (
-              <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-50">
-                <p className="font-medium">{radarT(loc, 'Copia agora', 'Copiá ahora', 'Copy now')}</p>
-                <code className="mt-1 block break-all text-xs">{tokenFlash}</code>
+          )}
+          {openLot && !cardOpen && (
+            <Link href={chainHref} className="self-start text-xs text-teal-200 hover:text-white">
+              {radarT(loc, 'Lote', 'Lote', 'Lot')} {openLot.code} · {TRACE_STAGE_LABEL[openLot.currentStage][loc]} →
+            </Link>
+          )}
+        </div>
+
+        {cardOpen && (
+          <div className="pointer-events-auto absolute bottom-4 right-4 top-28 z-20 w-[min(28rem,calc(100%-5.5rem))] overflow-y-auto rounded-2xl border border-white/10 bg-[#07111A]/95 px-4 py-4 shadow-2xl">
+            {tool === 'crops' && data.moduleId === 'agriculture' && (
+              <RadarCropsPanel
+                locale={loc}
+                crops={data.crops || []}
+                busy={busy}
+                onAdd={async (input) => {
+                  await patch({ action: 'crop_add', ...input });
+                  await load();
+                }}
+                onRemove={async (cropId) => {
+                  await patch({ action: 'crop_remove', cropId });
+                  await load();
+                }}
+              />
+            )}
+            {tool === 'space' && (
+              <RadarAddParcelForm
+                locale={loc}
+                moduleId={data.moduleId}
+                crops={data.crops || []}
+                busy={busy}
+                onCancel={() => setTool(null)}
+                onSubmit={async (input) => {
+                  const d = await patch({ action: 'parcel', ...input });
+                  await load();
+                  if (d?.unit?.id) setFocusedId(d.unit.id as string);
+                  setTool(null);
+                }}
+              />
+            )}
+            {panel === 'characterize' && (
+              <div className="space-y-5">
+                <div>
+                  <h2 className="font-serif text-2xl text-white">
+                    {loc === 'es' ? 'Caracterizar' : loc === 'en' ? 'Characterize' : 'Caracterizar'}
+                  </h2>
+                  <p className="mt-1 text-sm text-white/55">
+                    {radarT(loc, 'Tipo, cultura e hectares.', 'Tipo, cultivo y hectáreas.', 'Type, crop and hectares.')}
+                  </p>
+                </div>
+                <label className="block">
+                  <span className="text-xs uppercase tracking-wide text-white/45">
+                    {radarT(loc, 'Nome', 'Nombre', 'Name')}
+                  </span>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+                  />
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {RADAR_MODULES.map((m) => {
+                    const active = moduleId === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => isRadarModuleId(m.id) && setModuleId(m.id)}
+                        className={`rounded-2xl border px-4 py-4 text-left ${
+                          active ? 'border-emerald-400/50 bg-emerald-500/15' : 'border-white/10 bg-white/[0.03]'
+                        }`}
+                      >
+                        <p className="font-medium text-white">{m[loc]}</p>
+                        <p className="mt-1 text-xs text-white/45">{m.hint[loc]}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="text-xs uppercase tracking-wide text-white/45">
+                      {moduleId ? spaceKindMeta(moduleId).secondaryLabel[loc] : loc === 'es' ? 'Cultivo' : loc === 'en' ? 'Crop' : 'Cultura'}
+                    </span>
+                    <input
+                      value={crop}
+                      onChange={(e) => setCrop(e.target.value)}
+                      className="mt-2 w-full rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs uppercase tracking-wide text-white/45">
+                      {moduleId ? spaceKindMeta(moduleId).areaUnit[loc] : 'ha'}
+                    </span>
+                    <input
+                      value={area}
+                      onChange={(e) => setArea(e.target.value)}
+                      inputMode="decimal"
+                      className="mt-2 w-full rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+                    />
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy || !moduleId || name.trim().length < 2}
+                  onClick={() =>
+                    void patch({
+                      action: 'characterize',
+                      name,
+                      moduleId,
+                      crop,
+                      areaHa: area ? Number(area) : null,
+                    })
+                      .then(() => load())
+                      .then(() => setPanel(null))
+                      .catch((e) => setErr(e.message))
+                  }
+                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 disabled:opacity-40"
+                >
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sprout className="h-4 w-4" />}
+                  {radarT(loc, 'Guardar', 'Guardar', 'Save')}
+                </button>
+              </div>
+            )}
+            {panel === 'geolocate' && (
+              <RadarGeoPin
+                locale={loc}
+                lat={data.lat}
+                lng={data.lng}
+                busy={busy}
+                onSave={async (lat, lng) => {
+                  await patch({ action: 'geolocate', lat, lng });
+                  await load();
+                  setPanel(null);
+                }}
+              />
+            )}
+            {panel === 'sensors' && (
+              <div className="space-y-5">
+                <div>
+                  <h2 className="font-serif text-2xl text-white">{radarT(loc, 'Sensores', 'Sensores', 'Sensors')}</h2>
+                  <p className="mt-1 text-sm text-white/55">
+                    {radarT(
+                      loc,
+                      'Aparelho, espaço e DevEUI. O token aparece uma vez.',
+                      'Equipo, espacio y DevEUI. El token aparece una vez.',
+                      'Device, space and DevEUI. The token is shown once.',
+                    )}
+                  </p>
+                </div>
+                {data.sensors.length > 0 && (
+                  <ul className="space-y-2">
+                    {data.sensors.map((s) => (
+                      <li
+                        key={s.id}
+                        className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80"
+                      >
+                        <Radio className="h-4 w-4 text-emerald-300" />
+                        <span>{s.name}</span>
+                        <span className="text-white/35">· {s.metric}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <select
+                    value={sensorSku}
+                    onChange={(e) => setSensorSku(e.target.value)}
+                    className="min-w-[14rem] rounded-2xl border border-slate-500 bg-slate-950 px-3 py-3 text-sm text-slate-100 [&>option]:bg-slate-950 [&>option]:text-slate-100"
+                  >
+                    {RADAR_DEVICE_CATALOG.map((d) => (
+                      <option key={d.sku} value={d.sku}>
+                        {d.sku} — {d.label[loc]}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={sensorName}
+                    onChange={(e) => setSensorName(e.target.value)}
+                    placeholder={radarT(loc, 'Nome no sítio', 'Nombre en el sitio', 'Name on the site')}
+                    className="min-w-[12rem] flex-1 rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+                  />
+                  <input
+                    value={devEui}
+                    onChange={(e) => setDevEui(e.target.value)}
+                    placeholder="DevEUI"
+                    className="min-w-[10rem] rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy || sensorName.trim().length < 2}
+                    onClick={() =>
+                      void patch({
+                        action: 'sensor',
+                        name: sensorName,
+                        sku: sensorSku,
+                        devEui,
+                        unitId: focusedId || data.units[0]?.id,
+                      })
+                        .then((d) => {
+                          setTokenFlash(`${d.token as string}  →  ${d.ingestPath as string}`);
+                          setSensorName('');
+                          setDevEui('');
+                          return load();
+                        })
+                        .catch((e) => setErr(e.message))
+                    }
+                    className="inline-flex items-center gap-2 rounded-2xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 disabled:opacity-40"
+                  >
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radio className="h-4 w-4" />}
+                    {radarT(loc, 'Emitir token', 'Emitir token', 'Issue token')}
+                  </button>
+                </div>
+                {tokenFlash && (
+                  <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-50">
+                    <p className="font-medium">{radarT(loc, 'Copia agora', 'Copiá ahora', 'Copy now')}</p>
+                    <code className="mt-1 block break-all text-xs">{tokenFlash}</code>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
-                </div>
-              )}
-            </div>
+
+        {!cardOpen && focusedId && (
+          <div className="pointer-events-auto absolute bottom-4 right-16 z-20 flex w-[min(22rem,calc(100%-6rem))] max-h-[46%] flex-col gap-2 overflow-y-auto">
+            {focusedId && data.moduleId === 'agriculture' && (
+              <ParcelAssignCrop
+                locale={loc}
+                unit={data.units.find((u) => u.id === focusedId)}
+                crops={data.crops || []}
+                busy={busy}
+                onSave={async (cropName) => {
+                  await patch({ action: 'parcel_update', unitId: focusedId, crop: cropName });
+                  await load();
+                }}
+              />
+            )}
             <RadarFocusSheet
               companyId={companyId}
               engagementId={engagementId}
@@ -654,32 +678,15 @@ export function RadarPropertyWorkspace({
               units={data.units}
               focusedId={focusedId}
               latest={focusedId ? data.latestByUnit?.[focusedId] : null}
-              hasValve={Boolean(
-                data.devices?.some((d) => d.unitId === focusedId && d.sku === 'SVC01-LS2'),
-              )}
+              hasValve={Boolean(data.devices?.some((d) => d.unitId === focusedId && d.sku === 'SVC01-LS2'))}
             />
           </div>
-        </div>
+        )}
 
+      </div>
     </div>
   );
 }
-
-function EmptyHint({ locale, text, onClick }: { locale: Loc; text: string; onClick: () => void }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 px-6 py-10 text-center">
-      <p className="text-sm text-white/55">{text}</p>
-      <button
-        type="button"
-        onClick={onClick}
-        className="mt-4 rounded-xl bg-emerald-500/90 px-4 py-2 text-sm font-semibold text-[#04110c]"
-      >
-        {locale === 'en' ? 'Go' : 'Ir'}
-      </button>
-    </div>
-  );
-}
-
 function ParcelAssignCrop({
   locale,
   unit,

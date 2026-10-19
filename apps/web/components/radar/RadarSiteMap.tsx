@@ -82,6 +82,15 @@ type Props = {
   /** @deprecated trail removed — kept so callers compile; ignored */
   trailUnitIds?: string[];
   hero?: boolean;
+  /** Real satellite/OSM surface. Spaces stay as an overlay around the property pin. */
+  basemap?: {
+    lat: number | null;
+    lng: number | null;
+    areaHa: number | null;
+    onPin?: (lat: number, lng: number) => void;
+    placing?: boolean;
+    query?: string;
+  };
 };
 
 function HeaderIcon({ moduleId }: { moduleId?: string | null }) {
@@ -110,6 +119,7 @@ export function RadarSiteMap({
   onSaved,
   onRequestAddParcel,
   hero = false,
+  basemap,
 }: Props) {
   const loc = radarLoc(locale);
   const canEdit = mode === 'empresa';
@@ -259,6 +269,24 @@ export function RadarSiteMap({
     setResizing(rect.id);
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   };
+
+  if (basemap) {
+    return (
+      <RadarBasemap
+        locale={loc}
+        parcels={parcels}
+        layout={layout}
+        focusedId={focusedId}
+        onFocus={onFocus}
+        lat={basemap.lat}
+        lng={basemap.lng}
+        areaHa={basemap.areaHa}
+        onPin={basemap.onPin}
+        placing={basemap.placing}
+        query={basemap.query}
+      />
+    );
+  }
 
   if (parcels.length === 0) {
     return (
@@ -454,5 +482,341 @@ export function RadarSiteMap({
         })}
       </div>
     </section>
+  );
+}
+
+const ESRI_IMAGERY =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+type LeafletNs = {
+  map: (el: HTMLElement, opts?: Record<string, unknown>) => LeafletMap;
+  tileLayer: (url: string, opts?: Record<string, unknown>) => { addTo: (map: LeafletMap) => unknown; remove: () => void };
+  layerGroup: () => { addTo: (map: LeafletMap) => unknown; clearLayers: () => void; addLayer: (layer: unknown) => void };
+  polygon: (latlngs: [number, number][], opts?: Record<string, unknown>) => { on: (ev: string, fn: (e: { originalEvent?: Event }) => void) => unknown; bindTooltip: (text: string, opts?: Record<string, unknown>) => unknown };
+  circleMarker: (latlng: [number, number], opts?: Record<string, unknown>) => unknown;
+  control: { zoom: (opts?: Record<string, unknown>) => { addTo: (map: LeafletMap) => void } };
+  DomEvent: { stopPropagation: (e: Event) => void };
+  latLngBounds: (pts: [number, number][]) => unknown;
+};
+
+type LeafletMap = {
+  setView: (center: [number, number], zoom: number) => void;
+  fitBounds: (bounds: unknown, opts?: Record<string, unknown>) => void;
+  remove: () => void;
+  on: (ev: string, fn: (e: { latlng: { lat: number; lng: number } }) => void) => void;
+  off: (ev: string, fn: (e: { latlng: { lat: number; lng: number } }) => void) => void;
+  invalidateSize: () => void;
+  getContainer: () => HTMLElement;
+};
+
+function loadLeaflet(): Promise<LeafletNs> {
+  if (typeof window === 'undefined') return Promise.reject(new Error('leaflet'));
+  const w = window as Window & { L?: LeafletNs };
+  if (w.L) return Promise.resolve(w.L);
+  return new Promise((resolve, reject) => {
+    if (!document.getElementById('radar-leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'radar-leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    const done = () => {
+      if (w.L) resolve(w.L);
+      else reject(new Error('leaflet'));
+    };
+    const existing = document.getElementById('radar-leaflet-js') as HTMLScriptElement | null;
+    if (existing) {
+      if (w.L) done();
+      else existing.addEventListener('load', done, { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = 'radar-leaflet-js';
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.async = true;
+    script.onload = () => done();
+    script.onerror = () => reject(new Error('leaflet'));
+    document.body.appendChild(script);
+  });
+}
+
+function offsetLatLng(lat: number, lng: number, eastM: number, northM: number): [number, number] {
+  const lat2 = lat + northM / 111320;
+  const lng2 = lng + eastM / (111320 * Math.cos((lat * Math.PI) / 180));
+  return [lat2, lng2];
+}
+
+function siteRing(lat: number, lng: number, sideM: number): [number, number][] {
+  const h = sideM / 2;
+  return [
+    offsetLatLng(lat, lng, -h, h),
+    offsetLatLng(lat, lng, h, h),
+    offsetLatLng(lat, lng, h, -h),
+    offsetLatLng(lat, lng, -h, -h),
+  ];
+}
+
+function spaceRing(lat: number, lng: number, sideM: number, rect: RadarSpaceRect): [number, number][] {
+  const west = -sideM / 2 + (rect.x / 100) * sideM;
+  const east = west + (rect.w / 100) * sideM;
+  const north = sideM / 2 - (rect.y / 100) * sideM;
+  const south = north - (rect.h / 100) * sideM;
+  return [
+    offsetLatLng(lat, lng, west, north),
+    offsetLatLng(lat, lng, east, north),
+    offsetLatLng(lat, lng, east, south),
+    offsetLatLng(lat, lng, west, south),
+  ];
+}
+
+function RadarBasemap({
+  locale,
+  parcels,
+  layout,
+  focusedId,
+  onFocus,
+  lat,
+  lng,
+  areaHa,
+  onPin,
+  placing,
+  query,
+}: {
+  locale: Loc;
+  parcels: MapParcel[];
+  layout: RadarSiteLayoutDoc;
+  focusedId: string | null;
+  onFocus: (id: string) => void;
+  lat: number | null;
+  lng: number | null;
+  areaHa: number | null;
+  onPin?: (lat: number, lng: number) => void;
+  placing?: boolean;
+  query?: string;
+}) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const overlaysRef = useRef<{ clearLayers: () => void; addLayer: (layer: unknown) => void } | null>(null);
+  const satRef = useRef<{ addTo: (map: LeafletMap) => unknown; remove: () => void } | null>(null);
+  const osmRef = useRef<{ addTo: (map: LeafletMap) => unknown; remove: () => void } | null>(null);
+  const [imagery, setImagery] = useState<'sat' | 'map'>('sat');
+  const [ready, setReady] = useState(false);
+  const onPinRef = useRef(onPin);
+  const onFocusRef = useRef(onFocus);
+  const placingRef = useRef(placing);
+  const fittedKey = useRef('');
+  onPinRef.current = onPin;
+  onFocusRef.current = onFocus;
+  placingRef.current = placing;
+
+  const hasPin = lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    let cancelled = false;
+    let map: LeafletMap | null = null;
+    void loadLeaflet()
+      .then((L) => {
+        if (cancelled || !hostRef.current) return;
+        map = L.map(hostRef.current, { zoomControl: false, attributionControl: true });
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        const sat = L.tileLayer(ESRI_IMAGERY, {
+          attribution: 'Imagery © Esri',
+          maxZoom: 19,
+        });
+        const osm = L.tileLayer(OSM_TILES, {
+          attribution: '© OpenStreetMap',
+          maxZoom: 19,
+        });
+        sat.addTo(map);
+        const overlays = L.layerGroup();
+        overlays.addTo(map);
+        map.setView(hasPin ? [lat as number, lng as number] : [-15.8, -47.9], hasPin ? 17 : 12);
+        map.on('click', (e) => {
+          if (!placingRef.current) return;
+          const pin = onPinRef.current;
+          if (!pin) return;
+          pin(Math.round(e.latlng.lat * 1e6) / 1e6, Math.round(e.latlng.lng * 1e6) / 1e6);
+        });
+        mapRef.current = map;
+        overlaysRef.current = overlays;
+        satRef.current = sat;
+        osmRef.current = osm;
+        setReady(true);
+        const ro = new ResizeObserver(() => map?.invalidateSize());
+        ro.observe(hostRef.current);
+        (map as LeafletMap & { __ro?: ResizeObserver }).__ro = ro;
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      const ro = (map as (LeafletMap & { __ro?: ResizeObserver }) | null)?.__ro;
+      ro?.disconnect();
+      map?.remove();
+      mapRef.current = null;
+      overlaysRef.current = null;
+      setReady(false);
+    };
+    // Map instance is created once; pin recentering happens below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    if (imagery === 'sat') {
+      osmRef.current?.remove();
+      satRef.current?.addTo(map);
+    } else {
+      satRef.current?.remove();
+      osmRef.current?.addTo(map);
+    }
+  }, [imagery, ready]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const overlays = overlaysRef.current;
+    if (!map || !overlays || !ready) return;
+    let cancelled = false;
+    void loadLeaflet().then((L) => {
+      if (cancelled) return;
+      overlays.clearLayers();
+      if (!hasPin || lat == null || lng == null) {
+        map.getContainer().style.cursor = placing ? 'crosshair' : '';
+        return;
+      }
+      map.getContainer().style.cursor = placing ? 'crosshair' : '';
+      const ha = areaHa && areaHa > 0 ? areaHa : Math.max(0.4, parcels.length * 0.35 || 0.4);
+      const side = Math.sqrt(ha * 10000);
+      const q = (query || '').trim().toLowerCase();
+      const bounds: [number, number][] = [];
+      const outline = siteRing(lat, lng, side);
+      bounds.push(...outline);
+      overlays.addLayer(
+        L.polygon(outline, {
+          color: '#5eead4',
+          weight: 2,
+          dashArray: '6 6',
+          fillColor: '#14b8a6',
+          fillOpacity: 0.08,
+        }),
+      );
+      const parcelById = new Map(parcels.map((p) => [p.id, p]));
+      for (const rect of layout.spaces) {
+        const parcel = parcelById.get(rect.id);
+        if (!parcel) continue;
+        const tone = actionTone(parcel.nextAction, parcel.harvestBlocked, parcel.moisture);
+        const match = !q || parcel.name.toLowerCase().includes(q) || (parcel.crop || '').toLowerCase().includes(q);
+        const focused = focusedId === parcel.id;
+        const color = tone === 'critical' ? '#e11d48' : tone === 'warn' ? '#f59e0b' : '#2dd4bf';
+        const ring = spaceRing(lat, lng, side, rect);
+        bounds.push(...ring);
+        const poly = L.polygon(ring, {
+          color: focused ? '#ffffff' : color,
+          weight: focused ? 3 : 1.5,
+          fillColor: color,
+          fillOpacity: match ? (focused ? 0.55 : 0.38) : 0.08,
+        });
+        poly.on('click', (e) => {
+          if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
+          onFocusRef.current(parcel.id);
+        });
+        poly.bindTooltip(parcel.crop ? `${parcel.name} · ${parcel.crop}` : parcel.name, {
+          permanent: true,
+          direction: 'center',
+          className: 'radar-space-tip',
+          opacity: match ? 1 : 0.35,
+        });
+        overlays.addLayer(poly);
+      }
+      overlays.addLayer(
+        L.circleMarker([lat, lng], {
+          radius: 7,
+          color: '#042f2e',
+          weight: 2,
+          fillColor: '#5eead4',
+          fillOpacity: 1,
+        }),
+      );
+      const geomKey = `${lat}|${lng}|${side}|${layout.spaces.map((s) => `${s.id}:${s.x}:${s.y}:${s.w}:${s.h}`).join(',')}`;
+      if (fittedKey.current !== geomKey) {
+        fittedKey.current = geomKey;
+        if (bounds.length > 0) {
+          map.fitBounds(L.latLngBounds(bounds), { padding: [72, 72], maxZoom: 18, animate: false });
+        } else {
+          map.setView([lat, lng], 17);
+        }
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, hasPin, lat, lng, areaHa, layout, parcels, focusedId, query, placing]);
+
+  return (
+    <div className="radar-basemap absolute inset-0">
+      <div ref={hostRef} className="absolute inset-0" />
+      <style>{`
+        .radar-basemap .leaflet-control-zoom a {
+          background: #07111a;
+          color: #ecfeff;
+          border-color: rgba(255,255,255,0.14);
+          width: 34px;
+          height: 34px;
+          line-height: 34px;
+        }
+        .radar-basemap .leaflet-control-zoom a:hover { background: #12343c; color: white; }
+        .radar-basemap .leaflet-control-attribution {
+          background: rgba(7,17,26,0.78);
+          color: rgba(255,255,255,0.55);
+          font-size: 10px;
+        }
+        .radar-basemap .leaflet-control-attribution a { color: #99f6e4; }
+        .radar-space-tip {
+          background: rgba(7,17,26,0.9);
+          color: white;
+          border: 0;
+          border-radius: 999px;
+          box-shadow: none;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 2px 8px;
+        }
+        .radar-space-tip::before { display: none; }
+      `}</style>
+      <div className="absolute bottom-4 left-1/2 z-[500] flex -translate-x-1/2 rounded-full bg-[#07111A]/92 p-1 shadow-lg ring-1 ring-white/15">
+        <button
+          type="button"
+          onClick={() => setImagery('sat')}
+          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+            imagery === 'sat' ? 'bg-teal-300 text-slate-950' : 'text-white/75'
+          }`}
+        >
+          {radarT(locale, 'Satélite', 'Satélite', 'Satellite')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setImagery('map')}
+          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+            imagery === 'map' ? 'bg-teal-300 text-slate-950' : 'text-white/75'
+          }`}
+        >
+          {radarT(locale, 'Mapa', 'Mapa', 'Map')}
+        </button>
+      </div>
+      {!hasPin && (
+        <p className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full bg-[#07111A]/90 px-4 py-2 text-sm text-white shadow-lg ring-1 ring-white/10">
+          {radarT(locale, 'Clica no mapa para marcar o sítio', 'Clic en el mapa para marcar el sitio', 'Click the map to pin this site')}
+        </p>
+      )}
+      {hasPin && placing && (
+        <p className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full bg-[#07111A]/90 px-4 py-2 text-sm text-white shadow-lg ring-1 ring-white/10">
+          {radarT(locale, 'Clica para mover o sítio', 'Clic para mover el sitio', 'Click to move this site')}
+        </p>
+      )}
+    </div>
   );
 }

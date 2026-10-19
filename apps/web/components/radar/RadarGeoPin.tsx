@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Crosshair, Loader2, MapPin } from 'lucide-react';
 
 type Loc = 'pt' | 'es' | 'en';
@@ -8,7 +8,7 @@ type Loc = 'pt' | 'es' | 'en';
 const COPY = {
   pt: {
     title: 'Geolocalizar',
-    sub: 'Latitude e longitude do sítio.',
+    sub: 'Clica no mapa ou usa a tua localização.',
     lat: 'Latitude',
     lng: 'Longitude',
     here: 'Usar a minha localização',
@@ -17,7 +17,7 @@ const COPY = {
   },
   es: {
     title: 'Geolocalizar',
-    sub: 'Latitud y longitud del sitio.',
+    sub: 'Clic en el mapa o usá tu ubicación.',
     lat: 'Latitud',
     lng: 'Longitud',
     here: 'Usar mi ubicación',
@@ -26,7 +26,7 @@ const COPY = {
   },
   en: {
     title: 'Geolocate',
-    sub: 'Latitude and longitude of the site.',
+    sub: 'Click the map or use your location.',
     lat: 'Latitude',
     lng: 'Longitude',
     here: 'Use my location',
@@ -55,6 +55,11 @@ export function RadarGeoPin({
   const [geoBusy, setGeoBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  useEffect(() => {
+    setLatStr(lat != null ? String(lat) : '');
+    setLngStr(lng != null ? String(lng) : '');
+  }, [lat, lng]);
+
   const parsedLat = Number(latStr);
   const parsedLng = Number(lngStr);
   const valid =
@@ -65,7 +70,7 @@ export function RadarGeoPin({
 
   const useHere = () => {
     if (!navigator.geolocation) {
-      setErr(loc === 'en' ? 'Geolocation unavailable' : 'Geolocalização indisponível');
+      setErr(loc === 'en' ? 'Geolocation unavailable' : loc === 'es' ? 'Geolocalización no disponible' : 'Geolocalização indisponível');
       return;
     }
     setGeoBusy(true);
@@ -77,17 +82,12 @@ export function RadarGeoPin({
         setGeoBusy(false);
       },
       () => {
-        setErr(loc === 'en' ? 'Could not read location' : 'Não foi possível ler a localização');
+        setErr(loc === 'en' ? 'Could not read location' : loc === 'es' ? 'No se pudo leer la ubicación' : 'Não foi possível ler a localização');
         setGeoBusy(false);
       },
       { enableHighAccuracy: true, timeout: 12000 }
     );
   };
-
-  const delta = 0.04;
-  const iframeSrc = valid
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${parsedLng - delta}%2C${parsedLat - delta}%2C${parsedLng + delta}%2C${parsedLat + delta}&layer=mapnik&marker=${parsedLat}%2C${parsedLng}`
-    : null;
 
   return (
     <div className="space-y-5">
@@ -135,34 +135,6 @@ export function RadarGeoPin({
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
           {copy.save}
         </button>
-        {valid && (
-          <a
-            href={`https://www.openstreetmap.org/?mlat=${parsedLat}&mlon=${parsedLng}#map=14/${parsedLat}/${parsedLng}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center rounded-2xl border border-white/15 px-4 py-2.5 text-sm text-white/70"
-          >
-            {copy.open}
-          </a>
-        )}
-      </div>
-      {/* OSM export/embed always paints a noisy attribution+donation bar inside the
-          cross-origin iframe — clip it; we cannot set attributionControl on this embed. */}
-      <div className="radar-geo-map relative h-64 overflow-hidden rounded-[1.35rem] border border-white/10 bg-black/40 sm:h-80">
-        {iframeSrc ? (
-          <iframe
-            title="map"
-            src={iframeSrc}
-            className="absolute inset-x-0 top-0 h-[calc(100%+3.25rem)] w-full border-0"
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-white/40">
-            <MapPin className="mr-2 h-4 w-4" />
-            {loc === 'en' ? 'Enter coordinates to preview' : 'Introduz coordenadas para pré-visualizar'}
-          </div>
-        )}
       </div>
     </div>
   );
