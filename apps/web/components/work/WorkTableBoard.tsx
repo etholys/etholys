@@ -11,6 +11,7 @@ import {
   canAddColumnKind,
   columnKindLabel,
   DEFAULT_WORK_COLUMNS,
+  parseTags,
   type WorkColumn,
   type WorkColumnKind,
   type WorkNotifyPrefs,
@@ -39,6 +40,7 @@ type TaskRow = {
   project?: { id?: string; name?: string } | null;
   department?: { id?: string; name?: string } | null;
   folder?: { id?: string; name?: string } | null;
+  checklist?: Array<{ id: string; completed: boolean }>;
   _count?: { comments?: number; subtasks?: number; attachments?: number };
 };
 
@@ -111,6 +113,46 @@ function PeopleCell({
           <option key={u.id} value={u.id}>{u.name || u.email}</option>
         ))}
       </select>
+    </div>
+  );
+}
+
+function TagsCell({
+  task,
+  onPatch,
+  t,
+}: {
+  task: TaskRow;
+  onPatch: (id: string, body: Record<string, unknown>) => void;
+  t: (en: string, es: string, pt: string) => string;
+}) {
+  const tags = parseTags(task.tags);
+  return (
+    <div className="flex min-w-[120px] flex-wrap items-center gap-1">
+      {tags.map((tag) => (
+        <button
+          key={tag}
+          type="button"
+          onClick={() => onPatch(task.id, { tags: tags.filter((row) => row !== tag).join(',') })}
+          className="rounded-full bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-200"
+          title={t('Remove tag', 'Quitar etiqueta', 'Remover etiqueta')}
+        >
+          {tag}
+        </button>
+      ))}
+      <input
+        type="text"
+        placeholder={t('+ Tag', '+ Etiqueta', '+ Etiqueta')}
+        className="w-16 bg-transparent text-[11px] text-[color:var(--sys-faint)] outline-none"
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          const value = (e.target as HTMLInputElement).value.trim();
+          if (!value) return;
+          e.preventDefault();
+          if (!tags.includes(value)) onPatch(task.id, { tags: [...tags, value].join(',') });
+          (e.target as HTMLInputElement).value = '';
+        }}
+      />
     </div>
   );
 }
@@ -269,7 +311,8 @@ export function WorkTableBoard({
   const [updatesFor, setUpdatesFor] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
-  const colSpan = columns.length + (onToggleSelect ? 3 : 2);
+  const [hideDone, setHideDone] = useState(false);
+  const colSpan = columns.length + (onToggleSelect ? 4 : 3);
 
   const toggle = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }));
 
@@ -285,20 +328,23 @@ export function WorkTableBoard({
     }
   };
 
+  const visible = (list: TaskRow[]) =>
+    hideDone ? list.filter((task) => task.status !== 'DONE' && task.status !== 'CANCELLED') : list;
+
   const sections: Array<{ key: string; id: string | null; name: string; color: string; tasks: TaskRow[] }> = [
     ...groups.map((g) => ({
       key: g.id,
       id: g.id,
       name: g.name,
       color: g.color || '#0891b2',
-      tasks: sortByOrder(tasksByGroupId(g.id)),
+      tasks: sortByOrder(visible(tasksByGroupId(g.id))),
     })),
     {
       key: '__ungrouped',
       id: null,
       name: t('Ungrouped', 'Sin sección', 'Sem secção'),
       color: '#94a3b8',
-      tasks: sortByOrder(ungroupedTasks),
+      tasks: sortByOrder(visible(ungroupedTasks)),
     },
   ];
 
@@ -375,6 +421,15 @@ export function WorkTableBoard({
             {t('Starter groups', 'Grupos iniciales', 'Grupos iniciais')}
           </button>
         )}
+        <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-[11px] font-medium text-[color:var(--sys-muted)]">
+          <input
+            type="checkbox"
+            checked={hideDone}
+            onChange={(e) => setHideDone(e.target.checked)}
+            className="rounded border-slate-300 text-teal-600"
+          />
+          {t('Hide done', 'Ocultar hechas', 'Ocultar concluídas')}
+        </label>
         {onColumnsChange && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
@@ -388,7 +443,7 @@ export function WorkTableBoard({
             </button>
             {addOpen && (
               <div className="absolute left-0 z-20 mt-1 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-                {(['status', 'person', 'priority', 'due', 'start', 'estimate', 'origin', 'updates', 'files', 'text', 'number', 'checkbox', 'date'] as WorkColumnKind[])
+                {(['status', 'person', 'priority', 'due', 'start', 'estimate', 'origin', 'updates', 'files', 'tags', 'group', 'text', 'number', 'checkbox', 'date'] as WorkColumnKind[])
                   .filter((kind) => canAddColumnKind(columns, kind))
                   .map((kind) => (
                     <button
@@ -555,6 +610,7 @@ export function WorkTableBoard({
                         </th>
                       )}
                       <th className="w-8 px-1 py-2" />
+                      <th className="w-8 px-1 py-2" title={t('Done', 'Hecho', 'Feito')} />
                       <th className="min-w-[220px] px-3 py-2 font-semibold">{t('Task', 'Tarea', 'Tarefa')}</th>
                       {columns.map((col) => (
                         <th key={col.id} className="min-w-[120px] px-2 py-2">
@@ -637,6 +693,25 @@ export function WorkTableBoard({
                               <GripVertical className="h-4 w-4" />
                             </button>
                           </td>
+                          <td className="px-1 py-2" onClick={cellStop}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onPatch(task.id, { status: task.status === 'DONE' ? 'TODO' : 'DONE' })
+                              }
+                              className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition ${
+                                task.status === 'DONE'
+                                  ? 'border-emerald-500 bg-emerald-500 text-white'
+                                  : 'border-slate-300 hover:border-teal-500'
+                              }`}
+                              title={t('Mark done', 'Marcar hecha', 'Marcar concluída')}
+                              aria-label={t('Mark done', 'Marcar hecha', 'Marcar concluída')}
+                            >
+                              {task.status === 'DONE' ? (
+                                <span className="text-[10px] font-bold leading-none">✓</span>
+                              ) : null}
+                            </button>
+                          </td>
                           <td className="px-3 py-1.5" onClick={cellStop}>
                             <div className="flex items-center gap-2">
                               <button
@@ -668,7 +743,11 @@ export function WorkTableBoard({
                                 <button
                                   type="button"
                                   onClick={() => setTitleDraft({ id: task.id, value: task.title })}
-                                  className="min-w-0 flex-1 truncate text-left text-sm font-medium text-[color:var(--sys-ink)]"
+                                  className={`min-w-0 flex-1 truncate text-left text-sm font-medium ${
+                                    task.status === 'DONE'
+                                      ? 'text-[color:var(--sys-faint)] line-through'
+                                      : 'text-[color:var(--sys-ink)]'
+                                  }`}
                                 >
                                   {task.title}
                                 </button>
@@ -676,6 +755,11 @@ export function WorkTableBoard({
                               {(subtasksOf?.(task.id).length || 0) > 0 && (
                                 <span className="shrink-0 text-[10px] tabular-nums text-[color:var(--sys-faint)]">
                                   {subtasksOf!(task.id).filter((s) => s.status === 'DONE').length}/{subtasksOf!(task.id).length}
+                                </span>
+                              )}
+                              {(task.checklist?.length || 0) > 0 && (
+                                <span className="shrink-0 rounded bg-slate-500/15 px-1 py-0.5 text-[10px] tabular-nums text-[color:var(--sys-faint)]">
+                                  {task.checklist!.filter((c) => c.completed).length}/{task.checklist!.length}
                                 </span>
                               )}
                               {onDuplicate && (
@@ -800,6 +884,19 @@ export function WorkTableBoard({
                                 </div>
                               )}
                               {col.kind === 'files' && <FileCell taskId={task.id} count={task._count?.attachments || 0} t={t} />}
+                              {col.kind === 'tags' && <TagsCell task={task} onPatch={onPatch} t={t} />}
+                              {col.kind === 'group' && (
+                                <select
+                                  value={task.groupId || ''}
+                                  onChange={(e) => onPatch(task.id, { groupId: e.target.value || null })}
+                                  className="w-full cursor-pointer bg-transparent text-[11px] text-[color:var(--sys-ink)] outline-none"
+                                >
+                                  <option value="">{t('Ungrouped', 'Sin sección', 'Sem secção')}</option>
+                                  {groups.map((g) => (
+                                    <option key={g.id} value={g.id}>{g.name}</option>
+                                  ))}
+                                </select>
+                              )}
                               {col.kind === 'updates' && (
                                 <button
                                   type="button"
@@ -844,6 +941,21 @@ export function WorkTableBoard({
                           <tr key={sub.id} className="border-b border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)]/40">
                             {onToggleSelect && <td />}
                             <td />
+                            <td className="px-1 py-2" onClick={cellStop}>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onPatch(sub.id, { status: sub.status === 'DONE' ? 'TODO' : 'DONE' })
+                                }
+                                className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                                  sub.status === 'DONE'
+                                    ? 'border-emerald-500 bg-emerald-500 text-white'
+                                    : 'border-slate-300'
+                                }`}
+                              >
+                                {sub.status === 'DONE' ? <span className="text-[9px] font-bold">✓</span> : null}
+                              </button>
+                            </td>
                             <td className="px-3 py-1.5" onClick={cellStop}>
                               <div className="flex items-center gap-2 pl-6">
                                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_STYLE[sub.status]?.dot || 'bg-slate-300'}`} />

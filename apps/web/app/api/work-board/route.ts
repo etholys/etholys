@@ -15,6 +15,8 @@ const KINDS = new Set([
   'origin',
   'updates',
   'files',
+  'tags',
+  'group',
   'text',
   'number',
   'checkbox',

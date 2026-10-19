@@ -28,6 +28,8 @@ export type WorkColumnKind =
   | 'origin'
   | 'updates'
   | 'files'
+  | 'tags'
+  | 'group'
   | 'text'
   | 'number'
   | 'checkbox'
@@ -57,6 +59,8 @@ const SINGLETON_KINDS = new Set<WorkColumnKind>([
   'origin',
   'updates',
   'files',
+  'tags',
+  'group',
 ]);
 
 export function columnKindLabel(kind: WorkColumnKind, t: (en: string, es: string, pt: string) => string) {
@@ -79,6 +83,10 @@ export function columnKindLabel(kind: WorkColumnKind, t: (en: string, es: string
       return t('Updates', 'Actualizaciones', 'Atualizações');
     case 'files':
       return t('Files', 'Archivos', 'Ficheiros');
+    case 'tags':
+      return t('Tags', 'Etiquetas', 'Etiquetas');
+    case 'group':
+      return t('Group', 'Grupo', 'Grupo');
     case 'text':
       return t('Text', 'Texto', 'Texto');
     case 'number':
