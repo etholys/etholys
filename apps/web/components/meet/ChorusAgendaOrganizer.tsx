@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Check, Copy, Loader2, Video } from 'lucide-react';
+import { ArrowLeft, Check, Copy, Loader2, Mail, Share2, Video } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { CompanyPicker } from '@/components/hub/CompanyPicker';
@@ -133,7 +133,9 @@ export default function ChorusAgendaOrganizer({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [closeMode, setCloseMode] = useState(false);
   const [focusRequestId, setFocusRequestId] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const cursorSet = useRef(false);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
   const range = useMemo(() => visibleAgendaRange(view, cursorYmd), [view, cursorYmd]);
 
   const load = useCallback(async () => {
@@ -169,6 +171,15 @@ export default function ChorusAgendaOrganizer({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!shareOpen) return;
+    function onPointer(event: MouseEvent) {
+      if (!shareMenuRef.current?.contains(event.target as Node)) setShareOpen(false);
+    }
+    document.addEventListener('mousedown', onPointer);
+    return () => document.removeEventListener('mousedown', onPointer);
+  }, [shareOpen]);
 
   async function saveSettings() {
     if (!companyId) return;
@@ -213,6 +224,14 @@ export default function ChorusAgendaOrganizer({
     await navigator.clipboard.writeText(value);
     setCopied(value);
     window.setTimeout(() => setCopied(null), 1600);
+  }
+
+  function publicShareText(url: string) {
+    return t(
+      `Pode marcar um horário na minha agenda: ${url}`,
+      `Puedes reservar un horario en mi agenda: ${url}`,
+      `You can book a time on my agenda: ${url}`,
+    );
   }
 
   function wallToIso(value: string) {
@@ -424,35 +443,54 @@ export default function ChorusAgendaOrganizer({
           </div>
         ) : (
           <>
-            <section className="rounded-2xl border border-slate-200 p-4">
-              <p className="text-sm text-slate-600">
-                {t(
-                  'Envie este link. Quem abrir escolhe o dia e a hora, sem conta Etholys.',
-                  'Envía este enlace. Quien lo abra elige el día y la hora, sin cuenta Etholys.',
-                  'Share this link. People pick a day and time without an Etholys account.',
-                )}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <code className="break-all rounded-lg bg-slate-100 px-3 py-2 text-sm">{agenda.page.publicUrl}</code>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="relative" ref={shareMenuRef}>
                 <button
                   type="button"
-                  onClick={() => void copyText(agenda.page.publicUrl)}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-teal-800"
+                  aria-expanded={shareOpen}
+                  aria-haspopup="menu"
+                  onClick={() => setShareOpen((open) => !open)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
                 >
-                  {copied === agenda.page.publicUrl ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {t('Copiar', 'Copiar', 'Copy')}
+                  <Share2 className="h-4 w-4" />
+                  {t('Partilhar', 'Compartir', 'Share')}
                 </button>
+                {shareOpen ? (
+                  <div
+                    role="menu"
+                    className="absolute left-0 z-20 mt-1 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => void copyText(agenda.page.publicUrl)}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-slate-800 hover:bg-slate-50"
+                    >
+                      {copied === agenda.page.publicUrl ? <Check className="h-4 w-4 text-teal-800" /> : <Copy className="h-4 w-4" />}
+                      {copied === agenda.page.publicUrl ? t('Copiado', 'Copiado', 'Copied') : t('Copiar', 'Copiar', 'Copy')}
+                    </button>
+                    <a
+                      role="menuitem"
+                      href={`mailto:?subject=${encodeURIComponent(t('Agenda pública', 'Agenda pública', 'Public agenda'))}&body=${encodeURIComponent(publicShareText(agenda.page.publicUrl))}`}
+                      onClick={() => setShareOpen(false)}
+                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-800 hover:bg-slate-50"
+                    >
+                      <Mail className="h-4 w-4" />
+                      {t('E-mail', 'Correo', 'Email')}
+                    </a>
+                    <a
+                      role="menuitem"
+                      href={`https://wa.me/?text=${encodeURIComponent(publicShareText(agenda.page.publicUrl))}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => setShareOpen(false)}
+                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-800 hover:bg-slate-50"
+                    >
+                      {t('WhatsApp', 'WhatsApp', 'WhatsApp')}
+                    </a>
+                  </div>
+                ) : null}
               </div>
-              <p className="mt-3 text-xs text-slate-500">
-                {t(
-                  'Quem tem Google Calendar ligado em CHORUS recebe a reunião confirmada nesse calendário. Quem reserva pode descarregar .ics ou abrir Google e Outlook.',
-                  'Quien tiene Google Calendar conectado en CHORUS recibe la reunión confirmada en ese calendario. Quien reserva puede descargar .ics o abrir Google y Outlook.',
-                  'If Google Calendar is connected in CHORUS, a confirmed meeting is added there. Bookers can download .ics or open Google and Outlook.',
-                )}
-              </p>
-            </section>
-
-            <div className="flex flex-wrap items-end gap-2">
               <label className="block min-w-[16rem] flex-1 text-sm">
                 <span className="mb-1 block font-medium text-slate-700">{t('Fuso horário', 'Zona horaria', 'Timezone')}</span>
                 <select value={timeZone} onChange={(e) => setTimeZone(e.target.value)} className={FIELD}>
