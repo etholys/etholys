@@ -33,10 +33,14 @@ async function tenantCompany(companyId: string | null | undefined) {
 
 export async function GET(req: Request) {
   try {
-    const companyId = new URL(req.url).searchParams.get('companyId');
+    const url = new URL(req.url);
+    const companyId = url.searchParams.get('companyId');
     const gate = await tenantCompany(companyId);
     if ('error' in gate && gate.error) return gate.error;
-    const agenda = await getOrganizerAgenda(gate.companyId, gate.tenant.userId);
+    const agenda = await getOrganizerAgenda(gate.companyId, gate.tenant.userId, {
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+    });
     return NextResponse.json({ ...agenda, timeZones: MEET_TIMEZONE_OPTIONS });
   } catch (error) {
     return fail(error);
@@ -57,6 +61,8 @@ export async function PUT(req: Request) {
       windows?: { weekday: number; startMin: number; endMin: number }[];
       holidayCountries?: unknown;
       locale?: string;
+      from?: string | null;
+      to?: string | null;
     };
     const gate = await tenantCompany(body.companyId);
     if ('error' in gate && gate.error) return gate.error;
@@ -73,6 +79,8 @@ export async function PUT(req: Request) {
       windows: Array.isArray(body.windows) ? body.windows : [],
       holidayCountries: body.holidayCountries,
       locale: body.locale,
+      from: body.from,
+      to: body.to,
     });
     return NextResponse.json(agenda);
   } catch (error) {
@@ -88,11 +96,16 @@ export async function POST(req: Request) {
       blockId?: string;
       startsAt?: string;
       endsAt?: string;
+      from?: string | null;
+      to?: string | null;
     };
     const gate = await tenantCompany(body.companyId);
     if ('error' in gate && gate.error) return gate.error;
     if (body.action === 'remove-block') {
-      const agenda = await removeBookingBlock(gate.companyId, gate.tenant.userId, body.blockId || '');
+      const agenda = await removeBookingBlock(gate.companyId, gate.tenant.userId, body.blockId || '', {
+        from: body.from,
+        to: body.to,
+      });
       return NextResponse.json(agenda);
     }
     const agenda = await addBookingBlock({
@@ -100,6 +113,8 @@ export async function POST(req: Request) {
       ownerId: gate.tenant.userId,
       startsAt: body.startsAt || '',
       endsAt: body.endsAt || '',
+      from: body.from,
+      to: body.to,
     });
     return NextResponse.json(agenda);
   } catch (error) {

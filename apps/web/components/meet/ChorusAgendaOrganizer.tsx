@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Check, Copy, Loader2, Video } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { CompanyPicker } from '@/components/hub/CompanyPicker';
-import { hmToMinutes, minutesToHm, ymdInTimeZone } from '@/lib/meet/booking-slots';
+import { addDaysYmd, hmToMinutes, minutesToHm, startOfWeekMonday, ymdInTimeZone } from '@/lib/meet/booking-slots';
 import { meetWallTimeToUtc } from '@/lib/meet/timezone';
 import { AGENDA_HOLIDAY_COUNTRIES } from '@/lib/meet/holiday-countries';
 import ChorusAgendaCalendar, { type AgendaCalEvent, type AgendaView } from '@/components/meet/ChorusAgendaCalendar';
@@ -43,6 +43,7 @@ type Agenda = {
     blocks: { id: string; startsAt: string; endsAt: string; source?: string; label?: string | null }[];
   };
   requests: RequestRow[];
+  externalBusy?: { id: string; source: 'chorus' | 'google'; title: string; startsAt: string; endsAt: string }[];
   timeZones?: string[];
 };
 
@@ -63,6 +64,21 @@ const STATUS_LABEL: Record<string, [string, string, string]> = {
   counter_proposed: ['Horário proposto', 'Horario propuesto', 'Time proposed'],
   cancelled: ['Cancelado', 'Cancelada', 'Cancelled'],
 };
+
+function visibleAgendaRange(view: AgendaView, cursorYmd: string): { from: string; to: string } {
+  if (view === 'day') return { from: cursorYmd, to: addDaysYmd(cursorYmd, 1) };
+  if (view === 'week') {
+    const start = startOfWeekMonday(cursorYmd);
+    return { from: start, to: addDaysYmd(start, 7) };
+  }
+  if (view === 'year') {
+    const year = Number(cursorYmd.slice(0, 4));
+    return { from: `${cursorYmd.slice(0, 4)}-01-01`, to: `${year + 1}-01-01` };
+  }
+  const first = `${cursorYmd.slice(0, 7)}-01`;
+  const start = startOfWeekMonday(first);
+  return { from: start, to: addDaysYmd(start, 42) };
+}
 
 function windowsFromPage(rows: { weekday: number; startMin: number; endMin: number }[]): WindowRow[] {
   return WEEKDAYS.map((day) => {
@@ -118,13 +134,15 @@ export default function ChorusAgendaOrganizer({
   const [closeMode, setCloseMode] = useState(false);
   const [focusRequestId, setFocusRequestId] = useState<string | null>(null);
   const cursorSet = useRef(false);
+  const range = useMemo(() => visibleAgendaRange(view, cursorYmd), [view, cursorYmd]);
 
   const load = useCallback(async () => {
     if (!companyId) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/meet/agenda?companyId=${encodeURIComponent(companyId)}`);
+      const params = new URLSearchParams({ companyId, from: range.from, to: range.to });
+      const res = await fetch(`/api/meet/agenda?${params.toString()}`);
       const data = (await res.json()) as Agenda & { error?: string };
       if (!res.ok) throw new Error(data.error || 'error');
       setAgenda(data);
@@ -146,7 +164,7 @@ export default function ChorusAgendaOrganizer({
     } finally {
       setLoading(false);
     }
-  }, [companyId]);
+  }, [companyId, range.from, range.to]);
 
   useEffect(() => {
     void load();
@@ -171,6 +189,8 @@ export default function ChorusAgendaOrganizer({
           allowInPerson,
           holidayCountries,
           locale,
+          from: range.from,
+          to: range.to,
           windows: windows
             .filter((row) => row.enabled)
             .map((row) => ({ weekday: row.weekday, startMin: row.startMin, endMin: row.endMin })),
@@ -210,6 +230,8 @@ export default function ChorusAgendaOrganizer({
           companyId,
           startsAt: wallToIso(blockStart),
           endsAt: wallToIso(blockEnd),
+          from: range.from,
+          to: range.to,
         }),
       });
       const data = (await res.json()) as Agenda & { error?: string };
@@ -229,7 +251,7 @@ export default function ChorusAgendaOrganizer({
     const res = await fetch('/api/meet/agenda', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyId, action: 'remove-block', blockId }),
+      body: JSON.stringify({ companyId, action: 'remove-block', blockId, from: range.from, to: range.to }),
     });
     const data = (await res.json()) as Agenda & { error?: string };
     if (res.ok) setAgenda(data);
@@ -301,6 +323,17 @@ export default function ChorusAgendaOrganizer({
               endsAt: proposed ? request.proposedEndsAt! : request.endsAt,
             };
           }),
+        ...(agenda.externalBusy || []).map((block) => ({
+          id: block.id,
+          kind: 'block' as const,
+          source: block.source,
+          title:
+            block.source === 'google'
+              ? `Google · ${block.title}`
+              : `CHORUS · ${block.title}`,
+          startsAt: block.startsAt,
+          endsAt: block.endsAt,
+        })),
       ]
     : [];
 
@@ -324,6 +357,8 @@ export default function ChorusAgendaOrganizer({
           companyId,
           startsAt: meetWallTimeToUtc(startWall, timeZone).toISOString(),
           endsAt: meetWallTimeToUtc(endWall, timeZone).toISOString(),
+          from: range.from,
+          to: range.to,
         }),
       });
       const data = (await res.json()) as Agenda & { error?: string };

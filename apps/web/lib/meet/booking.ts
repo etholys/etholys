@@ -5,6 +5,12 @@ import { prisma } from '@/lib/prisma';
 import { createMeetSession } from '@/lib/meet/create-session';
 import { pushMeetSessionToGoogle } from '@/lib/meet/calendar-google-sync';
 import { createGoogleCalendarEvent } from '@/lib/meet/calendar-google';
+import { isGoogleImportedMeetRoomSlug, listAgendaGoogleEvents } from '@/lib/meet/calendar-google-import';
+import {
+  assembleAgendaExternalBusy,
+  externalBusyRanges,
+  type AgendaExternalBlock,
+} from '@/lib/meet/agenda-busy';
 import { buildMeetIcs } from '@/lib/meet/ics';
 import { meetAppBaseUrl, meetPublicJoinUrl } from '@/lib/meet/types';
 import { sendMeetInviteEmail } from '@/lib/meet/send-meet-email';
@@ -164,14 +170,137 @@ function busyRanges(
   return ranges;
 }
 
+type AgendaPageClock = {
+  id: string;
+  companyId: string;
+  ownerId: string;
+  timeZone: string;
+  windows: BookingWindowInput[];
+};
+
+function agendaRange(timeZone: string, fromYmd?: string | null, toYmd?: string | null): { start: Date; end: Date } {
+  const today = ymdInTimeZone(new Date(), timeZone);
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(fromYmd || '') ? fromYmd! : today;
+  let to = /^\d{4}-\d{2}-\d{2}$/.test(toYmd || '') ? toYmd! : addDaysYmd(from, 22);
+  if (to <= from) to = addDaysYmd(from, 1);
+  if (to > addDaysYmd(from, 400)) to = addDaysYmd(from, 400);
+  return {
+    start: meetWallTimeToUtc(`${from}T00:00`, timeZone),
+    end: meetWallTimeToUtc(`${to}T00:00`, timeZone),
+  };
+}
+
+async function externalBusyForPage(
+  page: AgendaPageClock,
+  range: { start: Date; end: Date },
+): Promise<AgendaExternalBlock[]> {
+  const owner = await prisma.user.findUnique({
+    where: { id: page.ownerId },
+    select: { email: true },
+  });
+  const email = owner?.email?.trim().toLowerCase() || '';
+  const sessions = await prisma.meetSession.findMany({
+    where: {
+      companyId: page.companyId,
+      isPermanent: false,
+      status: { in: ['scheduled', 'live', 'ended'] },
+      scheduledAt: { not: null, lt: range.end },
+      OR: [
+        { endsAt: { gt: range.start } },
+        { endsAt: null, scheduledAt: { gt: new Date(range.start.getTime() - 3 * 60 * 60_000) } },
+      ],
+      AND: [
+        {
+          OR: [
+            { createdById: page.ownerId },
+            { participants: { some: { userId: page.ownerId } } },
+            ...(email
+              ? [{ participants: { some: { email: { equals: email, mode: 'insensitive' as const } } } }]
+              : []),
+          ],
+        },
+      ],
+    },
+    select: {
+      id: true,
+      title: true,
+      scheduledAt: true,
+      endsAt: true,
+      roomSlug: true,
+      meetingUrl: true,
+      googleCalendarEventId: true,
+      bookingRequest: { select: { id: true, googleCalendarEventId: true } },
+    },
+    take: 400,
+  });
+
+  const bookingIds = await prisma.meetBookingRequest.findMany({
+    where: { pageId: page.id, googleCalendarEventId: { not: null } },
+    select: { googleCalendarEventId: true },
+  });
+
+  const mapped = sessions.flatMap((session) => {
+    if (!session.scheduledAt) return [];
+    const endsAt =
+      session.endsAt && session.endsAt > session.scheduledAt
+        ? session.endsAt
+        : new Date(session.scheduledAt.getTime() + 60 * 60_000);
+    if (endsAt <= range.start || session.scheduledAt >= range.end) return [];
+    return [
+      {
+        id: session.id,
+        title: session.title,
+        startsAt: session.scheduledAt,
+        endsAt,
+        roomSlug: session.roomSlug,
+        meetingUrl: session.meetingUrl,
+        googleCalendarEventId: session.googleCalendarEventId,
+        importedFromGoogle: isGoogleImportedMeetRoomSlug(session.roomSlug),
+        linkedToBooking: Boolean(session.bookingRequest),
+      },
+    ];
+  });
+
+  let google: Awaited<ReturnType<typeof listAgendaGoogleEvents>> = { state: 'error', events: [] };
+  try {
+    google = await listAgendaGoogleEvents(page.ownerId, range.start, range.end);
+  } catch (error) {
+    console.warn('[chorus/agenda] google busy', error instanceof Error ? error.message : error);
+  }
+
+  const blocks = assembleAgendaExternalBusy({
+    sessions: mapped,
+    google,
+    bookingGoogleEventIds: [
+      ...bookingIds.map((row) => row.googleCalendarEventId || ''),
+      ...sessions.map((session) => session.bookingRequest?.googleCalendarEventId || ''),
+    ].filter((id): id is string => Boolean(id)),
+    timeZone: page.timeZone,
+    windows: page.windows,
+  });
+  return blocks.filter((block) => block.startsAt < range.end && block.endsAt > range.start);
+}
+
 async function loadBusy(pageId: string, exceptRequestId?: string) {
+  const page = await prisma.meetBookingPage.findUnique({
+    where: { id: pageId },
+    include: { windows: true },
+  });
   const [blocks, requests] = await Promise.all([
     prisma.meetBookingBlock.findMany({ where: { pageId } }),
     prisma.meetBookingRequest.findMany({
       where: { pageId, status: { in: [...OPEN_STATUSES] } },
     }),
   ]);
-  return busyRanges(blocks, requests, exceptRequestId);
+  const held = busyRanges(blocks, requests, exceptRequestId);
+  if (!page) return held;
+  try {
+    const external = await externalBusyForPage(page, agendaRange(page.timeZone, null, null));
+    return [...held, ...externalBusyRanges(external)];
+  } catch (error) {
+    console.warn('[chorus/agenda] external busy', error instanceof Error ? error.message : error);
+    return held;
+  }
 }
 
 export async function getPublicAgenda(code: string) {
@@ -405,7 +534,21 @@ function serializeRequest(
   };
 }
 
-export async function getOrganizerAgenda(companyId: string, ownerId: string) {
+function serializeExternalBusy(blocks: AgendaExternalBlock[]) {
+  return blocks.map((block) => ({
+    id: block.id,
+    source: block.source,
+    title: block.title,
+    startsAt: block.startsAt.toISOString(),
+    endsAt: block.endsAt.toISOString(),
+  }));
+}
+
+export async function getOrganizerAgenda(
+  companyId: string,
+  ownerId: string,
+  range?: { from?: string | null; to?: string | null },
+) {
   const page = await ensureBookingPage(companyId, ownerId);
   const requests = await prisma.meetBookingRequest.findMany({
     where: { pageId: page.id },
@@ -416,6 +559,12 @@ export async function getOrganizerAgenda(companyId: string, ownerId: string) {
     orderBy: { startsAt: 'desc' },
     take: 200,
   });
+  let externalBusy: AgendaExternalBlock[] = [];
+  try {
+    externalBusy = await externalBusyForPage(page, agendaRange(page.timeZone, range?.from, range?.to));
+  } catch (error) {
+    console.warn('[chorus/agenda] external busy', error instanceof Error ? error.message : error);
+  }
   return {
     page: {
       id: page.id,
@@ -443,6 +592,7 @@ export async function getOrganizerAgenda(companyId: string, ownerId: string) {
       })),
     },
     requests: requests.map((row) => serializeRequest(row, page.publicCode)),
+    externalBusy: serializeExternalBusy(externalBusy),
   };
 }
 
@@ -459,6 +609,8 @@ export async function updateBookingPage(input: {
   windows: BookingWindowInput[];
   holidayCountries?: unknown;
   locale?: string | null;
+  from?: string | null;
+  to?: string | null;
 }) {
   const page = await ensureBookingPage(input.companyId, input.ownerId);
   const title = input.title.trim().slice(0, 160);
@@ -492,7 +644,7 @@ export async function updateBookingPage(input: {
     }),
   ]);
   await replaceHolidayBlocks(page.id, holidayCountries, timeZone, input.locale);
-  return getOrganizerAgenda(input.companyId, input.ownerId);
+  return getOrganizerAgenda(input.companyId, input.ownerId, { from: input.from, to: input.to });
 }
 
 async function replaceHolidayBlocks(
@@ -522,6 +674,8 @@ export async function addBookingBlock(input: {
   ownerId: string;
   startsAt: string;
   endsAt: string;
+  from?: string | null;
+  to?: string | null;
 }) {
   const page = await ensureBookingPage(input.companyId, input.ownerId);
   const startsAt = new Date(input.startsAt);
@@ -533,15 +687,20 @@ export async function addBookingBlock(input: {
     throw new BookingError('slot_invalid');
   }
   await prisma.meetBookingBlock.create({
-    data: { pageId: page.id, startsAt, endsAt },
+    data: { pageId: page.id, startsAt, endsAt, source: 'manual' },
   });
-  return getOrganizerAgenda(input.companyId, input.ownerId);
+  return getOrganizerAgenda(input.companyId, input.ownerId, { from: input.from, to: input.to });
 }
 
-export async function removeBookingBlock(companyId: string, ownerId: string, blockId: string) {
+export async function removeBookingBlock(
+  companyId: string,
+  ownerId: string,
+  blockId: string,
+  range?: { from?: string | null; to?: string | null },
+) {
   const page = await ensureBookingPage(companyId, ownerId);
   await prisma.meetBookingBlock.deleteMany({ where: { id: blockId, pageId: page.id, source: 'manual' } });
-  return getOrganizerAgenda(companyId, ownerId);
+  return getOrganizerAgenda(companyId, ownerId, range);
 }
 
 async function ownedRequest(companyId: string, ownerId: string, requestId: string) {
@@ -573,6 +732,9 @@ async function confirmRequest(
   endsAt: Date,
   locale: BookingLocale,
 ) {
+  const busy = await loadBusy(request.pageId, request.id);
+  if (conflicts(busy, startsAt, endsAt)) throw new BookingError('slot_taken');
+
   let meetSessionId = request.meetSessionId;
   let joinUrl: string | null = null;
 

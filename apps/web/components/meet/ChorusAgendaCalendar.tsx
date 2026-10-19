@@ -99,6 +99,12 @@ function eventTone(event: AgendaCalEvent): string {
   if (event.kind === 'block' && event.source === 'holiday') {
     return 'border-amber-700 bg-amber-100 text-amber-950';
   }
+  if (event.kind === 'block' && event.source === 'chorus') {
+    return 'border-teal-800 bg-teal-50 text-teal-950';
+  }
+  if (event.kind === 'block' && event.source === 'google') {
+    return 'border-blue-800 bg-blue-100 text-blue-950';
+  }
   if (event.kind === 'block') return 'border-slate-500 bg-slate-200 text-slate-900';
   if (event.status === 'accepted') return 'border-teal-900 bg-teal-800 text-white';
   if (event.status === 'counter_proposed') return 'border-sky-800 bg-sky-100 text-sky-950';
@@ -331,7 +337,7 @@ export default function ChorusAgendaCalendar({
                       >
                         {event.title}
                       </button>
-                      {event.kind === 'block' && event.source !== 'holiday' ? (
+                      {event.kind === 'block' && (event.source === 'manual' || !event.source) ? (
                         <button type="button" className="underline" onClick={() => onReopenBlock(event.id)}>
                           {t('Reabrir', 'Reabrir', 'Reopen')}
                         </button>
@@ -403,7 +409,9 @@ export default function ChorusAgendaCalendar({
                     const marks = inMonth ? dayMarks(day) : [];
                     const holiday = marks.some((event) => event.source === 'holiday');
                     const booking = marks.some((event) => event.kind === 'request');
-                    const closed = marks.some((event) => event.kind === 'block' && event.source !== 'holiday');
+                    const google = marks.some((event) => event.source === 'google');
+                    const chorus = marks.some((event) => event.source === 'chorus');
+                    const closed = marks.some((event) => event.kind === 'block' && event.source !== 'holiday' && event.source !== 'google' && event.source !== 'chorus');
                     return (
                       <button
                         key={day}
@@ -419,9 +427,13 @@ export default function ChorusAgendaCalendar({
                                 ? 'bg-amber-200 text-amber-950'
                                 : booking
                                   ? 'bg-teal-100 text-teal-950'
-                                  : closed
-                                    ? 'bg-slate-300 text-slate-900'
-                                    : 'text-slate-800 hover:bg-slate-100'
+                                  : google
+                                    ? 'bg-blue-200 text-blue-950'
+                                    : chorus
+                                      ? 'bg-teal-50 text-teal-950 ring-1 ring-teal-700'
+                                      : closed
+                                        ? 'bg-slate-300 text-slate-900'
+                                        : 'text-slate-800 hover:bg-slate-100'
                         }`}
                       >
                         {inMonth ? Number(day.slice(8, 10)) : ''}
@@ -439,6 +451,8 @@ export default function ChorusAgendaCalendar({
         <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-teal-800" /> {t('Aceite', 'Aceptada', 'Accepted')}</span>
         <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-amber-200 ring-1 ring-amber-700" /> {t('Pendente', 'Pendiente', 'Pending')}</span>
         <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-slate-300" /> {t('Fechado', 'Cerrado', 'Closed')}</span>
+        <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-teal-50 ring-1 ring-teal-800" /> CHORUS</span>
+        <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-blue-200 ring-1 ring-blue-800" /> Google</span>
         <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-amber-200" /> {t('Feriado', 'Festivo', 'Holiday')}</span>
       </div>
     </section>

@@ -1,7 +1,11 @@
 import 'server-only';
 
 import { getGoogleCalendarAccessToken } from '@/lib/meet/calendar-google';
-import { upsertExternalCalendarMeetSession } from '@/lib/meet/create-session';
+import { syncGoogleCalendarBidirectional } from '@/lib/meet/calendar-google-sync';
+import { addDaysYmd } from '@/lib/meet/booking-slots';
+import type { AgendaBusyGoogleEvent, GoogleBusyFetch } from '@/lib/meet/agenda-busy';
+
+export { googleMeetRoomSlug } from '@/lib/meet/calendar-google-sync';
 
 const GOOGLE_CALENDAR_EVENTS = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
 
@@ -47,15 +51,11 @@ function conferenceUrlFromGoogleEvent(event: {
   return null;
 }
 
-export function googleMeetRoomSlug(googleEventId: string): string {
-  const safe = googleEventId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 48);
-  return `gcal-${safe || 'event'}`;
-}
-
 export function isGoogleImportedMeetRoomSlug(roomSlug?: string | null): boolean {
   return Boolean(roomSlug?.startsWith('gcal-'));
 }
 
+/** Listagem pontual (UI/debug). Sync real: syncGoogleCalendarBidirectional. */
 export async function listGoogleCalendarEvents(
   userId: string,
   opts?: { timeMin?: Date; timeMax?: Date; maxResults?: number },
@@ -67,14 +67,14 @@ export async function listGoogleCalendarEvents(
     );
   }
 
-  const timeMin = opts?.timeMin ?? new Date(Date.now() - 7 * 86_400_000);
-  const timeMax = opts?.timeMax ?? new Date(Date.now() + 21 * 86_400_000);
+  const timeMin = opts?.timeMin ?? new Date(Date.now() - 90 * 86_400_000);
+  const timeMax = opts?.timeMax ?? new Date(Date.now() + 30 * 86_400_000);
   const url = new URL(GOOGLE_CALENDAR_EVENTS);
   url.searchParams.set('singleEvents', 'true');
   url.searchParams.set('orderBy', 'startTime');
   url.searchParams.set('timeMin', timeMin.toISOString());
   url.searchParams.set('timeMax', timeMax.toISOString());
-  url.searchParams.set('maxResults', String(Math.min(250, Math.max(1, opts?.maxResults ?? 120))));
+  url.searchParams.set('maxResults', String(Math.min(250, Math.max(1, opts?.maxResults ?? 250))));
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -107,7 +107,6 @@ export async function listGoogleCalendarEvents(
     if (!startRaw) continue;
     const scheduledAt = new Date(startRaw);
     let endsAt = endRaw ? new Date(endRaw) : new Date(scheduledAt.getTime() + 60 * 60_000);
-    // Eventos all-day: Google manda date (sem hora); trata como dia civil
     if (!item.start?.dateTime && item.start?.date) {
       scheduledAt.setHours(9, 0, 0, 0);
       endsAt = new Date(scheduledAt.getTime() + 60 * 60_000);
@@ -129,48 +128,139 @@ export async function listGoogleCalendarEvents(
   return rows;
 }
 
+type GoogleAgendaItem = {
+  id?: string;
+  status?: string;
+  summary?: string;
+  description?: string;
+  htmlLink?: string;
+  hangoutLink?: string;
+  location?: string;
+  transparency?: string;
+  eventType?: string;
+  attendees?: Array<{ self?: boolean; responseStatus?: string }>;
+  conferenceData?: { entryPoints?: Array<{ entryPointType?: string; uri?: string }> };
+  start?: { dateTime?: string; date?: string };
+  end?: { dateTime?: string; date?: string };
+};
+
+function agendaEventUrls(item: GoogleAgendaItem): string[] {
+  const urls = new Set<string>();
+  const conference = conferenceUrlFromGoogleEvent(item);
+  if (conference) urls.add(conference);
+  for (const text of [item.location, item.description, item.hangoutLink]) {
+    if (!text) continue;
+    const found = text.match(/https?:\/\/[^\s<>"']+/gi) || [];
+    for (const url of found) urls.add(url.replace(/[.,;)]+$/, ''));
+  }
+  return [...urls];
+}
+
+/**
+ * Eventos do calendário Google no intervalo visível.
+ * `off` se a conta não está ligada. `error` se o Google falhou — a agenda segue com o CHORUS.
+ */
+export async function listAgendaGoogleEvents(
+  userId: string,
+  timeMin: Date,
+  timeMax: Date,
+): Promise<GoogleBusyFetch> {
+  try {
+    const { accessToken, needsReconnect, connected } = await getGoogleCalendarAccessToken(userId);
+    if (!connected || needsReconnect || !accessToken) return { state: 'off', events: [] };
+
+    const rows: AgendaBusyGoogleEvent[] = [];
+    let pageToken = '';
+    for (let page = 0; page < 4; page += 1) {
+      const url = new URL(GOOGLE_CALENDAR_EVENTS);
+      url.searchParams.set('singleEvents', 'true');
+      url.searchParams.set('orderBy', 'startTime');
+      url.searchParams.set('timeMin', timeMin.toISOString());
+      url.searchParams.set('timeMax', timeMax.toISOString());
+      url.searchParams.set('maxResults', '250');
+      if (pageToken) url.searchParams.set('pageToken', pageToken);
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) {
+        console.warn('[chorus/agenda] google list', res.status);
+        return { state: 'error', events: [] };
+      }
+      const data = (await res.json()) as { items?: GoogleAgendaItem[]; nextPageToken?: string };
+      for (const item of data.items || []) {
+        const mapped = mapAgendaGoogleItem(item);
+        if (mapped) rows.push(mapped);
+      }
+      if (!data.nextPageToken) break;
+      pageToken = data.nextPageToken;
+    }
+    return { state: 'ok', events: rows };
+  } catch (error) {
+    console.warn('[chorus/agenda] google busy', error instanceof Error ? error.message : error);
+    return { state: 'error', events: [] };
+  }
+}
+
+function mapAgendaGoogleItem(item: GoogleAgendaItem): AgendaBusyGoogleEvent | null {
+  if (!item.id || item.status === 'cancelled') return null;
+  if (item.transparency === 'transparent') return null;
+  if (item.eventType === 'birthday' || item.eventType === 'workingLocation') return null;
+  const self = item.attendees?.find((attendee) => attendee.self);
+  if (self?.responseStatus === 'declined') return null;
+
+  const title = (item.summary || '').trim().slice(0, 200);
+  const urls = agendaEventUrls(item);
+  const allDay = Boolean(item.start?.date && !item.start?.dateTime);
+  if (allDay && item.start?.date) {
+    const startYmd = item.start.date;
+    const endYmdExclusive = item.end?.date && item.end.date > startYmd ? item.end.date : addDaysYmd(startYmd, 1);
+    return {
+      id: item.id,
+      title,
+      allDay: true,
+      startsAt: null,
+      endsAt: null,
+      startYmd,
+      endYmdExclusive,
+      urls,
+    };
+  }
+
+  const startRaw = item.start?.dateTime;
+  if (!startRaw) return null;
+  const startsAt = new Date(startRaw);
+  const endsAt = item.end?.dateTime ? new Date(item.end.dateTime) : new Date(startsAt.getTime() + 60 * 60_000);
+  if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime()) || endsAt <= startsAt) return null;
+  return {
+    id: item.id,
+    title,
+    allDay: false,
+    startsAt,
+    endsAt,
+    startYmd: null,
+    endYmdExclusive: null,
+    urls,
+  };
+}
+
+/** Sync Google → CHORUS (incremental; sem janela artificial). */
 export async function importGoogleCalendarIntoMeet(opts: {
   companyId: string;
   userId: string;
   timeMin?: Date;
   timeMax?: Date;
-}): Promise<{ imported: number; updated: number; skipped: number; sessionIds: string[] }> {
-  const events = await listGoogleCalendarEvents(opts.userId, {
-    timeMin: opts.timeMin,
-    timeMax: opts.timeMax,
+}): Promise<{ imported: number; updated: number; skipped: number; sessionIds: string[]; mode?: string }> {
+  const result = await syncGoogleCalendarBidirectional({
+    companyId: opts.companyId,
+    userId: opts.userId,
   });
-
-  let imported = 0;
-  let updated = 0;
-  let skipped = 0;
-  const sessionIds: string[] = [];
-
-  for (const event of events) {
-    // Ignorar eventos que já são salas Etholys Meet (evitar eco do sync de saída)
-    if (event.conferenceUrl && /meet\.etholys\.com/i.test(event.conferenceUrl)) {
-      skipped += 1;
-      continue;
-    }
-    const descriptionParts = [
-      event.description,
-      event.htmlLink ? `Google Calendar: ${event.htmlLink}` : null,
-      event.conferenceUrl ? `Link da reunião: ${event.conferenceUrl}` : null,
-    ].filter(Boolean);
-
-    const result = await upsertExternalCalendarMeetSession({
-      companyId: opts.companyId,
-      createdById: opts.userId,
-      roomSlug: googleMeetRoomSlug(event.id),
-      title: event.title,
-      description: descriptionParts.join('\n\n') || null,
-      scheduledAt: event.scheduledAt,
-      endsAt: event.endsAt,
-      meetingUrl: event.conferenceUrl,
-    });
-    sessionIds.push(result.session.id);
-    if (result.created) imported += 1;
-    else updated += 1;
-  }
-
-  return { imported, updated, skipped, sessionIds };
+  return {
+    imported: result.imported,
+    updated: result.updated + result.cancelled,
+    skipped: result.skipped,
+    sessionIds: [],
+    mode: result.mode,
+  };
 }
