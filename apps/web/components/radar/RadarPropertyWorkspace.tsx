@@ -286,9 +286,14 @@ export function RadarPropertyWorkspace({
     geolocate: radarT(loc, 'Marcar no mapa', 'Marcar en el mapa', 'Pin on map'),
     sensors: radarT(loc, 'Ligar sensores', 'Conectar sensores', 'Connect sensors'),
   };
+  // Solid dark chrome over OSM — translucent glass fails on pale tiles.
+  const chromePill =
+    'rounded-full bg-[#07111A] text-white shadow-lg ring-1 ring-white/25';
   const actionBtn = (on: boolean) =>
-    `rounded-full px-3.5 py-2 text-sm font-semibold shadow-md backdrop-blur ${
-      on ? 'bg-teal-300 text-slate-950' : 'bg-[#07111A]/92 text-white ring-1 ring-white/15 hover:bg-[#12343c]'
+    `rounded-full px-3.5 py-2 text-sm font-semibold shadow-lg ring-1 ${
+      on
+        ? 'bg-teal-300 text-slate-950 ring-teal-200/80'
+        : 'bg-[#07111A] text-white ring-white/25 hover:bg-[#12343c]'
     }`;
 
   const q = query.trim().toLowerCase();
@@ -363,11 +368,11 @@ export function RadarPropertyWorkspace({
 
       <div className="pointer-events-none absolute inset-0 z-[1100]">
         <aside className="pointer-events-auto absolute bottom-3 left-3 top-3 flex items-start gap-2">
-          <div className="flex w-12 flex-col items-center gap-1 rounded-2xl bg-[#07111A]/92 py-2 shadow-xl ring-1 ring-white/10">
+          <div className="flex w-12 flex-col items-center gap-1 rounded-2xl bg-[#07111A] py-2 shadow-xl ring-1 ring-white/25">
             <Link
               href={backHref}
               title={radarT(loc, 'Lugares', 'Lugares', 'Places')}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-white/70 hover:bg-white/10 hover:text-white"
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-white/85 hover:bg-white/10 hover:text-white"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -375,7 +380,7 @@ export function RadarPropertyWorkspace({
               type="button"
               onClick={() => setRailOpen((v) => !v)}
               className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                railOpen ? 'bg-teal-300 text-slate-950' : 'text-white/70 hover:bg-white/10'
+                railOpen ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:bg-white/10'
               }`}
               title={radarT(loc, 'Espaços', 'Espacios', 'Spaces')}
             >
@@ -383,9 +388,9 @@ export function RadarPropertyWorkspace({
             </button>
           </div>
           {railOpen && (
-            <div className="max-h-full w-[min(16rem,calc(100vw-5rem))] overflow-y-auto rounded-2xl bg-[#07111A]/92 p-1 shadow-xl ring-1 ring-white/10">
+            <div className="max-h-full w-[min(16rem,calc(100vw-5rem))] overflow-y-auto rounded-2xl bg-[#07111A] p-1 shadow-xl ring-1 ring-white/25">
               <p className="truncate px-3 pb-1 pt-2 text-sm font-semibold text-white">{data.name}</p>
-              {data.clientName && <p className="truncate px-3 pb-1 text-[11px] text-white/45">{data.clientName}</p>}
+              {data.clientName && <p className="truncate px-3 pb-1 text-[11px] text-white/70">{data.clientName}</p>}
               <RadarSpaceTree
                 locale={loc}
                 moduleId={data.moduleId}
@@ -405,13 +410,13 @@ export function RadarPropertyWorkspace({
           }`}
         >
           <div className="flex flex-wrap items-center gap-2">
-          <label className="flex min-w-[12rem] flex-1 items-center gap-2 rounded-full bg-[#07111A]/92 px-4 py-2.5 shadow-lg ring-1 ring-white/15">
-            <Search className="h-4 w-4 shrink-0 text-teal-200/80" />
+          <label className={`flex min-w-[12rem] flex-1 items-center gap-2 px-4 py-2.5 ${chromePill}`}>
+            <Search className="h-4 w-4 shrink-0 text-teal-200" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={radarT(loc, 'Buscar espaço', 'Buscar espacio', 'Search spaces')}
-              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/40"
+              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/70"
             />
           </label>
           <button
@@ -444,12 +449,12 @@ export function RadarPropertyWorkspace({
               {radarT(loc, 'Ficha', 'Ficha', 'File')}
             </button>
           )}
-          <div className="flex rounded-full bg-[#07111A]/92 p-1 shadow-lg ring-1 ring-white/15">
+          <div className={`flex p-1 ${chromePill}`}>
             <button
               type="button"
               onClick={() => setView('2d')}
               className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                view === '2d' ? 'bg-teal-300 text-slate-950' : 'text-white/70'
+                view === '2d' ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:text-white'
               }`}
             >
               2D
@@ -458,7 +463,7 @@ export function RadarPropertyWorkspace({
               type="button"
               onClick={() => setView('3d')}
               className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                view === '3d' ? 'bg-teal-300 text-slate-950' : 'text-white/70'
+                view === '3d' ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:text-white'
               }`}
             >
               3D
@@ -466,8 +471,8 @@ export function RadarPropertyWorkspace({
           </div>
           </div>
           {focusedUnit && (
-            <div className="flex max-w-full flex-wrap items-center gap-1 self-start rounded-full bg-white p-1 shadow-lg ring-1 ring-slate-300">
-              <span className="max-w-[12rem] truncate px-2 text-xs font-semibold text-slate-950">{focusedUnit.name}</span>
+            <div className={`flex max-w-full flex-wrap items-center gap-1 self-start p-1 ${chromePill}`}>
+              <span className="max-w-[12rem] truncate px-2 text-xs font-semibold text-white">{focusedUnit.name}</span>
               {!focusedPlaced ? (
                 <button
                   type="button"
@@ -478,8 +483,10 @@ export function RadarPropertyWorkspace({
                     setTool(null);
                     setEditMode((cur) => (cur === 'place' ? 'none' : 'place'));
                   }}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40 ${
-                    editMode === 'place' ? 'bg-teal-800' : 'bg-slate-950 hover:bg-slate-800'
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${
+                    editMode === 'place'
+                      ? 'bg-teal-300 text-slate-950'
+                      : 'bg-white/15 text-white hover:bg-white/25'
                   }`}
                 >
                   {radarT(loc, 'Colocar no mapa', 'Colocar en el mapa', 'Place on map')}
@@ -492,8 +499,10 @@ export function RadarPropertyWorkspace({
                       setView('2d');
                       setEditMode((cur) => (cur === 'move' ? 'none' : 'move'));
                     }}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold text-white ${
-                      editMode === 'move' ? 'bg-teal-800' : 'bg-slate-950 hover:bg-slate-800'
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                      editMode === 'move'
+                        ? 'bg-teal-300 text-slate-950'
+                        : 'bg-white/15 text-white hover:bg-white/25'
                     }`}
                   >
                     {radarT(loc, 'Mover', 'Mover', 'Move')}
@@ -501,7 +510,7 @@ export function RadarPropertyWorkspace({
                   <button
                     type="button"
                     onClick={() => focusedId && void commitLayout(rotateSpace(layout, focusedId))}
-                    className="rounded-full bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                    className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/25"
                   >
                     {radarT(loc, 'Rodar', 'Girar', 'Rotate')}
                   </button>
@@ -540,14 +549,17 @@ export function RadarPropertyWorkspace({
             </div>
           )}
           {openLot && !cardOpen && (
-            <Link href={chainHref} className="self-start text-xs text-teal-200 hover:text-white">
+            <Link
+              href={chainHref}
+              className={`self-start px-3.5 py-2 text-xs font-medium hover:bg-[#12343c] ${chromePill}`}
+            >
               {radarT(loc, 'Lote', 'Lote', 'Lot')} {openLot.code} · {TRACE_STAGE_LABEL[openLot.currentStage][loc]} →
             </Link>
           )}
         </div>
 
         {cardOpen && (
-          <div className="pointer-events-auto absolute bottom-4 right-4 top-28 z-20 w-[min(28rem,calc(100%-5.5rem))] overflow-y-auto rounded-2xl border border-white/10 bg-[#07111A]/95 px-4 py-4 shadow-2xl">
+          <div className="pointer-events-auto absolute bottom-4 right-4 top-28 z-20 w-[min(28rem,calc(100%-5.5rem))] overflow-y-auto rounded-2xl border border-white/20 bg-[#07111A] px-4 py-4 shadow-2xl">
             {tool === 'crops' && data.moduleId === 'agriculture' && (
               <RadarCropsPanel
                 locale={loc}

@@ -912,12 +912,12 @@ function RadarBasemap({
         .radar-space-tip::before { display: none; }
       `}</style>
       {!hasPin && (
-        <p className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full bg-[#07111A]/90 px-4 py-2 text-sm text-white shadow-lg ring-1 ring-white/10">
+        <p className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full bg-[#07111A] px-4 py-2 text-sm text-white shadow-lg ring-1 ring-white/25">
           {radarT(locale, 'Clica no mapa para marcar o sítio', 'Clic en el mapa para marcar el sitio', 'Click the map to pin this site')}
         </p>
       )}
       {hasPin && placing && (
-        <p className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full bg-[#07111A]/90 px-4 py-2 text-sm text-white shadow-lg ring-1 ring-white/10">
+        <p className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full bg-[#07111A] px-4 py-2 text-sm text-white shadow-lg ring-1 ring-white/25">
           {radarT(locale, 'Clica para mover o sítio', 'Clic para mover el sitio', 'Click to move this site')}
         </p>
       )}
