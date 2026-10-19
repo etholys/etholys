@@ -79,7 +79,14 @@ function windowsFromPage(rows: { weekday: number; startMin: number; endMin: numb
 const FIELD =
   'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 [color-scheme:light]';
 
-export default function ChorusAgendaOrganizer({ lockedCompanyId }: { lockedCompanyId?: string } = {}) {
+export default function ChorusAgendaOrganizer({
+  lockedCompanyId,
+  surface = 'chorus',
+}: {
+  lockedCompanyId?: string;
+  /** A mesma agenda abre no Chorus e no eCalendar. */
+  surface?: 'chorus' | 'calendar';
+} = {}) {
   const { locale } = useApp();
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
   const intl = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
@@ -335,30 +342,38 @@ export default function ChorusAgendaOrganizer({ lockedCompanyId }: { lockedCompa
     <div className="etholys-meet-light min-h-dvh bg-white text-slate-900" style={{ colorScheme: 'light' }}>
       <header className="border-b border-slate-200">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
-          <Link href="/hub/meet" className="inline-flex items-center gap-1 text-sm font-medium text-slate-600">
+          <Link
+            href={surface === 'calendar' ? '/hub/calendar' : '/hub/meet'}
+            className="inline-flex items-center gap-1 text-sm font-medium text-slate-600"
+          >
             <ArrowLeft className="h-4 w-4" />
-            CHORUS
+            {surface === 'calendar' ? 'eCalendar' : 'CHORUS'}
           </Link>
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-700 to-slate-900">
             <Video className="h-4 w-4 text-teal-50" />
           </span>
           <h1 className="text-lg font-semibold">{t('Agenda pública', 'Agenda pública', 'Public agenda')}</h1>
-          {lockedCompanyId ? (
-            <Link href="/hub/meet/agenda" className="ml-auto text-sm font-medium text-teal-800">
-              {t('Abrir no CHORUS', 'Abrir en CHORUS', 'Open in CHORUS')}
+          <div className="ml-auto flex flex-wrap items-center gap-3">
+            <Link
+              href={surface === 'calendar' ? '/hub/meet/agenda' : '/hub/calendar?view=agenda'}
+              className="text-sm font-medium text-teal-800"
+            >
+              {surface === 'calendar'
+                ? t('Abrir no Chorus', 'Abrir en Chorus', 'Open in Chorus')
+                : t('Abrir no eCalendar', 'Abrir en eCalendar', 'Open in eCalendar')}
             </Link>
-          ) : (
-            <CompanyPicker
-              companies={companies}
-              activeCompanyId={companyId}
-              onSelect={setActiveCompanyId}
-              ready={companiesReady}
-              error={companiesLoadError}
-              onRetry={() => void reloadCompanies()}
-              locale={locale}
-              className="ml-auto"
-            />
-          )}
+            {lockedCompanyId ? null : (
+              <CompanyPicker
+                companies={companies}
+                activeCompanyId={companyId}
+                onSelect={setActiveCompanyId}
+                ready={companiesReady}
+                error={companiesLoadError}
+                onRetry={() => void reloadCompanies()}
+                locale={locale}
+              />
+            )}
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">

@@ -61,6 +61,7 @@ test('agenda surfaces force light form colors', () => {
   const guest = readFileSync(join(root, 'components/meet/ChorusPublicAgenda.tsx'), 'utf8');
   assert.match(owner, /etholys-meet-light/);
   assert.match(owner, /ChorusAgendaCalendar/);
+  assert.match(owner, /\/hub\/calendar\?view=agenda/);
   assert.match(guest, /viewer === 'owner'/);
   assert.match(guest, /etholys-meet-light/);
   assert.doesNotMatch(`${owner}\n${guest}`, /jitsi|jibri|jigasi/i);
