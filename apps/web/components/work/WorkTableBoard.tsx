@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useState } from 'react';
-import { ChevronDown, ChevronRight, Copy, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, GripVertical, Paperclip, Plus, Trash2 } from 'lucide-react';
 import { getInitials } from '@/lib/utils';
 import { WorkUpdates } from './WorkUpdates';
 import {
@@ -30,6 +30,7 @@ type TaskRow = {
   customFields?: Record<string, unknown> | null;
   tags?: unknown;
   assigneeId?: string | null;
+  collaboratorIds?: unknown;
   projectId?: string | null;
   departmentId?: string | null;
   folderId?: string | null;
@@ -38,7 +39,7 @@ type TaskRow = {
   project?: { id?: string; name?: string } | null;
   department?: { id?: string; name?: string } | null;
   folder?: { id?: string; name?: string } | null;
-  _count?: { comments?: number; subtasks?: number };
+  _count?: { comments?: number; subtasks?: number; attachments?: number };
 };
 
 type DropTarget =
@@ -51,6 +52,138 @@ function cellStop(e: React.MouseEvent | React.KeyboardEvent) {
 
 function sortByOrder(tasks: TaskRow[]) {
   return [...tasks].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.title.localeCompare(b.title));
+}
+
+function personIds(task: TaskRow) {
+  const extra = Array.isArray(task.collaboratorIds) ? task.collaboratorIds.map((id) => String(id)) : [];
+  return [task.assigneeId, ...extra].filter((id): id is string => Boolean(id));
+}
+
+function PeopleCell({
+  task,
+  users,
+  onPatch,
+  t,
+}: {
+  task: TaskRow;
+  users: UserOpt[];
+  onPatch: (id: string, body: Record<string, unknown>) => void;
+  t: (en: string, es: string, pt: string) => string;
+}) {
+  const ids = personIds(task);
+  const extra = ids.filter((id) => id !== task.assigneeId);
+  const nameOf = (id: string) => users.find((u) => u.id === id)?.name || users.find((u) => u.id === id)?.email || id;
+  return (
+    <div className="flex min-w-[140px] flex-wrap items-center gap-1">
+      {ids.map((id) => (
+        <button
+          key={id}
+          type="button"
+          title={nameOf(id)}
+          onClick={() => {
+            if (id === task.assigneeId) {
+              const [next, ...rest] = extra;
+              onPatch(task.id, { assigneeId: next || null, collaboratorIds: rest });
+            } else {
+              onPatch(task.id, { collaboratorIds: extra.filter((row) => row !== id) });
+            }
+          }}
+          className="inline-flex h-6 items-center gap-1 rounded-full bg-teal-500/15 px-1.5 text-[10px] font-semibold text-teal-200"
+        >
+          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-teal-200 text-[8px] text-teal-900">
+            {getInitials(nameOf(id))}
+          </span>
+          <span className="max-w-[72px] truncate">{nameOf(id)}</span>
+        </button>
+      ))}
+      <select
+        value=""
+        onChange={(e) => {
+          const id = e.target.value;
+          if (!id || ids.includes(id)) return;
+          if (!task.assigneeId) onPatch(task.id, { assigneeId: id });
+          else onPatch(task.id, { collaboratorIds: [...extra, id] });
+        }}
+        className="max-w-[88px] cursor-pointer bg-transparent text-[11px] text-[color:var(--sys-faint)] outline-none"
+      >
+        <option value="">{t('+ Person', '+ Persona', '+ Pessoa')}</option>
+        {users.filter((u) => !ids.includes(u.id)).map((u) => (
+          <option key={u.id} value={u.id}>{u.name || u.email}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function FileCell({
+  taskId,
+  count,
+  t,
+}: {
+  taskId: string;
+  count: number;
+  t: (en: string, es: string, pt: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [files, setFiles] = useState<Array<{ id: string; fileName: string }>>([]);
+  const [n, setN] = useState(count);
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    const res = await fetch(`/api/tasks/${taskId}/files`);
+    const data = await res.json().catch(() => ({}));
+    const list = Array.isArray(data?.files) ? data.files : [];
+    setFiles(list);
+    setN(list.length);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => {
+          setOpen((v) => !v);
+          void load();
+        }}
+        className="inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--sys-ink)]"
+      >
+        <Paperclip className="h-3.5 w-3.5" />
+        {n > 0 ? n : t('Add', 'Añadir', 'Adicionar')}
+      </button>
+      {open && (
+        <div className="absolute left-0 z-30 mt-1 w-56 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel,#0f172a)] p-2 shadow-lg">
+          {files.map((file) => (
+            <a
+              key={file.id}
+              href={`/api/tasks/${taskId}/files/${file.id}`}
+              className="block truncate rounded px-1 py-1 text-[11px] text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+            >
+              {file.fileName}
+            </a>
+          ))}
+          <label className="mt-1 block cursor-pointer rounded px-1 py-1 text-[11px] font-semibold text-teal-300 hover:bg-teal-500/10">
+            {busy ? t('Uploading…', 'Subiendo…', 'A enviar…') : t('+ Upload file', '+ Subir archivo', '+ Enviar ficheiro')}
+            <input
+              type="file"
+              className="hidden"
+              disabled={busy}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (!file) return;
+                setBusy(true);
+                const body = new FormData();
+                body.set('file', file);
+                void fetch(`/api/tasks/${taskId}/files`, { method: 'POST', body })
+                  .then(() => load())
+                  .finally(() => setBusy(false));
+              }}
+            />
+          </label>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function WorkTableBoard({
@@ -255,7 +388,7 @@ export function WorkTableBoard({
             </button>
             {addOpen && (
               <div className="absolute left-0 z-20 mt-1 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-                {(['status', 'person', 'priority', 'due', 'start', 'estimate', 'origin', 'updates', 'text', 'number', 'checkbox', 'date'] as WorkColumnKind[])
+                {(['status', 'person', 'priority', 'due', 'start', 'estimate', 'origin', 'updates', 'files', 'text', 'number', 'checkbox', 'date'] as WorkColumnKind[])
                   .filter((kind) => canAddColumnKind(columns, kind))
                   .map((kind) => (
                     <button
@@ -588,25 +721,7 @@ export function WorkTableBoard({
                                 </select>
                               )}
                               {col.kind === 'person' && (
-                                <div className="flex items-center gap-1.5">
-                                  {task.assignee?.name ? (
-                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-100 text-[9px] font-bold text-teal-800">
-                                      {getInitials(task.assignee.name)}
-                                    </span>
-                                  ) : (
-                                    <span className="h-5 w-5 shrink-0 rounded-full border border-dashed border-slate-200" />
-                                  )}
-                                  <select
-                                    value={task.assigneeId || ''}
-                                    onChange={(e) => onPatch(task.id, { assigneeId: e.target.value || null })}
-                                    className="min-w-0 flex-1 cursor-pointer bg-transparent text-[11px] text-[color:var(--sys-ink)] outline-none"
-                                  >
-                                    <option value="">{t('—', '—', '—')}</option>
-                                    {users.map((u) => (
-                                      <option key={u.id} value={u.id}>{u.name || u.email}</option>
-                                    ))}
-                                  </select>
-                                </div>
+                                <PeopleCell task={task} users={users} onPatch={onPatch} t={t} />
                               )}
                               {col.kind === 'priority' && (
                                 <select
@@ -684,6 +799,7 @@ export function WorkTableBoard({
                                   </select>
                                 </div>
                               )}
+                              {col.kind === 'files' && <FileCell taskId={task.id} count={task._count?.attachments || 0} t={t} />}
                               {col.kind === 'updates' && (
                                 <button
                                   type="button"

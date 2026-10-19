@@ -88,6 +88,7 @@ export async function GET(req: Request) {
         startDate: true,
         estimatedHours: true,
         customFields: true,
+        collaboratorIds: true,
         order: true,
         projectId: true,
         companyId: true,

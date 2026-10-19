@@ -27,6 +27,7 @@ export type WorkColumnKind =
   | 'estimate'
   | 'origin'
   | 'updates'
+  | 'files'
   | 'text'
   | 'number'
   | 'checkbox'
@@ -55,6 +56,7 @@ const SINGLETON_KINDS = new Set<WorkColumnKind>([
   'estimate',
   'origin',
   'updates',
+  'files',
 ]);
 
 export function columnKindLabel(kind: WorkColumnKind, t: (en: string, es: string, pt: string) => string) {
@@ -75,6 +77,8 @@ export function columnKindLabel(kind: WorkColumnKind, t: (en: string, es: string
       return t('Origin', 'Origen', 'Origem');
     case 'updates':
       return t('Updates', 'Actualizaciones', 'Atualizações');
+    case 'files':
+      return t('Files', 'Archivos', 'Ficheiros');
     case 'text':
       return t('Text', 'Texto', 'Texto');
     case 'number':

@@ -117,6 +117,17 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
     if (body.dueDate !== undefined) data.dueDate = body.dueDate ? new Date(body.dueDate) : null;
     if (body.startDate !== undefined) data.startDate = body.startDate ? new Date(body.startDate) : null;
     if (body.assigneeId !== undefined) data.assigneeId = body.assigneeId || null;
+    if (Array.isArray(body.collaboratorIds)) {
+      const wanted = [...new Set(body.collaboratorIds.map((id: unknown) => String(id)).filter(Boolean))].slice(0, 12);
+      const members = wanted.length
+        ? await prisma.user.findMany({
+            where: { id: { in: wanted }, companyUsers: { some: { companyId: { in: tenant.companyIds } } } },
+            select: { id: true },
+          })
+        : [];
+      const primary = body.assigneeId !== undefined ? body.assigneeId || null : task.assigneeId;
+      data.collaboratorIds = members.map((u) => u.id).filter((id) => id !== primary);
+    }
     if (body.departmentId !== undefined) data.departmentId = body.departmentId || null;
     if (body.estimatedHours !== undefined) {
       data.estimatedHours =
@@ -193,6 +204,9 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
     else if (body.status !== undefined) data.completedAt = null;
 
     const prevAssignee = task.assigneeId;
+    const prevCollaborators = Array.isArray(task.collaboratorIds)
+      ? task.collaboratorIds.map((id) => String(id))
+      : [];
     const updated = await prisma.task.update({
       where: { id: params.taskId },
       data,
@@ -203,14 +217,29 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
     const company = companyId
       ? await prisma.company.findUnique({ where: { id: companyId }, select: { workBoardJson: true } })
       : null;
-    if (body.assigneeId !== undefined && wantsWorkNotify(company?.workBoardJson, 'assign')) {
-      notifyTaskAssigned({
-        assigneeId: updated.assigneeId,
-        actorId: tenant.userId,
-        title: updated.title,
-        projectId: updated.projectId,
-        prevAssigneeId: prevAssignee,
-      });
+    if (wantsWorkNotify(company?.workBoardJson, 'assign')) {
+      if (body.assigneeId !== undefined) {
+        notifyTaskAssigned({
+          assigneeId: updated.assigneeId,
+          actorId: tenant.userId,
+          title: updated.title,
+          projectId: updated.projectId,
+          prevAssigneeId: prevAssignee,
+        });
+      }
+      const nextCollaborators = Array.isArray(updated.collaboratorIds)
+        ? updated.collaboratorIds.map((id) => String(id))
+        : [];
+      for (const id of nextCollaborators) {
+        if (prevCollaborators.includes(id)) continue;
+        notifyTaskAssigned({
+          assigneeId: id,
+          actorId: tenant.userId,
+          title: updated.title,
+          projectId: updated.projectId,
+          prevAssigneeId: null,
+        });
+      }
     }
     if (body.status !== undefined && body.status !== task.status) {
       notifyTaskWatchers({

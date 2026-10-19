@@ -14,6 +14,7 @@ const KINDS = new Set([
   'estimate',
   'origin',
   'updates',
+  'files',
   'text',
   'number',
   'checkbox',

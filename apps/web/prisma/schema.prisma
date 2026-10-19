@@ -685,6 +685,8 @@ model Task {
   tags             String?
   /// Valores das colunas extra do quadro (texto, número, data, checkbox).
   customFields     Json?
+  /// Pessoas extra na tarefa, além do responsável principal.
+  collaboratorIds  Json?
   isActive         Boolean          @default(true)
   isRecurring      Boolean          @default(false)
   recurrenceMonths Int?
