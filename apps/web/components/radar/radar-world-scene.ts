@@ -94,24 +94,26 @@ function addSensor(group: THREE.Group, color: number, x: number, z: number) {
 
 export function mountRadarWorld(host: HTMLElement, opts: MountOpts): () => void {
   const width = host.clientWidth || 640;
-  const height = host.clientHeight || 420;
+  const height = host.clientHeight || 560;
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xdbeafe);
-  scene.fog = new THREE.Fog(0xdbeafe, 28, 70);
+  scene.background = new THREE.Color(0xb7c9a8);
+  scene.fog = new THREE.Fog(0xb7c9a8, 48, 140);
 
-  const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 200);
-  camera.position.set(12, 11, 14);
+  const camera = new THREE.PerspectiveCamera(32, width / height, 0.05, 400);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(width, height);
+  renderer.domElement.style.display = 'block';
+  renderer.domElement.style.width = '100%';
+  renderer.domElement.style.height = '100%';
   renderer.shadowMap.enabled = true;
   host.appendChild(renderer.domElement);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI / 2.15;
-  controls.target.set(0, 0, 0);
+  controls.target.set(0, 0.15, 0);
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.75));
   const sun = new THREE.DirectionalLight(0xffffff, 1.1);
@@ -126,6 +128,39 @@ export function mountRadarWorld(host: HTMLElement, opts: MountOpts): () => void 
   const gap = 0.7;
   const spanX = cols * cell + (cols - 1) * gap;
   const spanZ = rows * cell + (rows - 1) * gap;
+
+  const frameCamera = () => {
+    const w = host.clientWidth || 640;
+    const h = host.clientHeight || 560;
+    camera.aspect = w / Math.max(h, 1);
+    const fov = 32;
+    camera.fov = fov;
+    const vFov = (fov * Math.PI) / 180;
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+    const halfX = spanX / 2 + 0.4;
+    const halfZ = spanZ / 2 + 0.4;
+    const distH = halfX / Math.tan(hFov / 2);
+    const distV = halfZ / Math.tan(vFov / 2);
+    const viewDist = Math.min(distH, distV) * 1.08;
+    camera.position.copy(new THREE.Vector3(0.82, 0.7, 1).normalize().multiplyScalar(viewDist));
+    camera.near = 0.05;
+    camera.far = Math.max(120, viewDist * 14);
+    camera.updateProjectionMatrix();
+    controls.target.set(0, 0.2, 0);
+    controls.minDistance = viewDist * 0.45;
+    controls.maxDistance = viewDist * 3.2;
+    controls.update();
+    renderer.setSize(w, h);
+  };
+
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(Math.max(spanX, spanZ) * 8, 48),
+    new THREE.MeshStandardMaterial({ color: 0x6d8f58, roughness: 1 }),
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.42;
+  ground.receiveShadow = true;
+  scene.add(ground);
 
   const platform = new THREE.Mesh(
     new THREE.BoxGeometry(spanX + 2.4, 0.35, spanZ + 2.4),
@@ -203,13 +238,8 @@ export function mountRadarWorld(host: HTMLElement, opts: MountOpts): () => void 
   };
   tick();
 
-  const onResize = () => {
-    const w = host.clientWidth || 640;
-    const h = host.clientHeight || 420;
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-    renderer.setSize(w, h);
-  };
+  frameCamera();
+  const onResize = () => frameCamera();
   const observer = new ResizeObserver(onResize);
   observer.observe(host);
 

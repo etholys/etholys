@@ -55,11 +55,11 @@ export function RadarSpatialTwin({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, sensorKey, moduleId, focusedId]);
 
-  const tall = hero ? 'min-h-[320px] sm:min-h-[440px] md:min-h-[520px]' : 'min-h-[280px] sm:min-h-[380px]';
+  const tall = hero ? 'h-[calc(100dvh-11.5rem)] min-h-[560px]' : 'min-h-[280px] sm:min-h-[380px]';
 
   if (parcels.length === 0) {
     return (
-      <div className={`flex items-center justify-center rounded-xl border border-white/10 bg-[#dbeafe] ${tall}`}>
+      <div className={`flex items-center justify-center rounded-xl border border-white/10 bg-[#c5d4b8] ${tall}`}>
         <p className="text-sm text-slate-600">
           {radarT(loc, 'Ainda sem espaços na planta.', 'Aún sin espacios en la planta.', 'No spaces on the plant yet.')}
         </p>
@@ -68,7 +68,7 @@ export function RadarSpatialTwin({
   }
 
   return (
-    <div className={`relative overflow-hidden rounded-xl border border-slate-200/80 ${tall}`}>
+    <div className={`relative overflow-hidden rounded-xl ${tall}`}>
       <div ref={hostRef} className="absolute inset-0" />
       <p className="pointer-events-none absolute bottom-2 left-3 text-[10px] font-medium text-slate-600/80">
         {parcels.length} {radarT(loc, 'espaços', 'espacios', 'spaces')}

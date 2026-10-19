@@ -78,6 +78,7 @@ export function RadarOpsBar({
   const loc = radarLoc(locale);
   const pathname = usePathname() || '';
   const place = placeFor(pathname, loc);
+  const onProperty = pathname.includes('/radar/properties/');
   const [count, setCount] = useState<number | null>(null);
   const [top, setTop] = useState<string | null>(null);
 
@@ -100,6 +101,8 @@ export function RadarOpsBar({
       cancelled = true;
     };
   }, [companyId, engagementId, loc, pathname]);
+
+  if (onProperty) return null;
 
   return (
     <div className="mb-4 flex flex-wrap items-stretch gap-2">

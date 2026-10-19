@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Radio, Settings2, Sprout } from 'lucide-react';
+import { ArrowLeft, Loader2, Radio, Sprout } from 'lucide-react';
 import { RADAR_MODULES, type RadarModuleId } from '@/lib/etholys-products';
 import { isRadarModuleId, spaceKindMeta } from '@/lib/radar/space';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
-import type { PropertyStepId, PropertyStepState } from '@/lib/radar/property-progress';
-import { RadarProgressRail } from '@/components/radar/RadarProgressRail';
+import { PROPERTY_STEP_COPY, type PropertyStepId, type PropertyStepState } from '@/lib/radar/property-progress';
 import { RadarGeoPin } from '@/components/radar/RadarGeoPin';
 import { RadarSiteMap } from '@/components/radar/RadarSiteMap';
 import { RadarSpatialTwin } from '@/components/radar/RadarSpatialTwin';
@@ -88,8 +87,8 @@ export function RadarPropertyWorkspace({
   const [devEui, setDevEui] = useState('');
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [addingParcel, setAddingParcel] = useState(false);
-  const [mode, setMode] = useState<'operate' | 'setup'>('operate');
-  const [tool, setTool] = useState<'crops' | 'space' | 'sensors' | null>(null);
+  const [panel, setPanel] = useState<PropertyStepId | null>(null);
+  const [tool, setTool] = useState<'crops' | 'space' | null>(null);
   const [openLot, setOpenLot] = useState<{ code: string; currentStage: TraceStage } | null>(null);
 
   const load = useCallback(async () => {
@@ -116,13 +115,6 @@ export function RadarPropertyWorkspace({
         null;
       setFocusedId(prefer);
       if (!Array.isArray(p.crops)) (p as PropertyDetail).crops = [];
-      const done = Boolean(p.steps.find((s) => s.id === 'characterize')?.done);
-      if (!done) {
-        setMode('setup');
-        setStep('characterize');
-      } else if (initialUnitId) {
-        setMode('operate');
-      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -151,7 +143,7 @@ export function RadarPropertyWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [companyId, engagementId, data?.id, mode]);
+  }, [companyId, engagementId, data?.id]);
 
   const patch = async (payload: Record<string, unknown>) => {
     setBusy(true);
@@ -206,73 +198,96 @@ export function RadarPropertyWorkspace({
       };
     });
 
-  const showOperate = Boolean(characterized) && mode === 'operate';
+  const next = data.steps.find((s) => !s.done) ?? null;
   const companyQ = engagementId
     ? `company=${companyId}&engagement=${engagementId}`
     : `company=${companyId}`;
   const chainHref = `/hub/radar/cadeia?${companyQ}`;
+  const openStep = (id: PropertyStepId) => {
+    setPanel((cur) => (cur === id ? null : id));
+    setStep(id);
+    if (id !== 'draw') setTool(null);
+  };
+  const nextLabel: Record<PropertyStepId, string> = {
+    characterize: radarT(loc, 'Falta caracterizar o sítio', 'Falta caracterizar el sitio', 'Characterize this site'),
+    draw: radarT(loc, 'Falta criar o primeiro espaço', 'Falta crear el primer espacio', 'Add the first space'),
+    geolocate: radarT(loc, 'Falta marcar o sítio no mapa', 'Falta marcar el sitio en el mapa', 'Pin this site'),
+    sensors: radarT(loc, 'Falta ligar sensores', 'Falta conectar sensores', 'Connect sensors'),
+  };
+  const nextButton: Record<PropertyStepId, string> = {
+    characterize: radarT(loc, 'Caracterizar', 'Caracterizar', 'Characterize'),
+    draw: radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space'),
+    geolocate: radarT(loc, 'Marcar no mapa', 'Marcar en el mapa', 'Pin on map'),
+    sensors: radarT(loc, 'Ligar sensores', 'Conectar sensores', 'Connect sensors'),
+  };
+  const actionBtn = (on: boolean) =>
+    `rounded-lg px-3.5 py-2 text-sm font-semibold shadow-sm ${
+      on ? 'bg-emerald-400 text-slate-950' : 'bg-white text-slate-900 hover:bg-emerald-50'
+    }`;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href={backHref} className="inline-flex items-center gap-1.5 text-xs text-white/45 hover:text-white/70">
             <ArrowLeft className="h-3.5 w-3.5" />
             {radarT(loc, 'Lugares', 'Lugares', 'Places')}
           </Link>
-          <h1 className="mt-2 font-serif text-3xl text-white sm:text-4xl">{data.name}</h1>
+          <h1 className="mt-1 font-serif text-3xl text-white sm:text-4xl">{data.name}</h1>
           {data.clientName && <p className="mt-0.5 text-sm text-white/45">{data.clientName}</p>}
         </div>
-        {characterized && (
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setMode('operate')}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold ${
-                mode === 'operate' ? 'bg-sky-600 text-white' : 'border border-white/20 text-white'
-              }`}
-            >
-              {radarT(loc, 'Mapa 3D', 'Mapa 3D', '3D map')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('setup')}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold ${
-                mode === 'setup' ? 'bg-white text-slate-900' : 'border border-white/20 text-white'
-              }`}
-            >
-              <Settings2 className="h-3.5 w-3.5" />
-              {radarT(loc, 'Ficha do sítio', 'Ficha del sitio', 'Site file')}
-            </button>
-          </div>
+        {!next && (
+          <button type="button" onClick={() => openStep('characterize')} className={actionBtn(panel === 'characterize')}>
+            {radarT(loc, 'Ficha', 'Ficha', 'File')}
+          </button>
         )}
       </div>
 
       {err && <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">{err}</p>}
 
-      {showOperate ? (
-        <div className="space-y-3">
+      {next && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-50 px-4 py-3 text-amber-950">
+          <p className="text-sm font-semibold">{nextLabel[next.id]}</p>
+          <button
+            type="button"
+            onClick={() => openStep(next.id)}
+            className="rounded-lg bg-slate-950 px-3.5 py-2 text-sm font-semibold text-white"
+          >
+            {panel === next.id
+              ? radarT(loc, 'Fechar', 'Cerrar', 'Close')
+              : nextButton[next.id]}
+          </button>
+        </div>
+      )}
+
+      <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => setTool(tool === 'space' ? null : 'space')}
-              className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-semibold text-slate-950"
+              onClick={() => {
+                setTool(tool === 'space' ? null : 'space');
+                setPanel(null);
+              }}
+              className={actionBtn(tool === 'space')}
             >
               {radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
             </button>
             {data.moduleId === 'agriculture' && (
               <button
                 type="button"
-                onClick={() => setTool(tool === 'crops' ? null : 'crops')}
-                className="rounded-xl border border-white/25 bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
+                onClick={() => {
+                  setTool(tool === 'crops' ? null : 'crops');
+                  setPanel(null);
+                }}
+                className={actionBtn(tool === 'crops')}
               >
                 {radarT(loc, 'Cultivos', 'Cultivos', 'Crops')}
               </button>
             )}
             <button
               type="button"
-              onClick={() => setTool(tool === 'sensors' ? null : 'sensors')}
-              className="rounded-xl border border-white/25 bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
+              onClick={() => openStep('sensors')}
+              className={actionBtn(panel === 'sensors')}
             >
               {radarT(loc, 'Sensores', 'Sensores', 'Sensors')}
             </button>
@@ -307,79 +322,13 @@ export function RadarPropertyWorkspace({
               }}
             />
           )}
-          {tool === 'sensors' && (
-            <div className="rounded-xl border border-white/15 bg-slate-950 px-4 py-4">
-              <p className="text-sm font-semibold text-white">
-                {radarT(loc, 'Ligar equipamento', 'Conectar equipo', 'Connect a device')}
-              </p>
-              <p className="mt-1 text-xs text-slate-300">
-                {radarT(
-                  loc,
-                  'Escolhe o aparelho, o espaço e o DevEUI. O token aparece uma vez.',
-                  'Elegí el equipo, el espacio y el DevEUI. El token aparece una vez.',
-                  'Pick the device, the space and the DevEUI. The token is shown once.',
-                )}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <select
-                  value={sensorSku}
-                  onChange={(e) => setSensorSku(e.target.value)}
-                  className="min-w-[14rem] rounded-xl border border-slate-500 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 [&>option]:bg-slate-950 [&>option]:text-slate-100"
-                >
-                  {RADAR_DEVICE_CATALOG.map((d) => (
-                    <option key={d.sku} value={d.sku}>
-                      {d.sku} — {d.label[loc]}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  value={sensorName}
-                  onChange={(e) => setSensorName(e.target.value)}
-                  placeholder={loc === 'en' ? 'Name on the site' : 'Nome no sítio'}
-                  className="min-w-[12rem] flex-1 rounded-xl border border-slate-500 bg-slate-950 px-3 py-2.5 text-sm text-slate-100"
-                />
-                <input
-                  value={devEui}
-                  onChange={(e) => setDevEui(e.target.value)}
-                  placeholder="DevEUI"
-                  className="min-w-[10rem] rounded-xl border border-slate-500 bg-slate-950 px-3 py-2.5 text-sm text-slate-100"
-                />
-                <button
-                  type="button"
-                  disabled={busy || sensorName.trim().length < 2}
-                  onClick={() =>
-                    void patch({
-                      action: 'sensor',
-                      name: sensorName,
-                      sku: sensorSku,
-                      devEui,
-                      unitId: focusedId || data.units[0]?.id,
-                    })
-                      .then((d) => {
-                        setTokenFlash(`${d.token as string}  →  ${d.ingestPath as string}`);
-                        setSensorName('');
-                        setDevEui('');
-                        return load();
-                      })
-                      .catch(() => undefined)
-                  }
-                  className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-slate-950 disabled:opacity-40"
-                >
-                  {radarT(loc, 'Emitir token', 'Emitir token', 'Issue token')}
-                </button>
-              </div>
-              {tokenFlash && (
-                <code className="mt-3 block break-all rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-950">{tokenFlash}</code>
-              )}
-            </div>
-          )}
           {openLot && (
             <Link href={chainHref} className="text-xs text-emerald-300/80 hover:text-emerald-200">
               {radarT(loc, 'Lote', 'Lote', 'Lot')} {openLot.code} · {TRACE_STAGE_LABEL[openLot.currentStage][loc]} →
             </Link>
           )}
           {/* Ref pattern: tree (nav) | plant map | what to do */}
-          <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)_minmax(240px,0.85fr)] lg:items-start">
+          <div className="grid gap-2 lg:grid-cols-[minmax(148px,188px)_minmax(0,1fr)_minmax(220px,260px)] lg:items-stretch">
             <RadarSpaceTree
               locale={loc}
               moduleId={data.moduleId}
@@ -389,6 +338,7 @@ export function RadarPropertyWorkspace({
               focusedId={focusedId}
               onFocus={setFocusedId}
             />
+            <div className="relative min-h-0 min-w-0">
             <RadarSpatialTwin
               locale={loc}
               moduleId={data.moduleId}
@@ -403,33 +353,25 @@ export function RadarPropertyWorkspace({
               onFocus={setFocusedId}
               hero
             />
-            <RadarFocusSheet
-              companyId={companyId}
-              engagementId={engagementId}
-              propertyId={propertyId}
-              locale={loc}
-              moduleId={data.moduleId}
-              units={data.units}
-              focusedId={focusedId}
-              latest={focusedId ? data.latestByUnit?.[focusedId] : null}
-              hasValve={Boolean(
-                data.devices?.some((d) => d.unitId === focusedId && d.sku === 'SVC01-LS2'),
-              )}
-            />
-          </div>
-        </div>
-      ) : (
-        <>
-          <RadarProgressRail
-            steps={data.steps}
-            active={step}
-            locale={loc}
-            percent={data.progressPercent}
-            onSelect={setStep}
-          />
-
-          <div className="rounded-[1.5rem] border border-white/10 bg-gradient-to-br from-white/[0.05] to-transparent px-5 py-6 sm:px-7">
-            {/* setup steps stay below — unchanged block continues */}
+              {panel && (
+                <div className="absolute inset-x-3 top-3 z-20 max-h-[min(72%,34rem)] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 px-4 py-4 shadow-2xl">
+<div className="mb-4 flex flex-wrap gap-2">
+              {data.steps.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    setPanel(s.id);
+                    setStep(s.id);
+                  }}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
+                    panel === s.id ? 'bg-white text-slate-950' : 'bg-slate-800 text-slate-100'
+                  }`}
+                >
+                  {PROPERTY_STEP_COPY[s.id][loc].label}
+                </button>
+              ))}
+            </div>
             {step === 'characterize' && (
           <div className="space-y-5">
             <div>
@@ -437,16 +379,12 @@ export function RadarPropertyWorkspace({
                 {loc === 'es' ? 'Caracterizar' : loc === 'en' ? 'Characterize' : 'Caracterizar'}
               </h2>
               <p className="mt-1 text-sm text-white/55">
-                {loc === 'es'
-                  ? 'Tipo productivo, cultivo y área. Esto abre el lazo operativo.'
-                  : loc === 'en'
-                    ? 'Productive type, crop and area. This opens the ops loop.'
-                    : 'Tipo produtivo, cultura e área. Isto abre o laço operativo.'}
+                {radarT(loc, 'Tipo, cultura e hectares.', 'Tipo, cultivo y hectáreas.', 'Type, crop and hectares.')}
               </p>
             </div>
             <label className="block">
               <span className="text-xs uppercase tracking-wide text-white/45">
-                {loc === 'en' ? 'Name' : 'Nome'}
+                {radarT(loc, 'Nome', 'Nombre', 'Name')}
               </span>
               <input
                 value={name}
@@ -507,16 +445,13 @@ export function RadarPropertyWorkspace({
                   areaHa: area ? Number(area) : null,
                 })
                   .then(() => load())
-                  .then(() => {
-                    setMode('setup');
-                    setStep('draw');
-                  })
+                  .then(() => setPanel(null))
                   .catch((e) => setErr(e.message))
               }
-              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-[#04110c] disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 disabled:opacity-40"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sprout className="h-4 w-4" />}
-              {radarT(loc, 'Guardar e continuar', 'Guardar y continuar', 'Save & continue')}
+              {radarT(loc, 'Guardar', 'Guardar', 'Save')}
             </button>
           </div>
         )}
@@ -530,12 +465,11 @@ export function RadarPropertyWorkspace({
             {!characterized ? (
               <EmptyHint
                 locale={loc}
-                text={
-                  loc === 'en'
-                    ? 'Characterize the property first.'
-                    : 'Caracteriza a propriedade primeiro.'
-                }
-                onClick={() => setStep('characterize')}
+                text={radarT(loc, 'Caracteriza o sítio primeiro.', 'Caracterizá el sitio primero.', 'Characterize the site first.')}
+                onClick={() => {
+                  setPanel('characterize');
+                  setStep('characterize');
+                }}
               />
             ) : (
               <>
@@ -605,15 +539,6 @@ export function RadarPropertyWorkspace({
                 )}
               </>
             )}
-            {characterized && (
-              <button
-                type="button"
-                onClick={() => setStep('geolocate')}
-                className="rounded-2xl border border-white/15 px-4 py-2.5 text-sm text-white/80"
-              >
-                {loc === 'en' ? 'Continue to geolocate' : 'Continuar para geolocalizar'}
-              </button>
-            )}
           </div>
         )}
 
@@ -626,7 +551,7 @@ export function RadarPropertyWorkspace({
             onSave={async (lat, lng) => {
               await patch({ action: 'geolocate', lat, lng });
               await load();
-              setStep('sensors');
+              setPanel(null);
             }}
           />
         )}
@@ -635,14 +560,15 @@ export function RadarPropertyWorkspace({
           <div className="space-y-5">
             <div>
               <h2 className="font-serif text-2xl text-white">
-                {loc === 'es' ? 'Conectar sensores' : loc === 'en' ? 'Connect sensors' : 'Conectar sensores'}
+                {radarT(loc, 'Sensores', 'Sensores', 'Sensors')}
               </h2>
               <p className="mt-1 text-sm text-white/55">
-                {loc === 'es'
-                  ? 'Emití un token de ingest. Guardalo — solo se muestra una vez.'
-                  : loc === 'en'
-                    ? 'Issue an ingest token. Save it — shown only once.'
-                    : 'Emite um token de ingest. Guarda-o — só aparece uma vez.'}
+                {radarT(
+                  loc,
+                  'Aparelho, espaço e DevEUI. O token aparece uma vez.',
+                  'Equipo, espacio y DevEUI. El token aparece una vez.',
+                  'Device, space and DevEUI. The token is shown once.',
+                )}
               </p>
             </div>
             {data.sensors.length > 0 && (
@@ -674,7 +600,7 @@ export function RadarPropertyWorkspace({
               <input
                 value={sensorName}
                 onChange={(e) => setSensorName(e.target.value)}
-                placeholder={loc === 'en' ? 'Name on the site' : 'Nome no sítio'}
+                placeholder={radarT(loc, 'Nome no sítio', 'Nombre en el sitio', 'Name on the site')}
                 className="min-w-[12rem] flex-1 rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
               />
               <input
@@ -702,23 +628,39 @@ export function RadarPropertyWorkspace({
                     })
                     .catch((e) => setErr(e.message))
                 }
-                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-[#04110c] disabled:opacity-40"
+                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 disabled:opacity-40"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radio className="h-4 w-4" />}
-                {loc === 'en' ? 'Issue token' : 'Emitir token'}
+                {radarT(loc, 'Emitir token', 'Emitir token', 'Issue token')}
               </button>
             </div>
             {tokenFlash && (
               <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-50">
-                <p className="font-medium">{loc === 'en' ? 'Copy now' : 'Copia agora'}</p>
+                <p className="font-medium">{radarT(loc, 'Copia agora', 'Copiá ahora', 'Copy now')}</p>
                 <code className="mt-1 block break-all text-xs">{tokenFlash}</code>
               </div>
             )}
           </div>
         )}
-      </div>
-        </>
-      )}
+                </div>
+              )}
+            </div>
+            <RadarFocusSheet
+              companyId={companyId}
+              engagementId={engagementId}
+              propertyId={propertyId}
+              locale={loc}
+              moduleId={data.moduleId}
+              units={data.units}
+              focusedId={focusedId}
+              latest={focusedId ? data.latestByUnit?.[focusedId] : null}
+              hasValve={Boolean(
+                data.devices?.some((d) => d.unitId === focusedId && d.sku === 'SVC01-LS2'),
+              )}
+            />
+          </div>
+        </div>
+
     </div>
   );
 }
@@ -760,7 +702,7 @@ function ParcelAssignCrop({
     <div className="flex flex-wrap items-end gap-2 rounded-xl border border-white/10 bg-black/20 px-4 py-3">
       <div className="min-w-[10rem] flex-1">
         <p className="text-[10px] uppercase tracking-wide text-white/40">
-          {locale === 'en' ? 'Crop on' : 'Cultivo em'} {unit.name}
+          {locale === 'es' ? 'Cultivo en' : locale === 'en' ? 'Crop on' : 'Cultivo em'} {unit.name}
         </p>
         {crops.length > 0 ? (
           <select
@@ -768,7 +710,7 @@ function ParcelAssignCrop({
             onChange={(e) => setCrop(e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-500 bg-slate-950 px-3 py-2 text-sm text-slate-100"
           >
-            <option value="">{locale === 'en' ? 'None' : 'Nenhum'}</option>
+            <option value="">{locale === 'es' ? 'Ninguno' : locale === 'en' ? 'None' : 'Nenhum'}</option>
             {crops.map((c) => (
               <option key={c.id} value={c.name}>
                 {c.name}

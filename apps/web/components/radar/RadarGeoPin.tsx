@@ -8,7 +8,7 @@ type Loc = 'pt' | 'es' | 'en';
 const COPY = {
   pt: {
     title: 'Geolocalizar',
-    sub: 'Marca a propriedade no mapa. Coordenadas bastam — sem GIS completo.',
+    sub: 'Latitude e longitude do sítio.',
     lat: 'Latitude',
     lng: 'Longitude',
     here: 'Usar a minha localização',
@@ -17,7 +17,7 @@ const COPY = {
   },
   es: {
     title: 'Geolocalizar',
-    sub: 'Marcá la propiedad en el mapa. Con coordenadas alcanza — sin GIS completo.',
+    sub: 'Latitud y longitud del sitio.',
     lat: 'Latitud',
     lng: 'Longitud',
     here: 'Usar mi ubicación',
@@ -26,7 +26,7 @@ const COPY = {
   },
   en: {
     title: 'Geolocate',
-    sub: 'Pin the property on the map. Coordinates are enough — no full GIS.',
+    sub: 'Latitude and longitude of the site.',
     lat: 'Latitude',
     lng: 'Longitude',
     here: 'Use my location',

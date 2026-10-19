@@ -81,9 +81,9 @@ export const RADAR_MODULES = [
     pt: 'Carbono',
     en: 'Carbon',
     hint: {
-      es: 'Lectura de prácticas y emisiones — primera capa.',
-      pt: 'Leitura de práticas e emissões — primeira camada.',
-      en: 'Practices and emissions reading — first layer.',
+      es: 'Prácticas y emisiones.',
+      pt: 'Práticas e emissões.',
+      en: 'Practices and emissions.',
     },
   },
 ] as const;
