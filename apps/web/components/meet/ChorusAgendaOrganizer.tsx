@@ -439,12 +439,22 @@ export default function ChorusAgendaOrganizer({
   return (
     <div
       className={cn(
-        'etholys-system etholys-meet relative flex min-h-0 text-[color:var(--sys-ink)]',
-        embedded ? 'min-h-[70vh] flex-1' : 'etholys-hub isolate min-h-dvh bg-[color:var(--sys-canvas-bg,#07111A)]',
+        'etholys-system etholys-meet relative flex w-full text-[color:var(--sys-ink)]',
+        embedded
+          ? 'min-h-0 min-h-[70vh] flex-1'
+          : 'etholys-hub isolate min-h-dvh w-full overflow-hidden bg-[color:var(--sys-canvas-bg,#07111A)]',
       )}
       data-accent="teal"
     >
-      {embedded ? null : <SystemAtmosphere accent="teal" />}
+      {embedded ? null : (
+        <>
+          <div
+            aria-hidden
+            className="pointer-events-none fixed inset-0 -z-10 bg-[color:var(--sys-canvas-bg,#07111A)]"
+          />
+          <SystemAtmosphere accent="teal" />
+        </>
+      )}
       {sidebarOpen ? (
         <button
           type="button"

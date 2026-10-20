@@ -1731,12 +1731,25 @@ html[data-appearance='light'] .etholys-etask .text-rose-200 {
   color: #be123c !important;
 }
 
-/* CHORUS hub — mesma paleta do Hub. Formulários e agenda pública ficam em .etholys-meet-light. */
+/* CHORUS hub — mesma paleta do Hub. Formulários e agenda pública ficam em .etholys-meet-light.
+ * Body defaults to white (bg-background); without a full-bleed shell that shows as right/bottom gutters. */
+html:not([data-appearance='light']) body:has(.etholys-meet) {
+  background-color: #07111a;
+}
+html[data-appearance='light'] body:has(.etholys-meet) {
+  background-color: #f1f5f9;
+}
 html:not([data-appearance='light']) .etholys-meet {
   color-scheme: dark;
+  width: 100%;
+  min-height: 100dvh;
+  background-color: var(--sys-canvas-bg, #07111a);
 }
 html[data-appearance='light'] .etholys-meet {
   color-scheme: light;
+  width: 100%;
+  min-height: 100dvh;
+  background-color: var(--sys-canvas-bg, #f1f5f9);
 }
 html:not([data-appearance='light']) .etholys-meet .bg-white:not(.etholys-meet-light):not(.etholys-meet-light *),
 html:not([data-appearance='light']) .etholys-meet .bg-white\/95:not(.etholys-meet-light):not(.etholys-meet-light *),

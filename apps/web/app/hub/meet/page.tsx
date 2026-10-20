@@ -32,6 +32,8 @@ import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 import { CompanyPicker } from '@/components/hub/CompanyPicker';
 import { CompanyRequiredPanel } from '@/components/hub/CompanyRequiredPanel';
+import { sysTheme } from '@/lib/system-shell';
+import { cn } from '@/lib/utils';
 import {
   MeetScheduleDialog,
   type ScheduleDraft,
@@ -108,7 +110,7 @@ export default function MeetHubPage() {
   return (
     <Suspense
       fallback={
-        <div className="etholys-system etholys-meet flex min-h-screen items-center justify-center bg-[color:var(--sys-canvas-bg,#07111A)]">
+        <div className="etholys-system etholys-meet flex min-h-dvh w-full items-center justify-center bg-[color:var(--sys-canvas-bg,#07111A)]">
           <Loader2 className="h-8 w-8 animate-spin text-teal-300" />
         </div>
       }
@@ -634,12 +636,20 @@ function MeetHubContent() {
 
   return (
     <div
-      className="etholys-system etholys-hub etholys-meet relative isolate flex min-h-dvh flex-col bg-[color:var(--sys-canvas-bg,#07111A)] pb-[env(safe-area-inset-bottom)] text-[color:var(--sys-ink,#E8EEF2)]"
+      className={cn(
+        sysTheme.root,
+        'etholys-meet min-h-dvh w-full flex-col pb-[env(safe-area-inset-bottom)]',
+      )}
       data-accent="teal"
     >
+      {/* Fixed canvas so white body gutters never show if the shell height/width is short. */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10 bg-[color:var(--sys-canvas-bg,#07111A)]"
+      />
       <SystemAtmosphere accent="teal" />
-      <header className="sticky top-0 z-30 border-b border-[color:var(--sys-line)] bg-[color:var(--sys-aside-bg)] pt-[env(safe-area-inset-top)] backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
+      <header className="sticky top-0 z-30 w-full shrink-0 border-b border-[color:var(--sys-line)] bg-[color:var(--sys-aside-bg)] pt-[env(safe-area-inset-top)] backdrop-blur">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Link
             href="/hub"
             className="inline-flex touch-manipulation items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium text-[color:var(--sys-nav-idle)] hover:bg-[color:var(--sys-nav-hover)] hover:text-[color:var(--sys-ink)]"
@@ -828,7 +838,7 @@ function MeetHubContent() {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
+      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 min-h-0">
         {!companyId && (
           <CompanyRequiredPanel
             locale={locale}
