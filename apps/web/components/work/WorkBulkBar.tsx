@@ -27,9 +27,9 @@ export function WorkBulkBar({
   if (count <= 0) return null;
 
   return (
-    <div className="sticky top-0 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50/95 px-3 py-2 shadow-sm backdrop-blur">
-      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-900">
-        <CheckSquare className="h-4 w-4" />
+    <div className="sticky top-0 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] px-3 py-2 shadow-sm backdrop-blur">
+      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[color:var(--sys-ink)]">
+        <CheckSquare className="h-4 w-4 text-teal-300" />
         {count} {t('selected', 'seleccionadas', 'selecionadas')}
       </span>
       {onSelectAll && (
@@ -37,7 +37,7 @@ export function WorkBulkBar({
           type="button"
           onClick={onSelectAll}
           disabled={busy}
-          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-cyan-800 hover:bg-cyan-100 disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)] disabled:opacity-40"
         >
           <Square className="h-3.5 w-3.5" />
           {t('Select all visible', 'Seleccionar visibles', 'Selecionar visíveis')}
@@ -51,7 +51,7 @@ export function WorkBulkBar({
           e.target.value = '';
           if (v) void onBulk({ status: v });
         }}
-        className="rounded-lg border border-cyan-200 bg-white px-2 py-1 text-xs"
+        className="etask-field rounded-lg border px-2 py-1 text-xs"
       >
         <option value="">{t('Set status…', 'Estado…', 'Estado…')}</option>
         {WORK_KANBAN.map((s) => (
@@ -68,7 +68,7 @@ export function WorkBulkBar({
           e.target.value = '';
           if (v) void onBulk({ priority: v });
         }}
-        className="rounded-lg border border-cyan-200 bg-white px-2 py-1 text-xs"
+        className="etask-field rounded-lg border px-2 py-1 text-xs"
       >
         <option value="">{t('Set priority…', 'Prioridad…', 'Prioridade…')}</option>
         {WORK_PRIORITIES.map((p) => (
@@ -86,7 +86,7 @@ export function WorkBulkBar({
           if (v === '__clear') void onBulk({ assigneeId: null });
           else if (v) void onBulk({ assigneeId: v });
         }}
-        className="rounded-lg border border-cyan-200 bg-white px-2 py-1 text-xs"
+        className="etask-field rounded-lg border px-2 py-1 text-xs"
       >
         <option value="">{t('Assign…', 'Asignar…', 'Atribuir…')}</option>
         <option value="__clear">{t('Unassigned', 'Sin asignar', 'Sem responsável')}</option>
@@ -103,7 +103,7 @@ export function WorkBulkBar({
           if (e.target.value) void onBulk({ dueDate: e.target.value });
           e.target.value = '';
         }}
-        className="rounded-lg border border-cyan-200 bg-white px-2 py-1 text-xs"
+        className="etask-field rounded-lg border px-2 py-1 text-xs"
         title={t('Set due date', 'Fecha límite', 'Definir prazo')}
       />
       {onDelete && (
@@ -127,7 +127,7 @@ export function WorkBulkBar({
       <button
         type="button"
         onClick={onClear}
-        className="ml-auto rounded-lg p-1.5 text-cyan-700 hover:bg-cyan-100"
+        className="ml-auto rounded-lg p-1.5 text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
         aria-label="Clear selection"
       >
         <X className="h-4 w-4" />

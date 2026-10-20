@@ -1683,40 +1683,64 @@ html[data-appearance='light'] .etholys-etask .text-\[color\:var\(--sys-muted\,\#
   color: #334155 !important;
 }
 html:not([data-appearance='light']) .etholys-etask .bg-white,
+html:not([data-appearance='light']) .etholys-etask .bg-white\/60,
 html:not([data-appearance='light']) .etholys-etask .bg-white\/70,
 html:not([data-appearance='light']) .etholys-etask .bg-white\/80,
 html:not([data-appearance='light']) .etholys-etask .bg-white\/90,
 html:not([data-appearance='light']) .etholys-etask .bg-slate-50,
+html:not([data-appearance='light']) .etholys-etask .bg-slate-50\/50,
 html:not([data-appearance='light']) .etholys-etask .bg-slate-50\/80,
 html:not([data-appearance='light']) .etholys-etask .bg-slate-50\/90 {
   background-color: var(--sys-panel) !important;
 }
 html:not([data-appearance='light']) .etholys-etask .bg-slate-100,
 html:not([data-appearance='light']) .etholys-etask .bg-slate-100\/90,
+html:not([data-appearance='light']) .etholys-etask .bg-slate-200,
 html:not([data-appearance='light']) .etholys-etask .bg-slate-200\/80,
 html:not([data-appearance='light']) .etholys-etask .bg-cyan-50,
+html:not([data-appearance='light']) .etholys-etask .bg-cyan-50\/40,
 html:not([data-appearance='light']) .etholys-etask .bg-cyan-50\/70,
+html:not([data-appearance='light']) .etholys-etask .bg-cyan-50\/95,
+html:not([data-appearance='light']) .etholys-etask .bg-cyan-100,
+html:not([data-appearance='light']) .etholys-etask .bg-cyan-100\/70,
 html:not([data-appearance='light']) .etholys-etask .bg-sky-50,
 html:not([data-appearance='light']) .etholys-etask .bg-amber-50,
 html:not([data-appearance='light']) .etholys-etask .bg-violet-50,
 html:not([data-appearance='light']) .etholys-etask .bg-emerald-50,
 html:not([data-appearance='light']) .etholys-etask .bg-rose-50,
 html:not([data-appearance='light']) .etholys-etask .bg-orange-50,
+html:not([data-appearance='light']) .etholys-etask .bg-red-50,
+html:not([data-appearance='light']) .etholys-etask .bg-teal-50,
 html:not([data-appearance='light']) .etholys-etask .bg-teal-100 {
   background-color: var(--sys-panel-soft) !important;
 }
+html:not([data-appearance='light']) .etholys-etask .hover\:bg-slate-50:hover,
 html:not([data-appearance='light']) .etholys-etask .hover\:bg-slate-50\/80:hover,
-html:not([data-appearance='light']) .etholys-etask .hover\:bg-slate-100:hover {
+html:not([data-appearance='light']) .etholys-etask .hover\:bg-slate-100:hover,
+html:not([data-appearance='light']) .etholys-etask .hover\:bg-white:hover,
+html:not([data-appearance='light']) .etholys-etask .hover\:bg-teal-50:hover,
+html:not([data-appearance='light']) .etholys-etask .hover\:bg-cyan-50:hover,
+html:not([data-appearance='light']) .etholys-etask .hover\:bg-cyan-100:hover,
+html:not([data-appearance='light']) .etholys-etask .hover\:bg-rose-50:hover {
   background-color: var(--sys-nav-hover) !important;
 }
 html:not([data-appearance='light']) .etholys-etask .text-sky-800,
+html:not([data-appearance='light']) .etholys-etask .text-sky-700,
+html:not([data-appearance='light']) .etholys-etask .text-cyan-900,
 html:not([data-appearance='light']) .etholys-etask .text-cyan-800,
+html:not([data-appearance='light']) .etholys-etask .text-cyan-700,
 html:not([data-appearance='light']) .etholys-etask .text-teal-800,
+html:not([data-appearance='light']) .etholys-etask .text-teal-700,
+html:not([data-appearance='light']) .etholys-etask .text-teal-600,
+html:not([data-appearance='light']) .etholys-etask .text-amber-900,
 html:not([data-appearance='light']) .etholys-etask .text-amber-800,
 html:not([data-appearance='light']) .etholys-etask .text-violet-800,
 html:not([data-appearance='light']) .etholys-etask .text-emerald-800,
+html:not([data-appearance='light']) .etholys-etask .text-emerald-700,
 html:not([data-appearance='light']) .etholys-etask .text-orange-800,
-html:not([data-appearance='light']) .etholys-etask .text-rose-700 {
+html:not([data-appearance='light']) .etholys-etask .text-red-800,
+html:not([data-appearance='light']) .etholys-etask .text-rose-700,
+html:not([data-appearance='light']) .etholys-etask .text-rose-600 {
   color: var(--sys-ink) !important;
 }
 html:not([data-appearance='light']) .etholys-etask .text-slate-900,
@@ -1728,23 +1752,31 @@ html:not([data-appearance='light']) .etholys-etask .text-slate-600,
 html:not([data-appearance='light']) .etholys-etask .text-slate-500 {
   color: var(--sys-muted) !important;
 }
-html:not([data-appearance='light']) .etholys-etask .text-slate-400 {
+html:not([data-appearance='light']) .etholys-etask .text-slate-400,
+html:not([data-appearance='light']) .etholys-etask .text-slate-300 {
   color: var(--sys-faint) !important;
 }
 html:not([data-appearance='light']) .etholys-etask .border-slate-100,
 html:not([data-appearance='light']) .etholys-etask .border-slate-200,
 html:not([data-appearance='light']) .etholys-etask .border-slate-200\/80,
 html:not([data-appearance='light']) .etholys-etask .border-slate-200\/90,
-html:not([data-appearance='light']) .etholys-etask .border-cyan-100 {
+html:not([data-appearance='light']) .etholys-etask .border-cyan-100,
+html:not([data-appearance='light']) .etholys-etask .border-cyan-200 {
   border-color: var(--sys-line) !important;
 }
 html:not([data-appearance='light']) .etholys-etask .from-cyan-50,
+html:not([data-appearance='light']) .etholys-etask .from-white,
 html:not([data-appearance='light']) .etholys-etask .to-teal-50\/40,
+html:not([data-appearance='light']) .etholys-etask .to-slate-50\/80,
 html:not([data-appearance='light']) .etholys-etask .via-white {
   --tw-gradient-from: transparent;
   --tw-gradient-to: transparent;
   background-image: none !important;
   background-color: rgba(13, 148, 136, 0.12) !important;
+}
+html:not([data-appearance='light']) .etholys-etask .divide-slate-50 > :not([hidden]) ~ :not([hidden]),
+html:not([data-appearance='light']) .etholys-etask .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--sys-line) !important;
 }
 
 html[data-appearance='light'] .etholys-etask .bg-white\/10 {
@@ -1754,8 +1786,27 @@ html[data-appearance='light'] .etholys-etask .text-teal-200,
 html[data-appearance='light'] .etholys-etask .text-teal-300 {
   color: #0f766e !important;
 }
+html[data-appearance='light'] .etholys-etask .text-cyan-200,
+html[data-appearance='light'] .etholys-etask .text-cyan-300 {
+  color: #0e7490 !important;
+}
+html[data-appearance='light'] .etholys-etask .text-sky-200 {
+  color: #0369a1 !important;
+}
+html[data-appearance='light'] .etholys-etask .text-emerald-200 {
+  color: #047857 !important;
+}
+html[data-appearance='light'] .etholys-etask .text-amber-200 {
+  color: #b45309 !important;
+}
+html[data-appearance='light'] .etholys-etask .text-violet-200 {
+  color: #6d28d9 !important;
+}
 html[data-appearance='light'] .etholys-etask .text-rose-200 {
   color: #be123c !important;
+}
+html[data-appearance='light'] .etholys-etask .text-orange-200 {
+  color: #c2410c !important;
 }
 
 /* CHORUS hub — mesma paleta do Hub. Formulários e agenda pública ficam em .etholys-meet-light.

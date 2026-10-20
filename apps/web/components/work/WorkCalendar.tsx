@@ -170,7 +170,7 @@ export function WorkCalendar({
                   <button
                     type="button"
                     onClick={() => onCreateDay(day)}
-                    className="rounded p-0.5 text-slate-300 opacity-0 transition hover:bg-cyan-100 hover:text-cyan-700 group-hover/day:opacity-100"
+                    className="rounded p-0.5 text-[color:var(--sys-faint)] opacity-0 transition hover:bg-[color:var(--sys-nav-hover)] hover:text-teal-300 group-hover/day:opacity-100"
                     title={t('Add task', 'Añadir tarea', 'Adicionar tarefa')}
                   >
                     <Plus className="h-3.5 w-3.5" />

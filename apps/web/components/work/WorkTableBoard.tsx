@@ -92,7 +92,7 @@ function PeopleCell({
           }}
           className="inline-flex h-6 items-center gap-1 rounded-full bg-teal-500/15 px-1.5 text-[10px] font-semibold text-teal-200"
         >
-          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-teal-200 text-[8px] text-teal-900">
+          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-teal-500/35 text-[8px] text-[color:var(--sys-ink)]">
             {getInitials(nameOf(id))}
           </span>
           <span className="max-w-[72px] truncate">{nameOf(id)}</span>
@@ -461,7 +461,7 @@ export function WorkTableBoard({
                         ]);
                         setAddOpen(false);
                       }}
-                      className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50"
+                      className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
                     >
                       {columnKindLabel(kind, t)}
                     </button>

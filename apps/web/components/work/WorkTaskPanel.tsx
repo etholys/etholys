@@ -271,7 +271,7 @@ export function WorkTaskPanel({
     const parts = String(content || '').split(/(@[^\s@][^@]*?)(?=\s|$|@)/g);
     return parts.map((part, i) =>
       part.startsWith('@') ? (
-        <span key={i} className="rounded bg-cyan-100 px-1 font-medium text-cyan-800">
+        <span key={i} className="rounded bg-cyan-500/20 px-1 font-medium text-cyan-200">
           {part}
         </span>
       ) : (
@@ -283,7 +283,7 @@ export function WorkTaskPanel({
   return (
     <aside className="flex h-full w-full max-w-[440px] shrink-0 flex-col border-l border-[color:var(--sys-line)] bg-[color:var(--sys-panel,#fff)] text-[color:var(--sys-ink)] shadow-[-12px_0_32px_rgba(15,23,42,0.18)]">
       <div className="flex items-center justify-between border-b border-[color:var(--sys-line)] px-4 py-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-600 dark:text-teal-300">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-300">
           {t('Task', 'Tarea', 'Tarefa')}
         </p>
         <button
@@ -654,7 +654,7 @@ export function WorkTaskPanel({
                       <button
                         type="button"
                         onClick={() => pickMention(u)}
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-cyan-50"
+                        className="w-full px-3 py-2 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
                       >
                         {u.name || u.email}
                       </button>

@@ -726,7 +726,7 @@ export default function TasksBoard({
               'rounded-lg border px-3 py-2.5 text-sm transition',
               hasAdvFilters
                 ? 'border-cyan-300 bg-cyan-50 text-cyan-800'
-                : 'border-slate-200 text-slate-600 hover:bg-slate-50',
+                : 'border-[color:var(--sys-line)] text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]',
             )}
           >
             {t3('Filters', 'Filtros', 'Filtros')}
@@ -937,7 +937,7 @@ export default function TasksBoard({
                     <div
                       className={cn(
                         'min-h-[120px] space-y-2 rounded-xl p-2 transition',
-                        isDrop ? 'bg-cyan-100/70 ring-2 ring-cyan-300' : 'bg-slate-100/80',
+                        isDrop ? 'bg-cyan-500/15 ring-2 ring-cyan-400/40' : 'bg-[color:var(--sys-panel-soft)]',
                       )}
                     >
                       {colTasks.map((task: any) => (
@@ -973,7 +973,7 @@ export default function TasksBoard({
                           <p className="mb-2 line-clamp-2 text-sm font-medium text-slate-900">{task.title}</p>
                           <div className="flex items-center justify-between">
                             {task.assignee ? (
-                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-100 text-[10px] font-bold text-cyan-800">
+                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500/20 text-[10px] font-bold text-cyan-200">
                                 {getInitials(task.assignee.name)}
                               </span>
                             ) : (
@@ -991,7 +991,7 @@ export default function TasksBoard({
                           setForm({ ...emptyForm, status: col });
                           setShowForm(true);
                         }}
-                        className="w-full rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-cyan-300 hover:text-cyan-700"
+                        className="w-full rounded-lg border border-dashed border-[color:var(--sys-line)] py-2 text-xs text-[color:var(--sys-faint)] hover:border-teal-400/50 hover:text-teal-300"
                       >
                         + {tr('task.new')}
                       </button>

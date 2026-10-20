@@ -124,7 +124,7 @@ export function WorkGantt({
               key={task.id}
               type="button"
               onClick={() => onSelect(task.id)}
-              className="flex h-11 w-full items-center gap-2 border-b border-slate-50 px-3 text-left hover:bg-slate-50"
+              className="flex h-11 w-full items-center gap-2 border-b border-[color:var(--sys-line)] px-3 text-left hover:bg-[color:var(--sys-nav-hover)]"
             >
               <span
                 className="h-2 w-2 shrink-0 rounded-full"

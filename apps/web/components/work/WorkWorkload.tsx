@@ -162,9 +162,9 @@ export function WorkWorkload({
                         e.dataTransfer.effectAllowed = 'move';
                       }}
                       onClick={() => onOpenTask(task.id)}
-                      className="flex w-full items-center gap-3 px-2 py-2 text-left hover:bg-slate-50"
+                      className="flex w-full items-center gap-3 px-2 py-2 text-left text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
                     >
-                      <span className="min-w-0 flex-1 truncate text-sm text-slate-800">{task.title}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm">{task.title}</span>
                       <span className={cn('hidden shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium sm:inline', st.bg, st.text)}>
                         {workStatusLabel(task.status, t)}
                       </span>

@@ -110,7 +110,7 @@ export function WorkFolderShareDialog({
       <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
         <div className="flex items-start justify-between gap-2 border-b border-slate-100 px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-cyan-700">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-teal-300">
               {t('Share folder', 'Compartir carpeta', 'Partilhar pasta')}
             </p>
             <h3 className="truncate text-base font-semibold text-slate-900">{folderName}</h3>

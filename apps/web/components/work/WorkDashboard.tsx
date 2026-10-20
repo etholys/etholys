@@ -85,28 +85,28 @@ export function WorkDashboard({
       label: t('Open', 'Abiertas', 'Abertas'),
       value: open.length,
       icon: Clock3,
-      tone: 'text-cyan-700 bg-cyan-50',
+      tone: 'text-cyan-200 bg-cyan-500/15',
       go: () => onNav({ kind: 'all' }),
     },
     {
       label: t('Overdue', 'Atrasadas', 'Atrasadas'),
       value: overdue.length,
       icon: AlertTriangle,
-      tone: 'text-rose-700 bg-rose-50',
+      tone: 'text-rose-200 bg-rose-500/15',
       go: () => onNav({ kind: 'overdue' }),
     },
     {
       label: t('My tasks', 'Mis tareas', 'As minhas'),
       value: mine.length,
       icon: UserRound,
-      tone: 'text-slate-700 bg-slate-100',
+      tone: 'text-[color:var(--sys-ink)] bg-[color:var(--sys-panel-soft)]',
       go: () => onNav({ kind: 'mine' }),
     },
     {
       label: t('Due this week', 'Esta semana', 'Esta semana'),
       value: dueThisWeek.length,
       icon: CheckCircle2,
-      tone: 'text-emerald-700 bg-emerald-50',
+      tone: 'text-emerald-200 bg-emerald-500/15',
       go: () => onNav({ kind: 'all' }),
     },
   ];
@@ -172,7 +172,7 @@ export function WorkDashboard({
               <li key={d.id}>
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left hover:bg-slate-50"
+                  className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left hover:bg-[color:var(--sys-nav-hover)]"
                   onClick={() =>
                     d.id === '__none'
                       ? onNav({ kind: 'company' })
@@ -202,18 +202,18 @@ export function WorkDashboard({
               <li key={p.id}>
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
                   onClick={() => {
                     if (p.id === '__unassigned') onNav({ kind: 'unassigned' });
                     else if (p.id === currentUserId) onNav({ kind: 'mine' });
                     else onNav({ kind: 'person', id: p.id, name: p.name });
                   }}
                 >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-100 text-[10px] font-bold text-cyan-800">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-500/20 text-[10px] font-bold text-cyan-200">
                     {p.id === '__unassigned' ? '?' : getInitials(p.name)}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{p.name}</span>
-                  <span className="text-xs tabular-nums text-slate-500">{p.open}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm">{p.name}</span>
+                  <span className="text-xs tabular-nums text-[color:var(--sys-muted)]">{p.open}</span>
                 </button>
               </li>
             ))}
@@ -233,7 +233,7 @@ export function WorkDashboard({
                 key={task.id}
                 type="button"
                 onClick={() => onOpenTask(task.id)}
-                className="flex w-full items-center gap-3 px-1 py-2.5 text-left hover:bg-slate-50"
+                className="flex w-full items-center gap-3 px-1 py-2.5 text-left hover:bg-[color:var(--sys-nav-hover)]"
               >
                 <span
                   className={cn(
