@@ -125,7 +125,7 @@ function layoutLabel(
 export function MeetRoomClient({ sessionId }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: authSession } = useSession();
+  const { data: authSession, status: authStatus } = useSession();
   const { locale, activeCompanyId } = useApp();
   const currentUserId = (authSession?.user as { id?: string } | undefined)?.id || null;
   const t = (pt: string, es: string, en: string) => (locale === 'pt' ? pt : locale === 'es' ? es : en);
@@ -1265,7 +1265,14 @@ export function MeetRoomClient({ sessionId }: Props) {
           <div className="relative min-h-0 w-full flex-1">
             <div className="relative h-full min-h-0 w-full overflow-hidden rounded-2xl bg-slate-950">
             <div className="relative h-full min-h-0 w-full">
-              {session.meetingUrl && canEmbedChorusRoom(session.meetingUrl) ? (
+              {session.meetingUrl && canEmbedChorusRoom(session.meetingUrl) && authStatus === 'loading' ? (
+                <div className="flex h-full flex-col items-center justify-center gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-white/70" />
+                  <p className="text-xs text-white/50">
+                    {t('A preparar a sala…', 'Preparando la sala…', 'Preparing the room…')}
+                  </p>
+                </div>
+              ) : session.meetingUrl && canEmbedChorusRoom(session.meetingUrl) ? (
                 <MeetConferenceFrame
                   ref={conferenceRef}
                   meetingUrl={session.meetingUrl}

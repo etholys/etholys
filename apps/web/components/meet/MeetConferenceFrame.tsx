@@ -128,33 +128,114 @@ type Props = {
 };
 
 const JOIN_TIMEOUT_MS = 25_000;
+const EXTERNAL_API_LOAD_TIMEOUT_MS = 15_000;
 
 let externalApiLoader: Promise<void> | null = null;
 
-function loadExternalApi(origin: string): Promise<void> {
+function chorusRoomLoadError(locale: string): string {
+  if (locale === 'pt') return 'Não foi possível carregar a sala do CHORUS';
+  if (locale === 'en') return 'Could not load the CHORUS room';
+  return 'No fue posible cargar la sala de CHORUS';
+}
+
+function chorusRoomInvalidError(locale: string): string {
+  if (locale === 'pt') return 'Sala do CHORUS inválida';
+  if (locale === 'en') return 'Invalid CHORUS room';
+  return 'Sala de CHORUS inválida';
+}
+
+function chorusRoomJoinTimeoutError(locale: string): string {
+  if (locale === 'pt') {
+    return 'A sala do CHORUS não entrou a tempo. Atualiza a página ou abre numa nova janela.';
+  }
+  if (locale === 'en') {
+    return 'The CHORUS room did not join in time. Refresh or open in a new window.';
+  }
+  return 'La sala de CHORUS no entró a tiempo. Actualiza la página o ábrela en una ventana nueva.';
+}
+
+function chorusRoomOpenError(locale: string): string {
+  if (locale === 'pt') return 'Erro ao abrir a sala do CHORUS';
+  if (locale === 'en') return 'Error opening the CHORUS room';
+  return 'Error al abrir la sala de CHORUS';
+}
+
+function chorusRoomConnectError(locale: string): string {
+  if (locale === 'pt') return 'Falha ao ligar à sala do CHORUS';
+  if (locale === 'en') return 'Failed to connect to the CHORUS room';
+  return 'Fallo al conectar con la sala de CHORUS';
+}
+
+/** Carrega o script da API externa; falhas não ficam em cache (permite Actualizar / remount). */
+function loadExternalApi(origin: string, locale: string): Promise<void> {
   if (window.JitsiMeetExternalAPI) return Promise.resolve();
   if (externalApiLoader) return externalApiLoader;
 
-  externalApiLoader = new Promise<void>((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(
-      `script[data-etholys-jitsi-api="${origin}"]`,
-    );
-    if (existing) {
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error('API de vídeo do Meet indisponível')), {
-        once: true,
-      });
+  const failMsg = chorusRoomLoadError(locale);
+  let settled = false;
+  let resolveLoader!: () => void;
+  let rejectLoader!: (error: Error) => void;
+
+  const thisLoader = new Promise<void>((resolve, reject) => {
+    resolveLoader = () => resolve();
+    rejectLoader = (error) => reject(error);
+  });
+  externalApiLoader = thisLoader;
+
+  const ok = () => {
+    if (settled) return;
+    if (!window.JitsiMeetExternalAPI) {
+      fail();
       return;
     }
-    const script = document.createElement('script');
-    script.src = `${origin}/external_api.js`;
-    script.async = true;
-    script.dataset.etholysJitsiApi = origin;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Não foi possível carregar a sala de vídeo do Meet'));
-    document.head.appendChild(script);
-  });
-  return externalApiLoader;
+    settled = true;
+    resolveLoader();
+  };
+  const fail = () => {
+    if (settled) return;
+    settled = true;
+    if (externalApiLoader === thisLoader) externalApiLoader = null;
+    rejectLoader(new Error(failMsg));
+  };
+
+  const existing = document.querySelector<HTMLScriptElement>(
+    `script[data-etholys-jitsi-api="${origin}"]`,
+  );
+  if (existing) {
+    if (window.JitsiMeetExternalAPI) {
+      ok();
+      return thisLoader;
+    }
+    // Script já no DOM: se o load já passou sem API, não esperar para sempre.
+    if (existing.dataset.etholysApiState === 'error') {
+      existing.remove();
+    } else if (existing.dataset.etholysApiState === 'loaded') {
+      fail();
+      return thisLoader;
+    } else {
+      existing.addEventListener('load', ok, { once: true });
+      existing.addEventListener('error', fail, { once: true });
+      window.setTimeout(fail, EXTERNAL_API_LOAD_TIMEOUT_MS);
+      return thisLoader;
+    }
+  }
+
+  const script = document.createElement('script');
+  script.src = `${origin}/external_api.js`;
+  script.async = true;
+  script.dataset.etholysJitsiApi = origin;
+  script.onload = () => {
+    script.dataset.etholysApiState = 'loaded';
+    ok();
+  };
+  script.onerror = () => {
+    script.dataset.etholysApiState = 'error';
+    script.remove();
+    fail();
+  };
+  document.head.appendChild(script);
+  window.setTimeout(fail, EXTERNAL_API_LOAD_TIMEOUT_MS);
+  return thisLoader;
 }
 
 function readParticipantCount(api: JitsiApi, opts?: { assumeLocalJoined?: boolean }): number {
@@ -219,6 +300,14 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
     const apiRef = useRef<JitsiApi | null>(null);
     const filmstripHiddenRef = useRef(false);
     const joinedRef = useRef(false);
+    // Props que mudam após o join (ex.: nome da sessão NextAuth) NÃO podem remountar a sala —
+    // o cleanup fazia hangup e o jicofo registava join→leave em ~2s.
+    const titleRef = useRef(title);
+    const displayNameRef = useRef(displayName);
+    const transcriptionLanguageRef = useRef(transcriptionLanguage);
+    titleRef.current = title;
+    displayNameRef.current = displayName;
+    transcriptionLanguageRef.current = transcriptionLanguage;
     const callbacksRef = useRef({
       onReady,
       onTranscriptionChunk,
@@ -274,11 +363,10 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
         startTranscription() {
           // Não chama startRecording: isso pede o gravador de ficheiro (ausente)
           // e abre o diálogo «o áudio não está a ser gravado».
+          const preferred = transcriptionLanguageRef.current;
           const lang =
-            transcriptionLanguage === 'pt' ||
-            transcriptionLanguage === 'en' ||
-            transcriptionLanguage === 'es'
-              ? transcriptionLanguage
+            preferred === 'pt' || preferred === 'en' || preferred === 'es'
+              ? preferred
               : locale === 'pt'
                 ? 'pt'
                 : locale === 'en'
@@ -393,8 +481,30 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
           }
         },
       }),
-      [locale, meetingUrl, transcriptionLanguage],
+      [locale, meetingUrl],
     );
+
+    // Actualiza o nome visível sem destruir a conferência (evita hangup no hydrate da sessão).
+    useEffect(() => {
+      const name = (displayName || '').trim().slice(0, 80);
+      if (!name || !apiRef.current || !joinedRef.current) return;
+      try {
+        apiRef.current.executeCommand('displayName', name);
+      } catch {
+        /* ignore */
+      }
+    }, [displayName]);
+
+    useEffect(() => {
+      if (!apiRef.current || !joinedRef.current) return;
+      const next = (title || '').trim().slice(0, 200);
+      if (!next) return;
+      try {
+        apiRef.current.executeCommand('subject', next);
+      } catch {
+        /* ignore */
+      }
+    }, [title]);
 
     useEffect(() => {
       let origin = '';
@@ -483,9 +593,9 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
         try {
           const url = new URL(meetingUrl);
           const roomName = decodeURIComponent(url.pathname.replace(/^\/+/, '')).split('/')[0];
-          if (!roomName || !parentRef.current) throw new Error('Sala Meet inválida');
+          if (!roomName || !parentRef.current) throw new Error(chorusRoomInvalidError(locale));
 
-          await loadExternalApi(url.origin);
+          await loadExternalApi(url.origin, locale);
           if (disposed || !parentRef.current || !window.JitsiMeetExternalAPI) return;
 
           // Limpar restos de um mount anterior (Strict Mode / remount).
@@ -496,7 +606,9 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
           const initialW = Math.max(Math.floor(initialRect.width), 320);
           const initialH = Math.max(Math.floor(initialRect.height), 360);
 
-          const userName = (displayName || '').trim().slice(0, 80);
+          const userName = (displayNameRef.current || '').trim().slice(0, 80);
+          const roomTitle = (titleRef.current || '').trim();
+          const transcriptLang = transcriptionLanguageRef.current;
 
           api = new window.JitsiMeetExternalAPI(url.host, {
             roomName,
@@ -512,7 +624,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
                 }
               : {}),
             configOverwrite: {
-              subject: title,
+              subject: roomTitle,
               disableDeepLinking: true,
               deeplinking: { disabled: true },
               // Hub já tem MeetJoinSetupDialog — pré-sala do motor deixa 0 participantes
@@ -559,10 +671,8 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
                 autoCaptionOnTranscribe: true,
                 useAppLanguage: false,
                 preferredLanguage:
-                  transcriptionLanguage === 'pt' ||
-                  transcriptionLanguage === 'en' ||
-                  transcriptionLanguage === 'es'
-                    ? transcriptionLanguage
+                  transcriptLang === 'pt' || transcriptLang === 'en' || transcriptLang === 'es'
+                    ? transcriptLang
                     : locale === 'pt'
                       ? 'pt'
                       : locale === 'en'
@@ -807,7 +917,7 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
               payload?.error?.message ||
               payload?.error?.name ||
               payload?.message ||
-              'Falha ao ligar à sala de vídeo';
+              chorusRoomConnectError(locale);
             failJoin(detail);
           };
           api.addListener('conferenceFailed', onFatal);
@@ -827,18 +937,10 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
 
           joinTimer = window.setTimeout(() => {
             if (disposed || joinedRef.current) return;
-            failJoin(
-              locale === 'pt'
-                ? 'A sala de vídeo não entrou a tempo. Atualiza a página ou abre numa nova janela.'
-                : locale === 'en'
-                  ? 'The video room did not join in time. Refresh or open in a new window.'
-                  : 'La sala de vídeo no entró a tiempo. Actualiza la página o ábrela en una ventana nueva.',
-            );
+            failJoin(chorusRoomJoinTimeoutError(locale));
           }, JOIN_TIMEOUT_MS);
         } catch (error) {
-          failJoin(
-            error instanceof Error ? error.message : 'Erro ao abrir videoconferência',
-          );
+          failJoin(error instanceof Error ? error.message : chorusRoomOpenError(locale));
         }
       }
 
@@ -861,7 +963,8 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
           /* ignore */
         }
       };
-    }, [meetingUrl, title, locale, displayName, transcriptionLanguage]);
+      // Só remount quando muda a URL da sala ou o idioma da UI — nunca no hydrate do displayName.
+    }, [meetingUrl, locale]);
 
     return (
       <div className="relative h-full min-h-0 w-full overflow-hidden rounded-2xl bg-[#202124]">
