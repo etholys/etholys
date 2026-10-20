@@ -1655,6 +1655,33 @@ html:not([data-appearance='light']) .etholys-etask {
 html[data-appearance='light'] .etholys-etask {
   color-scheme: light;
 }
+/* Painel / formulário da tarefa: texto e campos sempre legíveis */
+.etholys-etask .etask-field,
+.etholys-etask select,
+.etholys-etask textarea {
+  color: var(--sys-ink) !important;
+  -webkit-text-fill-color: var(--sys-ink);
+  border-color: var(--sys-line) !important;
+  background-color: var(--sys-panel-soft) !important;
+}
+.etholys-etask input::placeholder,
+.etholys-etask textarea::placeholder {
+  color: var(--sys-faint) !important;
+  -webkit-text-fill-color: var(--sys-faint);
+  opacity: 1;
+}
+.etholys-etask option {
+  color: #0f172a;
+  background-color: #ffffff;
+}
+html:not([data-appearance='light']) .etholys-etask .text-\[color\:var\(--sys-muted\)\],
+html:not([data-appearance='light']) .etholys-etask .text-\[color\:var\(--sys-muted\,\#475569\)\] {
+  color: #e2e8f0 !important;
+}
+html[data-appearance='light'] .etholys-etask .text-\[color\:var\(--sys-muted\)\],
+html[data-appearance='light'] .etholys-etask .text-\[color\:var\(--sys-muted\,\#475569\)\] {
+  color: #334155 !important;
+}
 html:not([data-appearance='light']) .etholys-etask .bg-white,
 html:not([data-appearance='light']) .etholys-etask .bg-white\/70,
 html:not([data-appearance='light']) .etholys-etask .bg-white\/80,
