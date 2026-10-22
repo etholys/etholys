@@ -50,6 +50,72 @@ export const DEFAULT_WORK_COLUMNS: WorkColumn[] = [
   { id: 'updates', kind: 'updates', label: 'Updates' },
 ];
 
+/** Templates opcionais — só se aplicam quando o utilizador escolhe. */
+export const WORK_BOARD_TEMPLATES: Array<{
+  id: string;
+  label: { en: string; es: string; pt: string };
+  columns: WorkColumn[];
+}> = [
+  {
+    id: 'simple',
+    label: { en: 'Simple', es: 'Simple', pt: 'Simples' },
+    columns: [
+      { id: 'status', kind: 'status', label: 'Status' },
+      { id: 'person', kind: 'person', label: 'Person' },
+      { id: 'due', kind: 'due', label: 'Due' },
+    ],
+  },
+  {
+    id: 'default',
+    label: { en: 'Standard', es: 'Estándar', pt: 'Padrão' },
+    columns: DEFAULT_WORK_COLUMNS,
+  },
+  {
+    id: 'roles',
+    label: { en: 'With roles', es: 'Con roles', pt: 'Com papéis' },
+    columns: [
+      { id: 'status', kind: 'status', label: 'Status' },
+      { id: 'person', kind: 'person', label: 'Person' },
+      { id: 'responsible', kind: 'responsible', label: 'Owner' },
+      { id: 'reviewer', kind: 'reviewer', label: 'Reviewer' },
+      { id: 'priority', kind: 'priority', label: 'Priority' },
+      { id: 'due', kind: 'due', label: 'Due' },
+      { id: 'updates', kind: 'updates', label: 'Updates' },
+    ],
+  },
+];
+
+export function buildWorkBoardScopeKey(opts: {
+  kind: string;
+  userId?: string | null;
+  folderId?: string | null;
+  projectId?: string | null;
+  departmentId?: string | null;
+}): string {
+  switch (opts.kind) {
+    case 'mine':
+      return `mine:${opts.userId || 'unknown'}`;
+    case 'folder':
+      return `folder:${opts.folderId || 'unknown'}`;
+    case 'project':
+      return `project:${opts.projectId || 'unknown'}`;
+    case 'department':
+      return `department:${opts.departmentId || 'unknown'}`;
+    case 'company':
+      return 'company';
+    case 'all':
+      return 'all';
+    case 'overdue':
+      return 'overdue';
+    case 'unassigned':
+      return 'unassigned';
+    case 'week':
+      return 'week';
+    default:
+      return `nav:${opts.kind}`;
+  }
+}
+
 export const DEFAULT_WORK_NOTIFY: WorkNotifyPrefs = {
   comment: true,
   assign: true,

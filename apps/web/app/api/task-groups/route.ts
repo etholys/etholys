@@ -9,17 +9,22 @@ export async function GET(req: Request) {
     const tenant = await getUserCompanyIds();
     if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const companyId = new URL(req.url).searchParams.get('companyId');
+    const url = new URL(req.url);
+    const companyId = url.searchParams.get('companyId');
     if (!companyId || !tenant.companyIds.includes(companyId)) {
       return NextResponse.json({ error: 'companyId inválido' }, { status: 400 });
     }
+    const folderId = url.searchParams.get('folderId') || '';
+    const personal = url.searchParams.get('personal') === '1';
+
+    const where = personal
+      ? { companyId, isActive: true, ownerId: tenant.userId }
+      : folderId
+        ? { companyId, isActive: true, folderId, ownerId: null }
+        : { companyId, isActive: true, ownerId: null, folderId: null };
 
     const groups = await prisma.taskGroup.findMany({
-      where: {
-        companyId,
-        isActive: true,
-        OR: [{ ownerId: null }, { ownerId: tenant.userId }],
-      },
+      where,
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
       include: { _count: { select: { tasks: true } } },
     });
@@ -43,11 +48,25 @@ export async function POST(req: Request) {
     }
     if (!name) return NextResponse.json({ error: 'Nombre requerido' }, { status: 400 });
 
+    const personal = body.personal === true;
+    const folderId = body.folderId ? String(body.folderId) : null;
+    if (folderId) {
+      const folder = await prisma.workFolder.findFirst({
+        where: { id: folderId, companyId, isActive: true },
+        select: { id: true },
+      });
+      if (!folder) return NextResponse.json({ error: 'Tablero no encontrado' }, { status: 404 });
+    }
+
     const max = await prisma.taskGroup.aggregate({
-      where: { companyId, isActive: true },
+      where: {
+        companyId,
+        isActive: true,
+        ownerId: personal ? tenant.userId : null,
+        folderId: personal ? null : folderId,
+      },
       _max: { order: true },
     });
-    const personal = body.personal === true;
     const group = await prisma.taskGroup.create({
       data: {
         companyId,
@@ -55,6 +74,7 @@ export async function POST(req: Request) {
         color: body.color ? String(body.color) : null,
         order: (max._max.order ?? -1) + 1,
         ownerId: personal ? tenant.userId : null,
+        folderId: personal ? null : folderId,
       },
     });
     return NextResponse.json({ group });

@@ -7,7 +7,16 @@ import { LayoutGrid, List, Plus, Search, X } from 'lucide-react';
 import { WorkTableBoard } from './WorkTableBoard';
 import { WorkTaskPanel } from './WorkTaskPanel';
 import { WorkBulkBar } from './WorkBulkBar';
-import { WORK_KANBAN, STARTER_GROUPS, parseTags, DEFAULT_WORK_COLUMNS, DEFAULT_WORK_NOTIFY, type WorkColumn, type WorkNotifyPrefs } from './work-ui';
+import {
+  WORK_KANBAN,
+  STARTER_GROUPS,
+  parseTags,
+  DEFAULT_WORK_COLUMNS,
+  DEFAULT_WORK_NOTIFY,
+  WORK_BOARD_TEMPLATES,
+  type WorkColumn,
+  type WorkNotifyPrefs,
+} from './work-ui';
 
 type ML = { es: string; pt: string; en: string };
 const ml = (en: string, es: string, pt: string): ML => ({ en, es, pt });
@@ -25,6 +34,8 @@ export type TasksBoardProps = {
   initialAssigneeId?: string;
   /** When true, new groups stay private to the current user (Mi trabajo). */
   personalGroups?: boolean;
+  /** Layout key for this area — each board keeps its own columns. */
+  boardScopeKey?: string;
   queue?: '' | 'overdue' | 'unassigned' | 'week';
   externalSearch?: string;
   externalStatus?: string;
@@ -65,6 +76,7 @@ export default function TasksBoard({
   initialFolderId = '',
   initialAssigneeId = '',
   personalGroups = false,
+  boardScopeKey = '',
   queue = '',
   externalSearch = '',
   externalStatus = '',
@@ -75,6 +87,7 @@ export default function TasksBoard({
   presetTasks = null,
 }: TasksBoardProps) {
   const { tr, activeCompanyId, locale } = useApp();
+  const resolvedScopeKey = boardScopeKey || (activeCompanyId ? 'all' : '');
   const L = (m: ML) => m[locale] || m.en;
   const t3 = (en: string, es: string, pt: string) => L(ml(en, es, pt));
 
@@ -120,7 +133,7 @@ export default function TasksBoard({
   }, [forcedView]);
 
   const saveBoard = async (next: { columns?: WorkColumn[]; notify?: WorkNotifyPrefs }) => {
-    if (!activeCompanyId) return;
+    if (!activeCompanyId || !resolvedScopeKey) return;
     const columns = next.columns || boardColumns;
     const notify = next.notify || boardNotify;
     setBoardColumns(columns);
@@ -128,20 +141,31 @@ export default function TasksBoard({
     await fetch('/api/work-board', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyId: activeCompanyId, columns, notify }),
+      body: JSON.stringify({
+        companyId: activeCompanyId,
+        scopeKey: resolvedScopeKey,
+        columns,
+        notify,
+      }),
     });
   };
 
   useEffect(() => {
-    if (!activeCompanyId) return;
-    fetch(`/api/work-board?companyId=${encodeURIComponent(activeCompanyId)}`)
+    if (!activeCompanyId || !resolvedScopeKey) {
+      setBoardColumns(DEFAULT_WORK_COLUMNS);
+      return;
+    }
+    setBoardColumns(DEFAULT_WORK_COLUMNS);
+    fetch(
+      `/api/work-board?companyId=${encodeURIComponent(activeCompanyId)}&scopeKey=${encodeURIComponent(resolvedScopeKey)}`,
+    )
       .then((r) => r.json())
       .then((d) => {
         if (Array.isArray(d?.columns) && d.columns.length) setBoardColumns(d.columns);
         if (d?.notify) setBoardNotify({ ...DEFAULT_WORK_NOTIFY, ...d.notify });
       })
       .catch(() => {});
-  }, [activeCompanyId]);
+  }, [activeCompanyId, resolvedScopeKey]);
 
   useEffect(() => {
     setProjectFilter(initialProjectId);
@@ -180,7 +204,10 @@ export default function TasksBoard({
       setGroups([]);
       return;
     }
-    fetch(`/api/task-groups?companyId=${encodeURIComponent(activeCompanyId)}`)
+    const params = new URLSearchParams({ companyId: activeCompanyId });
+    if (personalGroups) params.set('personal', '1');
+    else if (folderFilter) params.set('folderId', folderFilter);
+    fetch(`/api/task-groups?${params}`)
       .then((r) => r.json())
       .then((d) => setGroups(d?.groups ?? []))
       .catch(() => setGroups([]));
@@ -204,7 +231,7 @@ export default function TasksBoard({
   useEffect(() => {
     fetchGroups();
     fetchFolders();
-  }, [activeCompanyId]);
+  }, [activeCompanyId, personalGroups, folderFilter]);
 
   useEffect(() => {
     fetch('/api/projects')
@@ -431,6 +458,7 @@ export default function TasksBoard({
           name,
           color: color || null,
           personal: personalGroups,
+          folderId: !personalGroups && folderFilter ? folderFilter : undefined,
         }),
       });
       fetchGroups();
@@ -905,6 +933,7 @@ export default function TasksBoard({
               notify={boardNotify}
               onColumnsChange={(columns) => void saveBoard({ columns })}
               onNotifyChange={(notifyPrefs) => void saveBoard({ notify: notifyPrefs })}
+              onApplyTemplate={(columns) => void saveBoard({ columns })}
               onCommentPosted={() => fetchTasks({ silent: true })}
               onDeleteTask={(id, title) => void deleteTask(id, title)}
               subtasksOf={(id) => (tasks ?? []).filter((task: any) => task?.parentId === id)}

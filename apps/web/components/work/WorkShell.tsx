@@ -14,7 +14,13 @@ import { WorkWorkload } from './WorkWorkload';
 import { WorkTaskPanel } from './WorkTaskPanel';
 import { WorkFolderShareDialog } from './WorkFolderShareDialog';
 import { WorkQuickAdd } from './WorkQuickAdd';
-import { WORK_KANBAN, WORK_PRIORITIES, workPriorityLabel, workStatusLabel } from './work-ui';
+import {
+  WORK_KANBAN,
+  WORK_PRIORITIES,
+  buildWorkBoardScopeKey,
+  workPriorityLabel,
+  workStatusLabel,
+} from './work-ui';
 import {
   Calendar,
   CalendarRange,
@@ -654,6 +660,13 @@ export default function WorkShell() {
                 initialFolderId={scopeProps?.folderId || ''}
                 initialAssigneeId={personFocus || scopeProps?.assigneeId || ''}
                 personalGroups={nav.kind === 'mine'}
+                boardScopeKey={buildWorkBoardScopeKey({
+                  kind: nav.kind,
+                  userId: currentUserId,
+                  folderId: nav.kind === 'folder' ? nav.id : '',
+                  projectId: nav.kind === 'project' ? nav.id : '',
+                  departmentId: nav.kind === 'department' ? nav.id : '',
+                })}
                 queue={
                   nav.kind === 'overdue' ? 'overdue' : nav.kind === 'unassigned' ? 'unassigned' : nav.kind === 'week' ? 'week' : ''
                 }

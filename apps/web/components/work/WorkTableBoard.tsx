@@ -11,6 +11,7 @@ import {
   canAddColumnKind,
   columnKindLabel,
   DEFAULT_WORK_COLUMNS,
+  WORK_BOARD_TEMPLATES,
   parseTags,
   type WorkColumn,
   type WorkColumnKind,
@@ -293,6 +294,7 @@ export function WorkTableBoard({
   subtasksOf,
   onAddSubtask,
   onDuplicate,
+  onApplyTemplate,
 }: {
   groups: GroupOpt[];
   ungroupedTasks: TaskRow[];
@@ -327,6 +329,7 @@ export function WorkTableBoard({
   subtasksOf?: (parentId: string) => TaskRow[];
   onAddSubtask?: (parentId: string, title: string) => Promise<void>;
   onDuplicate?: (task: TaskRow) => void;
+  onApplyTemplate?: (columns: WorkColumn[]) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -342,6 +345,7 @@ export function WorkTableBoard({
   const [updatesFor, setUpdatesFor] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const [hideDone, setHideDone] = useState(false);
   const colSpan = columns.length + (onToggleSelect ? 4 : 3);
 
@@ -461,6 +465,41 @@ export function WorkTableBoard({
           />
           {t('Hide done', 'Ocultar hechas', 'Ocultar concluídas')}
         </label>
+        {onApplyTemplate && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setTemplateOpen((v) => !v);
+                setAddOpen(false);
+                setNotifyOpen(false);
+              }}
+              className="inline-flex items-center gap-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-semibold text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
+            >
+              {t('Template', 'Plantilla', 'Modelo')}
+            </button>
+            {templateOpen && (
+              <div className="absolute left-0 z-20 mt-1 w-52 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-1 shadow-lg">
+                <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sys-faint)]">
+                  {t('Apply to this board only', 'Solo este tablero', 'Só este quadro')}
+                </p>
+                {WORK_BOARD_TEMPLATES.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => {
+                      onApplyTemplate(tpl.columns.map((c) => ({ ...c })));
+                      setTemplateOpen(false);
+                    }}
+                    className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+                  >
+                    {t(tpl.label.en, tpl.label.es, tpl.label.pt)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {onColumnsChange && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">

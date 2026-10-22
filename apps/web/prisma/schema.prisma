@@ -204,8 +204,9 @@ model Company {
   /// Respostas do assistente de contexto (sector, comércio, metas) — aciona módulos e memória de IA; não substitui aconselhamento legal.
   contextSetupJson            Json?
   contextSetupAt              DateTime?
-  /// Colunas do quadro eTask e preferências de notificação da empresa.
+  /// Template opcional de colunas eTask (aplicado só quando o utilizador escolhe).
   workBoardJson               Json?
+  workBoardLayouts            WorkBoardLayout[]
   /// Legado RADAR (producer|provider) — já não governa a UI; mantido só por compatibilidade.
   radarOrgRole                String?
   aiSessions                  AiAdvisorSession[]
@@ -744,6 +745,7 @@ model WorkFolder {
   owner      User               @relation("WorkFolderOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   members    WorkFolderMember[]
   tasks      Task[]
+  taskGroups TaskGroup[]
 
   @@index([companyId, ownerId])
   @@index([companyId, visibility])
@@ -768,6 +770,8 @@ model TaskGroup {
   companyId String
   /// Se preenchido, o grupo só aparece para este utilizador (ex.: secções em Mi trabajo).
   ownerId   String?
+  /// Se preenchido, o grupo pertence a um tablero de equipa.
+  folderId  String?
   name      String
   color     String?
   order     Int      @default(0)
@@ -775,11 +779,29 @@ model TaskGroup {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  folder    WorkFolder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
   tasks     Task[]
 
   @@index([companyId, order])
   @@index([ownerId])
+  @@index([folderId])
 }
+
+/// Layout do quadro eTask por área (Mi trabajo, tablero, operações, projeto…).
+model WorkBoardLayout {
+  id         String   @id @default(cuid())
+  companyId  String
+  /// Chave estável: mine:{userId} | folder:{id} | company | all | project:{id} | department:{id} | overdue | unassigned | week
+  scopeKey   String
+  layoutJson Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, scopeKey])
+  @@index([companyId])
+}
+
 
 /// Pedido de aprovação de entrega de tarefa (Work → CARTA)
 model TaskApprovalRequest {
