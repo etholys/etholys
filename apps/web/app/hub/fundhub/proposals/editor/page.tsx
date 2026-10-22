@@ -610,29 +610,42 @@ export default function FundHubProposalEditorPage() {
   const passToWrite = useCallback(() => {
     setStage('write');
     setComposerMode('write');
-    setDocumentMarkdown((prev) => {
-      const next = seedWriteCanvas(prev);
-      persistDraft({ documentMarkdown: next, stage: 'write' });
-      return next;
-    });
+    const nextDoc = seedWriteCanvas(documentMarkdown);
+    const appliedTitles = sectionsFromMarkdown(nextDoc).filter(
+      (s) =>
+        s.title.trim() &&
+        !/leitura|lectura|call reading|ideia|idea|rascunho|borrador|^draft$|elegib|bases oficial/i.test(
+          s.title,
+        ),
+    ).length;
+    setDocumentMarkdown(nextDoc);
+    const structureNote =
+      appliedTitles > 0
+        ? locale === 'en'
+          ? `Applied ${appliedTitles} sections from the official call form into the document on the right. Ask to write a specific point (e.g. «write c)»).`
+          : locale === 'pt'
+            ? `Apliquei ${appliedTitles} secções do formulário oficial no documento à direita. Pede para redigir um ponto (ex.: «escreve o c)»).`
+            : `Apliqué ${appliedTitles} secciones del formulario oficial en el documento a la derecha. Pedí redactar un punto (ej.: «escribe el c)»).`
+        : locale === 'en'
+          ? 'The document on the right is the draft. If the call form is not listed yet, attach the bases PDF or press Structure. Chat edits that canvas.'
+          : locale === 'pt'
+            ? 'O documento à direita é o rascunho. Se o formulário do edital ainda não aparecer, anexa o PDF das bases ou usa Estrutura. O chat edita esse canvas.'
+            : 'El documento a la derecha es el borrador. Si aún no aparece el formulario del edital, adjuntá el PDF de bases o usá Estructura. El chat edita ese canvas.';
     setChatMessages((prev) => {
       const next: ChatMessage[] = [
         ...prev,
         {
           role: 'assistant',
-          content:
-            locale === 'en'
-              ? 'The document on the right is the draft. Chat edits that canvas (like Gemini/ChatGPT). Use «Talk» only for Q&A about the call.'
-              : locale === 'pt'
-                ? 'O documento à direita é o rascunho. O chat edita esse canvas (como no Gemini/ChatGPT). Use «Conversar» só para dúvidas sobre o edital.'
-                : 'El documento a la derecha es el borrador. El chat edita ese canvas (como Gemini/ChatGPT). Use «Conversar» solo para dudas del edital.',
+          content: structureNote,
           createdAt: new Date().toISOString(),
         },
       ];
-      persistDraft({ chat: next, stage: 'write' });
+      persistDraft({ documentMarkdown: nextDoc, chat: next, stage: 'write' });
       return next;
     });
-  }, [seedWriteCanvas, persistDraft, locale]);
+    setRightRailCollapsed(false);
+    setRightRailTab('document');
+  }, [documentMarkdown, seedWriteCanvas, persistDraft, locale]);
 
   useEffect(() => {
     if (loading || !workspaceId) return;
@@ -1039,14 +1052,15 @@ export default function FundHubProposalEditorPage() {
     attachedFiles,
   ]);
 
-  const structureOnceRef = useRef(false);
+  const llmStructureAttemptedRef = useRef<string>('');
   useEffect(() => {
-    if (loading || !workspaceId || stage !== 'write') return;
-    if (structureOnceRef.current || chatLoading) return;
-    if (hasEditalFormOutline(documentMarkdown)) {
-      structureOnceRef.current = true;
-      return;
-    }
+    llmStructureAttemptedRef.current = '';
+  }, [workspaceId]);
+
+  // When bases arrive (often after the first paint), inject the official form into old/empty drafts.
+  useEffect(() => {
+    if (loading || !workspaceId || stage !== 'write' || chatLoading) return;
+    if (hasEditalFormOutline(documentMarkdown)) return;
     const basesBlob = [
       fund?.basesText,
       fund?.sourceExcerpt,
@@ -1057,17 +1071,22 @@ export default function FundHubProposalEditorPage() {
     ]
       .filter((s) => Boolean(String(s ?? '').trim()))
       .join('\n\n');
-    if (extractEditalFormTitles(basesBlob).length) {
-      structureOnceRef.current = true;
+    const titles = extractEditalFormTitles(basesBlob);
+    if (titles.length) {
       setDocumentMarkdown((prev) => {
-        const next = seedWriteCanvas(prev);
+        if (hasEditalFormOutline(prev)) return prev;
+        const next = appendFormTitleSections(prev, titles);
+        if (next === prev) return prev;
         persistDraft({ documentMarkdown: next, stage: 'write' });
         return next;
       });
+      setRightRailCollapsed(false);
+      setRightRailTab('document');
       return;
     }
     if (!basesBlob.trim() && !rfpChecklist.length) return;
-    structureOnceRef.current = true;
+    if (llmStructureAttemptedRef.current === workspaceId) return;
+    llmStructureAttemptedRef.current = workspaceId;
     void handleGenerateStructure();
   }, [
     loading,
@@ -1080,7 +1099,6 @@ export default function FundHubProposalEditorPage() {
     attachedFiles,
     rfpChecklist.length,
     chatLoading,
-    seedWriteCanvas,
     persistDraft,
     handleGenerateStructure,
   ]);
