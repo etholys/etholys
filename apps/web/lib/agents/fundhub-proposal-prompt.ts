@@ -1,6 +1,6 @@
 import { INSTITUTIONAL_PROSE_RULE } from '@/lib/agents/prose-rules';
 
-const PROMPT_VERSION = 'fundhub-proposal-v9';
+const PROMPT_VERSION = 'fundhub-proposal-v10';
 
 export type FundhubProposalMode = 'chat' | 'structure' | 'draft_section' | 'brainstorm' | 'understand';
 export type FundhubLocale = 'es' | 'pt' | 'en';
@@ -151,13 +151,17 @@ Propõe a estrutura de secções da candidatura — alinhada ao FORMATO DO EDITA
 ## TRABALHO (canvas — como ChatGPT/Gemini)
 O DOCUMENTO NO CANVAS é a verdade. A mensagem do utilizador é uma INSTRUÇÃO DE EDIÇÃO desse documento.
 - Não «converses» um ensaio novo: EDITA o texto que já está (ou cria só o ponto pedido se ainda estiver vazio).
-- SAÍDA: markdown com ## títulos que coincidam com o canvas / formulário. O sistema substitui essas secções no documento.
+- OBRIGATÓRIO: a PRIMEIRA linha da resposta é exactamente \`## {título}\` — o título da «Secção activa» ou o ## do canvas que estás a editar. Sem isto o sistema NÃO actualiza o documento.
+- PROIBIDO abrir com «Claro», «Aquí tienes», «He redactado», resumos ou perguntas. Só o markdown da secção.
 - UMA secção / um ponto por resposta (salvo pedirem várias explicitamente).
-- Se CONTEXTO tiver «Secção activa», essa é o alvo: reescreve-a com o MESMO ## (ou o título exacto do canvas).
+- Se CONTEXTO tiver «Secção activa», essa é o alvo: reescreve-a com o MESMO ## (título exacto do canvas).
 - Se pedirem o ponto «c)» / um campo concreto: só esse ponto. PROIBIDO preencher C, D, E ou outras secções na mesma resposta.
 - Se pedirem melhorar / encurtar / corrigir: parte do texto actual da secção (activa ou no canvas). PROIBIDO inventar outro tema.
 - Se corrigirem a postulante («é sobre X»): reescreve só a secção errada com essa entidade.
 - Se colarem material de base: sintetiza ESSE material no ponto pedido — não inventes outra org a partir do perfil Hub.
+- CONTINUIDADE DO CHAT: se pedirem melhorar a resposta anterior, parte DESSE texto (histórico ou ## no canvas). Não inventes outro tema.
+- ORGANIZAÇÃO POSTULANTE: a mensagem do utilizador / material colado manda sobre a empresa do Hub.
+- Não inventes factos que não estejam no CONTEXTO, nas bases ou na mensagem.
 - Marca [FALTA: …] inline; no máximo 1–2. Sem preâmbulo, sem tutorial. No máximo uma linha no fim: «Siguiente: [título]».
 - EXCEPÇÃO à regra de forma: neste modo USA ## (o canvas mapeia secções por estes títulos).`;
   }
@@ -222,10 +226,11 @@ NÃO uses um template genérico. Copia a estrutura do edital / checklist RFP / b
 ${userMessage.trim() ? `Nota do utilizador: ${userMessage.trim()}` : ''}`.trim();
   }
   if (mode === 'draft_section') {
+    const active = ctx.sectionTitle?.trim();
     return `${block}
 
 Modelo canvas: o documento acima é o rascunho vivo. A mensagem abaixo é o pedido de edição. Cumpre EXACTAMENTE esse pedido (ponto/campo/correção). Não uses a empresa do Hub como postulante se a mensagem nomear outra entidade. Não redijas secções não pedidas. Se houver «Secção activa», edita essa.
-
+${active ? `A primeira linha da tua resposta DEVE ser exactamente:\n## ${active}\n` : 'A primeira linha DEVE ser um ## que exista no documento do canvas.\n'}
 Instrução do utilizador:
 ${userMessage.trim()}`;
   }

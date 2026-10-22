@@ -370,10 +370,78 @@ export function sectionMarkerKey(title: string): string {
   return m ? m[1]! : '';
 }
 
-function isMetaProposalSection(title: string): boolean {
-  return /leitura|lectura|call reading|chuva|lluvia|ideia geral|idea general|general idea|bases oficial|elegib/i.test(
+export function isMetaProposalSection(title: string): boolean {
+  return /leitura|lectura|call reading|chuva|lluvia|ideia geral|idea general|general idea|bases oficial|elegib|rascunho|borrador|^draft$/i.test(
     title,
   );
+}
+
+/** True when the canvas already has real form sections (not only briefing meta). */
+export function hasEditalFormOutline(md: string): boolean {
+  const writable = sectionsFromMarkdown(md).filter(
+    (s) => s.title.trim() && !isMetaProposalSection(s.title),
+  );
+  return writable.length >= 2;
+}
+
+/**
+ * Pull literal form / annex titles from bases text (a), 1., Sección A — …).
+ * Prefer this over generic Idea/Draft when seeding the canvas.
+ */
+export function extractEditalFormTitles(text: string): string[] {
+  const hay = String(text || '').replace(/\r\n/g, '\n');
+  if (hay.trim().length < 80) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (raw: string) => {
+    let title = raw.replace(/\s+/g, ' ').trim().replace(/[:.\s]+$/u, '');
+    title = title.slice(0, 140);
+    if (title.length < 4) return;
+    const key = title.toLowerCase();
+    if (seen.has(key)) return;
+    if (
+      /^(página|page|http|www\.|tabla|cuadro|figura|ver\b|see\b|nota\b|note\b)/i.test(title)
+    ) {
+      return;
+    }
+    seen.add(key);
+    out.push(title);
+  };
+
+  for (const m of hay.matchAll(
+    /^[ \t]*(?:#{1,3}[ \t]*)?((?:[a-zA-Z]|[ivxlcdm]{1,6}|\d{1,2}(?:\.\d+)*)[.)])\s+([^\n]{6,140})/gim,
+  )) {
+    const marker = m[1]!.replace(/\s/g, '');
+    const rest = m[2]!.trim();
+    if (/[.!?]{2,}/.test(rest)) continue;
+    if (rest.split(/\s+/).length > 20) continue;
+    push(`${marker} ${rest}`);
+  }
+
+  for (const m of hay.matchAll(
+    /\b((?:secci[oó]n|secção|anexo|parte|cap[ií]tulo)\s+[A-Z0-9IVX]+)\s*[-–—:.]\s*([^\n]{4,100})/gi,
+  )) {
+    push(`${m[1]!.trim()} — ${m[2]!.trim()}`);
+  }
+
+  return out.slice(0, 20);
+}
+
+/** Append empty ## sections for edital form titles without duplicating. */
+export function appendFormTitleSections(md: string, titles: string[]): string {
+  if (!titles.length) return md;
+  let text = md.trim();
+  const extras: string[] = [];
+  for (const title of titles) {
+    const t = title.trim();
+    if (!t) continue;
+    const re = new RegExp(`^##\\s+${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'im');
+    if (re.test(text)) continue;
+    if (text.toLowerCase().includes(`## ${t.toLowerCase()}`)) continue;
+    extras.push(`## ${t}\n\n`);
+  }
+  if (!extras.length) return text;
+  return `${text}\n\n${extras.join('\n')}`.trim() + '\n';
 }
 
 /**
@@ -435,11 +503,34 @@ export function resolveCanvasEditTarget(
 
 /**
  * Merge AI draft into the canvas: matching ## titles are replaced; new titles are appended.
- * Draft without headings is appended as a new block.
+ * If preferredTitle is set and the draft has no ##, wrap it so the living section is replaced
+ * (ChatGPT/Gemini canvas behaviour).
  */
-export function mergeDraftIntoMarkdown(existing: string, draft: string): string {
-  const incoming = draft.trim();
+export function mergeDraftIntoMarkdown(
+  existing: string,
+  draft: string,
+  opts?: { preferredTitle?: string | null },
+): string {
+  let incoming = draft
+    .trim()
+    .replace(
+      /^(?:Escrito en el documento\.|Escrito no documento\.|Written into the document\.)\s*/i,
+      '',
+    )
+    .trim();
   if (!incoming) return existing;
+
+  const preferred = opts?.preferredTitle?.trim();
+  if (preferred) {
+    const probe = splitH2(incoming);
+    if (!probe.sections.length) {
+      incoming = `## ${preferred}\n\n${incoming}`;
+    } else if (probe.sections.length === 1) {
+      // Force the canvas title so fuzzy/exact replace hits the living section.
+      incoming = `## ${preferred}\n\n${probe.sections[0]!.content}`;
+    }
+  }
+
   const parsedIn = splitH2(incoming);
   const cur = existing.trim();
   if (!parsedIn.sections.length) {

@@ -35,8 +35,11 @@ import {
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import { RichTextPane } from '@/components/etholys/RichTextPane';
 import {
+  appendFormTitleSections,
   appendWriteSections,
+  extractEditalFormTitles,
   formatProposalFileContext,
+  hasEditalFormOutline,
   hydrateProposalAttachedFiles,
   mergeDraftIntoMarkdown,
   persistableProposalFiles,
@@ -576,20 +579,39 @@ export default function FundHubProposalEditorPage() {
     }
   }, [workspaceId, assistantBody, fund, fundId, documentMarkdown, chatMessages, persistDraft, locale]);
 
+  const seedWriteCanvas = useCallback(
+    (prev: string): string => {
+      let next =
+        prev?.trim() ||
+        seedDocumentMarkdown(fund || { id: 'adhoc', name: fund?.name || 'Proposta' }, undefined, locale);
+      const basesBlob = [
+        fund?.basesText,
+        fund?.sourceExcerpt,
+        intakeNotes,
+        ...attachedFiles
+          .filter((f) => f.role === 'bases' || f.role === 'reference')
+          .map((f) => f.textExcerpt || ''),
+      ]
+        .filter((s) => Boolean(String(s ?? '').trim()))
+        .join('\n\n');
+      const formTitles = extractEditalFormTitles(basesBlob);
+      if (formTitles.length) {
+        next = appendFormTitleSections(next, formTitles);
+      } else if (rfpChecklist.length) {
+        next = appendChecklistSections(next, rfpChecklist, locale);
+      } else if (!hasEditalFormOutline(next) && !/^##\s+/m.test(next)) {
+        next = appendWriteSections(next, locale);
+      }
+      return next;
+    },
+    [fund, intakeNotes, locale, rfpChecklist, attachedFiles],
+  );
+
   const passToWrite = useCallback(() => {
     setStage('write');
     setComposerMode('write');
     setDocumentMarkdown((prev) => {
-      // Não injectar «Ideia geral / Rascunho» genéricos se já há checklist do edital —
-      // o formato oficial manda; o utilizador usa «Estrutura» se ainda faltar.
-      let next =
-        prev?.trim() ||
-        seedDocumentMarkdown(fund || { id: 'adhoc', name: fund?.name || 'Proposta' }, undefined, locale);
-      if (rfpChecklist.length) {
-        next = appendChecklistSections(next, rfpChecklist, locale);
-      } else if (!/^##\s+/m.test(next)) {
-        next = appendWriteSections(next, locale);
-      }
+      const next = seedWriteCanvas(prev);
       persistDraft({ documentMarkdown: next, stage: 'write' });
       return next;
     });
@@ -610,7 +632,7 @@ export default function FundHubProposalEditorPage() {
       persistDraft({ chat: next, stage: 'write' });
       return next;
     });
-  }, [fund, persistDraft, locale, rfpChecklist]);
+  }, [seedWriteCanvas, persistDraft, locale]);
 
   useEffect(() => {
     if (loading || !workspaceId) return;
@@ -687,18 +709,6 @@ export default function FundHubProposalEditorPage() {
       setComposerMode('write');
     }
     const callQuestion = looksLikeCallQuestion(message);
-    const editTarget =
-      stage === 'write' && !callQuestion ? resolveCanvasEditTarget(documentMarkdown, message) : null;
-    const forceWrite =
-      !callQuestion &&
-      (slashWrite ||
-        looksLikeRevisionRequest(message) ||
-        Boolean(editTarget) ||
-        /\b(item\s*por\s*item|desarroll|redact|complet[ae]|formulari|postulaci[oó]n|escribir|escrev|preench|vamos\s+item|empez|arran[ck]|punto\s+[a-z0-9]|ítem\s*\d)/i.test(
-          message,
-        ));
-    const isWrite = stage === 'write' && !callQuestion && (composerMode === 'write' || forceWrite);
-    if (isWrite && composerMode !== 'write') setComposerMode('write');
 
     const basesReady =
       Boolean(fund?.basesText?.trim() && fund.basesText.trim().length > 200) ||
@@ -723,30 +733,44 @@ export default function FundHubProposalEditorPage() {
             : '\n\n[SOLO LAS BASES] Respondé solo con lo que está escrito en el texto de las BASES. Citá la sección. No uses la web ni una lista típica.';
     }
 
-    const turnFiles = sourceFiles.filter((f) => f.role === 'turn');
-    const attachBlock = formatProposalFileContext(turnFiles);
-
-    const wantsDraftHint = isWrite;
-    const sectionCount = sectionsFromMarkdown(documentMarkdown).filter(
-      (s) => !/lectura|leitura|call reading|elegib|bases oficial/i.test(s.title),
-    ).length;
-
-    if (wantsDraftHint && rfpChecklist.length && sectionCount < 3) {
-      setDocumentMarkdown((prev) => {
-        const next = appendChecklistSections(prev, rfpChecklist, locale);
-        persistDraft({ documentMarkdown: next });
-        return next;
-      });
+    // Seed the canvas BEFORE the request so the model and merge see the same living draft.
+    let canvasMd = documentMarkdown;
+    const forceWriteProbe =
+      !callQuestion &&
+      (slashWrite ||
+        looksLikeRevisionRequest(message) ||
+        /\b(item\s*por\s*item|desarroll|redact|complet[ae]|formulari|postulaci[oó]n|escribir|escrev|preench|vamos\s+item|empez|arran[ck]|punto\s+[a-z0-9]|ítem\s*\d)/i.test(
+          message,
+        ));
+    const willWrite =
+      stage === 'write' &&
+      !callQuestion &&
+      (composerMode === 'write' ||
+        forceWriteProbe ||
+        Boolean(resolveCanvasEditTarget(canvasMd, message)));
+    if (willWrite && !hasEditalFormOutline(canvasMd)) {
+      canvasMd = seedWriteCanvas(canvasMd);
+      setDocumentMarkdown(canvasMd);
+      persistDraft({ documentMarkdown: canvasMd });
       setRightRailCollapsed(false);
       setRightRailTab('document');
     }
 
+    const editTarget =
+      stage === 'write' && !callQuestion ? resolveCanvasEditTarget(canvasMd, message) : null;
+    const forceWrite = forceWriteProbe || Boolean(editTarget);
+    const isWrite = stage === 'write' && !callQuestion && (composerMode === 'write' || forceWrite);
+    if (isWrite && composerMode !== 'write') setComposerMode('write');
+
+    const turnFiles = sourceFiles.filter((f) => f.role === 'turn');
+    const attachBlock = formatProposalFileContext(turnFiles);
+
     const draftDirective = isWrite
       ? locale === 'en'
-        ? '\n\n[CANVAS EDIT] The document is the living draft. Edit ONLY the requested section (## matching the canvas). Applicant org from the user message wins over Hub company. Do not invent another section.'
+        ? `\n\n[CANVAS EDIT] The document is the living draft. First line MUST be ## ${editTarget?.title || '{exact canvas title}'}. Edit ONLY that section. Applicant org from the user message wins over Hub company.`
         : locale === 'pt'
-          ? '\n\n[EDIÇÃO DO CANVAS] O documento é o rascunho vivo. Edita SÓ a secção pedida (## igual ao canvas). A postulante da mensagem manda sobre a empresa do Hub. Não inventes outra secção.'
-          : '\n\n[EDICIÓN DEL CANVAS] El documento es el borrador vivo. Edita SOLO la sección pedida (## igual al canvas). La postulante del mensaje manda sobre la empresa del Hub. No inventes otra sección.'
+          ? `\n\n[EDIÇÃO DO CANVAS] O documento é o rascunho vivo. A primeira linha TEM de ser ## ${editTarget?.title || '{título exacto do canvas}'}. Edita SÓ essa secção. A postulante da mensagem manda sobre a empresa do Hub.`
+          : `\n\n[EDICIÓN DEL CANVAS] El documento es el borrador vivo. La primera línea DEBE ser ## ${editTarget?.title || '{título exacto del canvas}'}. Edita SOLO esa sección. La postulante del mensaje manda sobre la empresa del Hub.`
       : '';
 
     let reviseAnchor = '';
@@ -817,6 +841,7 @@ export default function FundHubProposalEditorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...assistantBody(isWrite ? 'draft_section' : 'chat', fullMessage, editTarget),
+          documentMarkdown: canvasMd,
           workspaceFilesBlock: formatProposalFileContext(sourceFiles.filter((f) => f.role !== 'turn')),
           chatHistory: historyForApi,
           fileParts,
@@ -834,8 +859,16 @@ export default function FundHubProposalEditorPage() {
       );
       let applied = false;
       if (isWrite && answer && !data.error) {
+        const preferredTitle =
+          editTarget?.title ||
+          (!hasEditalFormOutline(canvasMd)
+            ? undefined
+            : sectionsFromMarkdown(canvasMd).find((s) => !/leitura|lectura|call reading|elegib|bases oficial|ideia|idea|rascunho|borrador|draft/i.test(s.title))
+                ?.title);
         setDocumentMarkdown((prev) => {
-          const next = mergeDraftIntoMarkdown(prev, answer);
+          const next = mergeDraftIntoMarkdown(prev || canvasMd, answer, {
+            preferredTitle: preferredTitle || null,
+          });
           persistDraft({ documentMarkdown: next });
           return next;
         });
@@ -843,7 +876,7 @@ export default function FundHubProposalEditorPage() {
         setRightRailCollapsed(false);
         setRightRailTab('document');
         applied = true;
-      } else if (wantsDraftHint && answer.includes('## ')) {
+      } else if (isWrite && answer.includes('## ')) {
         setRightRailCollapsed(false);
         setRightRailTab('document');
       }
@@ -890,6 +923,7 @@ export default function FundHubProposalEditorPage() {
     composerMode,
     stage,
     fund,
+    seedWriteCanvas,
   ]);
 
   const insertIntoDocument = useCallback(
@@ -917,10 +951,22 @@ export default function FundHubProposalEditorPage() {
     setRightRailCollapsed(false);
     setRightRailTab('document');
     try {
-      // Preferir formato do edital (checklist) — não inventar outra arquitectura.
-      let titles =
-        rfpChecklist.length > 0 ? checklistToSectionTitles(rfpChecklist, locale) : [];
+      const basesBlob = [
+        fund?.basesText,
+        fund?.sourceExcerpt,
+        intakeNotes,
+        ...attachedFiles
+          .filter((f) => f.role === 'bases' || f.role === 'reference')
+          .map((f) => f.textExcerpt || ''),
+      ]
+        .filter((s) => Boolean(String(s ?? '').trim()))
+        .join('\n\n');
+      // 1) títulos literais das bases → 2) checklist → 3) LLM (nunca template genérico)
+      let titles = extractEditalFormTitles(basesBlob);
       let answer = '';
+      if (!titles.length && rfpChecklist.length) {
+        titles = checklistToSectionTitles(rfpChecklist, locale);
+      }
       if (!titles.length) {
         const response = await fetch('/api/proposals/assistant', {
           method: 'POST',
@@ -930,9 +976,9 @@ export default function FundHubProposalEditorPage() {
               'structure',
               ui(
                 locale,
-                'Genera solo los títulos de sección que pide esta convocatoria.',
-                'Gera só os títulos de secção que este edital pede.',
-                'Generate only the section titles this call requires.',
+                'Genera solo los títulos de sección que pide esta convocatoria. Copia la nomenclatura de las bases.',
+                'Gera só os títulos de secção que este edital pede. Copia a nomenclatura das bases.',
+                'Generate only the section titles this call requires. Copy the bases nomenclature.',
               ),
             ),
           ),
@@ -941,19 +987,14 @@ export default function FundHubProposalEditorPage() {
         answer = String(data.answer || '');
         titles = answer
           .split(/\r?\n/)
-          .map((line) => line.replace(/^\s*[\d\-\)\.]+\s*/, '').trim())
-          .filter(Boolean);
+          .map((line) => line.replace(/^\s*[\d\-\*\).]+\s*/, '').replace(/^#+\s*/, '').trim())
+          .filter((t) => t.length >= 4 && t.length <= 140);
       } else {
         answer = titles.map((t, i) => `${i + 1}. ${t}`).join('\n');
       }
       if (titles.length) {
         setDocumentMarkdown((prev) => {
-          const existing = prev.trim();
-          const extra = titles
-            .filter((t) => !existing.toLowerCase().includes(`## ${t.toLowerCase()}`))
-            .map((t) => `## ${t}\n\n`)
-            .join('\n');
-          let next = extra ? `${existing}\n\n${extra}` : existing;
+          let next = appendFormTitleSections(prev.trim(), titles);
           if (rfpChecklist.length) {
             next = appendChecklistSections(next, rfpChecklist, locale);
           }
@@ -987,7 +1028,62 @@ export default function FundHubProposalEditorPage() {
     } finally {
       setChatLoading(false);
     }
-  }, [assistantBody, persistDraft, rfpChecklist, locale]);
+  }, [
+    assistantBody,
+    persistDraft,
+    rfpChecklist,
+    locale,
+    fund?.basesText,
+    fund?.sourceExcerpt,
+    intakeNotes,
+    attachedFiles,
+  ]);
+
+  const structureOnceRef = useRef(false);
+  useEffect(() => {
+    if (loading || !workspaceId || stage !== 'write') return;
+    if (structureOnceRef.current || chatLoading) return;
+    if (hasEditalFormOutline(documentMarkdown)) {
+      structureOnceRef.current = true;
+      return;
+    }
+    const basesBlob = [
+      fund?.basesText,
+      fund?.sourceExcerpt,
+      intakeNotes,
+      ...attachedFiles
+        .filter((f) => f.role === 'bases' || f.role === 'reference')
+        .map((f) => f.textExcerpt || ''),
+    ]
+      .filter((s) => Boolean(String(s ?? '').trim()))
+      .join('\n\n');
+    if (extractEditalFormTitles(basesBlob).length) {
+      structureOnceRef.current = true;
+      setDocumentMarkdown((prev) => {
+        const next = seedWriteCanvas(prev);
+        persistDraft({ documentMarkdown: next, stage: 'write' });
+        return next;
+      });
+      return;
+    }
+    if (!basesBlob.trim() && !rfpChecklist.length) return;
+    structureOnceRef.current = true;
+    void handleGenerateStructure();
+  }, [
+    loading,
+    workspaceId,
+    stage,
+    documentMarkdown,
+    fund?.basesText,
+    fund?.sourceExcerpt,
+    intakeNotes,
+    attachedFiles,
+    rfpChecklist.length,
+    chatLoading,
+    seedWriteCanvas,
+    persistDraft,
+    handleGenerateStructure,
+  ]);
 
   const handleBrainstorm = useCallback(async () => {
     if (chatLoading) return;

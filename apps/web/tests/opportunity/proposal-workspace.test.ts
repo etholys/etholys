@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  appendFormTitleSections,
   buildEditalSummaryFromSeed,
+  extractEditalFormTitles,
   findReusableDraft,
   appendWriteSections,
   formatProposalFileContext,
+  hasEditalFormOutline,
   hydrateProposalAttachedFiles,
   persistableProposalFiles,
   mergeDraftIntoMarkdown,
@@ -205,6 +208,36 @@ test('canvas edit target and fuzzy c) merge keep the living draft', () => {
   assert.match(merged, /## D\. Clasificación/);
   const sys = buildFundhubProposalSystemPrompt('draft_section', 'es');
   assert.match(sys, /canvas — como ChatGPT\/Gemini/i);
+  assert.match(sys, /PRIMEIRA linha/);
+});
+
+test('edital form titles seed the canvas instead of a blank draft', () => {
+  const bases = `
+Formulario de postulación
+a) Nombre de la organización proponente
+b) Objetivo y actividades
+c) Presupuesto solicitado
+Sección D — Anexos obligatorios: lista de documentos
+`;
+  const titles = extractEditalFormTitles(bases);
+  assert.ok(titles.length >= 3);
+  assert.ok(titles.some((t) => /a\)/i.test(t) && /organización/i.test(t)));
+  assert.ok(titles.some((t) => /b\)/i.test(t)));
+  const seeded = appendFormTitleSections('# PPD\n\n## Lectura de la convocatoria\n\nBrief.\n', titles);
+  assert.equal(hasEditalFormOutline(seeded), true);
+  assert.match(seeded, /## a\)/);
+  assert.match(seeded, /## b\)/);
+});
+
+test('merge without ## still replaces the preferred canvas section', () => {
+  const doc = '# PPD\n\n## c) Objetivo\n\nTexto viejo.\n\n## D. Clasificación\n\nOk.\n';
+  const merged = mergeDraftIntoMarkdown(doc, 'Frutalcoop acopia frutas en Los Santos.', {
+    preferredTitle: 'c) Objetivo',
+  });
+  assert.match(merged, /## c\) Objetivo/);
+  assert.match(merged, /Frutalcoop/);
+  assert.equal(merged.includes('Texto viejo'), false);
+  assert.match(merged, /## D\. Clasificación/);
 });
 
 test('understand seed follows Spanish hub locale', () => {
