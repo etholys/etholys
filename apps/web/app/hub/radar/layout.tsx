@@ -43,6 +43,16 @@ function RadarShellInner({ children }: { children: ReactNode }) {
         detail: es ? 'Camino del producto y lo que pasó' : en ? 'Product path and what happened' : 'Caminho do produto e o que aconteceu',
       },
       {
+        href: '/hub/radar/caderno',
+        group: es ? 'Hacer' : en ? 'Do' : 'Fazer',
+        label: es ? 'Cuaderno' : en ? 'Notebook' : 'Caderno',
+        detail: es
+          ? 'Registro diario del campo o planta'
+          : en
+            ? 'Daily field or plant log'
+            : 'Registo diário do campo ou planta',
+      },
+      {
         href: '/hub/radar/tarefas',
         group: es ? 'Hacer' : en ? 'Do' : 'Fazer',
         label: es ? 'Tareas' : en ? 'Tasks' : 'Tarefas',

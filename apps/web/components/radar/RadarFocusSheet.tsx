@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Droplets, Loader2, MessageSquare } from 'lucide-react';
+import Link from 'next/link';
+import { BookOpen, Droplets, Loader2, MessageSquare } from 'lucide-react';
 import { DEFAULT_IRRIGATION_MM, MOISTURE_THRESHOLD } from '@/lib/radar/agriculture';
+import { cadernoCopy } from '@/lib/radar/caderno';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
 import { spaceKindMeta } from '@/lib/radar/space';
 
@@ -56,7 +58,15 @@ export function RadarFocusSheet({
 }) {
   const loc = radarLoc(locale);
   const meta = spaceKindMeta(moduleId);
+  const book = cadernoCopy(moduleId, loc);
   const focus = units.find((u) => u.id === focusedId) || units[0] || null;
+  const cadernoHref = (() => {
+    const q = new URLSearchParams({ company: companyId });
+    if (engagementId) q.set('engagement', engagementId);
+    if (propertyId) q.set('property', propertyId);
+    if (focus?.id) q.set('unit', focus.id);
+    return `/hub/radar/caderno?${q}`;
+  })();
   const [parcel, setParcel] = useState<AgriParcel | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [note, setNote] = useState('');
@@ -235,15 +245,24 @@ export function RadarFocusSheet({
           placeholder={radarT(loc, 'O que viste neste espaço…', 'Qué viste en este espacio…', 'What you saw here…')}
           className="w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-sky-500/40"
         />
-        <button
-          type="button"
-          disabled={busy || note.trim().length < 2}
-          onClick={() => void post({ action: 'line', kind: 'scout', unitId: focus.id, note: note.trim() })}
-          className="mt-2 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
-        >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
-          {radarT(loc, 'Guardar nota', 'Guardar nota', 'Save note')}
-        </button>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy || note.trim().length < 2}
+            onClick={() => void post({ action: 'line', kind: 'observation', unitId: focus.id, note: note.trim() })}
+            className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+            {radarT(loc, 'Guardar nota', 'Guardar nota', 'Save note')}
+          </button>
+          <Link
+            href={cadernoHref}
+            className="inline-flex items-center gap-2 rounded-lg border border-teal-400/40 bg-teal-500/15 px-3 py-1.5 text-sm font-medium text-teal-100 hover:bg-teal-500/25"
+          >
+            <BookOpen className="h-4 w-4" />
+            {book.registerCta}
+          </Link>
+        </div>
       </div>
 
       {recent.length > 0 && (

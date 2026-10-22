@@ -31,6 +31,17 @@ function placeFor(pathname: string, loc: 'pt' | 'es' | 'en'): Place {
       ),
     };
   }
+  if (pathname.includes('/radar/caderno')) {
+    return {
+      title: radarT(loc, 'Caderno', 'Cuaderno', 'Notebook'),
+      detail: radarT(
+        loc,
+        'O gesto diário: o que aconteceu no sítio.',
+        'El gesto diario: qué pasó en el sitio.',
+        'The daily gesture: what happened on site.',
+      ),
+    };
+  }
   if (pathname.includes('/radar/tarefas')) {
     return {
       title: radarT(loc, 'Tarefas', 'Tareas', 'Tasks'),

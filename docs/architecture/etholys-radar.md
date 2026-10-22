@@ -26,7 +26,8 @@ RADAR é **sempre a empresa** no Etholys — um produto, uma central. Não há g
 | **Clientes** | Opcionais. Criar novo **ou** vincular empresa AURORA/ATER (`linkedCompanyId`) |
 | **Técnicos** | Da lista de funcionários; atribuição por cliente/propriedade em escala; flags `canSeeAll` / `canCreateClients` |
 | **Home** | `/hub/radar` — **mapa** da operação (árvore de espaços + canvas + aviso quieto). Não é muro de alertas. |
-| **Nav** | Mapa · Cadeia · Tarefas · Equipa |
+| **Nav** | Mapa · Cadeia · **Caderno** · Tarefas · Equipa |
+| **Caderno** | `/hub/radar/caderno` — gesto diário (campo / SOP); `NexusFieldEntry` via `/api/radar/entries`. Mapa e 3D ficam em Ver. |
 | **Tarefas** | `/hub/radar/tarefas` — lista curta a partir de alertas (prioridade), não grelha LED |
 | **Cadeia** | `/hub/radar/cadeia` — lotes / custódia |
 | **Equipa** | `/hub/radar/equipa` — técnicos + clientes (admin) |

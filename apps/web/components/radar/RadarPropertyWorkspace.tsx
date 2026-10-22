@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Radio, Search, Sprout } from 'lucide-react';
+import { ArrowLeft, BookOpen, Loader2, Radio, Search, Sprout } from 'lucide-react';
 import { RADAR_MODULES, type RadarModuleId } from '@/lib/etholys-products';
+import { cadernoCopy } from '@/lib/radar/caderno';
 import { isRadarModuleId, spaceKindMeta } from '@/lib/radar/space';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
 import { type PropertyStepId, type PropertyStepState } from '@/lib/radar/property-progress';
@@ -264,6 +265,10 @@ export function RadarPropertyWorkspace({
     ? `company=${companyId}&engagement=${engagementId}`
     : `company=${companyId}`;
   const chainHref = `/hub/radar/cadeia?${companyQ}`;
+  const cadernoHref = `/hub/radar/caderno?${companyQ}&property=${propertyId}${
+    focusedId ? `&unit=${focusedId}` : ''
+  }`;
+  const bookCopy = cadernoCopy(data?.moduleId || moduleId, loc);
   const openStep = (id: PropertyStepId) => {
     if (id === 'draw') {
       setTool('space');
@@ -473,6 +478,13 @@ export function RadarPropertyWorkspace({
           {focusedUnit && (
             <div className={`flex max-w-full flex-wrap items-center gap-1 self-start p-1 ${chromePill}`}>
               <span className="max-w-[12rem] truncate px-2 text-xs font-semibold text-white">{focusedUnit.name}</span>
+              <Link
+                href={cadernoHref}
+                className="inline-flex items-center gap-1 rounded-full bg-teal-500/90 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-teal-400"
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                {bookCopy.registerCta}
+              </Link>
               {!focusedPlaced ? (
                 <button
                   type="button"
