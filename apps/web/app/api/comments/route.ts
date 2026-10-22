@@ -3,9 +3,13 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { createNotification } from '@/lib/notify';
 import { resolveTaskCommentMentions } from '@/lib/work/mentions';
-import { notifyTaskWatchers, wantsWorkNotify } from '@/lib/work/task-notify';
+import {
+  notifyTaskWatchers,
+  taskRoleUserIds,
+  wantsWorkEmail,
+  wantsWorkNotify,
+} from '@/lib/work/task-notify';
 
 async function assertTaskAccess(taskId: string, companyIds: string[]) {
   const task = await prisma.task.findFirst({
@@ -75,25 +79,27 @@ export async function POST(req: Request) {
           select: { workBoardJson: true },
         })
       : null;
+    const emailOn = wantsWorkEmail(company?.workBoardJson);
     notifyTaskWatchers({
       actorId: tenant.userId,
       type: 'task_update',
       title: 'Actualización en una tarea',
       message: `${authorName}: ${text.slice(0, 140)}`,
-      userIds: [access.assigneeId, access.creatorId],
+      userIds: taskRoleUserIds(access),
       enabled: wantsWorkNotify(company?.workBoardJson, 'comment'),
+      email: emailOn,
+      link,
     });
-    await Promise.all(
-      mentionIds.map((userId) =>
-        createNotification({
-          userId,
-          type: 'task_mention',
-          title: 'Te mencionaron en una tarea',
-          message: `${authorName} te mencionó en: ${access.title}`,
-          link,
-        }),
-      ),
-    );
+    notifyTaskWatchers({
+      actorId: tenant.userId,
+      type: 'task_mention',
+      title: 'Te mencionaron en una tarea',
+      message: `${authorName} te mencionó en: ${access.title}`,
+      userIds: mentionIds,
+      enabled: true,
+      email: emailOn,
+      link,
+    });
 
     return NextResponse.json({ comment });
   } catch (error: unknown) {

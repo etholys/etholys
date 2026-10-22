@@ -17,6 +17,8 @@ const KINDS = new Set([
   'files',
   'tags',
   'group',
+  'responsible',
+  'reviewer',
   'text',
   'number',
   'checkbox',
@@ -46,6 +48,7 @@ function parseBoard(raw: unknown): { columns: WorkColumn[]; notify: WorkNotifyPr
       comment: notifyRaw.comment !== false,
       assign: notifyRaw.assign !== false,
       status: notifyRaw.status !== false,
+      email: notifyRaw.email !== false,
     },
   };
 }

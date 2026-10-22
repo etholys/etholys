@@ -653,6 +653,7 @@ export default function WorkShell() {
                 initialTaskScope={scopeProps?.taskScope || ''}
                 initialFolderId={scopeProps?.folderId || ''}
                 initialAssigneeId={personFocus || scopeProps?.assigneeId || ''}
+                personalGroups={nav.kind === 'mine'}
                 queue={
                   nav.kind === 'overdue' ? 'overdue' : nav.kind === 'unassigned' ? 'unassigned' : nav.kind === 'week' ? 'week' : ''
                 }

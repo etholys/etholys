@@ -31,7 +31,11 @@ type TaskRow = {
   customFields?: Record<string, unknown> | null;
   tags?: unknown;
   assigneeId?: string | null;
+  responsibleId?: string | null;
+  reviewerId?: string | null;
   collaboratorIds?: unknown;
+  responsible?: UserOpt | null;
+  reviewer?: UserOpt | null;
   projectId?: string | null;
   departmentId?: string | null;
   folderId?: string | null;
@@ -114,6 +118,33 @@ function PeopleCell({
         ))}
       </select>
     </div>
+  );
+}
+
+function RoleSelect({
+  value,
+  users,
+  onChange,
+  t,
+}: {
+  value: string;
+  users: UserOpt[];
+  onChange: (id: string) => void;
+  t: (en: string, es: string, pt: string) => string;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full cursor-pointer bg-transparent text-[11px] text-[color:var(--sys-ink)] outline-none"
+    >
+      <option value="">{t('—', '—', '—')}</option>
+      {users.map((u) => (
+        <option key={u.id} value={u.id}>
+          {u.name || u.email}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -443,7 +474,7 @@ export function WorkTableBoard({
             </button>
             {addOpen && (
               <div className="absolute left-0 z-20 mt-1 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-                {(['status', 'person', 'priority', 'due', 'start', 'estimate', 'origin', 'updates', 'files', 'tags', 'group', 'text', 'number', 'checkbox', 'date'] as WorkColumnKind[])
+                {(['status', 'person', 'responsible', 'reviewer', 'priority', 'due', 'start', 'estimate', 'origin', 'updates', 'files', 'tags', 'group', 'text', 'number', 'checkbox', 'date'] as WorkColumnKind[])
                   .filter((kind) => canAddColumnKind(columns, kind))
                   .map((kind) => (
                     <button
@@ -485,12 +516,13 @@ export function WorkTableBoard({
                       ['comment', t('Updates on my tasks', 'Actualizaciones en mis tareas', 'Atualizações nas minhas tarefas')],
                       ['assign', t('When a task is assigned to me', 'Cuando me asignan una tarea', 'Quando me atribuem uma tarefa')],
                       ['status', t('When status changes', 'Cuando cambia el estado', 'Quando o estado muda')],
+                      ['email', t('Also send email', 'También enviar email', 'Também enviar email')],
                     ] as const
                   ).map(([key, label]) => (
-                    <label key={key} className="mb-2 flex items-center gap-2 text-slate-700">
+                    <label key={key} className="mb-2 flex items-center gap-2 text-[color:var(--sys-ink)]">
                       <input
                         type="checkbox"
-                        checked={notify[key]}
+                        checked={Boolean(notify[key])}
                         onChange={(e) => onNotifyChange({ ...notify, [key]: e.target.checked })}
                       />
                       {label}
@@ -807,6 +839,22 @@ export function WorkTableBoard({
                               {col.kind === 'person' && (
                                 <PeopleCell task={task} users={users} onPatch={onPatch} t={t} />
                               )}
+                              {col.kind === 'responsible' && (
+                                <RoleSelect
+                                  value={task.responsibleId || ''}
+                                  users={users}
+                                  onChange={(id) => onPatch(task.id, { responsibleId: id || null })}
+                                  t={t}
+                                />
+                              )}
+                              {col.kind === 'reviewer' && (
+                                <RoleSelect
+                                  value={task.reviewerId || ''}
+                                  users={users}
+                                  onChange={(id) => onPatch(task.id, { reviewerId: id || null })}
+                                  t={t}
+                                />
+                              )}
                               {col.kind === 'priority' && (
                                 <select
                                   value={task.priority}
@@ -933,7 +981,7 @@ export function WorkTableBoard({
                         {updatesFor === task.id && (
                           <tr>
                             <td colSpan={colSpan}>
-                              <WorkUpdates taskId={task.id} onPosted={onCommentPosted} t={t} />
+                              <WorkUpdates taskId={task.id} users={users} onPosted={onCommentPosted} t={t} />
                             </td>
                           </tr>
                         )}

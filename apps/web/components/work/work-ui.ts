@@ -31,6 +31,8 @@ export type WorkColumnKind =
   | 'files'
   | 'tags'
   | 'group'
+  | 'responsible'
+  | 'reviewer'
   | 'text'
   | 'number'
   | 'checkbox'
@@ -38,7 +40,7 @@ export type WorkColumnKind =
 
 export type WorkColumn = { id: string; kind: WorkColumnKind; label: string };
 
-export type WorkNotifyPrefs = { comment: boolean; assign: boolean; status: boolean };
+export type WorkNotifyPrefs = { comment: boolean; assign: boolean; status: boolean; email: boolean };
 
 export const DEFAULT_WORK_COLUMNS: WorkColumn[] = [
   { id: 'status', kind: 'status', label: 'Status' },
@@ -48,7 +50,12 @@ export const DEFAULT_WORK_COLUMNS: WorkColumn[] = [
   { id: 'updates', kind: 'updates', label: 'Updates' },
 ];
 
-export const DEFAULT_WORK_NOTIFY: WorkNotifyPrefs = { comment: true, assign: true, status: true };
+export const DEFAULT_WORK_NOTIFY: WorkNotifyPrefs = {
+  comment: true,
+  assign: true,
+  status: true,
+  email: true,
+};
 
 const SINGLETON_KINDS = new Set<WorkColumnKind>([
   'status',
@@ -62,6 +69,8 @@ const SINGLETON_KINDS = new Set<WorkColumnKind>([
   'files',
   'tags',
   'group',
+  'responsible',
+  'reviewer',
 ]);
 
 export function columnKindLabel(kind: WorkColumnKind, t: (en: string, es: string, pt: string) => string) {
@@ -69,7 +78,7 @@ export function columnKindLabel(kind: WorkColumnKind, t: (en: string, es: string
     case 'status':
       return t('Status', 'Estado', 'Estado');
     case 'person':
-      return t('Person', 'Persona', 'Pessoa');
+      return t('Executor', 'Ejecutor', 'Executor');
     case 'priority':
       return t('Priority', 'Prioridad', 'Prioridade');
     case 'due':
@@ -88,6 +97,10 @@ export function columnKindLabel(kind: WorkColumnKind, t: (en: string, es: string
       return t('Tags', 'Etiquetas', 'Etiquetas');
     case 'group':
       return t('Group', 'Grupo', 'Grupo');
+    case 'responsible':
+      return t('Owner', 'Responsable', 'Responsável');
+    case 'reviewer':
+      return t('Reviewer', 'Revisor', 'Revisor');
     case 'text':
       return t('Text', 'Texto', 'Texto');
     case 'number':

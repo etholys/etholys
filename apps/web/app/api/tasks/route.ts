@@ -97,12 +97,16 @@ export async function GET(req: Request) {
         groupId: true,
         folderId: true,
         assigneeId: true,
+        responsibleId: true,
+        reviewerId: true,
         creatorId: true,
         parentId: true,
         isActive: true,
         updatedAt: true,
         createdAt: true,
         assignee: { select: { id: true, name: true, email: true, avatar: true } },
+        responsible: { select: { id: true, name: true, email: true, avatar: true } },
+        reviewer: { select: { id: true, name: true, email: true, avatar: true } },
         creator: { select: { id: true, name: true } },
         project: {
           select: {

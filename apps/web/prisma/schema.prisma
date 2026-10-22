@@ -78,6 +78,8 @@ model User {
   proposalVersions              ProposalVersion[]            @relation("ProposalVersionCreator")
   sessions                      Session[]
   assignedTasks                 Task[]                       @relation("TaskAssignee")
+  responsibleTasks              Task[]                       @relation("TaskResponsible")
+  reviewerTasks                 Task[]                       @relation("TaskReviewer")
   createdTasks                  Task[]                       @relation("TaskCreator")
   workFoldersOwned              WorkFolder[]                 @relation("WorkFolderOwner")
   workFolderMemberships         WorkFolderMember[]
@@ -673,6 +675,10 @@ model Task {
   projectId        String?
   companyId        String?
   assigneeId       String?
+  /// Responsável pela tarefa (além do executor em assigneeId).
+  responsibleId    String?
+  /// Revisor que valida a entrega.
+  reviewerId       String?
   creatorId        String
   parentId         String?
   status           TaskStatus       @default(TODO)
@@ -700,6 +706,8 @@ model Task {
   checklist        ChecklistItem[]
   comments         Comment[]
   assignee         User?            @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  responsible      User?            @relation("TaskResponsible", fields: [responsibleId], references: [id])
+  reviewer         User?            @relation("TaskReviewer", fields: [reviewerId], references: [id])
   creator          User             @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
   department       Department?      @relation(fields: [departmentId], references: [id])
   group            TaskGroup?       @relation(fields: [groupId], references: [id], onDelete: SetNull)
@@ -758,6 +766,8 @@ model WorkFolderMember {
 model TaskGroup {
   id        String   @id @default(cuid())
   companyId String
+  /// Se preenchido, o grupo só aparece para este utilizador (ex.: secções em Mi trabajo).
+  ownerId   String?
   name      String
   color     String?
   order     Int      @default(0)
@@ -768,6 +778,7 @@ model TaskGroup {
   tasks     Task[]
 
   @@index([companyId, order])
+  @@index([ownerId])
 }
 
 /// Pedido de aprovação de entrega de tarefa (Work → CARTA)

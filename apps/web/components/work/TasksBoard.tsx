@@ -23,6 +23,8 @@ export type TasksBoardProps = {
   initialTaskScope?: string;
   initialFolderId?: string;
   initialAssigneeId?: string;
+  /** When true, new groups stay private to the current user (Mi trabajo). */
+  personalGroups?: boolean;
   queue?: '' | 'overdue' | 'unassigned' | 'week';
   externalSearch?: string;
   externalStatus?: string;
@@ -62,6 +64,7 @@ export default function TasksBoard({
   initialTaskScope = '',
   initialFolderId = '',
   initialAssigneeId = '',
+  personalGroups = false,
   queue = '',
   externalSearch = '',
   externalStatus = '',
@@ -423,7 +426,12 @@ export default function TasksBoard({
       await fetch('/api/task-groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId: activeCompanyId, name, color: color || null }),
+        body: JSON.stringify({
+          companyId: activeCompanyId,
+          name,
+          color: color || null,
+          personal: personalGroups,
+        }),
       });
       fetchGroups();
     } finally {

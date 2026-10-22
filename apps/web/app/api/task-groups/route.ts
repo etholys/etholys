@@ -15,7 +15,11 @@ export async function GET(req: Request) {
     }
 
     const groups = await prisma.taskGroup.findMany({
-      where: { companyId, isActive: true },
+      where: {
+        companyId,
+        isActive: true,
+        OR: [{ ownerId: null }, { ownerId: tenant.userId }],
+      },
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
       include: { _count: { select: { tasks: true } } },
     });
@@ -43,12 +47,14 @@ export async function POST(req: Request) {
       where: { companyId, isActive: true },
       _max: { order: true },
     });
+    const personal = body.personal === true;
     const group = await prisma.taskGroup.create({
       data: {
         companyId,
         name,
         color: body.color ? String(body.color) : null,
         order: (max._max.order ?? -1) + 1,
+        ownerId: personal ? tenant.userId : null,
       },
     });
     return NextResponse.json({ group });

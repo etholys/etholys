@@ -1,0 +1,4 @@
+ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "responsibleId" TEXT;
+ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "reviewerId" TEXT;
+ALTER TABLE "TaskGroup" ADD COLUMN IF NOT EXISTS "ownerId" TEXT;
+CREATE INDEX IF NOT EXISTS "TaskGroup_ownerId_idx" ON "TaskGroup"("ownerId");

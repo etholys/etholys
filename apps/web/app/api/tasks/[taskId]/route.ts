@@ -9,7 +9,13 @@ import {
   canReadFolder,
   getFolderAccess,
 } from '@/lib/work/folder-access';
-import { notifyTaskAssigned, notifyTaskWatchers, wantsWorkNotify } from '@/lib/work/task-notify';
+import {
+  notifyTaskAssigned,
+  notifyTaskWatchers,
+  taskRoleUserIds,
+  wantsWorkEmail,
+  wantsWorkNotify,
+} from '@/lib/work/task-notify';
 
 async function assertTaskAccess(
   taskId: string,
@@ -48,6 +54,8 @@ async function assertTaskAccess(
 
 const detailInclude = {
   assignee: true,
+  responsible: { select: { id: true, name: true, email: true } },
+  reviewer: { select: { id: true, name: true, email: true } },
   creator: true,
   project: { include: { company: true } },
   department: true,
@@ -117,6 +125,8 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
     if (body.dueDate !== undefined) data.dueDate = body.dueDate ? new Date(body.dueDate) : null;
     if (body.startDate !== undefined) data.startDate = body.startDate ? new Date(body.startDate) : null;
     if (body.assigneeId !== undefined) data.assigneeId = body.assigneeId || null;
+    if (body.responsibleId !== undefined) data.responsibleId = body.responsibleId || null;
+    if (body.reviewerId !== undefined) data.reviewerId = body.reviewerId || null;
     if (Array.isArray(body.collaboratorIds)) {
       const wanted = [...new Set(body.collaboratorIds.map((id: unknown) => String(id)).filter(Boolean))].slice(0, 12);
       const members = wanted.length
@@ -204,6 +214,8 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
     else if (body.status !== undefined) data.completedAt = null;
 
     const prevAssignee = task.assigneeId;
+    const prevResponsible = task.responsibleId;
+    const prevReviewer = task.reviewerId;
     const prevCollaborators = Array.isArray(task.collaboratorIds)
       ? task.collaboratorIds.map((id) => String(id))
       : [];
@@ -217,6 +229,7 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
     const company = companyId
       ? await prisma.company.findUnique({ where: { id: companyId }, select: { workBoardJson: true } })
       : null;
+    const emailOn = wantsWorkEmail(company?.workBoardJson);
     if (wantsWorkNotify(company?.workBoardJson, 'assign')) {
       if (body.assigneeId !== undefined) {
         notifyTaskAssigned({
@@ -225,6 +238,30 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
           title: updated.title,
           projectId: updated.projectId,
           prevAssigneeId: prevAssignee,
+          email: emailOn,
+          roleLabel: 'asignó como ejecutor',
+        });
+      }
+      if (body.responsibleId !== undefined) {
+        notifyTaskAssigned({
+          assigneeId: updated.responsibleId,
+          actorId: tenant.userId,
+          title: updated.title,
+          projectId: updated.projectId,
+          prevAssigneeId: prevResponsible,
+          email: emailOn,
+          roleLabel: 'asignó como responsable',
+        });
+      }
+      if (body.reviewerId !== undefined) {
+        notifyTaskAssigned({
+          assigneeId: updated.reviewerId,
+          actorId: tenant.userId,
+          title: updated.title,
+          projectId: updated.projectId,
+          prevAssigneeId: prevReviewer,
+          email: emailOn,
+          roleLabel: 'asignó como revisor',
         });
       }
       const nextCollaborators = Array.isArray(updated.collaboratorIds)
@@ -238,6 +275,7 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
           title: updated.title,
           projectId: updated.projectId,
           prevAssigneeId: null,
+          email: emailOn,
         });
       }
     }
@@ -247,8 +285,9 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
         type: 'task_status',
         title: 'Estado de una tarea',
         message: `${updated.title}: ${String(body.status).replace(/_/g, ' ')}`,
-        userIds: [updated.assigneeId, updated.creatorId],
+        userIds: taskRoleUserIds(updated),
         enabled: wantsWorkNotify(company?.workBoardJson, 'status'),
+        email: emailOn,
       });
     }
 

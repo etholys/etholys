@@ -27,6 +27,8 @@ type Detail = {
   startDate?: string | null;
   tags: unknown;
   assigneeId: string | null;
+  responsibleId?: string | null;
+  reviewerId?: string | null;
   groupId?: string | null;
   folderId?: string | null;
   projectId: string | null;
@@ -35,6 +37,8 @@ type Detail = {
   estimatedHours?: number | null;
   project?: { id: string; name: string } | null;
   assignee?: UserOpt | null;
+  responsible?: UserOpt | null;
+  reviewer?: UserOpt | null;
   creator?: UserOpt | null;
   group?: { id: string; name: string; color: string | null } | null;
   folder?: { id: string; name: string; color: string | null } | null;
@@ -343,13 +347,43 @@ export function WorkTaskPanel({
               </select>
             </label>
             <label className="space-y-1">
-              <span className={fieldLabel}>{t('Assignee', 'Responsable', 'Responsável')}</span>
+              <span className={fieldLabel}>{t('Executor', 'Ejecutor', 'Executor')}</span>
               <select
                 value={task.assigneeId || ''}
                 onChange={(e) => void patch({ assigneeId: e.target.value || null })}
                 className={fieldControl}
               >
-                <option value="">{t('Unassigned', 'Sin asignar', 'Sem responsável')}</option>
+                <option value="">{t('Unassigned', 'Sin asignar', 'Sem executor')}</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name || u.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className={fieldLabel}>{t('Owner', 'Responsable', 'Responsável')}</span>
+              <select
+                value={task.responsibleId || ''}
+                onChange={(e) => void patch({ responsibleId: e.target.value || null })}
+                className={fieldControl}
+              >
+                <option value="">{t('None', 'Ninguno', 'Nenhum')}</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name || u.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className={fieldLabel}>{t('Reviewer', 'Revisor', 'Revisor')}</span>
+              <select
+                value={task.reviewerId || ''}
+                onChange={(e) => void patch({ reviewerId: e.target.value || null })}
+                className={fieldControl}
+              >
+                <option value="">{t('None', 'Ninguno', 'Nenhum')}</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name || u.email}
