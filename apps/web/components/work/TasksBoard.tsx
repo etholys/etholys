@@ -580,6 +580,28 @@ export default function TasksBoard({
     );
   };
 
+  const persistSortOrders = async (
+    ordered: Array<{ groupId: string | null; taskIds: string[] }>,
+  ) => {
+    const orderMap = new Map<string, number>();
+    for (const group of ordered) {
+      group.taskIds.forEach((id, i) => orderMap.set(id, i));
+    }
+    if (orderMap.size === 0) return;
+    setTasks((prev) =>
+      prev.map((task) => (orderMap.has(task.id) ? { ...task, order: orderMap.get(task.id) } : task)),
+    );
+    await Promise.all(
+      [...orderMap.entries()].map(([id, order]) =>
+        fetch(`/api/tasks/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order }),
+        }),
+      ),
+    );
+  };
+
   const deleteGroup = async (groupId: string, name: string) => {
     if (!confirm(`${t3('Delete section', '¿Eliminar sección', 'Excluir secção')} "${name}"?`)) return;
     await fetch(`/api/task-groups/${groupId}`, { method: 'DELETE' });
@@ -939,6 +961,7 @@ export default function TasksBoard({
               subtasksOf={(id) => (tasks ?? []).filter((task: any) => task?.parentId === id)}
               onAddSubtask={addSubtask}
               onDuplicate={(task) => void duplicateTask(task)}
+              onPersistSortOrders={(ordered) => void persistSortOrders(ordered)}
             />
             </>
           ) : (

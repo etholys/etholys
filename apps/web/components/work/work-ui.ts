@@ -237,3 +237,284 @@ export function parseTags(raw: unknown): string[] {
     .map((t) => t.trim())
     .filter(Boolean);
 }
+
+const STATUS_RANK: Record<string, number> = {
+  BACKLOG: 0,
+  TODO: 1,
+  IN_PROGRESS: 2,
+  IN_REVIEW: 3,
+  DONE: 4,
+  CANCELLED: 5,
+};
+
+const PRIORITY_RANK: Record<string, number> = {
+  LOW: 0,
+  MEDIUM: 1,
+  HIGH: 2,
+  CRITICAL: 3,
+};
+
+export type WorkSortKey = 'title' | string;
+export type WorkSortDir = 'asc' | 'desc';
+export type WorkBoardSort = { key: WorkSortKey; dir: WorkSortDir };
+
+export function isSortableColumnKind(kind: WorkColumnKind | 'title'): boolean {
+  return (
+    kind === 'title' ||
+    kind === 'status' ||
+    kind === 'priority' ||
+    kind === 'due' ||
+    kind === 'start' ||
+    kind === 'person' ||
+    kind === 'responsible' ||
+    kind === 'reviewer' ||
+    kind === 'estimate' ||
+    kind === 'tags' ||
+    kind === 'group' ||
+    kind === 'text' ||
+    kind === 'number' ||
+    kind === 'date' ||
+    kind === 'checkbox' ||
+    kind === 'files' ||
+    kind === 'updates'
+  );
+}
+
+type SortableTask = {
+  title: string;
+  status: string;
+  priority: string;
+  order?: number;
+  dueDate?: string | null;
+  startDate?: string | null;
+  estimatedHours?: number | null;
+  assigneeId?: string | null;
+  responsibleId?: string | null;
+  reviewerId?: string | null;
+  groupId?: string | null;
+  customFields?: Record<string, unknown> | null;
+  tags?: unknown;
+  assignee?: { name?: string | null; email?: string } | null;
+  responsible?: { name?: string | null; email?: string } | null;
+  reviewer?: { name?: string | null; email?: string } | null;
+  _count?: { comments?: number; attachments?: number };
+};
+
+function personSortName(
+  id: string | null | undefined,
+  user: { name?: string | null; email?: string } | null | undefined,
+  users: Array<{ id: string; name: string | null; email?: string }>,
+) {
+  if (!id) return '';
+  if (user?.name || user?.email) return String(user.name || user.email || '');
+  const found = users.find((u) => u.id === id);
+  return found?.name || found?.email || id;
+}
+
+function dateMs(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  const n = new Date(String(value)).getTime();
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Compare two tasks for board column sort. Empty dates/people sink to the end on asc. */
+export function compareWorkTasks(
+  a: SortableTask,
+  b: SortableTask,
+  sort: WorkBoardSort,
+  columns: WorkColumn[],
+  users: Array<{ id: string; name: string | null; email?: string }> = [],
+  groups: Array<{ id: string; name: string }> = [],
+): number {
+  const mul = sort.dir === 'asc' ? 1 : -1;
+  let cmp = 0;
+
+  if (sort.key === 'title') {
+    cmp = a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+  } else {
+    const col = columns.find((c) => c.id === sort.key);
+    if (!col) {
+      return (a.order ?? 0) - (b.order ?? 0);
+    }
+    switch (col.kind) {
+      case 'due':
+      case 'start':
+      case 'date': {
+        const rawA =
+          col.kind === 'due' ? a.dueDate : col.kind === 'start' ? a.startDate : a.customFields?.[col.id];
+        const rawB =
+          col.kind === 'due' ? b.dueDate : col.kind === 'start' ? b.startDate : b.customFields?.[col.id];
+        const at = dateMs(rawA);
+        const bt = dateMs(rawB);
+        if (at == null && bt == null) cmp = 0;
+        else if (at == null) cmp = 1;
+        else if (bt == null) cmp = -1;
+        else cmp = at - bt;
+        break;
+      }
+      case 'priority':
+        cmp = (PRIORITY_RANK[a.priority] ?? 0) - (PRIORITY_RANK[b.priority] ?? 0);
+        break;
+      case 'status':
+        cmp = (STATUS_RANK[a.status] ?? 0) - (STATUS_RANK[b.status] ?? 0);
+        break;
+      case 'person': {
+        if (!a.assigneeId && !b.assigneeId) cmp = 0;
+        else if (!a.assigneeId) cmp = 1;
+        else if (!b.assigneeId) cmp = -1;
+        else {
+          cmp = personSortName(a.assigneeId, a.assignee, users).localeCompare(
+            personSortName(b.assigneeId, b.assignee, users),
+            undefined,
+            { sensitivity: 'base' },
+          );
+        }
+        break;
+      }
+      case 'responsible': {
+        if (!a.responsibleId && !b.responsibleId) cmp = 0;
+        else if (!a.responsibleId) cmp = 1;
+        else if (!b.responsibleId) cmp = -1;
+        else {
+          cmp = personSortName(a.responsibleId, a.responsible, users).localeCompare(
+            personSortName(b.responsibleId, b.responsible, users),
+            undefined,
+            { sensitivity: 'base' },
+          );
+        }
+        break;
+      }
+      case 'reviewer': {
+        if (!a.reviewerId && !b.reviewerId) cmp = 0;
+        else if (!a.reviewerId) cmp = 1;
+        else if (!b.reviewerId) cmp = -1;
+        else {
+          cmp = personSortName(a.reviewerId, a.reviewer, users).localeCompare(
+            personSortName(b.reviewerId, b.reviewer, users),
+            undefined,
+            { sensitivity: 'base' },
+          );
+        }
+        break;
+      }
+      case 'estimate':
+      case 'number': {
+        const an =
+          col.kind === 'estimate'
+            ? a.estimatedHours
+            : typeof a.customFields?.[col.id] === 'number'
+              ? (a.customFields[col.id] as number)
+              : Number(a.customFields?.[col.id]);
+        const bn =
+          col.kind === 'estimate'
+            ? b.estimatedHours
+            : typeof b.customFields?.[col.id] === 'number'
+              ? (b.customFields[col.id] as number)
+              : Number(b.customFields?.[col.id]);
+        const av = Number.isFinite(an as number) ? (an as number) : null;
+        const bv = Number.isFinite(bn as number) ? (bn as number) : null;
+        if (av == null && bv == null) cmp = 0;
+        else if (av == null) cmp = 1;
+        else if (bv == null) cmp = -1;
+        else cmp = av - bv;
+        break;
+      }
+      case 'text': {
+        const av = String(a.customFields?.[col.id] ?? '');
+        const bv = String(b.customFields?.[col.id] ?? '');
+        cmp = av.localeCompare(bv, undefined, { sensitivity: 'base' });
+        break;
+      }
+      case 'tags':
+        cmp = parseTags(a.tags).join(',').localeCompare(parseTags(b.tags).join(','), undefined, {
+          sensitivity: 'base',
+        });
+        break;
+      case 'group': {
+        const an = groups.find((g) => g.id === a.groupId)?.name || '';
+        const bn = groups.find((g) => g.id === b.groupId)?.name || '';
+        cmp = an.localeCompare(bn, undefined, { sensitivity: 'base' });
+        break;
+      }
+      case 'checkbox': {
+        const av = Boolean(a.customFields?.[col.id]) ? 1 : 0;
+        const bv = Boolean(b.customFields?.[col.id]) ? 1 : 0;
+        cmp = av - bv;
+        break;
+      }
+      case 'files':
+        cmp = (a._count?.attachments || 0) - (b._count?.attachments || 0);
+        break;
+      case 'updates':
+        cmp = (a._count?.comments || 0) - (b._count?.comments || 0);
+        break;
+      default:
+        cmp = 0;
+    }
+  }
+
+  if (cmp === 0) {
+    const byOrder = (a.order ?? 0) - (b.order ?? 0);
+    if (byOrder !== 0) return byOrder;
+    return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+  }
+  return cmp * mul;
+}
+
+export function workSortOptionLabels(
+  kind: WorkColumnKind | 'title',
+  t: (en: string, es: string, pt: string) => string,
+): { asc: string; desc: string } {
+  switch (kind) {
+    case 'title':
+      return {
+        asc: t('A → Z', 'A → Z', 'A → Z'),
+        desc: t('Z → A', 'Z → A', 'Z → A'),
+      };
+    case 'due':
+    case 'start':
+    case 'date':
+      return {
+        asc: t('Nearest first', 'Más próxima primero', 'Mais próxima primeiro'),
+        desc: t('Furthest first', 'Más lejana primero', 'Mais longe primeiro'),
+      };
+    case 'priority':
+      return {
+        asc: t('Low → Critical', 'Baja → Crítica', 'Baixa → Crítica'),
+        desc: t('Critical → Low', 'Crítica → Baja', 'Crítica → Baixa'),
+      };
+    case 'status':
+      return {
+        asc: t('Backlog → Done', 'Backlog → Hecho', 'Backlog → Feito'),
+        desc: t('Done → Backlog', 'Hecho → Backlog', 'Feito → Backlog'),
+      };
+    case 'person':
+    case 'responsible':
+    case 'reviewer':
+    case 'group':
+    case 'tags':
+    case 'text':
+      return {
+        asc: t('A → Z', 'A → Z', 'A → Z'),
+        desc: t('Z → A', 'Z → A', 'Z → A'),
+      };
+    case 'estimate':
+    case 'number':
+    case 'files':
+    case 'updates':
+      return {
+        asc: t('Low → High', 'Menor → Mayor', 'Menor → Maior'),
+        desc: t('High → Low', 'Mayor → Menor', 'Maior → Menor'),
+      };
+    case 'checkbox':
+      return {
+        asc: t('Unchecked first', 'Sin marcar primero', 'Desmarcadas primeiro'),
+        desc: t('Checked first', 'Marcadas primero', 'Marcadas primeiro'),
+      };
+    default:
+      return {
+        asc: t('Ascending', 'Ascendente', 'Ascendente'),
+        desc: t('Descending', 'Descendente', 'Descendente'),
+      };
+  }
+}

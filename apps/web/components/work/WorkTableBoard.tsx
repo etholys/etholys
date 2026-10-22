@@ -1,7 +1,17 @@
 'use client';
 
-import { Fragment, useState } from 'react';
-import { ChevronDown, ChevronRight, Copy, GripVertical, Paperclip, Plus, Trash2 } from 'lucide-react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  GripVertical,
+  Paperclip,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import { getInitials } from '@/lib/utils';
 import { WorkUpdates } from './WorkUpdates';
 import {
@@ -10,12 +20,17 @@ import {
   STATUS_STYLE,
   canAddColumnKind,
   columnKindLabel,
+  compareWorkTasks,
   DEFAULT_WORK_COLUMNS,
+  isSortableColumnKind,
   WORK_BOARD_TEMPLATES,
   parseTags,
+  workSortOptionLabels,
+  type WorkBoardSort,
   type WorkColumn,
   type WorkColumnKind,
   type WorkNotifyPrefs,
+  type WorkSortDir,
 } from './work-ui';
 
 type UserOpt = { id: string; name: string | null; email?: string };
@@ -295,6 +310,7 @@ export function WorkTableBoard({
   onAddSubtask,
   onDuplicate,
   onApplyTemplate,
+  onPersistSortOrders,
 }: {
   groups: GroupOpt[];
   ungroupedTasks: TaskRow[];
@@ -330,6 +346,7 @@ export function WorkTableBoard({
   onAddSubtask?: (parentId: string, title: string) => Promise<void>;
   onDuplicate?: (task: TaskRow) => void;
   onApplyTemplate?: (columns: WorkColumn[]) => void;
+  onPersistSortOrders?: (ordered: Array<{ groupId: string | null; taskIds: string[] }>) => Promise<void> | void;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -347,7 +364,21 @@ export function WorkTableBoard({
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [hideDone, setHideDone] = useState(false);
+  const [boardSort, setBoardSort] = useState<WorkBoardSort | null>(null);
+  const [sortMenuFor, setSortMenuFor] = useState<string | null>(null);
+  const [colFilters, setColFilters] = useState<{ status?: string; priority?: string; person?: string }>({});
+  const [savingSort, setSavingSort] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const colSpan = columns.length + (onToggleSelect ? 4 : 3);
+
+  useEffect(() => {
+    if (!sortMenuFor) return;
+    const onDoc = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setSortMenuFor(null);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [sortMenuFor]);
 
   const toggle = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }));
 
@@ -363,8 +394,16 @@ export function WorkTableBoard({
     }
   };
 
-  const visible = (list: TaskRow[]) =>
-    hideDone ? list.filter((task) => task.status !== 'DONE' && task.status !== 'CANCELLED') : list;
+  const applyListOrder = (list: TaskRow[]) => {
+    let next = hideDone ? list.filter((task) => task.status !== 'DONE' && task.status !== 'CANCELLED') : [...list];
+    if (colFilters.status) next = next.filter((task) => task.status === colFilters.status);
+    if (colFilters.priority) next = next.filter((task) => task.priority === colFilters.priority);
+    if (colFilters.person) next = next.filter((task) => personIds(task).includes(colFilters.person!));
+    if (boardSort) {
+      return [...next].sort((a, b) => compareWorkTasks(a, b, boardSort, columns, users, groups));
+    }
+    return sortByOrder(next);
+  };
 
   const sections: Array<{ key: string; id: string | null; name: string; color: string; tasks: TaskRow[] }> = [
     ...groups.map((g) => ({
@@ -372,16 +411,226 @@ export function WorkTableBoard({
       id: g.id,
       name: g.name,
       color: g.color || '#0891b2',
-      tasks: sortByOrder(visible(tasksByGroupId(g.id))),
+      tasks: applyListOrder(tasksByGroupId(g.id)),
     })),
     {
       key: '__ungrouped',
       id: null,
       name: t('Ungrouped', 'Sin sección', 'Sem secção'),
       color: '#94a3b8',
-      tasks: sortByOrder(visible(ungroupedTasks)),
+      tasks: applyListOrder(ungroupedTasks),
     },
   ];
+
+  const activeFilterCount = [colFilters.status, colFilters.priority, colFilters.person].filter(Boolean).length;
+
+  const setSort = (key: string, dir: WorkSortDir) => {
+    setBoardSort({ key, dir });
+    setSortMenuFor(null);
+  };
+
+  const persistCurrentSort = async () => {
+    if (!onPersistSortOrders || !boardSort) return;
+    setSavingSort(true);
+    try {
+      const sortList = (list: TaskRow[]) =>
+        [...list]
+          .sort((a, b) => compareWorkTasks(a, b, boardSort, columns, users, groups))
+          .map((task) => task.id);
+      await onPersistSortOrders([
+        ...groups.map((g) => ({ groupId: g.id as string | null, taskIds: sortList(tasksByGroupId(g.id)) })),
+        { groupId: null, taskIds: sortList(ungroupedTasks) },
+      ]);
+      setBoardSort(null);
+    } finally {
+      setSavingSort(false);
+      setSortMenuFor(null);
+    }
+  };
+
+  const renderSortHeader = (key: string, label: string, kind: WorkColumnKind | 'title') => {
+    if (!isSortableColumnKind(kind)) {
+      return <span className="inline-flex items-center gap-1">{label}</span>;
+    }
+    const active = boardSort?.key === key;
+    const labels = workSortOptionLabels(kind, t);
+    const open = sortMenuFor === key;
+    return (
+      <div className="relative inline-flex items-center gap-0.5" ref={open ? menuRef : undefined}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSortMenuFor((cur) => (cur === key ? null : key));
+            setAddOpen(false);
+            setNotifyOpen(false);
+            setTemplateOpen(false);
+          }}
+          className={`inline-flex max-w-full items-center gap-0.5 rounded px-0.5 py-0.5 text-left uppercase tracking-[0.12em] hover:bg-[color:var(--sys-nav-hover)] ${
+            active ? 'text-teal-300' : 'text-[color:var(--sys-faint)]'
+          }`}
+          title={t('Sort column', 'Ordenar columna', 'Ordenar coluna')}
+        >
+          <span className="truncate">{label}</span>
+          {active ? (
+            boardSort?.dir === 'asc' ? (
+              <ArrowUp className="h-3 w-3 shrink-0" />
+            ) : (
+              <ArrowDown className="h-3 w-3 shrink-0" />
+            )
+          ) : (
+            <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+          )}
+        </button>
+        {open && (
+          <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-1 shadow-lg">
+            <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sys-faint)]">
+              {t('Sort', 'Ordenar', 'Ordenar')}
+            </p>
+            <button
+              type="button"
+              onClick={() => setSort(key, 'asc')}
+              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-[color:var(--sys-nav-hover)] ${
+                active && boardSort?.dir === 'asc' ? 'text-teal-300' : 'text-[color:var(--sys-ink)]'
+              }`}
+            >
+              <ArrowUp className="h-3.5 w-3.5 shrink-0" />
+              {labels.asc}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSort(key, 'desc')}
+              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-[color:var(--sys-nav-hover)] ${
+                active && boardSort?.dir === 'desc' ? 'text-teal-300' : 'text-[color:var(--sys-ink)]'
+              }`}
+            >
+              <ArrowDown className="h-3.5 w-3.5 shrink-0" />
+              {labels.desc}
+            </button>
+            {active && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBoardSort(null);
+                  setSortMenuFor(null);
+                }}
+                className="mt-0.5 block w-full rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
+              >
+                {t('Clear sort', 'Quitar orden', 'Limpar ordenação')}
+              </button>
+            )}
+            {active && onPersistSortOrders && (
+              <button
+                type="button"
+                disabled={savingSort}
+                onClick={() => void persistCurrentSort()}
+                className="block w-full rounded-lg px-2 py-1.5 text-left text-sm font-semibold text-teal-300 hover:bg-teal-500/10 disabled:opacity-50"
+              >
+                {savingSort
+                  ? t('Saving…', 'Guardando…', 'A guardar…')
+                  : t('Save as board order', 'Guardar como orden', 'Gravar como ordem')}
+              </button>
+            )}
+            {(kind === 'status' || kind === 'priority' || kind === 'person') && (
+              <>
+                <div className="my-1 border-t border-[color:var(--sys-line)]" />
+                <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sys-faint)]">
+                  {t('Filter', 'Filtrar', 'Filtrar')}
+                </p>
+                {kind === 'status' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setColFilters((f) => ({ ...f, status: undefined }));
+                        setSortMenuFor(null);
+                      }}
+                      className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+                    >
+                      {t('All statuses', 'Todos los estados', 'Todos os estados')}
+                    </button>
+                    {WORK_KANBAN.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => {
+                          setColFilters((f) => ({ ...f, status: s }));
+                          setSortMenuFor(null);
+                        }}
+                        className={`block w-full rounded-lg px-2 py-1.5 text-left text-sm hover:bg-[color:var(--sys-nav-hover)] ${
+                          colFilters.status === s ? 'text-teal-300' : 'text-[color:var(--sys-ink)]'
+                        }`}
+                      >
+                        {statusLabel(s)}
+                      </button>
+                    ))}
+                  </>
+                )}
+                {kind === 'priority' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setColFilters((f) => ({ ...f, priority: undefined }));
+                        setSortMenuFor(null);
+                      }}
+                      className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+                    >
+                      {t('All priorities', 'Todas las prioridades', 'Todas as prioridades')}
+                    </button>
+                    {WORK_PRIORITIES.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => {
+                          setColFilters((f) => ({ ...f, priority: p }));
+                          setSortMenuFor(null);
+                        }}
+                        className={`block w-full rounded-lg px-2 py-1.5 text-left text-sm hover:bg-[color:var(--sys-nav-hover)] ${
+                          colFilters.priority === p ? 'text-teal-300' : 'text-[color:var(--sys-ink)]'
+                        }`}
+                      >
+                        {priorityLabel(p)}
+                      </button>
+                    ))}
+                  </>
+                )}
+                {kind === 'person' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setColFilters((f) => ({ ...f, person: undefined }));
+                        setSortMenuFor(null);
+                      }}
+                      className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+                    >
+                      {t('Anyone', 'Cualquiera', 'Qualquer pessoa')}
+                    </button>
+                    {users.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => {
+                          setColFilters((f) => ({ ...f, person: u.id }));
+                          setSortMenuFor(null);
+                        }}
+                        className={`block w-full truncate rounded-lg px-2 py-1.5 text-left text-sm hover:bg-[color:var(--sys-nav-hover)] ${
+                          colFilters.person === u.id ? 'text-teal-300' : 'text-[color:var(--sys-ink)]'
+                        }`}
+                      >
+                        {u.name || u.email}
+                      </button>
+                    ))}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const setDrop = (next: DropTarget | null) => {
     setDropTarget((prev) => {
@@ -465,6 +714,39 @@ export function WorkTableBoard({
           />
           {t('Hide done', 'Ocultar hechas', 'Ocultar concluídas')}
         </label>
+        <button
+          type="button"
+          onClick={() => {
+            const next: Record<string, boolean> = {};
+            sections.forEach((s) => {
+              next[s.key] = true;
+            });
+            setCollapsed(next);
+          }}
+          className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
+        >
+          {t('Collapse all', 'Colapsar todo', 'Recolher tudo')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setCollapsed({})}
+          className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
+        >
+          {t('Expand all', 'Expandir todo', 'Expandir tudo')}
+        </button>
+        {(boardSort || activeFilterCount > 0) && (
+          <button
+            type="button"
+            onClick={() => {
+              setBoardSort(null);
+              setColFilters({});
+            }}
+            className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-teal-300 hover:bg-teal-500/10"
+          >
+            {t('Clear sort / filters', 'Quitar orden / filtros', 'Limpar ordem / filtros')}
+            {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+          </button>
+        )}
         {onApplyTemplate && (
           <div className="relative">
             <button
@@ -512,7 +794,7 @@ export function WorkTableBoard({
               {t('Column', 'Columna', 'Coluna')}
             </button>
             {addOpen && (
-              <div className="absolute left-0 z-20 mt-1 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+              <div className="absolute left-0 z-20 mt-1 w-48 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-1 shadow-lg">
                 {(['status', 'person', 'responsible', 'reviewer', 'priority', 'due', 'start', 'estimate', 'origin', 'updates', 'files', 'tags', 'group', 'text', 'number', 'checkbox', 'date'] as WorkColumnKind[])
                   .filter((kind) => canAddColumnKind(columns, kind))
                   .map((kind) => (
@@ -663,9 +945,9 @@ export function WorkTableBoard({
               <div className="min-w-0 overflow-x-auto">
                 <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr className="border-b border-slate-100 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    <tr className="border-b border-[color:var(--sys-line)] text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--sys-faint)]">
                       {onToggleSelect && (
-                        <th className="w-8 px-2 py-2">
+                        <th className="sticky left-0 z-10 w-8 bg-[color:var(--sys-panel)] px-2 py-2">
                           <input
                             type="checkbox"
                             checked={
@@ -680,19 +962,35 @@ export function WorkTableBoard({
                           />
                         </th>
                       )}
-                      <th className="w-8 px-1 py-2" />
-                      <th className="w-8 px-1 py-2" title={t('Done', 'Hecho', 'Feito')} />
-                      <th className="min-w-[220px] px-3 py-2 font-semibold">{t('Task', 'Tarea', 'Tarefa')}</th>
+                      <th className={`sticky z-10 w-8 bg-[color:var(--sys-panel)] px-1 py-2 ${onToggleSelect ? 'left-8' : 'left-0'}`} />
+                      <th
+                        className={`sticky z-10 w-8 bg-[color:var(--sys-panel)] px-1 py-2 ${onToggleSelect ? 'left-16' : 'left-8'}`}
+                        title={t('Done', 'Hecho', 'Feito')}
+                      />
+                      <th
+                        className={`sticky z-10 min-w-[220px] bg-[color:var(--sys-panel)] px-3 py-2 font-semibold ${
+                          onToggleSelect ? 'left-24' : 'left-16'
+                        }`}
+                      >
+                        {renderSortHeader('title', t('Task', 'Tarea', 'Tarefa'), 'title')}
+                      </th>
                       {columns.map((col) => (
                         <th key={col.id} className="min-w-[120px] px-2 py-2">
                           <span className="inline-flex items-center gap-1">
-                            {col.kind === 'text' || col.kind === 'number' || col.kind === 'checkbox' || col.kind === 'date'
-                              ? col.label
-                              : columnKindLabel(col.kind, t)}
+                            {renderSortHeader(
+                              col.id,
+                              col.kind === 'text' ||
+                                col.kind === 'number' ||
+                                col.kind === 'checkbox' ||
+                                col.kind === 'date'
+                                ? col.label
+                                : columnKindLabel(col.kind, t),
+                              col.kind,
+                            )}
                             {onColumnsChange && columns.length > 1 && (
                               <button
                                 type="button"
-                                className="text-slate-300 hover:text-rose-600"
+                                className="text-[color:var(--sys-faint)] hover:text-rose-400"
                                 onClick={() => onColumnsChange(columns.filter((c) => c.id !== col.id))}
                                 aria-label={t('Remove column', 'Quitar columna', 'Remover coluna')}
                               >
@@ -735,7 +1033,7 @@ export function WorkTableBoard({
                           }`}
                         >
                           {onToggleSelect && (
-                            <td className="px-2 py-2" onClick={cellStop}>
+                            <td className="sticky left-0 z-[1] bg-inherit px-2 py-2" onClick={cellStop}>
                               <input
                                 type="checkbox"
                                 checked={Boolean(multiSelected)}
@@ -744,7 +1042,10 @@ export function WorkTableBoard({
                               />
                             </td>
                           )}
-                          <td className="px-1 py-2" onClick={cellStop}>
+                          <td
+                            className={`sticky z-[1] bg-inherit px-1 py-2 ${onToggleSelect ? 'left-8' : 'left-0'}`}
+                            onClick={cellStop}
+                          >
                             <button
                               type="button"
                               draggable
@@ -764,7 +1065,10 @@ export function WorkTableBoard({
                               <GripVertical className="h-4 w-4" />
                             </button>
                           </td>
-                          <td className="px-1 py-2" onClick={cellStop}>
+                          <td
+                            className={`sticky z-[1] bg-inherit px-1 py-2 ${onToggleSelect ? 'left-16' : 'left-8'}`}
+                            onClick={cellStop}
+                          >
                             <button
                               type="button"
                               onClick={() =>
@@ -783,7 +1087,10 @@ export function WorkTableBoard({
                               ) : null}
                             </button>
                           </td>
-                          <td className="px-3 py-1.5" onClick={cellStop}>
+                          <td
+                            className={`sticky z-[1] bg-inherit px-3 py-1.5 ${onToggleSelect ? 'left-24' : 'left-16'}`}
+                            onClick={cellStop}
+                          >
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
