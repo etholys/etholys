@@ -110,19 +110,69 @@ export function CandidateDetailSheet({
     [live.eligibility, live.whoCanApply, live.requirements, live.basesText, live.sourceExcerpt, locale],
   );
 
+  const sheetMemoryKey =
+    companyId && c.tempId
+      ? `fh-candidate-sheet:${companyId}:${c.tempId}`
+      : '';
+
   useEffect(() => {
     if (!open) return;
-    setTab(initialTab ?? 'overview');
-    setChat([]);
-    setInput('');
-    setBrief(null);
     setRejectOpen(false);
     setDocsOpen(false);
     setForceProposal(false);
     setMoreOpen(false);
     setFit(c.fit);
     setLive(c);
-  }, [open, c.tempId, initialTab, c]);
+
+    let restored = false;
+    if (sheetMemoryKey) {
+      try {
+        const raw = sessionStorage.getItem(sheetMemoryKey);
+        if (raw) {
+          const saved = JSON.parse(raw) as {
+            tempId?: string;
+            tab?: 'overview' | 'analyze';
+            chat?: Array<{ role: 'user' | 'assistant'; content: string }>;
+            brief?: string | null;
+            input?: string;
+          };
+          if (saved.tempId === c.tempId) {
+            setTab(saved.tab === 'analyze' || saved.tab === 'overview' ? saved.tab : initialTab ?? 'overview');
+            setChat(Array.isArray(saved.chat) ? saved.chat : []);
+            setBrief(typeof saved.brief === 'string' ? saved.brief : null);
+            setInput(typeof saved.input === 'string' ? saved.input : '');
+            restored = true;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!restored) {
+      setTab(initialTab ?? 'overview');
+      setChat([]);
+      setInput('');
+      setBrief(null);
+    }
+  }, [open, c.tempId, initialTab, c, sheetMemoryKey]);
+
+  useEffect(() => {
+    if (!open || !sheetMemoryKey) return;
+    try {
+      sessionStorage.setItem(
+        sheetMemoryKey,
+        JSON.stringify({
+          tempId: c.tempId,
+          tab,
+          chat,
+          brief,
+          input,
+        }),
+      );
+    } catch {
+      /* ignore quota */
+    }
+  }, [open, sheetMemoryKey, c.tempId, tab, chat, brief, input]);
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -1123,12 +1173,8 @@ export function CandidateDetailSheet({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+      {/* Backdrop does not close: accidental outside click was wiping AI chat / work. Use X or actions. */}
       {body}
       {docsModal}
     </div>
