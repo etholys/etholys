@@ -92,8 +92,8 @@ export async function getFolderAccess(
 /**
  * Prisma where: tasks the user may see in Work.
  * - Always: assigned / created / owner-reviewer roles, or folders they own/are member of, or SIEP projects they belong to.
- * - Company ADMIN also sees tasks on SHARED (team) boards — for the restricted "Everything" overview.
- * Never exposes other people's private unfoldered tasks to the whole company.
+ * - Company ADMIN also sees: SHARED/team boards + company ops (no folder) that are NOT in another person's private Mi trabajo section.
+ * Collaborators never get a company-wide dump of everyone else's private work.
  */
 export function folderVisibleTaskFilter(
   userId: string,
@@ -111,7 +111,25 @@ export function folderVisibleTaskFilter(
     or.push({ projectId: { in: opts.projectIds } });
   }
   if (opts?.companyAdmin) {
-    or.push({ folder: { visibility: 'SHARED' } });
+    // Team boards (explicit SHARED or any board with members)
+    or.push({
+      folder: {
+        OR: [{ visibility: 'SHARED' }, { members: { some: {} } }],
+      },
+    });
+    // Legacy company pool: unfoldered work outside someone else's personal sections
+    or.push({
+      AND: [
+        { folderId: null },
+        {
+          OR: [
+            { groupId: null },
+            { group: { ownerId: null } },
+            { group: { ownerId: userId } },
+          ],
+        },
+      ],
+    });
   }
   return { OR: or };
 }
