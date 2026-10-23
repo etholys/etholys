@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BookOpen, Droplets, Loader2, MessageSquare } from 'lucide-react';
+import { BookOpen, Droplets, Loader2, MessageSquare, X } from 'lucide-react';
 import { DEFAULT_IRRIGATION_MM, MOISTURE_THRESHOLD } from '@/lib/radar/agriculture';
 import { cadernoCopy } from '@/lib/radar/caderno';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
@@ -34,7 +34,7 @@ type Line = {
   unitName: string | null;
 };
 
-/** One focused space: what to do now + one note. Replaces stacked ops boards. */
+/** Full focus detail — always opaque; parent mounts it in a side/bottom sheet, not over map tiles. */
 export function RadarFocusSheet({
   companyId,
   engagementId,
@@ -45,6 +45,7 @@ export function RadarFocusSheet({
   propertyId,
   latest,
   hasValve,
+  onClose,
 }: {
   companyId: string;
   engagementId?: string | null;
@@ -55,11 +56,12 @@ export function RadarFocusSheet({
   propertyId?: string;
   latest?: Record<string, number> | null;
   hasValve?: boolean;
+  onClose?: () => void;
 }) {
   const loc = radarLoc(locale);
   const meta = spaceKindMeta(moduleId);
   const book = cadernoCopy(moduleId, loc);
-  const focus = units.find((u) => u.id === focusedId) || units[0] || null;
+  const focus = units.find((u) => u.id === focusedId) || null;
   const cadernoHref = (() => {
     const q = new URLSearchParams({ company: companyId });
     if (engagementId) q.set('engagement', engagementId);
@@ -118,7 +120,7 @@ export function RadarFocusSheet({
 
   if (!focus) {
     return (
-      <div className="rounded-2xl border border-dashed border-white/15 px-4 py-8 text-center text-sm text-white/50">
+      <div className="rounded-2xl border border-dashed border-white/20 bg-[#07111A] px-4 py-8 text-center text-sm text-white/55">
         {radarT(loc, 'Toca um espaço no mapa.', 'Tocá un espacio en el mapa.', 'Tap a space on the map.')}
       </div>
     );
@@ -149,32 +151,45 @@ export function RadarFocusSheet({
     : radarT(loc, 'Em dia', 'Al día', 'On track');
 
   return (
-    <section className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-4 sm:px-5">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
-        {radarT(loc, 'Tarefas', 'Tareas', 'Tasks')}
-      </p>
-      <h2 className="mt-1 truncate text-lg font-medium text-white">{focus.name}</h2>
-      <p className="text-xs text-white/45">
-        {[focus.crop, focus.areaHa != null ? `${focus.areaHa} ${meta.areaUnit[loc]}` : null, moisture != null ? `${moisture}%` : null]
-          .filter(Boolean)
-          .join(' · ') || '—'}
-      </p>
+    <section className="rounded-xl border border-white/15 bg-[#07111A] px-4 py-4 sm:px-5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+            {radarT(loc, 'Tarefas', 'Tareas', 'Tasks')}
+          </p>
+          <h2 className="mt-1 truncate text-lg font-medium text-white">{focus.name}</h2>
+          <p className="text-xs text-white/55">
+            {[focus.crop, focus.areaHa != null ? `${focus.areaHa} ${meta.areaUnit[loc]}` : null, moisture != null ? `${moisture}%` : null]
+              .filter(Boolean)
+              .join(' · ') || '—'}
+          </p>
+        </div>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full bg-[#12343c] p-2 text-white hover:bg-[#1a4a54]"
+            aria-label={radarT(loc, 'Fechar', 'Cerrar', 'Close')}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
 
-      {/* BlueIoT-style task card */}
       <div
         className={`mt-3 rounded-lg border px-3 py-3 ${
           holdHarvest || needIrrigate
-            ? 'border-amber-400/35 bg-amber-500/10'
-            : 'border-white/10 bg-black/25'
+            ? 'border-amber-400/40 bg-amber-950'
+            : 'border-white/15 bg-[#0c1a24]'
         }`}
       >
         <p className="text-sm font-medium text-white">{cue}</p>
-        <p className="mt-2 text-[11px] text-white/45">
+        <p className="mt-2 text-[11px] text-white/55">
           <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${holdHarvest || needIrrigate ? 'bg-amber-400' : 'bg-emerald-400'}`} />
           {priority}
         </p>
         {latest && Object.keys(latest).length > 0 && (
-          <ul className="mt-2 space-y-0.5 text-xs text-white/70">
+          <ul className="mt-2 space-y-0.5 text-xs text-white/80">
             {Object.entries(latest).map(([metric, value]) => (
               <li key={metric}>
                 {metric}: {value}
@@ -211,9 +226,9 @@ export function RadarFocusSheet({
               value={mm}
               onChange={(e) => setMm(e.target.value)}
               inputMode="decimal"
-              className="w-16 rounded-lg border border-white/15 bg-black/30 px-2 py-1.5 text-sm text-white"
+              className="w-16 rounded-lg border border-white/20 bg-[#07111A] px-2 py-1.5 text-sm text-white"
             />
-            <span className="text-xs text-white/45">mm</span>
+            <span className="text-xs text-white/55">mm</span>
             <button
               type="button"
               disabled={busy}
@@ -237,27 +252,27 @@ export function RadarFocusSheet({
       {err && <p className="mt-2 text-sm text-rose-200">{err}</p>}
       {ok && <p className="mt-2 text-sm text-emerald-200">{radarT(loc, 'Guardado', 'Guardado', 'Saved')}</p>}
 
-      <div className="mt-4 border-t border-white/10 pt-3">
+      <div className="mt-4 border-t border-white/15 pt-3">
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={2}
           placeholder={radarT(loc, 'O que viste neste espaço…', 'Qué viste en este espacio…', 'What you saw here…')}
-          className="w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-sky-500/40"
+          className="w-full rounded-lg border border-white/20 bg-[#0c1a24] px-3 py-2 text-sm text-white outline-none placeholder:text-white/45 focus:ring-2 focus:ring-sky-500/40"
         />
         <div className="mt-2 flex flex-wrap gap-2">
           <button
             type="button"
             disabled={busy || note.trim().length < 2}
             onClick={() => void post({ action: 'line', kind: 'observation', unitId: focus.id, note: note.trim() })}
-            className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#12343c] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
             {radarT(loc, 'Guardar nota', 'Guardar nota', 'Save note')}
           </button>
           <Link
             href={cadernoHref}
-            className="inline-flex items-center gap-2 rounded-lg border border-teal-400/40 bg-teal-500/15 px-3 py-1.5 text-sm font-medium text-teal-100 hover:bg-teal-500/25"
+            className="inline-flex items-center gap-2 rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-slate-950 hover:bg-teal-400"
           >
             <BookOpen className="h-4 w-4" />
             {book.registerCta}
@@ -266,10 +281,10 @@ export function RadarFocusSheet({
       </div>
 
       {recent.length > 0 && (
-        <ul className="mt-3 space-y-1.5 border-t border-white/10 pt-3">
+        <ul className="mt-3 space-y-1.5 border-t border-white/15 pt-3">
           {recent.map((l) => (
-            <li key={l.id} className="text-sm text-white/65">
-              <span className="text-white/35">
+            <li key={l.id} className="rounded-lg bg-[#0c1a24] px-3 py-2 text-sm text-white/80">
+              <span className="text-white/45">
                 {new Date(l.occurredAt).toLocaleString(loc === 'es' ? 'es' : loc === 'en' ? 'en' : 'pt-BR', {
                   day: '2-digit',
                   month: 'short',

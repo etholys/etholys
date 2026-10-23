@@ -181,3 +181,30 @@ Alertas no ecrã seguem sempre os protocolos de agricultura. A mensagem automát
 - Vista Técnico paralela / toggle Empresa|Técnico.
 - GIS completo, 3D, blockchain.
 - Rebuild de Postgres, Caddy ou Jitsi. Deploy de UI é só `etholys-web`.
+
+## Demos para apresentações (clientes)
+
+Dois tenants re-runnable (upsert). Senha partilhada: env `SANDBOX_PASSWORD` ou default interno `EtholysSandbox2026!` (não commitar segredos em `.env`).
+
+| Conta | Empresa | O que mostra |
+|-------|---------|--------------|
+| `demo.campo.novo@etholys.com` | Campo Novo (`CampoNovo`) | First-run: sem propriedade, mapa/Caderno vazios, funil Caracterizar → Desenhar → Geolocalizar → Sensores |
+| `master.horizonte@etholys.com` | Horizonte Verde (`Horizonte`) | Avançado: Finca escuela pin OSM (Praça do Buriti), 4 espaços colocados/rodados, cultivos, sondas, Caderno, lotes, alertas |
+
+Refresh após updates de produto (local ou Contabo, com `DATABASE_URL` da BD alvo):
+
+```bash
+cd apps/web
+npm run seed:radar-demos
+# equivalente: npx tsx --require dotenv/config scripts/seed-radar-demos.ts
+```
+
+Código: `lib/sandbox/seed-radar-demos.ts`, script `scripts/seed-radar-demos.ts`. A fazenda avançada também é actualizada por `npm run seed:sandbox` (`enrichSandboxPresentation` → `seedRadarFarm`).
+
+### Apagar no mapa (semântica)
+
+| Acção | Efeito |
+|-------|--------|
+| **Apagar do mapa** | Remove só o footprint (`placed: false`); o espaço fica na lista |
+| **Apagar espaço** | Soft-delete do `NexusOpsUnit` + remove do `layoutJson` (e desactiva sensores do espaço) |
+| Cultivos / sensores / Caderno | Trash com confirmação; Caderno via `DELETE /api/radar/entries` |

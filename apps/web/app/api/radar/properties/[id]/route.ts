@@ -17,6 +17,7 @@ import {
   emptyRadarLayout,
   mergeLayoutWithSpaces,
   parseRadarLayout,
+  removeSpaceFromLayout,
   sanitizeLayoutPatch,
   cropsFromLayout,
   withCrops,
@@ -484,6 +485,64 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
         areaHa: updated.areaHa,
       },
     });
+  }
+
+  if (action === 'parcel_delete') {
+    const unitId = String(body.unitId || '').trim();
+    if (!unitId) return NextResponse.json({ error: 'unitId obrigatório.' }, { status: 400 });
+    const unit = await prisma.nexusOpsUnit.findFirst({
+      where: { id: unitId, propertyId: id, companyId, isActive: true },
+    });
+    if (!unit) return NextResponse.json({ error: 'Espaço inválido.' }, { status: 404 });
+
+    await prisma.nexusOpsUnit.update({ where: { id: unitId }, data: { isActive: false } });
+    await prisma.nexusSensor.updateMany({
+      where: { companyId, unitId, isActive: true },
+      data: { isActive: false },
+    });
+
+    const layout = parseRadarLayout(property.layoutJson) || emptyRadarLayout();
+    const remaining = await prisma.nexusOpsUnit.findMany({
+      where: { propertyId: id, companyId, isActive: true },
+      select: { id: true, kind: true },
+    });
+    const spaceIds = remaining.filter(isRadarParcel).map((u) => u.id);
+    const sensorsLeft = await prisma.nexusSensor.findMany({
+      where: { companyId, isActive: true, unitId: { in: spaceIds } },
+      select: { id: true, unitId: true },
+    });
+    const cleaned = removeSpaceFromLayout(layout, unitId);
+    const merged = mergeLayoutWithSpaces(
+      cleaned,
+      spaceIds,
+      sensorsLeft.map((s) => ({ id: s.id, spaceId: s.unitId })),
+    );
+    await prisma.radarProperty.update({
+      where: { id },
+      data: { layoutJson: merged as object },
+    });
+    return NextResponse.json({ ok: true, layout: merged });
+  }
+
+  if (action === 'sensor_remove') {
+    const sensorId = String(body.sensorId || '').trim();
+    if (!sensorId) return NextResponse.json({ error: 'sensorId obrigatório.' }, { status: 400 });
+    const sensor = await prisma.nexusSensor.findFirst({
+      where: { id: sensorId, companyId, isActive: true },
+    });
+    if (!sensor) return NextResponse.json({ error: 'Sensor inválido.' }, { status: 404 });
+    await prisma.nexusSensor.update({ where: { id: sensorId }, data: { isActive: false } });
+    const layout = parseRadarLayout(property.layoutJson) || emptyRadarLayout();
+    const next = {
+      ...layout,
+      sensors: layout.sensors.filter((s) => s.id !== sensorId),
+      devices: (layout.devices || []).filter((d) => d.sensorId !== sensorId),
+    };
+    await prisma.radarProperty.update({
+      where: { id },
+      data: { layoutJson: next as object },
+    });
+    return NextResponse.json({ ok: true, layout: next });
   }
 
   // generic rename

@@ -101,6 +101,8 @@ export function RadarPropertyWorkspace({
   const [railOpen, setRailOpen] = useState(false);
   const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
   const [editMode, setEditMode] = useState<'none' | 'place' | 'move'>('none');
+  /** Full focus sheet — closed by default so the map stays clear. */
+  const [focusDetailOpen, setFocusDetailOpen] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -261,6 +263,7 @@ export function RadarPropertyWorkspace({
   const next = data.steps.find((s) => !s.done) ?? null;
   const focusedUnit = data.units.find((u) => u.id === focusedId) || null;
   const focusedPlaced = Boolean(layout.spaces.some((s) => s.id === focusedId && s.placed === true));
+  const focusedMoisture = focusedUnit?.moisture ?? null;
   const companyQ = engagementId
     ? `company=${companyId}&engagement=${engagementId}`
     : `company=${companyId}`;
@@ -306,6 +309,29 @@ export function RadarPropertyWorkspace({
     ? data.units.filter((u) => u.name.toLowerCase().includes(q) || (u.crop || '').toLowerCase().includes(q))
     : data.units;
   const cardOpen = Boolean(panel || tool);
+  const detailOpen = focusDetailOpen && Boolean(focusedId) && !cardOpen;
+
+  const deleteFocusedSpace = async () => {
+    if (!focusedId || !focusedUnit) return;
+    const ok = window.confirm(
+      radarT(
+        loc,
+        `Apagar o espaço «${focusedUnit.name}»? Sai da lista e do mapa.`,
+        `¿Borrar el espacio «${focusedUnit.name}»? Sale de la lista y del mapa.`,
+        `Delete space “${focusedUnit.name}”? It leaves the list and the map.`,
+      ),
+    );
+    if (!ok) return;
+    try {
+      await patch({ action: 'parcel_delete', unitId: focusedId });
+      setFocusedId(null);
+      setFocusDetailOpen(false);
+      setEditMode('none');
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Erro');
+    }
+  };
 
   return (
     <div ref={frameRef} className="relative isolate overflow-hidden bg-[#07111A]">
@@ -330,7 +356,10 @@ export function RadarPropertyWorkspace({
               lastValue: s.lastValue ?? null,
             }))}
             focusedId={focusedId}
-            onFocus={setFocusedId}
+            onFocus={(id) => {
+              setFocusedId(id);
+              setFocusDetailOpen(false);
+            }}
             fill
           />
         ) : (
@@ -349,7 +378,10 @@ export function RadarPropertyWorkspace({
               lastValue: s.lastValue ?? null,
             }))}
             focusedId={focusedId}
-            onFocus={setFocusedId}
+            onFocus={(id) => {
+              setFocusedId(id);
+              setFocusDetailOpen(false);
+            }}
             onSaved={() => void load()}
             syncedLayout={layout}
             editMode={editMode}
@@ -403,7 +435,10 @@ export function RadarPropertyWorkspace({
                 units={treeUnits}
                 sensors={data.sensors}
                 focusedId={focusedId}
-                onFocus={setFocusedId}
+                onFocus={(id) => {
+                  setFocusedId(id);
+                  setFocusDetailOpen(false);
+                }}
               />
             </div>
           )}
@@ -533,12 +568,26 @@ export function RadarPropertyWorkspace({
                       setEditMode('none');
                       void commitLayout(unplaceSpace(layout, focusedId));
                     }}
-                    className="rounded-full bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-800"
+                    className="rounded-full bg-[#12343c] px-3 py-1.5 text-xs font-semibold text-white ring-1 ring-white/20 hover:bg-[#1a4a54]"
+                    title={radarT(
+                      loc,
+                      'Só remove o desenho; o espaço fica na lista',
+                      'Solo quita el dibujo; el espacio queda en la lista',
+                      'Removes the drawing only; space stays in the list',
+                    )}
                   >
                     {radarT(loc, 'Apagar do mapa', 'Quitar del mapa', 'Remove from map')}
                   </button>
                 </>
               )}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void deleteFocusedSpace()}
+                className="rounded-full bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-800 disabled:opacity-40"
+              >
+                {radarT(loc, 'Apagar espaço', 'Borrar espacio', 'Delete space')}
+              </button>
             </div>
           )}
           {err && (
@@ -720,11 +769,32 @@ export function RadarPropertyWorkspace({
                     {data.sensors.map((s) => (
                       <li
                         key={s.id}
-                        className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80"
+                        className="flex items-center gap-3 rounded-xl border border-white/15 bg-[#0c1a24] px-4 py-3 text-sm text-white/80"
                       >
                         <Radio className="h-4 w-4 text-emerald-300" />
-                        <span>{s.name}</span>
-                        <span className="text-white/35">· {s.metric}</span>
+                        <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                        <span className="text-white/45">· {s.metric}</span>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => {
+                            const ok = window.confirm(
+                              radarT(
+                                loc,
+                                `Desactivar o sensor «${s.name}»?`,
+                                `¿Desactivar el sensor «${s.name}»?`,
+                                `Deactivate sensor “${s.name}”?`,
+                              ),
+                            );
+                            if (!ok) return;
+                            void patch({ action: 'sensor_remove', sensorId: s.id })
+                              .then(() => load())
+                              .catch((e) => setErr(e instanceof Error ? e.message : 'Erro'));
+                          }}
+                          className="rounded-full bg-rose-700 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-rose-800 disabled:opacity-40"
+                        >
+                          {radarT(loc, 'Apagar', 'Borrar', 'Delete')}
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -789,9 +859,29 @@ export function RadarPropertyWorkspace({
           </div>
         )}
 
-        {!cardOpen && focusedId && (
-          <div className="pointer-events-auto absolute bottom-4 right-16 z-20 flex w-[min(22rem,calc(100%-6rem))] max-h-[46%] flex-col gap-2 overflow-y-auto">
-            {focusedId && data.moduleId === 'agriculture' && (
+        {!cardOpen && focusedId && focusedUnit && !detailOpen && (
+          <div className="pointer-events-auto absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 justify-center px-3">
+            <button
+              type="button"
+              onClick={() => setFocusDetailOpen(true)}
+              className="inline-flex max-w-[min(28rem,calc(100vw-6rem))] items-center gap-2 rounded-full bg-[#07111A] px-4 py-2.5 text-sm font-semibold text-white shadow-xl ring-1 ring-white/25 hover:bg-[#12343c]"
+            >
+              <span className="truncate">{focusedUnit.name}</span>
+              {(focusedUnit.crop || focusedMoisture != null) && (
+                <span className="truncate font-medium text-teal-200">
+                  · {[focusedUnit.crop, focusedMoisture != null ? `${focusedMoisture}%` : null].filter(Boolean).join(' · ')}
+                </span>
+              )}
+              <span className="ml-1 rounded-full bg-teal-500/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-950">
+                {radarT(loc, 'Abrir', 'Abrir', 'Open')}
+              </span>
+            </button>
+          </div>
+        )}
+
+        {detailOpen && focusedId && (
+          <div className="pointer-events-auto absolute bottom-3 right-3 top-28 z-20 flex w-[min(24rem,calc(100%-5.5rem))] flex-col gap-2 overflow-y-auto rounded-2xl border border-white/20 bg-[#07111A] p-3 shadow-2xl sm:bottom-4 sm:right-4">
+            {data.moduleId === 'agriculture' && (
               <ParcelAssignCrop
                 locale={loc}
                 unit={data.units.find((u) => u.id === focusedId)}
@@ -811,8 +901,9 @@ export function RadarPropertyWorkspace({
               moduleId={data.moduleId}
               units={data.units}
               focusedId={focusedId}
-              latest={focusedId ? data.latestByUnit?.[focusedId] : null}
+              latest={data.latestByUnit?.[focusedId] ?? null}
               hasValve={Boolean(data.devices?.some((d) => d.unitId === focusedId && d.sku === 'SVC01-LS2'))}
+              onClose={() => setFocusDetailOpen(false)}
             />
           </div>
         )}
@@ -840,9 +931,9 @@ function ParcelAssignCrop({
   }, [unit?.id, unit?.crop]);
   if (!unit) return null;
   return (
-    <div className="flex flex-wrap items-end gap-2 rounded-xl border border-white/10 bg-black/20 px-4 py-3">
+    <div className="flex flex-wrap items-end gap-2 rounded-xl border border-white/15 bg-[#0c1a24] px-4 py-3">
       <div className="min-w-[10rem] flex-1">
-        <p className="text-[10px] uppercase tracking-wide text-white/40">
+        <p className="text-[10px] uppercase tracking-wide text-white/50">
           {locale === 'es' ? 'Cultivo en' : locale === 'en' ? 'Crop on' : 'Cultivo em'} {unit.name}
         </p>
         {crops.length > 0 ? (
@@ -862,7 +953,7 @@ function ParcelAssignCrop({
           <input
             value={crop}
             onChange={(e) => setCrop(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
+            className="mt-1 w-full rounded-lg border border-white/20 bg-[#07111A] px-3 py-2 text-sm text-white"
             placeholder={locale === 'en' ? 'Crop name' : 'Nome do cultivo'}
           />
         )}
@@ -871,7 +962,7 @@ function ParcelAssignCrop({
         type="button"
         disabled={busy}
         onClick={() => void onSave(crop)}
-        className="rounded-lg bg-emerald-500/90 px-3 py-2 text-xs font-semibold text-[#04110c] disabled:opacity-40"
+        className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-[#04110c] disabled:opacity-40"
       >
         {locale === 'en' ? 'Assign' : 'Associar'}
       </button>

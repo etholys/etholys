@@ -840,12 +840,19 @@ function RadarBasemap({
             moved: false,
           };
         });
-        poly.bindTooltip(parcel.crop ? `${parcel.name} · ${parcel.crop}` : parcel.name, {
-          permanent: true,
-          direction: 'center',
-          className: 'radar-space-tip',
-          opacity: match ? 1 : 0.35,
-        });
+        {
+          const tipParts = [
+            parcel.name,
+            parcel.crop || null,
+            parcel.moisture != null ? `${Math.round(parcel.moisture)}%` : null,
+          ].filter(Boolean);
+          poly.bindTooltip(tipParts.join(' · '), {
+            permanent: true,
+            direction: 'center',
+            className: 'radar-space-tip',
+            opacity: match ? 1 : 0.45,
+          });
+        }
         overlays.addLayer(poly);
       }
       overlays.addLayer(
@@ -900,14 +907,14 @@ function RadarBasemap({
         }
         .radar-basemap .leaflet-control-attribution a { color: #99f6e4; }
         .radar-space-tip {
-          background: rgba(7,17,26,0.9);
-          color: white;
-          border: 0;
+          background: #07111a !important;
+          color: #f8fafc !important;
+          border: 1px solid rgba(255,255,255,0.22) !important;
           border-radius: 999px;
-          box-shadow: none;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.35);
           font-size: 11px;
           font-weight: 600;
-          padding: 2px 8px;
+          padding: 3px 10px;
         }
         .radar-space-tip::before { display: none; }
       `}</style>

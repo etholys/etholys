@@ -138,9 +138,19 @@ export function RadarCropsPanel({
               <button
                 type="button"
                 disabled={busy || localBusy}
-                onClick={() => void onRemove(c.id)}
-                className="rounded-lg p-1.5 text-white/35 hover:bg-white/5 hover:text-rose-200"
-                title={loc === 'en' ? 'Remove' : 'Remover'}
+                onClick={() => {
+                  const ok = window.confirm(
+                    loc === 'en'
+                      ? `Delete crop “${c.name}”?`
+                      : loc === 'es'
+                        ? `¿Borrar el cultivo «${c.name}»?`
+                        : `Apagar o cultivo «${c.name}»?`,
+                  );
+                  if (!ok) return;
+                  void onRemove(c.id);
+                }}
+                className="rounded-full bg-rose-700 p-1.5 text-white hover:bg-rose-800 disabled:opacity-40"
+                title={loc === 'en' ? 'Delete' : loc === 'es' ? 'Borrar' : 'Apagar'}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

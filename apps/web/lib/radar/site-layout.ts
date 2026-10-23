@@ -379,3 +379,13 @@ export function unplaceSpace(layout: RadarSiteLayoutDoc, id: string): RadarSiteL
     spaces: layout.spaces.map((s) => (s.id === id ? { ...s, placed: false } : s)),
   };
 }
+
+/** Drop the space from the layout entirely (unit delete / list removal). */
+export function removeSpaceFromLayout(layout: RadarSiteLayoutDoc, id: string): RadarSiteLayoutDoc {
+  return {
+    ...layout,
+    spaces: layout.spaces.filter((s) => s.id !== id),
+    sensors: layout.sensors.map((s) => (s.spaceId === id ? { ...s, spaceId: null } : s)),
+    devices: (layout.devices || []).map((d) => (d.unitId === id ? { ...d, unitId: null } : d)),
+  };
+}
