@@ -213,8 +213,15 @@ export default function TasksBoard({
     if (personalGroups) params.set('personal', '1');
     else if (folderFilter) params.set('folderId', folderFilter);
     fetch(`/api/task-groups?${params}`)
-      .then((r) => r.json())
-      .then((d) => setGroups(d?.groups ?? []))
+      .then(async (r) => {
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          console.warn('task-groups', r.status, d);
+          setGroups([]);
+          return;
+        }
+        setGroups(Array.isArray(d?.groups) ? d.groups : []);
+      })
       .catch(() => setGroups([]));
   };
 
@@ -238,6 +245,17 @@ export default function TasksBoard({
     fetchGroups();
     fetchFolders();
   }, [activeCompanyId, personalGroups, folderFilter]);
+
+  // When hub injects tasks (Mi trabajo), refresh personal sections so group headers match task.groupId
+  const presetGroupKey = (presetTasks ?? [])
+    .map((t: any) => t?.groupId)
+    .filter(Boolean)
+    .sort()
+    .join(',');
+  useEffect(() => {
+    if (!embedded || !personalGroups || !activeCompanyId) return;
+    fetchGroups();
+  }, [embedded, personalGroups, activeCompanyId, presetGroupKey]);
 
   useEffect(() => {
     fetch('/api/projects')
@@ -654,11 +672,27 @@ export default function TasksBoard({
   });
 
   const hasAdvFilters = !!(priorityFilter || statusFilter || assigneeFilter || dateFromFilter || dateToFilter);
-  const knownGroupIds = new Set(groups.map((g) => g.id));
-  // If a task points at a group we are not allowed to list, still show it (never hide work)
-  const ungroupedTasks = filtered.filter(
-    (task: any) => !task?.groupId || !knownGroupIds.has(task.groupId),
-  );
+
+  // Always surface sections that tasks already belong to (API group list can lag / miss personal scope)
+  const boardGroups = (() => {
+    const map = new Map<string, { id: string; name: string; color: string | null }>();
+    for (const g of groups) {
+      map.set(g.id, { id: g.id, name: g.name, color: g.color ?? null });
+    }
+    for (const task of filtered) {
+      const gid = task?.groupId as string | undefined;
+      if (!gid || map.has(gid)) continue;
+      map.set(gid, {
+        id: gid,
+        name: task?.group?.name || t3('Group', 'Grupo', 'Grupo'),
+        color: task?.group?.color ?? null,
+      });
+    }
+    return Array.from(map.values());
+  })();
+
+  const knownGroupIds = new Set(boardGroups.map((g) => g.id));
+  const ungroupedTasks = filtered.filter((task: any) => !task?.groupId || !knownGroupIds.has(task.groupId));
   const tasksByGroupId = (groupId: string) => filtered.filter((task: any) => task?.groupId === groupId);
 
   const pageTitle = variant === 'hub' ? t3('Team tasks', 'Tareas del equipo', 'Tarefas da equipa') : tr('nav.tasks');
@@ -937,7 +971,7 @@ export default function TasksBoard({
                 t={t3}
               />
               <WorkTableBoard
-              groups={groups}
+              groups={boardGroups}
               ungroupedTasks={ungroupedTasks}
               tasksByGroupId={tasksByGroupId}
               users={users}

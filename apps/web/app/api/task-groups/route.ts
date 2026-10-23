@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     const folderId = url.searchParams.get('folderId') || '';
     const personal = url.searchParams.get('personal') === '1';
 
-    // Mi trabajo: own personal groups + any legacy company groups that still hold my tasks
+    // Mi trabajo: groups I own in this company, OR any group that still holds my assigned tasks here
     const where = personal
       ? {
           companyId,
@@ -25,13 +25,12 @@ export async function GET(req: Request) {
           OR: [
             { ownerId: tenant.userId },
             {
-              ownerId: null,
-              folderId: null,
               tasks: {
                 some: {
                   assigneeId: tenant.userId,
                   isActive: true,
                   parentId: null,
+                  OR: [{ companyId }, { project: { companyId } }],
                 },
               },
             },
