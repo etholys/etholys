@@ -120,6 +120,7 @@ export default function WorkShell() {
   const [statusChip, setStatusChip] = useState('');
   const [priorityChip, setPriorityChip] = useState('');
   const [personFocus, setPersonFocus] = useState('');
+  const [isCompanyAdmin, setIsCompanyAdmin] = useState(false);
 
   const currentUserId = (session?.user as { id?: string } | undefined)?.id || null;
 
@@ -164,6 +165,23 @@ export default function WorkShell() {
   useEffect(() => {
     fetchAllTasks();
   }, [activeCompanyId]);
+
+  useEffect(() => {
+    if (!activeCompanyId) {
+      setIsCompanyAdmin(false);
+      return;
+    }
+    fetch(`/api/workspace/access?companyId=${encodeURIComponent(activeCompanyId)}`)
+      .then((r) => r.json())
+      .then((d) => setIsCompanyAdmin(Boolean(d?.canManage)))
+      .catch(() => setIsCompanyAdmin(false));
+  }, [activeCompanyId]);
+
+  useEffect(() => {
+    if (nav.kind === 'all' && !isCompanyAdmin) {
+      setNav({ kind: 'mine' });
+    }
+  }, [nav.kind, isCompanyAdmin]);
 
   useEffect(() => {
     const d = new URLSearchParams();
@@ -273,7 +291,10 @@ export default function WorkShell() {
   const scopedTasks = useMemo(() => {
     const top = (tasks ?? []).filter((t: any) => !t.parentId);
     let list = top;
-    if (nav.kind === 'company') list = top.filter((t: any) => !t.projectId);
+    if (nav.kind === 'all') {
+      // Admin overview: only SHARED team boards — never private Mi trabajo
+      list = top.filter((t: any) => t.folderId && t.folder?.visibility === 'SHARED');
+    } else if (nav.kind === 'company') list = top.filter((t: any) => !t.projectId);
     else if (nav.kind === 'department') list = top.filter((t: any) => t.departmentId === nav.id);
     else if (nav.kind === 'project') list = top.filter((t: any) => t.projectId === nav.id);
     else if (nav.kind === 'folder') list = top.filter((t: any) => t.folderId === nav.id);
@@ -339,12 +360,15 @@ export default function WorkShell() {
         const d = new Date(t.dueDate);
         return d >= start && d < end;
       }).length,
+      sharedOpen: open.filter((t: any) => t.folderId && t.folder?.visibility === 'SHARED').length,
     };
   }, [tasks, currentUserId]);
 
   const contextTitle = (() => {
     if (nav.kind === 'dashboard') return t3('Dashboard', 'Panel', 'Painel');
-    if (nav.kind === 'all') return t3('All tasks', 'Todas las tareas', 'Todas as tarefas');
+    if (nav.kind === 'all') {
+      return t3('Shared boards', 'Tableros compartidos', 'Quadros partilhados');
+    }
     if (nav.kind === 'mine') return t3('My tasks', 'Mis tareas', 'As minhas tarefas');
     if (nav.kind === 'overdue') return t3('Overdue', 'Atrasadas', 'Atrasadas');
     if (nav.kind === 'unassigned') return t3('Unassigned', 'Sin asignar', 'Sem responsável');
@@ -363,6 +387,13 @@ export default function WorkShell() {
     }
     if (nav.kind === 'mine') {
       return t3('Assigned to you', 'Asignadas a ti', 'Atribuídas a ti');
+    }
+    if (nav.kind === 'all') {
+      return t3(
+        'Admin only — tasks on shared team boards (not private work)',
+        'Solo admin — tareas en tableros compartidos (no trabajo privado)',
+        'Só admin — tarefas em quadros partilhados (não trabalho privado)',
+      );
     }
     if (nav.kind === 'folder') {
       return t3('A board in your workspace', 'Un tablero de tu espacio', 'Um quadro do teu espaço');
@@ -505,6 +536,7 @@ export default function WorkShell() {
         counts={counts}
         onCreateFolder={createFolder}
         onShareFolder={(f) => setShareFolder(f)}
+        canSeeEverything={isCompanyAdmin}
         t={t3}
       />
 

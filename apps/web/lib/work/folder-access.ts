@@ -89,15 +89,31 @@ export async function getFolderAccess(
   return { folder, access };
 }
 
-/** Prisma where fragment: tasks visible under folder ACL. */
-export function folderVisibleTaskFilter(userId: string) {
-  return {
-    OR: [
-      { folderId: null },
-      { folder: { ownerId: userId } },
-      { folder: { members: { some: { userId } } } },
-    ],
-  };
+/**
+ * Prisma where: tasks the user may see in Work.
+ * - Always: assigned / created / owner-reviewer roles, or folders they own/are member of, or SIEP projects they belong to.
+ * - Company ADMIN also sees tasks on SHARED (team) boards — for the restricted "Everything" overview.
+ * Never exposes other people's private unfoldered tasks to the whole company.
+ */
+export function folderVisibleTaskFilter(
+  userId: string,
+  opts?: { companyAdmin?: boolean; projectIds?: string[] },
+) {
+  const or: Record<string, unknown>[] = [
+    { assigneeId: userId },
+    { creatorId: userId },
+    { responsibleId: userId },
+    { reviewerId: userId },
+    { folder: { ownerId: userId } },
+    { folder: { members: { some: { userId } } } },
+  ];
+  if (opts?.projectIds?.length) {
+    or.push({ projectId: { in: opts.projectIds } });
+  }
+  if (opts?.companyAdmin) {
+    or.push({ folder: { visibility: 'SHARED' } });
+  }
+  return { OR: or };
 }
 
 export function accessibleFoldersWhere(userId: string, companyId: string) {

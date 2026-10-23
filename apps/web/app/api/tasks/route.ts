@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { createNotification } from '@/lib/notify';
 import { getGuestProjectIds, requireProjectPermission } from '@/lib/siep/permissions';
+import { isCompanyAdmin } from '@/lib/integrated-workspace';
 import {
   canEditFolderContent,
   folderVisibleTaskFilter,
@@ -25,14 +26,21 @@ export async function GET(req: Request) {
     if (status) where.status = status;
     if (assigneeId) where.assigneeId = assigneeId;
 
-    const [companyMemberRows, guestProjectIds] = await Promise.all([
+    const [companyMemberRows, guestProjectIds, memberProjects] = await Promise.all([
       prisma.companyUser.findMany({
         where: { userId: tenant.userId },
         select: { companyId: true },
       }),
       getGuestProjectIds(tenant.userId),
+      prisma.projectMember.findMany({
+        where: { userId: tenant.userId, status: 'active' },
+        select: { projectId: true },
+      }),
     ]);
     const companyMemberIds = companyMemberRows.map((r) => r.companyId);
+    const accessibleProjectIds = [
+      ...new Set([...guestProjectIds, ...memberProjects.map((p) => p.projectId)]),
+    ];
 
     if (projectId) {
       const gate = await requireProjectPermission(tenant.userId, projectId, [
@@ -72,8 +80,20 @@ export async function GET(req: Request) {
       where.projectId = null;
     }
 
-    // Drive ACL: hide tasks in folders the user cannot access
-    const folderGate = folderVisibleTaskFilter(tenant.userId);
+    const adminForCompany =
+      Boolean(companyId) && companyMemberIds.includes(companyId)
+        ? await isCompanyAdmin(tenant.userId, companyId)
+        : false;
+
+    const projectIdsForGate = projectId
+      ? [...new Set([...accessibleProjectIds, projectId])]
+      : accessibleProjectIds;
+
+    // Privacy: no company-wide dump of private / unfoldered personal work
+    const folderGate = folderVisibleTaskFilter(tenant.userId, {
+      companyAdmin: adminForCompany,
+      projectIds: projectIdsForGate,
+    });
     where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), folderGate];
 
     const tasks = await prisma.task.findMany({
@@ -118,7 +138,7 @@ export async function GET(req: Request) {
         },
         department: { select: { id: true, name: true } },
         group: { select: { id: true, name: true, color: true } },
-        folder: { select: { id: true, name: true } },
+        folder: { select: { id: true, name: true, visibility: true } },
         checklist: {
           select: { id: true, text: true, completed: true, order: true },
           orderBy: { order: 'asc' },

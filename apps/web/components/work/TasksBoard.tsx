@@ -648,7 +648,11 @@ export default function TasksBoard({
   });
 
   const hasAdvFilters = !!(priorityFilter || statusFilter || assigneeFilter || dateFromFilter || dateToFilter);
-  const ungroupedTasks = filtered.filter((task: any) => !task?.groupId);
+  const knownGroupIds = new Set(groups.map((g) => g.id));
+  // If a task points at a group we are not allowed to list, still show it (never hide work)
+  const ungroupedTasks = filtered.filter(
+    (task: any) => !task?.groupId || !knownGroupIds.has(task.groupId),
+  );
   const tasksByGroupId = (groupId: string) => filtered.filter((task: any) => task?.groupId === groupId);
 
   const pageTitle = variant === 'hub' ? t3('Team tasks', 'Tareas del equipo', 'Tarefas da equipa') : tr('nav.tasks');

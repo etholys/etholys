@@ -59,6 +59,7 @@ export function WorkSidebar({
   counts,
   onCreateFolder,
   onShareFolder,
+  canSeeEverything = false,
   t,
 }: {
   nav: WorkNav;
@@ -69,9 +70,11 @@ export function WorkSidebar({
   currentUserId?: string | null;
   collapsed: boolean;
   onToggle: () => void;
-  counts: { open: number; overdue: number; mine: number; unassigned: number; week: number };
+  counts: { open: number; overdue: number; mine: number; unassigned: number; week: number; sharedOpen?: number };
   onCreateFolder: (input: { name: string; visibility: 'PERSONAL' | 'SHARED'; color?: string }) => Promise<void>;
   onShareFolder?: (folder: { id: string; name: string }) => void;
+  /** Company ADMIN only — overview of SHARED team boards */
+  canSeeEverything?: boolean;
   t: (en: string, es: string, pt: string) => string;
 }) {
   const [composerOpen, setComposerOpen] = useState(false);
@@ -235,7 +238,14 @@ export function WorkSidebar({
             </p>
           )}
           {item(nav.kind === 'dashboard', () => onNav({ kind: 'dashboard' }), <LayoutDashboard className="h-4 w-4" />, t('Home', 'Inicio', 'Início'))}
-          {item(nav.kind === 'all', () => onNav({ kind: 'all' }), <ListTodo className="h-4 w-4" />, t('Everything', 'Todo', 'Tudo'), counts.open)}
+          {canSeeEverything &&
+            item(
+              nav.kind === 'all',
+              () => onNav({ kind: 'all' }),
+              <ListTodo className="h-4 w-4" />,
+              t('Shared boards', 'Tableros compartidos', 'Quadros partilhados'),
+              counts.sharedOpen ?? 0,
+            )}
         </div>
 
         <div>
