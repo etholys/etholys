@@ -14,17 +14,20 @@ import {
   PRESENTATION_COMPANY_NAME,
   PRESENTATION_SHORT_NAME,
 } from '@/lib/sandbox/enrich-presentation';
-import { SANDBOX_USERS } from '@/lib/sandbox/seed-internal-sandbox';
 
 export const RADAR_EMPTY_SHORT_NAME = 'CampoNovo';
 export const RADAR_EMPTY_COMPANY_NAME = 'Campo Novo';
 export const RADAR_EMPTY_EMAIL = 'demo.campo.novo@etholys.com';
 export const RADAR_EMPTY_NAME = 'Produtor Campo Novo';
 
+const ADVANCED_EMAIL = 'master.horizonte@etholys.com';
+const ADVANCED_NAME = 'Dirección Horizonte';
+const ADVANCED_JOB = 'Dirección general';
+
 /** Known presentation logins (same password for all demo users). */
 export const RADAR_DEMO_LOGINS = {
   advanced: {
-    email: 'master.horizonte@etholys.com',
+    email: ADVANCED_EMAIL,
     company: PRESENTATION_COMPANY_NAME,
     shortName: PRESENTATION_SHORT_NAME,
     shows:
@@ -213,14 +216,13 @@ export async function seedRadarAdvancedDemo(
     summary.push(`Empresa existente: ${company.name} (${company.shortName})`);
   }
 
-  const master = SANDBOX_USERS.find((u) => u.key === 'master')!;
   const user = await ensureCompanyUser(prisma, {
     companyId: company.id,
-    email: master.email,
-    name: master.name,
+    email: ADVANCED_EMAIL,
+    name: ADVANCED_NAME,
     passwordHash: opts.passwordHash,
     locale: 'es',
-    jobTitle: master.jobTitle,
+    jobTitle: ADVANCED_JOB,
   });
 
   await enrichSandboxPresentation(prisma, company.id, user.id, summary);
