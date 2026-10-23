@@ -292,8 +292,8 @@ export default function WorkShell() {
     const top = (tasks ?? []).filter((t: any) => !t.parentId);
     let list = top;
     if (nav.kind === 'all') {
-      // Admin overview: only SHARED team boards — never private Mi trabajo
-      list = top.filter((t: any) => t.folderId && t.folder?.visibility === 'SHARED');
+      // Admin overview: only SHARED team boards — never Mi trabajo / personal folders
+      list = top.filter((t: any) => Boolean(t.folderId) && t.folder?.visibility === 'SHARED');
     } else if (nav.kind === 'company') list = top.filter((t: any) => !t.projectId);
     else if (nav.kind === 'department') list = top.filter((t: any) => t.departmentId === nav.id);
     else if (nav.kind === 'project') list = top.filter((t: any) => t.projectId === nav.id);

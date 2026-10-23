@@ -182,6 +182,11 @@ export default function TasksBoard({
   }, [presetTasks]);
 
   const fetchTasks = (opts?: { silent?: boolean }) => {
+    // Embedded hub board is owned by WorkShell (presetTasks) — never replace with a full company dump
+    if (embedded) {
+      onTasksChanged?.();
+      return;
+    }
     if (!opts?.silent && presetTasks == null) setLoading(true);
     const params = new URLSearchParams();
     if (activeCompanyId) params.set('companyId', activeCompanyId);
@@ -225,8 +230,9 @@ export default function TasksBoard({
   };
 
   useEffect(() => {
+    if (embedded) return;
     fetchTasks();
-  }, [activeCompanyId, projectFilter, departmentFilter, taskScopeFilter, folderFilter, assigneeFilter]);
+  }, [activeCompanyId, projectFilter, departmentFilter, taskScopeFilter, folderFilter, assigneeFilter, embedded]);
 
   useEffect(() => {
     fetchGroups();
