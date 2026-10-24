@@ -59,6 +59,7 @@ test('agenda surfaces force light form colors', () => {
   assert.match(css, /\.etholys-meet-light input:disabled[\s\S]*color:\s*#1e293b !important/);
   const owner = readFileSync(join(root, 'components/meet/ChorusAgendaOrganizer.tsx'), 'utf8');
   const guest = readFileSync(join(root, 'components/meet/ChorusPublicAgenda.tsx'), 'utf8');
+  const openDayGuest = readFileSync(join(root, 'components/meet/ChorusPublicOpenDay.tsx'), 'utf8');
   assert.match(owner, /etholys-meet/);
   assert.match(owner, /PanelLeftClose/);
   assert.match(owner, /ChorusAgendaCalendar/);
@@ -66,9 +67,13 @@ test('agenda surfaces force light form colors', () => {
   assert.match(owner, /etholys-system etholys-meet relative/);
   assert.match(owner, /role="dialog"/);
   assert.match(owner, /etholys-meet-light/);
+  assert.match(owner, /Dia de atendimento/);
+  assert.match(owner, /\/api\/meet\/agenda\/open-days/);
   assert.match(guest, /viewer === 'owner'/);
   assert.match(guest, /etholys-meet-light/);
-  assert.doesNotMatch(`${owner}\n${guest}`, /jitsi|jibri|jigasi/i);
+  assert.match(openDayGuest, /\/api\/meet\/public\/agenda\/d\//);
+  assert.match(openDayGuest, /etholys-meet-light/);
+  assert.doesNotMatch(`${owner}\n${guest}\n${openDayGuest}`, /jitsi|jibri|jigasi/i);
 });
 
 test('clicking an agenda hour opens the shared block dialog', () => {

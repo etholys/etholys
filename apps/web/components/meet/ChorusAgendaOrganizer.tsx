@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
+  CalendarPlus,
   CalendarRange,
   Check,
   Clock,
@@ -17,6 +18,7 @@ import {
   Settings,
   Share2,
   Sun,
+  Trash2,
   Video,
   X,
 } from 'lucide-react';
@@ -49,6 +51,21 @@ type RequestRow = {
   statusUrl: string;
   guests: { name: string | null; email: string }[];
 };
+type OpenDayRow = {
+  id: string;
+  publicUrl: string;
+  dayYmd: string;
+  title: string;
+  description: string | null;
+  locationText: string | null;
+  slotMinutes: number;
+  startMin: number;
+  endMin: number;
+  allowVirtual: boolean;
+  allowInPerson: boolean;
+  active: boolean;
+};
+
 type Agenda = {
   page: {
     publicUrl: string;
@@ -63,9 +80,11 @@ type Agenda = {
     windows: { weekday: number; startMin: number; endMin: number }[];
     blocks: { id: string; startsAt: string; endsAt: string; source?: string; label?: string | null }[];
   };
+  openDays?: OpenDayRow[];
   requests: RequestRow[];
   externalBusy?: { id: string; source: 'chorus' | 'google'; title: string; startsAt: string; endsAt: string }[];
   timeZones?: string[];
+  createdOpenDay?: OpenDayRow;
 };
 
 const WEEKDAYS: { weekday: number; pt: string; es: string; en: string }[] = [
@@ -175,10 +194,22 @@ export default function ChorusAgendaOrganizer({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [sharePos, setSharePos] = useState<{ top: number; left: number } | null>(null);
+  const [shareTargetUrl, setShareTargetUrl] = useState<string | null>(null);
+  const [openDayDialogOpen, setOpenDayDialogOpen] = useState(false);
+  const [openDayYmd, setOpenDayYmd] = useState('');
+  const [openDayTitle, setOpenDayTitle] = useState('');
+  const [openDayDescription, setOpenDayDescription] = useState('');
+  const [openDayLocation, setOpenDayLocation] = useState('');
+  const [openDaySlotMinutes, setOpenDaySlotMinutes] = useState(30);
+  const [openDayStartHm, setOpenDayStartHm] = useState('09:00');
+  const [openDayEndHm, setOpenDayEndHm] = useState('18:00');
+  const [openDayVirtual, setOpenDayVirtual] = useState(true);
+  const [openDayInPerson, setOpenDayInPerson] = useState(true);
   const cursorSet = useRef(false);
   const shareBtnRef = useRef<HTMLButtonElement>(null);
   const shareMenuRef = useRef<HTMLDivElement>(null);
   const range = useMemo(() => visibleAgendaRange(view, cursorYmd), [view, cursorYmd]);
+  const openDays = agenda?.openDays || [];
 
   const load = useCallback(async () => {
     if (!companyId) return;
@@ -220,10 +251,37 @@ export default function ChorusAgendaOrganizer({
       const target = event.target as Node;
       if (shareBtnRef.current?.contains(target) || shareMenuRef.current?.contains(target)) return;
       setShareOpen(false);
+      setShareTargetUrl(null);
     }
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [shareOpen]);
+
+  function openShareMenu(url: string, anchor: HTMLElement | null) {
+    const rect = anchor?.getBoundingClientRect();
+    if (!rect) return;
+    setShareTargetUrl(url);
+    setSharePos({ top: rect.top, left: Math.min(rect.right + 8, window.innerWidth - 188) });
+    setShareOpen(true);
+  }
+
+  function resetOpenDayForm() {
+    const weekday = (() => {
+      const match = cursorYmd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return -1;
+      return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))).getUTCDay();
+    })();
+    const win = windows.find((row) => row.weekday === weekday && row.enabled);
+    setOpenDayYmd(cursorYmd);
+    setOpenDayTitle('');
+    setOpenDayDescription('');
+    setOpenDayLocation(locationText);
+    setOpenDaySlotMinutes(slotMinutes);
+    setOpenDayStartHm(minutesToHm(win?.startMin ?? 9 * 60));
+    setOpenDayEndHm(minutesToHm(win?.endMin ?? 18 * 60));
+    setOpenDayVirtual(allowVirtual);
+    setOpenDayInPerson(allowInPerson);
+  }
 
   async function saveSettings() {
     if (!companyId) return;
@@ -271,11 +329,98 @@ export default function ChorusAgendaOrganizer({
   }
 
   function publicShareText(url: string) {
+    const isOpenDay = url.includes('/a/d/');
+    if (isOpenDay) {
+      return t(
+        `Pode marcar um horário neste dia de atendimento: ${url}`,
+        `Puedes reservar un horario en este día de atención: ${url}`,
+        `You can book a time on this office-hours day: ${url}`,
+      );
+    }
     return t(
       `Pode marcar um horário na minha agenda: ${url}`,
       `Puedes reservar un horario en mi agenda: ${url}`,
       `You can book a time on my agenda: ${url}`,
     );
+  }
+
+  async function createOpenDay() {
+    if (!companyId || !openDayYmd) return;
+    const startMin = hmToMinutes(openDayStartHm);
+    const endMin = hmToMinutes(openDayEndHm);
+    if (startMin == null || endMin == null || endMin - startMin < 15) {
+      setError(t('Horário inválido.', 'Horario inválido.', 'Invalid hours.'));
+      return;
+    }
+    if (!openDayVirtual && !openDayInPerson) {
+      setError(t('Escolha virtual e/ou presencial.', 'Elige virtual y/o presencial.', 'Choose virtual and/or in person.'));
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/meet/agenda/open-days', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          dayYmd: openDayYmd,
+          title: openDayTitle.trim() || null,
+          description: openDayDescription.trim() || null,
+          locationText: openDayLocation.trim() || null,
+          slotMinutes: openDaySlotMinutes,
+          startMin,
+          endMin,
+          allowVirtual: openDayVirtual,
+          allowInPerson: openDayInPerson,
+          from: range.from,
+          to: range.to,
+        }),
+      });
+      const data = (await res.json()) as Agenda & { error?: string };
+      if (!res.ok) throw new Error(data.error || 'error');
+      setAgenda(data);
+      setOpenDayDialogOpen(false);
+      setInfo(t('Dia de atendimento criado.', 'Día de atención creado.', 'Office-hours day created.'));
+      if (data.createdOpenDay?.publicUrl) {
+        void copyText(data.createdOpenDay.publicUrl);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeOpenDay(openDayId: string) {
+    if (!companyId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/meet/agenda/open-days', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId, openDayId, from: range.from, to: range.to }),
+      });
+      const data = (await res.json()) as Agenda & { error?: string };
+      if (!res.ok) throw new Error(data.error || 'error');
+      setAgenda(data);
+      setInfo(t('Dia removido.', 'Día eliminado.', 'Day removed.'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function labelOpenDay(ymd: string) {
+    const [y, m, d] = ymd.split('-').map(Number);
+    return new Date(Date.UTC(y, (m || 1) - 1, d || 1)).toLocaleDateString(intl, {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      timeZone: 'UTC',
+    });
   }
 
   function wallToIso(value: string) {
@@ -569,21 +714,35 @@ export default function ChorusAgendaOrganizer({
             type="button"
             disabled={!agenda}
             title={t('Partilhar', 'Compartir', 'Share')}
-            aria-expanded={shareOpen}
+            aria-expanded={shareOpen && shareTargetUrl === agenda?.page.publicUrl}
             onClick={() => {
-              if (shareOpen) {
+              if (shareOpen && shareTargetUrl === agenda?.page.publicUrl) {
                 setShareOpen(false);
+                setShareTargetUrl(null);
                 return;
               }
-              const rect = shareBtnRef.current?.getBoundingClientRect();
-              if (!rect) return;
-              setSharePos({ top: rect.top, left: Math.min(rect.right + 8, window.innerWidth - 188) });
-              setShareOpen(true);
+              if (agenda) openShareMenu(agenda.page.publicUrl, shareBtnRef.current);
             }}
-            className={sideItem(shareOpen)}
+            className={sideItem(shareOpen && shareTargetUrl === agenda?.page.publicUrl)}
           >
             <Share2 className="h-4 w-4 shrink-0" />
             {collapsed ? null : <span>{t('Partilhar', 'Compartir', 'Share')}</span>}
+          </button>
+
+          <button
+            type="button"
+            disabled={!agenda}
+            title={t('Dia de atendimento', 'Día de atención', 'Office hours day')}
+            onClick={() => {
+              resetOpenDayForm();
+              setOpenDayDialogOpen(true);
+              setCloseMode(false);
+              setSettingsOpen(false);
+            }}
+            className={sideItem(openDayDialogOpen)}
+          >
+            <CalendarPlus className="h-4 w-4 shrink-0" />
+            {collapsed ? null : <span>{t('Dia de atendimento', 'Día de atención', 'Office hours day')}</span>}
           </button>
 
           <button
@@ -675,6 +834,48 @@ export default function ChorusAgendaOrganizer({
               onReopenBlock={(id) => void removeBlock(id)}
               hideViewSwitch
             />
+
+            {openDays.length > 0 ? (
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-900">
+                <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  {t('Dias de atendimento', 'Días de atención', 'Office hours days')}
+                </h2>
+                <ul className="mt-3 space-y-2">
+                  {openDays.map((day) => (
+                    <li
+                      key={day.id}
+                      className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-900">{day.title}</p>
+                        <p className="text-xs text-slate-600">
+                          {labelOpenDay(day.dayYmd)} · {minutesToHm(day.startMin)}–{minutesToHm(day.endMin)} ·{' '}
+                          {day.slotMinutes} min
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(event) => openShareMenu(day.publicUrl, event.currentTarget)}
+                        className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800"
+                      >
+                        <Share2 className="h-3.5 w-3.5" />
+                        {t('Partilhar', 'Compartir', 'Share')}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void removeOpenDay(day.id)}
+                        className="rounded-full p-1.5 text-slate-500 hover:bg-slate-200"
+                        title={t('Remover', 'Eliminar', 'Remove')}
+                        aria-label={t('Remover', 'Eliminar', 'Remove')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
 
             {settingsOpen ? (
             <>
@@ -902,7 +1103,7 @@ export default function ChorusAgendaOrganizer({
         )}
       </main>
       </div>
-      {shareOpen && sharePos && agenda ? (
+      {shareOpen && sharePos && shareTargetUrl ? (
         <div
           role="menu"
           ref={shareMenuRef}
@@ -912,16 +1113,23 @@ export default function ChorusAgendaOrganizer({
           <button
             type="button"
             role="menuitem"
-            onClick={() => void copyText(agenda.page.publicUrl)}
+            onClick={() => void copyText(shareTargetUrl)}
             className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
           >
-            {copied === agenda.page.publicUrl ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {copied === agenda.page.publicUrl ? t('Copiado', 'Copiado', 'Copied') : t('Copiar enlace', 'Copiar enlace', 'Copy link')}
+            {copied === shareTargetUrl ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {copied === shareTargetUrl ? t('Copiado', 'Copiado', 'Copied') : t('Copiar enlace', 'Copiar enlace', 'Copy link')}
           </button>
           <a
             role="menuitem"
-            href={`mailto:?subject=${encodeURIComponent(t('Agenda pública', 'Agenda pública', 'Public agenda'))}&body=${encodeURIComponent(publicShareText(agenda.page.publicUrl))}`}
-            onClick={() => setShareOpen(false)}
+            href={`mailto:?subject=${encodeURIComponent(
+              shareTargetUrl.includes('/a/d/')
+                ? t('Dia de atendimento', 'Día de atención', 'Office hours day')
+                : t('Agenda pública', 'Agenda pública', 'Public agenda'),
+            )}&body=${encodeURIComponent(publicShareText(shareTargetUrl))}`}
+            onClick={() => {
+              setShareOpen(false);
+              setShareTargetUrl(null);
+            }}
             className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
           >
             <Mail className="h-4 w-4" />
@@ -929,14 +1137,160 @@ export default function ChorusAgendaOrganizer({
           </a>
           <a
             role="menuitem"
-            href={`https://wa.me/?text=${encodeURIComponent(publicShareText(agenda.page.publicUrl))}`}
+            href={`https://wa.me/?text=${encodeURIComponent(publicShareText(shareTargetUrl))}`}
             target="_blank"
             rel="noreferrer"
-            onClick={() => setShareOpen(false)}
+            onClick={() => {
+              setShareOpen(false);
+              setShareTargetUrl(null);
+            }}
             className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
           >
             {t('WhatsApp', 'WhatsApp', 'WhatsApp')}
           </a>
+        </div>
+      ) : null}
+      {openDayDialogOpen ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-0 sm:items-center sm:p-4"
+          onClick={() => setOpenDayDialogOpen(false)}
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="agenda-open-day-title"
+            className="etholys-meet-light max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 text-slate-900 shadow-2xl sm:rounded-2xl"
+            style={{ colorScheme: 'light' }}
+            onClick={(event) => event.stopPropagation()}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void createOpenDay();
+            }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h2 id="agenda-open-day-title" className="text-lg font-semibold text-slate-900">
+                {t('Dia de atendimento', 'Día de atención', 'Office hours day')}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setOpenDayDialogOpen(false)}
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+                aria-label={t('Cancelar', 'Cancelar', 'Cancel')}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-slate-600">
+              {t(
+                'Gera um link só para este dia — útil para assistência técnica ou oficinas pontuais.',
+                'Genera un enlace solo para este día — útil para asistencia técnica u oficinas puntuales.',
+                'Creates a link for this day only — useful for technical assistance or one-off workshops.',
+              )}
+            </p>
+            <label className="mt-4 block text-sm font-medium text-slate-700">
+              {t('Data', 'Fecha', 'Date')}
+              <input
+                type="date"
+                required
+                value={openDayYmd}
+                onChange={(event) => setOpenDayYmd(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+              />
+            </label>
+            <label className="mt-3 block text-sm font-medium text-slate-700">
+              {t('Título (opcional)', 'Título (opcional)', 'Title (optional)')}
+              <input
+                value={openDayTitle}
+                onChange={(event) => setOpenDayTitle(event.target.value)}
+                placeholder={t('Rodada de negócio', 'Ronda de negocios', 'Business round')}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+              />
+            </label>
+            <label className="mt-3 block text-sm font-medium text-slate-700">
+              {t('Notas (opcional)', 'Notas (opcional)', 'Notes (optional)')}
+              <textarea
+                value={openDayDescription}
+                onChange={(event) => setOpenDayDescription(event.target.value)}
+                rows={2}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+              />
+            </label>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium text-slate-700">
+                {t('Início', 'Inicio', 'Start')}
+                <input
+                  type="time"
+                  required
+                  value={openDayStartHm}
+                  onChange={(event) => setOpenDayStartHm(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                {t('Fim', 'Fin', 'End')}
+                <input
+                  type="time"
+                  required
+                  value={openDayEndHm}
+                  onChange={(event) => setOpenDayEndHm(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+                />
+              </label>
+            </div>
+            <label className="mt-3 block text-sm font-medium text-slate-700">
+              {t('Duração do slot', 'Duración del hueco', 'Slot length')}
+              <select
+                value={openDaySlotMinutes}
+                onChange={(event) => setOpenDaySlotMinutes(Number(event.target.value))}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+              >
+                {[15, 30, 45, 60, 90].map((n) => (
+                  <option key={n} value={n}>
+                    {n} min
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="mt-3 block text-sm font-medium text-slate-700">
+              {t('Local (opcional)', 'Lugar (opcional)', 'Place (optional)')}
+              <input
+                value={openDayLocation}
+                onChange={(event) => setOpenDayLocation(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+              />
+            </label>
+            <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-800">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={openDayVirtual} onChange={(e) => setOpenDayVirtual(e.target.checked)} />
+                {t('Virtual', 'Virtual', 'Virtual')}
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={openDayInPerson}
+                  onChange={(e) => setOpenDayInPerson(e.target.checked)}
+                />
+                {t('Presencial', 'Presencial', 'In person')}
+              </label>
+            </div>
+            {error ? <p className="mt-3 text-sm text-red-800">{error}</p> : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setOpenDayDialogOpen(false)}
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
+              >
+                {t('Cancelar', 'Cancelar', 'Cancel')}
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !openDayYmd}
+                className="rounded-full bg-teal-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {saving ? '…' : t('Criar e copiar link', 'Crear y copiar enlace', 'Create and copy link')}
+              </button>
+            </div>
+          </form>
         </div>
       ) : null}
       {blockDialogOpen ? (

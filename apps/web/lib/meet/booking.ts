@@ -21,10 +21,17 @@ import {
   DEFAULT_BOOKING_WINDOWS,
   normalizeBookingWindows,
   rangesOverlap,
+  weekdayOfYmd,
   ymdInTimeZone,
   type BookingWindowInput,
   type BusyRange,
 } from '@/lib/meet/booking-slots';
+import {
+  buildOpenDayWindows,
+  isValidOpenDayYmd,
+  normalizeOpenDayHours,
+  openDayPublicPath,
+} from '@/lib/meet/booking-open-day';
 import { collectHolidayDays, type HolidayDay } from '@/lib/meet/holidays';
 import { normalizeHolidayCountries } from '@/lib/meet/holiday-countries';
 import { isValidTimeZone, meetWallTimeToUtc } from '@/lib/meet/timezone';
@@ -71,6 +78,12 @@ export function agendaPublicUrl(code: string): string {
 export function agendaStatusUrl(code: string, token: string): string {
   return `${meetAppBaseUrl()}${agendaStatusPath(code, token)}`;
 }
+
+export function openDayPublicUrl(code: string): string {
+  return `${meetAppBaseUrl()}${openDayPublicPath(code)}`;
+}
+
+export { openDayPublicPath };
 
 type Held = { startsAt: Date; endsAt: Date };
 
@@ -321,6 +334,7 @@ export async function getPublicAgenda(code: string) {
     days: 21,
   });
   return {
+    kind: 'agenda' as const,
     page: {
       title: page.title,
       description: page.description,
@@ -333,6 +347,66 @@ export async function getPublicAgenda(code: string) {
     },
     slots,
   };
+}
+
+function serializeOpenDayPublic(
+  openDay: {
+    dayYmd: string;
+    title: string;
+    description: string | null;
+    locationText: string | null;
+    slotMinutes: number;
+    startMin: number;
+    endMin: number;
+    allowVirtual: boolean;
+    allowInPerson: boolean;
+  },
+  page: {
+    timeZone: string;
+    owner: { name: string | null };
+  },
+  slots: { date: string; startsAt: string; endsAt: string }[],
+) {
+  return {
+    kind: 'open_day' as const,
+    page: {
+      title: openDay.title,
+      description: openDay.description,
+      timeZone: page.timeZone,
+      slotMinutes: openDay.slotMinutes,
+      allowVirtual: openDay.allowVirtual,
+      allowInPerson: openDay.allowInPerson,
+      locationText: openDay.locationText,
+      ownerName: page.owner.name,
+      dayYmd: openDay.dayYmd,
+      startMin: openDay.startMin,
+      endMin: openDay.endMin,
+    },
+    slots,
+  };
+}
+
+export async function getPublicOpenDay(code: string) {
+  const openDay = await prisma.meetBookingOpenDay.findUnique({
+    where: { publicCode: code },
+    include: {
+      page: {
+        include: { owner: { select: { name: true } } },
+      },
+    },
+  });
+  if (!openDay || !openDay.active) return null;
+  const busy = await loadBusy(openDay.pageId);
+  const windows = buildOpenDayWindows(openDay.dayYmd, openDay.startMin, openDay.endMin);
+  const slots = buildOpenSlots({
+    timeZone: openDay.page.timeZone,
+    slotMinutes: openDay.slotMinutes,
+    windows,
+    busy,
+    fromYmd: openDay.dayYmd,
+    days: 1,
+  });
+  return serializeOpenDayPublic(openDay, openDay.page, slots);
 }
 
 function parseGuests(raw: unknown, bookerEmail: string): { name: string | null; email: string }[] {
@@ -355,6 +429,8 @@ function parseGuests(raw: unknown, bookerEmail: string): { name: string | null; 
 
 export async function createBookingRequest(input: {
   code: string;
+  /** Se definido, reserva via link de dia aberto (/a/d/{code}). */
+  openDayCode?: string | null;
   name: string;
   email: string;
   mode: string;
@@ -365,10 +441,25 @@ export async function createBookingRequest(input: {
   guests?: unknown;
   locale?: string | null;
 }) {
-  const page = await prisma.meetBookingPage.findUnique({
-    where: { publicCode: input.code },
-    include: { owner: { select: { id: true, name: true, email: true } }, windows: true },
-  });
+  const openDayCode = (input.openDayCode || '').trim();
+  const openDay = openDayCode
+    ? await prisma.meetBookingOpenDay.findUnique({
+        where: { publicCode: openDayCode },
+        include: {
+          page: {
+            include: { owner: { select: { id: true, name: true, email: true } }, windows: true },
+          },
+        },
+      })
+    : null;
+  if (openDayCode && (!openDay || !openDay.active)) throw new BookingError('not_found');
+
+  const page =
+    openDay?.page ||
+    (await prisma.meetBookingPage.findUnique({
+      where: { publicCode: input.code },
+      include: { owner: { select: { id: true, name: true, email: true } }, windows: true },
+    }));
   if (!page) throw new BookingError('not_found');
 
   const name = input.name.trim().slice(0, 120);
@@ -376,10 +467,16 @@ export async function createBookingRequest(input: {
   if (name.length < 1) throw new BookingError('name_required');
   if (!EMAIL_RE.test(email)) throw new BookingError('email_invalid');
 
+  const allowVirtual = openDay ? openDay.allowVirtual : page.allowVirtual;
+  const allowInPerson = openDay ? openDay.allowInPerson : page.allowInPerson;
+  const slotMinutes = openDay ? openDay.slotMinutes : page.slotMinutes;
+  const defaultLocation = openDay ? openDay.locationText : page.locationText;
+  const displayTitle = openDay ? openDay.title : page.title;
+
   const mode = input.mode === 'presencial' ? 'presencial' : input.mode === 'virtual' ? 'virtual' : '';
   if (!mode) throw new BookingError('mode_invalid');
-  if (mode === 'virtual' && !page.allowVirtual) throw new BookingError('mode_invalid');
-  if (mode === 'presencial' && !page.allowInPerson) throw new BookingError('mode_invalid');
+  if (mode === 'virtual' && !allowVirtual) throw new BookingError('mode_invalid');
+  if (mode === 'presencial' && !allowInPerson) throw new BookingError('mode_invalid');
 
   const starts = new Date(input.startsAt);
   const ends = new Date(input.endsAt);
@@ -388,12 +485,15 @@ export async function createBookingRequest(input: {
   }
 
   const busy = await loadBusy(page.id);
+  const windows = openDay
+    ? buildOpenDayWindows(openDay.dayYmd, openDay.startMin, openDay.endMin)
+    : page.windows;
   const slots = buildOpenSlots({
     timeZone: page.timeZone,
-    slotMinutes: page.slotMinutes,
-    windows: page.windows,
+    slotMinutes,
+    windows,
     busy,
-    days: 21,
+    ...(openDay ? { fromYmd: openDay.dayYmd, days: 1 } : { days: 21 }),
   });
   const match = slots.find(
     (slot) => slot.startsAt === starts.toISOString() && slot.endsAt === ends.toISOString(),
@@ -402,7 +502,7 @@ export async function createBookingRequest(input: {
 
   const location =
     mode === 'presencial'
-      ? (input.locationText || page.locationText || '').trim().slice(0, 500) || null
+      ? (input.locationText || defaultLocation || '').trim().slice(0, 500) || null
       : null;
   const guests = parseGuests(input.guests, email);
   const note = (input.note || '').trim().slice(0, 2000) || null;
@@ -412,6 +512,7 @@ export async function createBookingRequest(input: {
     data: {
       pageId: page.id,
       companyId: page.companyId,
+      openDayId: openDay?.id || null,
       publicToken: publicToken(),
       bookerName: name,
       bookerEmail: email,
@@ -445,10 +546,10 @@ export async function createBookingRequest(input: {
     to: email,
     subject:
       locale === 'pt'
-        ? `Pedido recebido: ${page.title}`
+        ? `Pedido recebido: ${displayTitle}`
         : locale === 'en'
-          ? `Request received: ${page.title}`
-          : `Solicitud recibida: ${page.title}`,
+          ? `Request received: ${displayTitle}`
+          : `Solicitud recibida: ${displayTitle}`,
     html: bookingEmailHtml({
       locale,
       intro:
@@ -457,7 +558,7 @@ export async function createBookingRequest(input: {
           : locale === 'en'
             ? 'Your request is pending. The organizer still needs to accept it.'
             : 'Tu solicitud quedó pendiente. Quien organiza todavía tiene que aceptarla.',
-      title: page.title,
+      title: displayTitle,
       when,
       lines: [modeLabel],
       ctaLabel: locale === 'pt' ? 'Ver pedido' : locale === 'en' ? 'View request' : 'Ver solicitud',
@@ -473,7 +574,7 @@ export async function createBookingRequest(input: {
       html: bookingEmailHtml({
         locale: orgLocale,
         intro: `${name} pediu um horário na sua agenda CHORUS.`,
-        title: page.title,
+        title: displayTitle,
         when,
         lines: [email, modeLabel, note || ''].filter(Boolean),
         ctaLabel: 'Abrir agenda',
@@ -544,21 +645,61 @@ function serializeExternalBusy(blocks: AgendaExternalBlock[]) {
   }));
 }
 
+function serializeOpenDayRow(row: {
+  id: string;
+  publicCode: string;
+  dayYmd: string;
+  title: string;
+  description: string | null;
+  locationText: string | null;
+  slotMinutes: number;
+  startMin: number;
+  endMin: number;
+  allowVirtual: boolean;
+  allowInPerson: boolean;
+  active: boolean;
+  createdAt: Date;
+}) {
+  return {
+    id: row.id,
+    publicCode: row.publicCode,
+    publicUrl: openDayPublicUrl(row.publicCode),
+    dayYmd: row.dayYmd,
+    title: row.title,
+    description: row.description,
+    locationText: row.locationText,
+    slotMinutes: row.slotMinutes,
+    startMin: row.startMin,
+    endMin: row.endMin,
+    allowVirtual: row.allowVirtual,
+    allowInPerson: row.allowInPerson,
+    active: row.active,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
 export async function getOrganizerAgenda(
   companyId: string,
   ownerId: string,
   range?: { from?: string | null; to?: string | null },
 ) {
   const page = await ensureBookingPage(companyId, ownerId);
-  const requests = await prisma.meetBookingRequest.findMany({
-    where: { pageId: page.id },
-    include: {
-      guests: true,
-      meetSession: { select: { id: true, meetingUrl: true, companyId: true } },
-    },
-    orderBy: { startsAt: 'desc' },
-    take: 200,
-  });
+  const [requests, openDays] = await Promise.all([
+    prisma.meetBookingRequest.findMany({
+      where: { pageId: page.id },
+      include: {
+        guests: true,
+        meetSession: { select: { id: true, meetingUrl: true, companyId: true } },
+      },
+      orderBy: { startsAt: 'desc' },
+      take: 200,
+    }),
+    prisma.meetBookingOpenDay.findMany({
+      where: { pageId: page.id, active: true },
+      orderBy: [{ dayYmd: 'asc' }, { createdAt: 'desc' }],
+      take: 50,
+    }),
+  ]);
   let externalBusy: AgendaExternalBlock[] = [];
   try {
     externalBusy = await externalBusyForPage(page, agendaRange(page.timeZone, range?.from, range?.to));
@@ -591,9 +732,94 @@ export async function getOrganizerAgenda(
         label: block.label,
       })),
     },
+    openDays: openDays.map(serializeOpenDayRow),
     requests: requests.map((row) => serializeRequest(row, page.publicCode)),
     externalBusy: serializeExternalBusy(externalBusy),
   };
+}
+
+export async function createBookingOpenDay(input: {
+  companyId: string;
+  ownerId: string;
+  dayYmd: string;
+  title?: string | null;
+  description?: string | null;
+  locationText?: string | null;
+  slotMinutes?: number;
+  startMin?: number;
+  endMin?: number;
+  allowVirtual?: boolean;
+  allowInPerson?: boolean;
+  from?: string | null;
+  to?: string | null;
+}) {
+  const page = await ensureBookingPage(input.companyId, input.ownerId);
+  const dayYmd = input.dayYmd.trim();
+  if (!isValidOpenDayYmd(dayYmd)) throw new BookingError('day_invalid');
+
+  const pageWindow = page.windows.find((window) => window.weekday === weekdayOfYmd(dayYmd));
+  const hours = normalizeOpenDayHours(
+    input.startMin ?? pageWindow?.startMin ?? 9 * 60,
+    input.endMin ?? pageWindow?.endMin ?? 18 * 60,
+  );
+  if (!hours) throw new BookingError('hours_invalid');
+
+  const allowVirtual = input.allowVirtual !== undefined ? Boolean(input.allowVirtual) : page.allowVirtual;
+  const allowInPerson = input.allowInPerson !== undefined ? Boolean(input.allowInPerson) : page.allowInPerson;
+  if (!allowVirtual && !allowInPerson) throw new BookingError('mode_invalid');
+
+  const title =
+    (input.title || '').trim().slice(0, 160) ||
+    `${page.title} · ${dayYmd}`.slice(0, 160);
+
+  let created;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      created = await prisma.meetBookingOpenDay.create({
+        data: {
+          pageId: page.id,
+          publicCode: publicCode(),
+          dayYmd,
+          title,
+          description: (input.description || '').trim().slice(0, 2000) || null,
+          locationText: (input.locationText || page.locationText || '').trim().slice(0, 500) || null,
+          slotMinutes: clampSlotMinutes(input.slotMinutes ?? page.slotMinutes),
+          startMin: hours.startMin,
+          endMin: hours.endMin,
+          allowVirtual,
+          allowInPerson,
+          active: true,
+        },
+      });
+      break;
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code === 'P2002' && attempt < 3) continue;
+      throw error;
+    }
+  }
+  if (!created) throw new BookingError('create_failed');
+
+  const agenda = await getOrganizerAgenda(input.companyId, input.ownerId, {
+    from: input.from,
+    to: input.to,
+  });
+  return { ...agenda, createdOpenDay: serializeOpenDayRow(created) };
+}
+
+export async function deactivateBookingOpenDay(
+  companyId: string,
+  ownerId: string,
+  openDayId: string,
+  range?: { from?: string | null; to?: string | null },
+) {
+  const page = await ensureBookingPage(companyId, ownerId);
+  const updated = await prisma.meetBookingOpenDay.updateMany({
+    where: { id: openDayId, pageId: page.id, active: true },
+    data: { active: false },
+  });
+  if (updated.count === 0) throw new BookingError('not_found');
+  return getOrganizerAgenda(companyId, ownerId, range);
 }
 
 export async function updateBookingPage(input: {

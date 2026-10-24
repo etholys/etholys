@@ -3576,10 +3576,38 @@ model MeetBookingPage {
   windows        MeetBookingWindow[]
   blocks         MeetBookingBlock[]
   requests       MeetBookingRequest[]
+  openDays       MeetBookingOpenDay[]
 
   @@unique([companyId, ownerId])
   @@index([companyId])
   @@index([ownerId])
+}
+
+/// Dia aberto partilhável — convidado vê só essa data e os slots livres.
+model MeetBookingOpenDay {
+  id            String   @id @default(cuid())
+  pageId        String
+  /// Código público — /a/d/{publicCode}
+  publicCode    String   @unique
+  /// YYYY-MM-DD no fuso da página
+  dayYmd        String
+  title         String
+  description   String?
+  locationText  String?
+  slotMinutes   Int      @default(30)
+  /// Minutos desde meia-noite no fuso da página
+  startMin      Int
+  endMin        Int
+  allowVirtual  Boolean  @default(true)
+  allowInPerson Boolean  @default(true)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  page          MeetBookingPage     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  requests      MeetBookingRequest[]
+
+  @@index([pageId, dayYmd])
+  @@index([pageId, active])
 }
 
 /// Horário semanal. weekday: 0 domingo … 6 sábado. Minutos desde meia-noite na zona da página.
@@ -3613,6 +3641,7 @@ model MeetBookingRequest {
   id                     String    @id @default(cuid())
   pageId                 String
   companyId              String
+  openDayId              String?
   publicToken            String    @unique
   bookerName             String
   bookerEmail            String
@@ -3632,6 +3661,7 @@ model MeetBookingRequest {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
   page                   MeetBookingPage    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  openDay                MeetBookingOpenDay? @relation(fields: [openDayId], references: [id], onDelete: SetNull)
   company                Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   meetSession            MeetSession?       @relation(fields: [meetSessionId], references: [id], onDelete: SetNull)
   guests                 MeetBookingGuest[]
@@ -3639,6 +3669,7 @@ model MeetBookingRequest {
   @@index([pageId, startsAt])
   @@index([companyId, status])
   @@index([bookerEmail])
+  @@index([openDayId])
 }
 
 model MeetBookingGuest {
