@@ -4,11 +4,17 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Bell } from 'lucide-react';
+import { useRadarClientScopeOptional } from '@/components/radar/RadarClientScopeContext';
+import { RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
 
 type Place = { title: string; detail: string };
 
-function placeFor(pathname: string, loc: 'pt' | 'es' | 'en'): Place {
+function placeFor(
+  pathname: string,
+  loc: 'pt' | 'es' | 'en',
+  contextLabel: string | null,
+): Place {
   if (pathname.includes('/radar/properties/')) {
     return {
       title: radarT(loc, 'Dentro de um sítio', 'Dentro de un sitio', 'Inside a site'),
@@ -17,6 +23,17 @@ function placeFor(pathname: string, loc: 'pt' | 'es' | 'en'): Place {
         'Mapa 3D no centro. Cultivos, espaços e sensores estão nos botões por cima do mapa.',
         'Mapa 3D en el centro. Cultivos, espacios y sensores están en los botones sobre el mapa.',
         '3D map in the center. Crops, spaces and sensors are the buttons above the map.',
+      ),
+    };
+  }
+  if (pathname.includes('/radar/empresas/')) {
+    return {
+      title: contextLabel || radarT(loc, 'Empresa', 'Empresa', 'Company'),
+      detail: radarT(
+        loc,
+        'Avisos desta empresa e lista de lugares para abrir.',
+        'Avisos de esta empresa y lista de lugares para abrir.',
+        'Notices for this company and places to open.',
       ),
     };
   }
@@ -65,13 +82,15 @@ function placeFor(pathname: string, loc: 'pt' | 'es' | 'en'): Place {
     };
   }
   return {
-    title: radarT(loc, 'Mapa da operação', 'Mapa de la operación', 'Operations map'),
-    detail: radarT(
-      loc,
-      'Escolhe um sítio para abrir o mapa 3D, os cultivos e os sensores.',
-      'Elegí un sitio para abrir el mapa 3D, los cultivos y los sensores.',
-      'Pick a site to open the 3D map, crops and sensors.',
-    ),
+    title: radarT(loc, 'Painel da operação', 'Panel de la operación', 'Operations dashboard'),
+    detail: contextLabel
+      ? contextLabel
+      : radarT(
+          loc,
+          'Onde estás, o que precisa atenção, e como abrir um lugar.',
+          'Dónde estás, qué necesita atención, y cómo abrir un lugar.',
+          'Where you are, what needs attention, and how to open a place.',
+        ),
   };
 }
 
@@ -88,7 +107,16 @@ export function RadarOpsBar({
 }) {
   const loc = radarLoc(locale);
   const pathname = usePathname() || '';
-  const place = placeFor(pathname, loc);
+  const scopeCtx = useRadarClientScopeOptional();
+  const scope = scopeCtx?.scope || RADAR_SCOPE_OWN;
+  const contextLabel =
+    scope === RADAR_SCOPE_OWN
+      ? radarT(loc, 'Minha operação', 'Mi operación', 'My operation')
+      : scope === 'all'
+        ? radarT(loc, 'Toda a carteira', 'Toda la cartera', 'Full portfolio')
+        : scopeCtx?.selectedClient?.name || null;
+
+  const place = placeFor(pathname, loc, contextLabel);
   const onProperty = pathname.includes('/radar/properties/');
   const [count, setCount] = useState<number | null>(null);
   const [top, setTop] = useState<string | null>(null);
@@ -98,6 +126,7 @@ export function RadarOpsBar({
     let cancelled = false;
     const q = new URLSearchParams({ companyId });
     if (engagementId) q.set('engagementId', engagementId);
+    if (scope) q.set('clientId', scope);
     void fetch(`/api/radar/alerts?${q}`, { cache: 'no-store' })
       .then((r) => r.json())
       .then((d) => {
@@ -111,13 +140,13 @@ export function RadarOpsBar({
     return () => {
       cancelled = true;
     };
-  }, [companyId, engagementId, loc, pathname]);
+  }, [companyId, engagementId, loc, pathname, scope]);
 
   if (onProperty) return null;
 
   return (
     <div className="mb-4 flex flex-wrap items-stretch gap-2">
-      <div className="min-w-[16rem] flex-1 rounded-xl border border-white/15 bg-slate-950 px-4 py-3">
+      <div className="min-w-[16rem] flex-1 rounded-xl border border-white/20 bg-slate-950 px-4 py-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
           {radarT(loc, 'Onde estás', 'Dónde estás', 'Where you are')}
         </p>
@@ -126,15 +155,15 @@ export function RadarOpsBar({
       </div>
       <Link
         href={tarefasHref}
-        className="flex min-w-[14rem] flex-1 items-center gap-3 rounded-xl border border-amber-300/40 bg-amber-50 px-4 py-3 text-amber-950"
+        className="flex min-w-[14rem] flex-1 items-center gap-3 rounded-xl border border-amber-400/40 bg-amber-950 px-4 py-3 text-amber-50"
       >
-        <Bell className="h-4 w-4 shrink-0" />
+        <Bell className="h-4 w-4 shrink-0 text-amber-200" />
         <span className="min-w-0">
-          <span className="block text-[10px] font-semibold uppercase tracking-[0.14em]">
+          <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-200/80">
             {radarT(loc, 'Avisos', 'Avisos', 'Notices')}
             {count != null ? ` · ${count}` : ''}
           </span>
-          <span className="mt-0.5 block truncate text-sm font-medium">
+          <span className="mt-0.5 block truncate text-sm font-medium text-amber-50">
             {top || radarT(loc, 'Abrir a lista do que fazer', 'Abrir la lista de qué hacer', 'Open the to-do list')}
           </span>
         </span>

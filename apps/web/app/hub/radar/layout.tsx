@@ -33,8 +33,12 @@ function RadarShellInner({ children }: { children: ReactNode }) {
       {
         href: '/hub/radar',
         group: es ? 'Ver' : en ? 'Look' : 'Ver',
-        label: es ? 'Mapa de la operación' : en ? 'Operations map' : 'Mapa da operação',
-        detail: es ? 'Entrá a un sitio para el mapa 3D' : en ? 'Open a site for the 3D map' : 'Entra num sítio para o mapa 3D',
+        label: es ? 'Panel' : en ? 'Dashboard' : 'Painel',
+        detail: es
+          ? 'Avisos, empresas y lugares — el mapa 3D está dentro de cada sitio'
+          : en
+            ? 'Notices, companies and places — 3D map is inside each site'
+            : 'Avisos, empresas e lugares — o mapa 3D está dentro de cada sítio',
       },
       {
         href: '/hub/radar/cadeia',

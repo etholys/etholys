@@ -142,12 +142,35 @@ export function RadarClientScopeProvider({ children }: { children: ReactNode }) 
       if (companyId) writeRadarScope(companyId, next);
       const params = new URLSearchParams(search.toString());
       if (companyId) params.set('company', companyId);
+      if (engagementId) params.set('engagement', engagementId);
+      else params.delete('engagement');
       params.set('client', next);
       params.delete('new');
       const qs = params.toString();
+      const isClient = next !== RADAR_SCOPE_ALL && next !== RADAR_SCOPE_OWN;
+      const onEmpresa = /\/hub\/radar\/empresas\//.test(pathname);
+      const onMapEntry =
+        pathname === '/hub/radar' ||
+        pathname === '/hub/radar/' ||
+        onEmpresa ||
+        pathname.startsWith('/hub/radar/provider');
+
+      if (isClient && onMapEntry) {
+        const target = `/hub/radar/empresas/${next}`;
+        if (pathname.startsWith(target)) {
+          router.replace(`${target}?${qs}`, { scroll: false });
+        } else {
+          router.push(`${target}?${qs}`);
+        }
+        return;
+      }
+      if (!isClient && onEmpresa) {
+        router.push(`/hub/radar?${qs}`);
+        return;
+      }
       router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false });
     },
-    [companyId, pathname, router, search],
+    [companyId, engagementId, pathname, router, search],
   );
 
   const selectedClientId =

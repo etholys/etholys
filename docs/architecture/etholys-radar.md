@@ -21,12 +21,13 @@ RADAR é **sempre a empresa** no Etholys — um produto, uma central. Não há g
 
 | Peça | Comportamento |
 |------|----------------|
-| **Âmbito** | Seletor na sidebar: **Minha operação** \| **Cliente** \| **Todos** |
+| **Âmbito** | Seletor **Propriedades** na sidebar: **Minha operação** \| **Cliente (empresa)** \| **Todos (carteira)**; botão **+** → Novo cliente \| Novo espaço |
 | **Caso zero** | Só a minha fazenda — propriedades com `clientId` null; sem clientes nem técnicos obrigatórios |
-| **Clientes** | Opcionais. Criar novo **ou** vincular empresa AURORA/ATER (`linkedCompanyId`) |
+| **Clientes** | Opcionais. Criar novo **ou** vincular empresa AURORA/ATER (`linkedCompanyId`). Um cliente pode ter vários espaços (horta + agroindústria + animais). |
 | **Técnicos** | Da lista de funcionários; atribuição por cliente/propriedade em escala; flags `canSeeAll` / `canCreateClients` |
-| **Home** | `/hub/radar` — **mapa** da operação (árvore de espaços + canvas + aviso quieto). Não é muro de alertas. |
-| **Nav** | Mapa · Cadeia · **Caderno** · Tarefas · Equipa |
+| **Home** | `/hub/radar` — **painel** (KPIs + «precisa atenção» + lista compacta de lugares/empresas). Não é lista gigante de cartões nem muro de alertas. |
+| **Empresa** | `/hub/radar/empresas/[id]` — perfil do cliente: avisos desse âmbito + lugares com ação Abrir → mapa/Caderno |
+| **Nav** | Painel · Cadeia · **Caderno** · Tarefas · Equipa |
 | **Caderno** | `/hub/radar/caderno` — gesto diário (campo / SOP); `NexusFieldEntry` via `/api/radar/entries`. Mapa e 3D ficam em Ver. |
 | **Tarefas** | `/hub/radar/tarefas` — lista curta a partir de alertas (prioridade), não grelha LED |
 | **Cadeia** | `/hub/radar/cadeia` — lotes / custódia |

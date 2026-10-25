@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, X } from 'lucide-react';
 import { useRadarClientScope } from '@/components/radar/RadarClientScopeContext';
-import { RADAR_SCOPE_ALL, RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
+import { RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
 
 const MODULES = [
@@ -16,6 +16,7 @@ const MODULES = [
 
 type AuroraOpt = { id: string; name: string };
 
+/** Compact dialog for novo cliente / novo espaço — from sidebar +. */
 export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
   const loc = radarLoc(locale);
   const router = useRouter();
@@ -55,6 +56,18 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
     })();
   }, [createOpen, companyId, engagementId]);
 
+  useEffect(() => {
+    if (!createOpen) return;
+    setName('');
+    setContact('');
+    setPhone('');
+    setLinkedCompanyId('');
+    setClientMode('new');
+    setModuleId('agriculture');
+    setLinkClientId(selectedClientId || (isOwnScope ? 'own' : ''));
+    setErr(null);
+  }, [createOpen, selectedClientId, isOwnScope]);
+
   if (!createOpen || !companyId) return null;
 
   const isClient = createOpen === 'client';
@@ -72,11 +85,6 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
 
   const close = () => {
     setCreateOpen(null);
-    setName('');
-    setContact('');
-    setPhone('');
-    setLinkedCompanyId('');
-    setClientMode('new');
     setErr(null);
   };
 
@@ -115,9 +123,9 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
       if (!r.ok) throw new Error(d.error || 'Falha');
       await refreshClients();
       bumpListRevision();
-      setScope(d.client.id);
       close();
-      window.setTimeout(() => setCreateOpen('property'), 50);
+      setScope(d.client.id);
+      window.setTimeout(() => setCreateOpen('property'), 80);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -159,140 +167,180 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
   };
 
   const title = isClient
-    ? radarT(loc, 'Cadastrar cliente', 'Registrar cliente', 'Register client')
+    ? radarT(loc, 'Novo cliente', 'Nuevo cliente', 'New client')
     : radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space');
+  const hint = isClient
+    ? radarT(
+        loc,
+        'Empresa que podes acompanhar — depois adicionas os seus espaços.',
+        'Empresa que podés acompañar — después agregás sus espacios.',
+        'A company you support — then add its spaces.',
+      )
+    : radarT(
+        loc,
+        'Um lugar concreto: horta, planta ou curral.',
+        'Un lugar concreto: huerta, planta o corral.',
+        'A concrete place: garden, plant or yard.',
+      );
 
   return (
-    <div className="mb-6 rounded-[1.35rem] border border-emerald-400/30 bg-emerald-500/10 px-5 py-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200/70">RADAR</p>
-          <h2 className="mt-1 font-serif text-2xl text-white">{title}</h2>
-        </div>
-        <button type="button" onClick={close} className="rounded-lg p-1.5 text-white/40 hover:bg-white/5 hover:text-white">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {isClient && (
-        <div className="mt-4 inline-flex rounded-xl border border-white/15 bg-black/20 p-1">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-3 sm:items-center">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="radar-create-title"
+        className="w-full max-w-md rounded-2xl border border-white/20 bg-slate-950 p-5 shadow-2xl"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 id="radar-create-title" className="font-serif text-2xl text-white">
+              {title}
+            </h2>
+            <p className="mt-1 text-xs text-slate-400">{hint}</p>
+          </div>
           <button
             type="button"
-            onClick={() => setClientMode('new')}
-            className={`rounded-lg px-3 py-1.5 text-xs ${clientMode === 'new' ? 'bg-emerald-500 text-[#04110c] font-semibold' : 'text-white/60'}`}
+            onClick={close}
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5 hover:text-white"
+            aria-label={radarT(loc, 'Fechar', 'Cerrar', 'Close')}
           >
-            {radarT(loc, 'Novo', 'Nuevo', 'New')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setClientMode('aurora')}
-            className={`rounded-lg px-3 py-1.5 text-xs ${clientMode === 'aurora' ? 'bg-emerald-500 text-[#04110c] font-semibold' : 'text-white/60'}`}
-          >
-            AURORA / ATER
+            <X className="h-4 w-4" />
           </button>
         </div>
-      )}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {isClient && clientMode === 'aurora' ? (
-          <select
-            value={linkedCompanyId}
-            onChange={(e) => setLinkedCompanyId(e.target.value)}
-            className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
-          >
-            <option value="">{radarT(loc, 'Escolher empresa AURORA…', 'Elegir empresa AURORA…', 'Pick AURORA company…')}</option>
-            {auroraOpts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={
-              isClient
-                ? radarT(loc, 'Nome do cliente', 'Nombre del cliente', 'Client name')
-                : radarT(loc, 'Nome do espaço', 'Nombre del espacio', 'Space name')
-            }
-            className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40 sm:col-span-2"
-            autoFocus
-          />
-        )}
-        {isClient ? (
-          <>
-            <input
-              value={contact}
-              onChange={(e) => setContact(e.target.value)}
-              placeholder={radarT(loc, 'Contacto (opcional)', 'Contacto (opcional)', 'Contact (optional)')}
-              className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
-            />
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder={radarT(loc, 'Telefone (opcional)', 'Teléfono (opcional)', 'Phone (optional)')}
-              className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
-            />
-            {clientMode === 'aurora' && auroraOpts.length === 0 && (
-              <p className="sm:col-span-2 text-xs text-white/45">
-                {radarT(
-                  loc,
-                  'Sem empresas ATER ligadas. Cria um cliente novo.',
-                  'Sin empresas ATER vinculadas. Creá un cliente nuevo.',
-                  'No ATER companies found. Create a new client instead.',
-                )}
-              </p>
-            )}
-          </>
-        ) : (
-          <>
-            {!selectedClientId && (
-              <select
-                value={linkClientId || (isOwnScope ? 'own' : '')}
-                onChange={(e) => setLinkClientId(e.target.value)}
-                className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
-              >
-                <option value="own">{radarT(loc, 'Minha operação (sem cliente)', 'Mi operación (sin cliente)', 'My operation (no client)')}</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            <select
-              value={moduleId}
-              onChange={(e) => setModuleId(e.target.value)}
-              className={`rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40${!selectedClientId ? '' : ' sm:col-span-2'}`}
+        {isClient && (
+          <div className="mt-4 inline-flex rounded-lg border border-white/15 bg-black/40 p-0.5">
+            <button
+              type="button"
+              onClick={() => setClientMode('new')}
+              className={`rounded-md px-3 py-1.5 text-xs ${
+                clientMode === 'new' ? 'bg-emerald-500 font-semibold text-[#04110c]' : 'text-slate-300'
+              }`}
             >
-              {MODULES.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label[loc]}
+              {radarT(loc, 'Novo', 'Nuevo', 'New')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setClientMode('aurora')}
+              className={`rounded-md px-3 py-1.5 text-xs ${
+                clientMode === 'aurora' ? 'bg-emerald-500 font-semibold text-[#04110c]' : 'text-slate-300'
+              }`}
+            >
+              AURORA / ATER
+            </button>
+          </div>
+        )}
+
+        <div className="mt-4 space-y-3">
+          {isClient && clientMode === 'aurora' ? (
+            <select
+              value={linkedCompanyId}
+              onChange={(e) => setLinkedCompanyId(e.target.value)}
+              className="w-full rounded-xl border border-white/20 bg-black px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+            >
+              <option value="">
+                {radarT(loc, 'Escolher empresa AURORA…', 'Elegir empresa AURORA…', 'Pick AURORA company…')}
+              </option>
+              {auroraOpts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
                 </option>
               ))}
             </select>
-          </>
-        )}
-      </div>
+          ) : (
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={
+                isClient
+                  ? radarT(loc, 'Nome do cliente', 'Nombre del cliente', 'Client name')
+                  : radarT(loc, 'Nome do espaço', 'Nombre del espacio', 'Space name')
+              }
+              className="w-full rounded-xl border border-white/20 bg-black px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+              autoFocus
+            />
+          )}
 
-      {err && <p className="mt-3 text-sm text-rose-200">{err}</p>}
+          {isClient ? (
+            <>
+              <input
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                placeholder={radarT(loc, 'Contacto (opcional)', 'Contacto (opcional)', 'Contact (optional)')}
+                className="w-full rounded-xl border border-white/20 bg-black px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+              />
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder={radarT(loc, 'Telefone (opcional)', 'Teléfono (opcional)', 'Phone (optional)')}
+                className="w-full rounded-xl border border-white/20 bg-black px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+              />
+              {clientMode === 'aurora' && auroraOpts.length === 0 && (
+                <p className="text-xs text-slate-400">
+                  {radarT(
+                    loc,
+                    'Sem empresas ATER ligadas. Cria um cliente novo.',
+                    'Sin empresas ATER vinculadas. Creá un cliente nuevo.',
+                    'No ATER companies found. Create a new client instead.',
+                  )}
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              {!selectedClientId && (
+                <select
+                  value={linkClientId || (isOwnScope ? 'own' : '')}
+                  onChange={(e) => setLinkClientId(e.target.value)}
+                  className="w-full rounded-xl border border-white/20 bg-black px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+                >
+                  <option value="own">
+                    {radarT(loc, 'Minha operação', 'Mi operación', 'My operation')}
+                  </option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <select
+                value={moduleId}
+                onChange={(e) => setModuleId(e.target.value)}
+                className="w-full rounded-xl border border-white/20 bg-black px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-400/40"
+              >
+                {MODULES.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label[loc]}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+        </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void (isClient ? submitClient() : submitProperty())}
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#04110c] disabled:opacity-40"
-        >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {isClient
-            ? radarT(loc, 'Criar cliente', 'Crear cliente', 'Create client')
-            : radarT(loc, 'Criar e abrir', 'Crear y abrir', 'Create & open')}
-        </button>
-        <button type="button" onClick={close} className="rounded-xl px-4 py-2.5 text-sm text-white/60">
-          {radarT(loc, 'Cancelar', 'Cancelar', 'Cancel')}
-        </button>
+        {err && <p className="mt-3 text-sm text-rose-200">{err}</p>}
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void (isClient ? submitClient() : submitProperty())}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#04110c] disabled:opacity-40"
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {isClient
+              ? radarT(loc, 'Criar cliente', 'Crear cliente', 'Create client')
+              : radarT(loc, 'Criar e abrir', 'Crear y abrir', 'Create & open')}
+          </button>
+          <button
+            type="button"
+            onClick={close}
+            className="rounded-xl px-4 py-2.5 text-sm text-slate-300 hover:text-white"
+          >
+            {radarT(loc, 'Cancelar', 'Cancelar', 'Cancel')}
+          </button>
+        </div>
       </div>
     </div>
   );
