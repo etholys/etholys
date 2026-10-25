@@ -2,16 +2,20 @@
 # Sem mem_limit o contentor cresce até OOM do host → swap thrash →
 # «sinal baixo» / cortes em todas as salas CHORUS (não só com transcrição).
 #
-# Uso (no VPS do motor de vídeo):
+# Nota Contabo ~8 GB (out/2026): mesmo com 3 GiB de teto o modelo ES+RNNLM
+# entra em restart loop (SIGKILL). Em produção o serviço fica parado
+# (ver VOSK_STOPPED_FOR_CALL_QUALITY). Preferir VPS dedicado ou modelo small.
+#
+# Uso (só com RAM suficiente, ideal VPS 2):
 #   docker compose -f docker-compose.yml -f docker-compose.etholys.yml \
 #     -f transcriber.yml -f /opt/etholys/infra/jitsi/vosk.yml up -d vosk
 services:
   vosk:
     image: alphacep/kaldi-es:latest
     restart: unless-stopped
-    # Modelo ES: pico de carga ~2.2–2.5 GiB; teto evita OOM do host (~3.5–6 GiB sem limite).
-    mem_limit: 2560m
-    memswap_limit: 2560m
+    # Teto de segurança se alguém reactivar no host partilhado.
+    mem_limit: 3072m
+    memswap_limit: 3072m
     networks:
       meet.jitsi:
 networks:

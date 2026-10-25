@@ -130,16 +130,22 @@ No Hub Meet, se ainda aparecer aviso de **demo meet.jit.si**, o `.env` não foi 
 
 ## 6. Operação / RAM
 
-No Contabo partilhado (~8 GB) o STT ao vivo (`vosk`) **sem teto de RAM** cresce até OOM do host
-e enche o swap — o sintoma para os utilizadores é «sinal baixo» / cortes em **todas** as salas,
-não só com transcrição ligada. Usar o overlay `infra/jitsi/vosk.yml` (`mem_limit: 2560m`) e
-`vm.swappiness=10`.
+No Contabo partilhado (~8 GB) o STT ao vivo (`vosk` / modelo ES + RNNLM) **sem teto de RAM**
+cresce até OOM do host e enche o swap — o sintoma para os utilizadores é «sinal baixo» / cortes
+em **todas** as salas, não só com transcrição ligada. Mitigações:
+
+1. `vm.swappiness=10` (persistente em `/etc/sysctl.d/99-etholys-meet.conf`)
+2. Overlay `infra/jitsi/vosk.yml` com `mem_limit` (ver ficheiro)
+3. **Em produção Contabo (out/2026):** `vosk` + `transcriber` estão **parados** de propósito
+   (`/opt/jitsi-docker/VOSK_STOPPED_FOR_CALL_QUALITY`) para proteger a qualidade da ligação.
+   Transcrição ao vivo na sala fica no **browser** (Hub) até haver VPS dedicado / modelo leve.
+   Caps de bitrate/resolução em `infra/jitsi/custom-config.js` (`channelLastN`, `maxBitratesVideo`).
 
 ```bash
-# STT com teto de RAM (recomendado)
+# Só reactivar STT de sala se houver RAM de sobra (ideal: VPS 2) — usar o overlay:
 cd /opt/jitsi-docker
 docker compose -f docker-compose.yml -f docker-compose.etholys.yml \
-  -f transcriber.yml -f /opt/etholys/infra/jitsi/vosk.yml up -d vosk
+  -f transcriber.yml -f /opt/etholys/infra/jitsi/vosk.yml up -d vosk transcriber
 
 # Parar Jitsi (libertar ~1–2 GB)
 cd /opt/jitsi-docker && docker compose stop
