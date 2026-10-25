@@ -6,8 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
   ArrowLeft,
-  Bell,
-  ChevronRight,
+  CheckCircle2,
   Loader2,
   MapPinned,
   Plus,
@@ -18,6 +17,7 @@ import { RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
 import type { PropertyStepState } from '@/lib/radar/property-progress';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
 import { spaceKindMeta } from '@/lib/radar/space';
+import { cn } from '@/lib/utils';
 
 type PropRow = {
   id: string;
@@ -153,23 +153,59 @@ export function RadarCompanyDashboard({
     );
   }
 
+  const topAlert = urgent[0] || null;
+  const metaLine = [
+    `${properties.length} ${radarT(loc, 'lugares', 'lugares', 'places')}`,
+    urgent.length
+      ? `${urgent.length} ${radarT(loc, 'avisos', 'avisos', 'notices')}`
+      : radarT(loc, 'sem urgências', 'sin urgencias', 'no urgencies'),
+  ].join(' · ');
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <div className="relative space-y-8 pb-8">
+      <header className="relative flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0 max-w-2xl">
           <button
             type="button"
             onClick={() => setScope?.(RADAR_SCOPE_OWN)}
-            className="mb-2 inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-200"
+            className="mb-3 inline-flex items-center gap-1.5 text-xs text-white/45 hover:text-emerald-200"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             {radarT(loc, 'Voltar à operação', 'Volver a la operación', 'Back to operation')}
           </button>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            {radarT(loc, 'Empresa / cliente', 'Empresa / cliente', 'Company / client')}
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-emerald-300/80">
+            {radarT(loc, 'Empresa', 'Empresa', 'Company')}
           </p>
-          <h1 className="mt-1 font-serif text-3xl text-white md:text-4xl">{clientName}</h1>
-          {contactName && <p className="mt-1 text-sm text-slate-300">{contactName}</p>}
+          <h1 className="mt-1 font-[family-name:var(--font-etholys-display)] text-3xl tracking-tight text-white md:text-4xl">
+            {clientName}
+          </h1>
+          <p className="mt-2 text-sm text-white/50">
+            {[contactName, metaLine].filter(Boolean).join(' · ')}
+          </p>
+          {topAlert ? (
+            <Link
+              href={topAlert.href}
+              className="mt-4 inline-flex max-w-full items-start gap-2 rounded-full border border-amber-400/25 bg-amber-500/10 px-3.5 py-2 text-left transition hover:border-amber-400/40 hover:bg-amber-500/15"
+            >
+              <AlertTriangle
+                className={cn(
+                  'mt-0.5 h-3.5 w-3.5 shrink-0',
+                  topAlert.severity === 'critical' ? 'text-rose-300' : 'text-amber-300',
+                )}
+              />
+              <span className="min-w-0">
+                <span className="block truncate text-sm text-amber-50">{topAlert.message[loc]}</span>
+                {topAlert.propertyName ? (
+                  <span className="block truncate text-[11px] text-amber-100/55">{topAlert.propertyName}</span>
+                ) : null}
+              </span>
+            </Link>
+          ) : (
+            <p className="mt-4 inline-flex items-center gap-2 text-sm text-emerald-200/90">
+              <CheckCircle2 className="h-4 w-4" />
+              {radarT(loc, 'Sem avisos urgentes.', 'Sin avisos urgentes.', 'No urgent notices.')}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <RadarEntityActions
@@ -184,150 +220,148 @@ export function RadarCompanyDashboard({
           <button
             type="button"
             onClick={() => setCreateOpen?.('property')}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#04110c]"
+            className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#04110c] shadow-[0_0_24px_-6px_rgba(16,185,129,0.55)]"
           >
             <Plus className="h-4 w-4" />
             {radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
           </button>
         </div>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-xl border border-white/15 bg-slate-950 px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-            {radarT(loc, 'Lugares', 'Lugares', 'Places')}
-          </p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-white">{properties.length}</p>
-        </div>
-        <Link
-          href={`/hub/radar/tarefas?${companyQ}`}
-          className="rounded-xl border border-amber-400/35 bg-amber-950 px-4 py-3"
-        >
-          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-200/80">
-            <Bell className="h-3 w-3" />
-            {radarT(loc, 'Avisos', 'Avisos', 'Notices')}
-          </p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-amber-50">{urgent.length}</p>
-        </Link>
-      </div>
-
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-white">
-          {radarT(loc, 'Precisa atenção', 'Necesita atención', 'Needs attention')}
-        </h2>
-        {urgent.length === 0 ? (
-          <p className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-slate-400">
-            {radarT(
-              loc,
-              'Sem avisos urgentes para esta empresa.',
-              'Sin avisos urgentes para esta empresa.',
-              'No urgent notices for this company.',
-            )}
-          </p>
-        ) : (
-          <ul className="divide-y divide-white/10 overflow-hidden rounded-xl border border-white/15 bg-slate-950">
-            {urgent.slice(0, 6).map((a) => (
-              <li key={a.id}>
-                <Link
-                  href={a.href}
-                  className="flex items-start gap-3 px-4 py-3 transition hover:bg-white/5"
-                >
-                  <AlertTriangle
-                    className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
-                      a.severity === 'critical' ? 'text-rose-300' : 'text-amber-300'
-                    }`}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm text-slate-100">{a.message[loc]}</span>
-                    {a.propertyName && (
-                      <span className="mt-0.5 block truncate text-xs text-slate-400">{a.propertyName}</span>
-                    )}
-                  </span>
-                  <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-white">
-          {radarT(loc, 'Lugares desta empresa', 'Lugares de esta empresa', 'Places for this company')}
-        </h2>
-        {properties.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-white/15 bg-slate-950 px-6 py-10 text-center">
-            <MapPinned className="mx-auto h-7 w-7 text-slate-500" />
-            <p className="mt-3 text-sm text-slate-300">
-              {radarT(
-                loc,
-                'Ainda sem espaços. Cria o primeiro (horta, agroindústria, animais…).',
-                'Aún sin espacios. Creá el primero (huerta, agroindustria, animales…).',
-                'No spaces yet. Create the first (garden, agroindustry, livestock…).',
-              )}
-            </p>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.85fr)] lg:items-start">
+        <section>
+          <div className="mb-3 flex items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold text-white">
+              {radarT(loc, 'Lugares', 'Lugares', 'Places')}
+            </h2>
             <button
               type="button"
               onClick={() => setCreateOpen?.('property')}
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#04110c]"
+              className="text-xs font-medium text-emerald-300/90 hover:text-emerald-200"
             >
-              <Plus className="h-4 w-4" />
-              {radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
+              + {radarT(loc, 'Novo', 'Nuevo', 'New')}
             </button>
           </div>
-        ) : (
-          <ul className="divide-y divide-white/10 overflow-hidden rounded-xl border border-white/15 bg-slate-950">
-            {properties.map((p) => {
-              const kind = spaceKindMeta(p.moduleId);
-              const hasAlert = urgent.some((a) => a.propertyId === p.id);
-              const openHref = `/hub/radar/properties/${p.id}?${companyQ}`;
-              return (
-                <li key={p.id}>
-                  <div className="flex items-center gap-2 px-2 py-1.5 sm:px-3">
+          {properties.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/15 px-6 py-12 text-center">
+              <MapPinned className="mx-auto h-7 w-7 text-white/35" />
+              <p className="mt-3 text-sm text-white/50">
+                {radarT(
+                  loc,
+                  'Ainda sem espaços. Cria o primeiro.',
+                  'Aún sin espacios. Creá el primero.',
+                  'No spaces yet. Create the first.',
+                )}
+              </p>
+            </div>
+          ) : (
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {properties.map((p) => {
+                const kind = spaceKindMeta(p.moduleId);
+                const placeAlerts = urgent.filter((a) => a.propertyId === p.id);
+                const worst = placeAlerts.find((a) => a.severity === 'critical') || placeAlerts[0];
+                const openHref = `/hub/radar/properties/${p.id}?${companyQ}`;
+                return (
+                  <li key={p.id} className="group relative">
                     <button
                       type="button"
                       onClick={() => router.push(openHref)}
-                      className="min-w-0 flex-1 rounded-lg px-2 py-2 text-left hover:bg-white/5"
+                      className="flex h-full w-full flex-col rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.05] to-transparent p-4 text-left transition hover:border-emerald-400/35 hover:from-emerald-500/[0.08]"
                     >
-                      <span className="flex items-center gap-2">
-                        <span className="truncate text-sm font-medium text-white">{p.name}</span>
-                        {hasAlert && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />}
-                      </span>
-                      <span className="mt-0.5 block truncate text-xs text-slate-400">
-                        {[
-                          kind.unitLabelPlural[loc],
-                          p.crop,
-                          p.unitCount
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="min-w-0">
+                          <span className="block truncate text-[15px] font-semibold text-white">{p.name}</span>
+                          <span className="mt-0.5 block truncate text-xs text-white/40">
+                            {[kind.unitLabelPlural[loc], p.crop].filter(Boolean).join(' · ')}
+                          </span>
+                        </span>
+                        <span
+                          className={cn(
+                            'mt-1 h-2 w-2 shrink-0 rounded-full',
+                            worst
+                              ? worst.severity === 'critical'
+                                ? 'bg-rose-400'
+                                : 'bg-amber-400'
+                              : 'bg-emerald-400/50',
+                          )}
+                        />
+                      </div>
+                      <div className="mt-4 flex items-end justify-between gap-2">
+                        <span className="text-xs tabular-nums text-white/45">
+                          {p.unitCount
                             ? `${p.unitCount} ${radarT(loc, 'unid.', 'unid.', 'units')}`
-                            : null,
-                          `${p.progressPercent}%`,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </span>
+                            : radarT(loc, 'Sem unidades', 'Sin unidades', 'No units')}
+                        </span>
+                        <span className="text-xs font-medium text-emerald-300 opacity-0 transition group-hover:opacity-100">
+                          {radarT(loc, 'Abrir mapa', 'Abrir mapa', 'Open map')} →
+                        </span>
+                      </div>
                     </button>
-                    <Link
-                      href={openHref}
-                      className="shrink-0 rounded-lg border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-medium text-emerald-100 hover:bg-emerald-500/20"
-                    >
-                      {radarT(loc, 'Abrir', 'Abrir', 'Open')}
+                    <div className="absolute right-2 top-2 opacity-0 transition group-hover:opacity-100">
+                      <RadarEntityActions
+                        kind="property"
+                        id={p.id}
+                        name={p.name}
+                        companyId={companyId}
+                        engagementId={engagementId}
+                        locale={loc}
+                        onDone={() => void afterEntityChange()}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        <aside className="lg:sticky lg:top-4">
+          <div className="overflow-hidden rounded-2xl border border-white/[0.1] bg-[#0a1620]/90">
+            <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-3">
+              <h2 className="text-sm font-semibold text-white">
+                {radarT(loc, 'Agora', 'Ahora', 'Now')}
+              </h2>
+              {urgent.length > 0 && (
+                <Link
+                  href={`/hub/radar/tarefas?${companyQ}`}
+                  className="text-xs font-medium text-emerald-300 hover:text-emerald-200"
+                >
+                  {radarT(loc, 'Tarefas', 'Tareas', 'Tasks')}
+                </Link>
+              )}
+            </div>
+            {urgent.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+                <CheckCircle2 className="h-6 w-6 text-emerald-400/80" />
+                <p className="text-sm text-white/55">
+                  {radarT(loc, 'Nada urgente nesta empresa.', 'Nada urgente en esta empresa.', 'Nothing urgent for this company.')}
+                </p>
+              </div>
+            ) : (
+              <ul>
+                {urgent.slice(0, 6).map((a, i) => (
+                  <li key={a.id} className={cn(i > 0 && 'border-t border-white/[0.06]')}>
+                    <Link href={a.href} className="flex gap-3 px-4 py-3.5 transition hover:bg-white/[0.04]">
+                      <span
+                        className={cn(
+                          'mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full',
+                          a.severity === 'critical' ? 'bg-rose-400' : 'bg-amber-400',
+                        )}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm leading-snug text-white/90">{a.message[loc]}</span>
+                        {a.propertyName ? (
+                          <span className="mt-1 block truncate text-[11px] text-white/35">{a.propertyName}</span>
+                        ) : null}
+                      </span>
                     </Link>
-                    <RadarEntityActions
-                      kind="property"
-                      id={p.id}
-                      name={p.name}
-                      companyId={companyId}
-                      engagementId={engagementId}
-                      locale={loc}
-                      onDone={() => void afterEntityChange()}
-                    />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }

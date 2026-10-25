@@ -142,32 +142,30 @@ export function RadarOpsBar({
     };
   }, [companyId, engagementId, loc, pathname, scope]);
 
-  if (onProperty) return null;
+  const onHome = pathname === '/hub/radar' || pathname === '/hub/radar/';
+
+  // Home already owns status + attention — don't stack another avisos strip.
+  if (onProperty || onHome) return null;
 
   return (
-    <div className="mb-4 flex flex-wrap items-stretch gap-2">
-      <div className="min-w-[16rem] flex-1 rounded-xl border border-white/20 bg-slate-950 px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-4">
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">
           {radarT(loc, 'Onde estás', 'Dónde estás', 'Where you are')}
         </p>
-        <p className="mt-1 text-sm font-semibold text-white">{place.title}</p>
-        <p className="mt-0.5 text-xs leading-relaxed text-slate-300">{place.detail}</p>
+        <p className="mt-0.5 text-sm font-semibold text-white">{place.title}</p>
+        <p className="mt-0.5 max-w-xl text-xs leading-relaxed text-white/45">{place.detail}</p>
       </div>
-      <Link
-        href={tarefasHref}
-        className="flex min-w-[14rem] flex-1 items-center gap-3 rounded-xl border border-amber-400/40 bg-amber-950 px-4 py-3 text-amber-50"
-      >
-        <Bell className="h-4 w-4 shrink-0 text-amber-200" />
-        <span className="min-w-0">
-          <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-200/80">
-            {radarT(loc, 'Avisos', 'Avisos', 'Notices')}
-            {count != null ? ` · ${count}` : ''}
-          </span>
-          <span className="mt-0.5 block truncate text-sm font-medium text-amber-50">
-            {top || radarT(loc, 'Abrir a lista do que fazer', 'Abrir la lista de qué hacer', 'Open the to-do list')}
-          </span>
-        </span>
-      </Link>
+      {count != null && count > 0 ? (
+        <Link
+          href={tarefasHref}
+          className="inline-flex shrink-0 items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-100 transition hover:bg-amber-500/15"
+        >
+          <Bell className="h-3.5 w-3.5" />
+          {count} {radarT(loc, 'avisos', 'avisos', 'notices')}
+          {top ? <span className="hidden max-w-[12rem] truncate text-amber-100/60 sm:inline">· {top}</span> : null}
+        </Link>
+      ) : null}
     </div>
   );
 }
