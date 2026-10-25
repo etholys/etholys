@@ -257,6 +257,7 @@ model Company {
   radarClients                RadarClient[]
   radarClientsLinked          RadarClient[]                @relation("RadarClientLinkedCompany")
   radarProperties             RadarProperty[]
+  radarTasks                  RadarTask[]
   radarTechnicians            RadarTechnician[]
   businessDossier             BusinessDossier?
   businessBets                BusinessBet[]
@@ -2381,6 +2382,34 @@ model RadarSiteLayout {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+/// Tarefa operativa RADAR (campo) — independente do motor eTask/Work.
+model RadarTask {
+  id           String    @id @default(cuid())
+  companyId    String
+  propertyId   String?
+  unitId       String?
+  title        String
+  description  String?   @db.Text
+  /// todo | doing | done
+  status       String    @default("todo")
+  /// critical | warning | info
+  severity     String    @default("info")
+  /// Chave estável do alerta de origem (ex. propertyId:irrigate:unitId); null = manual.
+  sourceKey    String?
+  dueAt        DateTime?
+  /// [{ id, at, note }]
+  progressJson Json?
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, sourceKey])
+  @@index([companyId, status, archivedAt])
+  @@index([companyId, unitId])
+  @@index([companyId, propertyId])
 }
 
 /// Cliente externo da empresa no RADAR (opcional — operação própria não precisa).

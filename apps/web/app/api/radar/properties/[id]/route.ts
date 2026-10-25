@@ -411,6 +411,29 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ ok: true, crops });
   }
 
+  if (action === 'crop_update') {
+    const cropId = String(body.cropId || '').trim();
+    if (!cropId) return NextResponse.json({ error: 'cropId obrigatório.' }, { status: 400 });
+    const cropName = String(body.name || '').trim();
+    if (cropName.length < 2) return NextResponse.json({ error: 'Nome do cultivo obrigatório.' }, { status: 400 });
+    const layout = parseRadarLayout(property.layoutJson) || emptyRadarLayout();
+    const crops = cropsFromLayout(layout);
+    const idx = crops.findIndex((c) => c.id === cropId);
+    if (idx < 0) return NextResponse.json({ error: 'Cultivo inválido.' }, { status: 404 });
+    crops[idx] = {
+      id: cropId,
+      name: cropName.slice(0, 80),
+      variety: body.variety !== undefined ? String(body.variety || '').trim().slice(0, 80) || null : crops[idx].variety,
+      season: body.season !== undefined ? String(body.season || '').trim().slice(0, 80) || null : crops[idx].season,
+    };
+    const next = withCrops(layout, crops);
+    await prisma.radarProperty.update({
+      where: { id },
+      data: { layoutJson: next as object },
+    });
+    return NextResponse.json({ ok: true, crops, crop: crops[idx] });
+  }
+
   if (action === 'parcel') {
     const name = String(body.name || '').trim();
     if (name.length < 2) return NextResponse.json({ error: 'Nome da parcela obrigatório.' }, { status: 400 });
@@ -557,6 +580,69 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       data: { layoutJson: next as object },
     });
     return NextResponse.json({ ok: true, layout: next });
+  }
+
+  if (action === 'sensor_update') {
+    const sensorId = String(body.sensorId || '').trim();
+    if (!sensorId) return NextResponse.json({ error: 'sensorId obrigatório.' }, { status: 400 });
+    const sensor = await prisma.nexusSensor.findFirst({
+      where: { id: sensorId, companyId, isActive: true },
+    });
+    if (!sensor) return NextResponse.json({ error: 'Sensor inválido.' }, { status: 404 });
+    const data: { name?: string; metric?: string; unitId?: string | null } = {};
+    if (body.name != null) {
+      const n = String(body.name).trim();
+      if (n.length >= 2) data.name = n.slice(0, 80);
+    }
+    if (body.metric != null) {
+      const metric = String(body.metric || '').trim();
+      if (!SENSOR_METRICS.has(metric)) return NextResponse.json({ error: 'Métrica inválida.' }, { status: 400 });
+      data.metric = metric;
+    }
+    if (body.unitId !== undefined) {
+      const unitId = String(body.unitId || '').trim() || null;
+      if (unitId) {
+        const unit = await prisma.nexusOpsUnit.findFirst({
+          where: { id: unitId, propertyId: id, companyId, isActive: true },
+        });
+        if (!unit) return NextResponse.json({ error: 'Espaço inválido.' }, { status: 400 });
+        data.unitId = unit.id;
+      } else {
+        data.unitId = null;
+      }
+    }
+    const updated = await prisma.nexusSensor.update({ where: { id: sensorId }, data });
+    const layout = parseRadarLayout(property.layoutJson) || emptyRadarLayout();
+    let devices = layout.devices || [];
+    const sku = String(body.sku || '').trim().toUpperCase();
+    const devEui = body.devEui !== undefined ? normalizeDevEui(body.devEui) : undefined;
+    if (sku || devEui !== undefined || body.unitId !== undefined) {
+      const prev = devices.find((d) => d.sensorId === sensorId);
+      const profile = sku ? deviceBySku(sku) : prev ? deviceBySku(prev.sku) : null;
+      const nextBinding = {
+        sensorId,
+        sku: (profile?.sku || prev?.sku || sku || 'SE01-LB').slice(0, 32),
+        devEui: devEui !== undefined ? devEui : prev?.devEui || null,
+        unitId: updated.unitId,
+      };
+      devices = [...devices.filter((d) => d.sensorId !== sensorId), nextBinding];
+      await prisma.radarProperty.update({
+        where: { id },
+        data: { layoutJson: { ...layout, devices } as object },
+      });
+    }
+    const binding = devices.find((d) => d.sensorId === sensorId) || null;
+    return NextResponse.json({
+      ok: true,
+      sensor: {
+        id: updated.id,
+        name: updated.name,
+        metric: updated.metric,
+        unitId: updated.unitId,
+        sku: binding?.sku || null,
+        devEui: binding?.devEui || null,
+      },
+    });
   }
 
   // generic rename

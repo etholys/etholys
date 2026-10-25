@@ -676,8 +676,19 @@ function RadarBasemap({
   const latRef = useRef(lat);
   const lngRef = useRef(lng);
   const sideRef = useRef(80);
-  const dragRef = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null);
+  const dragRef = useRef<{
+    id: string;
+    x: number;
+    y: number;
+    moved: boolean;
+    w: number;
+    h: number;
+    rotation: number;
+    poly: { setLatLngs: (latlngs: [number, number][]) => void } | null;
+  } | null>(null);
   const suppressClickRef = useRef(false);
+  /** Skip overlay rebuild mid-drag — recreating polygons was killing the move gesture. */
+  const skipOverlayRef = useRef(false);
   onPinRef.current = onPin;
   onFocusRef.current = onFocus;
   placingRef.current = placing;
@@ -709,31 +720,65 @@ function RadarBasemap({
         const overlays = L.layerGroup();
         overlays.addTo(map);
         map.setView(hasPin ? [lat as number, lng as number] : [-15.8, -47.9], hasPin ? 17 : 12);
+        const applyDragPoint = (clientX: number, clientY: number) => {
+          const drag = dragRef.current;
+          const lat0 = latRef.current;
+          const lng0 = lngRef.current;
+          const m = mapRef.current;
+          if (!drag || !m || lat0 == null || lng0 == null) return;
+          const box = m.getContainer().getBoundingClientRect();
+          const ll = m.containerPointToLatLng(L.point(clientX - box.left, clientY - box.top));
+          const pct = latLngToPct(lat0, lng0, sideRef.current, ll.lat, ll.lng);
+          drag.x = pct.x;
+          drag.y = pct.y;
+          drag.moved = true;
+          // Live visual without React layout rebuild (that was aborting the gesture).
+          if (drag.poly) {
+            const draftRect = {
+              id: drag.id,
+              x: Math.min(100 - drag.w, Math.max(0, pct.x - drag.w / 2)),
+              y: Math.min(100 - drag.h, Math.max(0, pct.y - drag.h / 2)),
+              w: drag.w,
+              h: drag.h,
+              rotation: drag.rotation,
+              placed: true as const,
+            };
+            drag.poly.setLatLngs(spaceRing(lat0, lng0, sideRef.current, draftRect));
+          }
+        };
         const finishDrag = () => {
           const drag = dragRef.current;
           if (!drag) return;
           dragRef.current = null;
+          skipOverlayRef.current = false;
           if (editModeRef.current !== 'move') mapRef.current?.dragging?.enable();
           if (!drag.moved) return;
           suppressClickRef.current = true;
+          window.setTimeout(() => {
+            suppressClickRef.current = false;
+          }, 0);
           onCommitRef.current(moveSpace(layoutRef.current, drag.id, drag.x, drag.y));
         };
-        map.on('mousemove', (e) => {
-          const drag = dragRef.current;
-          const lat0 = latRef.current;
-          const lng0 = lngRef.current;
-          if (!drag || lat0 == null || lng0 == null) return;
-          const pct = latLngToPct(lat0, lng0, sideRef.current, e.latlng.lat, e.latlng.lng);
-          drag.x = pct.x;
-          drag.y = pct.y;
-          drag.moved = true;
-          onDraftRef.current(moveSpace(layoutRef.current, drag.id, pct.x, pct.y));
-        });
-        map.on('mouseup', finishDrag);
-        window.addEventListener('mouseup', finishDrag);
-        (map as LeafletMap & { __endDrag?: () => void }).__endDrag = finishDrag;
+        const onWinMove = (ev: MouseEvent | TouchEvent) => {
+          if (!dragRef.current) return;
+          if ('touches' in ev) {
+            const t = ev.touches[0];
+            if (!t) return;
+            ev.preventDefault();
+            applyDragPoint(t.clientX, t.clientY);
+            return;
+          }
+          applyDragPoint(ev.clientX, ev.clientY);
+        };
+        const onWinUp = () => finishDrag();
+        window.addEventListener('mousemove', onWinMove);
+        window.addEventListener('mouseup', onWinUp);
+        window.addEventListener('touchmove', onWinMove, { passive: false });
+        window.addEventListener('touchend', onWinUp);
+        (map as LeafletMap & { __endDrag?: () => void; __moveDrag?: (ev: MouseEvent | TouchEvent) => void }).__endDrag = onWinUp;
+        (map as LeafletMap & { __moveDrag?: (ev: MouseEvent | TouchEvent) => void }).__moveDrag = onWinMove;
         map.on('click', (e) => {
-          if (suppressClickRef.current) {
+          if (suppressClickRef.current || dragRef.current) {
             suppressClickRef.current = false;
             return;
           }
@@ -760,9 +805,22 @@ function RadarBasemap({
       .catch(() => undefined);
     return () => {
       cancelled = true;
-      const extra = map as (LeafletMap & { __ro?: ResizeObserver; __endDrag?: () => void }) | null;
+      const extra = map as
+        | (LeafletMap & {
+            __ro?: ResizeObserver;
+            __endDrag?: () => void;
+            __moveDrag?: (ev: MouseEvent | TouchEvent) => void;
+          })
+        | null;
       extra?.__ro?.disconnect();
-      if (extra?.__endDrag) window.removeEventListener('mouseup', extra.__endDrag);
+      if (extra?.__endDrag) {
+        window.removeEventListener('mouseup', extra.__endDrag);
+        window.removeEventListener('touchend', extra.__endDrag);
+      }
+      if (extra?.__moveDrag) {
+        window.removeEventListener('mousemove', extra.__moveDrag);
+        window.removeEventListener('touchmove', extra.__moveDrag);
+      }
       map?.remove();
       mapRef.current = null;
       overlaysRef.current = null;
@@ -783,6 +841,8 @@ function RadarBasemap({
     const map = mapRef.current;
     const overlays = overlaysRef.current;
     if (!map || !overlays || !ready) return;
+    // Keep the same polygon DOM nodes while the user is dragging.
+    if (skipOverlayRef.current || dragRef.current) return;
     let cancelled = false;
     void loadLeaflet().then((L) => {
       if (cancelled) return;
@@ -791,7 +851,8 @@ function RadarBasemap({
         map.getContainer().style.cursor = placing ? 'crosshair' : '';
         return;
       }
-      map.getContainer().style.cursor = placing ? 'crosshair' : editMode === 'place' ? 'crosshair' : editMode === 'move' ? 'grab' : '';
+      map.getContainer().style.cursor =
+        placing ? 'crosshair' : editMode === 'place' ? 'crosshair' : editMode === 'move' ? 'grab' : '';
       const ha = areaHa && areaHa > 0 ? areaHa : Math.max(0.4, parcels.length * 0.35 || 0.4);
       const side = Math.sqrt(ha * 10000);
       sideRef.current = side;
@@ -826,22 +887,35 @@ function RadarBasemap({
           fillOpacity: match ? (focused ? 0.55 : 0.38) : 0.08,
         });
         poly.on('click', (e) => {
+          if (suppressClickRef.current || dragRef.current) return;
           if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
           onFocusRef.current(parcel.id);
         });
-        poly.on('mousedown', (e) => {
-          if (!canEditRef.current || editModeRef.current !== 'move' || focusedIdRef.current !== parcel.id) return;
-          if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
+        const startMove = (e: { originalEvent?: Event }) => {
+          if (!canEditRef.current || editModeRef.current !== 'move') return;
+          // Focus this footprint if needed; parent must preserve editMode on same/new focus while moving.
+          if (focusedIdRef.current !== parcel.id) onFocusRef.current(parcel.id);
+          if (e.originalEvent) {
+            L.DomEvent.stopPropagation(e.originalEvent);
+            L.DomEvent.preventDefault(e.originalEvent);
+          }
           map.dragging?.disable();
           dragRef.current = {
             id: parcel.id,
             x: rect.x + rect.w / 2,
             y: rect.y + rect.h / 2,
             moved: false,
+            w: rect.w,
+            h: rect.h,
+            rotation: rect.rotation ?? 0,
+            poly: poly as { setLatLngs: (latlngs: [number, number][]) => void },
           };
-        });
+          skipOverlayRef.current = true;
+          map.getContainer().style.cursor = 'grabbing';
+        };
+        poly.on('mousedown', startMove);
+        poly.on('touchstart', startMove as (e: unknown) => void);
         {
-          // Hover only — permanent tips stacked into a mess over the map.
           const tipParts = [
             parcel.name,
             parcel.crop || null,
@@ -939,7 +1013,7 @@ function RadarBasemap({
       )}
       {hasPin && editMode === 'move' && (
         <p className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg">
-          {radarT(locale, 'Arrasta o espaço selecionado', 'Arrastra el espacio seleccionado', 'Drag the selected space')}
+          {radarT(locale, 'Arrasta o espaço no mapa', 'Arrastrá el espacio en el mapa', 'Drag the space on the map')}
         </p>
       )}
     </div>
