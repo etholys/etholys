@@ -57,6 +57,29 @@ config.filmstrip.disableTopPanel = false;
 config.tileView = config.tileView || {};
 config.tileView.numberOfVisibleTiles = 25;
 
+// Capacidade do VPS partilhado (~8 GB): menos camadas / resoluções altas
+// evitam saturar o bridge e o aspecto de «sinal baixo» em salas com vários.
+config.channelLastN = 12;
+config.maxFullResolutionParticipants = 2;
+config.enableLayerSuspension = true;
+config.videoQuality = config.videoQuality || {};
+config.videoQuality.maxBitratesVideo = {
+  low: 100000,
+  standard: 250000,
+  high: 500000,
+  fullHd: 1000000,
+  ultraHd: 1000000,
+  ssHigh: 1500000,
+};
+config.constraints = config.constraints || {};
+config.constraints.video = Object.assign({}, config.constraints.video || {}, {
+  height: {
+    ideal: 360,
+    max: 720,
+    min: 180,
+  },
+});
+
 // Preferir a partilha no ecrã principal (estilo Google Meet)
 config.autoPinLatestScreenShare = 'remote-only';
 

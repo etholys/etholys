@@ -130,7 +130,17 @@ No Hub Meet, se ainda aparecer aviso de **demo meet.jit.si**, o `.env` não foi 
 
 ## 6. Operação / RAM
 
+No Contabo partilhado (~8 GB) o STT ao vivo (`vosk`) **sem teto de RAM** cresce até OOM do host
+e enche o swap — o sintoma para os utilizadores é «sinal baixo» / cortes em **todas** as salas,
+não só com transcrição ligada. Usar o overlay `infra/jitsi/vosk.yml` (`mem_limit: 2560m`) e
+`vm.swappiness=10`.
+
 ```bash
+# STT com teto de RAM (recomendado)
+cd /opt/jitsi-docker
+docker compose -f docker-compose.yml -f docker-compose.etholys.yml \
+  -f transcriber.yml -f /opt/etholys/infra/jitsi/vosk.yml up -d vosk
+
 # Parar Jitsi (libertar ~1–2 GB)
 cd /opt/jitsi-docker && docker compose stop
 
@@ -139,6 +149,10 @@ cd /opt/jitsi-docker && docker compose up -d
 ```
 
 Script de emergência OOM: `scripts/recuperar-servidor-oom.sh` (para contentores Jitsi).
+
+**TURN/Coturn** ainda não está neste piloto: redes corporativas/móveis simétricas podem continuar
+com ICE fraco. Abrir Coturn (3478/5349 + relay) é o próximo passo se o problema persistir
+depois do controlo de RAM.
 
 ---
 
