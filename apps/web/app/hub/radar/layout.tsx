@@ -43,6 +43,16 @@ function RadarShellInner({ children }: { children: ReactNode }) {
         group: ver,
       },
       {
+        href: '/hub/radar/drone',
+        label: es ? 'Drone' : en ? 'Drone' : 'Drone',
+        group: fazer,
+        detail: es
+          ? 'Mapeo aéreo asistido'
+          : en
+            ? 'Assisted aerial mapping'
+            : 'Mapeamento aéreo assistido',
+      },
+      {
         href: '/hub/radar/caderno',
         label: es ? 'Cuaderno' : en ? 'Notebook' : 'Caderno',
         group: fazer,
