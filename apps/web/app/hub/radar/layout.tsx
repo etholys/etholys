@@ -32,41 +32,23 @@ function RadarShellInner({ children }: { children: ReactNode }) {
     () => [
       {
         href: '/hub/radar',
-        group: es ? 'Ver' : en ? 'Look' : 'Ver',
         label: es ? 'Panel' : en ? 'Dashboard' : 'Painel',
-        detail: es
-          ? 'Avisos, empresas y lugares — el mapa 3D está dentro de cada sitio'
-          : en
-            ? 'Notices, companies and places — 3D map is inside each site'
-            : 'Avisos, empresas e lugares — o mapa 3D está dentro de cada sítio',
       },
       {
         href: '/hub/radar/cadeia',
-        group: es ? 'Seguir' : en ? 'Follow' : 'Seguir',
         label: es ? 'Rastreo del lote' : en ? 'Lot trace' : 'Rastreio do lote',
-        detail: es ? 'Camino del producto y lo que pasó' : en ? 'Product path and what happened' : 'Caminho do produto e o que aconteceu',
       },
       {
         href: '/hub/radar/caderno',
-        group: es ? 'Hacer' : en ? 'Do' : 'Fazer',
         label: es ? 'Cuaderno' : en ? 'Notebook' : 'Caderno',
-        detail: es
-          ? 'Registro diario del campo o planta'
-          : en
-            ? 'Daily field or plant log'
-            : 'Registo diário do campo ou planta',
       },
       {
         href: '/hub/radar/tarefas',
-        group: es ? 'Hacer' : en ? 'Do' : 'Fazer',
         label: es ? 'Tareas' : en ? 'Tasks' : 'Tarefas',
-        detail: es ? 'Qué hay que hacer ahora' : en ? 'What to do now' : 'O que há para fazer agora',
       },
       {
         href: '/hub/radar/equipa',
-        group: es ? 'Quién' : en ? 'Who' : 'Quem',
         label: es ? 'Equipo y clientes' : en ? 'Team and clients' : 'Equipa e clientes',
-        detail: es ? 'Técnicos y quién atiende cada sitio' : en ? 'Technicians and who covers each site' : 'Técnicos e quem trata de cada sítio',
       },
     ],
     [es, en],

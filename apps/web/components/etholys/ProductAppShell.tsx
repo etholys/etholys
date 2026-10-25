@@ -113,12 +113,13 @@ export function ProductAppShell({
         <aside
           className={cn(
             sysTheme.aside,
+            'overflow-hidden',
             collapsed ? 'w-16' : 'w-64',
             sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
           )}
         >
-          <div className={cn('flex-shrink-0 border-b border-white/10', collapsed ? 'p-2' : 'p-4')}>
-            <div className="flex items-center justify-between">
+          <div className={cn('shrink-0', collapsed ? 'p-2' : 'px-3 pb-2 pt-3')}>
+            <div className="flex items-center justify-between gap-1">
               <Link href={meta.href} className="flex min-w-0 items-center gap-2">
                 <div
                   className={cn(
@@ -150,73 +151,75 @@ export function ProductAppShell({
               </div>
             </div>
             {!collapsed && (
-              <>
-                {meta.tagline[loc] ? (
-                  <p className="mt-2 text-[11px] leading-snug text-white/45">{meta.tagline[loc]}</p>
-                ) : null}
-                <Link
-                  href="/hub"
-                  className="mt-2 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-white/40 transition hover:bg-white/5 hover:text-white"
-                >
-                  <ChevronDown className="h-3 w-3 rotate-90" />
-                  {loc === 'es' ? 'Volver al Hub' : loc === 'en' ? 'Back to Hub' : 'Voltar ao Hub'}
-                </Link>
-              </>
+              <Link
+                href="/hub"
+                className="mt-2 flex items-center gap-1.5 rounded-md px-1 py-1 text-xs text-white/40 transition hover:bg-white/5 hover:text-white"
+              >
+                <ChevronDown className="h-3 w-3 rotate-90" />
+                {loc === 'es' ? 'Volver al Hub' : loc === 'en' ? 'Back to Hub' : 'Voltar ao Hub'}
+              </Link>
             )}
           </div>
 
-          {!collapsed && (
-            <div className="flex-shrink-0 space-y-3 border-b border-white/10 p-3">
-              <CompanyPicker
-                companies={companies}
-                activeCompanyId={companyId}
-                onSelect={setActiveCompanyId}
-                ready={companiesReady}
-                error={companiesLoadError}
-                onRetry={() => void reloadCompanies()}
-                locale={loc}
-                compact
-                tone="dark"
-                className="w-full"
-              />
-              {sidebarAfterCompany}
-            </div>
-          )}
+          {/* One scroll column: scope + nav stay together (not a trapped middle pane). */}
+          <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain', collapsed ? 'px-1.5' : 'px-3')}>
+            {!collapsed && (
+              <div className="space-y-2 pb-3">
+                <CompanyPicker
+                  companies={companies}
+                  activeCompanyId={companyId}
+                  onSelect={setActiveCompanyId}
+                  ready={companiesReady}
+                  error={companiesLoadError}
+                  onRetry={() => void reloadCompanies()}
+                  locale={loc}
+                  compact
+                  tone="dark"
+                  className="w-full"
+                />
+                {sidebarAfterCompany}
+              </div>
+            )}
 
-          <nav className={cn('flex-1 space-y-0.5 overflow-y-auto', collapsed ? 'p-1.5' : 'p-3')}>
-            {nav.map((item, index) => {
-              const href = resolveNavHref ? resolveNavHref(item) : item.href;
-              const active = match?.href === item.href;
-              const showGroup = !collapsed && item.group && item.group !== nav[index - 1]?.group;
-              return (
-                <div key={item.href}>
-                  {showGroup && (
-                    <p className={cn('px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35', index > 0 && 'pt-3')}>
-                      {item.group}
-                    </p>
-                  )}
-                  <Link
-                    href={href}
-                    onClick={() => setSidebarOpen(false)}
-                    title={collapsed ? item.label : item.detail || item.label}
-                    className={cn(
-                      'flex rounded-lg text-sm font-medium transition',
-                      collapsed ? 'justify-center px-2 py-2.5' : 'flex-col gap-0.5 px-3 py-2',
-                      active ? sysTheme.active[accent] : sysTheme.navIdle
+            <nav className="space-y-0.5 pb-3">
+              {nav.map((item, index) => {
+                const href = resolveNavHref ? resolveNavHref(item) : item.href;
+                const active = match?.href === item.href;
+                const showGroup = !collapsed && item.group && item.group !== nav[index - 1]?.group;
+                return (
+                  <div key={item.href}>
+                    {showGroup && (
+                      <p
+                        className={cn(
+                          'px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30',
+                          index > 0 && 'pt-3',
+                        )}
+                      >
+                        {item.group}
+                      </p>
                     )}
-                  >
-                    {!collapsed && <span>{item.label}</span>}
-                    {!collapsed && item.detail && (
-                      <span className="text-[11px] font-normal leading-snug text-white/45">{item.detail}</span>
-                    )}
-                    {collapsed && <span className="text-[10px] font-semibold uppercase">{item.label.slice(0, 2)}</span>}
-                  </Link>
-                </div>
-              );
-            })}
-          </nav>
+                    <Link
+                      href={href}
+                      onClick={() => setSidebarOpen(false)}
+                      title={collapsed ? item.label : item.detail || item.label}
+                      className={cn(
+                        'flex rounded-lg text-sm font-medium transition',
+                        collapsed ? 'justify-center px-2 py-2.5' : 'items-center px-2.5 py-2',
+                        active ? sysTheme.active[accent] : sysTheme.navIdle,
+                      )}
+                    >
+                      {!collapsed && <span className="truncate">{item.label}</span>}
+                      {collapsed && (
+                        <span className="text-[10px] font-semibold uppercase">{item.label.slice(0, 2)}</span>
+                      )}
+                    </Link>
+                  </div>
+                );
+              })}
+            </nav>
+          </div>
 
-          <div className={cn('flex-shrink-0 border-t border-white/10', collapsed ? 'p-1.5' : 'p-3')}>
+          <div className={cn('shrink-0 border-t border-white/[0.07]', collapsed ? 'p-1.5' : 'p-3')}>
             <AppearanceToggle collapsed={collapsed} className="mb-1" />
             <button
               type="button"

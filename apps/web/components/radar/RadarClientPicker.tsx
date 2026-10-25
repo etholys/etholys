@@ -57,11 +57,7 @@ export function RadarClientPicker({ className }: { className?: string }) {
   };
 
   return (
-    <div ref={ref} className={cn('relative space-y-1.5', className)}>
-      <p className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/70">
-        {radarT(loc, 'Propriedades', 'Propiedades', 'Properties')}
-      </p>
-
+    <div ref={ref} className={cn('relative', className)}>
       <div className="flex items-stretch gap-1.5">
         <button
           type="button"
@@ -69,9 +65,10 @@ export function RadarClientPicker({ className }: { className?: string }) {
             setPlusOpen(false);
             setOpen((o) => !o);
           }}
-          className="flex min-w-0 flex-1 touch-manipulation items-center justify-between gap-1.5 rounded-lg border border-white/20 bg-slate-950 px-2.5 py-2 text-left text-xs font-medium text-white hover:border-emerald-400/50"
+          className="flex min-w-0 flex-1 touch-manipulation items-center justify-between gap-1.5 rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-2 text-left text-xs font-medium text-white/90 hover:border-emerald-400/40 hover:bg-white/[0.06]"
           aria-expanded={open}
           aria-haspopup="listbox"
+          title={radarT(loc, 'Âmbito', 'Ámbito', 'Scope')}
         >
           <span className="flex min-w-0 items-center gap-1.5">
             {scope === RADAR_SCOPE_OWN ? (
@@ -94,7 +91,7 @@ export function RadarClientPicker({ className }: { className?: string }) {
             setOpen(false);
             setPlusOpen((o) => !o);
           }}
-          className="inline-flex shrink-0 items-center justify-center rounded-lg border border-emerald-400/45 bg-emerald-500/15 px-2.5 text-emerald-100 hover:bg-emerald-500/25"
+          className="inline-flex shrink-0 items-center justify-center rounded-lg border border-white/12 bg-white/[0.04] px-2.5 text-emerald-200 hover:border-emerald-400/40 hover:bg-emerald-500/15"
           aria-label={radarT(loc, 'Criar', 'Crear', 'Create')}
           aria-expanded={plusOpen}
         >
