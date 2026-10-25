@@ -28,30 +28,56 @@ function RadarShellInner({ children }: { children: ReactNode }) {
     return s ? `?${s}` : '';
   }, [cid, engagementId, scope]);
 
+  const fazer = es ? 'Hacer' : en ? 'Do' : 'Fazer';
+  const ver = es ? 'Ver' : en ? 'See' : 'Ver';
   const nav = useMemo(
     () => [
       {
         href: '/hub/radar',
         label: es ? 'Panel' : en ? 'Dashboard' : 'Painel',
+        group: ver,
       },
       {
         href: '/hub/radar/cadeia',
         label: es ? 'Rastreo del lote' : en ? 'Lot trace' : 'Rastreio do lote',
+        group: ver,
       },
       {
         href: '/hub/radar/caderno',
         label: es ? 'Cuaderno' : en ? 'Notebook' : 'Caderno',
+        group: fazer,
       },
       {
         href: '/hub/radar/tarefas',
         label: es ? 'Tareas' : en ? 'Tasks' : 'Tarefas',
+        group: fazer,
+      },
+      {
+        href: '/hub/radar/assistente',
+        label: es ? 'Asistente' : en ? 'Assistant' : 'Assistente',
+        group: fazer,
+        detail: es
+          ? 'Consejo técnico y recordatorios'
+          : en
+            ? 'Technical advice and reminders'
+            : 'Conselho técnico e lembretes',
+      },
+      {
+        href: '/hub/radar/automatizacao',
+        label: es ? 'Automatización' : en ? 'Automation' : 'Automatização',
+        group: fazer,
+        detail: es
+          ? 'Vincular sensores y reglas'
+          : en
+            ? 'Bind sensors and rules'
+            : 'Ligar sensores e regras',
       },
       {
         href: '/hub/radar/equipa',
         label: es ? 'Equipo y clientes' : en ? 'Team and clients' : 'Equipa e clientes',
       },
     ],
-    [es, en],
+    [es, en, fazer, ver],
   );
 
   const resolveNavHref = useCallback((item: { href: string }) => `${item.href}${qs}`, [qs]);

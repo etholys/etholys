@@ -283,7 +283,17 @@ export function RadarFocusSheet({
       <div className={section}>
         <p className={heading}>{radarT(loc, 'Sensores', 'Sensores', 'Sensors')}</p>
         {spaceSensors.length === 0 ? (
-          <p className="mt-2 text-sm text-white/50">{radarT(loc, 'Nenhum sensor neste espaço.', 'Ningún sensor en este espacio.', 'No sensors on this space.')}</p>
+          <div className="mt-2 space-y-2">
+            <p className="text-sm text-white/50">
+              {radarT(loc, 'Nenhum sensor neste espaço.', 'Ningún sensor en este espacio.', 'No sensors on this space.')}
+            </p>
+            <Link
+              href={`/hub/radar/automatizacao?company=${encodeURIComponent(companyId)}${propertyId ? `&property=${encodeURIComponent(propertyId)}` : ''}${engagementId ? `&engagement=${encodeURIComponent(engagementId)}` : ''}`}
+              className="inline-flex text-xs font-semibold text-teal-200/90 underline-offset-2 hover:underline"
+            >
+              {radarT(loc, 'Começar automatização', 'Empezar automatización', 'Start automation')}
+            </Link>
+          </div>
         ) : (
           <ul className="mt-2 space-y-1.5">
             {spaceSensors.map((s) => (

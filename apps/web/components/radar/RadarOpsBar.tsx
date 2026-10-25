@@ -70,6 +70,28 @@ function placeFor(
       ),
     };
   }
+  if (pathname.includes('/radar/assistente')) {
+    return {
+      title: radarT(loc, 'Assistente', 'Asistente', 'Assistant'),
+      detail: radarT(
+        loc,
+        'Conselho técnico, fotos e lembretes de setup.',
+        'Consejo técnico, fotos y recordatorios de setup.',
+        'Technical advice, photos and setup reminders.',
+      ),
+    };
+  }
+  if (pathname.includes('/radar/automatizacao')) {
+    return {
+      title: radarT(loc, 'Automatização', 'Automatización', 'Automation'),
+      detail: radarT(
+        loc,
+        'Ligar aparelho ao espaço e regra humidade → válvula.',
+        'Vincular equipo al espacio y regla humedad → válvula.',
+        'Bind a device to a space and moisture → valve rule.',
+      ),
+    };
+  }
   if (pathname.includes('/radar/equipa')) {
     return {
       title: radarT(loc, 'Equipa', 'Equipo', 'Team'),

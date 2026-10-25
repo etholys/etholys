@@ -1015,6 +1015,14 @@ export function RadarPropertyWorkspace({
                       'Device, space and DevEUI. The token is shown once.',
                     )}
                   </p>
+                  {data.sensors.length === 0 && (
+                    <Link
+                      href={`/hub/radar/automatizacao?company=${encodeURIComponent(companyId)}&property=${encodeURIComponent(data.id)}${engagementId ? `&engagement=${encodeURIComponent(engagementId)}` : ''}`}
+                      className="mt-2 inline-flex text-xs font-semibold text-teal-200/90 underline-offset-2 hover:underline"
+                    >
+                      {radarT(loc, 'Começar automatização', 'Empezar automatización', 'Start automation')}
+                    </Link>
+                  )}
                 </div>
                 {editingSensorId && (
                   <div className="rounded-xl border border-teal-400/35 bg-[#0c1a24] px-4 py-4">
