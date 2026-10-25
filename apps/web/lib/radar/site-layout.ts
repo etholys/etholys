@@ -505,6 +505,17 @@ export function rotateSpace(layout: RadarSiteLayoutDoc, id: string, deltaDeg = 1
   return upsertSpace(layout, { ...prev, rotation: normRotation((prev.rotation ?? 0) + deltaDeg) });
 }
 
+/** Set absolute footprint rotation in degrees (any angle; wrapped to [0, 360)). */
+export function setSpaceRotation(
+  layout: RadarSiteLayoutDoc,
+  id: string,
+  degrees: number,
+): RadarSiteLayoutDoc {
+  const prev = layout.spaces.find((s) => s.id === id);
+  if (!prev || prev.placed !== true) return layout;
+  return upsertSpace(layout, { ...prev, rotation: normRotation(degrees) });
+}
+
 /** Remove the drawing. The database unit stays. */
 export function unplaceSpace(layout: RadarSiteLayoutDoc, id: string): RadarSiteLayoutDoc {
   return {

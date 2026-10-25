@@ -18,11 +18,14 @@ import {
   emptyRadarLayout,
   RADAR_STRUCTURE_KINDS,
   rotateSpace,
+  setSpaceRotation,
   unplaceSpace,
   type RadarCrop,
   type RadarSiteLayoutDoc,
   type RadarStructureKind,
 } from '@/lib/radar/site-layout';
+
+type SpaceEditMode = 'none' | 'place' | 'move' | 'rotate' | 'site_move' | 'site_resize';
 import { MOISTURE_THRESHOLD } from '@/lib/radar/agriculture';
 import { RADAR_DEVICE_CATALOG } from '@/lib/radar/devices';
 import { isTraceStage, TRACE_STAGE_LABEL, type TraceStage } from '@/lib/radar/trace';
@@ -117,7 +120,7 @@ export function RadarPropertyWorkspace({
   const [query, setQuery] = useState('');
   const [railOpen, setRailOpen] = useState(true);
   const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
-  const [editMode, setEditMode] = useState<'none' | 'place' | 'move' | 'site_move' | 'site_resize'>('none');
+  const [editMode, setEditMode] = useState<SpaceEditMode>('none');
   /** Full focus sheet — closed by default so the map stays clear. */
   const [focusDetailOpen, setFocusDetailOpen] = useState(false);
   const [draftAreaHa, setDraftAreaHa] = useState<number | null>(null);
@@ -479,7 +482,7 @@ export function RadarPropertyWorkspace({
             focusedId={focusedId}
             onFocus={(id) =>
               focusUnit(id, {
-                keepEditMode: editMode === 'move' || editMode === 'place',
+                keepEditMode: editMode === 'move' || editMode === 'rotate' || editMode === 'place',
               })
             }
             onSaved={() => void load()}
@@ -1314,11 +1317,66 @@ export function RadarPropertyWorkspace({
                     </button>
                     <button
                       type="button"
-                      onClick={() => focusedId && void commitLayout(rotateSpace(layout, focusedId))}
-                      className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15"
+                      onClick={() => {
+                        setEditMode((cur) => (cur === 'rotate' ? 'none' : 'rotate'));
+                      }}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                        editMode === 'rotate'
+                          ? 'bg-teal-300 text-slate-950'
+                          : 'bg-white/10 text-white hover:bg-white/15'
+                      }`}
                     >
-                      {radarT(loc, 'Rodar espaço', 'Girar espacio', 'Rotate space')}
+                      {editMode === 'rotate'
+                        ? radarT(loc, 'A rodar…', 'Girando…', 'Rotating…')
+                        : radarT(loc, 'Rodar espaço', 'Girar espacio', 'Rotate space')}
                     </button>
+                    {editMode === 'rotate' && focusedId && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-1.5 py-0.5">
+                        <button
+                          type="button"
+                          title="-1°"
+                          onClick={() => void commitLayout(rotateSpace(layout, focusedId, -1))}
+                          className="rounded-full px-2 py-1 text-[11px] font-semibold text-white/85 hover:bg-white/10"
+                        >
+                          −1°
+                        </button>
+                        <button
+                          type="button"
+                          title="+1°"
+                          onClick={() => void commitLayout(rotateSpace(layout, focusedId, 1))}
+                          className="rounded-full px-2 py-1 text-[11px] font-semibold text-white/85 hover:bg-white/10"
+                        >
+                          +1°
+                        </button>
+                        <button
+                          type="button"
+                          title="-15°"
+                          onClick={() => void commitLayout(rotateSpace(layout, focusedId, -15))}
+                          className="rounded-full px-2 py-1 text-[11px] font-semibold text-white/85 hover:bg-white/10"
+                        >
+                          −15°
+                        </button>
+                        <button
+                          type="button"
+                          title="+15°"
+                          onClick={() => void commitLayout(rotateSpace(layout, focusedId, 15))}
+                          className="rounded-full px-2 py-1 text-[11px] font-semibold text-white/85 hover:bg-white/10"
+                        >
+                          +15°
+                        </button>
+                        <span className="px-1.5 text-[11px] font-semibold tabular-nums text-teal-200">
+                          {Math.round(layout.spaces.find((s) => s.id === focusedId)?.rotation ?? 0)}°
+                        </span>
+                        <button
+                          type="button"
+                          title="0°"
+                          onClick={() => void commitLayout(setSpaceRotation(layout, focusedId, 0))}
+                          className="rounded-full px-2 py-1 text-[11px] font-semibold text-white/70 hover:bg-white/10"
+                        >
+                          0°
+                        </button>
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => {

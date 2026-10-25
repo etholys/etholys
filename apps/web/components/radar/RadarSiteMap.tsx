@@ -8,9 +8,12 @@ import {
   mergeLayoutWithSpaces,
   moveSpace,
   placeSpace,
+  setSpaceRotation,
   type RadarSiteLayoutDoc,
   type RadarSpaceRect,
 } from '@/lib/radar/site-layout';
+
+type MapEditMode = 'none' | 'place' | 'move' | 'rotate' | 'site_move' | 'site_resize';
 import { spaceKindMeta } from '@/lib/radar/space';
 import { radarLoc, radarT, type RadarLoc } from '@/lib/radar/i18n';
 
@@ -86,8 +89,8 @@ type Props = {
   hero?: boolean;
   /** When set, the parent owns the layout document (geo map edits). */
   syncedLayout?: RadarSiteLayoutDoc;
-  /** place/move = space footprint; site_move/site_resize = whole property. */
-  editMode?: 'none' | 'place' | 'move' | 'site_move' | 'site_resize';
+  /** place/move/rotate = space footprint; site_move/site_resize = whole property. */
+  editMode?: MapEditMode;
   onLayoutDraft?: (layout: RadarSiteLayoutDoc) => void;
   onLayoutCommit?: (layout: RadarSiteLayoutDoc) => void;
   /** Live draft while resizing the property outline (hectares). */
@@ -634,6 +637,65 @@ function latLngToPct(lat0: number, lng0: number, sideM: number, lat: number, lng
   };
 }
 
+function spaceCenterMeters(
+  sideM: number,
+  rect: Pick<RadarSpaceRect, 'x' | 'y' | 'w' | 'h'>,
+) {
+  const west = -sideM / 2 + (rect.x / 100) * sideM;
+  const east = west + (rect.w / 100) * sideM;
+  const north = sideM / 2 - (rect.y / 100) * sideM;
+  const south = north - (rect.h / 100) * sideM;
+  return { cx: (west + east) / 2, cy: (north + south) / 2, west, east, north, south };
+}
+
+/** Angle of a map point around the footprint centre: 0 = north, + = toward east (clockwise). */
+function spacePointerDegFromLatLng(
+  lat0: number,
+  lng0: number,
+  sideM: number,
+  rect: Pick<RadarSpaceRect, 'x' | 'y' | 'w' | 'h'>,
+  lat: number,
+  lng: number,
+) {
+  const { cx, cy } = spaceCenterMeters(sideM, rect);
+  const northM = (lat - lat0) * 111320;
+  const eastM = (lng - lng0) * (111320 * Math.cos((lat0 * Math.PI) / 180));
+  return (Math.atan2(eastM - cx, northM - cy) * 180) / Math.PI;
+}
+
+function spacePointerDeg(
+  lat0: number,
+  lng0: number,
+  sideM: number,
+  drag: { x: number; y: number; w: number; h: number },
+  lat: number,
+  lng: number,
+) {
+  return spacePointerDegFromLatLng(
+    lat0,
+    lng0,
+    sideM,
+    { x: drag.x - drag.w / 2, y: drag.y - drag.h / 2, w: drag.w, h: drag.h },
+    lat,
+    lng,
+  );
+}
+
+/** Handle sits just outside the rotated top edge so it tracks free rotation. */
+function spaceRotateHandle(
+  lat: number,
+  lng: number,
+  sideM: number,
+  rect: RadarSpaceRect,
+): [number, number] {
+  const { cx, cy, north, south } = spaceCenterMeters(sideM, rect);
+  const tip = (north - south) / 2 + Math.max(10, ((north - south) / 2) * 0.18);
+  const deg = ((rect.rotation || 0) * Math.PI) / 180;
+  const cos = Math.cos(deg);
+  const sin = Math.sin(deg);
+  return offsetLatLng(lat, lng, cx - tip * sin, cy + tip * cos);
+}
+
 function RadarBasemap({
   locale,
   parcels,
@@ -665,7 +727,7 @@ function RadarBasemap({
   placing?: boolean;
   query?: string;
   canEdit: boolean;
-  editMode: 'none' | 'place' | 'move' | 'site_move' | 'site_resize';
+  editMode: MapEditMode;
   onDraft: (layout: RadarSiteLayoutDoc) => void;
   onCommit: (layout: RadarSiteLayoutDoc) => void;
   onSiteAreaDraft?: (areaHa: number) => void;
@@ -692,6 +754,7 @@ function RadarBasemap({
   const sideRef = useRef(80);
   const siteOutlineRef = useRef<{ setLatLngs: (latlngs: [number, number][]) => void } | null>(null);
   const dragRef = useRef<{
+    kind: 'move' | 'rotate';
     id: string;
     x: number;
     y: number;
@@ -699,6 +762,9 @@ function RadarBasemap({
     w: number;
     h: number;
     rotation: number;
+    /** Pointer angle (deg) at gesture start — rotate only. */
+    startPointerDeg?: number;
+    startRotation?: number;
     poly: { setLatLngs: (latlngs: [number, number][]) => void } | null;
   } | null>(null);
   const siteResizeRef = useRef<{ sideM: number; moved: boolean } | null>(null);
@@ -763,6 +829,27 @@ function RadarBasemap({
 
           const drag = dragRef.current;
           if (!drag) return;
+          if (drag.kind === 'rotate') {
+            const pointerDeg = spacePointerDeg(lat0, lng0, sideRef.current, drag, ll.lat, ll.lng);
+            const startP = drag.startPointerDeg ?? pointerDeg;
+            const startR = drag.startRotation ?? drag.rotation;
+            // atan2(east, north) rises clockwise; layout rotation is CCW → invert delta.
+            drag.rotation = startR + (startP - pointerDeg);
+            drag.moved = true;
+            if (drag.poly) {
+              const draftRect = {
+                id: drag.id,
+                x: drag.x - drag.w / 2,
+                y: drag.y - drag.h / 2,
+                w: drag.w,
+                h: drag.h,
+                rotation: drag.rotation,
+                placed: true as const,
+              };
+              drag.poly.setLatLngs(spaceRing(lat0, lng0, sideRef.current, draftRect));
+            }
+            return;
+          }
           const pct = latLngToPct(lat0, lng0, sideRef.current, ll.lat, ll.lng);
           drag.x = pct.x;
           drag.y = pct.y;
@@ -786,7 +873,11 @@ function RadarBasemap({
           if (siteResize) {
             siteResizeRef.current = null;
             skipOverlayRef.current = false;
-            if (editModeRef.current !== 'move' && editModeRef.current !== 'site_resize') {
+            if (
+              editModeRef.current !== 'move' &&
+              editModeRef.current !== 'rotate' &&
+              editModeRef.current !== 'site_resize'
+            ) {
               mapRef.current?.dragging?.enable();
             }
             if (!siteResize.moved) return;
@@ -802,7 +893,11 @@ function RadarBasemap({
           if (!drag) return;
           dragRef.current = null;
           skipOverlayRef.current = false;
-          if (editModeRef.current !== 'move' && editModeRef.current !== 'site_resize') {
+          if (
+            editModeRef.current !== 'move' &&
+            editModeRef.current !== 'rotate' &&
+            editModeRef.current !== 'site_resize'
+          ) {
             mapRef.current?.dragging?.enable();
           }
           if (!drag.moved) return;
@@ -810,10 +905,14 @@ function RadarBasemap({
           window.setTimeout(() => {
             suppressClickRef.current = false;
           }, 0);
+          if (drag.kind === 'rotate') {
+            onCommitRef.current(setSpaceRotation(layoutRef.current, drag.id, drag.rotation));
+            return;
+          }
           onCommitRef.current(moveSpace(layoutRef.current, drag.id, drag.x, drag.y));
         };
         const onWinMove = (ev: MouseEvent | TouchEvent) => {
-          if (!dragRef.current) return;
+          if (!dragRef.current && !siteResizeRef.current) return;
           if ('touches' in ev) {
             const t = ev.touches[0];
             if (!t) return;
@@ -886,8 +985,9 @@ function RadarBasemap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map?.dragging || !ready) return;
-    if (editMode === 'move' || editMode === 'site_resize' || editMode === 'site_move') map.dragging.disable();
-    else map.dragging.enable();
+    if (editMode === 'move' || editMode === 'rotate' || editMode === 'site_resize' || editMode === 'site_move') {
+      map.dragging.disable();
+    } else map.dragging.enable();
   }, [editMode, ready]);
 
   useEffect(() => {
@@ -908,7 +1008,7 @@ function RadarBasemap({
         ? 'crosshair'
         : editMode === 'place' || editMode === 'site_move'
           ? 'crosshair'
-          : editMode === 'move' || editMode === 'site_resize'
+          : editMode === 'move' || editMode === 'rotate' || editMode === 'site_resize'
             ? 'grab'
             : '';
       const ha = areaHa && areaHa > 0 ? areaHa : Math.max(0.4, parcels.length * 0.35 || 0.4);
@@ -980,25 +1080,51 @@ function RadarBasemap({
           if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
           onFocusRef.current(parcel.id);
         });
-        const startMove = (e: { originalEvent?: Event }) => {
-          if (!canEditRef.current || editModeRef.current !== 'move') return;
-          // Focus this footprint if needed; parent must preserve editMode on same/new focus while moving.
+        const startMove = (e: { originalEvent?: Event; latlng?: { lat: number; lng: number } }) => {
+          if (!canEditRef.current) return;
+          const mode = editModeRef.current;
+          if (mode !== 'move' && mode !== 'rotate') return;
+          // Focus this footprint if needed; parent must preserve editMode on same/new focus while editing.
           if (focusedIdRef.current !== parcel.id) onFocusRef.current(parcel.id);
           if (e.originalEvent) {
             L.DomEvent.stopPropagation(e.originalEvent);
             L.DomEvent.preventDefault(e.originalEvent);
           }
           map.dragging?.disable();
-          dragRef.current = {
-            id: parcel.id,
-            x: rect.x + rect.w / 2,
-            y: rect.y + rect.h / 2,
-            moved: false,
-            w: rect.w,
-            h: rect.h,
-            rotation: rect.rotation ?? 0,
-            poly: poly as { setLatLngs: (latlngs: [number, number][]) => void },
-          };
+          const cx = rect.x + rect.w / 2;
+          const cy = rect.y + rect.h / 2;
+          const rotation = rect.rotation ?? 0;
+          if (mode === 'rotate') {
+            let pointerDeg = rotation;
+            if (e.latlng && lat != null && lng != null) {
+              pointerDeg = spacePointerDegFromLatLng(lat, lng, side, rect, e.latlng.lat, e.latlng.lng);
+            }
+            dragRef.current = {
+              kind: 'rotate',
+              id: parcel.id,
+              x: cx,
+              y: cy,
+              moved: false,
+              w: rect.w,
+              h: rect.h,
+              rotation,
+              startPointerDeg: pointerDeg,
+              startRotation: rotation,
+              poly: poly as { setLatLngs: (latlngs: [number, number][]) => void },
+            };
+          } else {
+            dragRef.current = {
+              kind: 'move',
+              id: parcel.id,
+              x: cx,
+              y: cy,
+              moved: false,
+              w: rect.w,
+              h: rect.h,
+              rotation,
+              poly: poly as { setLatLngs: (latlngs: [number, number][]) => void },
+            };
+          }
           skipOverlayRef.current = true;
           map.getContainer().style.cursor = 'grabbing';
         };
@@ -1020,6 +1146,50 @@ function RadarBasemap({
           });
         }
         overlays.addLayer(poly);
+        if (canEdit && editMode === 'rotate' && focused && lat != null && lng != null) {
+          const handleLl = spaceRotateHandle(lat, lng, side, rect);
+          const handle = L.circleMarker(handleLl, {
+            radius: 9,
+            color: '#042f2e',
+            weight: 2,
+            fillColor: '#99f6e4',
+            fillOpacity: 1,
+          });
+          handle.bindTooltip(
+            radarT(locale, 'Arrasta para rodar', 'Arrastrá para girar', 'Drag to rotate'),
+            { permanent: false, direction: 'top', className: 'radar-space-tip' },
+          );
+          const startHandleRotate = (e: { originalEvent?: Event; latlng?: { lat: number; lng: number } }) => {
+            if (!canEditRef.current || editModeRef.current !== 'rotate') return;
+            if (e.originalEvent) {
+              L.DomEvent.stopPropagation(e.originalEvent);
+              L.DomEvent.preventDefault(e.originalEvent);
+            }
+            map.dragging?.disable();
+            const pointerDeg =
+              e.latlng && lat != null && lng != null
+                ? spacePointerDegFromLatLng(lat, lng, side, rect, e.latlng.lat, e.latlng.lng)
+                : rect.rotation ?? 0;
+            dragRef.current = {
+              kind: 'rotate',
+              id: parcel.id,
+              x: rect.x + rect.w / 2,
+              y: rect.y + rect.h / 2,
+              moved: false,
+              w: rect.w,
+              h: rect.h,
+              rotation: rect.rotation ?? 0,
+              startPointerDeg: pointerDeg,
+              startRotation: rect.rotation ?? 0,
+              poly: poly as { setLatLngs: (latlngs: [number, number][]) => void },
+            };
+            skipOverlayRef.current = true;
+            map.getContainer().style.cursor = 'grabbing';
+          };
+          handle.on('mousedown', startHandleRotate);
+          handle.on('touchstart', startHandleRotate as (e: unknown) => void);
+          overlays.addLayer(handle);
+        }
       }
       const pin = L.circleMarker([lat, lng], {
         radius: editMode === 'site_move' ? 10 : 7,
@@ -1113,6 +1283,16 @@ function RadarBasemap({
       {hasPin && editMode === 'move' && (
         <p className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg">
           {radarT(locale, 'Arrasta o espaço no mapa', 'Arrastrá el espacio en el mapa', 'Drag the space on the map')}
+        </p>
+      )}
+      {hasPin && editMode === 'rotate' && (
+        <p className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg">
+          {radarT(
+            locale,
+            'Arrasta o puxador ou o espaço para rodar livremente',
+            'Arrastrá el mango o el espacio para girar libremente',
+            'Drag the handle or space to rotate freely',
+          )}
         </p>
       )}
       {hasPin && editMode === 'site_resize' && (

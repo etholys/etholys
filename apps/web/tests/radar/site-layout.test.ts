@@ -8,6 +8,7 @@ import {
   placeSpace,
   rotateSpace,
   sanitizeLayoutPatch,
+  setSpaceRotation,
   unplaceSpace,
 } from '../../lib/radar/site-layout';
 
@@ -82,7 +83,11 @@ test('place move rotate and unplace one space', () => {
   assert.equal(moved.spaces[0].y, 12);
   const turned = rotateSpace(moved, 'a', 15);
   assert.equal(turned.spaces[0].rotation, 15);
-  const cleared = unplaceSpace(turned, 'a');
+  const absolute = setSpaceRotation(turned, 'a', 47.3);
+  assert.equal(absolute.spaces[0].rotation, 47.3);
+  const wrapped = setSpaceRotation(absolute, 'a', -10);
+  assert.equal(wrapped.spaces[0].rotation, 350);
+  const cleared = unplaceSpace(wrapped, 'a');
   assert.equal(cleared.spaces[0].placed, false);
   assert.equal(cleared.spaces[0].id, 'a');
 });
