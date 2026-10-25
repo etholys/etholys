@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, BookOpen, Loader2, Radio, Search, Sprout } from 'lucide-react';
 import { RADAR_MODULES, type RadarModuleId } from '@/lib/etholys-products';
-import { cadernoCopy } from '@/lib/radar/caderno';
 import { isRadarModuleId, spaceKindMeta } from '@/lib/radar/space';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
 import { type PropertyStepId, type PropertyStepState } from '@/lib/radar/property-progress';
@@ -98,7 +97,7 @@ export function RadarPropertyWorkspace({
   const [openLot, setOpenLot] = useState<{ code: string; currentStage: TraceStage } | null>(null);
   const [view, setView] = useState<'2d' | '3d'>('2d');
   const [query, setQuery] = useState('');
-  const [railOpen, setRailOpen] = useState(false);
+  const [railOpen, setRailOpen] = useState(true);
   const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
   const [editMode, setEditMode] = useState<'none' | 'place' | 'move'>('none');
   /** Full focus sheet — closed by default so the map stays clear. */
@@ -271,7 +270,6 @@ export function RadarPropertyWorkspace({
   const cadernoHref = `/hub/radar/caderno?${companyQ}&property=${propertyId}${
     focusedId ? `&unit=${focusedId}` : ''
   }`;
-  const bookCopy = cadernoCopy(data?.moduleId || moduleId, loc);
   const openStep = (id: PropertyStepId) => {
     if (id === 'draw') {
       setTool('space');
@@ -359,6 +357,7 @@ export function RadarPropertyWorkspace({
             onFocus={(id) => {
               setFocusedId(id);
               setFocusDetailOpen(false);
+              setEditMode('none');
             }}
             fill
           />
@@ -381,6 +380,7 @@ export function RadarPropertyWorkspace({
             onFocus={(id) => {
               setFocusedId(id);
               setFocusDetailOpen(false);
+              setEditMode('none');
             }}
             onSaved={() => void load()}
             syncedLayout={layout}
@@ -416,12 +416,16 @@ export function RadarPropertyWorkspace({
             <button
               type="button"
               onClick={() => setRailOpen((v) => !v)}
-              className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+              className={`flex h-10 w-10 flex-col items-center justify-center rounded-xl ${
                 railOpen ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:bg-white/10'
               }`}
-              title={radarT(loc, 'Espaços', 'Espacios', 'Spaces')}
+              title={radarT(loc, 'Lista de espaços', 'Lista de espacios', 'Spaces list')}
+              aria-label={radarT(loc, 'Lista de espaços', 'Lista de espacios', 'Spaces list')}
             >
-              <span className="text-[11px] font-bold">{data.units.length}</span>
+              <span className="text-[11px] font-bold leading-none">{data.units.length}</span>
+              <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wide opacity-80">
+                {radarT(loc, 'lista', 'lista', 'list')}
+              </span>
             </button>
           </div>
           {railOpen && (
@@ -510,86 +514,6 @@ export function RadarPropertyWorkspace({
             </button>
           </div>
           </div>
-          {focusedUnit && (
-            <div className={`flex max-w-full flex-wrap items-center gap-1 self-start p-1 ${chromePill}`}>
-              <span className="max-w-[12rem] truncate px-2 text-xs font-semibold text-white">{focusedUnit.name}</span>
-              <Link
-                href={cadernoHref}
-                className="inline-flex items-center gap-1 rounded-full bg-teal-500/90 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-teal-400"
-              >
-                <BookOpen className="h-3.5 w-3.5" />
-                {bookCopy.registerCta}
-              </Link>
-              {!focusedPlaced ? (
-                <button
-                  type="button"
-                  disabled={data.lat == null || data.lng == null}
-                  onClick={() => {
-                    setView('2d');
-                    setPanel(null);
-                    setTool(null);
-                    setEditMode((cur) => (cur === 'place' ? 'none' : 'place'));
-                  }}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${
-                    editMode === 'place'
-                      ? 'bg-teal-300 text-slate-950'
-                      : 'bg-white/15 text-white hover:bg-white/25'
-                  }`}
-                >
-                  {radarT(loc, 'Colocar no mapa', 'Colocar en el mapa', 'Place on map')}
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView('2d');
-                      setEditMode((cur) => (cur === 'move' ? 'none' : 'move'));
-                    }}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                      editMode === 'move'
-                        ? 'bg-teal-300 text-slate-950'
-                        : 'bg-white/15 text-white hover:bg-white/25'
-                    }`}
-                  >
-                    {radarT(loc, 'Mover', 'Mover', 'Move')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => focusedId && void commitLayout(rotateSpace(layout, focusedId))}
-                    className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/25"
-                  >
-                    {radarT(loc, 'Rodar', 'Girar', 'Rotate')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!focusedId) return;
-                      setEditMode('none');
-                      void commitLayout(unplaceSpace(layout, focusedId));
-                    }}
-                    className="rounded-full bg-[#12343c] px-3 py-1.5 text-xs font-semibold text-white ring-1 ring-white/20 hover:bg-[#1a4a54]"
-                    title={radarT(
-                      loc,
-                      'Só remove o desenho; o espaço fica na lista',
-                      'Solo quita el dibujo; el espacio queda en la lista',
-                      'Removes the drawing only; space stays in the list',
-                    )}
-                  >
-                    {radarT(loc, 'Apagar do mapa', 'Quitar del mapa', 'Remove from map')}
-                  </button>
-                </>
-              )}
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void deleteFocusedSpace()}
-                className="rounded-full bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-800 disabled:opacity-40"
-              >
-                {radarT(loc, 'Apagar espaço', 'Borrar espacio', 'Delete space')}
-              </button>
-            </div>
-          )}
           {err && (
             <p className="max-w-md rounded-xl border border-rose-400/30 bg-rose-950/90 px-3 py-2 text-sm text-rose-100">
               {err}
@@ -860,23 +784,129 @@ export function RadarPropertyWorkspace({
         )}
 
         {!cardOpen && focusedId && focusedUnit && !detailOpen && (
-          <div className="pointer-events-auto absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 justify-center px-3">
-            <button
-              type="button"
-              onClick={() => setFocusDetailOpen(true)}
-              className="inline-flex max-w-[min(28rem,calc(100vw-6rem))] items-center gap-2 rounded-full bg-[#07111A] px-4 py-2.5 text-sm font-semibold text-white shadow-xl ring-1 ring-white/25 hover:bg-[#12343c]"
-            >
-              <span className="truncate">{focusedUnit.name}</span>
-              {(focusedUnit.crop || focusedMoisture != null) && (
-                <span className="truncate font-medium text-teal-200">
-                  · {[focusedUnit.crop, focusedMoisture != null ? `${focusedMoisture}%` : null].filter(Boolean).join(' · ')}
-                </span>
-              )}
-              <span className="ml-1 rounded-full bg-teal-500/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-950">
-                {radarT(loc, 'Abrir', 'Abrir', 'Open')}
-              </span>
-            </button>
+          <div className="pointer-events-auto absolute bottom-4 left-1/2 z-20 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 px-2">
+            <div className="rounded-2xl border border-white/15 bg-[#07111A]/95 p-3 shadow-2xl backdrop-blur-md">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditMode('none');
+                    setFocusDetailOpen(true);
+                  }}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <p className="truncate text-sm font-semibold text-white">{focusedUnit.name}</p>
+                  <p className="mt-0.5 truncate text-xs text-white/50">
+                    {[
+                      focusedUnit.crop,
+                      focusedMoisture != null ? `${focusedMoisture}%` : null,
+                      !focusedPlaced
+                        ? radarT(loc, 'Ainda fora do mapa', 'Aún fuera del mapa', 'Not on the map yet')
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || radarT(loc, 'Toca para abrir detalhes', 'Toca para abrir detalles', 'Tap to open details')}
+                  </p>
+                </button>
+                <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditMode('none');
+                      setFocusDetailOpen(true);
+                    }}
+                    className="rounded-full bg-teal-400 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-teal-300"
+                  >
+                    {radarT(loc, 'Abrir', 'Abrir', 'Open')}
+                  </button>
+                  <Link
+                    href={cadernoHref}
+                    className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    {radarT(loc, 'Caderno', 'Cuaderno', 'Notebook')}
+                  </Link>
+                </div>
+              </div>
+
+              {/* Layout tools only when adjusting — not competing with the map chrome. */}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-white/10 pt-2">
+                {!focusedPlaced ? (
+                  <button
+                    type="button"
+                    disabled={data.lat == null || data.lng == null}
+                    onClick={() => {
+                      setView('2d');
+                      setPanel(null);
+                      setTool(null);
+                      setEditMode((cur) => (cur === 'place' ? 'none' : 'place'));
+                    }}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${
+                      editMode === 'place' ? 'bg-teal-300 text-slate-950' : 'bg-white/10 text-white hover:bg-white/15'
+                    }`}
+                  >
+                    {editMode === 'place'
+                      ? radarT(loc, 'A cancelar…', 'Cancelando…', 'Cancel…')
+                      : radarT(loc, 'Colocar no mapa', 'Colocar en el mapa', 'Place on map')}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setView('2d');
+                        setEditMode((cur) => (cur === 'move' ? 'none' : 'move'));
+                      }}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                        editMode === 'move' ? 'bg-teal-300 text-slate-950' : 'bg-white/10 text-white hover:bg-white/15'
+                      }`}
+                    >
+                      {editMode === 'move'
+                        ? radarT(loc, 'A mover…', 'Moviendo…', 'Moving…')
+                        : radarT(loc, 'Mover', 'Mover', 'Move')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => focusedId && void commitLayout(rotateSpace(layout, focusedId))}
+                      className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15"
+                    >
+                      {radarT(loc, 'Rodar', 'Girar', 'Rotate')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!focusedId) return;
+                        setEditMode('none');
+                        void commitLayout(unplaceSpace(layout, focusedId));
+                      }}
+                      className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/15"
+                    >
+                      {radarT(loc, 'Tirar do mapa', 'Quitar del mapa', 'Remove from map')}
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void deleteFocusedSpace()}
+                  className="ml-auto rounded-full px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/15 disabled:opacity-40"
+                >
+                  {radarT(loc, 'Apagar espaço', 'Borrar espacio', 'Delete space')}
+                </button>
+              </div>
+            </div>
           </div>
+        )}
+
+        {!cardOpen && !focusedId && data.units.length > 0 && (
+          <p className="pointer-events-none absolute bottom-5 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#07111A]/85 px-4 py-2 text-xs text-white/70 shadow-lg ring-1 ring-white/15">
+            {radarT(
+              loc,
+              'Clica num espaço no mapa ou abre a lista à esquerda',
+              'Clic en un espacio del mapa o abre la lista a la izquierda',
+              'Click a space on the map or open the list on the left',
+            )}
+          </p>
         )}
 
         {detailOpen && focusedId && (

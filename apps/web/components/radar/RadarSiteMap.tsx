@@ -841,16 +841,19 @@ function RadarBasemap({
           };
         });
         {
+          // Hover only — permanent tips stacked into a mess over the map.
           const tipParts = [
             parcel.name,
             parcel.crop || null,
             parcel.moisture != null ? `${Math.round(parcel.moisture)}%` : null,
           ].filter(Boolean);
           poly.bindTooltip(tipParts.join(' · '), {
-            permanent: true,
-            direction: 'center',
+            permanent: false,
+            sticky: true,
+            direction: 'top',
+            offset: [0, -6],
             className: 'radar-space-tip',
-            opacity: match ? 1 : 0.45,
+            opacity: match ? 1 : 0.5,
           });
         }
         overlays.addLayer(poly);
@@ -907,14 +910,15 @@ function RadarBasemap({
         }
         .radar-basemap .leaflet-control-attribution a { color: #99f6e4; }
         .radar-space-tip {
-          background: #07111a !important;
+          background: rgba(7,17,26,0.92) !important;
           color: #f8fafc !important;
-          border: 1px solid rgba(255,255,255,0.22) !important;
-          border-radius: 999px;
-          box-shadow: 0 4px 14px rgba(0,0,0,0.35);
-          font-size: 11px;
+          border: 1px solid rgba(255,255,255,0.18) !important;
+          border-radius: 8px;
+          box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+          font-size: 12px;
           font-weight: 600;
-          padding: 3px 10px;
+          padding: 5px 10px;
+          white-space: nowrap;
         }
         .radar-space-tip::before { display: none; }
       `}</style>
