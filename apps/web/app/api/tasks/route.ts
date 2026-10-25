@@ -138,7 +138,14 @@ export async function GET(req: Request) {
         },
         department: { select: { id: true, name: true } },
         group: { select: { id: true, name: true, color: true, ownerId: true } },
-        folder: { select: { id: true, name: true, visibility: true } },
+        folder: {
+          select: {
+            id: true,
+            name: true,
+            visibility: true,
+            _count: { select: { members: true } },
+          },
+        },
         checklist: {
           select: { id: true, text: true, completed: true, order: true },
           orderBy: { order: 'asc' },

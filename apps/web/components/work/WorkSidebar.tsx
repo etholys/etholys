@@ -243,7 +243,7 @@ export function WorkSidebar({
               nav.kind === 'all',
               () => onNav({ kind: 'all' }),
               <ListTodo className="h-4 w-4" />,
-              t('Company work', 'Trabajo de la empresa', 'Trabalho da empresa'),
+              t('Shared boards', 'Tableros compartidos', 'Quadros partilhados'),
               counts.sharedOpen ?? 0,
             )}
         </div>

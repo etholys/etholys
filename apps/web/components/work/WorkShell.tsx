@@ -292,15 +292,11 @@ export default function WorkShell() {
     const top = (tasks ?? []).filter((t: any) => !t.parentId);
     let list = top;
     if (nav.kind === 'all') {
-      // Admin overview: team boards + company ops — never another person's private Mi trabajo sections
+      // Monday-like: only tasks on a board shared with the company or with people — never Mi trabajo
       list = top.filter((t: any) => {
-        const folder = t.folder;
-        if (folder && (folder.visibility === 'SHARED' || (folder.members?.length ?? 0) > 0)) return true;
-        if (t.folderId) return folder?.visibility === 'SHARED';
-        // unfoldered company pool
-        if (!t.groupId) return true;
-        const ownerId = t.group?.ownerId;
-        return !ownerId || ownerId === currentUserId;
+        if (!t.folderId || !t.folder) return false;
+        if (t.folder.visibility === 'SHARED') return true;
+        return (t.folder._count?.members ?? t.folder.members?.length ?? 0) > 0;
       });
     } else if (nav.kind === 'company') list = top.filter((t: any) => !t.projectId);
     else if (nav.kind === 'department') list = top.filter((t: any) => t.departmentId === nav.id);
@@ -369,13 +365,11 @@ export default function WorkShell() {
         return d >= start && d < end;
       }).length,
       sharedOpen: open.filter((t: any) => {
-        if (t.folderId && (t.folder?.visibility === 'SHARED' || (t.folder?.members?.length ?? 0) > 0)) {
-          return true;
-        }
-        if (t.folderId) return false;
-        if (!t.groupId) return true;
-        const ownerId = t.group?.ownerId;
-        return !ownerId || ownerId === currentUserId;
+        if (!t.folderId || !t.folder) return false;
+        return (
+          t.folder.visibility === 'SHARED' ||
+          (t.folder._count?.members ?? t.folder.members?.length ?? 0) > 0
+        );
       }).length,
     };
   }, [tasks, currentUserId]);
@@ -383,7 +377,7 @@ export default function WorkShell() {
   const contextTitle = (() => {
     if (nav.kind === 'dashboard') return t3('Dashboard', 'Panel', 'Painel');
     if (nav.kind === 'all') {
-      return t3('Company work', 'Trabajo de la empresa', 'Trabalho da empresa');
+      return t3('Shared boards', 'Tableros compartidos', 'Quadros partilhados');
     }
     if (nav.kind === 'mine') return t3('My tasks', 'Mis tareas', 'As minhas tarefas');
     if (nav.kind === 'overdue') return t3('Overdue', 'Atrasadas', 'Atrasadas');
@@ -406,9 +400,9 @@ export default function WorkShell() {
     }
     if (nav.kind === 'all') {
       return t3(
-        'Admin only — team boards and company work (not others’ private Mi trabajo)',
-        'Solo admin — tableros de equipo y trabajo de la empresa (no el Mi trabajo privado de otros)',
-        'Só admin — quadros de equipa e trabalho da empresa (não o Mi trabajo privado de outros)',
+        'Admin — only boards shared with the company or people (not private Mi trabajo)',
+        'Admin — solo tableros compartidos con la empresa o personas (no Mi trabajo privado)',
+        'Admin — só quadros partilhados com a empresa ou pessoas (não Mi trabajo privado)',
       );
     }
     if (nav.kind === 'folder') {
