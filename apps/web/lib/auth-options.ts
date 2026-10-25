@@ -57,6 +57,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
           forgeMagicToken: { label: 'Forge Magic', type: 'text' },
           studioMagicToken: { label: 'Studio Magic', type: 'text' },
+          workMagicToken: { label: 'Work Magic', type: 'text' },
         },
         async authorize(credentials) {
         try {
@@ -64,6 +65,25 @@ export const authOptions: NextAuthOptions = {
           if (studioMagic) {
             const { findShareByMagicToken } = await import('@/lib/studio/share');
             const share = await findShareByMagicToken(studioMagic);
+            const user = share?.user;
+            if (!user?.isActive || !user.email) return null;
+            if (credentials?.email && user.email.toLowerCase() !== credentials.email.trim().toLowerCase()) {
+              return null;
+            }
+            return {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role,
+              locale: user.locale,
+              image: user.avatar || user.image,
+            } as any;
+          }
+
+          const workMagic = (credentials as { workMagicToken?: string })?.workMagicToken?.trim();
+          if (workMagic) {
+            const { findWorkShareByMagicToken } = await import('@/lib/work/folder-share');
+            const share = await findWorkShareByMagicToken(workMagic);
             const user = share?.user;
             if (!user?.isActive || !user.email) return null;
             if (credentials?.email && user.email.toLowerCase() !== credentials.email.trim().toLowerCase()) {
@@ -195,6 +215,21 @@ export const authOptions: NextAuthOptions = {
           console.error('[next-auth][jwt] siep scope refresh failed', e);
         }
       }
+
+      const workCheckedAt = typeof token.workScopeCheckedAt === 'number' ? token.workScopeCheckedAt : 0;
+      const workStale = Date.now() - workCheckedAt > 15 * 60 * 1000;
+      if (userId && (user || workStale || !token.workAccessMode)) {
+        try {
+          const { resolveWorkJwtScope } = await import('@/lib/work/folder-share');
+          const work = await resolveWorkJwtScope(userId);
+          token.workAccessMode = work.mode;
+          token.workFolderIds = work.folderIds;
+          token.workHomePath = work.homePath;
+          token.workScopeCheckedAt = Date.now();
+        } catch (e) {
+          console.error('[next-auth][jwt] work scope refresh failed', e);
+        }
+      }
       return token;
     },
     async session({ session, token }: any) {
@@ -216,6 +251,9 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).siepAccessMode = token.siepAccessMode;
         (session.user as any).allowedProjectIds = token.allowedProjectIds ?? [];
         (session.user as any).siepHomePath = token.siepHomePath;
+        (session.user as any).workAccessMode = token.workAccessMode;
+        (session.user as any).workFolderIds = token.workFolderIds ?? [];
+        (session.user as any).workHomePath = token.workHomePath;
       }
       return session;
     },

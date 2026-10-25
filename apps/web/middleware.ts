@@ -15,6 +15,12 @@ import {
   type StudioShareTargetRef,
 } from '@/lib/studio/share-guard';
 import {
+  defaultWorkShareOnlyHome,
+  isApiAllowedForWorkShareOnly,
+  isPageAllowedForWorkShareOnly,
+  isPublicWorkSharePath,
+} from '@/lib/work/share-guard';
+import {
   defaultProjectGuestHome,
   isApiAllowedForProjectGuest,
   isPageAllowedForProjectGuest,
@@ -62,6 +68,7 @@ function isPublicStudioSharePath(pathname: string): boolean {
 function isProtectedPage(pathname: string): boolean {
   if (isPublicForgePath(pathname) || isPublicFundhubPath(pathname)) return false;
   if (isPublicStudioSharePath(pathname)) return false;
+  if (isPublicWorkSharePath(pathname)) return false;
   return PAGE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
@@ -79,6 +86,9 @@ type AccessToken = {
   studioAccessMode?: string;
   studioTargets?: StudioShareTargetRef[];
   studioHomePath?: string;
+  workAccessMode?: string;
+  workFolderIds?: string[];
+  workHomePath?: string;
   siepAccessMode?: string;
   allowedProjectIds?: string[];
   siepHomePath?: string;
@@ -214,6 +224,60 @@ async function enforceStudioShareOnlyScope(
 
   if (isProtectedPage(pathname) || pathname === '/hub' || pathname.startsWith('/hub/')) {
     return NextResponse.redirect(new URL(homePath || '/studio/shared', req.url));
+  }
+
+  return null;
+}
+
+async function enforceWorkShareOnlyScope(
+  req: NextRequest,
+  token: AccessToken | null,
+): Promise<NextResponse | null> {
+  const pathname = req.nextUrl.pathname;
+  if (pathname === '/api/internal/work-scope') return null;
+  if (isPublicWorkSharePath(pathname)) return null;
+
+  if (!token?.sub && !token?.id) return null;
+
+  let mode = token.workAccessMode;
+  let folderIds = Array.isArray(token.workFolderIds) ? token.workFolderIds : [];
+  let homePath = typeof token.workHomePath === 'string' ? token.workHomePath : '/hub/work';
+
+  if (mode !== 'share_only') {
+    if (mode === 'member') return null;
+    try {
+      const checkUrl = new URL('/api/internal/work-scope', req.nextUrl.origin);
+      const res = await fetch(checkUrl.toString(), {
+        headers: { cookie: req.headers.get('cookie') ?? '' },
+        cache: 'no-store',
+      });
+      if (!res.ok) return null;
+      const scope = (await res.json()) as {
+        mode?: string;
+        folderIds?: string[];
+        homePath?: string;
+      };
+      if (scope.mode !== 'share_only') return null;
+      mode = 'share_only';
+      folderIds = scope.folderIds || [];
+      homePath = scope.homePath || defaultWorkShareOnlyHome(folderIds);
+    } catch {
+      return null;
+    }
+  }
+
+  if (pathname.startsWith('/api/')) {
+    if (isApiAllowedForWorkShareOnly(pathname)) return null;
+    return NextResponse.json(
+      { error: 'Acesso restrito: apenas o tablero eTask partilhado consigo.', code: 'WORK_SHARE_ONLY' },
+      { status: 403 },
+    );
+  }
+
+  if (isPageAllowedForWorkShareOnly(pathname, folderIds)) return null;
+
+  if (isProtectedPage(pathname) || pathname === '/hub' || pathname.startsWith('/hub/')) {
+    return NextResponse.redirect(new URL(homePath || '/hub/work', req.url));
   }
 
   return null;
@@ -357,6 +421,7 @@ async function enforceFunctionOnlyScope(
   if (!token?.sub && !token?.id) return null;
   if (token.forgeAccessMode === 'course_only') return null;
   if (token.studioAccessMode === 'share_only') return null;
+  if (token.workAccessMode === 'share_only') return null;
   if (token.siepAccessMode === 'project_guest') return null;
 
   const scope = await resolveWorkspaceScope(req, token);
@@ -494,6 +559,9 @@ export async function middleware(req: NextRequest) {
   const studioShareBlock = await enforceStudioShareOnlyScope(req, token);
   if (studioShareBlock) return studioShareBlock;
 
+  const workShareBlock = await enforceWorkShareOnlyScope(req, token);
+  if (workShareBlock) return workShareBlock;
+
   const projectGuestBlock = await enforceProjectGuestScope(req, token);
   if (projectGuestBlock) return projectGuestBlock;
 
@@ -535,5 +603,7 @@ export const config = {
     '/acesso/:path*',
     '/studio',
     '/studio/:path*',
+    '/work/shared',
+    '/work/shared/:path*',
   ],
 };

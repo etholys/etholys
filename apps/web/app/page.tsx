@@ -23,6 +23,8 @@ export default function HomePage() {
       forgeHomePath?: string;
       studioAccessMode?: string;
       studioHomePath?: string;
+      workAccessMode?: string;
+      workHomePath?: string;
     };
     if (u?.forgeAccessMode === 'course_only' && u.forgeHomePath) {
       router.replace(u.forgeHomePath);
@@ -30,6 +32,10 @@ export default function HomePage() {
     }
     if (u?.studioAccessMode === 'share_only' && u.studioHomePath) {
       router.replace(u.studioHomePath);
+      return;
+    }
+    if (u?.workAccessMode === 'share_only' && u.workHomePath) {
+      router.replace(u.workHomePath);
       return;
     }
     if (u?.platformAdmin || u?.workspaceAccessMode === 'full') {

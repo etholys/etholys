@@ -83,6 +83,8 @@ model User {
   createdTasks                  Task[]                       @relation("TaskCreator")
   workFoldersOwned              WorkFolder[]                 @relation("WorkFolderOwner")
   workFolderMemberships         WorkFolderMember[]
+  workFolderShares              WorkFolderShare[]            @relation("WorkFolderShareUser")
+  workFolderSharesInvited       WorkFolderShare[]            @relation("WorkFolderShareInviter")
   taskTemplates                 TaskTemplate[]               @relation("TemplateCreator")
   taxFilings                    TaxFiling[]
   timeEntries                   TimeEntry[]
@@ -300,6 +302,7 @@ model Company {
   taskGroups                  TaskGroup[]
   taskApprovalRequests        TaskApprovalRequest[]
   workFolders                 WorkFolder[]
+  workFolderShares            WorkFolderShare[]
   billingAccount              CompanyBillingAccount?
   subscriptions               CompanySubscription[]
   billingEntitlements         CompanyEntitlement[]
@@ -744,6 +747,7 @@ model WorkFolder {
   company    Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   owner      User               @relation("WorkFolderOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   members    WorkFolderMember[]
+  shares     WorkFolderShare[]
   tasks      Task[]
   taskGroups TaskGroup[]
 
@@ -763,6 +767,38 @@ model WorkFolderMember {
 
   @@unique([folderId, userId])
   @@index([userId])
+}
+
+/// Convite / partilha de tablero Work por email (espelho leve de StudioShare).
+model WorkFolderShare {
+  id                  String    @id @default(cuid())
+  companyId           String
+  folderId            String
+  /// viewer | editor
+  role                String    @default("viewer")
+  email               String
+  userId              String?
+  /// company_member | external_guest
+  accessMode          String    @default("company_member")
+  token               String    @unique
+  magicLoginToken     String?   @unique
+  magicLoginExpiresAt DateTime?
+  /// active | revoked
+  status              String    @default("active")
+  invitedById         String?
+  acceptedAt          DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  company             Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  folder              WorkFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  user                User?     @relation("WorkFolderShareUser", fields: [userId], references: [id], onDelete: SetNull)
+  invitedBy           User?     @relation("WorkFolderShareInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([folderId, status])
+  @@index([email])
+  @@index([userId])
+  @@index([companyId])
 }
 
 model TaskGroup {

@@ -2,10 +2,12 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { getGuestCompanyIds } from '@/lib/siep/permissions';
+import { getWorkFolderShareCompanyIds } from '@/lib/work/folder-share';
 
 /**
  * Gets the current user's company IDs for multi-tenant data isolation.
- * Inclui empresas onde o utilizador é só convidado de projeto (project_guest).
+ * Inclui empresas onde o utilizador é só convidado de projeto (project_guest)
+ * ou convidado externo de um tablero eTask.
  * Returns null if not authenticated.
  */
 export async function getUserCompanyIds(): Promise<{ userId: string; companyIds: string[] } | null> {
@@ -16,17 +18,18 @@ export async function getUserCompanyIds(): Promise<{ userId: string; companyIds:
 
   // Confiar no JWT em uso normal — a verificação extra de existência na BD
   // (pós-reset) acrescentava latência a cada pedido autenticado.
-  const [companyUsers, guestIds] = await Promise.all([
+  const [companyUsers, guestIds, workShareIds] = await Promise.all([
     prisma.companyUser.findMany({
       where: { userId },
       select: { companyId: true },
     }),
     getGuestCompanyIds(userId),
+    getWorkFolderShareCompanyIds(userId),
   ]);
   const memberIds = companyUsers.map((cu) => cu.companyId);
   return {
     userId,
-    companyIds: [...new Set([...memberIds, ...guestIds])],
+    companyIds: [...new Set([...memberIds, ...guestIds, ...workShareIds])],
   };
 }
 

@@ -125,7 +125,11 @@ export function accessibleFoldersWhere(userId: string, companyId: string) {
   return {
     companyId,
     isActive: true,
-    OR: [{ ownerId: userId }, { members: { some: { userId } } }],
+    OR: [
+      { ownerId: userId },
+      { members: { some: { userId } } },
+      { shares: { some: { status: 'active', userId } } },
+    ],
   };
 }
 

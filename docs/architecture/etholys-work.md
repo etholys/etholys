@@ -106,7 +106,7 @@ Relatórios de campo / quilometragem / informes doador → **SIEP-only** (não W
 | Leitura de tarefas | GET lista oculta tarefas em pastas sem acesso |
 | Escrita | Assign a pasta exige `editor+` |
 
-Lib: `apps/web/lib/work/folder-access.ts` (espelho leve de Studio share, sem magic links nesta fase).
+Lib: `apps/web/lib/work/folder-access.ts` + `folder-share.ts` (espelho Studio: convite por email, magic link, `external_guest` só vê o tablero).
 
 ---
 
