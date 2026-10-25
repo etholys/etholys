@@ -442,6 +442,7 @@ export function RadarPropertyWorkspace({
                 onFocus={(id) => {
                   setFocusedId(id);
                   setFocusDetailOpen(false);
+                  setEditMode('none');
                 }}
               />
             </div>
