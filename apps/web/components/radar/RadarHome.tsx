@@ -16,6 +16,7 @@ import {
 import { useRadarClientScopeOptional } from '@/components/radar/RadarClientScopeContext';
 import { RADAR_SCOPE_ALL, RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
 import type { PropertyStepState } from '@/lib/radar/property-progress';
+import { RadarEntityActions } from '@/components/radar/RadarEntityActions';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
 import { spaceKindMeta } from '@/lib/radar/space';
 
@@ -68,6 +69,8 @@ export function RadarHome({
   const isAll = scope === RADAR_SCOPE_ALL;
   const setCreateOpen = scopeCtx?.setCreateOpen;
   const setScope = scopeCtx?.setScope;
+  const refreshClients = scopeCtx?.refreshClients;
+  const bumpListRevision = scopeCtx?.bumpListRevision;
   const clientsFromCtx = scopeCtx?.clients || [];
   const listRevision = scopeCtx?.listRevision ?? 0;
 
@@ -75,6 +78,11 @@ export function RadarHome({
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+
+  const afterEntityChange = useCallback(async () => {
+    await refreshClients?.();
+    bumpListRevision?.();
+  }, [refreshClients, bumpListRevision]);
 
   // Client scope on home → company dashboard
   useEffect(() => {
@@ -356,22 +364,33 @@ export function RadarHome({
           <ul className="divide-y divide-white/10 overflow-hidden rounded-xl border border-white/15 bg-slate-950">
             {portfolioClients.map((c) => (
               <li key={c.id}>
-                <button
-                  type="button"
-                  onClick={() => setScope?.(c.id)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
-                >
-                  <Building2 className="h-4 w-4 shrink-0 text-emerald-300" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-white">{c.name}</span>
-                    <span className="block text-xs text-slate-400">
-                      {c.propertyCount}{' '}
-                      {radarT(loc, 'lugar(es)', 'lugar(es)', 'place(s)')}
-                      {c.contactName ? ` · ${c.contactName}` : ''}
+                <div className="flex items-center gap-2 px-2 py-1.5 sm:px-3">
+                  <button
+                    type="button"
+                    onClick={() => setScope?.(c.id)}
+                    className="flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-left transition hover:bg-white/5 rounded-lg"
+                  >
+                    <Building2 className="h-4 w-4 shrink-0 text-emerald-300" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-white">{c.name}</span>
+                      <span className="block text-xs text-slate-400">
+                        {c.propertyCount}{' '}
+                        {radarT(loc, 'lugar(es)', 'lugar(es)', 'place(s)')}
+                        {c.contactName ? ` · ${c.contactName}` : ''}
+                      </span>
                     </span>
-                  </span>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-slate-500" />
-                </button>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-slate-500" />
+                  </button>
+                  <RadarEntityActions
+                    kind="client"
+                    id={c.id}
+                    name={c.name}
+                    companyId={companyId}
+                    engagementId={engagementId}
+                    locale={loc}
+                    onDone={() => void afterEntityChange()}
+                  />
+                </div>
               </li>
             ))}
           </ul>
@@ -407,35 +426,46 @@ export function RadarHome({
               const hasAlert = urgent.some((a) => a.propertyId === p.id);
               return (
                 <li key={p.id}>
-                  <button
-                    type="button"
-                    onClick={() => router.push(hrefFor(p))}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-white/5"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2">
-                        <span className="truncate text-sm font-medium text-white">{p.name}</span>
-                        {hasAlert && (
-                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" title="aviso" />
-                        )}
+                  <div className="flex items-center gap-2 px-2 py-1 sm:px-3">
+                    <button
+                      type="button"
+                      onClick={() => router.push(hrefFor(p))}
+                      className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-white/5"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <span className="truncate text-sm font-medium text-white">{p.name}</span>
+                          {hasAlert && (
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" title="aviso" />
+                          )}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-slate-400">
+                          {[
+                            isAll ? p.clientName : null,
+                            kind.unitLabelPlural[loc],
+                            p.crop,
+                            p.unitCount
+                              ? `${p.unitCount} ${radarT(loc, 'unid.', 'unid.', 'units')}`
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
                       </span>
-                      <span className="mt-0.5 block truncate text-xs text-slate-400">
-                        {[
-                          isAll ? p.clientName : null,
-                          kind.unitLabelPlural[loc],
-                          p.crop,
-                          p.unitCount
-                            ? `${p.unitCount} ${radarT(loc, 'unid.', 'unid.', 'units')}`
-                            : null,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
+                      <span className="shrink-0 rounded-lg border border-emerald-400/35 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-100">
+                        {radarT(loc, 'Abrir', 'Abrir', 'Open')}
                       </span>
-                    </span>
-                    <span className="shrink-0 rounded-lg border border-emerald-400/35 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-100">
-                      {radarT(loc, 'Abrir', 'Abrir', 'Open')}
-                    </span>
-                  </button>
+                    </button>
+                    <RadarEntityActions
+                      kind="property"
+                      id={p.id}
+                      name={p.name}
+                      companyId={companyId}
+                      engagementId={engagementId}
+                      locale={loc}
+                      onDone={() => void afterEntityChange()}
+                    />
+                  </div>
                 </li>
               );
             })}

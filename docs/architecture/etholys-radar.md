@@ -27,6 +27,7 @@ RADAR é **sempre a empresa** no Etholys — um produto, uma central. Não há g
 | **Técnicos** | Da lista de funcionários; atribuição por cliente/propriedade em escala; flags `canSeeAll` / `canCreateClients` |
 | **Home** | `/hub/radar` — **painel** (KPIs + «precisa atenção» + lista compacta de lugares/empresas). Não é lista gigante de cartões nem muro de alertas. |
 | **Empresa** | `/hub/radar/empresas/[id]` — perfil do cliente: avisos desse âmbito + lugares com ação Abrir → mapa/Caderno |
+| **Arquivar / apagar** | Cliente e lugar: menu **⋯** nas listas do painel e no perfil da empresa. Soft via `archivedAt` (sai do seletor/listas; unidades do lugar desativadas). «Apagar do mapa» continua só footprint. |
 | **Nav** | Painel · Cadeia · **Caderno** · Tarefas · Equipa |
 | **Caderno** | `/hub/radar/caderno` — gesto diário (campo / SOP); `NexusFieldEntry` via `/api/radar/entries`. Mapa e 3D ficam em Ver. |
 | **Tarefas** | `/hub/radar/tarefas` — lista curta a partir de alertas (prioridade), não grelha LED |

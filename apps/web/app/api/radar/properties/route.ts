@@ -28,11 +28,15 @@ export async function GET(req: NextRequest) {
   const auth = await authorize(companyId, engagementId);
   if ('error' in auth && auth.error) return auth.error;
 
-  const where = allClients
-    ? { companyId }
-    : clientId
-      ? { companyId, clientId }
-      : { companyId, clientId: null as string | null };
+  const includeArchived = url.searchParams.get('archived') === '1';
+  const where = {
+    ...(allClients
+      ? { companyId }
+      : clientId
+        ? { companyId, clientId }
+        : { companyId, clientId: null as string | null }),
+    ...(includeArchived ? {} : { archivedAt: null }),
+  };
 
   const properties = await prisma.radarProperty.findMany({
     where,
@@ -109,7 +113,7 @@ export async function POST(req: NextRequest) {
 
   if (clientId) {
     const client = await prisma.radarClient.findFirst({
-      where: { id: clientId, providerCompanyId: companyId },
+      where: { id: clientId, providerCompanyId: companyId, archivedAt: null },
     });
     if (!client) return NextResponse.json({ error: 'Cliente inválido.' }, { status: 404 });
   }

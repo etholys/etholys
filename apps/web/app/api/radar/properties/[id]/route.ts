@@ -26,6 +26,7 @@ import { isRadarParcel } from '@/lib/radar/agriculture';
 import { AGRICULTURE_MODULE } from '@/lib/nexus-sector-modules';
 import { deviceBySku, normalizeDevEui, RADAR_INGEST_METRICS } from '@/lib/radar/devices';
 import type { RadarDeviceBinding, RadarSiteLayoutDoc, RadarValveCommand } from '@/lib/radar/site-layout';
+import { archiveRadarProperty } from '@/lib/radar/archive';
 
 const SENSOR_METRICS = new Set([...AGRICULTURE_MODULE.metrics.map((m) => m.id), ...RADAR_INGEST_METRICS]);
 
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   if ('error' in auth && auth.error) return auth.error;
 
   const property = await prisma.radarProperty.findFirst({
-    where: { id, companyId },
+    where: { id, companyId, archivedAt: null },
     include: {
       client: { select: { id: true, name: true } },
       units: { where: { isActive: true }, orderBy: { createdAt: 'asc' } },
@@ -180,6 +181,19 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   if (!property) return NextResponse.json({ error: 'Propriedade inválida.' }, { status: 404 });
 
   const action = String(body.action || 'update').trim();
+
+  if (action === 'archive' || action === 'delete') {
+    if (property.archivedAt) {
+      return NextResponse.json({ ok: true, alreadyArchived: true });
+    }
+    const result = await archiveRadarProperty(companyId, id);
+    if (!result) return NextResponse.json({ error: 'Não foi possível arquivar.' }, { status: 400 });
+    return NextResponse.json({ ok: true, soft: true, ...result });
+  }
+
+  if (property.archivedAt) {
+    return NextResponse.json({ error: 'Propriedade arquivada.' }, { status: 410 });
+  }
 
   if (action === 'characterize') {
     const moduleId = normalizeModuleId(body.moduleId);

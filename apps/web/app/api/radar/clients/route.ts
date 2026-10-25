@@ -55,11 +55,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ aurora });
   }
 
+  const includeArchived = url.searchParams.get('archived') === '1';
   const clients = await prisma.radarClient.findMany({
-    where: { providerCompanyId: companyId },
+    where: {
+      providerCompanyId: companyId,
+      ...(includeArchived ? {} : { archivedAt: null }),
+    },
     orderBy: { createdAt: 'desc' },
     include: {
-      _count: { select: { properties: true } },
+      _count: {
+        select: {
+          properties: { where: { archivedAt: null } },
+        },
+      },
       linkedCompany: { select: { id: true, name: true, shortName: true } },
     },
   });
@@ -77,6 +85,7 @@ export async function GET(req: NextRequest) {
         ? c.linkedCompany.shortName || c.linkedCompany.name
         : null,
       propertyCount: c._count.properties,
+      archivedAt: c.archivedAt?.toISOString() || null,
       createdAt: c.createdAt.toISOString(),
     })),
   });

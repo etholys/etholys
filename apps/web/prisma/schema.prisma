@@ -2394,6 +2394,8 @@ model RadarClient {
   notes             String?
   /// Empresa Etholys / AURORA-ATER já existente (opção C).
   linkedCompanyId   String?
+  /// Soft-archive — oculto no seletor e na carteira ativa.
+  archivedAt        DateTime?
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
   providerCompany   Company                 @relation(fields: [providerCompanyId], references: [id], onDelete: Cascade)
@@ -2402,6 +2404,7 @@ model RadarClient {
   technicianScopes  RadarTechnicianScope[]
 
   @@index([providerCompanyId, createdAt])
+  @@index([providerCompanyId, archivedAt])
   @@index([linkedCompanyId])
 }
 
@@ -2423,6 +2426,8 @@ model RadarProperty {
   polygonJson Json?
   /// Elegibilidade territorial: UF, CAR, SIGEF, exclusões e liderança.
   complianceJson Json?
+  /// Soft-archive — oculto nas listas ativas; unidades desativadas.
+  archivedAt DateTime?
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
   company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -2433,6 +2438,7 @@ model RadarProperty {
   droneImages AuroraDroneImage[]
 
   @@index([companyId, createdAt])
+  @@index([companyId, archivedAt])
   @@index([clientId])
 }
 

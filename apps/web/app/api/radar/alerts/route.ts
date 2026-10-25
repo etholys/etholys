@@ -42,10 +42,10 @@ export async function GET(req: NextRequest) {
 
   const propertyWhere =
     !clientParam || clientParam === 'all' || clientParam === 'todos'
-      ? { companyId }
+      ? { companyId, archivedAt: null }
       : clientParam === 'own' || clientParam === 'mine' || clientParam === 'minha'
-        ? { companyId, clientId: null as string | null }
-        : { companyId, clientId: clientParam };
+        ? { companyId, clientId: null as string | null, archivedAt: null }
+        : { companyId, clientId: clientParam, archivedAt: null };
 
   const properties = await prisma.radarProperty.findMany({
     where: propertyWhere,

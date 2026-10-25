@@ -13,6 +13,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { useRadarClientScopeOptional } from '@/components/radar/RadarClientScopeContext';
+import { RadarEntityActions } from '@/components/radar/RadarEntityActions';
 import { RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
 import type { PropertyStepState } from '@/lib/radar/property-progress';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
@@ -54,6 +55,8 @@ export function RadarCompanyDashboard({
   const scopeCtx = useRadarClientScopeOptional();
   const setCreateOpen = scopeCtx?.setCreateOpen;
   const setScope = scopeCtx?.setScope;
+  const refreshClients = scopeCtx?.refreshClients;
+  const bumpListRevision = scopeCtx?.bumpListRevision;
   const listRevision = scopeCtx?.listRevision ?? 0;
   const clientFromCtx = scopeCtx?.clients.find((c) => c.id === clientId);
 
@@ -113,6 +116,17 @@ export function RadarCompanyDashboard({
     void load();
   }, [load, listRevision]);
 
+  const afterEntityChange = useCallback(async () => {
+    await refreshClients?.();
+    bumpListRevision?.();
+  }, [refreshClients, bumpListRevision]);
+
+  const afterClientArchived = useCallback(async () => {
+    await refreshClients?.();
+    bumpListRevision?.();
+    setScope?.(RADAR_SCOPE_OWN);
+  }, [refreshClients, bumpListRevision, setScope]);
+
   useEffect(() => {
     // Align sidebar scope with this company page (no-op if already set).
     if (!scopeCtx || scopeCtx.scope === clientId) return;
@@ -157,14 +171,25 @@ export function RadarCompanyDashboard({
           <h1 className="mt-1 font-serif text-3xl text-white md:text-4xl">{clientName}</h1>
           {contactName && <p className="mt-1 text-sm text-slate-300">{contactName}</p>}
         </div>
-        <button
-          type="button"
-          onClick={() => setCreateOpen?.('property')}
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#04110c]"
-        >
-          <Plus className="h-4 w-4" />
-          {radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <RadarEntityActions
+            kind="client"
+            id={clientId}
+            name={clientName || clientId}
+            companyId={companyId}
+            engagementId={engagementId}
+            locale={loc}
+            onDone={() => void afterClientArchived()}
+          />
+          <button
+            type="button"
+            onClick={() => setCreateOpen?.('property')}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#04110c]"
+          >
+            <Plus className="h-4 w-4" />
+            {radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -258,11 +283,11 @@ export function RadarCompanyDashboard({
               const openHref = `/hub/radar/properties/${p.id}?${companyQ}`;
               return (
                 <li key={p.id}>
-                  <div className="flex items-center gap-3 px-4 py-2.5">
+                  <div className="flex items-center gap-2 px-2 py-1.5 sm:px-3">
                     <button
                       type="button"
                       onClick={() => router.push(openHref)}
-                      className="min-w-0 flex-1 text-left"
+                      className="min-w-0 flex-1 rounded-lg px-2 py-2 text-left hover:bg-white/5"
                     >
                       <span className="flex items-center gap-2">
                         <span className="truncate text-sm font-medium text-white">{p.name}</span>
@@ -287,6 +312,15 @@ export function RadarCompanyDashboard({
                     >
                       {radarT(loc, 'Abrir', 'Abrir', 'Open')}
                     </Link>
+                    <RadarEntityActions
+                      kind="property"
+                      id={p.id}
+                      name={p.name}
+                      companyId={companyId}
+                      engagementId={engagementId}
+                      locale={loc}
+                      onDone={() => void afterEntityChange()}
+                    />
                   </div>
                 </li>
               );
