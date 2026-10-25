@@ -2231,7 +2231,7 @@ model NexusFieldEntry {
   id           String        @id @default(cuid())
   companyId    String
   unitId       String?
-  /// planting | input | irrigation | pest | harvest | observation | visit | note
+  /// planting | fertilization | input | irrigation | cultural | pest | harvest | weather | observation | visit | note | …
   kind         String
   occurredAt   DateTime
   payloadJson  Json

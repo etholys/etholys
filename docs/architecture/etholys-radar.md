@@ -29,7 +29,7 @@ RADAR é **sempre a empresa** no Etholys — um produto, uma central. Não há g
 | **Empresa** | `/hub/radar/empresas/[id]` — perfil do cliente: avisos desse âmbito + lugares com ação Abrir → mapa/Caderno |
 | **Arquivar / apagar** | Cliente e lugar: menu **⋯** nas listas do painel e no perfil da empresa. Soft via `archivedAt` (sai do seletor/listas; unidades do lugar desativadas). «Apagar do mapa» continua só footprint. |
 | **Nav** | Painel · Cadeia · **Caderno** · Tarefas · Equipa |
-| **Caderno** | `/hub/radar/caderno` — gesto diário (campo / SOP); `NexusFieldEntry` via `/api/radar/entries`. Mapa e 3D ficam em Ver. |
+| **Caderno** | `/hub/radar/caderno` — gesto diário (campo / SOP); `NexusFieldEntry` via `/api/radar/entries`. Mapa e 3D ficam em Ver. Modelado a práticas de caderno de campo (papel), sem clonar o PDF página a página — ver secção abaixo. |
 | **Tarefas** | `/hub/radar/tarefas` — lista curta a partir de alertas (prioridade), não grelha LED |
 | **Cadeia** | `/hub/radar/cadeia` — lotes / custódia |
 | **Equipa** | `/hub/radar/equipa` — técnicos + clientes (admin) |
@@ -129,6 +129,26 @@ Não é “onde está o lote?” em texto livre. É **check-in por etapa** com e
 - Fora deste ciclo: blockchain, SKU próprio, OCR de etiqueta.
 
 Lib: `lib/radar/trace.ts`, `lib/radar/evidence-upload.ts`.
+
+### Caderno de campo (agricultura)
+
+O Caderno digital segue a estrutura útil de um caderno de campo real (ex.: PIB / produção integrada), priorizando o que o produtor preenche em repetição — não o checklist de auditoria completo.
+
+Secções / tipos de registo (agricultura):
+
+- **Sementeira / plantio** — cultivar, n.º de plantas, densidade, área
+- **Adubação** — fertilizante, dose (kg ou L/ha), área
+- **Fitossanitário / insumo** — produto, dose, coadjuvante, praga/doença, volume de calda, área, **carência (PHI)**
+- **Irrigação** — lâmina (mm), tempo, frequência
+- **Tratos culturais** — ensacamento, desbaste, escoramento, roçada, capina, etc.
+- **Monitoramento de pragas (MIP)** — presença, nível, espécie
+- **Colheita** — quantidade, peso (kg), rendimento (kg/ha)
+- **Clima / evento** — geada, granizo, cheia, seca, vento, chuva torrencial
+- **Observação** e **visita técnica** — notas livres
+
+Schemas de campos: `lib/radar/caderno-fields.ts`. UI: `RadarCadernoBoard`. API: `/api/radar/entries`.
+
+Fora do digital (ainda papel / futuro): identificação CNPE completa, tabelas de perdas anuais por praga, dados físico-hídricos do solo (CC/PMP), calibração de pulverizador, listas de auditoria PIB, anexos de análise foliar/solo.
 
 ### Módulos
 

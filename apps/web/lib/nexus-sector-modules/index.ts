@@ -53,13 +53,16 @@ export function isAgricultureModule(sectorId: string | null | undefined): boolea
 
 export function fieldEntryKindLabel(kind: FieldEntryKind, locale: ModuleLocale): string {
   const map: Record<FieldEntryKind, { es: string; pt: string; en: string }> = {
-    planting: { es: 'Siembra', pt: 'Sementeira', en: 'Planting' },
-    input: { es: 'Insumo', pt: 'Insumo', en: 'Input' },
+    planting: { es: 'Siembra / plantío', pt: 'Sementeira / plantio', en: 'Planting' },
+    fertilization: { es: 'Fertilización', pt: 'Adubação', en: 'Fertilization' },
+    input: { es: 'Fitossanitario / insumo', pt: 'Fitossanitário / insumo', en: 'Crop protection / input' },
     irrigation: { es: 'Riego', pt: 'Irrigação', en: 'Irrigation' },
-    pest: { es: 'Plaga / MIP', pt: 'Praga / MIP', en: 'Pest / IPM' },
-    harvest: { es: 'Cosecha / despacho', pt: 'Colheita / expedição', en: 'Harvest / dispatch' },
+    cultural: { es: 'Labores culturales', pt: 'Tratos culturais', en: 'Cultural practices' },
+    pest: { es: 'Monitoreo plaga / MIP', pt: 'Monitoramento praga / MIP', en: 'Pest scouting / IPM' },
+    harvest: { es: 'Cosecha', pt: 'Colheita', en: 'Harvest' },
+    weather: { es: 'Clima / evento', pt: 'Clima / evento', en: 'Weather / event' },
     observation: { es: 'Observación', pt: 'Observação', en: 'Observation' },
-    visit: { es: 'Visita AT', pt: 'Visita AT', en: 'TA visit' },
+    visit: { es: 'Visita técnica', pt: 'Visita técnica', en: 'Technical visit' },
     note: { es: 'Nota', pt: 'Nota', en: 'Note' },
     health: { es: 'Sanidad', pt: 'Sanidade', en: 'Health' },
     feed: { es: 'Alimentación', pt: 'Alimentação', en: 'Feed' },

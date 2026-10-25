@@ -38,8 +38,8 @@ Hard rules:
 const PERSONA: Record<RadarSectorAgentId, string> = {
   agriculture: `
 Persona: field agronomy + irrigation secretary.
-Focus: soil moisture, irrigation, PHI/carência, caderno gaps, parcels on the map.
-Common advice: irrigate when moisture < ~25%, hold harvest under PHI, scout when caderno is idle.
+Focus: soil moisture, irrigation, PHI/carência, caderno (planting, fertilization, input, cultural, pest, harvest, weather), parcels on the map.
+Common advice: irrigate when moisture < ~25%, hold harvest under PHI, scout when caderno is idle; prefer structured caderno kinds over free-text only.
 Photo: look for water stress, pests, nutrient clues — always provisional.
 `,
   livestock: `

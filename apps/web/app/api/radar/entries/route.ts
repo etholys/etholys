@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { canAccessNexusOpsCompany } from '@/lib/nexus-ops';
 import { isFieldEntryKind } from '@/lib/nexus-ops-token';
-import { cadernoKindsForModule, noteFromPayload } from '@/lib/radar/caderno';
+import { buildCadernoPayload, cadernoKindsForModule, noteFromPayload } from '@/lib/radar/caderno';
 import { RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
 
 async function authorize(companyId: string, engagementId: string | null) {
@@ -151,31 +151,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Data inválida.' }, { status: 400 });
   }
 
-  const note = String(body.note || body.text || '').trim().slice(0, 2000);
-  const product = String(body.product || '').trim().slice(0, 120);
-  const dose = String(body.dose || '').trim().slice(0, 80);
-  const protocol = String(body.protocol || '').trim().slice(0, 160);
-  const mm = body.mm == null || body.mm === '' ? null : Number(body.mm);
-  const phiDays = body.phiDays == null || body.phiDays === '' ? null : Number(body.phiDays);
-
-  if (!note && !product && !protocol && kind !== 'irrigation') {
-    return NextResponse.json({ error: 'Escreve o que aconteceu ou escolhe um protocolo.' }, { status: 400 });
-  }
-  if (kind === 'input' && product.length < 2 && protocol.length < 2) {
-    return NextResponse.json({ error: 'Insumo pede produto ou protocolo.' }, { status: 400 });
-  }
-  if (kind === 'irrigation' && !(Number.isFinite(mm as number) && (mm as number) > 0) && !note) {
-    return NextResponse.json({ error: 'Irrigação pede milímetros ou uma nota.' }, { status: 400 });
-  }
-
-  const payload: Record<string, unknown> = {};
-  if (note) payload.note = note;
-  if (product) payload.product = product;
-  if (dose) payload.dose = dose;
-  if (protocol) payload.protocol = protocol;
-  if (kind === 'irrigation' && mm != null && Number.isFinite(mm)) payload.mm = mm;
-  if (kind === 'input' && Number.isFinite(phiDays as number) && (phiDays as number) > 0) {
-    payload.phiDays = phiDays;
+  const { payload, error: payloadError } = buildCadernoPayload(kind, body as Record<string, unknown>);
+  if (payloadError) {
+    return NextResponse.json({ error: payloadError }, { status: 400 });
   }
 
   const entry = await prisma.nexusFieldEntry.create({
@@ -195,7 +173,8 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  if (kind === 'irrigation' && mm != null && Number.isFinite(mm)) {
+  const mm = typeof payload.mm === 'number' ? payload.mm : null;
+  if (kind === 'irrigation' && mm != null && Number.isFinite(mm) && mm > 0) {
     await prisma.nexusReading.create({
       data: {
         companyId,

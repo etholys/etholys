@@ -1,6 +1,7 @@
 /**
  * RADAR Caderno — production notebook helpers.
  * Same NexusFieldEntry model; labels differ by property moduleId.
+ * Field schemas: ./caderno-fields (field-notebook practices).
  */
 import {
   fieldEntryKindLabel,
@@ -9,9 +10,22 @@ import {
   type ModuleLocale,
 } from '@/lib/nexus-sector-modules';
 import { isFieldEntryKind } from '@/lib/nexus-ops-token';
+import { summarizeCadernoPayload } from '@/lib/radar/caderno-fields';
 import { radarT, type RadarLoc } from '@/lib/radar/i18n';
 
 export type CadernoModuleId = 'agriculture' | 'agroindustry' | 'livestock' | 'carbon' | string | null;
+
+export {
+  buildCadernoPayload,
+  cadernoFieldLabel,
+  cadernoFieldPlaceholder,
+  cadernoFieldsForKind,
+  optionLabel,
+  summarizeCadernoPayload,
+  type CadernoFieldDef,
+  type CadernoFieldId,
+  type CadernoPayloadInput,
+} from '@/lib/radar/caderno-fields';
 
 export function cadernoKindsForModule(moduleId: CadernoModuleId): FieldEntryKind[] {
   const mod = getSectorModule(moduleId || 'agriculture');
@@ -93,17 +107,17 @@ export function cadernoCopy(moduleId: CadernoModuleId, loc: RadarLoc) {
       registerCta: radarT(loc, 'Registar no caderno', 'Registrar en el cuaderno', 'Log in notebook'),
     };
   }
-  // agriculture + carbon (carbon reads practices; still a simple notebook)
+  // agriculture + carbon (carbon reads practices; still a field notebook)
   return {
     nav: radarT(loc, 'Caderno', 'Cuaderno', 'Notebook'),
     title: radarT(loc, 'Caderno de campo', 'Cuaderno de campo', 'Field notebook'),
     subtitle: radarT(
       loc,
-      'O que aconteceu na parcela — data, espaço, quem e notas.',
-      'Qué pasó en la parcela — fecha, espacio, quién y notas.',
-      'What happened on the plot — date, space, who and notes.',
+      'Parcela, cultura, insumos/PHI, irrigação, tratos, pragas, colheita e clima — o que o caderno de papel pede no dia a dia.',
+      'Parcela, cultivo, insumos/PHI, riego, labores, plagas, cosecha y clima — lo que el cuaderno de papel pide a diario.',
+      'Plot, crop, inputs/PHI, irrigation, practices, pests, harvest and weather — what a paper field book needs daily.',
     ),
-    whatLabel: radarT(loc, 'O que fizeste', 'Qué hiciste', 'What you did'),
+    whatLabel: radarT(loc, 'Tipo de registo', 'Tipo de registro', 'Entry type'),
     protocolLabel: radarT(loc, 'Produto / dose', 'Producto / dosis', 'Product / dose'),
     protocolPlaceholder: radarT(loc, 'ex.: Ureia 50 kg', 'ej.: Urea 50 kg', 'e.g. Urea 50 kg'),
     notesPlaceholder: radarT(
@@ -123,22 +137,5 @@ export function cadernoCopy(moduleId: CadernoModuleId, loc: RadarLoc) {
 }
 
 export function noteFromPayload(payload: unknown): string {
-  if (!payload || typeof payload !== 'object') return '';
-  const row = payload as {
-    note?: unknown;
-    text?: unknown;
-    product?: unknown;
-    protocol?: unknown;
-    dose?: unknown;
-    mm?: unknown;
-  };
-  const note = String(row.note || row.text || '').trim();
-  if (note) return note;
-  const bits = [
-    row.protocol ? String(row.protocol) : '',
-    row.product ? String(row.product) : '',
-    row.dose ? String(row.dose) : '',
-    row.mm != null ? `${row.mm} mm` : '',
-  ].filter(Boolean);
-  return bits.join(' · ');
+  return summarizeCadernoPayload(payload);
 }

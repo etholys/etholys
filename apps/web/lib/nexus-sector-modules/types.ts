@@ -10,10 +10,13 @@ export type OpsUnitKind = 'parcel' | 'herd' | 'flock' | 'hive' | 'lot' | 'generi
 
 export type FieldEntryKind =
   | 'planting'
+  | 'fertilization'
   | 'input'
   | 'irrigation'
+  | 'cultural'
   | 'pest'
   | 'harvest'
+  | 'weather'
   | 'observation'
   | 'visit'
   | 'note'

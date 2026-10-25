@@ -2,10 +2,13 @@ import { createHash, randomBytes } from 'crypto';
 
 export const FIELD_ENTRY_KINDS = [
   'planting',
+  'fertilization',
   'input',
   'irrigation',
+  'cultural',
   'pest',
   'harvest',
+  'weather',
   'observation',
   'visit',
   'note',
