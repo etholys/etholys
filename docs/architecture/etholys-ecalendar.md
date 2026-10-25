@@ -18,7 +18,7 @@ Ferramenta **Etholys Tools**. Não é um sistema licenciável. Não copia as dat
 | **eCalendar** | Eventos criados neste calendário | Aqui (`CalendarEvent`) |
 | **eTask** | Tarefas com início ou prazo | eTask / projeto |
 | **Projeto** | Início, fim e marcos do projeto. Também filtra tarefas, reuniões Chorus e visitas AURORA desse projeto | SIEP / projeto |
-| **Chorus** | Sessões com hora marcada. A agenda pública (horários, feriados, link de reserva) é o mesmo ecrã em `/hub/meet/agenda` e em `/hub/calendar?view=agenda` | Chorus e eCalendar |
+| **Chorus** | Sessões com hora marcada. A agenda pública (horários, duração fixa do slot, feriados, link de reserva) é o mesmo ecrã em `/hub/meet/agenda` e em `/hub/calendar?view=agenda`. **Direção futura (não neste F0):** a partir de uma atividade do eCalendar, poder opcionalmente ligar ou criar uma agenda pública e enviar o link de marcação — sem construir ainda o sistema completo de inscrição/atividade | Chorus e eCalendar |
 | **FORGE** | Sessões ao vivo do curso | FORGE |
 | **FundHub** | Prazo do fundo | FundHub |
 | **AURORA** | Visitas de campo | AURORA |

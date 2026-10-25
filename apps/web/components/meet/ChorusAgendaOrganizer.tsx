@@ -29,7 +29,14 @@ import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 import { CompanyPicker } from '@/components/hub/CompanyPicker';
 import { sysTheme } from '@/lib/system-shell';
 import { cn } from '@/lib/utils';
-import { addDaysYmd, hmToMinutes, minutesToHm, startOfWeekMonday, ymdInTimeZone } from '@/lib/meet/booking-slots';
+import {
+  BOOKING_SLOT_MINUTE_OPTIONS,
+  addDaysYmd,
+  hmToMinutes,
+  minutesToHm,
+  startOfWeekMonday,
+  ymdInTimeZone,
+} from '@/lib/meet/booking-slots';
 import { meetWallTimeToUtc } from '@/lib/meet/timezone';
 import { AGENDA_HOLIDAY_COUNTRIES } from '@/lib/meet/holiday-countries';
 import ChorusAgendaCalendar, { type AgendaCalEvent, type AgendaView } from '@/components/meet/ChorusAgendaCalendar';
@@ -183,7 +190,7 @@ export default function ChorusAgendaOrganizer({
   const [blockEnd, setBlockEnd] = useState('');
   const [blockLabel, setBlockLabel] = useState('');
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
-  const [counter, setCounter] = useState<Record<string, { start: string; end: string }>>({});
+  const [counter, setCounter] = useState<Record<string, { start: string }>>({});
   const [holidayCountries, setHolidayCountries] = useState<string[]>([]);
   const [view, setView] = useState<AgendaView>('week');
   const [cursorYmd, setCursorYmd] = useState(() => ymdInTimeZone(new Date(), 'America/Sao_Paulo'));
@@ -709,6 +716,53 @@ export default function ChorusAgendaOrganizer({
             </label>
           )}
 
+          {collapsed ? (
+            <button
+              type="button"
+              className={sideItem(false)}
+              title={`${slotMinutes} min`}
+              onClick={() => {
+                setCollapsed(false);
+                setSettingsOpen(true);
+                window.setTimeout(
+                  () => document.getElementById('agenda-slot-duration')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+                  50,
+                );
+              }}
+            >
+              <span className="text-[10px] font-semibold tabular-nums">{slotMinutes}</span>
+            </button>
+          ) : (
+            <label id="agenda-slot-duration-side" className="block px-1 pb-2 text-xs text-[color:var(--sys-muted)]">
+              <span className="mb-1 flex items-center gap-1.5 font-medium">
+                {t('Duração da reunião', 'Duración de la reunión', 'Meeting length')}
+              </span>
+              <select
+                value={slotMinutes}
+                onChange={(e) => setSlotMinutes(Number(e.target.value))}
+                className={FIELD}
+                aria-describedby="agenda-slot-duration-hint"
+              >
+                {BOOKING_SLOT_MINUTE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n === 60
+                      ? t('1 hora', '1 hora', '1 hour')
+                      : n === 120
+                        ? t('2 horas', '2 horas', '2 hours')
+                        : `${n} min`}
+                  </option>
+                ))}
+              </select>
+              <span id="agenda-slot-duration-hint" className="mt-1 block text-[10px] leading-snug text-[color:var(--sys-faint)]">
+                {t(
+                  'O convidado só escolhe o início; o fim é automático.',
+                  'El invitado solo elige el inicio; el fin es automático.',
+                  'Guests only pick a start; the end is automatic.',
+                )}
+              </span>
+            </label>
+          )}
+
           <button
             ref={shareBtnRef}
             type="button"
@@ -776,7 +830,23 @@ export default function ChorusAgendaOrganizer({
               </span>
             )}
           </button>
-          <button type="button" onClick={() => setSettingsOpen((open) => !open)} className={sideItem(settingsOpen)} title={t('Definições', 'Ajustes', 'Settings')}>
+          <button
+            type="button"
+            onClick={() => {
+              setSettingsOpen((open) => {
+                const next = !open;
+                if (next) {
+                  window.setTimeout(
+                    () => document.getElementById('agenda-slot-duration')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+                    50,
+                  );
+                }
+                return next;
+              });
+            }}
+            className={sideItem(settingsOpen)}
+            title={t('Definições', 'Ajustes', 'Settings')}
+          >
             <Settings className="h-4 w-4 shrink-0" />
             {collapsed ? null : <span>{t('Definições', 'Ajustes', 'Settings')}</span>}
           </button>
@@ -888,13 +958,28 @@ export default function ChorusAgendaOrganizer({
                 <span className="mb-1 block text-slate-600">{t('Descrição', 'Descripción', 'Description')}</span>
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={FIELD} />
               </label>
-              <label className="block text-sm">
-                <span className="mb-1 block text-slate-600">{t('Duração', 'Duración', 'Length')}</span>
+              <label id="agenda-slot-duration" className="block text-sm md:col-span-2">
+                <span className="mb-1 block font-medium text-slate-800">
+                  {t('Duração de cada reunião', 'Duración de cada reunión', 'Length of each meeting')}
+                </span>
                 <select value={slotMinutes} onChange={(e) => setSlotMinutes(Number(e.target.value))} className={FIELD}>
-                  {[15, 30, 45, 60, 90].map((n) => (
-                    <option key={n} value={n}>{n} min</option>
+                  {BOOKING_SLOT_MINUTE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>
+                      {n === 60
+                        ? t('1 hora', '1 hora', '1 hour')
+                        : n === 120
+                          ? t('2 horas', '2 horas', '2 hours')
+                          : `${n} min`}
+                    </option>
                   ))}
                 </select>
+                <span className="mt-1 block text-xs text-slate-600">
+                  {t(
+                    'A agenda gera horários com esta duração. O convidado escolhe só o início.',
+                    'La agenda genera horarios con esta duración. El invitado solo elige el inicio.',
+                    'The agenda lays out slots of this length. Guests only pick a start time.',
+                  )}
+                </span>
               </label>
               <label className="block text-sm">
                 <span className="mb-1 block text-slate-600">{t('Local presencial', 'Lugar presencial', 'In-person place')}</span>
@@ -1027,7 +1112,7 @@ export default function ChorusAgendaOrganizer({
               ) : (
                 agenda.requests.map((request) => {
                   const open = request.status === 'pending' || request.status === 'counter_proposed';
-                  const proposal = counter[request.id] || { start: '', end: '' };
+                  const proposal = counter[request.id] || { start: '' };
                   const label = STATUS_LABEL[request.status];
                   return (
                     <article id={`agenda-request-${request.id}`} key={request.id} className={`rounded-2xl border bg-white p-4 text-slate-900 ${focusRequestId === request.id ? 'border-teal-700 ring-2 ring-teal-700' : 'border-slate-200'}`}>
@@ -1077,20 +1162,29 @@ export default function ChorusAgendaOrganizer({
                           <button type="button" disabled={saving} onClick={() => void act(request.id, 'close')} className="rounded-full border border-slate-300 px-3 py-2 text-sm font-semibold">
                             {t('Fechar horário', 'Cerrar horario', 'Close time')}
                           </button>
-                          <input type="datetime-local" value={proposal.start} onChange={(e) => setCounter({ ...counter, [request.id]: { ...proposal, start: e.target.value } })} className={FIELD} />
-                          <input type="datetime-local" value={proposal.end} onChange={(e) => setCounter({ ...counter, [request.id]: { ...proposal, end: e.target.value } })} className={FIELD} />
+                          <label className="text-sm">
+                            <span className="mb-1 block text-slate-600">{t('Novo início', 'Nuevo inicio', 'New start')}</span>
+                            <input
+                              type="datetime-local"
+                              value={proposal.start}
+                              onChange={(e) => setCounter({ ...counter, [request.id]: { start: e.target.value } })}
+                              className={FIELD}
+                            />
+                          </label>
                           <button
                             type="button"
-                            disabled={saving || !proposal.start || !proposal.end}
-                            onClick={() =>
-                              void act(request.id, 'counter', {
-                                proposedStartsAt: wallToIso(proposal.start),
-                                proposedEndsAt: wallToIso(proposal.end),
-                              })
-                            }
+                            disabled={saving || !proposal.start}
+                            onClick={() => {
+                              const proposedStartsAt = wallToIso(proposal.start);
+                              const proposedEndsAt = new Date(
+                                new Date(proposedStartsAt).getTime() + slotMinutes * 60_000,
+                              ).toISOString();
+                              void act(request.id, 'counter', { proposedStartsAt, proposedEndsAt });
+                            }}
                             className="rounded-full border border-teal-700 px-3 py-2 text-sm font-semibold text-teal-900"
                           >
                             {t('Propor outro horário', 'Proponer otro horario', 'Propose another time')}
+                            {` (${slotMinutes} min)`}
                           </button>
                         </div>
                       ) : null}
@@ -1238,18 +1332,29 @@ export default function ChorusAgendaOrganizer({
               </label>
             </div>
             <label className="mt-3 block text-sm font-medium text-slate-700">
-              {t('Duração do slot', 'Duración del hueco', 'Slot length')}
+              {t('Duração de cada reunião', 'Duración de cada reunión', 'Length of each meeting')}
               <select
                 value={openDaySlotMinutes}
                 onChange={(event) => setOpenDaySlotMinutes(Number(event.target.value))}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
               >
-                {[15, 30, 45, 60, 90].map((n) => (
+                {BOOKING_SLOT_MINUTE_OPTIONS.map((n) => (
                   <option key={n} value={n}>
-                    {n} min
+                    {n === 60
+                      ? t('1 hora', '1 hora', '1 hour')
+                      : n === 120
+                        ? t('2 horas', '2 horas', '2 hours')
+                        : `${n} min`}
                   </option>
                 ))}
               </select>
+              <span className="mt-1 block text-xs font-normal text-slate-600">
+                {t(
+                  'O convidado escolhe só o horário de início.',
+                  'El invitado solo elige la hora de inicio.',
+                  'Guests only pick a start time.',
+                )}
+              </span>
             </label>
             <label className="mt-3 block text-sm font-medium text-slate-700">
               {t('Local (opcional)', 'Lugar (opcional)', 'Place (optional)')}

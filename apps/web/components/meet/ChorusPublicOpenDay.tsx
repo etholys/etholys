@@ -116,7 +116,9 @@ export default function ChorusPublicOpenDay() {
           email,
           mode,
           startsAt: slot.startsAt,
-          endsAt: slot.endsAt,
+          endsAt: new Date(
+            new Date(slot.startsAt).getTime() + agenda.page.slotMinutes * 60_000,
+          ).toISOString(),
           note,
           locationText: mode === 'presencial' ? locationText : null,
           guests: guests.filter((guest) => guest.email.trim()),
@@ -175,8 +177,9 @@ export default function ChorusPublicOpenDay() {
                 <p className="mt-3 text-sm leading-relaxed text-slate-700">{agenda.page.description}</p>
               ) : null}
               <p className="mt-2 text-xs text-slate-500">
-                {minutesToHm(agenda.page.startMin)}–{minutesToHm(agenda.page.endMin)} · {agenda.page.slotMinutes}{' '}
-                min · {agenda.page.timeZone}
+                {minutesToHm(agenda.page.startMin)}–{minutesToHm(agenda.page.endMin)} ·{' '}
+                {t('Cada reunião', 'Cada reunión', 'Each meeting')}: {agenda.page.slotMinutes} min ·{' '}
+                {agenda.page.timeZone}
               </p>
             </div>
 
@@ -193,21 +196,26 @@ export default function ChorusPublicOpenDay() {
                 )}
               </p>
             ) : (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {agenda.slots.map((item) => (
-                  <button
-                    key={item.startsAt}
-                    type="button"
-                    onClick={() => setSlot(item)}
-                    className={`rounded-xl px-3 py-3 text-sm font-semibold ${
-                      slot?.startsAt === item.startsAt
-                        ? 'bg-teal-800 text-white'
-                        : 'bg-white text-teal-950 ring-1 ring-slate-300 hover:bg-teal-50'
-                    }`}
-                  >
-                    {labelTime(item.startsAt)}
-                  </button>
-                ))}
+              <div>
+                <p className="mb-2 text-sm font-medium text-slate-700">
+                  {t('Escolha o horário de início', 'Elige la hora de inicio', 'Pick a start time')}
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {agenda.slots.map((item) => (
+                    <button
+                      key={item.startsAt}
+                      type="button"
+                      onClick={() => setSlot(item)}
+                      className={`rounded-xl px-3 py-3 text-sm font-semibold ${
+                        slot?.startsAt === item.startsAt
+                          ? 'bg-teal-800 text-white'
+                          : 'bg-white text-teal-950 ring-1 ring-slate-300 hover:bg-teal-50'
+                      }`}
+                    >
+                      {labelTime(item.startsAt)}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -220,7 +228,8 @@ export default function ChorusPublicOpenDay() {
                 }}
               >
                 <p className="text-sm font-medium text-slate-700">
-                  {labelDay(slot.date)} · {labelTime(slot.startsAt)}–{labelTime(slot.endsAt)}
+                  {labelDay(slot.date)} · {t('Início', 'Inicio', 'Start')} {labelTime(slot.startsAt)} ·{' '}
+                  {agenda.page.slotMinutes} min
                 </p>
                 {agenda.page.allowVirtual && agenda.page.allowInPerson ? (
                   <div className="flex gap-2">

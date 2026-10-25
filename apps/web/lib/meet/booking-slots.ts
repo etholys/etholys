@@ -23,6 +23,9 @@ export type OpenSlot = {
 
 export const DEFAULT_BOOKING_SLOT_MINUTES = 30;
 
+/** Durações fixas que o organizador escolhe; o convidado só escolhe o início. */
+export const BOOKING_SLOT_MINUTE_OPTIONS = [15, 30, 45, 60, 90, 120] as const;
+
 /** Dias úteis 09:00–18:00. */
 export const DEFAULT_BOOKING_WINDOWS: BookingWindowInput[] = [1, 2, 3, 4, 5].map((weekday) => ({
   weekday,

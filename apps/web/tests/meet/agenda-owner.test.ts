@@ -69,11 +69,32 @@ test('agenda surfaces force light form colors', () => {
   assert.match(owner, /etholys-meet-light/);
   assert.match(owner, /Dia de atendimento/);
   assert.match(owner, /\/api\/meet\/agenda\/open-days/);
+  assert.match(owner, /BOOKING_SLOT_MINUTE_OPTIONS/);
+  assert.match(owner, /Duração da reunião|Duração de cada reunião/);
+  assert.match(owner, /agenda-slot-duration/);
   assert.match(guest, /viewer === 'owner'/);
   assert.match(guest, /etholys-meet-light/);
+  assert.match(guest, /Escolha o horário de início/);
+  assert.match(guest, /agenda\.page\.slotMinutes \* 60_000/);
+  assert.doesNotMatch(guest, /type=["']datetime-local["']/);
   assert.match(openDayGuest, /\/api\/meet\/public\/agenda\/d\//);
   assert.match(openDayGuest, /etholys-meet-light/);
   assert.doesNotMatch(`${owner}\n${guest}\n${openDayGuest}`, /jitsi|jibri|jigasi/i);
+});
+
+test('organizer slot length lays out guest open slots', () => {
+  const slots = buildOpenSlots({
+    timeZone: 'America/Sao_Paulo',
+    slotMinutes: 45,
+    windows: [{ weekday: 1, startMin: 9 * 60, endMin: 12 * 60 }],
+    days: 1,
+    now: new Date('2026-10-19T11:00:00.000Z'),
+    fromYmd: '2026-10-19',
+  });
+  assert.equal(slots.length, 4);
+  assert.equal(slots[0]?.startsAt, '2026-10-19T12:00:00.000Z');
+  assert.equal(slots[0]?.endsAt, '2026-10-19T12:45:00.000Z');
+  assert.equal(slots[1]?.startsAt, '2026-10-19T12:45:00.000Z');
 });
 
 test('clicking an agenda hour opens the shared block dialog', () => {

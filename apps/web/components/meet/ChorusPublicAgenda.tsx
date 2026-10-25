@@ -123,7 +123,9 @@ export default function ChorusPublicAgenda() {
           email,
           mode,
           startsAt: slot.startsAt,
-          endsAt: slot.endsAt,
+          endsAt: new Date(
+            new Date(slot.startsAt).getTime() + agenda.page.slotMinutes * 60_000,
+          ).toISOString(),
           note,
           locationText: mode === 'presencial' ? locationText : null,
           guests: guests.filter((guest) => guest.email.trim()),
@@ -182,7 +184,8 @@ export default function ChorusPublicAgenda() {
                 <p className="mt-3 text-sm leading-relaxed text-slate-700">{agenda.page.description}</p>
               ) : null}
               <p className="mt-2 text-xs text-slate-500">
-                {t('Fuso', 'Zona horaria', 'Timezone')}: {agenda.page.timeZone} · {agenda.page.slotMinutes} min
+                {t('Fuso', 'Zona horaria', 'Timezone')}: {agenda.page.timeZone} ·{' '}
+                {t('Cada reunião', 'Cada reunión', 'Each meeting')}: {agenda.page.slotMinutes} min
               </p>
             </div>
 
@@ -200,22 +203,27 @@ export default function ChorusPublicAgenda() {
               </p>
             ) : (
               <>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {days.map(([date]) => (
-                    <button
-                      key={date}
-                      type="button"
-                      onClick={() => {
-                        setDay(date);
-                        setSlot(null);
-                      }}
-                      className={`shrink-0 rounded-full px-3 py-2 text-sm font-semibold ${
-                        day === date ? 'bg-teal-800 text-white' : 'bg-white text-slate-900 ring-1 ring-slate-300'
-                      }`}
-                    >
-                      {labelDay(date)}
-                    </button>
-                  ))}
+                <div>
+                  <p className="mb-2 text-sm font-medium text-slate-700">
+                    {t('Escolha o horário de início', 'Elige la hora de inicio', 'Pick a start time')}
+                  </p>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {days.map(([date]) => (
+                      <button
+                        key={date}
+                        type="button"
+                        onClick={() => {
+                          setDay(date);
+                          setSlot(null);
+                        }}
+                        className={`shrink-0 rounded-full px-3 py-2 text-sm font-semibold ${
+                          day === date ? 'bg-teal-800 text-white' : 'bg-white text-slate-900 ring-1 ring-slate-300'
+                        }`}
+                      >
+                        {labelDay(date)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {daySlots.map((item) => (
@@ -245,7 +253,8 @@ export default function ChorusPublicAgenda() {
                 }}
               >
                 <p className="text-sm font-medium text-slate-700">
-                  {labelDay(slot.date)} · {labelTime(slot.startsAt)}–{labelTime(slot.endsAt)}
+                  {labelDay(slot.date)} · {t('Início', 'Inicio', 'Start')} {labelTime(slot.startsAt)} ·{' '}
+                  {agenda.page.slotMinutes} min
                 </p>
                 {agenda.page.allowVirtual && agenda.page.allowInPerson ? (
                   <div className="flex gap-2">
