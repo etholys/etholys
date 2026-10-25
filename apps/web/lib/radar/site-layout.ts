@@ -15,6 +15,36 @@ export type RadarSpaceRect = {
   rotation?: number;
   /** On the geo map only when the user placed this space. Auto-grid slots stay false. */
   placed?: boolean;
+  /** Real-world footprint in meters (optional; % layout still drives plant). */
+  widthM?: number | null;
+  lengthM?: number | null;
+  /** Plant spacing inside the space, meters. */
+  spacingM?: number | null;
+};
+
+export const RADAR_STRUCTURE_KINDS = ['shed', 'greenhouse', 'path', 'irrigation_line'] as const;
+export type RadarStructureKind = (typeof RADAR_STRUCTURE_KINDS)[number];
+
+/** Lightweight site structure — not CAD; lives in layoutJson. */
+export type RadarSiteStructure = {
+  id: string;
+  kind: RadarStructureKind;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotation?: number;
+  lengthM?: number | null;
+  widthM?: number | null;
+  heightM?: number | null;
+  label?: string | null;
+};
+
+/** Irrigation polyline in site % coords. */
+export type RadarIrrigationPath = {
+  id: string;
+  points: Array<{ x: number; y: number }>;
+  label?: string | null;
 };
 
 export type RadarSensorPin = {
@@ -59,6 +89,12 @@ export type RadarSiteLayoutDoc = {
   devices?: RadarDeviceBinding[];
   /** Fila de downlink da válvula, consumida pelo gateway. */
   commands?: RadarValveCommand[];
+  /** Shed / greenhouse / path / irrigation_line — MVP structures. */
+  structures?: RadarSiteStructure[];
+  /** Irrigation polylines on the property. */
+  irrigation?: RadarIrrigationPath[];
+  /** Property outline side in meters when areaHa is unknown (optional override). */
+  siteSideM?: number | null;
 };
 
 export function parseCrops(raw: unknown): RadarCrop[] {
@@ -138,6 +174,66 @@ function num(v: unknown, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function optPositiveM(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  const n = typeof v === 'number' ? v : Number(v);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(n * 100) / 100;
+}
+
+function isStructureKind(v: unknown): v is RadarStructureKind {
+  return typeof v === 'string' && (RADAR_STRUCTURE_KINDS as readonly string[]).includes(v);
+}
+
+export function parseStructures(raw: unknown): RadarSiteStructure[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RadarSiteStructure[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue;
+    const r = row as Record<string, unknown>;
+    const id = String(r.id || '').trim();
+    if (!id || !isStructureKind(r.kind)) continue;
+    out.push({
+      id: id.slice(0, 40),
+      kind: r.kind,
+      x: CLAMP(num(r.x, 10), 0, 95),
+      y: CLAMP(num(r.y, 10), 0, 95),
+      w: CLAMP(num(r.w, 12), 2, 100),
+      h: CLAMP(num(r.h, 8), 2, 100),
+      rotation: normRotation(r.rotation),
+      lengthM: optPositiveM(r.lengthM),
+      widthM: optPositiveM(r.widthM),
+      heightM: optPositiveM(r.heightM),
+      label: String(r.label || '').trim().slice(0, 80) || null,
+    });
+  }
+  return out.slice(0, 40);
+}
+
+export function parseIrrigation(raw: unknown): RadarIrrigationPath[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RadarIrrigationPath[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue;
+    const r = row as Record<string, unknown>;
+    const id = String(r.id || '').trim();
+    if (!id || !Array.isArray(r.points) || r.points.length < 2) continue;
+    const points: Array<{ x: number; y: number }> = [];
+    for (const p of r.points) {
+      if (!p || typeof p !== 'object') continue;
+      const pt = p as Record<string, unknown>;
+      points.push({ x: CLAMP(num(pt.x, 50), 0, 100), y: CLAMP(num(pt.y, 50), 0, 100) });
+    }
+    if (points.length < 2) continue;
+    out.push({
+      id: id.slice(0, 40),
+      points: points.slice(0, 40),
+      label: String(r.label || '').trim().slice(0, 80) || null,
+    });
+  }
+  return out.slice(0, 20);
+}
+
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
@@ -150,7 +246,15 @@ export function normRotation(v: unknown): number {
 }
 
 export function emptyRadarLayout(): RadarSiteLayoutDoc {
-  return { version: RADAR_LAYOUT_VERSION, spaces: [], sensors: [], crops: [] };
+  return {
+    version: RADAR_LAYOUT_VERSION,
+    spaces: [],
+    sensors: [],
+    crops: [],
+    structures: [],
+    irrigation: [],
+    siteSideM: null,
+  };
 }
 
 /** Grelha automática quando ainda não há layout guardado. */
@@ -177,6 +281,9 @@ export function autoLayoutSpaces(
         ...prev,
         rotation: normRotation(prev.rotation),
         placed: prev.placed === true,
+        widthM: prev.widthM ?? null,
+        lengthM: prev.lengthM ?? null,
+        spacingM: prev.spacingM ?? null,
       };
     }
     const col = i % cols;
@@ -202,6 +309,9 @@ export function parseRadarLayout(raw: unknown): RadarSiteLayoutDoc | null {
     crops?: unknown;
     devices?: unknown;
     commands?: unknown;
+    structures?: unknown;
+    irrigation?: unknown;
+    siteSideM?: unknown;
   };
   if (!Array.isArray(row.spaces)) return null;
   const spaces: RadarSpaceRect[] = [];
@@ -218,6 +328,9 @@ export function parseRadarLayout(raw: unknown): RadarSiteLayoutDoc | null {
       h: CLAMP(num(r.h, 20), 8, 100),
       rotation: normRotation(r.rotation),
       placed: r.placed === true,
+      widthM: optPositiveM(r.widthM),
+      lengthM: optPositiveM(r.lengthM),
+      spacingM: optPositiveM(r.spacingM),
     });
   }
   const sensors: RadarSensorPin[] = [];
@@ -243,6 +356,9 @@ export function parseRadarLayout(raw: unknown): RadarSiteLayoutDoc | null {
     crops: parseCrops(row.crops),
     devices: parseDevices(row.devices),
     commands: parseCommands(row.commands),
+    structures: parseStructures(row.structures),
+    irrigation: parseIrrigation(row.irrigation),
+    siteSideM: optPositiveM(row.siteSideM),
   };
 }
 
@@ -282,6 +398,9 @@ export function mergeLayoutWithSpaces(
     crops: cropsFromLayout(saved),
     devices: saved?.devices || [],
     commands: saved?.commands || [],
+    structures: saved?.structures || [],
+    irrigation: saved?.irrigation || [],
+    siteSideM: saved?.siteSideM ?? null,
   };
 }
 
@@ -292,6 +411,14 @@ export function sanitizeLayoutPatch(
 ): RadarSiteLayoutDoc | null {
   const parsed = parseRadarLayout(body);
   if (!parsed) return null;
+  const bodyObj = body as {
+    crops?: unknown;
+    devices?: unknown;
+    commands?: unknown;
+    structures?: unknown;
+    irrigation?: unknown;
+    siteSideM?: unknown;
+  };
   const spaces = parsed.spaces
     .filter((s) => allowedSpaceIds.has(s.id))
     .map((s) => ({
@@ -302,6 +429,9 @@ export function sanitizeLayoutPatch(
       h: CLAMP(s.h, 10, 100 - s.y),
       rotation: normRotation(s.rotation),
       placed: s.placed === true,
+      widthM: s.widthM ?? null,
+      lengthM: s.lengthM ?? null,
+      spacingM: s.spacingM ?? null,
     }));
   const sensors = parsed.sensors
     .filter((s) => allowedSensorIds.has(s.id))
@@ -315,9 +445,12 @@ export function sanitizeLayoutPatch(
     version: RADAR_LAYOUT_VERSION,
     spaces,
     sensors,
-    crops: parseCrops((body as { crops?: unknown })?.crops ?? parsed.crops),
-    devices: parseDevices((body as { devices?: unknown })?.devices ?? parsed.devices),
-    commands: parseCommands((body as { commands?: unknown })?.commands ?? parsed.commands),
+    crops: parseCrops(bodyObj.crops ?? parsed.crops),
+    devices: parseDevices(bodyObj.devices ?? parsed.devices),
+    commands: parseCommands(bodyObj.commands ?? parsed.commands),
+    structures: parseStructures(bodyObj.structures ?? parsed.structures),
+    irrigation: parseIrrigation(bodyObj.irrigation ?? parsed.irrigation),
+    siteSideM: optPositiveM(bodyObj.siteSideM ?? parsed.siteSideM),
   };
 }
 

@@ -11,6 +11,7 @@ import {
   Loader2,
   MapPinned,
   Plus,
+  Settings2,
 } from 'lucide-react';
 import { useRadarClientScopeOptional } from '@/components/radar/RadarClientScopeContext';
 import { RADAR_SCOPE_ALL, RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
@@ -439,7 +440,16 @@ export function RadarHome({
                           </div>
                         ) : null}
                       </button>
-                      <div className="absolute right-2 top-2 opacity-0 transition group-hover:opacity-100">
+                      <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                        <Link
+                          href={`${hrefFor(p)}&settings=1`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded-lg border border-white/20 bg-slate-900 p-1.5 text-teal-100 hover:border-teal-400/50"
+                          title={radarT(loc, 'Definições do lugar', 'Ajustes del lugar', 'Place settings')}
+                          aria-label={radarT(loc, 'Definições', 'Ajustes', 'Settings')}
+                        >
+                          <Settings2 className="h-3.5 w-3.5" />
+                        </Link>
                         <RadarEntityActions
                           kind="property"
                           id={p.id}
@@ -447,6 +457,7 @@ export function RadarHome({
                           companyId={companyId}
                           engagementId={engagementId}
                           locale={loc}
+                          settingsHref={`${hrefFor(p)}&settings=1`}
                           onDone={() => void afterEntityChange()}
                         />
                       </div>

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Archive, Loader2, MoreVertical, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { Archive, Loader2, MoreVertical, Settings2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { radarLoc, radarT, type RadarLoc } from '@/lib/radar/i18n';
 
@@ -14,6 +15,7 @@ export function RadarEntityActions({
   companyId,
   engagementId,
   locale,
+  settingsHref,
   onDone,
   className,
 }: {
@@ -23,6 +25,8 @@ export function RadarEntityActions({
   companyId: string;
   engagementId?: string | null;
   locale: string;
+  /** When kind=property, link into Definições do lugar. */
+  settingsHref?: string | null;
   onDone?: () => void;
   className?: string;
 }) {
@@ -135,15 +139,28 @@ export function RadarEntityActions({
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => setConfirm('delete')}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-rose-200 hover:bg-rose-500/15"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {radarT(loc, 'Apagar lugar', 'Borrar lugar', 'Delete place')}
-            </button>
+            <>
+              {settingsHref && (
+                <Link
+                  href={settingsHref}
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-teal-100 hover:bg-teal-500/15"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  {radarT(loc, 'Definições', 'Ajustes', 'Settings')}
+                </Link>
+              )}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => setConfirm('delete')}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-rose-200 hover:bg-rose-500/15"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {radarT(loc, 'Apagar lugar', 'Borrar lugar', 'Delete place')}
+              </button>
+            </>
           )}
         </div>
       )}

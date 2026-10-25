@@ -119,10 +119,25 @@ export async function PATCH(req: NextRequest) {
     if (!patch || patch.spaces.length === 0) {
       return NextResponse.json({ error: 'Layout inválido.' }, { status: 400 });
     }
-    // Preserve crop catalog if client omitted it
+    // Preserve catalog / site extras if client omitted them
     const existing = parseRadarLayout(property.layoutJson);
     if ((!patch.crops || patch.crops.length === 0) && existing?.crops?.length) {
       patch.crops = existing.crops;
+    }
+    if ((!patch.devices || patch.devices.length === 0) && existing?.devices?.length) {
+      patch.devices = existing.devices;
+    }
+    if ((!patch.commands || patch.commands.length === 0) && existing?.commands?.length) {
+      patch.commands = existing.commands;
+    }
+    if ((!patch.structures || patch.structures.length === 0) && existing?.structures?.length) {
+      patch.structures = existing.structures;
+    }
+    if ((!patch.irrigation || patch.irrigation.length === 0) && existing?.irrigation?.length) {
+      patch.irrigation = existing.irrigation;
+    }
+    if (patch.siteSideM == null && existing?.siteSideM != null) {
+      patch.siteSideM = existing.siteSideM;
     }
     const row = await prisma.radarProperty.update({
       where: { id: propertyId },

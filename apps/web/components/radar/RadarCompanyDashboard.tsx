@@ -261,6 +261,7 @@ export function RadarCompanyDashboard({
                 const placeAlerts = urgent.filter((a) => a.propertyId === p.id);
                 const worst = placeAlerts.find((a) => a.severity === 'critical') || placeAlerts[0];
                 const openHref = `/hub/radar/properties/${p.id}?${companyQ}`;
+                const settingsHref = `${openHref}&settings=1`;
                 return (
                   <li key={p.id} className="group relative">
                     <button
@@ -305,6 +306,7 @@ export function RadarCompanyDashboard({
                         companyId={companyId}
                         engagementId={engagementId}
                         locale={loc}
+                        settingsHref={settingsHref}
                         onDone={() => void afterEntityChange()}
                       />
                     </div>

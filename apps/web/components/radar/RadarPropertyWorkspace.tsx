@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, BookOpen, Loader2, Pencil, Radio, Search, Sprout } from 'lucide-react';
+import { ArrowLeft, BookOpen, Loader2, MapPinned, Maximize2, Pencil, Radio, Search, Settings2, Sprout } from 'lucide-react';
 import { RADAR_MODULES, type RadarModuleId } from '@/lib/etholys-products';
 import { isRadarModuleId, spaceKindMeta } from '@/lib/radar/space';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
@@ -16,10 +16,12 @@ import { RadarFocusSheet } from '@/components/radar/RadarFocusSheet';
 import { RadarSpaceTree } from '@/components/radar/RadarSpaceTree';
 import {
   emptyRadarLayout,
+  RADAR_STRUCTURE_KINDS,
   rotateSpace,
   unplaceSpace,
   type RadarCrop,
   type RadarSiteLayoutDoc,
+  type RadarStructureKind,
 } from '@/lib/radar/site-layout';
 import { MOISTURE_THRESHOLD } from '@/lib/radar/agriculture';
 import { RADAR_DEVICE_CATALOG } from '@/lib/radar/devices';
@@ -68,6 +70,7 @@ export function RadarPropertyWorkspace({
   locale,
   backHref,
   initialUnitId,
+  initialSettingsOpen,
 }: {
   companyId: string;
   propertyId: string;
@@ -75,6 +78,8 @@ export function RadarPropertyWorkspace({
   locale: string;
   backHref: string;
   initialUnitId?: string | null;
+  /** Open Definições do lugar on mount (e.g. ?settings=1 from home). */
+  initialSettingsOpen?: boolean;
 }) {
   const loc = radarLoc(locale);
   const [data, setData] = useState<PropertyDetail | null>(null);
@@ -96,6 +101,9 @@ export function RadarPropertyWorkspace({
   const [spaceName, setSpaceName] = useState('');
   const [spaceCrop, setSpaceCrop] = useState('');
   const [spaceArea, setSpaceArea] = useState('');
+  const [spaceWidthM, setSpaceWidthM] = useState('');
+  const [spaceLengthM, setSpaceLengthM] = useState('');
+  const [spaceSpacingM, setSpaceSpacingM] = useState('');
   const [editingSensorId, setEditingSensorId] = useState<string | null>(null);
   const [editSensorName, setEditSensorName] = useState('');
   const [editSensorMetric, setEditSensorMetric] = useState('');
@@ -109,9 +117,11 @@ export function RadarPropertyWorkspace({
   const [query, setQuery] = useState('');
   const [railOpen, setRailOpen] = useState(true);
   const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
-  const [editMode, setEditMode] = useState<'none' | 'place' | 'move'>('none');
+  const [editMode, setEditMode] = useState<'none' | 'place' | 'move' | 'site_move' | 'site_resize'>('none');
   /** Full focus sheet — closed by default so the map stays clear. */
   const [focusDetailOpen, setFocusDetailOpen] = useState(false);
+  const [draftAreaHa, setDraftAreaHa] = useState<number | null>(null);
+  const settingsOpened = useRef(false);
   const frameRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -147,6 +157,14 @@ export function RadarPropertyWorkspace({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!initialSettingsOpen || settingsOpened.current || !data) return;
+    settingsOpened.current = true;
+    setPanel('characterize');
+    setTool(null);
+    // Do not force 2D — user stays in whatever view they had; edit tools use map when needed.
+  }, [initialSettingsOpen, data]);
 
   useEffect(() => {
     const el = frameRef.current;
@@ -238,6 +256,27 @@ export function RadarPropertyWorkspace({
     }
   };
 
+  const commitSiteArea = async (nextHa: number) => {
+    const ha = Number.isFinite(nextHa) && nextHa > 0 ? Math.round(nextHa * 100) / 100 : null;
+    if (ha == null) return;
+    setDraftAreaHa(ha);
+    setArea(String(ha));
+    try {
+      await patch({
+        action: 'characterize',
+        name: name.trim() || data?.name,
+        moduleId: moduleId || data?.moduleId,
+        crop: crop || data?.crop || '',
+        areaHa: ha,
+      });
+      setEditMode((cur) => (cur === 'site_resize' ? 'none' : cur));
+      setDraftAreaHa(null);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Erro');
+    }
+  };
+
   if (loading && !data) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
@@ -283,6 +322,10 @@ export function RadarPropertyWorkspace({
       setSpaceName(u.name);
       setSpaceCrop(u.crop || '');
       setSpaceArea(u.areaHa != null ? String(u.areaHa) : '');
+      const rect = layout.spaces.find((s) => s.id === id);
+      setSpaceWidthM(rect?.widthM != null ? String(rect.widthM) : '');
+      setSpaceLengthM(rect?.lengthM != null ? String(rect.lengthM) : '');
+      setSpaceSpacingM(rect?.spacingM != null ? String(rect.spacingM) : '');
     }
   };
 
@@ -291,6 +334,10 @@ export function RadarPropertyWorkspace({
     setSpaceName(focusedUnit.name);
     setSpaceCrop(focusedUnit.crop || '');
     setSpaceArea(focusedUnit.areaHa != null ? String(focusedUnit.areaHa) : '');
+    const rect = layout.spaces.find((s) => s.id === focusedUnit.id);
+    setSpaceWidthM(rect?.widthM != null ? String(rect.widthM) : '');
+    setSpaceLengthM(rect?.lengthM != null ? String(rect.lengthM) : '');
+    setSpaceSpacingM(rect?.spacingM != null ? String(rect.spacingM) : '');
     setEditingSpace(true);
     setFocusDetailOpen(true);
     setEditMode('none');
@@ -312,7 +359,7 @@ export function RadarPropertyWorkspace({
     }
     setPanel((cur) => (cur === id ? null : id));
     setTool(null);
-    if (id === 'geolocate') setView('2d');
+    // Geolocate uses map handlers; if in 3D we temporarily show the map while editMode/placing is active.
   };
   const nextLabel: Record<PropertyStepId, string> = {
     characterize: radarT(loc, 'Falta caracterizar o sítio', 'Falta caracterizar el sitio', 'Characterize this site'),
@@ -372,24 +419,47 @@ export function RadarPropertyWorkspace({
         layer, those values compete with sibling overlays (z-10) and bury all map chrome.
       */}
       <div className="absolute inset-0 z-0">
-        {view === '3d' ? (
+        {/*
+          Stay in 3D mode for the toggle. When an edit tool needs Leaflet (place/move/site_*),
+          show the OSM map for the gesture — view state stays '3d' and Twin returns when editMode clears.
+        */}
+        {view === '3d' && editMode === 'none' && panel !== 'geolocate' ? (
           <RadarSpatialTwin
             locale={loc}
             moduleId={data.moduleId}
             parcels={mapParcels.flatMap((p) => {
               const rect = layout.spaces.find((s) => s.id === p.id && s.placed === true);
               if (!rect) return [];
-              return [{ ...p, x: rect.x, y: rect.y, w: rect.w, h: rect.h, rotation: rect.rotation ?? 0 }];
+              return [
+                {
+                  ...p,
+                  x: rect.x,
+                  y: rect.y,
+                  w: rect.w,
+                  h: rect.h,
+                  rotation: rect.rotation ?? 0,
+                  widthM: rect.widthM ?? null,
+                  lengthM: rect.lengthM ?? null,
+                  spacingM: rect.spacingM ?? null,
+                },
+              ];
             })}
             sensors={data.sensors.map((s) => ({
               id: s.id,
               name: s.name,
               unitId: s.unitId,
               lastValue: s.lastValue ?? null,
+              sku: data.devices?.find((d) => d.sensorId === s.id)?.sku || null,
             }))}
             focusedId={focusedId}
             onFocus={(id) => focusUnit(id)}
             fill
+            lat={data.lat}
+            lng={data.lng}
+            areaHa={draftAreaHa ?? data.areaHa}
+            siteSideM={layout.siteSideM ?? null}
+            structures={layout.structures || []}
+            irrigation={layout.irrigation || []}
           />
         ) : (
           <RadarSiteMap
@@ -407,21 +477,37 @@ export function RadarPropertyWorkspace({
               lastValue: s.lastValue ?? null,
             }))}
             focusedId={focusedId}
-            onFocus={(id) => focusUnit(id, { keepEditMode: editMode === 'move' || editMode === 'place' })}
+            onFocus={(id) =>
+              focusUnit(id, {
+                keepEditMode: editMode === 'move' || editMode === 'place',
+              })
+            }
             onSaved={() => void load()}
             syncedLayout={layout}
             editMode={editMode}
             onLayoutDraft={draftLayout}
             onLayoutCommit={(next) => void commitLayout(next)}
+            onSiteAreaDraft={(ha) => {
+              setDraftAreaHa(ha);
+              setArea(String(ha));
+            }}
+            onSiteAreaCommit={(ha) => void commitSiteArea(ha)}
             basemap={{
               lat: data.lat,
               lng: data.lng,
-              areaHa: data.areaHa,
+              areaHa: draftAreaHa ?? data.areaHa,
               query,
-              placing: panel === 'geolocate' || data.lat == null || data.lng == null,
+              placing:
+                editMode === 'site_move' ||
+                panel === 'geolocate' ||
+                data.lat == null ||
+                data.lng == null,
               onPin: (lat, lng) => {
                 void patch({ action: 'geolocate', lat, lng })
-                  .then(() => load())
+                  .then(() => {
+                    setEditMode((cur) => (cur === 'site_move' ? 'none' : cur));
+                    return load();
+                  })
                   .catch((e) => setErr(e instanceof Error ? e.message : 'Erro'));
               },
             }}
@@ -511,8 +597,19 @@ export function RadarPropertyWorkspace({
           <button type="button" onClick={() => openStep('sensors')} className={actionBtn(panel === 'sensors')}>
             {radarT(loc, 'Sensores', 'Sensores', 'Sensors')}
           </button>
-          <button type="button" onClick={() => openStep('characterize')} className={actionBtn(panel === 'characterize')}>
-            {radarT(loc, 'Ficha do sítio', 'Ficha del sitio', 'Site file')}
+          <button
+            type="button"
+            onClick={() => {
+              openStep('characterize');
+              setEditMode('none');
+            }}
+            className={actionBtn(panel === 'characterize')}
+            title={radarT(loc, 'Definições do lugar', 'Ajustes del lugar', 'Place settings')}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Settings2 className="h-3.5 w-3.5" />
+              {radarT(loc, 'Definições', 'Ajustes', 'Settings')}
+            </span>
           </button>
           <div className={`flex p-1 ${chromePill}`}>
             <button
@@ -535,6 +632,16 @@ export function RadarPropertyWorkspace({
             </button>
           </div>
           </div>
+          {view === '3d' && editMode !== 'none' && (
+            <p className="max-w-xl self-start rounded-full bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-950 shadow-lg">
+              {radarT(
+                loc,
+                'Modo 3D activo — a editar no mapa OSM; a vista 3D retoma ao terminar a ferramenta.',
+                'Modo 3D activo — editando en el mapa OSM; la vista 3D vuelve al terminar la herramienta.',
+                '3D mode on — editing on the OSM map; 3D returns when you finish the tool.',
+              )}
+            </p>
+          )}
           {err && (
             <p className="max-w-md rounded-xl border border-rose-400/30 bg-rose-950/90 px-3 py-2 text-sm text-rose-100">
               {err}
@@ -597,7 +704,6 @@ export function RadarPropertyWorkspace({
                   await load();
                   if (d?.unit?.id) {
                     setFocusedId(d.unit.id as string);
-                    setView('2d');
                     setEditMode('place');
                   }
                   setTool(null);
@@ -608,14 +714,208 @@ export function RadarPropertyWorkspace({
               <div className="space-y-5">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-                    {radarT(loc, 'Ficha do sítio', 'Ficha del sitio', 'Site file')}
+                    {radarT(loc, 'Configuração', 'Configuración', 'Configuration')}
                   </p>
                   <h2 className="mt-1 font-serif text-2xl text-white">
-                    {radarT(loc, 'Editar propriedade', 'Editar propiedad', 'Edit property')}
+                    {radarT(loc, 'Definições do lugar', 'Ajustes del lugar', 'Place settings')}
                   </h2>
                   <p className="mt-1 text-sm text-white/55">
-                    {radarT(loc, 'Nome, tipo/módulo, cultura e hectares.', 'Nombre, tipo/módulo, cultivo y hectáreas.', 'Name, type/module, crop and hectares.')}
+                    {radarT(
+                      loc,
+                      'Nome, tipo/módulo, área — e mover ou redimensionar a propriedade no mapa.',
+                      'Nombre, tipo/módulo, área — y mover o redimensionar la propiedad en el mapa.',
+                      'Name, type/module, area — and move or resize the property on the map.',
+                    )}
                   </p>
+                </div>
+                <div className="rounded-xl border border-amber-400/30 bg-[#0c1a24] px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-200/80">
+                    {radarT(loc, 'Propriedade no mapa', 'Propiedad en el mapa', 'Property on the map')}
+                  </p>
+                  <p className="mt-1 text-xs text-white/50">
+                    {radarT(
+                      loc,
+                      'Ferramentas do contorno do sítio — distintas de Mover/Rodar de um espaço.',
+                      'Herramientas del contorno del sitio — distintas de Mover/Girar de un espacio.',
+                      'Site outline tools — distinct from moving/rotating a space.',
+                    )}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        setTool(null);
+                        setFocusedId(null);
+                        setFocusDetailOpen(false);
+                        setEditMode((cur) => (cur === 'site_move' ? 'none' : 'site_move'));
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                        editMode === 'site_move'
+                          ? 'bg-amber-300 text-slate-950'
+                          : 'bg-white/10 text-white hover:bg-white/15'
+                      }`}
+                    >
+                      <MapPinned className="h-3.5 w-3.5" />
+                      {editMode === 'site_move'
+                        ? radarT(loc, 'A mover propriedade…', 'Moviendo propiedad…', 'Moving property…')
+                        : radarT(loc, 'Mover propriedade', 'Mover propiedad', 'Move property')}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy || data.lat == null || data.lng == null}
+                      onClick={() => {
+                        setTool(null);
+                        setFocusedId(null);
+                        setFocusDetailOpen(false);
+                        setEditMode((cur) => (cur === 'site_resize' ? 'none' : 'site_resize'));
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${
+                        editMode === 'site_resize'
+                          ? 'bg-amber-300 text-slate-950'
+                          : 'bg-white/10 text-white hover:bg-white/15'
+                      }`}
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                      {editMode === 'site_resize'
+                        ? radarT(loc, 'A redimensionar…', 'Redimensionando…', 'Resizing…')
+                        : radarT(loc, 'Redimensionar', 'Redimensionar', 'Resize')}
+                    </button>
+                  </div>
+                  {(draftAreaHa ?? data.areaHa) != null && (
+                    <p className="mt-2 text-xs text-white/55">
+                      {radarT(loc, 'Área actual', 'Área actual', 'Current area')}:{' '}
+                      <span className="font-semibold text-white">
+                        {draftAreaHa ?? data.areaHa} ha
+                      </span>
+                      {(draftAreaHa ?? data.areaHa) != null && (
+                        <span className="ml-2 text-white/40">
+                          (~{Math.round(Math.sqrt(Number(draftAreaHa ?? data.areaHa) * 10000))} m de lado)
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+                <div className="rounded-xl border border-white/12 bg-[#0c1a24] px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+                    {radarT(loc, 'Estruturas e irrigação (MVP)', 'Estructuras e irrigación (MVP)', 'Structures & irrigation (MVP)')}
+                  </p>
+                  <p className="mt-1 text-xs text-white/45">
+                    {radarT(
+                      loc,
+                      'Tipos simples no layout — visíveis em 2D/3D. Não é CAD.',
+                      'Tipos simples en el layout — visibles en 2D/3D. No es CAD.',
+                      'Simple layout types — visible in 2D/3D. Not CAD.',
+                    )}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {RADAR_STRUCTURE_KINDS.filter((k) => k !== 'irrigation_line').map((kind) => (
+                      <button
+                        key={kind}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          const id = `st_${Date.now().toString(36)}`;
+                          const label: Record<RadarStructureKind, string> = {
+                            shed: radarT(loc, 'Galpão', 'Galpón', 'Shed'),
+                            greenhouse: radarT(loc, 'Estufa', 'Invernadero', 'Greenhouse'),
+                            path: radarT(loc, 'Caminho', 'Camino', 'Path'),
+                            irrigation_line: radarT(loc, 'Irrigação', 'Riego', 'Irrigation'),
+                          };
+                          const next = {
+                            ...layout,
+                            structures: [
+                              ...(layout.structures || []),
+                              {
+                                id,
+                                kind,
+                                x: 20 + ((layout.structures?.length || 0) % 4) * 12,
+                                y: 20 + Math.floor((layout.structures?.length || 0) / 4) * 12,
+                                w: kind === 'path' ? 40 : 14,
+                                h: kind === 'path' ? 6 : 12,
+                                lengthM: kind === 'path' ? 20 : 6,
+                                widthM: kind === 'path' ? 2 : 4,
+                                heightM: kind === 'path' ? 0.1 : 2.5,
+                                label: label[kind],
+                              },
+                            ],
+                          };
+                          void commitLayout(next);
+                        }}
+                        className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-white/15"
+                      >
+                        + {kind === 'shed' ? radarT(loc, 'Galpão', 'Galpón', 'Shed') : kind === 'greenhouse' ? radarT(loc, 'Estufa', 'Invernadero', 'Greenhouse') : radarT(loc, 'Caminho', 'Camino', 'Path')}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        const id = `ir_${Date.now().toString(36)}`;
+                        const n = layout.irrigation?.length || 0;
+                        const next = {
+                          ...layout,
+                          irrigation: [
+                            ...(layout.irrigation || []),
+                            {
+                              id,
+                              label: radarT(loc, 'Linha de irrigação', 'Línea de riego', 'Irrigation line'),
+                              points: [
+                                { x: 15, y: 30 + n * 8 },
+                                { x: 50, y: 30 + n * 8 },
+                                { x: 85, y: 35 + n * 8 },
+                              ],
+                            },
+                          ],
+                        };
+                        void commitLayout(next);
+                      }}
+                      className="rounded-full bg-sky-700/80 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-sky-600"
+                    >
+                      + {radarT(loc, 'Irrigação', 'Riego', 'Irrigation')}
+                    </button>
+                  </div>
+                  {((layout.structures?.length || 0) > 0 || (layout.irrigation?.length || 0) > 0) && (
+                    <ul className="mt-2 space-y-1 text-xs text-white/60">
+                      {(layout.structures || []).map((s) => (
+                        <li key={s.id} className="flex justify-between gap-2">
+                          <span>
+                            {s.label || s.kind}
+                            {s.lengthM != null ? ` · ${s.lengthM}×${s.widthM ?? '—'} m` : ''}
+                          </span>
+                          <button
+                            type="button"
+                            className="text-rose-300 hover:text-rose-200"
+                            onClick={() =>
+                              void commitLayout({
+                                ...layout,
+                                structures: (layout.structures || []).filter((x) => x.id !== s.id),
+                              })
+                            }
+                          >
+                            {radarT(loc, 'Apagar', 'Borrar', 'Delete')}
+                          </button>
+                        </li>
+                      ))}
+                      {(layout.irrigation || []).map((ir) => (
+                        <li key={ir.id} className="flex justify-between gap-2">
+                          <span>{ir.label || radarT(loc, 'Irrigação', 'Riego', 'Irrigation')}</span>
+                          <button
+                            type="button"
+                            className="text-rose-300 hover:text-rose-200"
+                            onClick={() =>
+                              void commitLayout({
+                                ...layout,
+                                irrigation: (layout.irrigation || []).filter((x) => x.id !== ir.id),
+                              })
+                            }
+                          >
+                            {radarT(loc, 'Apagar', 'Borrar', 'Delete')}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
                 <label className="block">
                   <span className="text-xs uppercase tracking-wide text-white/45">
@@ -977,7 +1277,6 @@ export function RadarPropertyWorkspace({
                     type="button"
                     disabled={data.lat == null || data.lng == null}
                     onClick={() => {
-                      setView('2d');
                       setPanel(null);
                       setTool(null);
                       setEditMode((cur) => (cur === 'place' ? 'none' : 'place'));
@@ -995,7 +1294,6 @@ export function RadarPropertyWorkspace({
                     <button
                       type="button"
                       onClick={() => {
-                        setView('2d');
                         setEditMode((cur) => (cur === 'move' ? 'none' : 'move'));
                       }}
                       className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
@@ -1003,15 +1301,15 @@ export function RadarPropertyWorkspace({
                       }`}
                     >
                       {editMode === 'move'
-                        ? radarT(loc, 'A mover…', 'Moviendo…', 'Moving…')
-                        : radarT(loc, 'Mover', 'Mover', 'Move')}
+                        ? radarT(loc, 'A mover espaço…', 'Moviendo espacio…', 'Moving space…')
+                        : radarT(loc, 'Mover espaço', 'Mover espacio', 'Move space')}
                     </button>
                     <button
                       type="button"
                       onClick={() => focusedId && void commitLayout(rotateSpace(layout, focusedId))}
                       className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15"
                     >
-                      {radarT(loc, 'Rodar', 'Girar', 'Rotate')}
+                      {radarT(loc, 'Rodar espaço', 'Girar espacio', 'Rotate space')}
                     </button>
                     <button
                       type="button"
@@ -1080,6 +1378,29 @@ export function RadarPropertyWorkspace({
                     placeholder={moduleId ? spaceKindMeta(moduleId).areaUnit[loc] : 'ha'}
                     className="w-full rounded-xl border border-slate-500 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none"
                   />
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      value={spaceWidthM}
+                      onChange={(e) => setSpaceWidthM(e.target.value)}
+                      inputMode="decimal"
+                      placeholder={radarT(loc, 'Largura m', 'Ancho m', 'Width m')}
+                      className="rounded-xl border border-slate-500 bg-slate-950 px-2 py-2 text-sm text-slate-100 outline-none"
+                    />
+                    <input
+                      value={spaceLengthM}
+                      onChange={(e) => setSpaceLengthM(e.target.value)}
+                      inputMode="decimal"
+                      placeholder={radarT(loc, 'Comp. m', 'Largo m', 'Length m')}
+                      className="rounded-xl border border-slate-500 bg-slate-950 px-2 py-2 text-sm text-slate-100 outline-none"
+                    />
+                    <input
+                      value={spaceSpacingM}
+                      onChange={(e) => setSpaceSpacingM(e.target.value)}
+                      inputMode="decimal"
+                      placeholder={radarT(loc, 'Espaç. m', 'Espac. m', 'Spacing m')}
+                      className="rounded-xl border border-slate-500 bg-slate-950 px-2 py-2 text-sm text-slate-100 outline-none"
+                    />
+                  </div>
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button
@@ -1093,6 +1414,22 @@ export function RadarPropertyWorkspace({
                         crop: spaceCrop.trim() || null,
                         areaHa: spaceArea ? Number(spaceArea) : null,
                       })
+                        .then(() => {
+                          const next = {
+                            ...layout,
+                            spaces: layout.spaces.map((s) =>
+                              s.id === focusedId
+                                ? {
+                                    ...s,
+                                    widthM: spaceWidthM ? Number(spaceWidthM) : null,
+                                    lengthM: spaceLengthM ? Number(spaceLengthM) : null,
+                                    spacingM: spaceSpacingM ? Number(spaceSpacingM) : null,
+                                  }
+                                : s,
+                            ),
+                          };
+                          return commitLayout(next);
+                        })
                         .then(() => load())
                         .then(() => setEditingSpace(false))
                         .catch((e) => setErr(e instanceof Error ? e.message : 'Erro'))

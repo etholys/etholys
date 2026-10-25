@@ -14,6 +14,10 @@ function PropertyInner() {
   const companyId = search.get('company') || activeCompanyId || '';
   const engagementId = search.get('engagement');
   const initialUnitId = search.get('unit');
+  const initialSettingsOpen =
+    search.get('settings') === '1' ||
+    search.get('settings') === 'true' ||
+    search.get('config') === '1';
   const propertyId = String(params.id || '');
 
   if (!companyId || !propertyId) {
@@ -34,6 +38,7 @@ function PropertyInner() {
       locale={loc}
       backHref={backHref}
       initialUnitId={initialUnitId}
+      initialSettingsOpen={initialSettingsOpen}
     />
   );
 }
