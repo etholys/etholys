@@ -430,23 +430,25 @@ export function RadarPropertyWorkspace({
           <RadarSpatialTwin
             locale={loc}
             moduleId={data.moduleId}
-            parcels={mapParcels.flatMap((p) => {
-              const rect = layout.spaces.find((s) => s.id === p.id && s.placed === true);
-              if (!rect) return [];
-              return [
-                {
-                  ...p,
-                  x: rect.x,
-                  y: rect.y,
-                  w: rect.w,
-                  h: rect.h,
-                  rotation: rect.rotation ?? 0,
-                  widthM: rect.widthM ?? null,
-                  lengthM: rect.lengthM ?? null,
-                  spacingM: rect.spacingM ?? null,
-                },
-              ];
+            parcels={mapParcels.map((p) => {
+              // Local plant % layout drives the 3D twin even when placed=false (not on OSM yet).
+              const rect = layout.spaces.find((s) => s.id === p.id);
+              if (!rect) return p;
+              return {
+                ...p,
+                x: rect.x,
+                y: rect.y,
+                w: rect.w,
+                h: rect.h,
+                rotation: rect.rotation ?? 0,
+                widthM: rect.widthM ?? null,
+                lengthM: rect.lengthM ?? null,
+                spacingM: rect.spacingM ?? null,
+              };
             })}
+            mapPlacedCount={layout.spaces.filter(
+              (s) => s.placed === true && mapParcels.some((p) => p.id === s.id),
+            ).length}
             sensors={data.sensors.map((s) => ({
               id: s.id,
               name: s.name,
