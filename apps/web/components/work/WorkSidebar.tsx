@@ -13,7 +13,7 @@ import {
   Folder,
   FolderKanban,
   LayoutDashboard,
-  ListTodo,
+  Layers,
   Lock,
   Menu,
   PanelLeftClose,
@@ -71,7 +71,6 @@ export function WorkSidebar({
   counts,
   onCreateFolder,
   onShareFolder,
-  canSeeEverything = false,
   t,
 }: {
   nav: WorkNav;
@@ -95,26 +94,24 @@ export function WorkSidebar({
   };
   onCreateFolder: (input: { name: string; visibility: 'PERSONAL' | 'SHARED'; color?: string }) => Promise<void>;
   onShareFolder?: (folder: { id: string; name: string }) => void;
-  /** Company ADMIN only — overview of SHARED team boards */
-  canSeeEverything?: boolean;
   t: (en: string, es: string, pt: string) => string;
 }) {
-  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerFor, setComposerFor] = useState<'SHARED' | 'PERSONAL' | null>(null);
   const [draft, setDraft] = useState('');
   const [color, setColor] = useState<string>(GROUP_COLORS[0]);
-  const [visibility, setVisibility] = useState<'PERSONAL' | 'SHARED'>('PERSONAL');
   const [creating, setCreating] = useState(false);
-  const [companyOpen, setCompanyOpen] = useState(true);
+  /** Org filters are not boards — keep collapsed so they don't look like a third board list. */
+  const [orgOpen, setOrgOpen] = useState(false);
   const composerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!composerOpen) return;
+    if (!composerFor) return;
     const onDoc = (e: MouseEvent) => {
-      if (!composerRef.current?.contains(e.target as Node)) setComposerOpen(false);
+      if (!composerRef.current?.contains(e.target as Node)) setComposerFor(null);
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [composerOpen]);
+  }, [composerFor]);
 
   const go = (n: WorkNav) => {
     onNav(n);
@@ -165,27 +162,25 @@ export function WorkSidebar({
 
   const submitFolder = async () => {
     const name = draft.trim();
-    if (!name || creating) return;
+    if (!name || creating || !composerFor) return;
     setCreating(true);
     try {
-      await onCreateFolder({ name, visibility, color });
+      await onCreateFolder({ name, visibility: composerFor, color });
       setDraft('');
-      setComposerOpen(false);
-      setVisibility('PERSONAL');
+      setComposerFor(null);
     } finally {
       setCreating(false);
     }
   };
 
-  const openComposer = () => {
+  const openComposer = (kind: 'SHARED' | 'PERSONAL') => {
     if (collapsed) onToggle();
-    setComposerOpen(true);
+    setComposerFor(kind);
+    setDraft('');
   };
 
-  const folderRow = (f: WorkFolderRow) => {
+  const folderRow = (f: WorkFolderRow, shared: boolean) => {
     const isOwner = f.ownerId === currentUserId;
-    const memberCount = f.members?.length ?? f._count?.members ?? 0;
-    const shared = f.visibility === 'SHARED' || memberCount > 0;
     const shareBtn =
       isOwner && onShareFolder ? (
         <button
@@ -233,6 +228,86 @@ export function WorkSidebar({
       shareBtn,
     );
   };
+
+  const newBoardPopover = (kind: 'SHARED' | 'PERSONAL') =>
+    composerFor === kind && !collapsed ? (
+      <div
+        ref={composerRef}
+        className="absolute right-0 top-8 z-40 w-56 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-3 shadow-lg"
+      >
+        <p className="mb-2 text-xs font-semibold text-[color:var(--sys-ink)]">
+          {kind === 'SHARED'
+            ? t('New shared board', 'Nuevo tablero compartido', 'Novo quadro partilhado')
+            : t('New private board', 'Nuevo tablero solo mío', 'Novo quadro só meu')}
+        </p>
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              void submitFolder();
+            }
+            if (e.key === 'Escape') setComposerFor(null);
+          }}
+          placeholder={t('Name', 'Nombre', 'Nome')}
+          className="mb-2 w-full rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-500"
+        />
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {GROUP_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColor(c)}
+              className={cn('h-5 w-5 rounded-full ring-offset-2', color === c ? 'ring-2 ring-slate-800' : 'ring-0')}
+              style={{ backgroundColor: c }}
+              aria-label={c}
+            />
+          ))}
+        </div>
+        <p className="mb-2 text-[10px] leading-snug text-[color:var(--sys-faint)]">
+          {kind === 'SHARED'
+            ? t(
+                'You can invite people after creating it',
+                'Podrás invitar personas después de crearlo',
+                'Podes convidar pessoas depois de o criares',
+              )
+            : t('Only you can see it', 'Solo tú lo ves', 'Só tu o vês')}
+        </p>
+        <button
+          type="button"
+          disabled={creating || !draft.trim()}
+          onClick={() => void submitFolder()}
+          className="w-full rounded-lg bg-teal-700 px-2 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-40"
+        >
+          {t('Create', 'Crear', 'Criar')}
+        </button>
+      </div>
+    ) : null;
+
+  const sectionPlus = (kind: 'SHARED' | 'PERSONAL') => (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => (composerFor === kind ? setComposerFor(null) : openComposer(kind))}
+        className="rounded-md p-1 text-[color:var(--sys-faint)] hover:bg-teal-500/15 hover:text-teal-200"
+        title={
+          kind === 'SHARED'
+            ? t('New shared board', 'Nuevo tablero compartido', 'Novo quadro partilhado')
+            : t('New private board', 'Nuevo tablero solo mío', 'Novo quadro só meu')
+        }
+        aria-label={
+          kind === 'SHARED'
+            ? t('New shared board', 'Nuevo tablero compartido', 'Novo quadro partilhado')
+            : t('New private board', 'Nuevo tablero solo mío', 'Novo quadro só meu')
+        }
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+      {newBoardPopover(kind)}
+    </div>
+  );
 
   const personalFolders = folders.filter(
     (f) => f.visibility !== 'SHARED' && (f.members?.length ?? f._count?.members ?? 0) === 0,
@@ -303,19 +378,25 @@ export function WorkSidebar({
         </div>
 
         <nav className={cn('min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain pb-3', collapsed ? 'px-1.5' : 'px-2')}>
+          {/* Inbox — not boards */}
           <div className="space-y-0.5 pt-2">
             {!collapsed && (
               <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)]">
-                {t('Me', 'Yo', 'Eu')}
+                {t('Work', 'Trabajo', 'Trabalho')}
               </p>
             )}
-            {item(nav.kind === 'mine', () => go({ kind: 'mine' }), <UserRound className="h-4 w-4" />, t('My work', 'Mi trabajo', 'O meu trabalho'), counts.mine)}
             {item(
-              nav.kind === 'archive',
-              () => go({ kind: 'archive' }),
-              <Archive className="h-4 w-4" />,
-              t('Archive', 'Archivo', 'Arquivo'),
-              counts.archived,
+              nav.kind === 'dashboard',
+              () => go({ kind: 'dashboard' }),
+              <LayoutDashboard className="h-4 w-4" />,
+              t('Home', 'Inicio', 'Início'),
+            )}
+            {item(
+              nav.kind === 'mine',
+              () => go({ kind: 'mine' }),
+              <UserRound className="h-4 w-4" />,
+              t('My tasks', 'Mis tareas', 'As minhas tarefas'),
+              counts.mine,
             )}
             {item(
               nav.kind === 'overdue',
@@ -326,134 +407,91 @@ export function WorkSidebar({
               undefined,
               'danger',
             )}
-            {personalFolders.map((f) => folderRow(f))}
-          </div>
-
-          <div className="space-y-0.5">
-            {!collapsed && (
-              <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)]">
-                {t('Overview', 'Visión', 'Visão')}
-              </p>
+            {item(
+              nav.kind === 'archive',
+              () => go({ kind: 'archive' }),
+              <Archive className="h-4 w-4" />,
+              t('Archive', 'Archivo', 'Arquivo'),
+              counts.archived,
             )}
-            {item(nav.kind === 'dashboard', () => go({ kind: 'dashboard' }), <LayoutDashboard className="h-4 w-4" />, t('Home', 'Inicio', 'Início'))}
-            {canSeeEverything &&
-              item(
-                nav.kind === 'all',
-                () => go({ kind: 'all' }),
-                <ListTodo className="h-4 w-4" />,
-                t('All shared boards', 'Todos los tableros', 'Todos os quadros'),
-                counts.sharedOpen ?? 0,
-              )}
           </div>
 
-          {/* Shared collaborative boards — not the same as company/org filters below */}
+          {/* Shared boards + synthetic “all shared” */}
           <div>
             <div className={cn('mb-1 flex items-center', collapsed ? 'justify-center' : 'justify-between px-2')}>
               {!collapsed && (
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)]">
-                  {t('Boards', 'Tableros', 'Quadros')}
+                  {t('Shared', 'Compartidos', 'Partilhados')}
                 </p>
               )}
-              <div className="relative" ref={composerRef}>
-                <button
-                  type="button"
-                  onClick={() => (composerOpen ? setComposerOpen(false) : openComposer())}
-                  className="rounded-md p-1 text-[color:var(--sys-faint)] hover:bg-teal-500/15 hover:text-teal-200"
-                  title={t('New board', 'Nuevo tablero', 'Novo quadro')}
-                  aria-label={t('New board', 'Nuevo tablero', 'Novo quadro')}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-                {composerOpen && !collapsed && (
-                  <div className="absolute right-0 top-8 z-40 w-56 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-3 shadow-lg">
-                    <p className="mb-2 text-xs font-semibold text-[color:var(--sys-ink)]">
-                      {t('New board', 'Nuevo tablero', 'Novo quadro')}
-                    </p>
-                    <input
-                      autoFocus
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          void submitFolder();
-                        }
-                        if (e.key === 'Escape') setComposerOpen(false);
-                      }}
-                      placeholder={t('Name', 'Nombre', 'Nome')}
-                      className="mb-2 w-full rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-500"
-                    />
-                    <div className="mb-2 flex flex-wrap gap-1.5">
-                      {GROUP_COLORS.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => setColor(c)}
-                          className={cn(
-                            'h-5 w-5 rounded-full ring-offset-2',
-                            color === c ? 'ring-2 ring-slate-800' : 'ring-0',
-                          )}
-                          style={{ backgroundColor: c }}
-                          aria-label={c}
-                        />
-                      ))}
-                    </div>
-                    <div className="mb-2 grid grid-cols-2 gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setVisibility('PERSONAL')}
-                        className={cn(
-                          'rounded-md px-2 py-1 text-[11px] font-semibold',
-                          visibility === 'PERSONAL' ? 'bg-teal-600 text-white' : 'bg-white/10 text-[color:var(--sys-muted)]',
-                        )}
-                      >
-                        {t('Only me', 'Solo yo', 'Só eu')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setVisibility('SHARED')}
-                        className={cn(
-                          'rounded-md px-2 py-1 text-[11px] font-semibold',
-                          visibility === 'SHARED' ? 'bg-teal-600 text-white' : 'bg-white/10 text-[color:var(--sys-muted)]',
-                        )}
-                      >
-                        {t('Share', 'Compartir', 'Partilhar')}
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={creating || !draft.trim()}
-                      onClick={() => void submitFolder()}
-                      className="w-full rounded-lg bg-teal-700 px-2 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-40"
-                    >
-                      {t('Create', 'Crear', 'Criar')}
-                    </button>
-                  </div>
-                )}
-              </div>
+              {sectionPlus('SHARED')}
             </div>
-            <div className="space-y-0.5">{sharedFolders.map((f) => folderRow(f))}</div>
+            <div className="space-y-0.5">
+              {item(
+                nav.kind === 'all',
+                () => go({ kind: 'all' }),
+                <Layers className="h-4 w-4" />,
+                t('All shared', 'Todo lo compartido', 'Tudo partilhado'),
+                counts.sharedOpen ?? 0,
+              )}
+              {sharedFolders.map((f) => folderRow(f, true))}
+            </div>
             {!collapsed && sharedFolders.length === 0 && (
-              <p className="px-2.5 py-1 text-[11px] text-[color:var(--sys-faint)]">
-                {t('Shared boards with your team', 'Tableros compartidos con el equipo', 'Quadros partilhados com a equipa')}
+              <p className="px-2.5 py-1 text-[11px] leading-snug text-[color:var(--sys-faint)]">
+                {t(
+                  'Boards you share with others — “All shared” lists every task in them',
+                  'Tableros que compartes — “Todo lo compartido” junta todas sus tareas',
+                  'Quadros que partilhas — “Tudo partilhado” junta todas as tarefas deles',
+                )}
               </p>
             )}
           </div>
 
-          {/* Org filters / SIEP mirrors — deliberately not “Equipo” to avoid colliding with Boards */}
+          {/* Private boards — only me */}
+          <div>
+            <div className={cn('mb-1 flex items-center', collapsed ? 'justify-center' : 'justify-between px-2')}>
+              {!collapsed && (
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)]">
+                  {t('Only me', 'Solo yo', 'Só eu')}
+                </p>
+              )}
+              {sectionPlus('PERSONAL')}
+            </div>
+            <div className="space-y-0.5">{personalFolders.map((f) => folderRow(f, false))}</div>
+            {!collapsed && personalFolders.length === 0 && (
+              <p className="px-2.5 py-1 text-[11px] leading-snug text-[color:var(--sys-faint)]">
+                {t(
+                  'Private boards — only you can see them until you share',
+                  'Tableros privados — solo tú los ves hasta que los compartas',
+                  'Quadros privados — só tu os vês até partilhares',
+                )}
+              </p>
+            )}
+          </div>
+
+          {/* Org / SIEP filters — not boards */}
           <div>
             {!collapsed ? (
               <button
                 type="button"
-                onClick={() => setCompanyOpen((v) => !v)}
+                onClick={() => setOrgOpen((v) => !v)}
                 className="mb-1 flex w-full items-center justify-between px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)] hover:text-[color:var(--sys-ink)]"
               >
-                {t('Company', 'Empresa', 'Empresa')}
-                <ChevronDown className={cn('h-3 w-3 transition', companyOpen && 'rotate-180')} />
+                <span>{t('Other filters', 'Otros filtros', 'Outros filtros')}</span>
+                <ChevronDown className={cn('h-3 w-3 transition', orgOpen && 'rotate-180')} />
               </button>
             ) : null}
-            {(collapsed || companyOpen) && (
+            {(collapsed || orgOpen) && (
               <div className="space-y-0.5">
+                {!collapsed && (
+                  <p className="px-2.5 pb-1 text-[10px] leading-snug text-[color:var(--sys-faint)]">
+                    {t(
+                      'Not boards — company and project views',
+                      'No son tableros — vistas de empresa y proyectos',
+                      'Não são quadros — vistas de empresa e projetos',
+                    )}
+                  </p>
+                )}
                 {item(
                   nav.kind === 'company',
                   () => go({ kind: 'company' }),
@@ -526,12 +564,7 @@ export function WorkMobileBar({
 }) {
   return (
     <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-[color:var(--sys-line)] bg-[color:var(--sys-aside-bg)]/90 px-3 py-2 backdrop-blur-md lg:hidden">
-      <button
-        type="button"
-        onClick={onOpen}
-        className="rounded-lg p-1.5 text-[color:var(--sys-ink)]"
-        aria-label="Menu"
-      >
+      <button type="button" onClick={onOpen} className="rounded-lg p-1.5 text-[color:var(--sys-ink)]" aria-label="Menu">
         <Menu className="h-5 w-5" />
       </button>
       <span className={sysTheme.brand}>{title}</span>

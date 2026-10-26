@@ -141,8 +141,6 @@ export default function WorkShell() {
   const [statusChip, setStatusChip] = useState('');
   const [priorityChip, setPriorityChip] = useState('');
   const [personFocus, setPersonFocus] = useState('');
-  const [isCompanyAdmin, setIsCompanyAdmin] = useState(false);
-
   const currentUserId = (session?.user as { id?: string } | undefined)?.id || null;
 
   const syncUrl = useCallback(
@@ -205,23 +203,6 @@ export default function WorkShell() {
   useEffect(() => {
     if (nav.kind === 'archive') fetchArchivedTasks();
   }, [nav.kind, activeCompanyId]);
-
-  useEffect(() => {
-    if (!activeCompanyId) {
-      setIsCompanyAdmin(false);
-      return;
-    }
-    fetch(`/api/workspace/access?companyId=${encodeURIComponent(activeCompanyId)}`)
-      .then((r) => r.json())
-      .then((d) => setIsCompanyAdmin(Boolean(d?.canManage)))
-      .catch(() => setIsCompanyAdmin(false));
-  }, [activeCompanyId]);
-
-  useEffect(() => {
-    if (nav.kind === 'all' && !isCompanyAdmin) {
-      setNav({ kind: 'mine' });
-    }
-  }, [nav.kind, isCompanyAdmin]);
 
   useEffect(() => {
     const d = new URLSearchParams();
@@ -418,7 +399,7 @@ export default function WorkShell() {
   const contextTitle = (() => {
     if (nav.kind === 'dashboard') return t3('Dashboard', 'Panel', 'Painel');
     if (nav.kind === 'all') {
-      return t3('Shared boards', 'Tableros compartidos', 'Quadros partilhados');
+      return t3('All shared', 'Todo lo compartido', 'Tudo partilhado');
     }
     if (nav.kind === 'mine') return t3('My tasks', 'Mis tareas', 'As minhas tarefas');
     if (nav.kind === 'archive') return t3('Archive', 'Archivo', 'Arquivo');
@@ -458,9 +439,9 @@ export default function WorkShell() {
     }
     if (nav.kind === 'all') {
       return t3(
-        'Admin — only boards shared with the company or people (not private Mi trabajo)',
-        'Admin — solo tableros compartidos con la empresa o personas (no Mi trabajo privado)',
-        'Admin — só quadros partilhados com a empresa ou pessoas (não Mi trabajo privado)',
+        'One list of every task on boards shared with you — not your private boards',
+        'Una sola lista de tareas en tableros compartidos contigo — no tus tableros privados',
+        'Uma só lista de tarefas nos quadros partilhados contigo — não os teus quadros privados',
       );
     }
     if (nav.kind === 'folder') {
@@ -618,7 +599,6 @@ export default function WorkShell() {
         counts={counts}
         onCreateFolder={createFolder}
         onShareFolder={(f) => setShareFolder(f)}
-        canSeeEverything={isCompanyAdmin}
         t={t3}
       />
 
