@@ -3,7 +3,11 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { createNotification } from '@/lib/notify';
+import {
+  buildTaskContextLine,
+  notifyTaskWatchers,
+  wantsWorkEmail,
+} from '@/lib/work/task-notify';
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   try {
@@ -20,9 +24,18 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     const existing = await prisma.taskApprovalRequest.findFirst({
       where: { id: params.id, companyId: { in: tenant.companyIds } },
       include: {
-        task: { select: { id: true, title: true } },
+        task: {
+          select: {
+            id: true,
+            title: true,
+            folder: { select: { name: true } },
+            group: { select: { name: true } },
+            project: { select: { name: true } },
+          },
+        },
         requester: { select: { id: true, name: true } },
         approver: { select: { id: true, name: true } },
+        company: { select: { workBoardJson: true } },
       },
     });
     if (!existing) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
@@ -54,12 +67,35 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       });
     }
 
-    await createNotification({
-      userId: existing.requesterId,
+    const approved = decision === 'APPROVED';
+    const actorName = approval.approver.name || 'Alguien';
+    const what = approved
+      ? 'Aprobó la entrega'
+      : `Rechazó la entrega${decisionNote ? `: ${decisionNote}` : ''}`;
+    notifyTaskWatchers({
+      actorId: tenant.userId,
       type: 'task_approval_decision',
-      title: decision === 'APPROVED' ? 'Entrega aprobada' : 'Entrega rechazada',
-      message: `${approval.approver.name} ${decision === 'APPROVED' ? 'aprobó' : 'rechazó'}: ${approval.task.title}`,
+      title: approved ? 'Entrega aprobada' : 'Entrega rechazada',
+      message: `${actorName} ${approved ? 'aprobó' : 'rechazó'}: ${approval.task.title}`,
+      userIds: [existing.requesterId],
+      enabled: true,
+      email: wantsWorkEmail(existing.company?.workBoardJson),
       link: '/hub/work',
+      mail: {
+        subjectPhrase: approved ? 'Entrega aprobada' : 'Entrega rechazada',
+        headline: approved ? 'Entrega aprobada' : 'Entrega rechazada',
+        where: buildTaskContextLine({
+          taskTitle: existing.task.title,
+          folderName: existing.task.folder?.name,
+          groupName: existing.task.group?.name,
+          projectName: existing.task.project?.name,
+        }),
+        what,
+        who: actorName,
+        when: new Date(),
+        link: '/hub/work',
+        detail: decisionNote,
+      },
     });
 
     return NextResponse.json({ approval });

@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from 'react';
 import {
+  Archive,
   ArrowDown,
   ArrowUp,
   ChevronDown,
@@ -46,10 +47,15 @@ type TaskRow = {
   estimatedHours?: number | null;
   customFields?: Record<string, unknown> | null;
   tags?: unknown;
+  roleMemberIds?: unknown;
   assigneeId?: string | null;
   responsibleId?: string | null;
   reviewerId?: string | null;
   collaboratorIds?: unknown;
+  assigneeIds?: string[] | null;
+  responsibleIds?: string[] | null;
+  reviewerIds?: string[] | null;
+  people?: Array<{ userId: string; role: string; sortOrder?: number }> | null;
   responsible?: UserOpt | null;
   reviewer?: UserOpt | null;
   projectId?: string | null;
@@ -76,9 +82,123 @@ function sortByOrder(tasks: TaskRow[]) {
   return [...tasks].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.title.localeCompare(b.title));
 }
 
+function roleMembersFromCustom(task: TaskRow): { executor?: string[]; responsible?: string[]; reviewer?: string[] } {
+  const cf = task.customFields;
+  if (!cf || typeof cf !== 'object' || Array.isArray(cf)) return {};
+  const raw = (cf as Record<string, unknown>).__roleMemberIds;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const o = raw as Record<string, unknown>;
+  return {
+    executor: Array.isArray(o.executor) ? o.executor.map(String).filter(Boolean) : undefined,
+    responsible: Array.isArray(o.responsible) ? o.responsible.map(String).filter(Boolean) : undefined,
+    reviewer: Array.isArray(o.reviewer) ? o.reviewer.map(String).filter(Boolean) : undefined,
+  };
+}
+
 function personIds(task: TaskRow) {
+  if (Array.isArray(task.assigneeIds) && task.assigneeIds.length) {
+    return [...new Set(task.assigneeIds.map(String).filter(Boolean))];
+  }
+  const fromCustom = roleMembersFromCustom(task).executor;
+  if (fromCustom?.length) return fromCustom;
+  if (Array.isArray(task.people) && task.people.some((p) => p.role === 'EXECUTOR')) {
+    return task.people
+      .filter((p) => p.role === 'EXECUTOR')
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      .map((p) => p.userId);
+  }
   const extra = Array.isArray(task.collaboratorIds) ? task.collaboratorIds.map((id) => String(id)) : [];
   return [task.assigneeId, ...extra].filter((id): id is string => Boolean(id));
+}
+
+function roleIds(task: TaskRow, role: 'RESPONSIBLE' | 'REVIEWER') {
+  if (role === 'RESPONSIBLE') {
+    if (Array.isArray(task.responsibleIds) && task.responsibleIds.length) {
+      return [...new Set(task.responsibleIds.map(String).filter(Boolean))];
+    }
+    const fromCustom = roleMembersFromCustom(task).responsible;
+    if (fromCustom?.length) return fromCustom;
+    if (Array.isArray(task.people) && task.people.some((p) => p.role === 'RESPONSIBLE')) {
+      return task.people
+        .filter((p) => p.role === 'RESPONSIBLE')
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        .map((p) => p.userId);
+    }
+    return task.responsibleId ? [task.responsibleId] : [];
+  }
+  if (Array.isArray(task.reviewerIds) && task.reviewerIds.length) {
+    return [...new Set(task.reviewerIds.map(String).filter(Boolean))];
+  }
+  const fromCustom = roleMembersFromCustom(task).reviewer;
+  if (fromCustom?.length) return fromCustom;
+  if (Array.isArray(task.people) && task.people.some((p) => p.role === 'REVIEWER')) {
+    return task.people
+      .filter((p) => p.role === 'REVIEWER')
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      .map((p) => p.userId);
+  }
+  return task.reviewerId ? [task.reviewerId] : [];
+}
+
+function RolePeopleCell({
+  ids,
+  users,
+  onChange,
+  t,
+  accent = 'teal',
+}: {
+  ids: string[];
+  users: UserOpt[];
+  onChange: (next: string[]) => void;
+  t: (en: string, es: string, pt: string) => string;
+  accent?: 'teal' | 'sky' | 'violet';
+}) {
+  const nameOf = (id: string) => users.find((u) => u.id === id)?.name || users.find((u) => u.id === id)?.email || id;
+  const chip =
+    accent === 'sky'
+      ? 'bg-sky-500/15 text-sky-200'
+      : accent === 'violet'
+        ? 'bg-violet-500/15 text-violet-200'
+        : 'bg-teal-500/15 text-teal-200';
+  const av =
+    accent === 'sky'
+      ? 'bg-sky-500/35'
+      : accent === 'violet'
+        ? 'bg-violet-500/35'
+        : 'bg-teal-500/35';
+  return (
+    <div className="flex min-w-[140px] flex-wrap items-center gap-1">
+      {ids.map((id) => (
+        <button
+          key={id}
+          type="button"
+          title={`${nameOf(id)} — ${t('Remove', 'Quitar', 'Remover')}`}
+          onClick={() => onChange(ids.filter((row) => row !== id))}
+          className={`inline-flex h-6 items-center gap-1 rounded-full px-1.5 text-[10px] font-semibold ${chip}`}
+        >
+          <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[8px] text-[color:var(--sys-ink)] ${av}`}>
+            {getInitials(nameOf(id))}
+          </span>
+          <span className="max-w-[72px] truncate">{nameOf(id)}</span>
+        </button>
+      ))}
+      <select
+        value=""
+        onChange={(e) => {
+          const id = e.target.value;
+          if (!id || ids.includes(id)) return;
+          onChange([...ids, id]);
+        }}
+        className="min-w-[7rem] max-w-[10rem] cursor-pointer rounded border border-dashed border-[color:var(--sys-line)] bg-transparent px-1 py-0.5 text-[11px] text-[color:var(--sys-faint)] outline-none"
+        title={t('Add another person', 'Añadir otra persona', 'Adicionar outra pessoa')}
+      >
+        <option value="">{t('+ Add', '+ Añadir', '+ Adicionar')}</option>
+        {users.filter((u) => !ids.includes(u.id)).map((u) => (
+          <option key={u.id} value={u.id}>{u.name || u.email}</option>
+        ))}
+      </select>
+    </div>
+  );
 }
 
 function PeopleCell({
@@ -92,75 +212,14 @@ function PeopleCell({
   onPatch: (id: string, body: Record<string, unknown>) => void;
   t: (en: string, es: string, pt: string) => string;
 }) {
-  const ids = personIds(task);
-  const extra = ids.filter((id) => id !== task.assigneeId);
-  const nameOf = (id: string) => users.find((u) => u.id === id)?.name || users.find((u) => u.id === id)?.email || id;
   return (
-    <div className="flex min-w-[140px] flex-wrap items-center gap-1">
-      {ids.map((id) => (
-        <button
-          key={id}
-          type="button"
-          title={nameOf(id)}
-          onClick={() => {
-            if (id === task.assigneeId) {
-              const [next, ...rest] = extra;
-              onPatch(task.id, { assigneeId: next || null, collaboratorIds: rest });
-            } else {
-              onPatch(task.id, { collaboratorIds: extra.filter((row) => row !== id) });
-            }
-          }}
-          className="inline-flex h-6 items-center gap-1 rounded-full bg-teal-500/15 px-1.5 text-[10px] font-semibold text-teal-200"
-        >
-          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-teal-500/35 text-[8px] text-[color:var(--sys-ink)]">
-            {getInitials(nameOf(id))}
-          </span>
-          <span className="max-w-[72px] truncate">{nameOf(id)}</span>
-        </button>
-      ))}
-      <select
-        value=""
-        onChange={(e) => {
-          const id = e.target.value;
-          if (!id || ids.includes(id)) return;
-          if (!task.assigneeId) onPatch(task.id, { assigneeId: id });
-          else onPatch(task.id, { collaboratorIds: [...extra, id] });
-        }}
-        className="max-w-[88px] cursor-pointer bg-transparent text-[11px] text-[color:var(--sys-faint)] outline-none"
-      >
-        <option value="">{t('+ Person', '+ Persona', '+ Pessoa')}</option>
-        {users.filter((u) => !ids.includes(u.id)).map((u) => (
-          <option key={u.id} value={u.id}>{u.name || u.email}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function RoleSelect({
-  value,
-  users,
-  onChange,
-  t,
-}: {
-  value: string;
-  users: UserOpt[];
-  onChange: (id: string) => void;
-  t: (en: string, es: string, pt: string) => string;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full cursor-pointer bg-transparent text-[11px] text-[color:var(--sys-ink)] outline-none"
-    >
-      <option value="">{t('—', '—', '—')}</option>
-      {users.map((u) => (
-        <option key={u.id} value={u.id}>
-          {u.name || u.email}
-        </option>
-      ))}
-    </select>
+    <RolePeopleCell
+      ids={personIds(task)}
+      users={users}
+      onChange={(next) => onPatch(task.id, { assigneeIds: next })}
+      t={t}
+      accent="teal"
+    />
   );
 }
 
@@ -306,6 +365,8 @@ export function WorkTableBoard({
   onNotifyChange,
   onCommentPosted,
   onDeleteTask,
+  onArchiveTask,
+  onArchiveDoneInGroup,
   subtasksOf,
   onAddSubtask,
   onDuplicate,
@@ -342,6 +403,8 @@ export function WorkTableBoard({
   onNotifyChange?: (notify: WorkNotifyPrefs) => void;
   onCommentPosted?: () => void;
   onDeleteTask?: (id: string, title: string) => void;
+  onArchiveTask?: (id: string, title: string) => void;
+  onArchiveDoneInGroup?: (groupId: string | null, taskIds: string[]) => void;
   subtasksOf?: (parentId: string) => TaskRow[];
   onAddSubtask?: (parentId: string, title: string) => Promise<void>;
   onDuplicate?: (task: TaskRow) => void;
@@ -929,6 +992,20 @@ export function WorkTableBoard({
                 </div>
               )}
               <div className="flex-1" />
+              {onArchiveDoneInGroup && doneCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ids = section.tasks.filter((task) => task.status === 'DONE').map((task) => task.id);
+                    if (ids.length) onArchiveDoneInGroup(section.id, ids);
+                  }}
+                  className="mr-1 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-400 hover:bg-teal-50 hover:text-teal-700"
+                  title={t('Archive done', 'Archivar hechas', 'Arquivar concluídas')}
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{t('Archive done', 'Archivar hechas', 'Arquivar concluídas')}</span>
+                </button>
+              )}
               {section.id ? (
                 <button
                   type="button"
@@ -1157,6 +1234,16 @@ export function WorkTableBoard({
                               >
                                 {t('Open', 'Abrir', 'Abrir')}
                               </button>
+                              {onArchiveTask && (
+                                <button
+                                  type="button"
+                                  onClick={() => onArchiveTask(task.id, task.title)}
+                                  className="shrink-0 rounded p-1 text-[color:var(--sys-faint)] opacity-0 hover:text-teal-300 group-hover:opacity-100"
+                                  title={t('Archive', 'Archivar', 'Arquivar')}
+                                >
+                                  <Archive className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                               {onDeleteTask && (
                                 <button
                                   type="button"
@@ -1186,19 +1273,21 @@ export function WorkTableBoard({
                                 <PeopleCell task={task} users={users} onPatch={onPatch} t={t} />
                               )}
                               {col.kind === 'responsible' && (
-                                <RoleSelect
-                                  value={task.responsibleId || ''}
+                                <RolePeopleCell
+                                  ids={roleIds(task, 'RESPONSIBLE')}
                                   users={users}
-                                  onChange={(id) => onPatch(task.id, { responsibleId: id || null })}
+                                  onChange={(next) => onPatch(task.id, { responsibleIds: next })}
                                   t={t}
+                                  accent="sky"
                                 />
                               )}
                               {col.kind === 'reviewer' && (
-                                <RoleSelect
-                                  value={task.reviewerId || ''}
+                                <RolePeopleCell
+                                  ids={roleIds(task, 'REVIEWER')}
                                   users={users}
-                                  onChange={(id) => onPatch(task.id, { reviewerId: id || null })}
+                                  onChange={(next) => onPatch(task.id, { reviewerIds: next })}
                                   t={t}
+                                  accent="violet"
                                 />
                               )}
                               {col.kind === 'priority' && (

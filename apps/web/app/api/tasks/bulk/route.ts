@@ -10,6 +10,8 @@ import {
   canReadFolder,
   getFolderAccess,
 } from '@/lib/work/folder-access';
+import { archiveTaskTree, restoreTaskTree } from '@/lib/work/task-archive';
+import { replaceTaskRolePeople } from '@/lib/work/task-people';
 
 const PATCHABLE = new Set([
   'status',
@@ -59,10 +61,12 @@ export async function PUT(req: Request) {
     const ids: string[] = Array.isArray(body.ids) ? body.ids.map(String).filter(Boolean) : [];
     const patch = body.patch && typeof body.patch === 'object' ? body.patch : {};
     const remove = body.delete === true;
+    const archive = body.archive === true;
+    const restore = body.restore === true;
     if (!ids.length) return NextResponse.json({ error: 'ids required' }, { status: 400 });
     if (ids.length > 100) return NextResponse.json({ error: 'max 100 tasks' }, { status: 400 });
 
-    if (remove) {
+    if (remove || archive || restore) {
       const updated: string[] = [];
       const skipped: string[] = [];
       for (const id of ids) {
@@ -71,7 +75,13 @@ export async function PUT(req: Request) {
           skipped.push(id);
           continue;
         }
-        await prisma.task.update({ where: { id }, data: { isActive: false } });
+        if (remove) {
+          await prisma.task.update({ where: { id }, data: { isActive: false } });
+        } else if (archive) {
+          await archiveTaskTree(id, tenant.userId);
+        } else {
+          await restoreTaskTree(id);
+        }
         updated.push(id);
       }
       return NextResponse.json({ updated: updated.length, skipped: skipped.length, ids: updated });
@@ -116,6 +126,14 @@ export async function PUT(req: Request) {
 
       const prevAssignee = task.assigneeId;
       await prisma.task.update({ where: { id }, data });
+      if (data.assigneeId !== undefined) {
+        await replaceTaskRolePeople({
+          taskId: id,
+          role: 'EXECUTOR',
+          userIds: data.assigneeId ? [String(data.assigneeId)] : [],
+          companyIds: tenant.companyIds,
+        });
+      }
       updated.push(id);
 
       if (

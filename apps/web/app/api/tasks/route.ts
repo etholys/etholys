@@ -11,6 +11,12 @@ import {
   folderVisibleTaskFilter,
   getFolderAccess,
 } from '@/lib/work/folder-access';
+import {
+  executorFilter,
+  peopleSelect,
+  syncTaskPeopleFromLegacy,
+  withRoleIdArrays,
+} from '@/lib/work/task-people';
 
 export async function GET(req: Request) {
   try {
@@ -21,10 +27,18 @@ export async function GET(req: Request) {
     const status = searchParams.get('status');
     const assigneeId = searchParams.get('assigneeId');
     const companyId = searchParams.get('companyId');
-    const where: any = { isActive: true };
+    const archivedOnly = searchParams.get('archived') === '1';
+    const where: any = {
+      isActive: true,
+      // Active board excludes archived; Archivo lists them under the same ACL filters.
+      archivedAt: archivedOnly ? { not: null } : null,
+    };
     if (projectId) where.projectId = projectId;
     if (status) where.status = status;
-    if (assigneeId) where.assigneeId = assigneeId;
+    // Qualquer executor (FK legado + TaskPerson), não só o primário
+    if (assigneeId) {
+      where.AND = [...(Array.isArray(where.AND) ? where.AND : []), executorFilter(assigneeId)];
+    }
 
     const [companyMemberRows, guestProjectIds, memberProjects] = await Promise.all([
       prisma.companyUser.findMany({
@@ -96,65 +110,84 @@ export async function GET(req: Request) {
     });
     where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), folderGate];
 
-    const tasks = await prisma.task.findMany({
-      where,
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        priority: true,
-        dueDate: true,
-        startDate: true,
-        estimatedHours: true,
-        customFields: true,
-        collaboratorIds: true,
-        tags: true,
-        order: true,
-        projectId: true,
-        companyId: true,
-        departmentId: true,
-        groupId: true,
-        folderId: true,
-        assigneeId: true,
-        responsibleId: true,
-        reviewerId: true,
-        creatorId: true,
-        parentId: true,
-        isActive: true,
-        updatedAt: true,
-        createdAt: true,
-        assignee: { select: { id: true, name: true, email: true, avatar: true } },
-        responsible: { select: { id: true, name: true, email: true, avatar: true } },
-        reviewer: { select: { id: true, name: true, email: true, avatar: true } },
-        creator: { select: { id: true, name: true } },
-        project: {
-          select: {
-            id: true,
-            name: true,
-            companyId: true,
-            company: { select: { id: true, shortName: true, color: true } },
-          },
+    const taskSelectBase = {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+      priority: true,
+      dueDate: true,
+      startDate: true,
+      estimatedHours: true,
+      customFields: true,
+      collaboratorIds: true,
+      tags: true,
+      order: true,
+      projectId: true,
+      companyId: true,
+      departmentId: true,
+      groupId: true,
+      folderId: true,
+      assigneeId: true,
+      responsibleId: true,
+      reviewerId: true,
+      creatorId: true,
+      parentId: true,
+      isActive: true,
+      archivedAt: true,
+      archivedById: true,
+      updatedAt: true,
+      createdAt: true,
+      assignee: { select: { id: true, name: true, email: true, avatar: true } },
+      responsible: { select: { id: true, name: true, email: true, avatar: true } },
+      reviewer: { select: { id: true, name: true, email: true, avatar: true } },
+      creator: { select: { id: true, name: true } },
+      archivedBy: { select: { id: true, name: true } },
+      project: {
+        select: {
+          id: true,
+          name: true,
+          companyId: true,
+          company: { select: { id: true, shortName: true, color: true } },
         },
-        department: { select: { id: true, name: true } },
-        group: { select: { id: true, name: true, color: true, ownerId: true } },
-        folder: {
-          select: {
-            id: true,
-            name: true,
-            visibility: true,
-            _count: { select: { members: true } },
-          },
-        },
-        checklist: {
-          select: { id: true, text: true, completed: true, order: true },
-          orderBy: { order: 'asc' },
-        },
-        _count: { select: { comments: true, subtasks: true, attachments: true } },
       },
-      orderBy: [{ order: 'asc' }, { updatedAt: 'desc' }],
-    });
-    return NextResponse.json({ tasks });
+      department: { select: { id: true, name: true } },
+      group: { select: { id: true, name: true, color: true, ownerId: true } },
+      folder: {
+        select: {
+          id: true,
+          name: true,
+          visibility: true,
+          _count: { select: { members: true } },
+        },
+      },
+      checklist: {
+        select: { id: true, text: true, completed: true, order: true },
+        orderBy: { order: 'asc' as const },
+      },
+      _count: { select: { comments: true, subtasks: true, attachments: true } },
+    };
+
+    let tasks;
+    try {
+      tasks = await prisma.task.findMany({
+        where,
+        select: {
+          ...taskSelectBase,
+          roleMemberIds: true,
+          people: { select: peopleSelect, orderBy: [{ role: 'asc' as const }, { sortOrder: 'asc' as const }] },
+        },
+        orderBy: [{ order: 'asc' }, { updatedAt: 'desc' }],
+      });
+    } catch {
+      // Sem migração TaskPerson / roleMemberIds — lista com FKs + customFields
+      tasks = await prisma.task.findMany({
+        where,
+        select: taskSelectBase,
+        orderBy: [{ order: 'asc' }, { updatedAt: 'desc' }],
+      });
+    }
+    return NextResponse.json({ tasks: tasks.map((t) => withRoleIdArrays(t)) });
   } catch (error: any) {
     console.error('Tasks error:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
@@ -192,9 +225,31 @@ export async function POST(req: Request) {
       return raw.length ? raw.join(',') : null;
     };
 
+    const roleArrays = {
+      assigneeIds: Array.isArray(rawTaskData.assigneeIds) ? rawTaskData.assigneeIds : undefined,
+      responsibleIds: Array.isArray(rawTaskData.responsibleIds) ? rawTaskData.responsibleIds : undefined,
+      reviewerIds: Array.isArray(rawTaskData.reviewerIds) ? rawTaskData.reviewerIds : undefined,
+    };
     const taskData: Record<string, unknown> = { ...rawTaskData };
+    delete taskData.assigneeIds;
+    delete taskData.responsibleIds;
+    delete taskData.reviewerIds;
+    delete taskData.people;
     if ('tags' in taskData) taskData.tags = normalizeTags(taskData.tags);
+    // Primário legado a partir do 1.º id do array multi
+    if (Array.isArray(roleArrays.assigneeIds) && roleArrays.assigneeIds.length) {
+      taskData.assigneeId = String(roleArrays.assigneeIds[0]);
+      taskData.collaboratorIds = roleArrays.assigneeIds.slice(1).map(String);
+    }
+    if (Array.isArray(roleArrays.responsibleIds) && roleArrays.responsibleIds.length) {
+      taskData.responsibleId = String(roleArrays.responsibleIds[0]);
+    }
+    if (Array.isArray(roleArrays.reviewerIds) && roleArrays.reviewerIds.length) {
+      taskData.reviewerId = String(roleArrays.reviewerIds[0]);
+    }
     if (!taskData.assigneeId) delete taskData.assigneeId;
+    if (!taskData.responsibleId) delete taskData.responsibleId;
+    if (!taskData.reviewerId) delete taskData.reviewerId;
     if (!taskData.departmentId) delete taskData.departmentId;
     if (!taskData.projectId) delete taskData.projectId;
     if (!taskData.parentId) delete taskData.parentId;
@@ -213,6 +268,20 @@ export async function POST(req: Request) {
     } else {
       delete taskData.estimatedHours;
     }
+
+    const afterCreateSync = async (taskId: string) => {
+      await syncTaskPeopleFromLegacy({
+        taskId,
+        companyIds: tenant.companyIds,
+        assigneeIds: roleArrays.assigneeIds,
+        responsibleIds: roleArrays.responsibleIds,
+        reviewerIds: roleArrays.reviewerIds,
+        assigneeId: taskData.assigneeId as string | undefined,
+        responsibleId: taskData.responsibleId as string | undefined,
+        reviewerId: taskData.reviewerId as string | undefined,
+        collaboratorIds: taskData.collaboratorIds,
+      });
+    };
 
     // If recurring with count > 1, create multiple tasks with incremented due dates
     const count = body.isRecurring && recurrenceCount ? Math.min(parseInt(recurrenceCount) || 1, 60) : 1;
@@ -242,9 +311,16 @@ export async function POST(req: Request) {
             recurrenceGroup: groupId,
             title: `${taskData.title} (${i + 1}/${count})`,
           } as any,
-          include: { assignee: true, project: true },
+          include: { assignee: true, project: true, people: { select: peopleSelect } },
         });
-        created.push(tx);
+        await afterCreateSync(tx.id);
+        const enriched = withRoleIdArrays(
+          await prisma.task.findFirst({
+            where: { id: tx.id },
+            include: { assignee: true, project: true, people: { select: peopleSelect, orderBy: [{ role: 'asc' }, { sortOrder: 'asc' }] } },
+          })!,
+        );
+        created.push(enriched);
         if (tx.assigneeId && tx.assigneeId !== tenant.userId) {
           createNotification({
             userId: tx.assigneeId,
@@ -260,7 +336,16 @@ export async function POST(req: Request) {
 
     const task = await prisma.task.create({
       data: { ...taskData, creatorId: tenant.userId } as any,
-      include: { assignee: true, project: true },
+      include: { assignee: true, project: true, people: { select: peopleSelect } },
+    });
+    await afterCreateSync(task.id);
+    const refreshed = await prisma.task.findFirst({
+      where: { id: task.id },
+      include: {
+        assignee: true,
+        project: true,
+        people: { select: peopleSelect, orderBy: [{ role: 'asc' }, { sortOrder: 'asc' }] },
+      },
     });
     // Notify assignee
     if (task.assigneeId && task.assigneeId !== tenant.userId) {
@@ -272,7 +357,7 @@ export async function POST(req: Request) {
         link: task.projectId ? `/projects/${task.projectId}` : '/tasks',
       });
     }
-    return NextResponse.json({ task });
+    return NextResponse.json({ task: refreshed ? withRoleIdArrays(refreshed) : withRoleIdArrays(task) });
   } catch (error: any) {
     console.error('Create task error:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });

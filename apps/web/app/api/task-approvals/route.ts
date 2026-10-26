@@ -3,7 +3,11 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
-import { createNotification } from '@/lib/notify';
+import {
+  buildTaskContextLine,
+  notifyTaskAction,
+  wantsWorkEmail,
+} from '@/lib/work/task-notify';
 
 export async function GET(req: Request) {
   try {
@@ -89,6 +93,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Ya hay una aprobación pendiente', approval: existing }, { status: 409 });
     }
 
+    const taskFull = await prisma.task.findFirst({
+      where: { id: taskId },
+      include: {
+        project: { select: { name: true } },
+        folder: { select: { name: true } },
+        group: { select: { name: true } },
+      },
+    });
+
+    if (task.status !== 'DONE' && task.status !== 'CANCELLED') {
+      await prisma.task.update({
+        where: { id: taskId },
+        data: { status: 'IN_REVIEW' },
+      });
+    }
+
     const approval = await prisma.taskApprovalRequest.create({
       data: {
         taskId,
@@ -105,11 +125,25 @@ export async function POST(req: Request) {
       },
     });
 
-    await createNotification({
-      userId: approverId,
-      type: 'task_approval_request',
-      title: 'Aprobación de entrega solicitada',
-      message: `${approval.requester.name} solicita aprobación de: ${approval.task.title}`,
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { workBoardJson: true },
+    });
+    const actorName = approval.requester.name || 'Alguien';
+    notifyTaskAction({
+      recipientId: approverId,
+      actorId: tenant.userId,
+      actorName,
+      action: 'review',
+      taskTitle: approval.task.title,
+      where: buildTaskContextLine({
+        taskTitle: approval.task.title,
+        folderName: taskFull?.folder?.name,
+        groupName: taskFull?.group?.name,
+        projectName: taskFull?.project?.name,
+      }),
+      note,
+      email: wantsWorkEmail(company?.workBoardJson),
       link: '/hub/work',
     });
 

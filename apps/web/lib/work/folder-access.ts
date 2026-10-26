@@ -104,6 +104,10 @@ export function folderVisibleTaskFilter(
     { creatorId: userId },
     { responsibleId: userId },
     { reviewerId: userId },
+    // Multi-pessoa em customFields.__roleMemberIds (sem migração)
+    { customFields: { path: ['__roleMemberIds', 'executor'], array_contains: userId } },
+    { customFields: { path: ['__roleMemberIds', 'responsible'], array_contains: userId } },
+    { customFields: { path: ['__roleMemberIds', 'reviewer'], array_contains: userId } },
     { folder: { ownerId: userId } },
     { folder: { members: { some: { userId } } } },
   ];

@@ -80,7 +80,9 @@ model User {
   assignedTasks                 Task[]                       @relation("TaskAssignee")
   responsibleTasks              Task[]                       @relation("TaskResponsible")
   reviewerTasks                 Task[]                       @relation("TaskReviewer")
+  taskPeople                    TaskPerson[]
   createdTasks                  Task[]                       @relation("TaskCreator")
+  archivedTasks                 Task[]                       @relation("TaskArchivedBy")
   workFoldersOwned              WorkFolder[]                 @relation("WorkFolderOwner")
   workFolderMemberships         WorkFolderMember[]
   workFolderShares              WorkFolderShare[]            @relation("WorkFolderShareUser")
@@ -696,12 +698,17 @@ model Task {
   tags             String?
   /// Valores das colunas extra do quadro (texto, número, data, checkbox).
   customFields     Json?
-  /// Pessoas extra na tarefa, além do responsável principal.
+  /// Legacy: pessoas extra no papel executor (além de assigneeId). Preferir TaskPerson / roleMemberIds.
   collaboratorIds  Json?
+  /// Multi por papel (sempre gravado): { executor?: string[], responsible?: string[], reviewer?: string[] }.
+  roleMemberIds    Json?
   isActive         Boolean          @default(true)
   isRecurring      Boolean          @default(false)
   recurrenceMonths Int?
   recurrenceGroup  String?
+  /// Soft-archive — oculto no quadro ativo; visível no Archivo sob ACL.
+  archivedAt       DateTime?
+  archivedById     String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   departmentId     String?
@@ -714,12 +721,14 @@ model Task {
   responsible      User?            @relation("TaskResponsible", fields: [responsibleId], references: [id])
   reviewer         User?            @relation("TaskReviewer", fields: [reviewerId], references: [id])
   creator          User             @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  archivedBy       User?            @relation("TaskArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
   department       Department?      @relation(fields: [departmentId], references: [id])
   group            TaskGroup?       @relation(fields: [groupId], references: [id], onDelete: SetNull)
   folder           WorkFolder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
   parent           Task?            @relation("SubTasks", fields: [parentId], references: [id])
   subtasks         Task[]           @relation("SubTasks")
   project          Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  people           TaskPerson[]
   dependedBy       TaskDependency[] @relation("DependencyTask")
   dependsOn        TaskDependency[] @relation("DependentTask")
   meetActionItems  MeetActionItem[]
@@ -730,6 +739,26 @@ model Task {
   @@index([groupId])
   @@index([folderId])
   @@index([companyId])
+  @@index([companyId, archivedAt])
+  @@index([archivedAt])
+}
+
+/// Multi-pessoa por papel (executor / responsável / supervisor-revisor).
+/// assigneeId / responsibleId / reviewerId mantêm-se como 1.º de cada papel (legado + filtros simples).
+model TaskPerson {
+  id        String         @id @default(cuid())
+  taskId    String
+  userId    String
+  role      TaskPersonRole
+  /// Ordem de apresentação (0 = primário do papel).
+  sortOrder Int            @default(0)
+  createdAt DateTime       @default(now())
+  task      Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId, role])
+  @@index([userId, role])
+  @@index([taskId, role])
 }
 
 /// Pasta Work — pessoal ou partilhada; qualquer membro da empresa pode criar (não só admin).
@@ -3471,6 +3500,13 @@ enum TaskStatus {
   IN_REVIEW
   DONE
   CANCELLED
+}
+
+/// Papéis multi-pessoa numa Task (Work / eTask).
+enum TaskPersonRole {
+  EXECUTOR
+  RESPONSIBLE
+  REVIEWER
 }
 
 enum Priority {

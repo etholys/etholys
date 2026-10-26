@@ -44,7 +44,9 @@ export type WorkNotifyPrefs = { comment: boolean; assign: boolean; status: boole
 
 export const DEFAULT_WORK_COLUMNS: WorkColumn[] = [
   { id: 'status', kind: 'status', label: 'Status' },
-  { id: 'person', kind: 'person', label: 'Person' },
+  { id: 'person', kind: 'person', label: 'Executor' },
+  { id: 'responsible', kind: 'responsible', label: 'Owner' },
+  { id: 'reviewer', kind: 'reviewer', label: 'Supervisor' },
   { id: 'priority', kind: 'priority', label: 'Priority' },
   { id: 'due', kind: 'due', label: 'Due' },
   { id: 'updates', kind: 'updates', label: 'Updates' },
@@ -77,7 +79,7 @@ export const WORK_BOARD_TEMPLATES: Array<{
       { id: 'status', kind: 'status', label: 'Status' },
       { id: 'person', kind: 'person', label: 'Person' },
       { id: 'responsible', kind: 'responsible', label: 'Owner' },
-      { id: 'reviewer', kind: 'reviewer', label: 'Reviewer' },
+      { id: 'reviewer', kind: 'reviewer', label: 'Supervisor' },
       { id: 'priority', kind: 'priority', label: 'Priority' },
       { id: 'due', kind: 'due', label: 'Due' },
       { id: 'updates', kind: 'updates', label: 'Updates' },
@@ -166,7 +168,7 @@ export function columnKindLabel(kind: WorkColumnKind, t: (en: string, es: string
     case 'responsible':
       return t('Owner', 'Responsable', 'Responsável');
     case 'reviewer':
-      return t('Reviewer', 'Revisor', 'Revisor');
+      return t('Supervisor', 'Supervisor', 'Supervisor');
     case 'text':
       return t('Text', 'Texto', 'Texto');
     case 'number':

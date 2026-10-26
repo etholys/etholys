@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { resolveTaskCommentMentions } from '@/lib/work/mentions';
 import {
+  buildTaskContextLine,
+  compactTitle,
   notifyTaskWatchers,
   taskRoleUserIds,
   wantsWorkEmail,
@@ -14,7 +16,11 @@ import {
 async function assertTaskAccess(taskId: string, companyIds: string[]) {
   const task = await prisma.task.findFirst({
     where: { id: taskId, isActive: true },
-    include: { project: { select: { companyId: true } } },
+    include: {
+      project: { select: { companyId: true, name: true } },
+      folder: { select: { name: true } },
+      group: { select: { name: true } },
+    },
   });
   if (!task) return null;
   const companyId = task.project?.companyId || task.companyId;
@@ -80,25 +86,52 @@ export async function POST(req: Request) {
         })
       : null;
     const emailOn = wantsWorkEmail(company?.workBoardJson);
+    const whereLine = buildTaskContextLine({
+      taskTitle: access.title,
+      folderName: access.folder?.name,
+      groupName: access.group?.name,
+      projectName: access.project?.name,
+    });
+    const when = comment.createdAt || new Date();
     notifyTaskWatchers({
       actorId: tenant.userId,
       type: 'task_update',
-      title: 'Actualización en una tarea',
+      title: 'Nuevo comentario',
       message: `${authorName}: ${text.slice(0, 140)}`,
       userIds: taskRoleUserIds(access),
       enabled: wantsWorkNotify(company?.workBoardJson, 'comment'),
       email: emailOn,
       link,
+      mail: {
+        subjectPhrase: 'Nuevo comentario',
+        headline: 'Nuevo comentario',
+        where: whereLine,
+        what: 'Añadió un comentario',
+        who: authorName,
+        when,
+        link,
+        detail: text.slice(0, 2000),
+      },
     });
     notifyTaskWatchers({
       actorId: tenant.userId,
       type: 'task_mention',
-      title: 'Te mencionaron en una tarea',
-      message: `${authorName} te mencionó en: ${access.title}`,
+      title: 'Te mencionaron',
+      message: `${authorName} te mencionó en: ${compactTitle(access.title)}`,
       userIds: mentionIds,
       enabled: true,
       email: emailOn,
       link,
+      mail: {
+        subjectPhrase: 'Te mencionaron',
+        headline: 'Te mencionaron',
+        where: whereLine,
+        what: 'Te mencionó en un comentario',
+        who: authorName,
+        when,
+        link,
+        detail: text.slice(0, 2000),
+      },
     });
 
     return NextResponse.json({ comment });

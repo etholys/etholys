@@ -12,6 +12,9 @@ type Task = {
   priority: string;
   dueDate?: string | null;
   assigneeId?: string | null;
+  assigneeIds?: string[] | null;
+  collaboratorIds?: unknown;
+  people?: Array<{ userId: string; role: string; user?: { name?: string | null } }> | null;
   assignee?: { id: string; name: string | null } | null;
   department?: { id: string; name: string } | null;
   project?: { id: string; name: string } | null;
@@ -44,7 +47,15 @@ export function WorkDashboard({
 
   const open = top.filter((task) => OPEN.has(task.status));
   const overdue = open.filter((task) => task.dueDate && new Date(task.dueDate) < now);
-  const mine = open.filter((task) => currentUserId && task.assigneeId === currentUserId);
+  const executorIds = (task: Task) => {
+    if (Array.isArray(task.assigneeIds) && task.assigneeIds.length) return task.assigneeIds.map(String);
+    if (Array.isArray(task.people) && task.people.some((p) => p.role === 'EXECUTOR')) {
+      return task.people.filter((p) => p.role === 'EXECUTOR').map((p) => p.userId);
+    }
+    const extra = Array.isArray(task.collaboratorIds) ? task.collaboratorIds.map(String) : [];
+    return [task.assigneeId, ...extra].filter(Boolean).map(String);
+  };
+  const mine = open.filter((task) => currentUserId && executorIds(task).includes(currentUserId));
   const dueThisWeek = open.filter((task) => {
     if (!task.dueDate) return false;
     const d = new Date(task.dueDate);
@@ -64,11 +75,25 @@ export function WorkDashboard({
 
   const byPerson = new Map<string, { name: string; open: number }>();
   for (const task of open) {
-    const key = task.assigneeId || '__unassigned';
-    const name = task.assignee?.name || t('Unassigned', 'Sin asignar', 'Sem responsável');
-    const row = byPerson.get(key) || { name, open: 0 };
-    row.open += 1;
-    byPerson.set(key, row);
+    const ids = executorIds(task);
+    if (!ids.length) {
+      const row = byPerson.get('__unassigned') || {
+        name: t('Unassigned', 'Sin asignar', 'Sem responsável'),
+        open: 0,
+      };
+      row.open += 1;
+      byPerson.set('__unassigned', row);
+      continue;
+    }
+    for (const key of ids) {
+      const name =
+        task.people?.find((p) => p.userId === key)?.user?.name ||
+        (key === task.assigneeId ? task.assignee?.name : null) ||
+        t('Person', 'Persona', 'Pessoa');
+      const row = byPerson.get(key) || { name: String(name), open: 0 };
+      row.open += 1;
+      byPerson.set(key, row);
+    }
   }
 
   const people = [...byPerson.entries()]

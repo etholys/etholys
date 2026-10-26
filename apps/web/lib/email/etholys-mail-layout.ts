@@ -37,22 +37,103 @@ export const ETHOLYS_MAIL = {
   border: '#e2e8f0',
 } as const;
 
-/** Nomes comerciais no Hub (não chaves de licença). */
+/** Nomes comerciais no Hub (não chaves de licença). Pacote piloto: sem FORGE / PRISM / Advisor. */
 export const RIKOLTO_ACCESS_COPY = {
   systems: [
-    { key: 'ATLAS', label: 'ATLAS', blurbEs: 'Gestión empresarial (finanzas, RRHH, proveedores, clientes)' },
-    { key: 'SIEP', label: 'SIEP', blurbEs: 'Gestión de proyectos, evidencias y seguimiento' },
-    { key: 'FUNDHUB', label: 'FundHub', blurbEs: 'Captación de fondos y propuestas' },
-    { key: 'AURORA', label: 'AURORA', blurbEs: 'Incubadora virtual y acompañamiento técnico' },
-    { key: 'POLARIS', label: 'POLARIS', blurbEs: 'Línea base y guía de autodesarrollo' },
-    { key: 'RADAR', label: 'RADAR', blurbEs: 'Digitalización productiva (datos, alertas, automatización)' },
+    {
+      key: 'ATLAS',
+      label: 'ATLAS',
+      blurbEs:
+        'gestión empresarial integral (planificación, finanzas, contabilidad, recursos humanos, proveedores, clientes e inventario)',
+      blurbPt:
+        'gestão empresarial integral (planejamento, finanças, contabilidade, recursos humanos, fornecedores, clientes e inventário)',
+      blurbEn:
+        'integrated business management (planning, finance, accounting, HR, suppliers, customers, and inventory)',
+    },
+    {
+      key: 'SIEP',
+      label: 'SIEP',
+      blurbEs: 'gestión de proyectos (portafolio, ejecución, evidencias y seguimiento)',
+      blurbPt: 'gestão de projetos (portfólio, execução, evidências e acompanhamento)',
+      blurbEn: 'project management (portfolio, delivery, evidence, and follow-up)',
+    },
+    {
+      key: 'FUNDHUB',
+      label: 'FundHub',
+      blurbEs: 'captación de fondos, seguimiento de convocatorias y elaboración de propuestas',
+      blurbPt: 'captação de fundos, acompanhamento de editais e elaboração de propostas',
+      blurbEn: 'fundraising, call tracking, and proposal drafting',
+    },
+    {
+      key: 'AURORA',
+      label: 'AURORA',
+      blurbEs: 'incubadora virtual para el acompañamiento técnico al desarrollo de negocios',
+      blurbPt: 'incubadora virtual para o acompanhamento técnico ao desenvolvimento de negócios',
+      blurbEn: 'virtual incubator for technical support to business development',
+    },
+    {
+      key: 'POLARIS',
+      label: 'POLARIS',
+      blurbEs: 'línea base de madurez organizacional y guía de autodesarrollo',
+      blurbPt: 'linha de base de maturidade organizacional e guia de autodesenvolvimento',
+      blurbEn: 'organizational maturity baseline and self-development guide',
+    },
+    {
+      key: 'RADAR',
+      label: 'RADAR',
+      blurbEs: 'digitalización productiva con datos, alertas y automatización',
+      blurbPt: 'digitalização produtiva com dados, alertas e automação',
+      blurbEn: 'productive digitalization with data, alerts, and automation',
+    },
   ],
   tools: [
-    { key: 'studio', label: 'Studio', blurbEs: 'Documentos, diagramación y diseño con IA' },
-    { key: 'work', label: 'Work', blurbEs: 'Gestor de tareas del equipo' },
-    { key: 'chorus', label: 'Chorus', blurbEs: 'Reuniones, videollamadas, transcripción y grabación' },
+    {
+      key: 'studio',
+      label: 'Studio',
+      blurbEs: 'redacción y diagramación de documentos con apoyo de inteligencia artificial',
+      blurbPt: 'redação e diagramação de documentos com apoio de inteligência artificial',
+      blurbEn: 'document writing and layout with AI support',
+    },
+    {
+      key: 'work',
+      label: 'eTask',
+      blurbEs: 'gestión de tareas y seguimiento del trabajo del equipo',
+      blurbPt: 'gestão de tarefas e acompanhamento do trabalho da equipe',
+      blurbEn: 'task management and team work tracking',
+    },
+    {
+      key: 'chorus',
+      label: 'Chorus',
+      blurbEs: 'reuniones y videollamadas, con transcripción y grabación',
+      blurbPt: 'reuniões e videochamadas, com transcrição e gravação',
+      blurbEn: 'meetings and video calls, with transcription and recording',
+    },
   ],
 } as const;
+
+function accessBlurb(
+  item: { blurbEs: string; blurbPt: string; blurbEn: string },
+  locale: EtholysMailLocale,
+): string {
+  if (locale === 'pt') return item.blurbPt;
+  if (locale === 'en') return item.blurbEn;
+  return item.blurbEs;
+}
+
+function pilotCatalogSections(locale: EtholysMailLocale): { title: string; items: string[] }[] {
+  const systemsTitle = locale === 'pt' ? 'Sistemas' : locale === 'en' ? 'Systems' : 'Sistemas';
+  const toolsTitle = locale === 'pt' ? 'Ferramentas' : locale === 'en' ? 'Tools' : 'Herramientas';
+  return [
+    {
+      title: systemsTitle,
+      items: RIKOLTO_ACCESS_COPY.systems.map((s) => `${s.label} — ${accessBlurb(s, locale)}`),
+    },
+    {
+      title: toolsTitle,
+      items: RIKOLTO_ACCESS_COPY.tools.map((t) => `${t.label} — ${accessBlurb(t, locale)}`),
+    },
+  ];
+}
 
 export function escapeHtml(value: string): string {
   return value
@@ -220,220 +301,186 @@ export type InviteMailInput = {
   projectName?: string | null;
   code: string;
   loginUrl: string;
+  /** Validez del código de invitación (días). */
   expiresDays?: number;
-  /** Se true, lista sistemas/tools do pacote Rikolto (sem FORGE/PRISM/Advisor). */
+  /** Duración del acceso de la organización (meses). */
+  accessMonths?: number;
+  /** Si true, lista sistemas/herramientas del paquete institucional (sin FORGE/PRISM/Advisor). */
   includeRikoltoCatalog?: boolean;
+  /** Alias preferido do catálogo piloto (mesmo pacote que Rikolto). */
+  includePilotCatalog?: boolean;
 };
 
 export function buildInvitationEmail(opts: InviteMailInput): { subject: string; html: string } {
   const locale: EtholysMailLocale =
     opts.locale === 'pt' || opts.locale === 'en' ? opts.locale : 'es';
-  const days = opts.expiresDays ?? 7;
-  const kind = opts.inviteKind || 'employee';
+  const inviteDays = opts.expiresDays ?? 14;
+  const accessMonths = opts.accessMonths ?? 6;
+  const company = opts.companyName.trim();
+  const showCatalog =
+    opts.includePilotCatalog === true ||
+    opts.includeRikoltoCatalog === true ||
+    company.toLowerCase().includes('rikolto');
 
-  const subject =
-    locale === 'pt'
-      ? `Convite para Etholys — ${opts.companyName}`
-      : locale === 'en'
-        ? `You're invited to Etholys — ${opts.companyName}`
-        : `Te invitaron a Etholys — ${opts.companyName}`;
+  const catalogSections = showCatalog ? pilotCatalogSections(locale) : undefined;
 
-  const headline =
-    locale === 'pt'
-      ? 'Bem-vindo(a) ao Etholys'
-      : locale === 'en'
-        ? 'Welcome to Etholys'
-        : 'Bienvenido/a a Etholys';
-
-  const who = opts.inviterName?.trim() || (locale === 'en' ? 'Your team' : 'Tu equipo');
-
-  let lead: string;
-  if (locale === 'pt') {
-    if (kind === 'ally') {
-      lead = `${who} convidou-o(a) a colaborar em ${opts.companyName}${opts.projectName ? ` (projecto ${opts.projectName})` : ''}.`;
-    } else if (kind === 'temporary') {
-      lead = `${who} concedeu-lhe acesso temporário a Etholys na organização ${opts.companyName}.`;
-    } else {
-      lead = `${who} convidou-o(a) a entrar em Etholys com a organização ${opts.companyName}.`;
+  if (locale === 'es') {
+    const paragraphs: string[] = [
+      'Etholys es un ecosistema digital que integra, en un único entorno de trabajo, la gestión empresarial, la ejecución de proyectos, la captación de fondos y el acompañamiento en el terreno.',
+      `Con el fin de que usted pueda conocer mejor nuestro ecosistema digital, hemos habilitado para ${company} los productos que se detallan a continuación.`,
+    ];
+    if (opts.projectName?.trim() && opts.inviteKind === 'ally') {
+      paragraphs.push(`Proyecto de colaboración: ${opts.projectName.trim()}.`);
     }
-  } else if (locale === 'en') {
-    if (kind === 'ally') {
-      lead = `${who} invited you to collaborate with ${opts.companyName}${opts.projectName ? ` on ${opts.projectName}` : ''}.`;
-    } else if (kind === 'temporary') {
-      lead = `${who} granted you temporary access to Etholys for ${opts.companyName}.`;
-    } else {
-      lead = `${who} invited you to join Etholys with ${opts.companyName}.`;
-    }
-  } else {
-    if (kind === 'ally') {
-      lead = `${who} te invitó a colaborar con ${opts.companyName}${opts.projectName ? ` en el proyecto ${opts.projectName}` : ''}.`;
-    } else if (kind === 'temporary') {
-      lead = `${who} te dio acceso temporal a Etholys en ${opts.companyName}.`;
-    } else {
-      lead = `${who} te invitó a unirte a Etholys con ${opts.companyName}.`;
-    }
-  }
-
-  const paragraphs = [lead];
-  if (opts.jobTitle?.trim()) {
     paragraphs.push(
-      locale === 'pt'
-        ? `O teu cargo: ${opts.jobTitle.trim()}.`
-        : locale === 'en'
-          ? `Your role: ${opts.jobTitle.trim()}.`
-          : `Tu cargo: ${opts.jobTitle.trim()}.`,
+      'Para utilizarlos, pulse «Activar acceso». Si aún no tiene cuenta, la pantalla le pedirá crear una contraseña — no hay una contraseña previa. Si ya tiene cuenta Etholys, inicie sesión con la misma y el acceso se aplicará.',
     );
+    paragraphs.push(
+      `El acceso de ${company} permanecerá activo durante ${accessMonths} meses, con acompañamiento del equipo Etholys durante la puesta en marcha.`,
+    );
+
+    return {
+      subject: `Bienvenido/a a Etholys — ${company}`,
+      html: renderEtholysMailLayout({
+        locale: 'es',
+        preheader: `Bienvenido/a a Etholys — acceso habilitado para ${company}`,
+        eyebrow: company,
+        headline: 'Bienvenido/a a Etholys',
+        paragraphs,
+        sections: catalogSections,
+        codeBlock: { label: 'Código de activación', value: opts.code },
+        cta: { label: 'Activar acceso', href: opts.loginUrl },
+        note: `Esta invitación personal es válida durante ${inviteDays} días. Si el correo no le corresponde, puede ignorarlo con seguridad.`,
+        productLine: 'Etholys · Fábrica de Soluciones',
+      }),
+    };
   }
 
-  paragraphs.push(
+  const paragraphs =
     locale === 'pt'
-      ? 'Activa a conta com o código abaixo. Se já tens conta Etholys, entra e usa o mesmo código.'
-      : locale === 'en'
-        ? 'Activate with the code below. If you already have an Etholys account, sign in and use the same code.'
-        : 'Activa tu cuenta con el código de abajo. Si ya tienes cuenta Etholys, inicia sesión y usa el mismo código.',
-  );
-
-  const sections =
-    opts.includeRikoltoCatalog || opts.companyName.toLowerCase().includes('rikolto')
       ? [
-          {
-            title: locale === 'pt' ? 'Sistemas' : locale === 'en' ? 'Systems' : 'Sistemas',
-            items: RIKOLTO_ACCESS_COPY.systems.map((s) =>
-              locale === 'en'
-                ? `${s.label}`
-                : locale === 'pt'
-                  ? `${s.label}`
-                  : `${s.label} — ${s.blurbEs}`,
-            ),
-          },
-          {
-            title: locale === 'pt' ? 'Ferramentas' : locale === 'en' ? 'Tools' : 'Herramientas',
-            items: RIKOLTO_ACCESS_COPY.tools.map((t) =>
-              locale === 'en' ? t.label : locale === 'pt' ? t.label : `${t.label} — ${t.blurbEs}`,
-            ),
-          },
+          'O Etholys é um ecossistema digital que integra, em um único ambiente de trabalho, a gestão empresarial, a execução de projetos, a captação de fundos e o acompanhamento em campo.',
+          `Para que você possa conhecer melhor o nosso ecossistema digital, habilitamos para ${company} os produtos detalhados a seguir.`,
+          ...(opts.projectName?.trim() && opts.inviteKind === 'ally'
+            ? [`Projeto de colaboração: ${opts.projectName.trim()}.`]
+            : []),
+          'Para utilizá-los, use o botão «Ativar acesso». Se ainda não tem conta, o ecrã pede para criar uma senha — não há senha pré-definida. Se já tiver conta Etholys, entre com ela e o acesso será aplicado.',
+          `O acesso de ${company} permanecerá ativo durante ${accessMonths} meses, com acompanhamento da equipe Etholys durante a entrada em operação.`,
         ]
-      : undefined;
+      : [
+          'Etholys is a digital ecosystem that brings together, in a single workspace, business management, project delivery, fundraising, and field accompaniment.',
+          `So that you can explore our digital ecosystem, we have enabled the following products for ${company}.`,
+          'To get started, use the “Activate access” button. If you do not have an account yet, the screen asks you to create a password — there is no preset password. If you already have an Etholys account, sign in and access will be applied.',
+          `${company}'s access will remain active for ${accessMonths} months, with Etholys team support during onboarding.`,
+        ];
 
-  const html = renderEtholysMailLayout({
-    locale,
-    preheader:
-      locale === 'pt'
-        ? `${who} convidou-te para ${opts.companyName} no Etholys`
-        : locale === 'en'
-          ? `${who} invited you to ${opts.companyName} on Etholys`
-          : `${who} te invitó a ${opts.companyName} en Etholys`,
-    eyebrow: opts.companyName,
-    headline,
-    paragraphs,
-    sections,
-    codeBlock: {
-      label: locale === 'pt' ? 'O teu código' : locale === 'en' ? 'Your code' : 'Tu código',
-      value: opts.code,
-    },
-    cta: {
-      label: locale === 'pt' ? 'Activar acesso' : locale === 'en' ? 'Activate access' : 'Activar acceso',
-      href: opts.loginUrl,
-    },
-    note:
-      locale === 'pt'
-        ? `Este convite é válido por ${days} dias.`
-        : locale === 'en'
-          ? `This invitation is valid for ${days} days.`
-          : `Esta invitación es válida durante ${days} días.`,
-    productLine: 'Etholys · Fábrica de Soluciones',
-  });
-
-  return { subject, html };
+  return {
+    subject:
+      locale === 'pt' ? `Bem-vindo(a) ao Etholys — ${company}` : `Welcome to Etholys — ${company}`,
+    html: renderEtholysMailLayout({
+      locale,
+      preheader:
+        locale === 'pt'
+          ? `Bem-vindo(a) ao Etholys — acesso habilitado para ${company}`
+          : `Welcome to Etholys — access for ${company}`,
+      eyebrow: company,
+      headline: locale === 'pt' ? 'Bem-vindo(a) ao Etholys' : 'Welcome to Etholys',
+      paragraphs,
+      sections: catalogSections,
+      codeBlock: {
+        label: locale === 'pt' ? 'Código de ativação' : 'Activation code',
+        value: opts.code,
+      },
+      cta: {
+        label: locale === 'pt' ? 'Ativar acesso' : 'Activate access',
+        href: opts.loginUrl,
+      },
+      note:
+        locale === 'pt'
+          ? `Este convite pessoal é válido durante ${inviteDays} dias. Se este e-mail não for destinado a você, pode ignorá-lo com segurança.`
+          : `This personal invitation is valid for ${inviteDays} days.`,
+      productLine:
+        locale === 'pt' ? 'Etholys · Fábrica de Soluções' : 'Etholys · Solutions Factory',
+    }),
+  };
 }
 
-/** Email institucional de boas-vindas (grupo) — sem “piloto/espacio”. */
+/** Email institucional de boas-vindas (grupo). */
 export function buildPilotWelcomeEmail(opts: {
   locale?: EtholysMailLocale;
   organizationName: string;
   contactName?: string | null;
   loginUrl: string;
+  accessMonths?: number;
 }): { subject: string; html: string } {
   const locale: EtholysMailLocale =
     opts.locale === 'pt' || opts.locale === 'en' ? opts.locale : 'es';
   const org = opts.organizationName;
+  const months = opts.accessMonths ?? 6;
   const who = opts.contactName?.trim();
 
-  const subject =
+  if (locale === 'es') {
+    const paragraphs = [
+      who ? `Estimado/a ${who}:` : 'Estimado/a equipo:',
+      'Etholys es un ecosistema digital que integra, en un único entorno de trabajo, la gestión empresarial, la ejecución de proyectos, la captación de fondos y el acompañamiento en el terreno.',
+      `Con el fin de que ${org} pueda conocer mejor nuestro ecosistema digital, hemos habilitado los productos que se detallan a continuación.`,
+      'Cada persona del equipo recibirá una invitación individual con su código de activación. Para comenzar, acceda a la plataforma e introduzca dicho código.',
+      `El acceso de ${org} permanecerá activo durante ${months} meses, con acompañamiento del equipo Etholys durante la puesta en marcha.`,
+    ];
+    return {
+      subject: `Bienvenidos a Etholys — ${org}`,
+      html: renderEtholysMailLayout({
+        locale: 'es',
+        preheader: `Bienvenidos a Etholys — acceso habilitado para ${org}`,
+        eyebrow: org,
+        headline: 'Bienvenidos a Etholys',
+        paragraphs,
+        sections: pilotCatalogSections('es'),
+        cta: { label: 'Entrar a Etholys', href: opts.loginUrl },
+        note: 'Si no ha recibido su código individual, solicítelo al administrador de su organización o al equipo Etholys.',
+        productLine: 'Etholys · Fábrica de Soluciones',
+      }),
+    };
+  }
+
+  const paragraphs =
     locale === 'pt'
-      ? `${org} × Etholys — o vosso acesso está pronto`
-      : locale === 'en'
-        ? `${org} × Etholys — your access is ready`
-        : `${org} × Etholys — su acceso está listo`;
+      ? [
+          who ? `Prezado(a) ${who},` : 'Prezada equipe,',
+          'O Etholys é um ecossistema digital que integra, em um único ambiente de trabalho, a gestão empresarial, a execução de projetos, a captação de fundos e o acompanhamento em campo.',
+          `Para que a ${org} possa conhecer melhor o nosso ecossistema digital, habilitamos os produtos detalhados a seguir.`,
+          'Cada pessoa da equipe receberá um convite individual com o respectivo código de ativação. Para começar, acesse a plataforma e introduza esse código.',
+          `O acesso de ${org} permanecerá ativo durante ${months} meses, com acompanhamento da equipe Etholys durante a entrada em operação.`,
+        ]
+      : [
+          who ? `Dear ${who},` : 'Dear team,',
+          'Etholys is a digital ecosystem for business management, projects, fundraising, and field accompaniment.',
+          `We have enabled the following products for ${org}.`,
+          `Each person receives an individual activation code. Access remains active for ${months} months.`,
+        ];
 
-  const greet =
-    locale === 'pt'
-      ? who
-        ? `Olá ${who},`
-        : 'Olá,'
-      : locale === 'en'
-        ? who
-          ? `Hello ${who},`
-          : 'Hello,'
-        : who
-          ? `Hola ${who},`
-          : 'Hola,';
-
-  const p1 =
-    locale === 'pt'
-      ? `A ${org} já pode usar o Etholys: gestão da organização, projectos, captação de fundos e acompanhamento no terreno — num único login.`
-      : locale === 'en'
-        ? `${org} can now use Etholys: organization management, projects, fundraising, and field accompaniment — in one login.`
-        : `${org} ya puede usar Etholys: gestión de la organización, proyectos, captación de fondos y acompañamiento en el terreno — en un solo inicio de sesión.`;
-
-  const p2 =
-    locale === 'pt'
-      ? 'A equipa Etholys acompanha-vos na entrada. Cada pessoa activa a conta com o seu código individual.'
-      : locale === 'en'
-        ? 'The Etholys team will support onboarding. Each person activates with their own access code.'
-        : 'El equipo Etholys les acompaña en la entrada. Cada persona activa su cuenta con su propio código.';
-
-  const systemItems = RIKOLTO_ACCESS_COPY.systems.map((s) => `${s.label} — ${s.blurbEs}`);
-  const toolItems = RIKOLTO_ACCESS_COPY.tools.map((t) => `${t.label} — ${t.blurbEs}`);
-
-  const html = renderEtholysMailLayout({
-    locale,
-    preheader:
-      locale === 'pt'
-        ? `${org}: acesso Etholys pronto`
-        : locale === 'en'
-          ? `${org}: Etholys access ready`
-          : `${org}: acceso Etholys listo`,
-    eyebrow: org,
-    headline:
-      locale === 'pt'
-        ? 'Bem-vindos ao Etholys'
-        : locale === 'en'
-          ? 'Welcome to Etholys'
-          : 'Bienvenidos a Etholys',
-    paragraphs: [greet, p1, p2],
-    sections: [
-      {
-        title: locale === 'pt' ? 'Sistemas' : locale === 'en' ? 'Systems' : 'Sistemas',
-        items: systemItems,
+  return {
+    subject: locale === 'pt' ? `Bem-vindos ao Etholys — ${org}` : `Welcome to Etholys — ${org}`,
+    html: renderEtholysMailLayout({
+      locale,
+      preheader:
+        locale === 'pt'
+          ? `Bem-vindos ao Etholys — acesso habilitado para ${org}`
+          : `Welcome to Etholys — access for ${org}`,
+      eyebrow: org,
+      headline: locale === 'pt' ? 'Bem-vindos ao Etholys' : 'Welcome to Etholys',
+      paragraphs,
+      sections: pilotCatalogSections(locale),
+      cta: {
+        label: locale === 'pt' ? 'Entrar no Etholys' : 'Open Etholys',
+        href: opts.loginUrl,
       },
-      {
-        title: locale === 'pt' ? 'Ferramentas' : locale === 'en' ? 'Tools' : 'Herramientas',
-        items: toolItems,
-      },
-    ],
-    cta: {
-      label: locale === 'pt' ? 'Entrar no Etholys' : locale === 'en' ? 'Open Etholys' : 'Entrar a Etholys',
-      href: opts.loginUrl,
-    },
-    note:
-      locale === 'pt'
-        ? 'Cada pessoa recebe um código individual por email. Se não chegou, peçam ao administrador ou à equipa Etholys.'
-        : locale === 'en'
-          ? 'Each person receives an individual access code by email. If it did not arrive, ask your admin or the Etholys team.'
-          : 'Cada persona recibe un código individual por correo. Si no llegó, pídanlo al administrador o al equipo Etholys.',
-    productLine: 'Etholys · Fábrica de Soluciones',
-  });
-
-  return { subject, html };
+      note:
+        locale === 'pt'
+          ? 'Se não recebeu o código individual, peça ao administrador da organização ou à equipe Etholys.'
+          : 'If you did not receive your code, ask your admin or the Etholys team.',
+      productLine:
+        locale === 'pt' ? 'Etholys · Fábrica de Soluções' : 'Etholys · Solutions Factory',
+    }),
+  };
 }

@@ -17,6 +17,126 @@ const fieldControl =
 type UserOpt = { id: string; name: string | null; email?: string };
 type GroupOpt = { id: string; name: string; color: string | null };
 
+function membersFromCustom(customFields: unknown) {
+  if (!customFields || typeof customFields !== 'object' || Array.isArray(customFields)) return {};
+  const raw = (customFields as Record<string, unknown>).__roleMemberIds;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const o = raw as Record<string, unknown>;
+  return {
+    executor: Array.isArray(o.executor) ? o.executor.map(String).filter(Boolean) : undefined,
+    responsible: Array.isArray(o.responsible) ? o.responsible.map(String).filter(Boolean) : undefined,
+    reviewer: Array.isArray(o.reviewer) ? o.reviewer.map(String).filter(Boolean) : undefined,
+  };
+}
+
+function panelRoleIds(
+  task: {
+    assigneeId?: string | null;
+    responsibleId?: string | null;
+    reviewerId?: string | null;
+    assigneeIds?: string[] | null;
+    responsibleIds?: string[] | null;
+    reviewerIds?: string[] | null;
+    collaboratorIds?: unknown;
+    customFields?: unknown;
+    people?: Array<{ userId: string; role: string; sortOrder?: number }> | null;
+  },
+  role: 'EXECUTOR' | 'RESPONSIBLE' | 'REVIEWER',
+): string[] {
+  const fromCustom = membersFromCustom(task.customFields);
+  if (role === 'EXECUTOR') {
+    if (Array.isArray(task.assigneeIds) && task.assigneeIds.length) {
+      return [...new Set(task.assigneeIds.map(String).filter(Boolean))];
+    }
+    if (fromCustom.executor?.length) return fromCustom.executor;
+    if (Array.isArray(task.people) && task.people.some((p) => p.role === 'EXECUTOR')) {
+      return task.people
+        .filter((p) => p.role === 'EXECUTOR')
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        .map((p) => p.userId);
+    }
+    const extra = Array.isArray(task.collaboratorIds) ? task.collaboratorIds.map(String) : [];
+    return [...new Set([task.assigneeId, ...extra].filter(Boolean).map(String))];
+  }
+  if (role === 'RESPONSIBLE') {
+    if (Array.isArray(task.responsibleIds) && task.responsibleIds.length) {
+      return [...new Set(task.responsibleIds.map(String).filter(Boolean))];
+    }
+    if (fromCustom.responsible?.length) return fromCustom.responsible;
+    if (Array.isArray(task.people) && task.people.some((p) => p.role === 'RESPONSIBLE')) {
+      return task.people
+        .filter((p) => p.role === 'RESPONSIBLE')
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        .map((p) => p.userId);
+    }
+    return task.responsibleId ? [task.responsibleId] : [];
+  }
+  if (Array.isArray(task.reviewerIds) && task.reviewerIds.length) {
+    return [...new Set(task.reviewerIds.map(String).filter(Boolean))];
+  }
+  if (fromCustom.reviewer?.length) return fromCustom.reviewer;
+  if (Array.isArray(task.people) && task.people.some((p) => p.role === 'REVIEWER')) {
+    return task.people
+      .filter((p) => p.role === 'REVIEWER')
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      .map((p) => p.userId);
+  }
+  return task.reviewerId ? [task.reviewerId] : [];
+}
+
+function RoleMultiPicker({
+  ids,
+  users,
+  onChange,
+  t,
+  emptyLabel,
+}: {
+  ids: string[];
+  users: UserOpt[];
+  onChange: (ids: string[]) => void;
+  t: (en: string, es: string, pt: string) => string;
+  emptyLabel: string;
+}) {
+  const nameOf = (id: string) => users.find((u) => u.id === id)?.name || users.find((u) => u.id === id)?.email || id;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex min-h-[36px] flex-wrap items-center gap-1 rounded-lg border border-[color:var(--sys-line,#cbd5e1)] bg-[color:var(--sys-panel-soft,#f8fafc)] px-2 py-1.5">
+        {ids.length === 0 && (
+          <span className="text-[11px] text-[color:var(--sys-faint,#94a3b8)]">{emptyLabel}</span>
+        )}
+        {ids.map((id) => (
+          <button
+            key={id}
+            type="button"
+            title={t('Remove', 'Quitar', 'Remover')}
+            onClick={() => onChange(ids.filter((row) => row !== id))}
+            className="inline-flex h-6 items-center gap-1 rounded-full bg-teal-500/15 px-2 text-[10px] font-semibold text-teal-700 dark:text-teal-200"
+          >
+            {nameOf(id)}
+            <span aria-hidden>×</span>
+          </button>
+        ))}
+      </div>
+      <select
+        value=""
+        onChange={(e) => {
+          const id = e.target.value;
+          if (!id || ids.includes(id)) return;
+          onChange([...ids, id]);
+        }}
+        className={fieldControl}
+      >
+        <option value="">{t('+ Add person', '+ Añadir persona', '+ Adicionar pessoa')}</option>
+        {users.filter((u) => !ids.includes(u.id)).map((u) => (
+          <option key={u.id} value={u.id}>
+            {u.name || u.email}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 type Detail = {
   id: string;
   title: string;
@@ -29,6 +149,11 @@ type Detail = {
   assigneeId: string | null;
   responsibleId?: string | null;
   reviewerId?: string | null;
+  assigneeIds?: string[] | null;
+  responsibleIds?: string[] | null;
+  reviewerIds?: string[] | null;
+  collaboratorIds?: unknown;
+  people?: Array<{ userId: string; role: string; sortOrder?: number }> | null;
   groupId?: string | null;
   folderId?: string | null;
   projectId: string | null;
@@ -98,8 +223,10 @@ export function WorkTaskPanel({
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [timeHours, setTimeHours] = useState('');
   const [timeDesc, setTimeDesc] = useState('');
-  const [approvalApproverId, setApprovalApproverId] = useState('');
-  const [approvalNote, setApprovalNote] = useState('');
+  const [sendAction, setSendAction] = useState<'review' | 'delivery' | 'handoff'>('review');
+  const [sendRecipientId, setSendRecipientId] = useState('');
+  const [sendNote, setSendNote] = useState('');
+  const [sendingAction, setSendingAction] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -247,21 +374,35 @@ export function WorkTaskPanel({
     await load();
   };
 
-  const requestApproval = async () => {
-    if (!approvalApproverId) return;
-    const r = await fetch('/api/task-approvals', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskId, approverId: approvalApproverId, note: approvalNote || null }),
-    });
-    if (!r.ok) {
+  const submitSendAction = async () => {
+    if (!sendRecipientId) return;
+    setSendingAction(true);
+    setError('');
+    try {
+      const r = await fetch(`/api/tasks/${taskId}/send-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: sendAction,
+          recipientId: sendRecipientId,
+          note: sendNote.trim() || null,
+        }),
+      });
       const d = await r.json().catch(() => ({}));
-      setError(d.error || t('Could not request approval', 'No se pudo solicitar', 'Não foi possível solicitar'));
-      return;
+      if (!r.ok) {
+        throw new Error(
+          d.error || t('Could not send', 'No se pudo enviar', 'Não foi possível enviar'),
+        );
+      }
+      setSendRecipientId('');
+      setSendNote('');
+      await load();
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setSendingAction(false);
     }
-    setApprovalApproverId('');
-    setApprovalNote('');
-    await load();
   };
 
   const remove = async () => {
@@ -346,51 +487,36 @@ export function WorkTaskPanel({
                 ))}
               </select>
             </label>
-            <label className="space-y-1">
+            <div className="space-y-1 sm:col-span-2">
               <span className={fieldLabel}>{t('Executor', 'Ejecutor', 'Executor')}</span>
-              <select
-                value={task.assigneeId || ''}
-                onChange={(e) => void patch({ assigneeId: e.target.value || null })}
-                className={fieldControl}
-              >
-                <option value="">{t('Unassigned', 'Sin asignar', 'Sem executor')}</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name || u.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1">
+              <RoleMultiPicker
+                ids={panelRoleIds(task, 'EXECUTOR')}
+                users={users}
+                onChange={(ids) => void patch({ assigneeIds: ids })}
+                t={t}
+                emptyLabel={t('Unassigned', 'Sin asignar', 'Sem executor')}
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
               <span className={fieldLabel}>{t('Owner', 'Responsable', 'Responsável')}</span>
-              <select
-                value={task.responsibleId || ''}
-                onChange={(e) => void patch({ responsibleId: e.target.value || null })}
-                className={fieldControl}
-              >
-                <option value="">{t('None', 'Ninguno', 'Nenhum')}</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name || u.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className={fieldLabel}>{t('Reviewer', 'Revisor', 'Revisor')}</span>
-              <select
-                value={task.reviewerId || ''}
-                onChange={(e) => void patch({ reviewerId: e.target.value || null })}
-                className={fieldControl}
-              >
-                <option value="">{t('None', 'Ninguno', 'Nenhum')}</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name || u.email}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <RoleMultiPicker
+                ids={panelRoleIds(task, 'RESPONSIBLE')}
+                users={users}
+                onChange={(ids) => void patch({ responsibleIds: ids })}
+                t={t}
+                emptyLabel={t('None', 'Ninguno', 'Nenhum')}
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <span className={fieldLabel}>{t('Supervisor', 'Supervisor', 'Supervisor')}</span>
+              <RoleMultiPicker
+                ids={panelRoleIds(task, 'REVIEWER')}
+                users={users}
+                onChange={(ids) => void patch({ reviewerIds: ids })}
+                t={t}
+                emptyLabel={t('None', 'Ninguno', 'Nenhum')}
+              />
+            </div>
             <label className="space-y-1">
               <span className={fieldLabel}>{t('Due', 'Fecha', 'Prazo')}</span>
               <input
@@ -621,15 +747,39 @@ export function WorkTaskPanel({
 
           <section>
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sys-muted)]">
-              {t('Approval', 'Aprobación', 'Aprovação')}
+              {t('Send activity', 'Enviar actividad', 'Enviar atividade')}
+            </p>
+            <p className="mb-2 text-[11px] leading-snug text-[color:var(--sys-faint,#94a3b8)]">
+              {t(
+                'Ask for review, deliver work, or pass the baton — the other person gets a notification and email.',
+                'Pide revisión, entrega el trabajo o pasa el testigo — la otra persona recibe aviso y correo.',
+                'Peça revisão, entregue o trabalho ou passe o bastão — a outra pessoa recebe aviso e e-mail.',
+              )}
             </p>
             <div className="space-y-2">
               <select
-                value={approvalApproverId}
-                onChange={(e) => setApprovalApproverId(e.target.value)}
-                className="etask-field w-full rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs text-[color:var(--sys-ink)]"
+                value={sendAction}
+                onChange={(e) => setSendAction(e.target.value as 'review' | 'delivery' | 'handoff')}
+                className={`${fieldControl}`}
               >
-                <option value="">{t('Choose approver…', 'Elegir aprobador…', 'Escolher aprovador…')}</option>
+                <option value="review">
+                  {t('Request review', 'Pedir revisión', 'Pedir revisão')}
+                </option>
+                <option value="delivery">
+                  {t('Deliver / hand in', 'Entregar', 'Entregar')}
+                </option>
+                <option value="handoff">
+                  {t('Pass the baton', 'Pasar el testigo', 'Passar o bastão')}
+                </option>
+              </select>
+              <select
+                value={sendRecipientId}
+                onChange={(e) => setSendRecipientId(e.target.value)}
+                className={`${fieldControl}`}
+              >
+                <option value="">
+                  {t('Choose who…', 'Elegir a quién…', 'Escolher para quem…')}
+                </option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name || u.email}
@@ -637,24 +787,30 @@ export function WorkTaskPanel({
                 ))}
               </select>
               <input
-                value={approvalNote}
-                onChange={(e) => setApprovalNote(e.target.value)}
+                value={sendNote}
+                onChange={(e) => setSendNote(e.target.value)}
                 placeholder={t('Note (optional)', 'Nota (opcional)', 'Nota (opcional)')}
-                className="etask-field w-full rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs text-[color:var(--sys-ink)]"
+                className={`${fieldControl}`}
               />
               <button
                 type="button"
-                onClick={() => void requestApproval()}
-                disabled={!approvalApproverId}
-                className="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-500 disabled:opacity-40"
+                onClick={() => void submitSendAction()}
+                disabled={!sendRecipientId || sendingAction}
+                className="rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-500 disabled:opacity-40"
               >
-                {t('Request approval', 'Solicitar aprobación', 'Solicitar aprovação')}
+                {sendingAction
+                  ? t('Sending…', 'Enviando…', 'A enviar…')
+                  : t('Send activity', 'Enviar actividad', 'Enviar atividade')}
               </button>
             </div>
             <ul className="mt-2 space-y-1">
               {(task.approvalRequests || []).map((a) => (
-                <li key={a.id} className="rounded-lg bg-[color:var(--sys-panel-soft)] px-2 py-1.5 text-[11px] text-[color:var(--sys-muted)]">
+                <li
+                  key={a.id}
+                  className="rounded-lg bg-[color:var(--sys-panel-soft)] px-2 py-1.5 text-[11px] text-[color:var(--sys-muted)]"
+                >
                   {a.status} → {a.approver?.name || '—'}
+                  {a.note ? ` · ${a.note}` : ''}
                 </li>
               ))}
             </ul>

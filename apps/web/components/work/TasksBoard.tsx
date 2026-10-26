@@ -278,12 +278,30 @@ export default function TasksBoard({
     setTasks((prev) =>
       prev.map((task) => {
         if (task.id !== taskId) return task;
-        const next = { ...task, ...body };
-        if (body.assigneeId !== undefined) {
+        const next: any = { ...task, ...body };
+        if (Array.isArray(body.assigneeIds)) {
+          const ids = body.assigneeIds.map(String);
+          next.assigneeIds = ids;
+          next.assigneeId = ids[0] || null;
+          next.collaboratorIds = ids.slice(1);
+          next.assignee = ids[0]
+            ? users.find((u: any) => u.id === ids[0]) || task.assignee
+            : null;
+        } else if (body.assigneeId !== undefined) {
           next.assignee =
             body.assigneeId == null
               ? null
               : users.find((u: any) => u.id === body.assigneeId) || task.assignee;
+        }
+        if (Array.isArray(body.responsibleIds)) {
+          const ids = body.responsibleIds.map(String);
+          next.responsibleIds = ids;
+          next.responsibleId = ids[0] || null;
+        }
+        if (Array.isArray(body.reviewerIds)) {
+          const ids = body.reviewerIds.map(String);
+          next.reviewerIds = ids;
+          next.reviewerId = ids[0] || null;
         }
         if (body.customFields && typeof body.customFields === 'object') {
           next.customFields = { ...(task.customFields || {}), ...(body.customFields as object) };
@@ -291,11 +309,15 @@ export default function TasksBoard({
         return next;
       }),
     );
-    await fetch(`/api/tasks/${taskId}`, {
+    const res = await fetch(`/api/tasks/${taskId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.task) {
+      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, ...data.task } : task)));
+    }
     notifyChanged();
   };
 
@@ -329,6 +351,83 @@ export default function TasksBoard({
       return next;
     });
     if (selectedId === id) setSelectedId(null);
+    notifyChanged();
+  };
+
+  const archiveTask = async (id: string, title: string) => {
+    if (
+      !confirm(
+        `${t3('Archive this task?', '¿Archivar esta tarea?', 'Arquivar esta tarefa?')} ${title}`,
+      )
+    ) {
+      return;
+    }
+    const res = await fetch(`/api/tasks/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archived: true }),
+    });
+    if (!res.ok) return;
+    setTasks((prev) => prev.filter((task) => task.id !== id && task.parentId !== id));
+    setBulkIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    if (selectedId === id) setSelectedId(null);
+    notifyChanged();
+  };
+
+  const archiveSelected = async () => {
+    if (bulkIds.size === 0) return;
+    if (
+      !confirm(
+        t3(
+          `Archive ${bulkIds.size} tasks?`,
+          `¿Archivar ${bulkIds.size} tareas?`,
+          `Arquivar ${bulkIds.size} tarefas?`,
+        ),
+      )
+    ) {
+      return;
+    }
+    setBulkBusy(true);
+    try {
+      const res = await fetch('/api/tasks/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [...bulkIds], archive: true }),
+      });
+      if (res.ok) {
+        setBulkIds(new Set());
+        fetchTasks({ silent: true });
+        notifyChanged();
+      }
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const archiveDoneInGroup = async (_groupId: string | null, taskIds: string[]) => {
+    if (!taskIds.length) return;
+    if (
+      !confirm(
+        t3(
+          `Archive ${taskIds.length} done tasks?`,
+          `¿Archivar ${taskIds.length} tareas hechas?`,
+          `Arquivar ${taskIds.length} tarefas concluídas?`,
+        ),
+      )
+    ) {
+      return;
+    }
+    const res = await fetch('/api/tasks/bulk', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: taskIds, archive: true }),
+    });
+    if (!res.ok) return;
+    fetchTasks({ silent: true });
     notifyChanged();
   };
 
@@ -462,6 +561,8 @@ export default function TasksBoard({
     if (projectFilter) body.projectId = projectFilter;
     else if (activeCompanyId) body.companyId = activeCompanyId;
     if (departmentFilter) body.departmentId = departmentFilter;
+    // Match applyPack / WorkShell quickCreate: Mi trabajo & person scopes filter by assignee
+    if (assigneeFilter) body.assigneeId = assigneeFilter;
     await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -648,7 +749,16 @@ export default function TasksBoard({
     const priority = embedded ? externalPriority : priorityFilter;
     if (priority && task?.priority !== priority) return false;
     if (status && task?.status !== status) return false;
-    if (queue === 'unassigned' && task?.assigneeId) return false;
+    if (
+      queue === 'unassigned' &&
+      (Array.isArray(task?.assigneeIds)
+        ? task.assigneeIds.length > 0
+        : Boolean(task?.assigneeId) ||
+          (Array.isArray(task?.collaboratorIds) && task.collaboratorIds.length > 0) ||
+          (Array.isArray(task?.people) && task.people.some((p: any) => p.role === 'EXECUTOR')))
+    ) {
+      return false;
+    }
     if (queue === 'overdue' || queue === 'week') {
       const open = ['BACKLOG', 'TODO', 'IN_PROGRESS', 'IN_REVIEW'].includes(task?.status);
       if (!open || !task?.dueDate) return false;
@@ -663,7 +773,17 @@ export default function TasksBoard({
         if (due < start || due >= end) return false;
       }
     }
-    if (assigneeFilter && task?.assigneeId !== assigneeFilter) return false;
+    if (assigneeFilter) {
+      const execIds = Array.isArray(task?.assigneeIds)
+        ? task.assigneeIds.map(String)
+        : Array.isArray(task?.people) && task.people.some((p: any) => p.role === 'EXECUTOR')
+          ? task.people.filter((p: any) => p.role === 'EXECUTOR').map((p: any) => String(p.userId))
+          : [
+              task?.assigneeId,
+              ...(Array.isArray(task?.collaboratorIds) ? task.collaboratorIds.map(String) : []),
+            ].filter(Boolean);
+      if (!execIds.includes(assigneeFilter)) return false;
+    }
     if (dateFromFilter && task?.dueDate && new Date(task.dueDate) < new Date(dateFromFilter)) return false;
     if (dateToFilter && task?.dueDate && new Date(task.dueDate) > new Date(`${dateToFilter}T23:59:59`)) {
       return false;
@@ -967,6 +1087,7 @@ export default function TasksBoard({
                 onClear={() => setBulkIds(new Set())}
                 onSelectAll={() => setBulkIds(new Set(filtered.map((t: any) => t.id)))}
                 onBulk={runBulk}
+                onArchive={() => void archiveSelected()}
                 onDelete={() => void deleteSelected()}
                 t={t3}
               />
@@ -1002,6 +1123,8 @@ export default function TasksBoard({
               onApplyTemplate={(columns) => void saveBoard({ columns })}
               onCommentPosted={() => fetchTasks({ silent: true })}
               onDeleteTask={(id, title) => void deleteTask(id, title)}
+              onArchiveTask={(id, title) => void archiveTask(id, title)}
+              onArchiveDoneInGroup={(groupId, ids) => void archiveDoneInGroup(groupId, ids)}
               subtasksOf={(id) => (tasks ?? []).filter((task: any) => task?.parentId === id)}
               onAddSubtask={addSubtask}
               onDuplicate={(task) => void duplicateTask(task)}

@@ -56,11 +56,36 @@ function parseNotify(raw: unknown): WorkNotifyPrefs {
   };
 }
 
+/** Garante colunas multi-papel visíveis em layouts antigos (sem apagar customizações). */
+function ensureRoleColumns(columns: WorkColumn[]): WorkColumn[] {
+  const out = [...columns];
+  const afterPerson = Math.max(0, out.findIndex((c) => c.kind === 'person')) + 1 || 1;
+  if (!out.some((c) => c.kind === 'responsible')) {
+    out.splice(afterPerson, 0, {
+      id: 'responsible',
+      kind: 'responsible',
+      label: 'Responsável',
+    });
+  }
+  const afterResponsible = Math.max(
+    afterPerson,
+    out.findIndex((c) => c.kind === 'responsible') + 1,
+  );
+  if (!out.some((c) => c.kind === 'reviewer')) {
+    out.splice(afterResponsible, 0, {
+      id: 'reviewer',
+      kind: 'reviewer',
+      label: 'Supervisor',
+    });
+  }
+  return out;
+}
+
 function parseLayout(raw: unknown): { columns: WorkColumn[]; notify: WorkNotifyPrefs } {
   const body = raw && typeof raw === 'object' ? (raw as { columns?: unknown; notify?: unknown }) : {};
   const columns = parseColumns(body.columns);
   return {
-    columns: columns.length ? columns : DEFAULT_WORK_COLUMNS,
+    columns: ensureRoleColumns(columns.length ? columns : DEFAULT_WORK_COLUMNS),
     notify: parseNotify(body.notify),
   };
 }

@@ -10,12 +10,24 @@ import {
   getFolderAccess,
 } from '@/lib/work/folder-access';
 import {
+  buildTaskContextLine,
+  compactTitle,
   notifyTaskAssigned,
   notifyTaskWatchers,
+  statusLabel,
   taskRoleUserIds,
   wantsWorkEmail,
   wantsWorkNotify,
 } from '@/lib/work/task-notify';
+import { archiveTaskTree, restoreTaskTree } from '@/lib/work/task-archive';
+import {
+  executorIdsFromTask,
+  peopleSelect,
+  replaceTaskRolePeople,
+  responsibleIdsFromTask,
+  reviewerIdsFromTask,
+  withRoleIdArrays,
+} from '@/lib/work/task-people';
 
 async function assertTaskAccess(
   taskId: string,
@@ -52,7 +64,7 @@ async function assertTaskAccess(
   return task;
 }
 
-const detailInclude = {
+const detailIncludeBase = {
   assignee: true,
   responsible: { select: { id: true, name: true, email: true } },
   reviewer: { select: { id: true, name: true, email: true } },
@@ -71,10 +83,11 @@ const detailInclude = {
     orderBy: { date: 'desc' as const },
   },
   subtasks: {
-    where: { isActive: true },
+    where: { isActive: true, archivedAt: null },
     include: { assignee: { select: { id: true, name: true } } },
     orderBy: { order: 'asc' as const },
   },
+  archivedBy: { select: { id: true, name: true } },
   parent: { select: { id: true, title: true } },
   approvalRequests: {
     orderBy: { createdAt: 'desc' as const },
@@ -87,6 +100,25 @@ const detailInclude = {
   _count: { select: { comments: true, subtasks: true, attachments: true } },
 };
 
+const detailInclude = {
+  ...detailIncludeBase,
+  people: { select: peopleSelect, orderBy: [{ role: 'asc' as const }, { sortOrder: 'asc' as const }] },
+};
+
+async function loadTaskDetail(taskId: string) {
+  try {
+    return await prisma.task.findFirst({
+      where: { id: taskId, isActive: true },
+      include: detailInclude,
+    });
+  } catch {
+    return prisma.task.findFirst({
+      where: { id: taskId, isActive: true },
+      include: detailIncludeBase,
+    });
+  }
+}
+
 export async function GET(_req: Request, { params }: { params: { taskId: string } }) {
   try {
     const tenant = await getUserCompanyIds();
@@ -95,13 +127,10 @@ export async function GET(_req: Request, { params }: { params: { taskId: string 
     const access = await assertTaskAccess(params.taskId, tenant);
     if (!access) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
 
-    const task = await prisma.task.findFirst({
-      where: { id: params.taskId, isActive: true },
-      include: detailInclude,
-    });
+    const task = await loadTaskDetail(params.taskId);
     if (!task) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
 
-    return NextResponse.json({ task });
+    return NextResponse.json({ task: withRoleIdArrays(task) });
   } catch (error: unknown) {
     console.error('Get task error:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
@@ -124,10 +153,13 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
     if (body.priority !== undefined) data.priority = body.priority;
     if (body.dueDate !== undefined) data.dueDate = body.dueDate ? new Date(body.dueDate) : null;
     if (body.startDate !== undefined) data.startDate = body.startDate ? new Date(body.startDate) : null;
-    if (body.assigneeId !== undefined) data.assigneeId = body.assigneeId || null;
-    if (body.responsibleId !== undefined) data.responsibleId = body.responsibleId || null;
-    if (body.reviewerId !== undefined) data.reviewerId = body.reviewerId || null;
-    if (Array.isArray(body.collaboratorIds)) {
+    // Single-FK patches still supported; multi-arrays take precedence via replaceTaskRolePeople below.
+    if (body.assigneeId !== undefined && body.assigneeIds === undefined) data.assigneeId = body.assigneeId || null;
+    if (body.responsibleId !== undefined && body.responsibleIds === undefined) {
+      data.responsibleId = body.responsibleId || null;
+    }
+    if (body.reviewerId !== undefined && body.reviewerIds === undefined) data.reviewerId = body.reviewerId || null;
+    if (Array.isArray(body.collaboratorIds) && body.assigneeIds === undefined) {
       const wanted = [...new Set(body.collaboratorIds.map((id: unknown) => String(id)).filter(Boolean))].slice(0, 12);
       const members = wanted.length
         ? await prisma.user.findMany({
@@ -213,62 +245,107 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
     if (body.status === 'DONE') data.completedAt = new Date();
     else if (body.status !== undefined) data.completedAt = null;
 
-    const prevAssignee = task.assigneeId;
-    const prevResponsible = task.responsibleId;
-    const prevReviewer = task.reviewerId;
-    const prevCollaborators = Array.isArray(task.collaboratorIds)
-      ? task.collaboratorIds.map((id) => String(id))
-      : [];
-    const updated = await prisma.task.update({
-      where: { id: params.taskId },
-      data,
-      include: detailInclude,
-    });
+    const wantArchive = body.archived === true;
+    const wantRestore = body.archived === false;
+    if (wantArchive || wantRestore) {
+      if (wantArchive) await archiveTaskTree(params.taskId, tenant.userId);
+      else await restoreTaskTree(params.taskId);
+      const refreshed = await loadTaskDetail(params.taskId);
+      return NextResponse.json({ task: refreshed ? withRoleIdArrays(refreshed) : refreshed });
+    }
+
+    const prevExecutors = executorIdsFromTask(task);
+    const prevResponsible = responsibleIdsFromTask(task);
+    const prevReviewers = reviewerIdsFromTask(task);
+
+    if (Object.keys(data).length) {
+      await prisma.task.update({ where: { id: params.taskId }, data });
+    }
+
+    // Multi-role arrays (preferred) — also sync when single FK / collaboratorIds change
+    if (Array.isArray(body.assigneeIds)) {
+      await replaceTaskRolePeople({
+        taskId: params.taskId,
+        role: 'EXECUTOR',
+        userIds: body.assigneeIds,
+        companyIds: tenant.companyIds,
+      });
+    } else if (body.assigneeId !== undefined || Array.isArray(body.collaboratorIds)) {
+      const primary =
+        body.assigneeId !== undefined ? body.assigneeId || null : task.assigneeId;
+      const extras = Array.isArray(body.collaboratorIds)
+        ? body.collaboratorIds.map((id: unknown) => String(id)).filter(Boolean)
+        : Array.isArray(task.collaboratorIds)
+          ? task.collaboratorIds.map((id) => String(id))
+          : [];
+      await replaceTaskRolePeople({
+        taskId: params.taskId,
+        role: 'EXECUTOR',
+        userIds: [...(primary ? [String(primary)] : []), ...extras.filter((id) => id !== primary)],
+        companyIds: tenant.companyIds,
+      });
+    }
+
+    if (Array.isArray(body.responsibleIds)) {
+      await replaceTaskRolePeople({
+        taskId: params.taskId,
+        role: 'RESPONSIBLE',
+        userIds: body.responsibleIds,
+        companyIds: tenant.companyIds,
+      });
+    } else if (body.responsibleId !== undefined) {
+      await replaceTaskRolePeople({
+        taskId: params.taskId,
+        role: 'RESPONSIBLE',
+        userIds: body.responsibleId ? [String(body.responsibleId)] : [],
+        companyIds: tenant.companyIds,
+      });
+    }
+
+    if (Array.isArray(body.reviewerIds)) {
+      await replaceTaskRolePeople({
+        taskId: params.taskId,
+        role: 'REVIEWER',
+        userIds: body.reviewerIds,
+        companyIds: tenant.companyIds,
+      });
+    } else if (body.reviewerId !== undefined) {
+      await replaceTaskRolePeople({
+        taskId: params.taskId,
+        role: 'REVIEWER',
+        userIds: body.reviewerId ? [String(body.reviewerId)] : [],
+        companyIds: tenant.companyIds,
+      });
+    }
+
+    const updated = await loadTaskDetail(params.taskId);
+    if (!updated) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+    const enriched = withRoleIdArrays(updated);
 
     const companyId = updated.companyId || updated.project?.companyId || null;
     const company = companyId
       ? await prisma.company.findUnique({ where: { id: companyId }, select: { workBoardJson: true } })
       : null;
     const emailOn = wantsWorkEmail(company?.workBoardJson);
+    const actor = await prisma.user.findUnique({
+      where: { id: tenant.userId },
+      select: { name: true, email: true },
+    });
+    const actorName = actor?.name || actor?.email || 'Alguien';
+    const whereLine = buildTaskContextLine({
+      taskTitle: updated.title,
+      folderName: updated.folder?.name,
+      groupName: updated.group?.name,
+      projectName: updated.project?.name,
+    });
+    const taskLink = '/hub/work';
+
     if (wantsWorkNotify(company?.workBoardJson, 'assign')) {
-      if (body.assigneeId !== undefined) {
-        notifyTaskAssigned({
-          assigneeId: updated.assigneeId,
-          actorId: tenant.userId,
-          title: updated.title,
-          projectId: updated.projectId,
-          prevAssigneeId: prevAssignee,
-          email: emailOn,
-          roleLabel: 'asignó como ejecutor',
-        });
-      }
-      if (body.responsibleId !== undefined) {
-        notifyTaskAssigned({
-          assigneeId: updated.responsibleId,
-          actorId: tenant.userId,
-          title: updated.title,
-          projectId: updated.projectId,
-          prevAssigneeId: prevResponsible,
-          email: emailOn,
-          roleLabel: 'asignó como responsable',
-        });
-      }
-      if (body.reviewerId !== undefined) {
-        notifyTaskAssigned({
-          assigneeId: updated.reviewerId,
-          actorId: tenant.userId,
-          title: updated.title,
-          projectId: updated.projectId,
-          prevAssigneeId: prevReviewer,
-          email: emailOn,
-          roleLabel: 'asignó como revisor',
-        });
-      }
-      const nextCollaborators = Array.isArray(updated.collaboratorIds)
-        ? updated.collaboratorIds.map((id) => String(id))
-        : [];
-      for (const id of nextCollaborators) {
-        if (prevCollaborators.includes(id)) continue;
+      const nextExecutors = enriched.assigneeIds;
+      const nextResponsible = enriched.responsibleIds;
+      const nextReviewers = enriched.reviewerIds;
+      for (const id of nextExecutors) {
+        if (prevExecutors.includes(id)) continue;
         notifyTaskAssigned({
           assigneeId: id,
           actorId: tenant.userId,
@@ -276,22 +353,65 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
           projectId: updated.projectId,
           prevAssigneeId: null,
           email: emailOn,
+          roleLabel: 'asignó como ejecutor',
+          actorName,
+          where: whereLine,
+        });
+      }
+      for (const id of nextResponsible) {
+        if (prevResponsible.includes(id)) continue;
+        notifyTaskAssigned({
+          assigneeId: id,
+          actorId: tenant.userId,
+          title: updated.title,
+          projectId: updated.projectId,
+          prevAssigneeId: null,
+          email: emailOn,
+          roleLabel: 'asignó como responsable',
+          actorName,
+          where: whereLine,
+        });
+      }
+      for (const id of nextReviewers) {
+        if (prevReviewers.includes(id)) continue;
+        notifyTaskAssigned({
+          assigneeId: id,
+          actorId: tenant.userId,
+          title: updated.title,
+          projectId: updated.projectId,
+          prevAssigneeId: null,
+          email: emailOn,
+          roleLabel: 'asignó como supervisor',
+          actorName,
+          where: whereLine,
         });
       }
     }
     if (body.status !== undefined && body.status !== task.status) {
+      const fromLabel = statusLabel(String(task.status));
+      const toLabel = statusLabel(String(body.status));
       notifyTaskWatchers({
         actorId: tenant.userId,
         type: 'task_status',
-        title: 'Estado de una tarea',
-        message: `${updated.title}: ${String(body.status).replace(/_/g, ' ')}`,
-        userIds: taskRoleUserIds(updated),
+        title: 'Estado actualizado',
+        message: `${compactTitle(updated.title)}: ${fromLabel} → ${toLabel}`,
+        userIds: taskRoleUserIds(enriched),
         enabled: wantsWorkNotify(company?.workBoardJson, 'status'),
         email: emailOn,
+        link: taskLink,
+        mail: {
+          subjectPhrase: 'Estado actualizado',
+          headline: 'Estado actualizado',
+          where: whereLine,
+          what: `Estado: ${fromLabel} → ${toLabel}`,
+          who: actorName,
+          when: new Date(),
+          link: taskLink,
+        },
       });
     }
 
-    return NextResponse.json({ task: updated });
+    return NextResponse.json({ task: enriched });
   } catch (error: unknown) {
     console.error('Update task error:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });

@@ -179,11 +179,13 @@ export async function createWorkFolderShare(opts: {
       create: { folderId: opts.folderId, userId, role: role === 'editor' ? 'editor' : 'viewer' },
       update: { role: role === 'editor' ? 'editor' : 'viewer' },
     });
-    await prisma.workFolder.update({
-      where: { id: opts.folderId },
-      data: { visibility: 'SHARED' },
-    });
   }
+
+  // Any invite (company or external pending) marks the board as shared
+  await prisma.workFolder.update({
+    where: { id: opts.folderId },
+    data: { visibility: 'SHARED' },
+  });
 
   const inviteUrl = buildWorkFolderShareUrl(token);
   const inviter = await prisma.user.findUnique({

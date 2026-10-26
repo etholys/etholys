@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { Lock, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type UserRow = { id: string; name?: string | null; email?: string | null };
@@ -40,6 +40,8 @@ export function WorkFolderShareDialog({
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [shares, setShares] = useState<ShareRow[]>([]);
   const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [owner, setOwner] = useState<UserRow | null>(null);
+  const [visibility, setVisibility] = useState<'PERSONAL' | 'SHARED'>('PERSONAL');
   const [pickUserId, setPickUserId] = useState('');
   const [emailDraft, setEmailDraft] = useState('');
   const [pickRole, setPickRole] = useState<'viewer' | 'editor'>('viewer');
@@ -47,6 +49,11 @@ export function WorkFolderShareDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
+
+  const pendingOrGuestShares = shares.filter(
+    (s) => s.accessMode === 'external_guest' || !s.acceptedAt,
+  );
+  const isShared = visibility === 'SHARED' || members.length > 0 || pendingOrGuestShares.length > 0;
 
   const reload = () => {
     setLoading(true);
@@ -58,6 +65,8 @@ export function WorkFolderShareDialog({
       .then(([folderData, sharesData]) => {
         setMembers(folderData?.folder?.members ?? []);
         setOwnerId(folderData?.folder?.ownerId ?? null);
+        setOwner(folderData?.folder?.owner ?? null);
+        setVisibility(folderData?.folder?.visibility === 'SHARED' ? 'SHARED' : 'PERSONAL');
         setShares(sharesData?.shares ?? []);
       })
       .catch(() => setError(t('Failed to load', 'Error al cargar', 'Falha ao carregar')))
@@ -74,25 +83,39 @@ export function WorkFolderShareDialog({
     (u) => u.id !== ownerId && !members.some((m) => m.userId === u.id),
   );
 
-  const persistMembers = async (next: { userId: string; role: string }[]) => {
+  const persistMembers = async (
+    next: { userId: string; role: string }[],
+    opts?: { visibility?: 'PERSONAL' | 'SHARED' },
+  ) => {
     setSaving(true);
     setError(null);
     try {
+      const body: Record<string, unknown> = {
+        members: next.map((m) => ({ userId: m.userId, role: m.role })),
+      };
+      if (opts?.visibility) {
+        body.visibility = opts.visibility;
+      } else if (next.length > 0) {
+        body.visibility = 'SHARED';
+      } else if (pendingOrGuestShares.length === 0) {
+        // Last company member removed and no pending email invites → private again
+        body.visibility = 'PERSONAL';
+      }
+
       const res = await fetch(`/api/work-folders/${folderId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          members: next.map((m) => ({ userId: m.userId, role: m.role })),
-          visibility: 'SHARED',
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data?.error || t('Could not save', 'No se pudo guardar', 'Não foi possível guardar'));
-        return;
+        return false;
       }
       setMembers(data?.folder?.members ?? []);
+      setVisibility(data?.folder?.visibility === 'SHARED' ? 'SHARED' : 'PERSONAL');
       onSaved();
+      return true;
     } finally {
       setSaving(false);
     }
@@ -151,20 +174,73 @@ export function WorkFolderShareDialog({
     await persistMembers(next);
   };
 
-  const revokeShare = async (shareId: string) => {
+  const deleteShare = async (shareId: string) => {
+    const res = await fetch(
+      `/api/work-folders/${folderId}/shares?shareId=${encodeURIComponent(shareId)}`,
+      { method: 'DELETE' },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data?.error || t('Could not remove', 'No se pudo quitar', 'Não foi possível remover'));
+      return false;
+    }
+    return true;
+  };
+
+  const revokeShareAndReload = async (shareId: string) => {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/work-folders/${folderId}/shares?shareId=${encodeURIComponent(shareId)}`,
-        { method: 'DELETE' },
-      );
+      const revoked = shares.find((s) => s.id === shareId);
+      const ok = await deleteShare(shareId);
+      if (!ok) return;
+      const remainingShares = shares.filter((s) => s.id !== shareId);
+      const remainingMembers = members.filter((m) => m.userId !== revoked?.user?.id);
+      if (remainingMembers.length === 0 && remainingShares.length === 0) {
+        await persistMembers([], { visibility: 'PERSONAL' });
+        setShares([]);
+      } else {
+        reload();
+        onSaved();
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Remove everyone + revoke invites + switch board back to private. */
+  const makePrivate = async () => {
+    const confirmed = window.confirm(
+      t(
+        'Stop sharing this board? Everyone will lose access and it becomes private again.',
+        '¿Dejar de compartir este tablero? Todos perderán el acceso y volverá a ser privado.',
+        'Deixar de partilhar este quadro? Todos perdem o acesso e volta a ser privado.',
+      ),
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      for (const s of shares) {
+        const ok = await deleteShare(s.id);
+        if (!ok) return;
+      }
+      // Clear members without nested saving toggles
+      const res = await fetch(`/api/work-folders/${folderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ members: [], visibility: 'PERSONAL' }),
+      });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data?.error || t('Could not remove', 'No se pudo quitar', 'Não foi possível remover'));
+        setError(data?.error || t('Could not save', 'No se pudo guardar', 'Não foi possível guardar'));
         return;
       }
-      reload();
+      setMembers(data?.folder?.members ?? []);
+      setVisibility('PERSONAL');
+      setShares([]);
+      setLastInviteUrl(null);
       onSaved();
     } finally {
       setSaving(false);
@@ -183,11 +259,17 @@ export function WorkFolderShareDialog({
             </p>
             <h3 className="truncate text-base font-semibold text-slate-900">{folderName}</h3>
             <p className="mt-0.5 text-[11px] text-slate-400">
-              {t(
-                'Invite company people or any email — guests only see this board.',
-                'Invita a personas de la empresa o cualquier email — el invitado solo ve este tablero.',
-                'Convida pessoas da empresa ou qualquer email — o convidado só vê este tablero.',
-              )}
+              {isShared
+                ? t(
+                    'People with access. Remove anyone or stop sharing entirely.',
+                    'Personas con acceso. Quita a cualquiera o deja de compartir por completo.',
+                    'Pessoas com acesso. Remove alguém ou deixa de partilhar por completo.',
+                  )
+                : t(
+                    'Invite company people or any email — guests only see this board.',
+                    'Invita a personas de la empresa o cualquier email — el invitado solo ve este tablero.',
+                    'Convida pessoas da empresa ou qualquer email — o convidado só vê este tablero.',
+                  )}
             </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
@@ -270,7 +352,15 @@ export function WorkFolderShareDialog({
               {error && <p className="text-xs text-rose-600">{error}</p>}
 
               <ul className="max-h-56 space-y-1 overflow-y-auto">
-                {members.length === 0 && shares.length === 0 && (
+                <li className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2">
+                  <span className="min-w-0 flex-1 truncate text-sm text-slate-800">
+                    {owner?.name || owner?.email || t('You (owner)', 'Tú (dueño)', 'Tu (dono)')}
+                  </span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    {t('Owner', 'Dueño', 'Dono')}
+                  </span>
+                </li>
+                {members.length === 0 && pendingOrGuestShares.length === 0 && (
                   <li className="rounded-lg bg-slate-50 px-3 py-4 text-center text-xs text-slate-400">
                     {t('No one invited yet', 'Nadie invitado aún', 'Ninguém convidado ainda')}
                   </li>
@@ -302,37 +392,47 @@ export function WorkFolderShareDialog({
                     </button>
                   </li>
                 ))}
-                {shares
-                  .filter((s) => s.accessMode === 'external_guest' || !s.acceptedAt)
-                  .map((s) => (
-                    <li
-                      key={s.id}
-                      className="flex items-center gap-2 rounded-lg border border-teal-100 bg-teal-50/40 px-2.5 py-2"
+                {pendingOrGuestShares.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex items-center gap-2 rounded-lg border border-teal-100 bg-teal-50/40 px-2.5 py-2"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-sm text-slate-800">
+                      {s.email}
+                      <span className="ml-1 text-[10px] text-teal-700">
+                        {s.acceptedAt
+                          ? t('guest', 'invitado', 'convidado')
+                          : t('pending', 'pendiente', 'pendente')}
+                      </span>
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      {s.role === 'editor'
+                        ? t('Editor', 'Editor', 'Editor')
+                        : t('Viewer', 'Lector', 'Leitor')}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void revokeShareAndReload(s.id)}
+                      className="text-xs font-medium text-rose-600 hover:underline disabled:opacity-40"
                     >
-                      <span className="min-w-0 flex-1 truncate text-sm text-slate-800">
-                        {s.email}
-                        <span className="ml-1 text-[10px] text-teal-700">
-                          {s.acceptedAt
-                            ? t('guest', 'invitado', 'convidado')
-                            : t('pending', 'pendiente', 'pendente')}
-                        </span>
-                      </span>
-                      <span className="text-[10px] text-slate-500">
-                        {s.role === 'editor'
-                          ? t('Editor', 'Editor', 'Editor')
-                          : t('Viewer', 'Lector', 'Leitor')}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => void revokeShare(s.id)}
-                        className="text-xs font-medium text-rose-600 hover:underline disabled:opacity-40"
-                      >
-                        {t('Remove', 'Quitar', 'Remover')}
-                      </button>
-                    </li>
-                  ))}
+                      {t('Remove', 'Quitar', 'Remover')}
+                    </button>
+                  </li>
+                ))}
               </ul>
+
+              {isShared && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void makePrivate()}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-40"
+                >
+                  <Lock className="h-3.5 w-3.5" />
+                  {t('Stop sharing — make private', 'Dejar de compartir — solo yo', 'Deixar de partilhar — só eu')}
+                </button>
+              )}
             </>
           )}
         </div>

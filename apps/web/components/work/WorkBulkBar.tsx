@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckSquare, Square, X } from 'lucide-react';
+import { Archive, CheckSquare, Square, X } from 'lucide-react';
 import { WORK_KANBAN, WORK_PRIORITIES } from './work-ui';
 
 type UserOpt = { id: string; name: string | null; email?: string };
@@ -11,6 +11,7 @@ export function WorkBulkBar({
   onClear,
   onSelectAll,
   onBulk,
+  onArchive,
   onDelete,
   busy,
   t,
@@ -20,6 +21,7 @@ export function WorkBulkBar({
   onClear: () => void;
   onSelectAll?: () => void;
   onBulk: (patch: Record<string, unknown>) => Promise<void>;
+  onArchive?: () => void;
   onDelete?: () => void;
   busy?: boolean;
   t: (en: string, es: string, pt: string) => string;
@@ -106,6 +108,17 @@ export function WorkBulkBar({
         className="etask-field rounded-lg border px-2 py-1 text-xs"
         title={t('Set due date', 'Fecha límite', 'Definir prazo')}
       />
+      {onArchive && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onArchive}
+          className="inline-flex items-center gap-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1 text-xs font-semibold text-[color:var(--sys-ink)] hover:border-teal-400 hover:text-teal-700 disabled:opacity-40"
+        >
+          <Archive className="h-3.5 w-3.5" />
+          {t('Archive', 'Archivar', 'Arquivar')}
+        </button>
+      )}
       {onDelete && (
         <button
           type="button"

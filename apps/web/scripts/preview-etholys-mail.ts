@@ -17,10 +17,10 @@ const invite = buildInvitationEmail({
   inviterName: 'Equipo Etholys',
   companyName: 'Rikolto',
   inviteKind: 'employee',
-  jobTitle: 'Coordinación de proyectos',
   code: 'RIK7A2C9',
   loginUrl: 'https://app.etholys.com/login?invite=RIK7A2C9',
   expiresDays: 14,
+  accessMonths: 6,
   includeRikoltoCatalog: true,
 });
 
@@ -29,6 +29,7 @@ const welcome = buildPilotWelcomeEmail({
   organizationName: 'Rikolto',
   contactName: 'equipo',
   loginUrl: 'https://app.etholys.com/login',
+  accessMonths: 6,
 });
 
 writeFileSync(join(outDir, 'rikolto-invite.html'), invite.html, 'utf8');
