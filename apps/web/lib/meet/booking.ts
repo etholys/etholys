@@ -32,6 +32,12 @@ import {
   normalizeOpenDayHours,
   openDayPublicPath,
 } from '@/lib/meet/booking-open-day';
+import {
+  groupEventPublicPath,
+  isValidGroupEventYmd,
+  normalizeGroupCapacity,
+  normalizeGroupEventHours,
+} from '@/lib/meet/booking-group-event';
 import { collectHolidayDays, type HolidayDay } from '@/lib/meet/holidays';
 import { normalizeHolidayCountries } from '@/lib/meet/holiday-countries';
 import { isValidTimeZone, meetWallTimeToUtc } from '@/lib/meet/timezone';
@@ -83,7 +89,11 @@ export function openDayPublicUrl(code: string): string {
   return `${meetAppBaseUrl()}${openDayPublicPath(code)}`;
 }
 
-export { openDayPublicPath };
+export function groupEventPublicUrl(code: string): string {
+  return `${meetAppBaseUrl()}${groupEventPublicPath(code)}`;
+}
+
+export { openDayPublicPath, groupEventPublicPath };
 
 type Held = { startsAt: Date; endsAt: Date };
 
@@ -662,6 +672,7 @@ function serializeOpenDayRow(row: {
 }) {
   return {
     id: row.id,
+    kind: 'slots' as const,
     publicCode: row.publicCode,
     publicUrl: openDayPublicUrl(row.publicCode),
     dayYmd: row.dayYmd,
@@ -678,13 +689,79 @@ function serializeOpenDayRow(row: {
   };
 }
 
+function serializeGroupEventRow(
+  row: {
+    id: string;
+    publicCode: string;
+    dayYmd: string;
+    title: string;
+    description: string | null;
+    locationText: string | null;
+    startMin: number;
+    endMin: number;
+    allowVirtual: boolean;
+    allowInPerson: boolean;
+    capacity: number | null;
+    forgeCourseId: string | null;
+    projectId: string | null;
+    meetSessionId: string | null;
+    active: boolean;
+    createdAt: Date;
+    registrations?: {
+      id: string;
+      name: string;
+      email: string;
+      phone: string | null;
+      note: string | null;
+      mode: string;
+      createdAt: Date;
+    }[];
+    _count?: { registrations: number };
+  },
+  opts?: { includeRegistrants?: boolean },
+) {
+  const registrationCount = row._count?.registrations ?? row.registrations?.length ?? 0;
+  return {
+    id: row.id,
+    kind: 'group' as const,
+    publicCode: row.publicCode,
+    publicUrl: groupEventPublicUrl(row.publicCode),
+    dayYmd: row.dayYmd,
+    title: row.title,
+    description: row.description,
+    locationText: row.locationText,
+    startMin: row.startMin,
+    endMin: row.endMin,
+    allowVirtual: row.allowVirtual,
+    allowInPerson: row.allowInPerson,
+    capacity: row.capacity,
+    forgeCourseId: row.forgeCourseId,
+    projectId: row.projectId,
+    meetSessionId: row.meetSessionId,
+    active: row.active,
+    registrationCount,
+    registrations: opts?.includeRegistrants
+      ? (row.registrations || []).map((reg) => ({
+          id: reg.id,
+          name: reg.name,
+          email: reg.email,
+          phone: reg.phone,
+          note: reg.note,
+          mode: reg.mode,
+          createdAt: reg.createdAt.toISOString(),
+        }))
+      : undefined,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
 export async function getOrganizerAgenda(
   companyId: string,
   ownerId: string,
   range?: { from?: string | null; to?: string | null },
 ) {
   const page = await ensureBookingPage(companyId, ownerId);
-  const [requests, openDays] = await Promise.all([
+  const [requests, openDays, groupEvents] = await Promise.all([
     prisma.meetBookingRequest.findMany({
       where: { pageId: page.id },
       include: {
@@ -696,6 +773,18 @@ export async function getOrganizerAgenda(
     }),
     prisma.meetBookingOpenDay.findMany({
       where: { pageId: page.id, active: true },
+      orderBy: [{ dayYmd: 'asc' }, { createdAt: 'desc' }],
+      take: 50,
+    }),
+    prisma.meetBookingGroupEvent.findMany({
+      where: { pageId: page.id, active: true },
+      include: {
+        _count: { select: { registrations: true } },
+        registrations: {
+          orderBy: { createdAt: 'desc' },
+          take: 200,
+        },
+      },
       orderBy: [{ dayYmd: 'asc' }, { createdAt: 'desc' }],
       take: 50,
     }),
@@ -733,6 +822,7 @@ export async function getOrganizerAgenda(
       })),
     },
     openDays: openDays.map(serializeOpenDayRow),
+    groupEvents: groupEvents.map((row) => serializeGroupEventRow(row, { includeRegistrants: true })),
     requests: requests.map((row) => serializeRequest(row, page.publicCode)),
     externalBusy: serializeExternalBusy(externalBusy),
   };
@@ -820,6 +910,212 @@ export async function deactivateBookingOpenDay(
   });
   if (updated.count === 0) throw new BookingError('not_found');
   return getOrganizerAgenda(companyId, ownerId, range);
+}
+
+export async function createBookingGroupEvent(input: {
+  companyId: string;
+  ownerId: string;
+  dayYmd: string;
+  title?: string | null;
+  description?: string | null;
+  locationText?: string | null;
+  startMin?: number;
+  endMin?: number;
+  allowVirtual?: boolean;
+  allowInPerson?: boolean;
+  capacity?: number | null;
+  forgeCourseId?: string | null;
+  projectId?: string | null;
+  meetSessionId?: string | null;
+  from?: string | null;
+  to?: string | null;
+}) {
+  const page = await ensureBookingPage(input.companyId, input.ownerId);
+  const dayYmd = input.dayYmd.trim();
+  if (!isValidGroupEventYmd(dayYmd)) throw new BookingError('day_invalid');
+
+  const pageWindow = page.windows.find((window) => window.weekday === weekdayOfYmd(dayYmd));
+  const hours = normalizeGroupEventHours(
+    input.startMin ?? pageWindow?.startMin ?? 9 * 60,
+    input.endMin ?? pageWindow?.endMin ?? 18 * 60,
+  );
+  if (!hours) throw new BookingError('hours_invalid');
+
+  const allowVirtual = input.allowVirtual !== undefined ? Boolean(input.allowVirtual) : page.allowVirtual;
+  const allowInPerson = input.allowInPerson !== undefined ? Boolean(input.allowInPerson) : page.allowInPerson;
+  if (!allowVirtual && !allowInPerson) throw new BookingError('mode_invalid');
+
+  const title =
+    (input.title || '').trim().slice(0, 160) ||
+    `${page.title} · ${dayYmd}`.slice(0, 160);
+
+  const capacity =
+    input.capacity === undefined ? null : normalizeGroupCapacity(input.capacity);
+  if (input.capacity !== undefined && input.capacity !== null && capacity == null) {
+    throw new BookingError('capacity_invalid');
+  }
+
+  let created;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      created = await prisma.meetBookingGroupEvent.create({
+        data: {
+          pageId: page.id,
+          publicCode: publicCode(),
+          dayYmd,
+          title,
+          description: (input.description || '').trim().slice(0, 2000) || null,
+          locationText: (input.locationText || page.locationText || '').trim().slice(0, 500) || null,
+          startMin: hours.startMin,
+          endMin: hours.endMin,
+          allowVirtual,
+          allowInPerson,
+          capacity,
+          forgeCourseId: (input.forgeCourseId || '').trim().slice(0, 64) || null,
+          projectId: (input.projectId || '').trim().slice(0, 64) || null,
+          meetSessionId: (input.meetSessionId || '').trim().slice(0, 64) || null,
+          active: true,
+        },
+        include: {
+          _count: { select: { registrations: true } },
+          registrations: { orderBy: { createdAt: 'desc' }, take: 200 },
+        },
+      });
+      break;
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code === 'P2002' && attempt < 3) continue;
+      throw error;
+    }
+  }
+  if (!created) throw new BookingError('create_failed');
+
+  const agenda = await getOrganizerAgenda(input.companyId, input.ownerId, {
+    from: input.from,
+    to: input.to,
+  });
+  return { ...agenda, createdGroupEvent: serializeGroupEventRow(created, { includeRegistrants: true }) };
+}
+
+export async function deactivateBookingGroupEvent(
+  companyId: string,
+  ownerId: string,
+  groupEventId: string,
+  range?: { from?: string | null; to?: string | null },
+) {
+  const page = await ensureBookingPage(companyId, ownerId);
+  const updated = await prisma.meetBookingGroupEvent.updateMany({
+    where: { id: groupEventId, pageId: page.id, active: true },
+    data: { active: false },
+  });
+  if (updated.count === 0) throw new BookingError('not_found');
+  return getOrganizerAgenda(companyId, ownerId, range);
+}
+
+function serializeGroupEventPublic(
+  event: {
+    title: string;
+    description: string | null;
+    locationText: string | null;
+    dayYmd: string;
+    startMin: number;
+    endMin: number;
+    allowVirtual: boolean;
+    allowInPerson: boolean;
+    capacity: number | null;
+  },
+  page: { timeZone: string; owner: { name: string | null } | null },
+  registrationCount: number,
+) {
+  const spotsLeft =
+    event.capacity == null ? null : Math.max(0, event.capacity - registrationCount);
+  return {
+    kind: 'group_event' as const,
+    page: {
+      title: event.title,
+      description: event.description,
+      timeZone: page.timeZone,
+      allowVirtual: event.allowVirtual,
+      allowInPerson: event.allowInPerson,
+      locationText: event.locationText,
+      ownerName: page.owner?.name || null,
+      dayYmd: event.dayYmd,
+      startMin: event.startMin,
+      endMin: event.endMin,
+      capacity: event.capacity,
+      registrationCount,
+      spotsLeft,
+      full: spotsLeft !== null && spotsLeft <= 0,
+    },
+  };
+}
+
+export async function getPublicGroupEvent(code: string) {
+  const event = await prisma.meetBookingGroupEvent.findUnique({
+    where: { publicCode: code },
+    include: {
+      page: { include: { owner: { select: { name: true } } } },
+      _count: { select: { registrations: true } },
+    },
+  });
+  if (!event || !event.active) return null;
+  return serializeGroupEventPublic(event, event.page, event._count.registrations);
+}
+
+export async function createGroupEventRegistration(input: {
+  code: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  note?: string | null;
+  mode: string;
+}) {
+  const event = await prisma.meetBookingGroupEvent.findUnique({
+    where: { publicCode: (input.code || '').trim() },
+    include: { _count: { select: { registrations: true } } },
+  });
+  if (!event || !event.active) throw new BookingError('not_found');
+
+  const name = (input.name || '').trim().slice(0, 120);
+  if (!name) throw new BookingError('name_required');
+  const email = (input.email || '').trim().toLowerCase().slice(0, 200);
+  if (!EMAIL_RE.test(email)) throw new BookingError('email_invalid');
+  const phone = (input.phone || '').trim().slice(0, 40) || null;
+  const note = (input.note || '').trim().slice(0, 2000) || null;
+
+  const mode = (input.mode || '').trim();
+  if (mode !== 'virtual' && mode !== 'presencial') throw new BookingError('mode_invalid');
+  if (mode === 'virtual' && !event.allowVirtual) throw new BookingError('mode_invalid');
+  if (mode === 'presencial' && !event.allowInPerson) throw new BookingError('mode_invalid');
+
+  if (event.capacity != null && event._count.registrations >= event.capacity) {
+    throw new BookingError('event_full');
+  }
+
+  let created;
+  try {
+    created = await prisma.meetBookingGroupRegistration.create({
+      data: {
+        eventId: event.id,
+        publicToken: publicToken(),
+        name,
+        email,
+        phone,
+        note,
+        mode,
+      },
+    });
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code === 'P2002') throw new BookingError('already_registered');
+    throw error;
+  }
+
+  return {
+    ok: true,
+    registrationId: created.id,
+    publicToken: created.publicToken,
+  };
 }
 
 export async function updateBookingPage(input: {

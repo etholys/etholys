@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   buildOpenDayWindows,
   isValidOpenDayYmd,
@@ -16,6 +19,11 @@ test('open day ymd and hours validation', () => {
   assert.deepEqual(normalizeOpenDayHours(9 * 60, 12 * 60), { startMin: 540, endMin: 720 });
   assert.equal(normalizeOpenDayHours(10 * 60, 10 * 60 + 10), null);
   assert.equal(openDayPublicPath('abc123'), '/a/d/abc123');
+});
+
+test('open-day module copy stays generic (not business-round product)', () => {
+  const mod = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../lib/meet/booking-open-day.ts'), 'utf8');
+  assert.doesNotMatch(mod, /rodada/i);
 });
 
 test('open day windows expose only that weekday', () => {

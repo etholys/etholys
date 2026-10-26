@@ -153,7 +153,7 @@ export default function ChorusPublicOpenDay() {
           <div>
             <p className="text-sm font-semibold tracking-[0.12em]">CHORUS</p>
             <p className="text-xs text-slate-500">
-              {t('Dia de atendimento', 'Día de atención', 'Office hours day')}
+              {t('Horários do dia', 'Horarios del día', 'Day schedule')}
             </p>
           </div>
         </div>

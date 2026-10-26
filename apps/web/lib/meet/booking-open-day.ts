@@ -1,5 +1,5 @@
 /**
- * Dia aberto da agenda CHORUS (oficina pontual / rodada / assistência).
+ * Dia aberto da agenda CHORUS — horários 1:1 (atendimento / assistência).
  * Puro: sem base de dados.
  */
 

@@ -67,11 +67,15 @@ test('agenda surfaces force light form colors', () => {
   assert.match(owner, /etholys-system etholys-meet relative/);
   assert.match(owner, /role="dialog"/);
   assert.match(owner, /etholys-meet-light/);
-  assert.match(owner, /Dia de atendimento/);
+  assert.match(owner, /Criar atividade/);
+  assert.match(owner, /Horários \/ atendimento|Horários do dia/);
+  assert.match(owner, /Evento \/ capacita/);
   assert.match(owner, /\/api\/meet\/agenda\/open-days/);
+  assert.match(owner, /\/api\/meet\/agenda\/group-events/);
   assert.match(owner, /BOOKING_SLOT_MINUTE_OPTIONS/);
-  assert.match(owner, /Duração da reunião|Duração de cada reunião/);
+  assert.match(owner, /Duração da reunião|Duração de cada reunião|Duração de cada atendimento/);
   assert.match(owner, /agenda-slot-duration/);
+  assert.doesNotMatch(owner, /Rodada de negócio|Ronda de negocios|Business round/i);
   assert.match(guest, /viewer === 'owner'/);
   assert.match(guest, /etholys-meet-light/);
   assert.match(guest, /Escolha o horário de início/);
@@ -79,7 +83,15 @@ test('agenda surfaces force light form colors', () => {
   assert.doesNotMatch(guest, /type=["']datetime-local["']/);
   assert.match(openDayGuest, /\/api\/meet\/public\/agenda\/d\//);
   assert.match(openDayGuest, /etholys-meet-light/);
-  assert.doesNotMatch(`${owner}\n${guest}\n${openDayGuest}`, /jitsi|jibri|jigasi/i);
+  assert.match(openDayGuest, /Horários do dia/);
+  const groupGuest = readFileSync(join(root, 'components/meet/ChorusPublicGroupEvent.tsx'), 'utf8');
+  assert.match(groupGuest, /\/api\/meet\/public\/agenda\/e\//);
+  assert.match(groupGuest, /Formulário de inscrição|Formulario de inscripción|Registration form/);
+  assert.doesNotMatch(groupGuest, /Escolha o horário de início|Elige la hora de inicio|Pick a start time/);
+  assert.doesNotMatch(
+    `${owner}\n${guest}\n${openDayGuest}\n${groupGuest}`,
+    /jitsi|jibri|jigasi/i,
+  );
 });
 
 test('organizer slot length lays out guest open slots', () => {

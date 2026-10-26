@@ -3648,13 +3648,14 @@ model MeetBookingPage {
   blocks         MeetBookingBlock[]
   requests       MeetBookingRequest[]
   openDays       MeetBookingOpenDay[]
+  groupEvents    MeetBookingGroupEvent[]
 
   @@unique([companyId, ownerId])
   @@index([companyId])
   @@index([ownerId])
 }
 
-/// Dia aberto partilhável — convidado vê só essa data e os slots livres.
+/// Dia aberto partilhável — horários 1:1; convidado escolhe só o início.
 model MeetBookingOpenDay {
   id            String   @id @default(cuid())
   pageId        String
@@ -3679,6 +3680,57 @@ model MeetBookingOpenDay {
 
   @@index([pageId, dayYmd])
   @@index([pageId, active])
+}
+
+/// Evento grupal / capacitação — inscrição no mesmo bloco (sem grelha de slots).
+model MeetBookingGroupEvent {
+  id            String   @id @default(cuid())
+  pageId        String
+  /// Código público — /a/e/{publicCode}
+  publicCode    String   @unique
+  /// YYYY-MM-DD no fuso da página
+  dayYmd        String
+  title         String
+  description   String?
+  locationText  String?
+  /// Minutos desde meia-noite no fuso da página
+  startMin      Int
+  endMin        Int
+  allowVirtual  Boolean  @default(true)
+  allowInPerson Boolean  @default(true)
+  /// null = sem limite
+  capacity      Int?
+  /// Stubs opcionais para ligações futuras
+  forgeCourseId String?
+  projectId     String?
+  meetSessionId String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  page          MeetBookingPage              @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  registrations MeetBookingGroupRegistration[]
+
+  @@index([pageId, dayYmd])
+  @@index([pageId, active])
+}
+
+/// Inscrição num evento grupal (formulário padrão).
+model MeetBookingGroupRegistration {
+  id          String               @id @default(cuid())
+  eventId     String
+  publicToken String               @unique
+  name        String
+  email       String
+  phone       String?
+  note        String?              @db.Text
+  /// virtual | presencial
+  mode        String
+  createdAt   DateTime             @default(now())
+  event       MeetBookingGroupEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, email])
+  @@index([eventId])
+  @@index([email])
 }
 
 /// Horário semanal. weekday: 0 domingo … 6 sábado. Minutos desde meia-noite na zona da página.

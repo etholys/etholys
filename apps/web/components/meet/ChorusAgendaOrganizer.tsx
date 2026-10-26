@@ -19,6 +19,7 @@ import {
   Share2,
   Sun,
   Trash2,
+  Users,
   Video,
   X,
 } from 'lucide-react';
@@ -60,6 +61,7 @@ type RequestRow = {
 };
 type OpenDayRow = {
   id: string;
+  kind?: 'slots';
   publicUrl: string;
   dayYmd: string;
   title: string;
@@ -72,6 +74,34 @@ type OpenDayRow = {
   allowInPerson: boolean;
   active: boolean;
 };
+
+type GroupEventRow = {
+  id: string;
+  kind?: 'group';
+  publicUrl: string;
+  dayYmd: string;
+  title: string;
+  description: string | null;
+  locationText: string | null;
+  startMin: number;
+  endMin: number;
+  allowVirtual: boolean;
+  allowInPerson: boolean;
+  capacity: number | null;
+  registrationCount: number;
+  registrations?: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    note: string | null;
+    mode: string;
+    createdAt: string;
+  }[];
+  active: boolean;
+};
+
+type CreateActivityKind = 'slots' | 'group';
 
 type Agenda = {
   page: {
@@ -88,10 +118,12 @@ type Agenda = {
     blocks: { id: string; startsAt: string; endsAt: string; source?: string; label?: string | null }[];
   };
   openDays?: OpenDayRow[];
+  groupEvents?: GroupEventRow[];
   requests: RequestRow[];
   externalBusy?: { id: string; source: 'chorus' | 'google'; title: string; startsAt: string; endsAt: string }[];
   timeZones?: string[];
   createdOpenDay?: OpenDayRow;
+  createdGroupEvent?: GroupEventRow;
 };
 
 const WEEKDAYS: { weekday: number; pt: string; es: string; en: string }[] = [
@@ -202,7 +234,8 @@ export default function ChorusAgendaOrganizer({
   const [shareOpen, setShareOpen] = useState(false);
   const [sharePos, setSharePos] = useState<{ top: number; left: number } | null>(null);
   const [shareTargetUrl, setShareTargetUrl] = useState<string | null>(null);
-  const [openDayDialogOpen, setOpenDayDialogOpen] = useState(false);
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+  const [activityKind, setActivityKind] = useState<CreateActivityKind | null>(null);
   const [openDayYmd, setOpenDayYmd] = useState('');
   const [openDayTitle, setOpenDayTitle] = useState('');
   const [openDayDescription, setOpenDayDescription] = useState('');
@@ -212,11 +245,14 @@ export default function ChorusAgendaOrganizer({
   const [openDayEndHm, setOpenDayEndHm] = useState('18:00');
   const [openDayVirtual, setOpenDayVirtual] = useState(true);
   const [openDayInPerson, setOpenDayInPerson] = useState(true);
+  const [groupCapacity, setGroupCapacity] = useState('');
+  const [expandedGroupEventId, setExpandedGroupEventId] = useState<string | null>(null);
   const cursorSet = useRef(false);
   const shareBtnRef = useRef<HTMLButtonElement>(null);
   const shareMenuRef = useRef<HTMLDivElement>(null);
   const range = useMemo(() => visibleAgendaRange(view, cursorYmd), [view, cursorYmd]);
   const openDays = agenda?.openDays || [];
+  const groupEvents = agenda?.groupEvents || [];
 
   const load = useCallback(async () => {
     if (!companyId) return;
@@ -272,13 +308,14 @@ export default function ChorusAgendaOrganizer({
     setShareOpen(true);
   }
 
-  function resetOpenDayForm() {
+  function resetActivityForm() {
     const weekday = (() => {
       const match = cursorYmd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
       if (!match) return -1;
       return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))).getUTCDay();
     })();
     const win = windows.find((row) => row.weekday === weekday && row.enabled);
+    setActivityKind(null);
     setOpenDayYmd(cursorYmd);
     setOpenDayTitle('');
     setOpenDayDescription('');
@@ -288,6 +325,7 @@ export default function ChorusAgendaOrganizer({
     setOpenDayEndHm(minutesToHm(win?.endMin ?? 18 * 60));
     setOpenDayVirtual(allowVirtual);
     setOpenDayInPerson(allowInPerson);
+    setGroupCapacity('');
   }
 
   async function saveSettings() {
@@ -336,12 +374,18 @@ export default function ChorusAgendaOrganizer({
   }
 
   function publicShareText(url: string) {
-    const isOpenDay = url.includes('/a/d/');
-    if (isOpenDay) {
+    if (url.includes('/a/d/')) {
       return t(
-        `Pode marcar um horário neste dia de atendimento: ${url}`,
-        `Puedes reservar un horario en este día de atención: ${url}`,
-        `You can book a time on this office-hours day: ${url}`,
+        `Pode marcar um horário neste dia aberto: ${url}`,
+        `Puedes reservar un horario en este día abierto: ${url}`,
+        `You can book a time on this open day: ${url}`,
+      );
+    }
+    if (url.includes('/a/e/')) {
+      return t(
+        `Pode inscrever-se neste evento: ${url}`,
+        `Puedes inscribirte en este evento: ${url}`,
+        `You can register for this event: ${url}`,
       );
     }
     return t(
@@ -387,10 +431,64 @@ export default function ChorusAgendaOrganizer({
       const data = (await res.json()) as Agenda & { error?: string };
       if (!res.ok) throw new Error(data.error || 'error');
       setAgenda(data);
-      setOpenDayDialogOpen(false);
-      setInfo(t('Dia de atendimento criado.', 'Día de atención creado.', 'Office-hours day created.'));
+      setActivityDialogOpen(false);
+      setInfo(t('Horários do dia criados.', 'Horarios del día creados.', 'Day schedule created.'));
       if (data.createdOpenDay?.publicUrl) {
         void copyText(data.createdOpenDay.publicUrl);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function createGroupEvent() {
+    if (!companyId || !openDayYmd) return;
+    const startMin = hmToMinutes(openDayStartHm);
+    const endMin = hmToMinutes(openDayEndHm);
+    if (startMin == null || endMin == null || endMin - startMin < 15) {
+      setError(t('Horário inválido.', 'Horario inválido.', 'Invalid hours.'));
+      return;
+    }
+    if (!openDayVirtual && !openDayInPerson) {
+      setError(t('Escolha virtual e/ou presencial.', 'Elige virtual y/o presencial.', 'Choose virtual and/or in person.'));
+      return;
+    }
+    const capacityRaw = groupCapacity.trim();
+    const capacity = capacityRaw ? Number(capacityRaw) : null;
+    if (capacityRaw && (!Number.isFinite(capacity) || (capacity as number) < 1)) {
+      setError(t('Capacidade inválida.', 'Capacidad inválida.', 'Invalid capacity.'));
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/meet/agenda/group-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          dayYmd: openDayYmd,
+          title: openDayTitle.trim() || null,
+          description: openDayDescription.trim() || null,
+          locationText: openDayLocation.trim() || null,
+          startMin,
+          endMin,
+          allowVirtual: openDayVirtual,
+          allowInPerson: openDayInPerson,
+          capacity,
+          from: range.from,
+          to: range.to,
+        }),
+      });
+      const data = (await res.json()) as Agenda & { error?: string };
+      if (!res.ok) throw new Error(data.error || 'error');
+      setAgenda(data);
+      setActivityDialogOpen(false);
+      setInfo(t('Evento criado.', 'Evento creado.', 'Event created.'));
+      if (data.createdGroupEvent?.publicUrl) {
+        void copyText(data.createdGroupEvent.publicUrl);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'error');
@@ -420,6 +518,27 @@ export default function ChorusAgendaOrganizer({
     }
   }
 
+  async function removeGroupEvent(groupEventId: string) {
+    if (!companyId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/meet/agenda/group-events', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId, groupEventId, from: range.from, to: range.to }),
+      });
+      const data = (await res.json()) as Agenda & { error?: string };
+      if (!res.ok) throw new Error(data.error || 'error');
+      setAgenda(data);
+      setInfo(t('Evento removido.', 'Evento eliminado.', 'Event removed.'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function labelOpenDay(ymd: string) {
     const [y, m, d] = ymd.split('-').map(Number);
     return new Date(Date.UTC(y, (m || 1) - 1, d || 1)).toLocaleDateString(intl, {
@@ -428,6 +547,16 @@ export default function ChorusAgendaOrganizer({
       month: 'short',
       timeZone: 'UTC',
     });
+  }
+
+  function shareMailSubject(url: string) {
+    if (url.includes('/a/d/')) {
+      return t('Horários do dia', 'Horarios del día', 'Day schedule');
+    }
+    if (url.includes('/a/e/')) {
+      return t('Evento / capacitação', 'Evento / capacitación', 'Event / training');
+    }
+    return t('Agenda pública', 'Agenda pública', 'Public agenda');
   }
 
   function wallToIso(value: string) {
@@ -786,17 +915,17 @@ export default function ChorusAgendaOrganizer({
           <button
             type="button"
             disabled={!agenda}
-            title={t('Dia de atendimento', 'Día de atención', 'Office hours day')}
+            title={t('Criar atividade', 'Crear actividad', 'Create activity')}
             onClick={() => {
-              resetOpenDayForm();
-              setOpenDayDialogOpen(true);
+              resetActivityForm();
+              setActivityDialogOpen(true);
               setCloseMode(false);
               setSettingsOpen(false);
             }}
-            className={sideItem(openDayDialogOpen)}
+            className={sideItem(activityDialogOpen)}
           >
             <CalendarPlus className="h-4 w-4 shrink-0" />
-            {collapsed ? null : <span>{t('Dia de atendimento', 'Día de atención', 'Office hours day')}</span>}
+            {collapsed ? null : <span>{t('Criar atividade', 'Crear actividad', 'Create activity')}</span>}
           </button>
 
           <button
@@ -905,45 +1034,128 @@ export default function ChorusAgendaOrganizer({
               hideViewSwitch
             />
 
-            {openDays.length > 0 ? (
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-900">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  {t('Dias de atendimento', 'Días de atención', 'Office hours days')}
-                </h2>
-                <ul className="mt-3 space-y-2">
-                  {openDays.map((day) => (
-                    <li
-                      key={day.id}
-                      className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-slate-900">{day.title}</p>
-                        <p className="text-xs text-slate-600">
-                          {labelOpenDay(day.dayYmd)} · {minutesToHm(day.startMin)}–{minutesToHm(day.endMin)} ·{' '}
-                          {day.slotMinutes} min
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(event) => openShareMenu(day.publicUrl, event.currentTarget)}
-                        className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800"
-                      >
-                        <Share2 className="h-3.5 w-3.5" />
-                        {t('Partilhar', 'Compartir', 'Share')}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => void removeOpenDay(day.id)}
-                        className="rounded-full p-1.5 text-slate-500 hover:bg-slate-200"
-                        title={t('Remover', 'Eliminar', 'Remove')}
-                        aria-label={t('Remover', 'Eliminar', 'Remove')}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+            {openDays.length > 0 || groupEvents.length > 0 ? (
+              <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900">
+                {openDays.length > 0 ? (
+                  <div>
+                    <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      {t('Horários do dia', 'Horarios del día', 'Day schedules')}
+                    </h2>
+                    <ul className="mt-3 space-y-2">
+                      {openDays.map((day) => (
+                        <li
+                          key={day.id}
+                          className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-slate-900">{day.title}</p>
+                            <p className="text-xs text-slate-600">
+                              {labelOpenDay(day.dayYmd)} · {minutesToHm(day.startMin)}–{minutesToHm(day.endMin)} ·{' '}
+                              {day.slotMinutes} min · {t('1:1', '1:1', '1:1')}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(event) => openShareMenu(day.publicUrl, event.currentTarget)}
+                            className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800"
+                          >
+                            <Share2 className="h-3.5 w-3.5" />
+                            {t('Partilhar', 'Compartir', 'Share')}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => void removeOpenDay(day.id)}
+                            className="rounded-full p-1.5 text-slate-500 hover:bg-slate-200"
+                            title={t('Remover', 'Eliminar', 'Remove')}
+                            aria-label={t('Remover', 'Eliminar', 'Remove')}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {groupEvents.length > 0 ? (
+                  <div>
+                    <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      {t('Eventos / capacitações', 'Eventos / capacitaciones', 'Events / training')}
+                    </h2>
+                    <ul className="mt-3 space-y-2">
+                      {groupEvents.map((event) => (
+                        <li
+                          key={event.id}
+                          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold text-slate-900">{event.title}</p>
+                              <p className="text-xs text-slate-600">
+                                {labelOpenDay(event.dayYmd)} · {minutesToHm(event.startMin)}–
+                                {minutesToHm(event.endMin)} · {event.registrationCount}{' '}
+                                {t('inscritos', 'inscritos', 'registered')}
+                                {event.capacity != null ? ` / ${event.capacity}` : ''}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedGroupEventId((id) => (id === event.id ? null : event.id))
+                              }
+                              className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800"
+                            >
+                              <Users className="h-3.5 w-3.5" />
+                              {t('Inscritos', 'Inscritos', 'Registrants')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(ev) => openShareMenu(event.publicUrl, ev.currentTarget)}
+                              className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800"
+                            >
+                              <Share2 className="h-3.5 w-3.5" />
+                              {t('Partilhar', 'Compartir', 'Share')}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={saving}
+                              onClick={() => void removeGroupEvent(event.id)}
+                              className="rounded-full p-1.5 text-slate-500 hover:bg-slate-200"
+                              title={t('Remover', 'Eliminar', 'Remove')}
+                              aria-label={t('Remover', 'Eliminar', 'Remove')}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                          {expandedGroupEventId === event.id ? (
+                            <ul className="mt-2 space-y-1 border-t border-slate-200 pt-2">
+                              {(event.registrations || []).length === 0 ? (
+                                <li className="text-xs text-slate-500">
+                                  {t('Ainda sem inscritos.', 'Aún sin inscritos.', 'No registrants yet.')}
+                                </li>
+                              ) : (
+                                (event.registrations || []).map((reg) => (
+                                  <li key={reg.id} className="text-xs text-slate-700">
+                                    <span className="font-semibold text-slate-900">{reg.name}</span>
+                                    {' · '}
+                                    {reg.email}
+                                    {reg.phone ? ` · ${reg.phone}` : ''}
+                                    {' · '}
+                                    {reg.mode}
+                                    {reg.note ? (
+                                      <span className="block text-slate-500">{reg.note}</span>
+                                    ) : null}
+                                  </li>
+                                ))
+                              )}
+                            </ul>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </section>
             ) : null}
 
@@ -1216,9 +1428,7 @@ export default function ChorusAgendaOrganizer({
           <a
             role="menuitem"
             href={`mailto:?subject=${encodeURIComponent(
-              shareTargetUrl.includes('/a/d/')
-                ? t('Dia de atendimento', 'Día de atención', 'Office hours day')
-                : t('Agenda pública', 'Agenda pública', 'Public agenda'),
+              shareMailSubject(shareTargetUrl),
             )}&body=${encodeURIComponent(publicShareText(shareTargetUrl))}`}
             onClick={() => {
               setShareOpen(false);
@@ -1244,157 +1454,256 @@ export default function ChorusAgendaOrganizer({
           </a>
         </div>
       ) : null}
-      {openDayDialogOpen ? (
+      {activityDialogOpen ? (
         <div
           className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-0 sm:items-center sm:p-4"
-          onClick={() => setOpenDayDialogOpen(false)}
+          onClick={() => setActivityDialogOpen(false)}
         >
           <form
             role="dialog"
             aria-modal="true"
-            aria-labelledby="agenda-open-day-title"
+            aria-labelledby="agenda-activity-title"
             className="etholys-meet-light max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 text-slate-900 shadow-2xl sm:rounded-2xl"
             style={{ colorScheme: 'light' }}
             onClick={(event) => event.stopPropagation()}
             onSubmit={(event) => {
               event.preventDefault();
-              void createOpenDay();
+              if (activityKind === 'slots') void createOpenDay();
+              else if (activityKind === 'group') void createGroupEvent();
             }}
           >
             <div className="flex items-start justify-between gap-3">
-              <h2 id="agenda-open-day-title" className="text-lg font-semibold text-slate-900">
-                {t('Dia de atendimento', 'Día de atención', 'Office hours day')}
+              <h2 id="agenda-activity-title" className="text-lg font-semibold text-slate-900">
+                {activityKind === 'slots'
+                  ? t('Horários do dia', 'Horarios del día', 'Day schedule')
+                  : activityKind === 'group'
+                    ? t('Evento / capacitação', 'Evento / capacitación', 'Event / training')
+                    : t('Criar atividade', 'Crear actividad', 'Create activity')}
               </h2>
               <button
                 type="button"
-                onClick={() => setOpenDayDialogOpen(false)}
+                onClick={() => setActivityDialogOpen(false)}
                 className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
                 aria-label={t('Cancelar', 'Cancelar', 'Cancel')}
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <p className="mt-1 text-sm text-slate-600">
-              {t(
-                'Gera um link só para este dia — útil para assistência técnica ou oficinas pontuais.',
-                'Genera un enlace solo para este día — útil para asistencia técnica u oficinas puntuales.',
-                'Creates a link for this day only — useful for technical assistance or one-off workshops.',
-              )}
-            </p>
-            <label className="mt-4 block text-sm font-medium text-slate-700">
-              {t('Data', 'Fecha', 'Date')}
-              <input
-                type="date"
-                required
-                value={openDayYmd}
-                onChange={(event) => setOpenDayYmd(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
-              />
-            </label>
-            <label className="mt-3 block text-sm font-medium text-slate-700">
-              {t('Título (opcional)', 'Título (opcional)', 'Title (optional)')}
-              <input
-                value={openDayTitle}
-                onChange={(event) => setOpenDayTitle(event.target.value)}
-                placeholder={t('Rodada de negócio', 'Ronda de negocios', 'Business round')}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
-              />
-            </label>
-            <label className="mt-3 block text-sm font-medium text-slate-700">
-              {t('Notas (opcional)', 'Notas (opcional)', 'Notes (optional)')}
-              <textarea
-                value={openDayDescription}
-                onChange={(event) => setOpenDayDescription(event.target.value)}
-                rows={2}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
-              />
-            </label>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="text-sm font-medium text-slate-700">
-                {t('Início', 'Inicio', 'Start')}
-                <input
-                  type="time"
-                  required
-                  value={openDayStartHm}
-                  onChange={(event) => setOpenDayStartHm(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
-                />
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                {t('Fim', 'Fin', 'End')}
-                <input
-                  type="time"
-                  required
-                  value={openDayEndHm}
-                  onChange={(event) => setOpenDayEndHm(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
-                />
-              </label>
-            </div>
-            <label className="mt-3 block text-sm font-medium text-slate-700">
-              {t('Duração de cada reunião', 'Duración de cada reunión', 'Length of each meeting')}
-              <select
-                value={openDaySlotMinutes}
-                onChange={(event) => setOpenDaySlotMinutes(Number(event.target.value))}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
-              >
-                {BOOKING_SLOT_MINUTE_OPTIONS.map((n) => (
-                  <option key={n} value={n}>
-                    {n === 60
-                      ? t('1 hora', '1 hora', '1 hour')
-                      : n === 120
-                        ? t('2 horas', '2 horas', '2 hours')
-                        : `${n} min`}
-                  </option>
-                ))}
-              </select>
-              <span className="mt-1 block text-xs font-normal text-slate-600">
-                {t(
-                  'O convidado escolhe só o horário de início.',
-                  'El invitado solo elige la hora de inicio.',
-                  'Guests only pick a start time.',
+
+            {!activityKind ? (
+              <div className="mt-4 space-y-3">
+                <p className="text-sm text-slate-600">
+                  {t(
+                    'Escolha o tipo de atividade. O título é livre — pode chamar como quiser.',
+                    'Elige el tipo de actividad. El título es libre — puedes llamarlo como quieras.',
+                    'Choose the activity type. The title is free text — name it however you want.',
+                  )}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActivityKind('slots')}
+                  className="flex w-full flex-col items-start gap-1 rounded-xl border border-slate-300 bg-white px-4 py-3 text-left hover:border-teal-700 hover:bg-teal-50"
+                >
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <Clock className="h-4 w-4 text-teal-800" />
+                    {t('Horários / atendimento', 'Horarios / atención', 'Slots / office hours')}
+                  </span>
+                  <span className="text-xs text-slate-600">
+                    {t(
+                      '1:1 — o convidado escolhe só um horário de início na janela do dia.',
+                      '1:1 — el invitado solo elige una hora de inicio en la ventana del día.',
+                      '1:1 — guest picks only a start time within the day window.',
+                    )}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivityKind('group')}
+                  className="flex w-full flex-col items-start gap-1 rounded-xl border border-slate-300 bg-white px-4 py-3 text-left hover:border-teal-700 hover:bg-teal-50"
+                >
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <Users className="h-4 w-4 text-teal-800" />
+                    {t('Evento / capacitação', 'Evento / capacitación', 'Event / training')}
+                  </span>
+                  <span className="text-xs text-slate-600">
+                    {t(
+                      'Grupo — várias pessoas inscrevem-se no mesmo bloco (formulário, sem grelha de slots).',
+                      'Grupo — varias personas se inscriben al mismo bloque (formulario, sin rejilla de slots).',
+                      'Group — many people register for the same block (form, no slot grid).',
+                    )}
+                  </span>
+                </button>
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setActivityDialogOpen(false)}
+                    className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
+                  >
+                    {t('Cancelar', 'Cancelar', 'Cancel')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActivityKind(null)}
+                  className="mt-2 text-xs font-semibold text-teal-800"
+                >
+                  {t('← Mudar tipo', '← Cambiar tipo', '← Change type')}
+                </button>
+                <p className="mt-1 text-sm text-slate-600">
+                  {activityKind === 'slots'
+                    ? t(
+                        'Link público com horários livres desse dia. O convidado marca um atendimento 1:1.',
+                        'Enlace público con horarios libres de ese día. El invitado reserva una atención 1:1.',
+                        'Public link with open times that day. Guests book a 1:1 slot.',
+                      )
+                    : t(
+                        'Link público de inscrição no evento completo — todos no mesmo horário.',
+                        'Enlace público de inscripción al evento completo — todos en el mismo horario.',
+                        'Public registration link for the whole event — everyone in the same block.',
+                      )}
+                </p>
+                <label className="mt-4 block text-sm font-medium text-slate-700">
+                  {t('Data', 'Fecha', 'Date')}
+                  <input
+                    type="date"
+                    required
+                    value={openDayYmd}
+                    onChange={(event) => setOpenDayYmd(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+                  />
+                </label>
+                <label className="mt-3 block text-sm font-medium text-slate-700">
+                  {t('Título (opcional)', 'Título (opcional)', 'Title (optional)')}
+                  <input
+                    value={openDayTitle}
+                    onChange={(event) => setOpenDayTitle(event.target.value)}
+                    placeholder={
+                      activityKind === 'slots'
+                        ? t('Ex.: Atendimento técnico', 'Ej.: Atención técnica', 'E.g. Technical assistance')
+                        : t('Ex.: Capacitação aberta', 'Ej.: Capacitación abierta', 'E.g. Open training')
+                    }
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+                  />
+                </label>
+                <label className="mt-3 block text-sm font-medium text-slate-700">
+                  {t('Notas (opcional)', 'Notas (opcional)', 'Notes (optional)')}
+                  <textarea
+                    value={openDayDescription}
+                    onChange={(event) => setOpenDayDescription(event.target.value)}
+                    rows={2}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+                  />
+                </label>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    {t('Início', 'Inicio', 'Start')}
+                    <input
+                      type="time"
+                      required
+                      value={openDayStartHm}
+                      onChange={(event) => setOpenDayStartHm(event.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+                    />
+                  </label>
+                  <label className="text-sm font-medium text-slate-700">
+                    {t('Fim', 'Fin', 'End')}
+                    <input
+                      type="time"
+                      required
+                      value={openDayEndHm}
+                      onChange={(event) => setOpenDayEndHm(event.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+                    />
+                  </label>
+                </div>
+                {activityKind === 'slots' ? (
+                  <label className="mt-3 block text-sm font-medium text-slate-700">
+                    {t('Duração de cada atendimento', 'Duración de cada atención', 'Length of each slot')}
+                    <select
+                      value={openDaySlotMinutes}
+                      onChange={(event) => setOpenDaySlotMinutes(Number(event.target.value))}
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+                    >
+                      {BOOKING_SLOT_MINUTE_OPTIONS.map((n) => (
+                        <option key={n} value={n}>
+                          {n === 60
+                            ? t('1 hora', '1 hora', '1 hour')
+                            : n === 120
+                              ? t('2 horas', '2 horas', '2 hours')
+                              : `${n} min`}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="mt-1 block text-xs font-normal text-slate-600">
+                      {t(
+                        'O convidado escolhe só o horário de início.',
+                        'El invitado solo elige la hora de inicio.',
+                        'Guests only pick a start time.',
+                      )}
+                    </span>
+                  </label>
+                ) : (
+                  <label className="mt-3 block text-sm font-medium text-slate-700">
+                    {t('Capacidade (opcional)', 'Capacidad (opcional)', 'Capacity (optional)')}
+                    <input
+                      type="number"
+                      min={1}
+                      max={10000}
+                      value={groupCapacity}
+                      onChange={(event) => setGroupCapacity(event.target.value)}
+                      placeholder={t('Sem limite', 'Sin límite', 'No limit')}
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+                    />
+                  </label>
                 )}
-              </span>
-            </label>
-            <label className="mt-3 block text-sm font-medium text-slate-700">
-              {t('Local (opcional)', 'Lugar (opcional)', 'Place (optional)')}
-              <input
-                value={openDayLocation}
-                onChange={(event) => setOpenDayLocation(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
-              />
-            </label>
-            <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-800">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={openDayVirtual} onChange={(e) => setOpenDayVirtual(e.target.checked)} />
-                {t('Virtual', 'Virtual', 'Virtual')}
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={openDayInPerson}
-                  onChange={(e) => setOpenDayInPerson(e.target.checked)}
-                />
-                {t('Presencial', 'Presencial', 'In person')}
-              </label>
-            </div>
-            {error ? <p className="mt-3 text-sm text-red-800">{error}</p> : null}
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setOpenDayDialogOpen(false)}
-                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
-              >
-                {t('Cancelar', 'Cancelar', 'Cancel')}
-              </button>
-              <button
-                type="submit"
-                disabled={saving || !openDayYmd}
-                className="rounded-full bg-teal-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {saving ? '…' : t('Criar e copiar link', 'Crear y copiar enlace', 'Create and copy link')}
-              </button>
-            </div>
+                <label className="mt-3 block text-sm font-medium text-slate-700">
+                  {t('Local (opcional)', 'Lugar (opcional)', 'Place (optional)')}
+                  <input
+                    value={openDayLocation}
+                    onChange={(event) => setOpenDayLocation(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900"
+                  />
+                </label>
+                <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-800">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={openDayVirtual}
+                      onChange={(e) => setOpenDayVirtual(e.target.checked)}
+                    />
+                    {t('Virtual', 'Virtual', 'Virtual')}
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={openDayInPerson}
+                      onChange={(e) => setOpenDayInPerson(e.target.checked)}
+                    />
+                    {t('Presencial', 'Presencial', 'In person')}
+                  </label>
+                </div>
+                {error ? <p className="mt-3 text-sm text-red-800">{error}</p> : null}
+                <div className="mt-5 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActivityDialogOpen(false)}
+                    className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
+                  >
+                    {t('Cancelar', 'Cancelar', 'Cancel')}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving || !openDayYmd}
+                    className="rounded-full bg-teal-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {saving ? '…' : t('Criar e copiar link', 'Crear y copiar enlace', 'Create and copy link')}
+                  </button>
+                </div>
+              </>
+            )}
           </form>
         </div>
       ) : null}
