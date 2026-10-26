@@ -6,8 +6,9 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/app/providers';
 import { cn } from '@/lib/utils';
 import TasksBoard from './TasksBoard';
-import { WorkSidebar, type WorkNav } from './WorkSidebar';
+import { WorkMobileBar, WorkSidebar, type WorkNav } from './WorkSidebar';
 import { WorkDashboard } from './WorkDashboard';
+import { WorkArchive } from './WorkArchive';
 import { WorkGantt } from './WorkGantt';
 import { WorkCalendar } from './WorkCalendar';
 import { WorkWorkload } from './WorkWorkload';
@@ -28,12 +29,28 @@ import {
   List,
   ListTree,
   Search,
+  Share2,
   Users,
   X,
 } from 'lucide-react';
 
 type ML = { es: string; pt: string; en: string };
 const ml = (en: string, es: string, pt: string): ML => ({ en, es, pt });
+
+/** Qualquer executor (arrays API, join people, ou legado assignee + collaborators). */
+function taskExecutorIds(task: any): string[] {
+  if (Array.isArray(task?.assigneeIds) && task.assigneeIds.length) {
+    return [...new Set(task.assigneeIds.map(String).filter(Boolean))];
+  }
+  if (Array.isArray(task?.people) && task.people.some((p: any) => p.role === 'EXECUTOR')) {
+    return task.people
+      .filter((p: any) => p.role === 'EXECUTOR')
+      .map((p: any) => String(p.userId))
+      .filter(Boolean);
+  }
+  const extra = Array.isArray(task?.collaboratorIds) ? task.collaboratorIds.map(String) : [];
+  return [...new Set([task?.assigneeId, ...extra].filter(Boolean).map(String))];
+}
 
 export type BoardView = 'table' | 'kanban' | 'gantt' | 'calendar' | 'list' | 'workload';
 
@@ -57,6 +74,7 @@ function parseNavFromParams(
   if (kind === 'all') return { kind: 'all' };
   if (kind === 'company') return { kind: 'company' };
   if (kind === 'mine') return { kind: 'mine' };
+  if (kind === 'archive') return { kind: 'archive' };
   if (kind === 'overdue') return { kind: 'overdue' };
   if (kind === 'unassigned') return { kind: 'unassigned' };
   if (kind === 'week') return { kind: 'week' };
@@ -104,9 +122,11 @@ export default function WorkShell() {
 
   const [nav, setNav] = useState<WorkNav>({ kind: 'dashboard' });
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [boardView, setBoardView] = useState<BoardView>('table');
   const [urlReady, setUrlReady] = useState(false);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [archivedTasks, setArchivedTasks] = useState<any[]>([]);
   const [deps, setDeps] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -115,6 +135,7 @@ export default function WorkShell() {
   const [groups, setGroups] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loadingDash, setLoadingDash] = useState(true);
+  const [loadingArchive, setLoadingArchive] = useState(false);
   const [shareFolder, setShareFolder] = useState<{ id: string; name: string } | null>(null);
   const [query, setQuery] = useState('');
   const [statusChip, setStatusChip] = useState('');
@@ -151,6 +172,20 @@ export default function WorkShell() {
       .catch(() => setLoadingDash(false));
   };
 
+  const fetchArchivedTasks = (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoadingArchive(true);
+    const params = new URLSearchParams();
+    if (activeCompanyId) params.set('companyId', activeCompanyId);
+    params.set('archived', '1');
+    fetch(`/api/tasks?${params}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setArchivedTasks(d?.tasks ?? []);
+        setLoadingArchive(false);
+      })
+      .catch(() => setLoadingArchive(false));
+  };
+
   const fetchFolders = () => {
     if (!activeCompanyId) {
       setFolders([]);
@@ -164,7 +199,12 @@ export default function WorkShell() {
 
   useEffect(() => {
     fetchAllTasks();
+    fetchArchivedTasks({ silent: true });
   }, [activeCompanyId]);
+
+  useEffect(() => {
+    if (nav.kind === 'archive') fetchArchivedTasks();
+  }, [nav.kind, activeCompanyId]);
 
   useEffect(() => {
     if (!activeCompanyId) {
@@ -303,16 +343,16 @@ export default function WorkShell() {
     else if (nav.kind === 'project') list = top.filter((t: any) => t.projectId === nav.id);
     else if (nav.kind === 'folder') list = top.filter((t: any) => t.folderId === nav.id);
     else if (nav.kind === 'mine') {
-      list = top.filter((t: any) => currentUserId && t.assigneeId === currentUserId);
+      list = top.filter((t: any) => currentUserId && taskExecutorIds(t).includes(currentUserId));
     } else if (nav.kind === 'person') {
-      list = top.filter((t: any) => t.assigneeId === nav.id);
+      list = top.filter((t: any) => taskExecutorIds(t).includes(nav.id));
     } else if (nav.kind === 'overdue') {
       const now = Date.now();
       list = top.filter(
         (t: any) => OPEN.has(t.status) && t.dueDate && new Date(t.dueDate).getTime() < now,
       );
     } else if (nav.kind === 'unassigned') {
-      list = top.filter((t: any) => OPEN.has(t.status) && !t.assigneeId);
+      list = top.filter((t: any) => OPEN.has(t.status) && taskExecutorIds(t).length === 0);
     } else if (nav.kind === 'week') {
       const now = new Date();
       const start = new Date(now);
@@ -326,7 +366,7 @@ export default function WorkShell() {
         return d >= start && d < end;
       });
     }
-    if (personFocus) list = list.filter((t: any) => t.assigneeId === personFocus);
+    if (personFocus) list = list.filter((t: any) => taskExecutorIds(t).includes(personFocus));
     const q = query.trim().toLowerCase();
     if (statusChip) list = list.filter((t: any) => t.status === statusChip);
     if (priorityChip) list = list.filter((t: any) => t.priority === priorityChip);
@@ -357,8 +397,8 @@ export default function WorkShell() {
     return {
       open: open.length,
       overdue: open.filter((t: any) => t.dueDate && new Date(t.dueDate) < now).length,
-      mine: open.filter((t: any) => currentUserId && t.assigneeId === currentUserId).length,
-      unassigned: open.filter((t: any) => !t.assigneeId).length,
+      mine: open.filter((t: any) => currentUserId && taskExecutorIds(t).includes(currentUserId)).length,
+      unassigned: open.filter((t: any) => taskExecutorIds(t).length === 0).length,
       week: open.filter((t: any) => {
         if (!t.dueDate) return false;
         const d = new Date(t.dueDate);
@@ -371,8 +411,9 @@ export default function WorkShell() {
           (t.folder._count?.members ?? t.folder.members?.length ?? 0) > 0
         );
       }).length,
+      archived: (archivedTasks ?? []).filter((t: any) => !t.parentId).length,
     };
-  }, [tasks, currentUserId]);
+  }, [tasks, archivedTasks, currentUserId]);
 
   const contextTitle = (() => {
     if (nav.kind === 'dashboard') return t3('Dashboard', 'Panel', 'Painel');
@@ -380,6 +421,7 @@ export default function WorkShell() {
       return t3('Shared boards', 'Tableros compartidos', 'Quadros partilhados');
     }
     if (nav.kind === 'mine') return t3('My tasks', 'Mis tareas', 'As minhas tarefas');
+    if (nav.kind === 'archive') return t3('Archive', 'Archivo', 'Arquivo');
     if (nav.kind === 'overdue') return t3('Overdue', 'Atrasadas', 'Atrasadas');
     if (nav.kind === 'unassigned') return t3('Unassigned', 'Sin asignar', 'Sem responsável');
     if (nav.kind === 'week') return t3('This week', 'Esta semana', 'Esta semana');
@@ -391,9 +433,25 @@ export default function WorkShell() {
     return 'eTask';
   })();
 
+  const activeFolder =
+    nav.kind === 'folder' ? folders.find((f: { id: string }) => f.id === nav.id) ?? null : null;
+  const canManageActiveFolderShare =
+    !!activeFolder && !!currentUserId && activeFolder.ownerId === currentUserId;
+  const activeFolderIsShared =
+    !!activeFolder &&
+    (activeFolder.visibility === 'SHARED' ||
+      (activeFolder.members?.length ?? activeFolder._count?.members ?? 0) > 0);
+
   const contextHint = (() => {
     if (nav.kind === 'overdue') {
       return t3('Open tasks past their due date', 'Tareas abiertas vencidas', 'Tarefas abertas fora do prazo');
+    }
+    if (nav.kind === 'archive') {
+      return t3(
+        'Your archive — shared archived tasks stay visible to people with board access',
+        'Tu archivo — las archivadas de tableros compartidos siguen visibles para quien tenga acceso',
+        'O teu arquivo — as arquivadas de quadros partilhados continuam visíveis para quem tiver acesso',
+      );
     }
     if (nav.kind === 'mine') {
       return t3('Assigned to you', 'Asignadas a ti', 'Atribuídas a ti');
@@ -406,7 +464,18 @@ export default function WorkShell() {
       );
     }
     if (nav.kind === 'folder') {
-      return t3('A board in your workspace', 'Un tablero de tu espacio', 'Um quadro do teu espaço');
+      if (activeFolderIsShared) {
+        return t3(
+          'Shared board — manage who can access it',
+          'Tablero compartido — gestiona quién tiene acceso',
+          'Quadro partilhado — gere quem tem acesso',
+        );
+      }
+      return t3(
+        'Private board — only you can see it until you share',
+        'Tablero privado — solo tú lo ves hasta que lo compartas',
+        'Quadro privado — só tu o vês até partilhares',
+      );
     }
     if (nav.kind === 'company') {
       return t3(
@@ -511,6 +580,7 @@ export default function WorkShell() {
   const showPanel =
     !!selectedId &&
     (nav.kind === 'dashboard' ||
+      nav.kind === 'archive' ||
       shellViews.includes(boardView) ||
       nav.kind === 'overdue');
 
@@ -533,7 +603,7 @@ export default function WorkShell() {
   );
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden bg-[color:var(--sys-panel)]">
+    <div className="relative flex min-h-0 min-h-screen flex-1 overflow-hidden bg-[color:var(--sys-panel)]">
       <WorkSidebar
         nav={nav}
         onNav={changeNav}
@@ -543,6 +613,8 @@ export default function WorkShell() {
         currentUserId={currentUserId}
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
+        mobileOpen={mobileOpen}
+        onMobileClose={() => setMobileOpen(false)}
         counts={counts}
         onCreateFolder={createFolder}
         onShareFolder={(f) => setShareFolder(f)}
@@ -550,7 +622,13 @@ export default function WorkShell() {
         t={t3}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div
+        className={cn(
+          'relative z-10 flex min-h-screen min-w-0 flex-1 flex-col transition-all',
+          collapsed ? 'lg:ml-16' : 'lg:ml-60',
+        )}
+      >
+        <WorkMobileBar onOpen={() => setMobileOpen(true)} />
         <div className="space-y-2.5 border-b border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] px-4 py-3">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
@@ -558,7 +636,32 @@ export default function WorkShell() {
               {contextHint && <p className="mt-0.5 text-[11px] text-[color:var(--sys-faint)]">{contextHint}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {nav.kind !== 'dashboard' && (
+              {canManageActiveFolderShare && activeFolder && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShareFolder({
+                      id: activeFolder.id,
+                      name: activeFolder.name || (nav.kind === 'folder' ? nav.name : activeFolder.id),
+                    })
+                  }
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium transition',
+                    activeFolderIsShared
+                      ? 'border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100'
+                      : 'border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] text-[color:var(--sys-ink)] hover:border-teal-400 hover:text-teal-800',
+                  )}
+                  title={t3('Share & manage access', 'Compartir y gestionar acceso', 'Partilhar e gerir acesso')}
+                >
+                  <Share2 className="h-4 w-4" />
+                  <span>
+                    {activeFolderIsShared
+                      ? t3('Access', 'Acceso', 'Acesso')
+                      : t3('Share', 'Compartir', 'Partilhar')}
+                  </span>
+                </button>
+              )}
+              {nav.kind !== 'dashboard' && nav.kind !== 'archive' && (
                 <div className="flex max-w-full flex-wrap rounded-lg bg-[color:var(--sys-panel-soft)] p-0.5">
                   {viewBtn('table', <ListTree className="h-4 w-4" />, t3('Board', 'Tablero', 'Quadro'), 'Board')}
                   {viewBtn('list', <List className="h-4 w-4" />, t3('List', 'Lista', 'Lista'), 'List')}
@@ -571,7 +674,7 @@ export default function WorkShell() {
             </div>
           </div>
 
-          {nav.kind !== 'dashboard' && (
+          {nav.kind !== 'dashboard' && nav.kind !== 'archive' && (
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <WorkQuickAdd
                 className="min-w-0 flex-1"
@@ -648,6 +751,40 @@ export default function WorkShell() {
                   t={t3}
                 />
               )
+            ) : nav.kind === 'archive' ? (
+              <WorkArchive
+                tasks={(archivedTasks ?? []).filter((t: any) => !t.parentId)}
+                loading={loadingArchive}
+                onOpen={setSelectedId}
+                onRestore={async (id) => {
+                  const res = await fetch(`/api/tasks/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ archived: false }),
+                  });
+                  if (!res.ok) return;
+                  fetchArchivedTasks({ silent: true });
+                  fetchAllTasks({ silent: true });
+                }}
+                onDelete={async (id, title) => {
+                  if (
+                    !confirm(
+                      `${t3(
+                        'Delete permanently?',
+                        '¿Eliminar definitivamente?',
+                        'Eliminar definitivamente?',
+                      )} ${title}`,
+                    )
+                  ) {
+                    return;
+                  }
+                  const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+                  if (!res.ok) return;
+                  fetchArchivedTasks({ silent: true });
+                  if (selectedId === id) setSelectedId(null);
+                }}
+                t={t3}
+              />
             ) : boardView === 'gantt' ? (
               <WorkGantt tasks={scopedTasks} deps={deps} onSelect={setSelectedId} t={t3} />
             ) : boardView === 'calendar' ? (
@@ -716,7 +853,10 @@ export default function WorkShell() {
                 externalStatus={statusChip}
                 externalPriority={priorityChip}
                 presetTasks={loadingDash ? null : boardTasks}
-                onTasksChanged={() => fetchAllTasks({ silent: true })}
+                onTasksChanged={() => {
+                  fetchAllTasks({ silent: true });
+                  fetchArchivedTasks({ silent: true });
+                }}
                 externalSelectedId={selectedId}
                 onExternalSelect={setSelectedId}
               />

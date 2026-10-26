@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Building2,
-  CheckSquare,
   Edit2,
   FolderKanban,
   Layers,
@@ -16,7 +15,6 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
-import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 import { sysTheme } from '@/lib/system-shell';
 import { cn } from '@/lib/utils';
@@ -163,48 +161,35 @@ export default function HubWorkSettingsPage() {
   };
 
   return (
-    <div className={cn(sysTheme.root, 'etholys-etask min-h-screen flex-col')} data-accent="teal">
+    <div className={cn(sysTheme.root, 'etholys-etask flex-col')} data-accent="teal">
       <SystemAtmosphere accent="teal" />
-      <header className="relative z-30 border-b border-[color:var(--sys-line)] bg-[color:var(--sys-aside-bg)] backdrop-blur-md">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link
-              href="/hub/work"
-              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              eTask
-            </Link>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-teal-700 text-white">
-              <Settings className="h-5 w-5" />
+      <main className="relative z-10 mx-auto w-full max-w-4xl flex-1 space-y-6 overflow-auto px-4 py-6 sm:px-6">
+        <div className="space-y-3">
+          <Link
+            href="/hub/work"
+            className="inline-flex items-center gap-1.5 text-sm text-[color:var(--sys-nav-idle)] hover:text-[color:var(--sys-ink)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            eTask
+          </Link>
+          <div className="flex min-w-0 items-start gap-3">
+            <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border', sysTheme.icon.teal)}>
+              <Settings className="h-4 w-4" strokeWidth={1.75} />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-bold text-slate-900">
+              <h1 className="font-[family-name:var(--font-etholys-display)] text-xl font-bold tracking-tight text-[color:var(--sys-ink)]">
                 {t('eTask settings', 'Ajustes de eTask', 'Definições eTask')}
               </h1>
-              <p className="truncate text-xs text-slate-500">
+              <p className="mt-0.5 text-sm text-[color:var(--sys-faint)]">
                 {t(
-                  'Departments, board sections and links — without leaving eTask',
-                  'Sectores, secciones del tablero y atajos — sin salir de eTask',
-                  'Setores, secções do quadro e atalhos — sem sair do eTask',
+                  'Departments, board sections and links',
+                  'Sectores, secciones del tablero y atajos',
+                  'Setores, secções do quadro e atalhos',
                 )}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <AppearanceToggle collapsed />
-          <Link
-            href="/hub/work"
-            className="hidden items-center gap-1.5 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)] sm:inline-flex"
-          >
-            <CheckSquare className="h-3.5 w-3.5" />
-            {t('Open board', 'Abrir tablero', 'Abrir quadro')}
-          </Link>
-          </div>
         </div>
-      </header>
-
-      <main className="relative z-10 mx-auto w-full max-w-4xl space-y-6 px-4 py-6 sm:px-6">
         {!activeCompanyId && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {t(
