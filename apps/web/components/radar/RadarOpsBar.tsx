@@ -20,9 +20,9 @@ function placeFor(
       title: radarT(loc, 'Dentro de um sítio', 'Dentro de un sitio', 'Inside a site'),
       detail: radarT(
         loc,
-        'Mapa 3D no centro. Cultivos, espaços e sensores estão nos botões por cima do mapa.',
-        'Mapa 3D en el centro. Cultivos, espacios y sensores están en los botones sobre el mapa.',
-        '3D map in the center. Crops, spaces and sensors are the buttons above the map.',
+        'Mapa no centro. Ferramentas (espaços, cultivos, sensores, camadas) na barra à esquerda.',
+        'Mapa en el centro. Herramientas (espacios, cultivos, sensores, capas) en la barra izquierda.',
+        'Map in the center. Tools (spaces, crops, sensors, layers) in the left rail.',
       ),
     };
   }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
+  AlertTriangle,
   ArrowLeft,
   BookOpen,
   Layers,
@@ -10,6 +11,7 @@ import {
   Loader2,
   MapPinned,
   Maximize2,
+  Package,
   Pencil,
   Plus,
   Radio,
@@ -134,6 +136,8 @@ export function RadarPropertyWorkspace({
   const [query, setQuery] = useState('');
   /** Closed by default so the map stays clear (Maps-like). */
   const [railOpen, setRailOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [layersOpen, setLayersOpen] = useState(false);
   const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
   const [editMode, setEditMode] = useState<SpaceEditMode>('none');
   /** Full focus sheet — closed by default so the map stays clear. */
@@ -369,7 +373,28 @@ export function RadarPropertyWorkspace({
   const cadernoHref = `/hub/radar/caderno?${companyQ}&property=${propertyId}${
     focusedId ? `&unit=${focusedId}` : ''
   }`;
+  const closeRailFlyouts = () => {
+    setRailOpen(false);
+    setSearchOpen(false);
+    setLayersOpen(false);
+  };
+
+  const setExclusiveFlyout = (which: 'list' | 'search' | 'layers' | null) => {
+    setPanel(null);
+    setTool(null);
+    setRailOpen(which === 'list');
+    setSearchOpen(which === 'search');
+    setLayersOpen(which === 'layers');
+  };
+
+  const openToolPanel = (next: 'crops' | 'space') => {
+    closeRailFlyouts();
+    setPanel(null);
+    setTool((cur) => (cur === next ? null : next));
+  };
+
   const openStep = (id: PropertyStepId) => {
+    closeRailFlyouts();
     if (id === 'draw') {
       setTool('space');
       setPanel(null);
@@ -392,18 +417,19 @@ export function RadarPropertyWorkspace({
     sensors: radarT(loc, 'Ligar sensores', 'Conectar sensores', 'Connect sensors'),
   };
   // Solid dark chrome over OSM — translucent glass fails on pale tiles.
-  const chromePill =
-    'rounded-2xl bg-[#07111A] text-white shadow-lg ring-1 ring-white/25';
-  const chipBtn = (on: boolean) =>
-    `inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold shadow-lg ring-1 ${
-      on
-        ? 'bg-teal-300 text-slate-950 ring-teal-200/80'
-        : 'bg-[#07111A] text-white ring-white/25 hover:bg-[#12343c]'
-    }`;
   const railBtn = (on: boolean) =>
-    `flex w-full flex-col items-center gap-0.5 rounded-xl px-1 py-2 ${
+    `group relative flex h-11 w-11 items-center justify-center rounded-xl transition ${
       on ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:bg-white/10 hover:text-white'
     }`;
+  const railTip = (title: string, detail: string) => (
+    <span
+      role="tooltip"
+      className="pointer-events-none absolute left-full top-1/2 z-[60] ml-2.5 hidden w-52 -translate-y-1/2 rounded-lg border border-white/15 bg-[#07111A] px-3 py-2 text-left shadow-xl group-hover:block group-focus-within:block"
+    >
+      <span className="block text-xs font-semibold text-white">{title}</span>
+      <span className="mt-0.5 block text-[11px] leading-snug text-white/55">{detail}</span>
+    </span>
+  );
 
   const q = query.trim().toLowerCase();
   const treeUnits = q
@@ -541,43 +567,215 @@ export function RadarPropertyWorkspace({
       </div>
 
       <div className="pointer-events-none absolute inset-0 z-[1100]">
-        {/* Maps-like floating left rail + optional spaces panel */}
-        <aside className="pointer-events-auto absolute bottom-3 left-3 top-3 flex items-stretch gap-2">
-          <div className="flex w-[3.25rem] flex-col items-center gap-1 rounded-2xl bg-[#07111A] px-1 py-2 shadow-xl ring-1 ring-white/25">
+        {/* Full-height icon rail — all map chrome lives here (Maps-like). */}
+        <aside className="pointer-events-auto absolute inset-y-0 left-0 z-20 flex">
+          <nav
+            className="flex h-full w-14 shrink-0 flex-col items-center gap-0.5 border-r border-white/10 bg-[#07111A] py-2 shadow-[4px_0_24px_rgba(0,0,0,0.35)]"
+            aria-label={radarT(loc, 'Ferramentas do mapa', 'Herramientas del mapa', 'Map tools')}
+          >
             <Link
               href={backHref}
-              title={radarT(loc, 'Lugares', 'Lugares', 'Places')}
               className={railBtn(false)}
+              aria-label={radarT(loc, 'Voltar', 'Volver', 'Back')}
             >
               <ArrowLeft className="h-4 w-4" />
-              <span className="text-[8px] font-semibold uppercase leading-tight tracking-wide">
-                {radarT(loc, 'Voltar', 'Volver', 'Back')}
-              </span>
+              {railTip(
+                radarT(loc, 'Voltar', 'Volver', 'Back'),
+                radarT(loc, 'Voltar à lista de lugares.', 'Volver a la lista de lugares.', 'Back to places list.'),
+              )}
             </Link>
+
             <button
               type="button"
-              onClick={() => setRailOpen((v) => !v)}
+              onClick={() => setExclusiveFlyout(railOpen ? null : 'list')}
               className={railBtn(railOpen)}
-              title={radarT(loc, 'Lista de espaços', 'Lista de espacios', 'Spaces list')}
               aria-label={radarT(loc, 'Lista de espaços', 'Lista de espacios', 'Spaces list')}
               aria-pressed={railOpen}
             >
-              <List className="h-4 w-4" />
-              <span className="text-[8px] font-semibold uppercase leading-tight tracking-wide">
-                {data.units.length}
+              <span className="relative">
+                <List className="h-4 w-4" />
+                <span
+                  className={`absolute -right-2 -top-1.5 min-w-[1rem] rounded-full px-1 text-center text-[9px] font-bold leading-4 ${
+                    railOpen ? 'bg-slate-950 text-teal-200' : 'bg-teal-300 text-slate-950'
+                  }`}
+                >
+                  {data.units.length}
+                </span>
               </span>
+              {railTip(
+                radarT(loc, 'Espaços', 'Espacios', 'Spaces'),
+                radarT(
+                  loc,
+                  'Lista dos espaços deste sítio.',
+                  'Lista de los espacios de este sitio.',
+                  'List of spaces on this site.',
+                ),
+              )}
             </button>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setExclusiveFlyout(searchOpen ? null : 'search')}
+                className={railBtn(searchOpen || Boolean(query.trim()))}
+                aria-label={radarT(loc, 'Buscar espaço', 'Buscar espacio', 'Search spaces')}
+                aria-pressed={searchOpen}
+              >
+                <Search className="h-4 w-4" />
+                {railTip(
+                  radarT(loc, 'Buscar', 'Buscar', 'Search'),
+                  radarT(loc, 'Filtrar espaços por nome ou cultivo.', 'Filtrar espacios por nombre o cultivo.', 'Filter spaces by name or crop.'),
+                )}
+              </button>
+              {searchOpen && (
+                <div className="absolute left-full top-0 z-30 ml-2 w-[min(18rem,calc(100vw-5rem))]">
+                  <label className="flex items-center gap-2 rounded-2xl bg-[#07111A] px-4 py-2.5 text-white shadow-xl ring-1 ring-white/25">
+                    <Search className="h-4 w-4 shrink-0 text-teal-200" />
+                    <input
+                      autoFocus
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder={radarT(loc, 'Buscar espaço', 'Buscar espacio', 'Search spaces')}
+                      className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/55"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => openToolPanel('space')}
+              className={railBtn(tool === 'space')}
+              aria-label={radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
+              aria-pressed={tool === 'space'}
+            >
+              <Plus className="h-4 w-4" />
+              {railTip(
+                radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space'),
+                radarT(loc, 'Criar um espaço e colocá-lo no mapa.', 'Crear un espacio y colocarlo en el mapa.', 'Create a space and place it on the map.'),
+              )}
+            </button>
+
+            {data.moduleId === 'agriculture' && (
+              <button
+                type="button"
+                onClick={() => openToolPanel('crops')}
+                className={railBtn(tool === 'crops')}
+                aria-label={radarT(loc, 'Cultivos', 'Cultivos', 'Crops')}
+                aria-pressed={tool === 'crops'}
+              >
+                <Sprout className="h-4 w-4" />
+                {railTip(
+                  radarT(loc, 'Cultivos', 'Cultivos', 'Crops'),
+                  radarT(loc, 'Gerir culturas deste sítio.', 'Gestionar cultivos de este sitio.', 'Manage crops for this site.'),
+                )}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => openStep('sensors')}
+              className={railBtn(panel === 'sensors')}
+              aria-label={radarT(loc, 'Sensores', 'Sensores', 'Sensors')}
+              aria-pressed={panel === 'sensors'}
+            >
+              <Radio className="h-4 w-4" />
+              {railTip(
+                radarT(loc, 'Sensores', 'Sensores', 'Sensors'),
+                radarT(loc, 'Ligar e gerir sensores no sítio.', 'Conectar y gestionar sensores en el sitio.', 'Connect and manage site sensors.'),
+              )}
+            </button>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setExclusiveFlyout(layersOpen ? null : 'layers')}
+                className={railBtn(layersOpen)}
+                aria-label={radarT(loc, 'Camadas', 'Capas', 'Layers')}
+                aria-pressed={layersOpen}
+              >
+                <Layers className="h-4 w-4" />
+                {railTip(
+                  radarT(loc, 'Camadas', 'Capas', 'Layers'),
+                  radarT(loc, 'Alternar vista 2D ou 3D do mapa.', 'Cambiar vista 2D o 3D del mapa.', 'Switch map view between 2D and 3D.'),
+                )}
+              </button>
+              {layersOpen && (
+                <div className="absolute left-full top-0 z-30 ml-2 overflow-hidden rounded-2xl bg-[#07111A] shadow-xl ring-1 ring-white/25">
+                  <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
+                    <Layers className="h-3.5 w-3.5 text-teal-200" />
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">
+                      {radarT(loc, 'Camadas', 'Capas', 'Layers')}
+                    </span>
+                  </div>
+                  <div className="flex p-1">
+                    <button
+                      type="button"
+                      onClick={() => setView('2d')}
+                      className={`rounded-xl px-3.5 py-2 text-sm font-semibold ${
+                        view === '2d' ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:bg-white/10'
+                      }`}
+                    >
+                      2D
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setView('3d')}
+                      className={`rounded-xl px-3.5 py-2 text-sm font-semibold ${
+                        view === '3d' ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:bg-white/10'
+                      }`}
+                    >
+                      3D
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {next && (
+              <button
+                type="button"
+                onClick={() => openStep(next.id)}
+                className={railBtn(
+                  panel === next.id || (next.id === 'draw' && tool === 'space'),
+                )}
+                aria-label={nextLabel[next.id]}
+              >
+                <AlertTriangle
+                  className={`h-4 w-4 ${
+                    panel === next.id || (next.id === 'draw' && tool === 'space')
+                      ? ''
+                      : 'text-amber-300'
+                  }`}
+                />
+                {railTip(nextLabel[next.id], nextButton[next.id])}
+              </button>
+            )}
+
+            {openLot && (
+              <Link href={chainHref} className={railBtn(false)} aria-label={`${radarT(loc, 'Lote', 'Lote', 'Lot')} ${openLot.code}`}>
+                <Package className="h-4 w-4" />
+                {railTip(
+                  `${radarT(loc, 'Lote', 'Lote', 'Lot')} ${openLot.code}`,
+                  `${TRACE_STAGE_LABEL[openLot.currentStage][loc]} — ${radarT(loc, 'Abrir rastreio.', 'Abrir rastreo.', 'Open lot trace.')}`,
+                )}
+              </Link>
+            )}
+
             <Link
               href={cadernoHref}
-              title={radarT(loc, 'Caderno', 'Cuaderno', 'Notebook')}
               className={railBtn(false)}
+              aria-label={radarT(loc, 'Caderno', 'Cuaderno', 'Notebook')}
             >
               <BookOpen className="h-4 w-4" />
-              <span className="text-[8px] font-semibold uppercase leading-tight tracking-wide">
-                {radarT(loc, 'Caderno', 'Cuaderno', 'Note')}
-              </span>
+              {railTip(
+                radarT(loc, 'Caderno', 'Cuaderno', 'Notebook'),
+                radarT(loc, 'Registo diário do que aconteceu no sítio.', 'Registro diario de lo que pasó en el sitio.', 'Daily log of what happened on site.'),
+              )}
             </Link>
-            <div className="mt-auto flex w-full flex-col items-center gap-1 border-t border-white/10 pt-2">
+
+            <div className="mt-auto flex w-full flex-col items-center border-t border-white/10 pt-1">
               <button
                 type="button"
                 onClick={() => {
@@ -585,17 +783,20 @@ export function RadarPropertyWorkspace({
                   setEditMode('none');
                 }}
                 className={railBtn(panel === 'characterize')}
-                title={radarT(loc, 'Definições do lugar', 'Ajustes del lugar', 'Place settings')}
+                aria-label={radarT(loc, 'Ajustes', 'Ajustes', 'Settings')}
+                aria-pressed={panel === 'characterize'}
               >
                 <Settings2 className="h-4 w-4" />
-                <span className="text-[8px] font-semibold uppercase leading-tight tracking-wide">
-                  {radarT(loc, 'Ajustes', 'Ajustes', 'Set')}
-                </span>
+                {railTip(
+                  radarT(loc, 'Ajustes', 'Ajustes', 'Settings'),
+                  radarT(loc, 'Definições e caracterização do lugar.', 'Ajustes y caracterización del lugar.', 'Place settings and characterization.'),
+                )}
               </button>
             </div>
-          </div>
+          </nav>
+
           {railOpen && (
-            <div className="flex max-h-full w-[min(16rem,calc(100vw-5rem))] flex-col overflow-hidden rounded-2xl bg-[#07111A] shadow-xl ring-1 ring-white/25">
+            <div className="flex h-full w-[min(16rem,calc(100vw-5rem))] flex-col overflow-hidden border-r border-white/10 bg-[#07111A] shadow-xl">
               <div className="shrink-0 border-b border-white/10 px-3 pb-2 pt-3">
                 <p className="truncate text-sm font-semibold text-white">{data.name}</p>
                 {data.clientName && (
@@ -615,55 +816,13 @@ export function RadarPropertyWorkspace({
               </div>
             </div>
           )}
+
         </aside>
 
-        {/* Search pill + filter chips (top), clear of the left rail */}
-        <div
-          className={`pointer-events-auto absolute right-3 top-3 flex flex-col items-stretch gap-2 ${
-            railOpen ? 'left-[20.5rem]' : 'left-[4.5rem]'
-          }`}
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <label className={`flex min-w-[11rem] max-w-md flex-1 items-center gap-2 px-4 py-2.5 ${chromePill}`}>
-              <Search className="h-4 w-4 shrink-0 text-teal-200" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={radarT(loc, 'Buscar espaço', 'Buscar espacio', 'Search spaces')}
-                className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/55"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => {
-                setTool(tool === 'space' ? null : 'space');
-                setPanel(null);
-              }}
-              className={chipBtn(tool === 'space')}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              {radarT(loc, 'Espaço', 'Espacio', 'Space')}
-            </button>
-            {data.moduleId === 'agriculture' && (
-              <button
-                type="button"
-                onClick={() => {
-                  setTool(tool === 'crops' ? null : 'crops');
-                  setPanel(null);
-                }}
-                className={chipBtn(tool === 'crops')}
-              >
-                <Sprout className="h-3.5 w-3.5" />
-                {radarT(loc, 'Cultivos', 'Cultivos', 'Crops')}
-              </button>
-            )}
-            <button type="button" onClick={() => openStep('sensors')} className={chipBtn(panel === 'sensors')}>
-              <Radio className="h-3.5 w-3.5" />
-              {radarT(loc, 'Sensores', 'Sensores', 'Sensors')}
-            </button>
-          </div>
+        {/* Status toasts — top of map, clear of the rail */}
+        <div className="pointer-events-auto absolute left-16 right-3 top-3 z-10 flex flex-col items-start gap-2">
           {view === '3d' && editMode !== 'none' && (
-            <p className="max-w-xl self-start rounded-full bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-950 shadow-lg">
+            <p className="max-w-xl rounded-full bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-950 shadow-lg">
               {radarT(
                 loc,
                 'Modo 3D activo — a editar no mapa; a vista 3D retoma ao terminar a ferramenta.',
@@ -677,66 +836,10 @@ export function RadarPropertyWorkspace({
               {err}
             </p>
           )}
-          {next && (
-            <div className="flex max-w-md items-center justify-between gap-3 self-start rounded-full bg-amber-50 px-3.5 py-1.5 text-amber-950 shadow-lg">
-              <p className="truncate text-xs font-semibold sm:text-sm">{nextLabel[next.id]}</p>
-              <button
-                type="button"
-                onClick={() => openStep(next.id)}
-                className="shrink-0 rounded-full bg-slate-950 px-3 py-1 text-[11px] font-semibold text-white"
-              >
-                {panel === next.id || (next.id === 'draw' && tool === 'space')
-                  ? radarT(loc, 'Fechar', 'Cerrar', 'Close')
-                  : nextButton[next.id]}
-              </button>
-            </div>
-          )}
-          {openLot && !cardOpen && (
-            <Link
-              href={chainHref}
-              className={`self-start px-3.5 py-2 text-xs font-medium hover:bg-[#12343c] ${chromePill}`}
-            >
-              {radarT(loc, 'Lote', 'Lote', 'Lot')} {openLot.code} · {TRACE_STAGE_LABEL[openLot.currentStage][loc]} →
-            </Link>
-          )}
         </div>
 
-        {/* Bottom-right: map type / layers (2D · 3D) — hide when a right sheet is open */}
-        {!cardOpen && !detailOpen && (
-          <div className="pointer-events-auto absolute bottom-4 right-3 z-20 flex flex-col items-end gap-2">
-            <div className="overflow-hidden rounded-2xl bg-[#07111A] shadow-xl ring-1 ring-white/25">
-              <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
-                <Layers className="h-3.5 w-3.5 text-teal-200" />
-                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">
-                  {radarT(loc, 'Camadas', 'Capas', 'Layers')}
-                </span>
-              </div>
-              <div className="flex p-1">
-                <button
-                  type="button"
-                  onClick={() => setView('2d')}
-                  className={`rounded-xl px-3.5 py-2 text-sm font-semibold ${
-                    view === '2d' ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:bg-white/10'
-                  }`}
-                >
-                  2D
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setView('3d')}
-                  className={`rounded-xl px-3.5 py-2 text-sm font-semibold ${
-                    view === '3d' ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:bg-white/10'
-                  }`}
-                >
-                  3D
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {cardOpen && (
-          <div className="pointer-events-auto absolute bottom-4 right-4 top-28 z-20 w-[min(28rem,calc(100%-5.5rem))] overflow-y-auto rounded-2xl border border-white/20 bg-[#07111A] px-4 py-4 shadow-2xl">
+          <div className="pointer-events-auto absolute bottom-4 left-16 right-4 top-4 z-20 w-auto max-w-[28rem] overflow-y-auto rounded-2xl border border-white/20 bg-[#07111A] px-4 py-4 shadow-2xl ml-auto">
             {tool === 'crops' && data.moduleId === 'agriculture' && (
               <RadarCropsPanel
                 locale={loc}
@@ -1476,7 +1579,7 @@ export function RadarPropertyWorkspace({
         )}
 
         {detailOpen && focusedId && focusedUnit && (
-          <div className="pointer-events-auto absolute bottom-3 right-3 top-28 z-20 flex w-[min(24rem,calc(100%-5.5rem))] flex-col gap-2 overflow-y-auto rounded-2xl border border-white/20 bg-[#07111A] p-3 shadow-2xl sm:bottom-4 sm:right-4">
+          <div className="pointer-events-auto absolute bottom-3 left-16 right-3 top-4 z-20 ml-auto flex w-[min(24rem,calc(100%-5rem))] flex-col gap-2 overflow-y-auto rounded-2xl border border-white/20 bg-[#07111A] p-3 shadow-2xl sm:bottom-4 sm:right-4">
             {editingSpace && (
               <div className="rounded-xl border border-teal-400/35 bg-[#0c1a24] px-4 py-4">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-teal-200/80">
