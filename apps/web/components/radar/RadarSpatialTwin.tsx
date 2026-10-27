@@ -3,7 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
 import type { WorldParcel, WorldSensor } from '@/components/radar/radar-world-scene';
-import type { RadarIrrigationPath, RadarSiteStructure } from '@/lib/radar/site-layout';
+import type { RadarIrrigationPath, RadarSiteStructure, RadarSpaceRect } from '@/lib/radar/site-layout';
+import { RadarMapLibreTwin } from '@/components/radar/RadarMapLibreTwin';
 
 type Props = {
   locale: string;
@@ -20,11 +21,17 @@ type Props = {
   siteSideM?: number | null;
   structures?: RadarSiteStructure[];
   irrigation?: RadarIrrigationPath[];
+  /** Layout spaces (placed flag + % rects) for MapLibre extrusions. */
+  spaces?: RadarSpaceRect[];
   /** How many parcels are geolocated on the OSM map (`placed=true`). Local plant still renders when 0. */
   mapPlacedCount?: number;
 };
 
-/** Mundo 3D da exploração: OSM no chão (se houver pin) + silhuetas por cultivo/dispositivo (planta local %). */
+/**
+ * Mundo 3D da exploração.
+ * Com pin geo: MapLibre com pitch (mapa real inclinável) + extrusões dos espaços.
+ * Sem pin: planta local three.js (sem plano OSM — esse era a névoa azul).
+ */
 export function RadarSpatialTwin({
   locale,
   moduleId,
@@ -40,12 +47,15 @@ export function RadarSpatialTwin({
   siteSideM = null,
   structures = [],
   irrigation = [],
+  spaces = [],
   mapPlacedCount,
 }: Props) {
   const loc = radarLoc(locale);
   const hostRef = useRef<HTMLDivElement>(null);
   const focusRef = useRef(onFocus);
   focusRef.current = onFocus;
+
+  const hasOsmPin = lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
 
   const key = parcels
     .map(
@@ -57,6 +67,7 @@ export function RadarSpatialTwin({
   const geoKey = `${lat}|${lng}|${areaHa}|${siteSideM}|${structures.map((s) => s.id).join(',')}|${irrigation.map((i) => i.id).join(',')}`;
 
   useEffect(() => {
+    if (hasOsmPin) return;
     const host = hostRef.current;
     if (!host || parcels.length === 0) return;
     let cleanup = () => {};
@@ -69,8 +80,8 @@ export function RadarSpatialTwin({
         sensors,
         focusedId,
         onFocus: (id) => focusRef.current(id),
-        lat,
-        lng,
+        lat: null,
+        lng: null,
         areaHa,
         siteSideM,
         structures,
@@ -82,7 +93,7 @@ export function RadarSpatialTwin({
       cleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, sensorKey, geoKey, moduleId, focusedId]);
+  }, [hasOsmPin, key, sensorKey, geoKey, moduleId, focusedId]);
 
   const tall = fill
     ? 'absolute inset-0 h-full min-h-0'
@@ -107,8 +118,26 @@ export function RadarSpatialTwin({
     );
   }
 
-  const showLocalPlantHint = mapPlacedCount === 0;
-  const hasOsmPin = lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
+  if (hasOsmPin) {
+    return (
+      <RadarMapLibreTwin
+        locale={locale}
+        parcels={parcels}
+        spaces={spaces.length > 0 ? spaces : parcelsAsSpaces(parcels)}
+        focusedId={focusedId}
+        onFocus={onFocus}
+        lat={lat as number}
+        lng={lng as number}
+        areaHa={areaHa}
+        siteSideM={siteSideM}
+        structures={structures}
+        irrigation={irrigation}
+        fill={fill}
+      />
+    );
+  }
+
+  const showLocalPlantHint = mapPlacedCount === 0 || mapPlacedCount == null;
 
   return (
     <div className={fill ? 'absolute inset-0 overflow-hidden' : `relative overflow-hidden rounded-xl ${tall}`}>
@@ -117,20 +146,33 @@ export function RadarSpatialTwin({
         <p className="pointer-events-none absolute left-1/2 top-3 z-[1] max-w-[min(28rem,92%)] -translate-x-1/2 rounded-full bg-black/70 px-3 py-1.5 text-center text-[11px] font-medium leading-snug text-white/90 shadow-lg ring-1 ring-white/15">
           {radarT(
             loc,
-            'Estes espaços ainda não estão no mapa. Coloca-os ou vê a planta local em 3D.',
-            'Estos espacios aún no están en el mapa. Colócalos o mira la planta local en 3D.',
-            'These spaces are not on the map yet. Place them or view the local plant in 3D.',
+            'Sem pin no mapa — planta local 3D. Geolocaliza o lugar para o mapa 3D real.',
+            'Sin pin en el mapa — planta local 3D. Geolocaliza el lugar para el mapa 3D real.',
+            'No map pin yet — local 3D plant. Geolocate the place for the real 3D map.',
           )}
         </p>
       )}
       <p className="pointer-events-none absolute bottom-2 left-3 text-[10px] font-medium text-white/80 drop-shadow">
         {parcels.length} {radarT(loc, 'espaços', 'espacios', 'spaces')}
-        {showLocalPlantHint
-          ? ` · ${radarT(loc, 'planta local', 'planta local', 'local plant')}`
-          : hasOsmPin
-            ? ' · © OpenStreetMap'
-            : ` · ${radarT(loc, 'planta local', 'planta local', 'local plant')}`}
+        {` · ${radarT(loc, 'planta local', 'planta local', 'local plant')}`}
       </p>
     </div>
   );
+}
+
+function parcelsAsSpaces(parcels: WorldParcel[]): RadarSpaceRect[] {
+  return parcels
+    .filter((p) => typeof p.x === 'number' && typeof p.y === 'number')
+    .map((p) => ({
+      id: p.id,
+      x: p.x as number,
+      y: p.y as number,
+      w: p.w ?? 18,
+      h: p.h ?? 14,
+      rotation: p.rotation ?? 0,
+      placed: true,
+      widthM: p.widthM ?? null,
+      lengthM: p.lengthM ?? null,
+      spacingM: p.spacingM ?? null,
+    }));
 }

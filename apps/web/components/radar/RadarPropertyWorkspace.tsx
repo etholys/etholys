@@ -446,6 +446,7 @@ export function RadarPropertyWorkspace({
                 spacingM: rect.spacingM ?? null,
               };
             })}
+            spaces={layout.spaces}
             mapPlacedCount={layout.spaces.filter(
               (s) => s.placed === true && mapParcels.some((p) => p.id === s.id),
             ).length}
@@ -641,9 +642,9 @@ export function RadarPropertyWorkspace({
             <p className="max-w-xl self-start rounded-full bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-950 shadow-lg">
               {radarT(
                 loc,
-                'Modo 3D activo — a editar no mapa OSM; a vista 3D retoma ao terminar a ferramenta.',
-                'Modo 3D activo — editando en el mapa OSM; la vista 3D vuelve al terminar la herramienta.',
-                '3D mode on — editing on the OSM map; 3D returns when you finish the tool.',
+                'Modo 3D activo — a editar no mapa; a vista 3D retoma ao terminar a ferramenta.',
+                'Modo 3D activo — editando en el mapa; la vista 3D vuelve al terminar la herramienta.',
+                '3D mode on — editing on the map; 3D returns when you finish the tool.',
               )}
             </p>
           )}

@@ -76,51 +76,6 @@ function labelSprite(text: string) {
   return sprite;
 }
 
-function osmTileXY(lat: number, lng: number, z: number) {
-  const n = 2 ** z;
-  const x = Math.floor(((lng + 180) / 360) * n);
-  const latRad = (lat * Math.PI) / 180;
-  const y = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n);
-  return { x, y, z };
-}
-
-/** OSM raster under the site — commercial-safe tiles + attribution in UI. */
-function addOsmGround(scene: THREE.Scene, lat: number, lng: number, sideM: number) {
-  const z = 17;
-  const { x: tx, y: ty } = osmTileXY(lat, lng, z);
-  const loader = new THREE.TextureLoader();
-  loader.crossOrigin = 'anonymous';
-  const group = new THREE.Group();
-  group.position.y = -0.45;
-  const tileSpan = sideM * 1.35;
-  // 3×3 tiles around the site pin
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dy = -1; dy <= 1; dy++) {
-      const url = `https://tile.openstreetmap.org/${z}/${tx + dx}/${ty + dy}.png`;
-      const mat = new THREE.MeshBasicMaterial({ color: 0x8a9a7a, transparent: true, opacity: 0.92 });
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(tileSpan / 3, tileSpan / 3), mat);
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.position.set(dx * (tileSpan / 3), 0, dy * (tileSpan / 3));
-      mesh.receiveShadow = true;
-      group.add(mesh);
-      loader.load(
-        url,
-        (tex) => {
-          tex.colorSpace = THREE.SRGBColorSpace;
-          mat.map = tex;
-          mat.color.set(0xffffff);
-          mat.needsUpdate = true;
-        },
-        undefined,
-        () => {
-          /* keep green fallback if tile blocked */
-        },
-      );
-    }
-  }
-  scene.add(group);
-}
-
 function addCropFamily(group: THREE.Group, family: CropVisualFamily, roomW: number, roomD: number, spacingM: number | null) {
   const pad = 0.25;
   const usableW = Math.max(0.5, roomW - pad * 2);
@@ -344,8 +299,8 @@ export function mountRadarWorld(host: HTMLElement, opts: MountOpts): () => void 
   const width = host.clientWidth || 640;
   const height = host.clientHeight || 560;
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87a0b8);
-  scene.fog = new THREE.Fog(0x87a0b8, 60, 180);
+  // Local plant only (geo 3D uses MapLibre). Soft sky — no heavy fog that washed out the scene.
+  scene.background = new THREE.Color(0xb8c9b0);
 
   const camera = new THREE.PerspectiveCamera(32, width / height, 0.05, 500);
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -385,26 +340,15 @@ export function mountRadarWorld(host: HTMLElement, opts: MountOpts): () => void 
   const gridSpanX = cols * cell + (cols - 1) * gap;
   const gridSpanZ = rows * cell + (rows - 1) * gap;
 
-  if (opts.lat != null && opts.lng != null && Number.isFinite(opts.lat) && Number.isFinite(opts.lng)) {
-    addOsmGround(scene, opts.lat, opts.lng, SPAN);
-  } else {
-    const ground = new THREE.Mesh(
-      new THREE.CircleGeometry(SPAN * 1.6, 48),
-      new THREE.MeshStandardMaterial({ color: 0x6d8f58, roughness: 1 }),
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.42;
-    ground.receiveShadow = true;
-    scene.add(ground);
-  }
-
-  const platform = new THREE.Mesh(
-    new THREE.BoxGeometry(SPAN + 2, 0.2, SPAN + 2),
-    new THREE.MeshStandardMaterial({ color: 0xf1f5f9, transparent: true, opacity: 0.55 }),
+  // Opaque soil disc only — never a translucent slab or failed OSM texture plane (that was the blue fog bug).
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(SPAN * 0.72, 48),
+    new THREE.MeshStandardMaterial({ color: 0x5f7d4a, roughness: 1 }),
   );
-  platform.position.y = -0.28;
-  platform.receiveShadow = true;
-  scene.add(platform);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.08;
+  ground.receiveShadow = true;
+  scene.add(ground);
 
   // 10 m scale bar
   const scaleLen = Math.min(10, SPAN * 0.25);
