@@ -15,12 +15,21 @@ import {
   resolveMeetSpeechLanguage,
   type MeetSpeechLanguage,
 } from '@/lib/meet/language';
-import { startMeetLocalRecorder, type MeetLocalRecorder } from '@/lib/meet/local-recorder';
+import {
+  isMeetCaptureSelfTabError,
+  registerExternalCaptureHandle,
+  startMeetLocalRecorder,
+  type MeetLocalRecorder,
+} from '@/lib/meet/local-recorder';
 import { meetRecapPath } from '@/lib/meet/types';
 
 type Props = {
   companyId?: string;
   sessionId?: string;
+  /** Link externo a abrir noutra aba (Zoom/Teams/Meet) */
+  openMeetingUrl?: string;
+  /** Arrancar o picker de ecrã ao carregar */
+  autoRecord?: boolean;
 };
 
 type Phase = 'setup' | 'recording' | 'processing' | 'pending';
@@ -29,7 +38,12 @@ type Phase = 'setup' | 'recording' | 'processing' | 'pending';
  * Reuniões externas (Zoom / Teams / Google Meet): mesmo pipeline CHORUS que a sala interna —
  * gravação → R2 → Whisper/Gemini + diarização (sem Web Speech ao vivo).
  */
-export function MeetExternalCapture({ companyId, sessionId: initialSessionId }: Props) {
+export function MeetExternalCapture({
+  companyId,
+  sessionId: initialSessionId,
+  openMeetingUrl,
+  autoRecord,
+}: Props) {
   const { locale } = useApp();
   const router = useRouter();
   const t = (pt: string, es: string, en: string) =>
@@ -94,20 +108,43 @@ export function MeetExternalCapture({ companyId, sessionId: initialSessionId }: 
     }
   }, [locale, t, title]);
 
+  useEffect(() => {
+    registerExternalCaptureHandle();
+  }, []);
+
+  const [pendingChecked, setPendingChecked] = useState(false);
+  useEffect(() => {
+    const sid = sessionId || initialSessionId;
+    if (!sid) {
+      setPendingChecked(true);
+      return;
+    }
+    void getPendingMeetRecording(sid)
+      .then((row) => {
+        if (row) setPhase('pending');
+      })
+      .finally(() => setPendingChecked(true));
+  }, [sessionId, initialSessionId]);
+
+  const autoRecordStartedRef = useRef(false);
+  useEffect(() => {
+    if (!pendingChecked) return;
+    if (!autoRecord || !companyId || !canRecord || phase !== 'setup') return;
+    if (autoRecordStartedRef.current) return;
+    autoRecordStartedRef.current = true;
+    const timer = window.setTimeout(() => {
+      void startRecording();
+    }, 500);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRecord, companyId, canRecord, phase, pendingChecked]);
+
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
     }
   }, []);
-
-  useEffect(() => {
-    const sid = sessionId || initialSessionId;
-    if (!sid) return;
-    void getPendingMeetRecording(sid).then((row) => {
-      if (row) setPhase('pending');
-    });
-  }, [sessionId, initialSessionId]);
 
   async function retryPendingUpload() {
     if (!companyId) return;
@@ -276,8 +313,11 @@ export function MeetExternalCapture({ companyId, sessionId: initialSessionId }: 
     setError(null);
     finalizeRef.current = false;
     try {
+      // Modo externo: NUNCA preferCurrentTab / include self (isso é só para Gravar na sala).
       const { recorder } = await startMeetLocalRecorder({
         suggestedTitle: title.trim() || 'chorus-externa',
+        captureMode: 'external',
+        forbidSelfTab: true,
       });
       recorderRef.current = recorder;
       startedAtRef.current = Date.now();
@@ -289,6 +329,16 @@ export function MeetExternalCapture({ companyId, sessionId: initialSessionId }: 
     } catch (err) {
       recorderRef.current = null;
       if (err instanceof DOMException && err.name === 'AbortError') return;
+      if (isMeetCaptureSelfTabError(err)) {
+        setError(
+          t(
+            'Escolheste esta aba do CHORUS — isso não grava a reunião. Cancela e no diálogo escolhe a janela/aba do Zoom, Teams ou Meet (com «partilhar áudio da aba» se for uma aba).',
+            'Elegiste esta pestaña de CHORUS — eso no graba la reunión. Cancela y en el diálogo elige la ventana/pestaña de Zoom, Teams o Meet (con «compartir audio de la pestaña» si es una pestaña).',
+            'You picked this CHORUS tab — that does not record the meeting. Cancel and in the dialog choose the Zoom, Teams, or Meet window/tab (enable «share tab audio» if it is a tab).',
+          ),
+        );
+        return;
+      }
       setError(
         err instanceof Error
           ? err.message
@@ -352,6 +402,24 @@ export function MeetExternalCapture({ companyId, sessionId: initialSessionId }: 
       </header>
 
       <main className="mx-auto max-w-lg px-4 py-10 sm:px-6">
+        {openMeetingUrl && phase === 'setup' && (
+          <a
+            href={openMeetingUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-teal-500/30 bg-teal-950/40 px-4 py-3 text-sm text-teal-100 hover:bg-teal-900/50"
+          >
+            <span>
+              {t(
+                'A reunião deve estar noutra aba/janela. Se não abriu, clica aqui.',
+                'La reunión debe estar en otra pestaña/ventana. Si no abrió, pulsa aquí.',
+                'The meeting should be in another tab/window. If it did not open, click here.',
+              )}
+            </span>
+            <MonitorUp className="h-4 w-4 shrink-0" />
+          </a>
+        )}
+
         {error && (
           <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-950/40 px-4 py-3 text-sm text-red-200">
             {error}
@@ -369,16 +437,16 @@ export function MeetExternalCapture({ companyId, sessionId: initialSessionId }: 
                 <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-xs leading-relaxed text-white/55">
                   <li>
                     {t(
-                      'Abre a reunião externa (Zoom, Teams, etc.) noutra janela.',
-                      'Abre la reunión externa (Zoom, Teams, etc.) en otra ventana.',
-                      'Open the external meeting (Zoom, Teams, etc.) in another window.',
+                      'Abre a reunião externa (Zoom, Teams, Google Meet, etc.) noutra aba ou janela — não nesta do CHORUS.',
+                      'Abre la reunión externa (Zoom, Teams, Google Meet, etc.) en otra pestaña o ventana — no en esta de CHORUS.',
+                      'Open the external meeting (Zoom, Teams, Google Meet, etc.) in another tab or window — not this CHORUS one.',
                     )}
                   </li>
                   <li>
                     {t(
-                      'Clica «Gravar na nuvem» e escolhe essa janela com áudio.',
-                      'Pulsa «Grabar en la nube» y elige esa ventana con audio.',
-                      'Click «Record to cloud» and pick that window with audio.',
+                      'Clica «Gravar na nuvem». No diálogo do browser escolhe a janela/aba da reunião externa (nunca «esta pestaña» / esta aba do CHORUS). Se for uma aba, ativa «partilhar áudio da aba».',
+                      'Pulsa «Grabar en la nube». En el diálogo del navegador elige la ventana/pestaña de la reunión externa (nunca «esta pestaña» / esta de CHORUS). Si es una pestaña, activa «compartir audio de la pestaña».',
+                      'Click «Record to cloud». In the browser dialog pick the external meeting window/tab (never «this tab» / this CHORUS tab). If it is a tab, enable «share tab audio».',
                     )}
                   </li>
                   <li>
@@ -448,9 +516,9 @@ export function MeetExternalCapture({ companyId, sessionId: initialSessionId }: 
             </h2>
             <p className="mt-2 text-sm text-white/55">
               {t(
-                'Mantém a janela da reunião aberta. A transcrição com speakers aparece no resumo ao parar.',
-                'Mantén la ventana de la reunión abierta. La transcripción con participantes aparece en el resumen al parar.',
-                'Keep the meeting window open. Speaker-attributed transcript appears in the recap when you stop.',
+                'Mantém a janela da reunião externa aberta (não esta aba do CHORUS). A transcrição com speakers aparece no resumo ao parar.',
+                'Mantén la ventana de la reunión externa abierta (no esta pestaña de CHORUS). La transcripción con participantes aparece en el resumen al parar.',
+                'Keep the external meeting window open (not this CHORUS tab). Speaker-attributed transcript appears in the recap when you stop.',
               )}
             </p>
             <button

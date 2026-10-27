@@ -9,7 +9,16 @@ function CaptureInner() {
   const searchParams = useSearchParams();
   const companyId = searchParams.get('companyId')?.trim() || undefined;
   const sessionId = searchParams.get('sessionId')?.trim() || undefined;
-  return <MeetExternalCapture companyId={companyId} sessionId={sessionId} />;
+  const openMeetingUrl = searchParams.get('openUrl')?.trim() || undefined;
+  const autoRecord = searchParams.get('autoRecord') === '1';
+  return (
+    <MeetExternalCapture
+      companyId={companyId}
+      sessionId={sessionId}
+      openMeetingUrl={openMeetingUrl}
+      autoRecord={autoRecord}
+    />
+  );
 }
 
 export default function MeetCapturePage() {

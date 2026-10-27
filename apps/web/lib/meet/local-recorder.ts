@@ -12,6 +12,40 @@ export type MeetLocalRecorder = {
   destroy: () => void;
 };
 
+/** Identifica esta página no Capture Handle (Chrome) para rejeitar auto-gravação. */
+export const CHORUS_EXTERNAL_CAPTURE_HANDLE = 'etholys-chorus-external-capture';
+
+export const MEET_CAPTURE_SELF_TAB_CODE = 'MEET_CAPTURE_SELF_TAB';
+
+export function isMeetCaptureSelfTabError(err: unknown): boolean {
+  return Boolean(
+    err &&
+      typeof err === 'object' &&
+      'code' in err &&
+      (err as { code?: string }).code === MEET_CAPTURE_SELF_TAB_CODE,
+  );
+}
+
+/** Regista a página de captura externa para detetar se o utilizador partilhou esta aba. */
+export function registerExternalCaptureHandle(): void {
+  try {
+    const md = navigator.mediaDevices as MediaDevices & {
+      setCaptureHandleConfig?: (cfg: {
+        handle: string;
+        permittedOrigins?: string[];
+        exposeOrigin?: boolean;
+      }) => void;
+    };
+    md.setCaptureHandleConfig?.({
+      handle: CHORUS_EXTERNAL_CAPTURE_HANDLE,
+      permittedOrigins: ['*'],
+      exposeOrigin: true,
+    });
+  } catch {
+    /* API opcional */
+  }
+}
+
 function defaultFileName(title?: string): string {
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
   const safe =
@@ -88,9 +122,8 @@ export type MeetLocalRecorderOptions = {
   /** Se false, não pede mic extra (evita conflito com a câmara/mic da sala). */
   captureMicrophone?: boolean;
   /**
-   * `external` = reunião Zoom/Meet/Teams: picker completo e abre na lista de abas
-   * (o utilizador deve escolher a aba da reunião externa, NÃO a do CHORUS).
-   * `room` = sala CHORUS nativa.
+   * `external` = reunião Zoom/Meet/Teams: exclui esta aba Etholys/CHORUS.
+   * `room` = sala CHORUS nativa (preferCurrentTab + incluir self).
    */
   captureMode?: 'external' | 'room';
 };
@@ -103,27 +136,67 @@ function stopStream(stream: MediaStream | null | undefined) {
   }
 }
 
-/** Detecta se o utilizador partilhou a própria aba Etholys/CHORUS. */
+function selfTabError(message: string): Error {
+  return Object.assign(new Error(message), { code: MEET_CAPTURE_SELF_TAB_CODE });
+}
+
+/** Detecta se o utilizador partilhou a própria aba Etholys/CHORUS (captura externa). */
 function isSelfChorusTabCapture(track: MediaStreamTrack): boolean {
-  const label = (track.label || '').toLowerCase();
-  if (!label) return false;
+  try {
+    const handle = (
+      track as MediaStreamTrack & {
+        getCaptureHandle?: () => { handle?: string; origin?: string } | null;
+      }
+    ).getCaptureHandle?.();
+    if (handle?.handle === CHORUS_EXTERNAL_CAPTURE_HANDLE) return true;
+  } catch {
+    /* ignore */
+  }
+
+  const label = (track.label || '').toLowerCase().trim();
   const title = (typeof document !== 'undefined' ? document.title : '').toLowerCase();
   const href = (typeof location !== 'undefined' ? location.href : '').toLowerCase();
+  const host = (typeof location !== 'undefined' ? location.hostname : '').toLowerCase();
+  const onChorusCapture =
+    href.includes('/hub/meet/capture') ||
+    href.includes('/hub/meet') ||
+    host.includes('etholys');
 
-  if (title.length >= 8) {
+  if (!label) {
+    // Sem label: Capture Handle é a via fiável; se falhou, não bloquear por defeito.
+    return false;
+  }
+
+  if (title.length >= 6) {
     const tip = title.slice(0, Math.min(40, title.length));
     if (label.includes(tip)) return true;
   }
+
+  if (host && label.includes(host) && onChorusCapture) return true;
+
   if (
-    (label.includes('chorus') || label.includes('etholys') || label.includes('fábrica') || label.includes('fabrica')) &&
-    (href.includes('/hub/meet') || href.includes('etholys.com') || title.includes('chorus') || title.includes('etholys'))
+    (label.includes('chorus') ||
+      label.includes('etholys') ||
+      label.includes('fábrica') ||
+      label.includes('fabrica') ||
+      label.includes('reunion externa') ||
+      label.includes('reunião externa') ||
+      label.includes('reunión externa')) &&
+    onChorusCapture
   ) {
-    if (title && label.includes(title.slice(0, 12))) return true;
-    // Captura externa: qualquer aba Etholys/CHORUS é a errada
-    if (href.includes('/hub/meet/capture') || href.includes('/hub/meet')) return true;
+    return true;
   }
+
   return false;
 }
+
+type DisplayMediaOpts = DisplayMediaStreamOptions & {
+  preferCurrentTab?: boolean;
+  selfBrowserSurface?: 'include' | 'exclude';
+  systemAudio?: 'include' | 'exclude';
+  monitorTypeSurfaces?: 'include' | 'exclude';
+  surfaceSwitching?: 'include' | 'exclude';
+};
 
 export async function startMeetLocalRecorder(opts?: MeetLocalRecorderOptions): Promise<{
   recorder: MeetLocalRecorder;
@@ -137,21 +210,30 @@ export async function startMeetLocalRecorder(opts?: MeetLocalRecorderOptions): P
   );
   const captureMicrophone = opts?.captureMicrophone !== false;
 
+  if (captureMode === 'external') {
+    registerExternalCaptureHandle();
+  }
+
   // Sala CHORUS: a aba desta chamada entra na lista (preferCurrentTab + selfBrowserSurface).
-  // Captura externa: esconde a aba do CHORUS para gravar Meet/Zoom/Teams.
-  const displayMediaOpts: DisplayMediaStreamOptions = {
-    video: {
-      frameRate: { ideal: 30 },
-      width: { ideal: 1920 },
-      height: { ideal: 1080 },
-      displaySurface: 'browser',
-    },
+  // Captura externa: esconde a aba do CHORUS; deixa Window/Screen/Tab (outra) para Zoom/Teams/Meet.
+  const videoConstraints: MediaTrackConstraints & { displaySurface?: string } = {
+    frameRate: { ideal: 30 },
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+  };
+  // Só na sala forçamos preferência por aba do browser (a própria chamada).
+  if (recordingThisCall) {
+    videoConstraints.displaySurface = 'browser';
+  }
+
+  const displayMediaOpts: DisplayMediaOpts = {
+    video: videoConstraints,
     audio: true,
     preferCurrentTab: recordingThisCall,
     selfBrowserSurface: recordingThisCall ? 'include' : 'exclude',
     systemAudio: 'include',
     monitorTypeSurfaces: 'include',
-    surfaceSwitching: 'include',
+    surfaceSwitching: recordingThisCall ? 'include' : 'exclude',
   };
 
   const display = await navigator.mediaDevices.getDisplayMedia(displayMediaOpts);
@@ -159,10 +241,8 @@ export async function startMeetLocalRecorder(opts?: MeetLocalRecorderOptions): P
   const videoTrack = display.getVideoTracks()[0];
   if (videoTrack && forbidSelfTab && isSelfChorusTabCapture(videoTrack)) {
     stopStream(display);
-    throw new Error(
-      captureMode === 'external'
-        ? 'Escolheste a aba do CHORUS — isso não grava a reunião. Cancela e escolhe a aba do Google Meet, Zoom ou Teams (ou a janela / ecrã inteiro).'
-        : 'Escolhe a aba desta reunião CHORUS (com áudio da aba), uma janela ou o ecrã inteiro.',
+    throw selfTabError(
+      'SELF_TAB: escolheste a aba do CHORUS — isso não grava a reunião externa.',
     );
   }
 
@@ -197,7 +277,7 @@ export async function startMeetLocalRecorder(opts?: MeetLocalRecorderOptions): P
     void audioCtx?.close().catch(() => undefined);
     throw new Error(
       captureMode === 'external'
-        ? 'Sem vídeo. No diálogo do Chrome escolhe a aba do Meet/Zoom/Teams (com áudio da aba ligado), uma janela ou o ecrã inteiro — nunca a aba do CHORUS.'
+        ? 'Sem vídeo. No diálogo do browser escolhe a aba/janela da reunião externa (Zoom, Teams, Meet) com áudio da aba — nunca a aba do CHORUS.'
         : 'Partilha sem vídeo. No diálogo escolhe esta aba do CHORUS (áudio da aba ligado), uma janela ou o ecrã inteiro.',
     );
   }
