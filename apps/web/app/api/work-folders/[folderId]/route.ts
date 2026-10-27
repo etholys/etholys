@@ -103,6 +103,17 @@ export async function PUT(req: Request, { params }: { params: { folderId: string
       }
     }
 
+    // Convert to PERSONAL: drop ACL so the board leaves “Compartidos” (legacy boards included).
+    if (data.visibility === 'PERSONAL') {
+      if (!wantsMembers) {
+        await prisma.workFolderMember.deleteMany({ where: { folderId: params.folderId } });
+      }
+      await prisma.workFolderShare.updateMany({
+        where: { folderId: params.folderId, status: 'active' },
+        data: { status: 'revoked' },
+      });
+    }
+
     const folder = await prisma.workFolder.update({
       where: { id: params.folderId },
       data,

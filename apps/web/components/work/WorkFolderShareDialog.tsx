@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Lock, X } from 'lucide-react';
+import { Lock, Users, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type UserRow = { id: string; name?: string | null; email?: string | null };
@@ -19,6 +19,7 @@ type ShareRow = {
   acceptedAt?: string | null;
   user?: UserRow | null;
 };
+type BoardVisibility = 'PERSONAL' | 'SHARED';
 
 export function WorkFolderShareDialog({
   folderId,
@@ -41,7 +42,7 @@ export function WorkFolderShareDialog({
   const [shares, setShares] = useState<ShareRow[]>([]);
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [owner, setOwner] = useState<UserRow | null>(null);
-  const [visibility, setVisibility] = useState<'PERSONAL' | 'SHARED'>('PERSONAL');
+  const [visibility, setVisibility] = useState<BoardVisibility>('PERSONAL');
   const [pickUserId, setPickUserId] = useState('');
   const [emailDraft, setEmailDraft] = useState('');
   const [pickRole, setPickRole] = useState<'viewer' | 'editor'>('viewer');
@@ -53,7 +54,8 @@ export function WorkFolderShareDialog({
   const pendingOrGuestShares = shares.filter(
     (s) => s.accessMode === 'external_guest' || !s.acceptedAt,
   );
-  const isShared = visibility === 'SHARED' || members.length > 0 || pendingOrGuestShares.length > 0;
+  const hasPeople = members.length > 0 || pendingOrGuestShares.length > 0;
+  const isShared = visibility === 'SHARED' || hasPeople;
 
   const reload = () => {
     setLoading(true);
@@ -85,7 +87,7 @@ export function WorkFolderShareDialog({
 
   const persistMembers = async (
     next: { userId: string; role: string }[],
-    opts?: { visibility?: 'PERSONAL' | 'SHARED' },
+    opts?: { visibility?: BoardVisibility },
   ) => {
     setSaving(true);
     setError(null);
@@ -209,24 +211,22 @@ export function WorkFolderShareDialog({
   };
 
   /** Remove everyone + revoke invites + switch board back to private. */
-  const makePrivate = async () => {
-    const confirmed = window.confirm(
-      t(
-        'Stop sharing this board? Everyone will lose access and it becomes private again.',
-        '¿Dejar de compartir este tablero? Todos perderán el acceso y volverá a ser privado.',
-        'Deixar de partilhar este quadro? Todos perdem o acesso e volta a ser privado.',
-      ),
-    );
-    if (!confirmed) return;
+  const makePrivate = async (opts?: { skipConfirm?: boolean }) => {
+    if (!opts?.skipConfirm) {
+      const confirmed = window.confirm(
+        t(
+          'Stop sharing this board? Everyone will lose access and it becomes private again.',
+          '¿Dejar de compartir este tablero? Todos perderán el acceso y volverá a ser privado.',
+          'Deixar de partilhar este quadro? Todos perdem o acesso e volta a ser privado.',
+        ),
+      );
+      if (!confirmed) return;
+    }
 
     setSaving(true);
     setError(null);
     try {
-      for (const s of shares) {
-        const ok = await deleteShare(s.id);
-        if (!ok) return;
-      }
-      // Clear members without nested saving toggles
+      // API clears members + revokes shares when visibility → PERSONAL
       const res = await fetch(`/api/work-folders/${folderId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -247,6 +247,37 @@ export function WorkFolderShareDialog({
     }
   };
 
+  const setBoardType = async (next: BoardVisibility) => {
+    if (next === visibility && !(next === 'PERSONAL' && hasPeople)) return;
+
+    if (next === 'PERSONAL' && (hasPeople || visibility === 'SHARED')) {
+      await makePrivate({ skipConfirm: false });
+      return;
+    }
+
+    if (next === 'SHARED') {
+      setSaving(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/work-folders/${folderId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ visibility: 'SHARED' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data?.error || t('Could not save', 'No se pudo guardar', 'Não foi possível guardar'));
+          return;
+        }
+        setVisibility(data?.folder?.visibility === 'SHARED' ? 'SHARED' : 'PERSONAL');
+        setMembers(data?.folder?.members ?? members);
+        onSaved();
+      } finally {
+        setSaving(false);
+      }
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -261,14 +292,14 @@ export function WorkFolderShareDialog({
             <p className="mt-0.5 text-[11px] text-slate-400">
               {isShared
                 ? t(
-                    'People with access. Remove anyone or stop sharing entirely.',
-                    'Personas con acceso. Quita a cualquiera o deja de compartir por completo.',
-                    'Pessoas com acesso. Remove alguém ou deixa de partilhar por completo.',
+                    'People with access. Change board type or stop sharing entirely.',
+                    'Personas con acceso. Cambia el tipo de tablero o deja de compartir.',
+                    'Pessoas com acesso. Muda o tipo de quadro ou deixa de partilhar.',
                   )
                 : t(
-                    'Invite company people or any email — guests only see this board.',
-                    'Invita a personas de la empresa o cualquier email — el invitado solo ve este tablero.',
-                    'Convida pessoas da empresa ou qualquer email — o convidado só vê este tablero.',
+                    'Choose board type, then invite people if you want.',
+                    'Elige el tipo de tablero y, si quieres, invita personas.',
+                    'Escolhe o tipo de quadro e, se quiseres, convida pessoas.',
                   )}
             </p>
           </div>
@@ -284,6 +315,55 @@ export function WorkFolderShareDialog({
             </div>
           ) : (
             <>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                  {t('Board type', 'Tipo de tablero', 'Tipo de quadro')}
+                </p>
+                <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-white p-1 ring-1 ring-slate-200">
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void setBoardType('PERSONAL')}
+                    className={cn(
+                      'inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition disabled:opacity-40',
+                      visibility === 'PERSONAL' && !hasPeople
+                        ? 'bg-slate-900 text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-100',
+                    )}
+                  >
+                    <Lock className="h-3.5 w-3.5" />
+                    {t('Only me', 'Solo yo', 'Só eu')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void setBoardType('SHARED')}
+                    className={cn(
+                      'inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition disabled:opacity-40',
+                      visibility === 'SHARED' || hasPeople
+                        ? 'bg-teal-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-100',
+                    )}
+                  >
+                    <Users className="h-3.5 w-3.5" />
+                    {t('Shared', 'Compartido', 'Partilhado')}
+                  </button>
+                </div>
+                <p className="mt-2 text-[11px] leading-snug text-slate-500">
+                  {visibility === 'SHARED' || hasPeople
+                    ? t(
+                        'Shows under Shared. Invite below — access stays invite-only.',
+                        'Aparece en Compartidos. Invita abajo — el acceso sigue siendo solo por invitación.',
+                        'Aparece em Partilhados. Convida abaixo — o acesso continua só por convite.',
+                      )
+                    : t(
+                        'Private under Only me. Switch to Shared to move legacy boards into Shared.',
+                        'Privado en Solo yo. Cambia a Compartido para mover tableros antiguos a Compartidos.',
+                        'Privado em Só eu. Muda para Partilhado para mover quadros antigos para Partilhados.',
+                      )}
+                </p>
+              </div>
+
               <div className="flex flex-wrap gap-2">
                 <select
                   value={pickUserId}
