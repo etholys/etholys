@@ -2,7 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, BookOpen, Loader2, MapPinned, Maximize2, Pencil, Radio, Search, Settings2, Sprout } from 'lucide-react';
+import {
+  ArrowLeft,
+  BookOpen,
+  Layers,
+  List,
+  Loader2,
+  MapPinned,
+  Maximize2,
+  Pencil,
+  Plus,
+  Radio,
+  Search,
+  Settings2,
+  Sprout,
+} from 'lucide-react';
 import { RADAR_MODULES, type RadarModuleId } from '@/lib/etholys-products';
 import { isRadarModuleId, spaceKindMeta } from '@/lib/radar/space';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
@@ -118,7 +132,8 @@ export function RadarPropertyWorkspace({
   const [openLot, setOpenLot] = useState<{ code: string; currentStage: TraceStage } | null>(null);
   const [view, setView] = useState<'2d' | '3d'>('2d');
   const [query, setQuery] = useState('');
-  const [railOpen, setRailOpen] = useState(true);
+  /** Closed by default so the map stays clear (Maps-like). */
+  const [railOpen, setRailOpen] = useState(false);
   const [layout, setLayout] = useState<RadarSiteLayoutDoc>(emptyRadarLayout());
   const [editMode, setEditMode] = useState<SpaceEditMode>('none');
   /** Full focus sheet — closed by default so the map stays clear. */
@@ -378,12 +393,16 @@ export function RadarPropertyWorkspace({
   };
   // Solid dark chrome over OSM — translucent glass fails on pale tiles.
   const chromePill =
-    'rounded-full bg-[#07111A] text-white shadow-lg ring-1 ring-white/25';
-  const actionBtn = (on: boolean) =>
-    `rounded-full px-3.5 py-2 text-sm font-semibold shadow-lg ring-1 ${
+    'rounded-2xl bg-[#07111A] text-white shadow-lg ring-1 ring-white/25';
+  const chipBtn = (on: boolean) =>
+    `inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold shadow-lg ring-1 ${
       on
         ? 'bg-teal-300 text-slate-950 ring-teal-200/80'
         : 'bg-[#07111A] text-white ring-white/25 hover:bg-[#12343c]'
+    }`;
+  const railBtn = (on: boolean) =>
+    `flex w-full flex-col items-center gap-0.5 rounded-xl px-1 py-2 ${
+      on ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:bg-white/10 hover:text-white'
     }`;
 
   const q = query.trim().toLowerCase();
@@ -522,121 +541,126 @@ export function RadarPropertyWorkspace({
       </div>
 
       <div className="pointer-events-none absolute inset-0 z-[1100]">
-        <aside className="pointer-events-auto absolute bottom-3 left-3 top-3 flex items-start gap-2">
-          <div className="flex w-12 flex-col items-center gap-1 rounded-2xl bg-[#07111A] py-2 shadow-xl ring-1 ring-white/25">
+        {/* Maps-like floating left rail + optional spaces panel */}
+        <aside className="pointer-events-auto absolute bottom-3 left-3 top-3 flex items-stretch gap-2">
+          <div className="flex w-[3.25rem] flex-col items-center gap-1 rounded-2xl bg-[#07111A] px-1 py-2 shadow-xl ring-1 ring-white/25">
             <Link
               href={backHref}
               title={radarT(loc, 'Lugares', 'Lugares', 'Places')}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-white/85 hover:bg-white/10 hover:text-white"
+              className={railBtn(false)}
             >
               <ArrowLeft className="h-4 w-4" />
+              <span className="text-[8px] font-semibold uppercase leading-tight tracking-wide">
+                {radarT(loc, 'Voltar', 'Volver', 'Back')}
+              </span>
             </Link>
             <button
               type="button"
               onClick={() => setRailOpen((v) => !v)}
-              className={`flex h-10 w-10 flex-col items-center justify-center rounded-xl ${
-                railOpen ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:bg-white/10'
-              }`}
+              className={railBtn(railOpen)}
               title={radarT(loc, 'Lista de espaços', 'Lista de espacios', 'Spaces list')}
               aria-label={radarT(loc, 'Lista de espaços', 'Lista de espacios', 'Spaces list')}
+              aria-pressed={railOpen}
             >
-              <span className="text-[11px] font-bold leading-none">{data.units.length}</span>
-              <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wide opacity-80">
-                {radarT(loc, 'lista', 'lista', 'list')}
+              <List className="h-4 w-4" />
+              <span className="text-[8px] font-semibold uppercase leading-tight tracking-wide">
+                {data.units.length}
               </span>
             </button>
+            <Link
+              href={cadernoHref}
+              title={radarT(loc, 'Caderno', 'Cuaderno', 'Notebook')}
+              className={railBtn(false)}
+            >
+              <BookOpen className="h-4 w-4" />
+              <span className="text-[8px] font-semibold uppercase leading-tight tracking-wide">
+                {radarT(loc, 'Caderno', 'Cuaderno', 'Note')}
+              </span>
+            </Link>
+            <div className="mt-auto flex w-full flex-col items-center gap-1 border-t border-white/10 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  openStep('characterize');
+                  setEditMode('none');
+                }}
+                className={railBtn(panel === 'characterize')}
+                title={radarT(loc, 'Definições do lugar', 'Ajustes del lugar', 'Place settings')}
+              >
+                <Settings2 className="h-4 w-4" />
+                <span className="text-[8px] font-semibold uppercase leading-tight tracking-wide">
+                  {radarT(loc, 'Ajustes', 'Ajustes', 'Set')}
+                </span>
+              </button>
+            </div>
           </div>
           {railOpen && (
-            <div className="max-h-full w-[min(16rem,calc(100vw-5rem))] overflow-y-auto rounded-2xl bg-[#07111A] p-1 shadow-xl ring-1 ring-white/25">
-              <p className="truncate px-3 pb-1 pt-2 text-sm font-semibold text-white">{data.name}</p>
-              {data.clientName && <p className="truncate px-3 pb-1 text-[11px] text-white/70">{data.clientName}</p>}
-              <RadarSpaceTree
-                locale={loc}
-                moduleId={data.moduleId}
-                propertyName={data.name}
-                units={treeUnits}
-                sensors={data.sensors}
-                focusedId={focusedId}
-                onFocus={(id) => focusUnit(id)}
-              />
+            <div className="flex max-h-full w-[min(16rem,calc(100vw-5rem))] flex-col overflow-hidden rounded-2xl bg-[#07111A] shadow-xl ring-1 ring-white/25">
+              <div className="shrink-0 border-b border-white/10 px-3 pb-2 pt-3">
+                <p className="truncate text-sm font-semibold text-white">{data.name}</p>
+                {data.clientName && (
+                  <p className="truncate text-[11px] text-white/55">{data.clientName}</p>
+                )}
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-1">
+                <RadarSpaceTree
+                  locale={loc}
+                  moduleId={data.moduleId}
+                  propertyName={data.name}
+                  units={treeUnits}
+                  sensors={data.sensors}
+                  focusedId={focusedId}
+                  onFocus={(id) => focusUnit(id)}
+                />
+              </div>
             </div>
           )}
         </aside>
 
+        {/* Search pill + filter chips (top), clear of the left rail */}
         <div
           className={`pointer-events-auto absolute right-3 top-3 flex flex-col items-stretch gap-2 ${
-            railOpen ? 'left-[19.5rem]' : 'left-16'
+            railOpen ? 'left-[20.5rem]' : 'left-[4.5rem]'
           }`}
         >
           <div className="flex flex-wrap items-center gap-2">
-          <label className={`flex min-w-[12rem] flex-1 items-center gap-2 px-4 py-2.5 ${chromePill}`}>
-            <Search className="h-4 w-4 shrink-0 text-teal-200" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={radarT(loc, 'Buscar espaço', 'Buscar espacio', 'Search spaces')}
-              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/70"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => {
-              setTool(tool === 'space' ? null : 'space');
-              setPanel(null);
-            }}
-            className={actionBtn(tool === 'space')}
-          >
-            {radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
-          </button>
-          {data.moduleId === 'agriculture' && (
+            <label className={`flex min-w-[11rem] max-w-md flex-1 items-center gap-2 px-4 py-2.5 ${chromePill}`}>
+              <Search className="h-4 w-4 shrink-0 text-teal-200" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={radarT(loc, 'Buscar espaço', 'Buscar espacio', 'Search spaces')}
+                className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/55"
+              />
+            </label>
             <button
               type="button"
               onClick={() => {
-                setTool(tool === 'crops' ? null : 'crops');
+                setTool(tool === 'space' ? null : 'space');
                 setPanel(null);
               }}
-              className={actionBtn(tool === 'crops')}
+              className={chipBtn(tool === 'space')}
             >
-              {radarT(loc, 'Cultivos', 'Cultivos', 'Crops')}
+              <Plus className="h-3.5 w-3.5" />
+              {radarT(loc, 'Espaço', 'Espacio', 'Space')}
             </button>
-          )}
-          <button type="button" onClick={() => openStep('sensors')} className={actionBtn(panel === 'sensors')}>
-            {radarT(loc, 'Sensores', 'Sensores', 'Sensors')}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              openStep('characterize');
-              setEditMode('none');
-            }}
-            className={actionBtn(panel === 'characterize')}
-            title={radarT(loc, 'Definições do lugar', 'Ajustes del lugar', 'Place settings')}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              <Settings2 className="h-3.5 w-3.5" />
-              {radarT(loc, 'Definições', 'Ajustes', 'Settings')}
-            </span>
-          </button>
-          <div className={`flex p-1 ${chromePill}`}>
-            <button
-              type="button"
-              onClick={() => setView('2d')}
-              className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                view === '2d' ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:text-white'
-              }`}
-            >
-              2D
+            {data.moduleId === 'agriculture' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTool(tool === 'crops' ? null : 'crops');
+                  setPanel(null);
+                }}
+                className={chipBtn(tool === 'crops')}
+              >
+                <Sprout className="h-3.5 w-3.5" />
+                {radarT(loc, 'Cultivos', 'Cultivos', 'Crops')}
+              </button>
+            )}
+            <button type="button" onClick={() => openStep('sensors')} className={chipBtn(panel === 'sensors')}>
+              <Radio className="h-3.5 w-3.5" />
+              {radarT(loc, 'Sensores', 'Sensores', 'Sensors')}
             </button>
-            <button
-              type="button"
-              onClick={() => setView('3d')}
-              className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                view === '3d' ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:text-white'
-              }`}
-            >
-              3D
-            </button>
-          </div>
           </div>
           {view === '3d' && editMode !== 'none' && (
             <p className="max-w-xl self-start rounded-full bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-950 shadow-lg">
@@ -654,12 +678,12 @@ export function RadarPropertyWorkspace({
             </p>
           )}
           {next && (
-            <div className="flex max-w-xl items-center justify-between gap-3 self-start rounded-full bg-amber-50 px-4 py-2 text-amber-950 shadow-lg">
-              <p className="truncate text-sm font-semibold">{nextLabel[next.id]}</p>
+            <div className="flex max-w-md items-center justify-between gap-3 self-start rounded-full bg-amber-50 px-3.5 py-1.5 text-amber-950 shadow-lg">
+              <p className="truncate text-xs font-semibold sm:text-sm">{nextLabel[next.id]}</p>
               <button
                 type="button"
                 onClick={() => openStep(next.id)}
-                className="shrink-0 rounded-full bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white"
+                className="shrink-0 rounded-full bg-slate-950 px-3 py-1 text-[11px] font-semibold text-white"
               >
                 {panel === next.id || (next.id === 'draw' && tool === 'space')
                   ? radarT(loc, 'Fechar', 'Cerrar', 'Close')
@@ -676,6 +700,40 @@ export function RadarPropertyWorkspace({
             </Link>
           )}
         </div>
+
+        {/* Bottom-right: map type / layers (2D · 3D) — hide when a right sheet is open */}
+        {!cardOpen && !detailOpen && (
+          <div className="pointer-events-auto absolute bottom-4 right-3 z-20 flex flex-col items-end gap-2">
+            <div className="overflow-hidden rounded-2xl bg-[#07111A] shadow-xl ring-1 ring-white/25">
+              <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
+                <Layers className="h-3.5 w-3.5 text-teal-200" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">
+                  {radarT(loc, 'Camadas', 'Capas', 'Layers')}
+                </span>
+              </div>
+              <div className="flex p-1">
+                <button
+                  type="button"
+                  onClick={() => setView('2d')}
+                  className={`rounded-xl px-3.5 py-2 text-sm font-semibold ${
+                    view === '2d' ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:bg-white/10'
+                  }`}
+                >
+                  2D
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView('3d')}
+                  className={`rounded-xl px-3.5 py-2 text-sm font-semibold ${
+                    view === '3d' ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:bg-white/10'
+                  }`}
+                >
+                  3D
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {cardOpen && (
           <div className="pointer-events-auto absolute bottom-4 right-4 top-28 z-20 w-[min(28rem,calc(100%-5.5rem))] overflow-y-auto rounded-2xl border border-white/20 bg-[#07111A] px-4 py-4 shadow-2xl">
@@ -1406,8 +1464,8 @@ export function RadarPropertyWorkspace({
           </div>
         )}
 
-        {!cardOpen && !focusedId && data.units.length > 0 && (
-          <p className="pointer-events-none absolute bottom-5 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#07111A]/85 px-4 py-2 text-xs text-white/70 shadow-lg ring-1 ring-white/15">
+        {!cardOpen && !detailOpen && !focusedId && data.units.length > 0 && (
+          <p className="pointer-events-none absolute bottom-5 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#07111A]/90 px-4 py-2 text-xs text-white/70 shadow-lg ring-1 ring-white/15">
             {radarT(
               loc,
               'Clica num espaço no mapa ou abre a lista à esquerda',

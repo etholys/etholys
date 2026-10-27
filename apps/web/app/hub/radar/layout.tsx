@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useMemo, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { ProductAppShell } from '@/components/etholys/ProductAppShell';
 import { useApp } from '@/app/providers';
 import {
@@ -12,12 +13,15 @@ import { RadarCreatePanel } from '@/components/radar/RadarCreatePanel';
 import { RadarOpsBar } from '@/components/radar/RadarOpsBar';
 
 function RadarShellInner({ children }: { children: ReactNode }) {
+  const pathname = usePathname() || '';
   const { locale, activeCompanyId } = useApp();
   const { companyId, engagementId, scope } = useRadarClientScope();
   const es = locale === 'es';
   const en = locale === 'en';
   const loc = es || en ? locale : 'pt';
   const cid = companyId || activeCompanyId || '';
+  /** Property map is Maps-like: icon rail + edge-to-edge canvas. */
+  const onPropertyMap = pathname.includes('/radar/properties/');
 
   const qs = useMemo(() => {
     const q = new URLSearchParams();
@@ -99,6 +103,8 @@ function RadarShellInner({ children }: { children: ReactNode }) {
       nav={nav}
       resolveNavHref={resolveNavHref}
       sidebarAfterCompany={<RadarClientPicker />}
+      defaultCollapsed={onPropertyMap}
+      canvasBleed={onPropertyMap}
     >
       <RadarOpsBar locale={loc} companyId={cid} engagementId={engagementId} tarefasHref={`/hub/radar/tarefas${qs}`} />
       <RadarCreatePanel locale={loc} />

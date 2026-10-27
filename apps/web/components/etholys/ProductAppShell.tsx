@@ -51,6 +51,8 @@ export function ProductAppShell({
   children,
   sidebarAfterCompany,
   resolveNavHref,
+  defaultCollapsed = false,
+  canvasBleed = false,
 }: {
   product: EtholysProductId;
   accent: SystemAccent;
@@ -59,6 +61,10 @@ export function ProductAppShell({
   /** Conteúdo extra sob o seletor global de empresa (ex.: negócio atendido AURORA). */
   sidebarAfterCompany?: ReactNode;
   resolveNavHref?: (item: Nav) => string;
+  /** Start with icon rail (Maps-like) — e.g. RADAR property map. */
+  defaultCollapsed?: boolean;
+  /** Edge-to-edge main: no padding / max-width (map surfaces). */
+  canvasBleed?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -71,8 +77,12 @@ export function ProductAppShell({
   const companyId = ensuredId || (activeCompanyId ? String(activeCompanyId) : '');
   const hydrated = useRef(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const Icon = PRODUCT_ICON[product];
+
+  useEffect(() => {
+    setCollapsed(defaultCollapsed);
+  }, [defaultCollapsed]);
 
   const cycleLocale = () => {
     const next: Locale = locale === 'es' ? 'pt' : locale === 'pt' ? 'en' : 'es';
@@ -291,8 +301,15 @@ export function ProductAppShell({
             <span className={sysTheme.brand}>{meta.name}</span>
           </div>
 
-          <main className="sys-canvas min-w-0 flex-1 overflow-auto p-4 md:p-6">
-            <div className="mx-auto max-w-6xl">{children}</div>
+          <main
+            className={cn(
+              'sys-canvas min-w-0 flex-1',
+              canvasBleed ? 'overflow-hidden p-0' : 'overflow-auto p-4 md:p-6',
+            )}
+          >
+            <div className={cn(canvasBleed ? 'h-full min-h-0 w-full' : 'mx-auto max-w-6xl')}>
+              {children}
+            </div>
           </main>
         </div>
       </div>
