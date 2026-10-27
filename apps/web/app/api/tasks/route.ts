@@ -260,6 +260,12 @@ export async function POST(req: Request) {
       if (!folderAccess || !canEditFolderContent(folderAccess.access)) {
         return NextResponse.json({ error: 'Carpeta no encontrada' }, { status: 404 });
       }
+      if (folderAccess.folder.kind === 'FOLDER') {
+        return NextResponse.json(
+          { error: 'Las tareas van en tableros, no en carpetas' },
+          { status: 400 },
+        );
+      }
     }
     if (taskData.dueDate) taskData.dueDate = new Date(String(taskData.dueDate));
     if (taskData.startDate) taskData.startDate = new Date(String(taskData.startDate));

@@ -47,6 +47,8 @@ type FolderWithMembers = {
   ownerId: string;
   visibility: string;
   isActive: boolean;
+  kind: string;
+  parentId: string | null;
   members: { userId: string; role: string }[];
 };
 
@@ -59,9 +61,16 @@ export async function loadWorkFolder(folderId: string): Promise<FolderWithMember
       ownerId: true,
       visibility: true,
       isActive: true,
+      kind: true,
+      parentId: true,
       members: { select: { userId: true, role: true } },
     },
   });
+}
+
+/** Only BOARD nodes hold tasks. */
+export function isWorkBoard(kind: string | null | undefined): boolean {
+  return kind !== 'FOLDER';
 }
 
 /** Drive-like: owner or explicit member only (SHARED is not company-wide). */

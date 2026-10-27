@@ -46,7 +46,9 @@ export async function PUT(req: Request, { params }: { params: { folderId: string
       body.name !== undefined ||
       body.color !== undefined ||
       body.order !== undefined ||
-      body.visibility !== undefined;
+      body.visibility !== undefined ||
+      body.parentId !== undefined ||
+      body.kind !== undefined;
     const wantsMembers = Array.isArray(body.members) || Array.isArray(body.memberIds);
 
     if (wantsMeta && !canManageFolder(access.access)) {
@@ -61,6 +63,59 @@ export async function PUT(req: Request, { params }: { params: { folderId: string
     if (body.order !== undefined) data.order = parseInt(String(body.order), 10) || 0;
     if (body.visibility === 'PERSONAL' || body.visibility === 'SHARED') {
       data.visibility = body.visibility;
+    }
+
+    if (body.parentId !== undefined) {
+      const nextParent = body.parentId ? String(body.parentId) : null;
+      if (nextParent === params.folderId) {
+        return NextResponse.json({ error: 'Carpeta inválida' }, { status: 400 });
+      }
+      if (nextParent) {
+        // Prevent cycles: walk ancestors
+        let walk: string | null = nextParent;
+        const seen = new Set<string>([params.folderId]);
+        while (walk) {
+          if (seen.has(walk)) {
+            return NextResponse.json({ error: 'Ciclo de carpetas' }, { status: 400 });
+          }
+          seen.add(walk);
+          const row = await prisma.workFolder.findFirst({
+            where: { id: walk, isActive: true },
+            select: { parentId: true, kind: true, companyId: true },
+          });
+          if (!row || row.companyId !== access.folder.companyId) {
+            return NextResponse.json({ error: 'Carpeta padre no encontrada' }, { status: 404 });
+          }
+          if (row.kind === 'BOARD') {
+            return NextResponse.json(
+              { error: 'No se puede anidar dentro de un tablero' },
+              { status: 400 },
+            );
+          }
+          walk = row.parentId;
+        }
+        const parentAccess = await getFolderAccess(nextParent, tenant.userId, tenant.companyIds);
+        if (!parentAccess) {
+          return NextResponse.json({ error: 'Carpeta padre no encontrada' }, { status: 404 });
+        }
+      }
+      data.parentId = nextParent;
+    }
+
+    // Promote/demote only when empty of the wrong shape (boards with tasks stay boards).
+    if (body.kind === 'FOLDER' || body.kind === 'BOARD') {
+      if (body.kind === 'FOLDER') {
+        const taskCount = await prisma.task.count({
+          where: { folderId: params.folderId, isActive: true },
+        });
+        if (taskCount > 0) {
+          return NextResponse.json(
+            { error: 'Mueve o archiva las tareas antes de convertir el tablero en carpeta' },
+            { status: 400 },
+          );
+        }
+      }
+      data.kind = body.kind;
     }
 
     if (wantsMembers) {
@@ -139,9 +194,26 @@ export async function DELETE(_req: Request, { params }: { params: { folderId: st
       return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
     }
 
+    // Soft-delete node + descendants (unlimited nesting).
+    const toDisable = new Set<string>([params.folderId]);
+    let frontier = [params.folderId];
+    while (frontier.length) {
+      const kids = await prisma.workFolder.findMany({
+        where: { parentId: { in: frontier }, isActive: true },
+        select: { id: true },
+      });
+      frontier = [];
+      for (const k of kids) {
+        if (!toDisable.has(k.id)) {
+          toDisable.add(k.id);
+          frontier.push(k.id);
+        }
+      }
+    }
+    const ids = [...toDisable];
     await prisma.$transaction([
-      prisma.task.updateMany({ where: { folderId: params.folderId }, data: { folderId: null } }),
-      prisma.workFolder.update({ where: { id: params.folderId }, data: { isActive: false } }),
+      prisma.task.updateMany({ where: { folderId: { in: ids } }, data: { folderId: null } }),
+      prisma.workFolder.updateMany({ where: { id: { in: ids } }, data: { isActive: false } }),
     ]);
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

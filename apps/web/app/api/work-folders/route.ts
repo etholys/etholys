@@ -42,43 +42,69 @@ export async function POST(req: Request) {
     const companyId = String(body.companyId || '');
     const name = String(body.name || '').trim();
     const visibility = body.visibility === 'SHARED' ? 'SHARED' : 'PERSONAL';
+    const kind = body.kind === 'FOLDER' ? 'FOLDER' : 'BOARD';
+    const parentId = body.parentId ? String(body.parentId) : null;
     if (!companyId || !tenant.companyIds.includes(companyId)) {
       return NextResponse.json({ error: 'companyId inválido' }, { status: 400 });
     }
     if (!name) return NextResponse.json({ error: 'Nombre requerido' }, { status: 400 });
 
+    if (parentId) {
+      const parent = await prisma.workFolder.findFirst({
+        where: { id: parentId, ...accessibleFoldersWhere(tenant.userId, companyId) },
+        select: { id: true, kind: true },
+      });
+      // Nest only under folders (containers). Boards stay leaves.
+      if (!parent) {
+        return NextResponse.json({ error: 'Carpeta padre no encontrada' }, { status: 404 });
+      }
+      if (parent.kind === 'BOARD') {
+        return NextResponse.json(
+          { error: 'No se puede anidar dentro de un tablero — usa una carpeta' },
+          { status: 400 },
+        );
+      }
+    }
+
     const max = await prisma.workFolder.aggregate({
-      where: { companyId, ownerId: tenant.userId, isActive: true },
+      where: {
+        companyId,
+        ownerId: tenant.userId,
+        isActive: true,
+        parentId: parentId ?? null,
+      },
       _max: { order: true },
     });
 
     type MemberIn = { userId: string; role: string };
     let membersCreate: MemberIn[] = [];
-    if (Array.isArray(body.members)) {
-      membersCreate = body.members
-        .map((m: { userId?: string; role?: string }) => ({
-          userId: String(m?.userId || ''),
-          role: parseWorkFolderRole(m?.role, 'viewer') === 'editor' ? 'editor' : 'viewer',
-        }))
-        .filter((m: MemberIn) => m.userId && m.userId !== tenant.userId);
-    } else if (Array.isArray(body.memberIds)) {
-      membersCreate = body.memberIds
-        .map(String)
-        .filter((id: string) => id && id !== tenant.userId)
-        .map((userId: string) => ({ userId, role: 'viewer' }));
-    }
+    if (kind === 'BOARD') {
+      if (Array.isArray(body.members)) {
+        membersCreate = body.members
+          .map((m: { userId?: string; role?: string }) => ({
+            userId: String(m?.userId || ''),
+            role: parseWorkFolderRole(m?.role, 'viewer') === 'editor' ? 'editor' : 'viewer',
+          }))
+          .filter((m: MemberIn) => m.userId && m.userId !== tenant.userId);
+      } else if (Array.isArray(body.memberIds)) {
+        membersCreate = body.memberIds
+          .map(String)
+          .filter((id: string) => id && id !== tenant.userId)
+          .map((userId: string) => ({ userId, role: 'viewer' }));
+      }
 
-    // Validate invitees are company members
-    if (membersCreate.length) {
-      const ok = await prisma.companyUser.findMany({
-        where: {
-          companyId,
-          userId: { in: membersCreate.map((m) => m.userId) },
-        },
-        select: { userId: true },
-      });
-      const okSet = new Set(ok.map((r) => r.userId));
-      membersCreate = membersCreate.filter((m) => okSet.has(m.userId));
+      // Validate invitees are company members
+      if (membersCreate.length) {
+        const ok = await prisma.companyUser.findMany({
+          where: {
+            companyId,
+            userId: { in: membersCreate.map((m) => m.userId) },
+          },
+          select: { userId: true },
+        });
+        const okSet = new Set(ok.map((r) => r.userId));
+        membersCreate = membersCreate.filter((m) => okSet.has(m.userId));
+      }
     }
 
     const folder = await prisma.workFolder.create({
@@ -86,12 +112,15 @@ export async function POST(req: Request) {
         companyId,
         name,
         color: body.color ? String(body.color) : null,
-        visibility,
+        kind,
+        parentId,
+        visibility: kind === 'FOLDER' ? 'PERSONAL' : visibility,
         ownerId: tenant.userId,
         order: (max._max.order ?? -1) + 1,
-        members: membersCreate.length
-          ? { create: membersCreate.map((m) => ({ userId: m.userId, role: m.role })) }
-          : undefined,
+        members:
+          kind === 'BOARD' && membersCreate.length
+            ? { create: membersCreate.map((m) => ({ userId: m.userId, role: m.role })) }
+            : undefined,
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },

@@ -96,15 +96,21 @@ Relatórios de campo / quilometragem / informes doador → **SIEP-only** (não W
 
 `Task` em `prisma/schema.prisma`: `projectId?`, `companyId?`, `folderId?`, `assigneeId`, `parentId` (subtarefas), `tags`, `status`, `priority`, dates, recurring, checklist, comments, timeEntries, dependencies.
 
-### Pastas (`WorkFolder`) — ACL Drive-like
+### Pastas e tableros (`WorkFolder`) — árvore + ACL Drive-like
+
+| Campo | Significado |
+|-------|-------------|
+| `kind` | `FOLDER` = contentor (aninhável); `BOARD` = folha com tarefas (legado = BOARD) |
+| `parentId` | Aninhamento ilimitado; só se aninha sob `FOLDER` |
+| `visibility` | `PERSONAL` \| `SHARED` no **tablero** (partilha); pastas usam o mesmo ACL |
 
 | Regra | Comportamento |
 |-------|----------------|
-| Visibilidade | `PERSONAL` ou `SHARED` (rótulo); **acesso = owner ∪ `WorkFolderMember`** |
-| Breaking change F10 | `SHARED` **já não** é company-wide; owners devem convidar |
+| Visibilidade | `PERSONAL` ou `SHARED`; **acesso = owner ∪ `WorkFolderMember`** (não company-wide) |
 | Roles | `viewer` (legado `member`), `editor`, `owner` |
-| Leitura de tarefas | GET lista oculta tarefas em pastas sem acesso |
-| Escrita | Assign a pasta exige `editor+` |
+| Tarefas | Só em `BOARD`; pastas organizam a árvore na sidebar |
+| Dashboard | `WorkDashboardLayout` por `userId` + `companyId` — cada utilizador escolhe tableros na síntese |
+| Filtros org. | Setores / projetos SIEP / Operaciones = **filtros**, não tableros |
 
 Lib: `apps/web/lib/work/folder-access.ts` + `folder-share.ts` (espelho Studio: convite por email, magic link, `external_guest` só vê o tablero).
 

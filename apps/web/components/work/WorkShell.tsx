@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/app/providers';
 import { cn } from '@/lib/utils';
 import TasksBoard from './TasksBoard';
-import { WorkMobileBar, WorkSidebar, type WorkNav } from './WorkSidebar';
+import { WorkMobileBar, WorkSidebar, type WorkCreateFolderInput, type WorkNav } from './WorkSidebar';
 import { WorkDashboard } from './WorkDashboard';
 import { WorkArchive } from './WorkArchive';
 import { WorkGantt } from './WorkGantt';
@@ -137,6 +137,8 @@ export default function WorkShell() {
   const [loadingDash, setLoadingDash] = useState(true);
   const [loadingArchive, setLoadingArchive] = useState(false);
   const [shareFolder, setShareFolder] = useState<{ id: string; name: string } | null>(null);
+  const [dashBoardIds, setDashBoardIds] = useState<string[]>([]);
+  const [dashPersonalized, setDashPersonalized] = useState(false);
   const [query, setQuery] = useState('');
   const [statusChip, setStatusChip] = useState('');
   const [priorityChip, setPriorityChip] = useState('');
@@ -195,6 +197,37 @@ export default function WorkShell() {
       .catch(() => setFolders([]));
   };
 
+  const fetchDashboardLayout = () => {
+    if (!activeCompanyId) {
+      setDashBoardIds([]);
+      setDashPersonalized(false);
+      return;
+    }
+    fetch(`/api/work-dashboard?companyId=${encodeURIComponent(activeCompanyId)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setDashBoardIds(Array.isArray(data?.layout?.boardIds) ? data.layout.boardIds : []);
+        setDashPersonalized(Boolean(data?.personalized));
+      })
+      .catch(() => {
+        setDashBoardIds([]);
+        setDashPersonalized(false);
+      });
+  };
+
+  const saveDashboardBoardIds = async (ids: string[]) => {
+    if (!activeCompanyId) return;
+    const res = await fetch('/api/work-dashboard', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId: activeCompanyId, boardIds: ids }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return;
+    setDashBoardIds(Array.isArray(data?.layout?.boardIds) ? data.layout.boardIds : ids);
+    setDashPersonalized(true);
+  };
+
   useEffect(() => {
     fetchAllTasks();
     fetchArchivedTasks({ silent: true });
@@ -222,6 +255,7 @@ export default function WorkShell() {
       .then((data) => setUsers(data?.users ?? []))
       .catch(() => {});
     fetchFolders();
+    fetchDashboardLayout();
   }, [activeCompanyId]);
 
   useEffect(() => {
@@ -397,7 +431,7 @@ export default function WorkShell() {
   }, [tasks, archivedTasks, currentUserId]);
 
   const contextTitle = (() => {
-    if (nav.kind === 'dashboard') return t3('Dashboard', 'Panel', 'Painel');
+    if (nav.kind === 'dashboard') return t3('My home', 'Mi inicio', 'O meu início');
     if (nav.kind === 'all') {
       return t3('All shared', 'Todo lo compartido', 'Tudo partilhado');
     }
@@ -416,10 +450,15 @@ export default function WorkShell() {
 
   const activeFolder =
     nav.kind === 'folder' ? folders.find((f: { id: string }) => f.id === nav.id) ?? null : null;
+  const activeIsContainerFolder = !!activeFolder && activeFolder.kind === 'FOLDER';
   const canManageActiveFolderShare =
-    !!activeFolder && !!currentUserId && activeFolder.ownerId === currentUserId;
+    !!activeFolder &&
+    !activeIsContainerFolder &&
+    !!currentUserId &&
+    activeFolder.ownerId === currentUserId;
   const activeFolderIsShared =
     !!activeFolder &&
+    !activeIsContainerFolder &&
     (activeFolder.visibility === 'SHARED' ||
       (activeFolder.members?.length ?? activeFolder._count?.members ?? 0) > 0);
 
@@ -445,6 +484,13 @@ export default function WorkShell() {
       );
     }
     if (nav.kind === 'folder') {
+      if (activeIsContainerFolder) {
+        return t3(
+          'Folder — open a board inside, or create a subfolder / board from the sidebar',
+          'Carpeta — abre un tablero dentro, o crea subcarpeta / tablero en la barra',
+          'Pasta — abre um tablero dentro, ou cria subpasta / tablero na barra',
+        );
+      }
       if (activeFolderIsShared) {
         return t3(
           'Shared board — manage who can access it',
@@ -468,8 +514,9 @@ export default function WorkShell() {
     return null;
   })();
 
-  const createFolder = async (input: { name: string; visibility: 'PERSONAL' | 'SHARED'; color?: string }) => {
+  const createFolder = async (input: WorkCreateFolderInput) => {
     if (!activeCompanyId) return;
+    const kind = input.kind === 'FOLDER' ? 'FOLDER' : 'BOARD';
     const res = await fetch('/api/work-folders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -478,17 +525,20 @@ export default function WorkShell() {
         name: input.name,
         visibility: input.visibility,
         color: input.color,
+        kind,
+        parentId: input.parentId || null,
       }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return;
     fetchFolders();
+    fetchDashboardLayout();
     if (data.folder?.id) {
       const next: WorkNav = { kind: 'folder', id: data.folder.id, name: data.folder.name };
       setNav(next);
       setBoardView('table');
       syncUrl(next, 'table');
-      if (input.visibility === 'SHARED') {
+      if (kind === 'BOARD' && input.visibility === 'SHARED') {
         setShareFolder({ id: data.folder.id, name: data.folder.name });
       }
     }
@@ -504,7 +554,7 @@ export default function WorkShell() {
     if (dueDate) body.dueDate = dueDate;
     if (nav.kind === 'project') body.projectId = nav.id;
     if (nav.kind === 'department') body.departmentId = nav.id;
-    if (nav.kind === 'folder') body.folderId = nav.id;
+    if (nav.kind === 'folder' && !activeIsContainerFolder) body.folderId = nav.id;
     if (nav.kind === 'company') {
       /* company ops = no project */
     }
@@ -641,7 +691,7 @@ export default function WorkShell() {
                   </span>
                 </button>
               )}
-              {nav.kind !== 'dashboard' && nav.kind !== 'archive' && (
+              {nav.kind !== 'dashboard' && nav.kind !== 'archive' && !activeIsContainerFolder && (
                 <div className="flex max-w-full flex-wrap rounded-lg bg-[color:var(--sys-panel-soft)] p-0.5">
                   {viewBtn('table', <ListTree className="h-4 w-4" />, t3('Board', 'Tablero', 'Quadro'), 'Board')}
                   {viewBtn('list', <List className="h-4 w-4" />, t3('List', 'Lista', 'Lista'), 'List')}
@@ -654,7 +704,7 @@ export default function WorkShell() {
             </div>
           </div>
 
-          {nav.kind !== 'dashboard' && nav.kind !== 'archive' && (
+          {nav.kind !== 'dashboard' && nav.kind !== 'archive' && !activeIsContainerFolder && (
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <WorkQuickAdd
                 className="min-w-0 flex-1"
@@ -725,12 +775,63 @@ export default function WorkShell() {
               ) : (
                 <WorkDashboard
                   tasks={tasks}
+                  folders={folders}
+                  selectedBoardIds={dashBoardIds}
+                  personalized={dashPersonalized}
+                  onSaveBoardIds={saveDashboardBoardIds}
                   currentUserId={currentUserId}
                   onOpenTask={setSelectedId}
                   onNav={changeNav}
                   t={t3}
                 />
               )
+            ) : activeIsContainerFolder ? (
+              <div className="space-y-4 p-4 sm:p-6">
+                <p className="text-sm text-[color:var(--sys-muted)]">
+                  {t3(
+                    'This is a folder. Boards with tasks are listed below — create more from the sidebar (+).',
+                    'Esto es una carpeta. Los tableros con tareas están abajo — crea más desde la barra (+).',
+                    'Isto é uma pasta. Os tableros com tarefas estão abaixo — cria mais na barra (+).',
+                  )}
+                </p>
+                <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {folders
+                    .filter(
+                      (f: { parentId?: string | null; kind?: string }) =>
+                        f.parentId === activeFolder?.id && f.kind !== 'FOLDER',
+                    )
+                    .map((f: { id: string; name: string; color?: string | null; _count?: { tasks?: number } }) => (
+                      <li key={f.id}>
+                        <button
+                          type="button"
+                          onClick={() => changeNav({ kind: 'folder', id: f.id, name: f.name })}
+                          className="flex w-full items-center justify-between rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] px-3 py-3 text-left hover:border-teal-300 hover:bg-teal-50/40"
+                        >
+                          <span className="truncate text-sm font-semibold text-[color:var(--sys-ink)]">{f.name}</span>
+                          <span className="text-xs tabular-nums text-[color:var(--sys-faint)]">
+                            {f._count?.tasks ?? 0}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  {folders
+                    .filter(
+                      (f: { parentId?: string | null; kind?: string }) =>
+                        f.parentId === activeFolder?.id && f.kind === 'FOLDER',
+                    )
+                    .map((f: { id: string; name: string }) => (
+                      <li key={f.id}>
+                        <button
+                          type="button"
+                          onClick={() => changeNav({ kind: 'folder', id: f.id, name: f.name })}
+                          className="flex w-full items-center gap-2 rounded-xl border border-dashed border-[color:var(--sys-line)] px-3 py-3 text-left text-sm text-[color:var(--sys-muted)] hover:border-teal-300"
+                        >
+                          {f.name}
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              </div>
             ) : nav.kind === 'archive' ? (
               <WorkArchive
                 tasks={(archivedTasks ?? []).filter((t: any) => !t.parentId)}

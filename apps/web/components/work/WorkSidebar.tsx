@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -10,10 +10,12 @@ import {
   CalendarRange,
   CheckSquare,
   ChevronDown,
+  ChevronRight,
   Folder,
   FolderKanban,
+  FolderPlus,
   LayoutDashboard,
-  Layers,
+  LayoutGrid,
   Lock,
   Menu,
   PanelLeftClose,
@@ -50,12 +52,63 @@ export type WorkFolderRow = {
   color?: string | null;
   visibility: string;
   ownerId: string;
+  kind?: string | null;
+  parentId?: string | null;
   members?: { userId: string }[];
   _count?: { tasks?: number; members?: number };
 };
 
+export type WorkCreateFolderInput = {
+  name: string;
+  visibility: 'PERSONAL' | 'SHARED';
+  color?: string;
+  kind?: 'FOLDER' | 'BOARD';
+  parentId?: string | null;
+};
+
 type Dept = { id: string; name: string };
 type Proj = { id: string; name: string; _count?: { tasks?: number } };
+
+type TreeNode = WorkFolderRow & { children: TreeNode[] };
+
+type ComposerTarget =
+  | { mode: 'folder'; parentId: string | null }
+  | { mode: 'board'; parentId: string | null; visibility: 'PERSONAL' | 'SHARED' };
+
+function isBoard(row: WorkFolderRow) {
+  return row.kind !== 'FOLDER';
+}
+
+function isSharedBoard(f: WorkFolderRow) {
+  return f.visibility === 'SHARED' || (f.members?.length ?? f._count?.members ?? 0) > 0;
+}
+
+function buildTree(folders: WorkFolderRow[]): TreeNode[] {
+  const byId = new Map<string, TreeNode>();
+  for (const f of folders) {
+    byId.set(f.id, { ...f, children: [] });
+  }
+  const roots: TreeNode[] = [];
+  for (const node of byId.values()) {
+    const pid = node.parentId || null;
+    if (pid && byId.has(pid)) {
+      byId.get(pid)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  const sortNodes = (nodes: TreeNode[]) => {
+    nodes.sort((a, b) => {
+      const ak = a.kind === 'FOLDER' ? 0 : 1;
+      const bk = b.kind === 'FOLDER' ? 0 : 1;
+      if (ak !== bk) return ak - bk;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+    for (const n of nodes) sortNodes(n.children);
+  };
+  sortNodes(roots);
+  return roots;
+}
 
 export function WorkSidebar({
   nav,
@@ -92,26 +145,45 @@ export function WorkSidebar({
     sharedOpen?: number;
     archived?: number;
   };
-  onCreateFolder: (input: { name: string; visibility: 'PERSONAL' | 'SHARED'; color?: string }) => Promise<void>;
+  onCreateFolder: (input: WorkCreateFolderInput) => Promise<void>;
   onShareFolder?: (folder: { id: string; name: string }) => void;
   t: (en: string, es: string, pt: string) => string;
 }) {
-  const [composerFor, setComposerFor] = useState<'SHARED' | 'PERSONAL' | null>(null);
+  const [composer, setComposer] = useState<ComposerTarget | null>(null);
   const [draft, setDraft] = useState('');
   const [color, setColor] = useState<string>(GROUP_COLORS[0]);
   const [creating, setCreating] = useState(false);
-  /** Org filters are not boards — keep collapsed so they don't look like a third board list. */
   const [orgOpen, setOrgOpen] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const composerRef = useRef<HTMLDivElement>(null);
 
+  const tree = useMemo(() => buildTree(folders), [folders]);
+
   useEffect(() => {
-    if (!composerFor) return;
+    // Auto-expand ancestors of the active board/folder.
+    if (nav.kind !== 'folder') return;
+    const path: string[] = [];
+    let cur: WorkFolderRow | undefined = folders.find((f) => f.id === nav.id);
+    while (cur?.parentId) {
+      path.push(cur.parentId);
+      cur = folders.find((f) => f.id === cur!.parentId);
+    }
+    if (!path.length) return;
+    setExpanded((prev) => {
+      const next = { ...prev };
+      for (const id of path) next[id] = true;
+      return next;
+    });
+  }, [nav, folders]);
+
+  useEffect(() => {
+    if (!composer) return;
     const onDoc = (e: MouseEvent) => {
-      if (!composerRef.current?.contains(e.target as Node)) setComposerFor(null);
+      if (!composerRef.current?.contains(e.target as Node)) setComposer(null);
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [composerFor]);
+  }, [composer]);
 
   const go = (n: WorkNav) => {
     onNav(n);
@@ -126,12 +198,14 @@ export function WorkSidebar({
     badge?: number,
     trailing?: ReactNode,
     badgeTone?: 'default' | 'danger',
+    indentPx?: number,
   ) => (
     <div
       className={cn(
         'group flex w-full items-center gap-0.5 rounded-lg transition',
         active ? 'bg-teal-500/15' : 'hover:bg-[color:var(--sys-nav-hover)]',
       )}
+      style={indentPx ? { paddingLeft: indentPx } : undefined}
     >
       <button
         type="button"
@@ -160,86 +234,65 @@ export function WorkSidebar({
     </div>
   );
 
-  const submitFolder = async () => {
+  const submitComposer = async () => {
     const name = draft.trim();
-    if (!name || creating || !composerFor) return;
+    if (!name || creating || !composer) return;
     setCreating(true);
     try {
-      await onCreateFolder({ name, visibility: composerFor, color });
+      if (composer.mode === 'folder') {
+        await onCreateFolder({
+          name,
+          visibility: 'PERSONAL',
+          color,
+          kind: 'FOLDER',
+          parentId: composer.parentId,
+        });
+      } else {
+        await onCreateFolder({
+          name,
+          visibility: composer.visibility,
+          color,
+          kind: 'BOARD',
+          parentId: composer.parentId,
+        });
+      }
       setDraft('');
-      setComposerFor(null);
+      setComposer(null);
+      if (composer.parentId) {
+        setExpanded((prev) => ({ ...prev, [composer.parentId!]: true }));
+      }
     } finally {
       setCreating(false);
     }
   };
 
-  const openComposer = (kind: 'SHARED' | 'PERSONAL') => {
+  const openComposer = (target: ComposerTarget) => {
     if (collapsed) onToggle();
-    setComposerFor(kind);
+    setComposer(target);
     setDraft('');
   };
 
-  const folderRow = (f: WorkFolderRow, shared: boolean) => {
-    const isOwner = f.ownerId === currentUserId;
-    const shareBtn =
-      isOwner && onShareFolder ? (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onShareFolder({ id: f.id, name: f.name });
-          }}
-          className={cn(
-            'mr-1 rounded-md p-1 transition hover:bg-teal-500/15 hover:text-teal-300',
-            shared || (nav.kind === 'folder' && nav.id === f.id)
-              ? 'text-teal-400/90'
-              : 'text-[color:var(--sys-faint)]',
-          )}
-          title={
-            shared
-              ? t('Manage access', 'Gestionar acceso', 'Gerir acesso')
-              : t('Share', 'Compartir', 'Partilhar')
-          }
-          aria-label={
-            shared
-              ? t('Manage access', 'Gestionar acceso', 'Gerir acesso')
-              : t('Share', 'Compartir', 'Partilhar')
-          }
-        >
-          <Share2 className="h-3.5 w-3.5" />
-        </button>
-      ) : null;
-    const icon = (
-      <span className="relative inline-flex">
-        <Folder className="h-4 w-4" style={{ color: f.color || '#0d9488' }} />
-        {shared ? (
-          <Users className="absolute -bottom-1 -right-1.5 h-2.5 w-2.5 rounded-full bg-white text-slate-500" />
-        ) : (
-          <Lock className="absolute -bottom-1 -right-1.5 h-2.5 w-2.5 rounded-full bg-white text-slate-400" />
-        )}
-      </span>
-    );
-    return item(
-      nav.kind === 'folder' && nav.id === f.id,
-      () => go({ kind: 'folder', id: f.id, name: f.name }),
-      icon,
-      f.name,
-      f._count?.tasks,
-      shareBtn,
-    );
-  };
-
-  const newBoardPopover = (kind: 'SHARED' | 'PERSONAL') =>
-    composerFor === kind && !collapsed ? (
+  const composerPopover = (match: ComposerTarget) => {
+    if (!composer) return null;
+    const same =
+      composer.mode === match.mode &&
+      composer.parentId === match.parentId &&
+      (composer.mode === 'folder' ||
+        match.mode === 'folder' ||
+        (composer.mode === 'board' && match.mode === 'board' && composer.visibility === match.visibility));
+    if (!same || collapsed) return null;
+    const title =
+      composer.mode === 'folder'
+        ? t('New folder', 'Nueva carpeta', 'Nova pasta')
+        : composer.visibility === 'SHARED'
+          ? t('New shared board', 'Nuevo tablero compartido', 'Novo quadro partilhado')
+          : t('New private board', 'Nuevo tablero solo mío', 'Novo quadro só meu');
+    return (
       <div
         ref={composerRef}
         className="absolute right-0 top-8 z-40 w-56 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-3 shadow-lg"
       >
-        <p className="mb-2 text-xs font-semibold text-[color:var(--sys-ink)]">
-          {kind === 'SHARED'
-            ? t('New shared board', 'Nuevo tablero compartido', 'Novo quadro partilhado')
-            : t('New private board', 'Nuevo tablero solo mío', 'Novo quadro só meu')}
-        </p>
+        <p className="mb-2 text-xs font-semibold text-[color:var(--sys-ink)]">{title}</p>
         <input
           autoFocus
           value={draft}
@@ -247,9 +300,9 @@ export function WorkSidebar({
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
-              void submitFolder();
+              void submitComposer();
             }
-            if (e.key === 'Escape') setComposerFor(null);
+            if (e.key === 'Escape') setComposer(null);
           }}
           placeholder={t('Name', 'Nombre', 'Nome')}
           className="mb-2 w-full rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-500"
@@ -266,55 +319,178 @@ export function WorkSidebar({
             />
           ))}
         </div>
-        <p className="mb-2 text-[10px] leading-snug text-[color:var(--sys-faint)]">
-          {kind === 'SHARED'
-            ? t(
-                'You can invite people after creating it',
-                'Podrás invitar personas después de crearlo',
-                'Podes convidar pessoas depois de o criares',
-              )
-            : t('Only you can see it', 'Solo tú lo ves', 'Só tu o vês')}
-        </p>
+        {composer.mode === 'board' && (
+          <p className="mb-2 text-[10px] leading-snug text-[color:var(--sys-faint)]">
+            {composer.visibility === 'SHARED'
+              ? t(
+                  'You can invite people after creating it',
+                  'Podrás invitar personas después de crearlo',
+                  'Podes convidar pessoas depois de o criares',
+                )
+              : t('Only you can see it', 'Solo tú lo ves', 'Só tu o vês')}
+          </p>
+        )}
+        {composer.mode === 'folder' && (
+          <p className="mb-2 text-[10px] leading-snug text-[color:var(--sys-faint)]">
+            {t(
+              'Folders organize boards — tasks live on boards',
+              'Las carpetas organizan tableros — las tareas viven en tableros',
+              'As pastas organizam tableros — as tarefas ficam nos tableros',
+            )}
+          </p>
+        )}
         <button
           type="button"
           disabled={creating || !draft.trim()}
-          onClick={() => void submitFolder()}
+          onClick={() => void submitComposer()}
           className="w-full rounded-lg bg-teal-700 px-2 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-40"
         >
           {t('Create', 'Crear', 'Criar')}
         </button>
       </div>
-    ) : null;
+    );
+  };
 
-  const sectionPlus = (kind: 'SHARED' | 'PERSONAL') => (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => (composerFor === kind ? setComposerFor(null) : openComposer(kind))}
-        className="rounded-md p-1 text-[color:var(--sys-faint)] hover:bg-teal-500/15 hover:text-teal-200"
-        title={
-          kind === 'SHARED'
-            ? t('New shared board', 'Nuevo tablero compartido', 'Novo quadro partilhado')
-            : t('New private board', 'Nuevo tablero solo mío', 'Novo quadro só meu')
-        }
-        aria-label={
-          kind === 'SHARED'
-            ? t('New shared board', 'Nuevo tablero compartido', 'Novo quadro partilhado')
-            : t('New private board', 'Nuevo tablero solo mío', 'Novo quadro só meu')
-        }
-      >
-        <Plus className="h-3.5 w-3.5" />
-      </button>
-      {newBoardPopover(kind)}
-    </div>
-  );
+  const renderNode = (node: TreeNode, depth: number): ReactNode => {
+    const folder = !isBoard(node);
+    const shared = isSharedBoard(node);
+    const isOwner = node.ownerId === currentUserId;
+    const open = expanded[node.id] ?? depth < 1;
+    const indent = collapsed ? 0 : Math.min(depth, 6) * 12;
 
-  const personalFolders = folders.filter(
-    (f) => f.visibility !== 'SHARED' && (f.members?.length ?? f._count?.members ?? 0) === 0,
-  );
-  const sharedFolders = folders.filter(
-    (f) => f.visibility === 'SHARED' || (f.members?.length ?? f._count?.members ?? 0) > 0,
-  );
+    if (folder) {
+      const chevron = (
+        <button
+          type="button"
+          className="mr-0.5 rounded p-0.5 text-[color:var(--sys-faint)] hover:bg-teal-500/10 hover:text-teal-200"
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded((prev) => ({ ...prev, [node.id]: !open }));
+          }}
+          aria-label={open ? t('Collapse', 'Contraer', 'Contrair') : t('Expand', 'Expandir', 'Expandir')}
+        >
+          {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        </button>
+      );
+      const addBtns = !collapsed ? (
+        <div className="relative mr-0.5 flex items-center opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              openComposer({ mode: 'folder', parentId: node.id });
+            }}
+            className="rounded-md p-1 text-[color:var(--sys-faint)] hover:bg-teal-500/15 hover:text-teal-200"
+            title={t('New subfolder', 'Nueva subcarpeta', 'Nova subpasta')}
+          >
+            <FolderPlus className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              openComposer({ mode: 'board', parentId: node.id, visibility: 'PERSONAL' });
+            }}
+            className="rounded-md p-1 text-[color:var(--sys-faint)] hover:bg-teal-500/15 hover:text-teal-200"
+            title={t('New board here', 'Nuevo tablero aquí', 'Novo quadro aqui')}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+          {composer?.mode === 'folder' && composer.parentId === node.id
+            ? composerPopover({ mode: 'folder', parentId: node.id })
+            : null}
+          {composer?.mode === 'board' && composer.parentId === node.id
+            ? composerPopover({ mode: 'board', parentId: node.id, visibility: 'PERSONAL' })
+            : null}
+        </div>
+      ) : null;
+
+      return (
+        <div key={node.id}>
+          <div
+            className={cn(
+              'group flex w-full items-center gap-0.5 rounded-lg transition',
+              nav.kind === 'folder' && nav.id === node.id
+                ? 'bg-teal-500/15'
+                : 'hover:bg-[color:var(--sys-nav-hover)]',
+            )}
+            style={{ paddingLeft: indent }}
+          >
+            {!collapsed && chevron}
+            <button
+              type="button"
+              onClick={() => {
+                setExpanded((prev) => ({ ...prev, [node.id]: !open }));
+                go({ kind: 'folder', id: node.id, name: node.name });
+              }}
+              className={cn(
+                'flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px]',
+                nav.kind === 'folder' && nav.id === node.id
+                  ? 'font-semibold text-[color:var(--sys-ink)]'
+                  : 'text-[color:var(--sys-nav-idle)]',
+              )}
+              title={node.name}
+            >
+              <Folder className="h-4 w-4 shrink-0" style={{ color: node.color || '#64748b' }} />
+              {!collapsed && <span className="min-w-0 flex-1 truncate">{node.name}</span>}
+            </button>
+            {addBtns}
+          </div>
+          {open && !collapsed && node.children.map((c) => renderNode(c, depth + 1))}
+        </div>
+      );
+    }
+
+    const shareBtn =
+      isOwner && onShareFolder ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onShareFolder({ id: node.id, name: node.name });
+          }}
+          className={cn(
+            'mr-1 rounded-md p-1 transition hover:bg-teal-500/15 hover:text-teal-300',
+            shared || (nav.kind === 'folder' && nav.id === node.id)
+              ? 'text-teal-400/90'
+              : 'text-[color:var(--sys-faint)]',
+          )}
+          title={
+            shared
+              ? t('Manage access', 'Gestionar acceso', 'Gerir acesso')
+              : t('Share', 'Compartir', 'Partilhar')
+          }
+        >
+          <Share2 className="h-3.5 w-3.5" />
+        </button>
+      ) : null;
+
+    const icon = (
+      <span className="relative inline-flex">
+        <LayoutGrid className="h-4 w-4" style={{ color: node.color || '#0d9488' }} />
+        {shared ? (
+          <Users className="absolute -bottom-1 -right-1.5 h-2.5 w-2.5 rounded-full bg-white text-slate-500" />
+        ) : (
+          <Lock className="absolute -bottom-1 -right-1.5 h-2.5 w-2.5 rounded-full bg-white text-slate-400" />
+        )}
+      </span>
+    );
+
+    return (
+      <div key={node.id}>
+        {item(
+          nav.kind === 'folder' && nav.id === node.id,
+          () => go({ kind: 'folder', id: node.id, name: node.name }),
+          icon,
+          node.name,
+          node._count?.tasks,
+          shareBtn,
+          undefined,
+          indent,
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -378,7 +554,7 @@ export function WorkSidebar({
         </div>
 
         <nav className={cn('min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain pb-3', collapsed ? 'px-1.5' : 'px-2')}>
-          {/* Inbox — not boards */}
+          {/* Personal utility views — not boards */}
           <div className="space-y-0.5 pt-2">
             {!collapsed && (
               <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)]">
@@ -408,6 +584,20 @@ export function WorkSidebar({
               'danger',
             )}
             {item(
+              nav.kind === 'unassigned',
+              () => go({ kind: 'unassigned' }),
+              <UserRound className="h-4 w-4" />,
+              t('Unassigned', 'Sin asignar', 'Sem responsável'),
+              counts.unassigned,
+            )}
+            {item(
+              nav.kind === 'week',
+              () => go({ kind: 'week' }),
+              <CalendarRange className="h-4 w-4" />,
+              t('This week', 'Esta semana', 'Esta semana'),
+              counts.week,
+            )}
+            {item(
               nav.kind === 'archive',
               () => go({ kind: 'archive' }),
               <Archive className="h-4 w-4" />,
@@ -416,54 +606,87 @@ export function WorkSidebar({
             )}
           </div>
 
-          {/* Shared boards + synthetic “all shared” */}
+          {/* Folder tree + boards */}
           <div>
             <div className={cn('mb-1 flex items-center', collapsed ? 'justify-center' : 'justify-between px-2')}>
               {!collapsed && (
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)]">
-                  {t('Shared', 'Compartidos', 'Partilhados')}
+                  {t('Boards', 'Tableros', 'Tableros')}
                 </p>
               )}
-              {sectionPlus('SHARED')}
+              {!collapsed && (
+                <div className="relative flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      composer?.mode === 'folder' && !composer.parentId
+                        ? setComposer(null)
+                        : openComposer({ mode: 'folder', parentId: null })
+                    }
+                    className="rounded-md p-1 text-[color:var(--sys-faint)] hover:bg-teal-500/15 hover:text-teal-200"
+                    title={t('New folder', 'Nueva carpeta', 'Nova pasta')}
+                  >
+                    <FolderPlus className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      composer?.mode === 'board' && !composer.parentId
+                        ? setComposer(null)
+                        : openComposer({ mode: 'board', parentId: null, visibility: 'PERSONAL' })
+                    }
+                    className="rounded-md p-1 text-[color:var(--sys-faint)] hover:bg-teal-500/15 hover:text-teal-200"
+                    title={t('New board', 'Nuevo tablero', 'Novo quadro')}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                  {composer?.mode === 'folder' && composer.parentId === null
+                    ? composerPopover({ mode: 'folder', parentId: null })
+                    : null}
+                  {composer?.mode === 'board' && composer.parentId === null
+                    ? composerPopover({
+                        mode: 'board',
+                        parentId: null,
+                        visibility: composer.visibility,
+                      })
+                    : null}
+                </div>
+              )}
             </div>
+            {!collapsed && (
+              <div className="mb-1.5 flex gap-1 px-2">
+                <button
+                  type="button"
+                  onClick={() => openComposer({ mode: 'board', parentId: null, visibility: 'PERSONAL' })}
+                  className="rounded-md px-1.5 py-0.5 text-[10px] text-[color:var(--sys-faint)] hover:bg-teal-500/10 hover:text-teal-200"
+                >
+                  {t('+ Private', '+ Solo yo', '+ Só eu')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openComposer({ mode: 'board', parentId: null, visibility: 'SHARED' })}
+                  className="rounded-md px-1.5 py-0.5 text-[10px] text-[color:var(--sys-faint)] hover:bg-teal-500/10 hover:text-teal-200"
+                >
+                  {t('+ Shared', '+ Compartido', '+ Partilhado')}
+                </button>
+              </div>
+            )}
             <div className="space-y-0.5">
               {item(
                 nav.kind === 'all',
                 () => go({ kind: 'all' }),
-                <Layers className="h-4 w-4" />,
+                <Users className="h-4 w-4" />,
                 t('All shared', 'Todo lo compartido', 'Tudo partilhado'),
                 counts.sharedOpen ?? 0,
               )}
-              {sharedFolders.map((f) => folderRow(f, true))}
+              {tree.map((n) => renderNode(n, 0))}
             </div>
-            {!collapsed && sharedFolders.length === 0 && (
+            {!collapsed && tree.length === 0 && (
               <p className="px-2.5 py-1 text-[11px] leading-snug text-[color:var(--sys-faint)]">
                 {t(
-                  'Boards you share with others — “All shared” lists every task in them',
-                  'Tableros que compartes — “Todo lo compartido” junta todas sus tareas',
-                  'Quadros que partilhas — “Tudo partilhado” junta todas as tarefas deles',
-                )}
-              </p>
-            )}
-          </div>
-
-          {/* Private boards — only me */}
-          <div>
-            <div className={cn('mb-1 flex items-center', collapsed ? 'justify-center' : 'justify-between px-2')}>
-              {!collapsed && (
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)]">
-                  {t('Only me', 'Solo yo', 'Só eu')}
-                </p>
-              )}
-              {sectionPlus('PERSONAL')}
-            </div>
-            <div className="space-y-0.5">{personalFolders.map((f) => folderRow(f, false))}</div>
-            {!collapsed && personalFolders.length === 0 && (
-              <p className="px-2.5 py-1 text-[11px] leading-snug text-[color:var(--sys-faint)]">
-                {t(
-                  'Private boards — only you can see them until you share',
-                  'Tableros privados — solo tú los ves hasta que los compartas',
-                  'Quadros privados — só tu os vês até partilhares',
+                  'Create folders and boards. Boards are personal or shared.',
+                  'Crea carpetas y tableros. Los tableros son personales o compartidos.',
+                  'Cria pastas e tableros. Os tableros são pessoais ou partilhados.',
                 )}
               </p>
             )}
@@ -477,7 +700,7 @@ export function WorkSidebar({
                 onClick={() => setOrgOpen((v) => !v)}
                 className="mb-1 flex w-full items-center justify-between px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--sys-faint)] hover:text-[color:var(--sys-ink)]"
               >
-                <span>{t('Other filters', 'Otros filtros', 'Outros filtros')}</span>
+                <span>{t('Org filters', 'Filtros org.', 'Filtros org.')}</span>
                 <ChevronDown className={cn('h-3 w-3 transition', orgOpen && 'rotate-180')} />
               </button>
             ) : null}
@@ -486,9 +709,9 @@ export function WorkSidebar({
                 {!collapsed && (
                   <p className="px-2.5 pb-1 text-[10px] leading-snug text-[color:var(--sys-faint)]">
                     {t(
-                      'Not boards — company and project views',
-                      'No son tableros — vistas de empresa y proyectos',
-                      'Não são quadros — vistas de empresa e projetos',
+                      'Not boards — company, sectors and SIEP projects',
+                      'No son tableros — empresa, sectores y proyectos SIEP',
+                      'Não são tableros — empresa, setores e projetos SIEP',
                     )}
                   </p>
                 )}
@@ -497,20 +720,6 @@ export function WorkSidebar({
                   () => go({ kind: 'company' }),
                   <Building2 className="h-4 w-4" />,
                   t('Operations', 'Operaciones', 'Operações'),
-                )}
-                {item(
-                  nav.kind === 'unassigned',
-                  () => go({ kind: 'unassigned' }),
-                  <UserRound className="h-4 w-4" />,
-                  t('Unassigned', 'Sin asignar', 'Sem responsável'),
-                  counts.unassigned,
-                )}
-                {item(
-                  nav.kind === 'week',
-                  () => go({ kind: 'week' }),
-                  <CalendarRange className="h-4 w-4" />,
-                  t('This week', 'Esta semana', 'Esta semana'),
-                  counts.week,
                 )}
                 {departments.map((d) =>
                   item(

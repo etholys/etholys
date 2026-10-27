@@ -87,6 +87,7 @@ model User {
   workFolderMemberships         WorkFolderMember[]
   workFolderShares              WorkFolderShare[]            @relation("WorkFolderShareUser")
   workFolderSharesInvited       WorkFolderShare[]            @relation("WorkFolderShareInviter")
+  workDashboardLayouts          WorkDashboardLayout[]
   taskTemplates                 TaskTemplate[]               @relation("TemplateCreator")
   taxFilings                    TaxFiling[]
   timeEntries                   TimeEntry[]
@@ -306,6 +307,7 @@ model Company {
   taskApprovalRequests        TaskApprovalRequest[]
   workFolders                 WorkFolder[]
   workFolderShares            WorkFolderShare[]
+  workDashboardLayouts        WorkDashboardLayout[]
   billingAccount              CompanyBillingAccount?
   subscriptions               CompanySubscription[]
   billingEntitlements         CompanyEntitlement[]
@@ -761,13 +763,18 @@ model TaskPerson {
   @@index([taskId, role])
 }
 
-/// Pasta Work — pessoal ou partilhada; qualquer membro da empresa pode criar (não só admin).
+/// Pasta / tablero Work — FOLDER = contentor (aninhável); BOARD = folha com tarefas.
+/// Qualquer membro da empresa pode criar (não só admin).
 model WorkFolder {
   id         String             @id @default(cuid())
   companyId  String
   name       String
   color      String?
-  /// PERSONAL | SHARED
+  /// FOLDER | BOARD — legado sem coluna = BOARD
+  kind       String             @default("BOARD")
+  /// Aninhamento ilimitado (só FOLDER deve ter filhos na UI; BOARD é folha).
+  parentId   String?
+  /// PERSONAL | SHARED — aplica-se sobretudo a BOARD (partilha); FOLDER usa o mesmo ACL.
   visibility String             @default("PERSONAL")
   ownerId    String
   order      Int                @default(0)
@@ -776,6 +783,8 @@ model WorkFolder {
   updatedAt  DateTime           @updatedAt
   company    Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   owner      User               @relation("WorkFolderOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  parent     WorkFolder?        @relation("WorkFolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children   WorkFolder[]       @relation("WorkFolderTree")
   members    WorkFolderMember[]
   shares     WorkFolderShare[]
   tasks      Task[]
@@ -783,6 +792,24 @@ model WorkFolder {
 
   @@index([companyId, ownerId])
   @@index([companyId, visibility])
+  @@index([parentId])
+  @@index([companyId, kind])
+}
+
+/// Layout pessoal do Início / dashboard Work (por utilizador × empresa).
+model WorkDashboardLayout {
+  id         String   @id @default(cuid())
+  companyId  String
+  userId     String
+  /// { boardIds: string[] } — tableros incluídos na síntese pessoal
+  layoutJson Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@index([userId])
 }
 
 model WorkFolderMember {
