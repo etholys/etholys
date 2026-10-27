@@ -9,12 +9,13 @@ import {
   ChevronRight,
   Copy,
   GripVertical,
+  MessageSquare,
+  MoreHorizontal,
   Paperclip,
   Plus,
   Trash2,
 } from 'lucide-react';
 import { getInitials } from '@/lib/utils';
-import { WorkUpdates } from './WorkUpdates';
 import {
   WORK_KANBAN,
   WORK_PRIORITIES,
@@ -153,6 +154,7 @@ function RolePeopleCell({
   t: (en: string, es: string, pt: string) => string;
   accent?: 'teal' | 'sky' | 'violet';
 }) {
+  const [adding, setAdding] = useState(false);
   const nameOf = (id: string) => users.find((u) => u.id === id)?.name || users.find((u) => u.id === id)?.email || id;
   const chip =
     accent === 'sky'
@@ -166,8 +168,42 @@ function RolePeopleCell({
       : accent === 'violet'
         ? 'bg-violet-500/35'
         : 'bg-teal-500/35';
+  const addSelect = (
+    <select
+      autoFocus={adding}
+      value=""
+      onChange={(e) => {
+        const id = e.target.value;
+        if (!id || ids.includes(id)) return;
+        onChange([...ids, id]);
+        setAdding(false);
+      }}
+      onBlur={() => setAdding(false)}
+      className="min-w-[6.5rem] max-w-[9rem] cursor-pointer rounded border border-[color:var(--sys-line)] bg-transparent px-1 py-0.5 text-[11px] text-[color:var(--sys-faint)] outline-none"
+      title={t('Add person', 'Añadir persona', 'Adicionar pessoa')}
+    >
+      <option value="">{t('Select…', 'Elegir…', 'Escolher…')}</option>
+      {users.filter((u) => !ids.includes(u.id)).map((u) => (
+        <option key={u.id} value={u.id}>{u.name || u.email}</option>
+      ))}
+    </select>
+  );
+
+  if (!ids.length && !adding) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAdding(true)}
+        className="text-[11px] text-[color:var(--sys-faint)] hover:text-[color:var(--sys-muted)]"
+        title={t('Add person', 'Añadir persona', 'Adicionar pessoa')}
+      >
+        —
+      </button>
+    );
+  }
+
   return (
-    <div className="flex min-w-[140px] flex-wrap items-center gap-1">
+    <div className="group/people flex min-w-[88px] flex-wrap items-center gap-1">
       {ids.map((id) => (
         <button
           key={id}
@@ -182,21 +218,18 @@ function RolePeopleCell({
           <span className="max-w-[72px] truncate">{nameOf(id)}</span>
         </button>
       ))}
-      <select
-        value=""
-        onChange={(e) => {
-          const id = e.target.value;
-          if (!id || ids.includes(id)) return;
-          onChange([...ids, id]);
-        }}
-        className="min-w-[7rem] max-w-[10rem] cursor-pointer rounded border border-dashed border-[color:var(--sys-line)] bg-transparent px-1 py-0.5 text-[11px] text-[color:var(--sys-faint)] outline-none"
-        title={t('Add another person', 'Añadir otra persona', 'Adicionar outra pessoa')}
-      >
-        <option value="">{t('+ Add', '+ Añadir', '+ Adicionar')}</option>
-        {users.filter((u) => !ids.includes(u.id)).map((u) => (
-          <option key={u.id} value={u.id}>{u.name || u.email}</option>
-        ))}
-      </select>
+      {adding ? (
+        addSelect
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="rounded px-1 text-[11px] font-semibold text-[color:var(--sys-faint)] opacity-0 hover:text-teal-300 group-hover/people:opacity-100"
+          title={t('Add person', 'Añadir persona', 'Adicionar pessoa')}
+        >
+          +
+        </button>
+      )}
     </div>
   );
 }
@@ -296,7 +329,7 @@ function FileCell({
         className="inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--sys-ink)]"
       >
         <Paperclip className="h-3.5 w-3.5" />
-        {n > 0 ? n : t('Add', 'Añadir', 'Adicionar')}
+        {n > 0 ? n : <span className="text-[color:var(--sys-faint)]">—</span>}
       </button>
       {open && (
         <div className="absolute left-0 z-30 mt-1 w-56 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel,#0f172a)] p-2 shadow-lg">
@@ -363,7 +396,6 @@ export function WorkTableBoard({
   notify,
   onColumnsChange,
   onNotifyChange,
-  onCommentPosted,
   onDeleteTask,
   onArchiveTask,
   onArchiveDoneInGroup,
@@ -422,16 +454,18 @@ export function WorkTableBoard({
   const [titleDraft, setTitleDraft] = useState<{ id: string; value: string } | null>(null);
   const [openSubs, setOpenSubs] = useState<Record<string, boolean>>({});
   const [subDrafts, setSubDrafts] = useState<Record<string, string>>({});
-  const [updatesFor, setUpdatesFor] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [showGroupDraft, setShowGroupDraft] = useState(false);
   const [hideDone, setHideDone] = useState(false);
   const [boardSort, setBoardSort] = useState<WorkBoardSort | null>(null);
   const [sortMenuFor, setSortMenuFor] = useState<string | null>(null);
   const [colFilters, setColFilters] = useState<{ status?: string; priority?: string; person?: string }>({});
   const [savingSort, setSavingSort] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const viewMenuRef = useRef<HTMLDivElement | null>(null);
   const colSpan = columns.length + (onToggleSelect ? 4 : 3);
 
   useEffect(() => {
@@ -443,6 +477,19 @@ export function WorkTableBoard({
     return () => document.removeEventListener('mousedown', onDoc);
   }, [sortMenuFor]);
 
+  useEffect(() => {
+    if (!viewOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (viewMenuRef.current && !viewMenuRef.current.contains(e.target as Node)) {
+        setViewOpen(false);
+        setAddOpen(false);
+        setNotifyOpen(false);
+        setTemplateOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [viewOpen]);
   const toggle = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }));
 
   const submitQuick = async (key: string, groupId: string | null) => {
@@ -728,36 +775,76 @@ export function WorkTableBoard({
     setDropTarget(null);
   };
 
+  const focusQuickAdd = () => {
+    const target = sections.find((s) => !collapsed[s.key]) || sections[0];
+    if (!target) return;
+    setCollapsed((c) => ({ ...c, [target.key]: false }));
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLInputElement>(`[data-quick-add="${target.key}"]`)?.focus();
+    });
+  };
+
+  const createGroupFromDraft = () => {
+    const name = newGroup.trim();
+    if (!name) return;
+    void onCreateGroup(name).then(() => {
+      setNewGroup('');
+      setShowGroupDraft(false);
+    });
+  };
+
   return (
     <div className="min-w-0 space-y-3">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <input
-          value={newGroup}
-          onChange={(e) => setNewGroup(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              const name = newGroup.trim();
-              if (!name) return;
-              void onCreateGroup(name).then(() => setNewGroup(''));
-            }
-          }}
-          placeholder={t('New group…', 'Nuevo grupo…', 'Novo grupo…')}
-          className="w-44 max-w-full rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-3 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-500"
-        />
         <button
           type="button"
-          disabled={creatingGroup || !newGroup.trim()}
-          onClick={() => {
-            const name = newGroup.trim();
-            if (!name) return;
-            void onCreateGroup(name).then(() => setNewGroup(''));
-          }}
-          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-semibold text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)] disabled:opacity-40"
+          onClick={focusQuickAdd}
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-teal-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-500"
         >
           <Plus className="h-3.5 w-3.5" />
-          {t('Add group', 'Añadir grupo', 'Adicionar grupo')}
+          {t('Add task', 'Añadir tarea', 'Adicionar tarefa')}
         </button>
+        {showGroupDraft ? (
+          <div className="flex min-w-0 items-center gap-1.5">
+            <input
+              autoFocus
+              value={newGroup}
+              onChange={(e) => setNewGroup(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  createGroupFromDraft();
+                }
+                if (e.key === 'Escape') {
+                  setShowGroupDraft(false);
+                  setNewGroup('');
+                }
+              }}
+              onBlur={() => {
+                if (!newGroup.trim()) setShowGroupDraft(false);
+              }}
+              placeholder={t('New group…', 'Nuevo grupo…', 'Novo grupo…')}
+              className="w-40 max-w-full rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-3 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-500"
+            />
+            <button
+              type="button"
+              disabled={creatingGroup || !newGroup.trim()}
+              onClick={createGroupFromDraft}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-semibold text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)] disabled:opacity-40"
+            >
+              {t('Add group', 'Añadir grupo', 'Adicionar grupo')}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowGroupDraft(true)}
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-semibold text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t('Add group', 'Añadir grupo', 'Adicionar grupo')}
+          </button>
+        )}
         {groups.length === 0 && (
           <button
             type="button"
@@ -768,156 +855,195 @@ export function WorkTableBoard({
             {t('Starter groups', 'Grupos iniciales', 'Grupos iniciais')}
           </button>
         )}
-        <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-[11px] font-medium text-[color:var(--sys-muted)]">
-          <input
-            type="checkbox"
-            checked={hideDone}
-            onChange={(e) => setHideDone(e.target.checked)}
-            className="rounded border-slate-300 text-teal-600"
-          />
-          {t('Hide done', 'Ocultar hechas', 'Ocultar concluídas')}
-        </label>
-        <button
-          type="button"
-          onClick={() => {
-            const next: Record<string, boolean> = {};
-            sections.forEach((s) => {
-              next[s.key] = true;
-            });
-            setCollapsed(next);
-          }}
-          className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
-        >
-          {t('Collapse all', 'Colapsar todo', 'Recolher tudo')}
-        </button>
-        <button
-          type="button"
-          onClick={() => setCollapsed({})}
-          className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
-        >
-          {t('Expand all', 'Expandir todo', 'Expandir tudo')}
-        </button>
-        {(boardSort || activeFilterCount > 0) && (
+        <div className="relative ml-auto" ref={viewMenuRef}>
           <button
             type="button"
             onClick={() => {
-              setBoardSort(null);
-              setColFilters({});
+              setViewOpen((v) => !v);
+              setAddOpen(false);
+              setNotifyOpen(false);
+              setTemplateOpen(false);
             }}
-            className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-teal-300 hover:bg-teal-500/10"
+            className="inline-flex items-center gap-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-semibold text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
           >
-            {t('Clear sort / filters', 'Quitar orden / filtros', 'Limpar ordem / filtros')}
-            {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            <MoreHorizontal className="h-3.5 w-3.5" />
+            {t('View', 'Vista', 'Vista')}
           </button>
-        )}
-        {onApplyTemplate && (
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => {
-                setTemplateOpen((v) => !v);
-                setAddOpen(false);
-                setNotifyOpen(false);
-              }}
-              className="inline-flex items-center gap-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-semibold text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
-            >
-              {t('Template', 'Plantilla', 'Modelo')}
-            </button>
-            {templateOpen && (
-              <div className="absolute left-0 z-20 mt-1 w-52 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-1 shadow-lg">
-                <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sys-faint)]">
-                  {t('Apply to this board only', 'Solo este tablero', 'Só este quadro')}
-                </p>
-                {WORK_BOARD_TEMPLATES.map((tpl) => (
+          {viewOpen && (
+            <div className="absolute right-0 z-30 mt-1 w-60 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-1 shadow-lg">
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]">
+                <input
+                  type="checkbox"
+                  checked={hideDone}
+                  onChange={(e) => setHideDone(e.target.checked)}
+                  className="rounded border-slate-300 text-teal-600"
+                />
+                {t('Hide done', 'Ocultar hechas', 'Ocultar concluídas')}
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const next: Record<string, boolean> = {};
+                  sections.forEach((s) => {
+                    next[s.key] = true;
+                  });
+                  setCollapsed(next);
+                  setViewOpen(false);
+                }}
+                className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+              >
+                {t('Collapse all', 'Colapsar todo', 'Recolher tudo')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCollapsed({});
+                  setViewOpen(false);
+                }}
+                className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+              >
+                {t('Expand all', 'Expandir todo', 'Expandir tudo')}
+              </button>
+              {(boardSort || activeFilterCount > 0) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBoardSort(null);
+                    setColFilters({});
+                    setViewOpen(false);
+                  }}
+                  className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-teal-300 hover:bg-teal-500/10"
+                >
+                  {t('Clear sort / filters', 'Quitar orden / filtros', 'Limpar ordem / filtros')}
+                  {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+                </button>
+              )}
+              {onColumnsChange && (
+                <div className="relative border-t border-[color:var(--sys-line)] pt-1 mt-1">
                   <button
-                    key={tpl.id}
                     type="button"
                     onClick={() => {
-                      onApplyTemplate(tpl.columns.map((c) => ({ ...c })));
+                      setAddOpen((v) => !v);
+                      setNotifyOpen(false);
+                      setTemplateOpen(false);
+                    }}
+                    className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {t('Column', 'Columna', 'Coluna')}
+                  </button>
+                  {addOpen && (
+                    <div className="absolute left-0 top-full z-40 mt-0.5 max-h-64 w-52 overflow-y-auto rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-1 shadow-lg">
+                      {(['status', 'person', 'responsible', 'reviewer', 'priority', 'due', 'start', 'estimate', 'origin', 'updates', 'files', 'tags', 'group', 'text', 'number', 'checkbox', 'date'] as WorkColumnKind[])
+                        .filter((kind) => canAddColumnKind(columns, kind))
+                        .map((kind) => (
+                          <button
+                            key={kind}
+                            type="button"
+                            onClick={() => {
+                              const label =
+                                kind === 'text' || kind === 'number' || kind === 'checkbox' || kind === 'date'
+                                  ? window.prompt(t('Column name', 'Nombre de la columna', 'Nome da coluna'), columnKindLabel(kind, t)) || ''
+                                  : columnKindLabel(kind, t);
+                              if (!label.trim()) return;
+                              onColumnsChange([
+                                ...columns,
+                                {
+                                  id:
+                                    kind === 'text' || kind === 'number' || kind === 'checkbox' || kind === 'date'
+                                      ? `${kind}-${Date.now()}`
+                                      : kind,
+                                  kind,
+                                  label: label.trim(),
+                                },
+                              ]);
+                              setAddOpen(false);
+                              setViewOpen(false);
+                            }}
+                            className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+                          >
+                            {columnKindLabel(kind, t)}
+                          </button>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {onApplyTemplate && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTemplateOpen((v) => !v);
+                      setAddOpen(false);
+                      setNotifyOpen(false);
+                    }}
+                    className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+                  >
+                    {t('Template', 'Plantilla', 'Modelo')}
+                  </button>
+                  {templateOpen && (
+                    <div className="absolute left-0 top-full z-40 mt-0.5 w-52 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-1 shadow-lg">
+                      <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sys-faint)]">
+                        {t('Apply to this board only', 'Solo este tablero', 'Só este quadro')}
+                      </p>
+                      {WORK_BOARD_TEMPLATES.map((tpl) => (
+                        <button
+                          key={tpl.id}
+                          type="button"
+                          onClick={() => {
+                            onApplyTemplate(tpl.columns.map((c) => ({ ...c })));
+                            setTemplateOpen(false);
+                            setViewOpen(false);
+                          }}
+                          className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+                        >
+                          {t(tpl.label.en, tpl.label.es, tpl.label.pt)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {onNotifyChange && notify && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotifyOpen((v) => !v);
+                      setAddOpen(false);
                       setTemplateOpen(false);
                     }}
                     className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
                   >
-                    {t(tpl.label.en, tpl.label.es, tpl.label.pt)}
+                    {t('Notifications', 'Notificaciones', 'Notificações')}
                   </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        {onColumnsChange && (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setAddOpen((v) => !v)}
-              className="inline-flex items-center gap-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-semibold text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              {t('Column', 'Columna', 'Coluna')}
-            </button>
-            {addOpen && (
-              <div className="absolute left-0 z-20 mt-1 w-48 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-1 shadow-lg">
-                {(['status', 'person', 'responsible', 'reviewer', 'priority', 'due', 'start', 'estimate', 'origin', 'updates', 'files', 'tags', 'group', 'text', 'number', 'checkbox', 'date'] as WorkColumnKind[])
-                  .filter((kind) => canAddColumnKind(columns, kind))
-                  .map((kind) => (
-                    <button
-                      key={kind}
-                      type="button"
-                      onClick={() => {
-                        const label =
-                          kind === 'text' || kind === 'number' || kind === 'checkbox' || kind === 'date'
-                            ? window.prompt(t('Column name', 'Nombre de la columna', 'Nome da coluna'), columnKindLabel(kind, t)) || ''
-                            : columnKindLabel(kind, t);
-                        if (!label.trim()) return;
-                        onColumnsChange([
-                          ...columns,
-                          { id: kind === 'text' || kind === 'number' || kind === 'checkbox' || kind === 'date' ? `${kind}-${Date.now()}` : kind, kind, label: label.trim() },
-                        ]);
-                        setAddOpen(false);
-                      }}
-                      className="block w-full rounded-lg px-2 py-1.5 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
-                    >
-                      {columnKindLabel(kind, t)}
-                    </button>
-                  ))}
-              </div>
-            )}
-          </div>
-          {onNotifyChange && notify && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setNotifyOpen((v) => !v)}
-                className="rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-xs font-semibold text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)]"
-              >
-                {t('Notifications', 'Notificaciones', 'Notificações')}
-              </button>
-              {notifyOpen && (
-                <div className="absolute left-0 z-20 mt-1 w-64 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lg">
-                  {(
-                    [
-                      ['comment', t('Updates on my tasks', 'Actualizaciones en mis tareas', 'Atualizações nas minhas tarefas')],
-                      ['assign', t('When a task is assigned to me', 'Cuando me asignan una tarea', 'Quando me atribuem uma tarefa')],
-                      ['status', t('When status changes', 'Cuando cambia el estado', 'Quando o estado muda')],
-                      ['email', t('Also send email', 'También enviar email', 'Também enviar email')],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <label key={key} className="mb-2 flex items-center gap-2 text-[color:var(--sys-ink)]">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(notify[key])}
-                        onChange={(e) => onNotifyChange({ ...notify, [key]: e.target.checked })}
-                      />
-                      {label}
-                    </label>
-                  ))}
+                  {notifyOpen && (
+                    <div className="absolute left-0 top-full z-40 mt-0.5 w-64 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] p-3 text-sm shadow-lg">
+                      {(
+                        [
+                          ['comment', t('Updates on my tasks', 'Actualizaciones en mis tareas', 'Atualizações nas minhas tarefas')],
+                          ['assign', t('When a task is assigned to me', 'Cuando me asignan una tarea', 'Quando me atribuem uma tarefa')],
+                          ['status', t('When status changes', 'Cuando cambia el estado', 'Quando o estado muda')],
+                          ['email', t('Also send email', 'También enviar email', 'Também enviar email')],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <label key={key} className="mb-2 flex items-center gap-2 text-[color:var(--sys-ink)]">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(notify[key])}
+                            onChange={(e) => onNotifyChange({ ...notify, [key]: e.target.checked })}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
         </div>
-        )}
       </div>
 
       {sections.map((section) => {
@@ -1105,7 +1231,9 @@ export function WorkTableBoard({
                           }}
                           className={`group cursor-pointer border-b border-[color:var(--sys-line)] transition ${
                             draggingId === task.id ? 'opacity-40' : ''
-                          } ${rowDrop ? 'border-t-2 border-t-teal-400' : ''} ${
+                          } ${task.status === 'DONE' ? 'opacity-55' : ''} ${
+                            rowDrop ? 'border-t-2 border-t-teal-400' : ''
+                          } ${
                             selected || multiSelected ? 'bg-teal-500/15' : 'hover:bg-[color:var(--sys-nav-hover)]'
                           }`}
                         >
@@ -1217,6 +1345,17 @@ export function WorkTableBoard({
                                   {task.checklist!.filter((c) => c.completed).length}/{task.checklist!.length}
                                 </span>
                               )}
+                              {(task._count?.comments || 0) > 0 && !columns.some((c) => c.kind === 'updates') && (
+                                <button
+                                  type="button"
+                                  onClick={() => onSelect(task.id)}
+                                  className="inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold tabular-nums text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)] hover:text-teal-300"
+                                  title={t('Updates', 'Actualizaciones', 'Atualizações')}
+                                >
+                                  <MessageSquare className="h-3 w-3" />
+                                  {task._count?.comments}
+                                </button>
+                              )}
                               {onDuplicate && (
                                 <button
                                   type="button"
@@ -1306,10 +1445,14 @@ export function WorkTableBoard({
                                   type="date"
                                   value={task.dueDate ? String(task.dueDate).slice(0, 10) : ''}
                                   onChange={(e) => onPatch(task.id, { dueDate: e.target.value || null })}
-                                  className={`w-full bg-transparent text-[11px] text-[color:var(--sys-ink)] outline-none [color-scheme:inherit] ${
-                                    task.dueDate && !['DONE', 'CANCELLED'].includes(task.status) && new Date(task.dueDate).getTime() < Date.now()
-                                      ? 'font-semibold text-rose-400'
-                                      : ''
+                                  className={`w-full min-w-[7rem] bg-transparent text-[11px] outline-none [color-scheme:inherit] ${
+                                    !task.dueDate
+                                      ? 'text-[color:var(--sys-faint)]'
+                                      : task.dueDate &&
+                                          !['DONE', 'CANCELLED'].includes(task.status) &&
+                                          new Date(task.dueDate).getTime() < Date.now()
+                                        ? 'font-semibold text-rose-400'
+                                        : 'text-[color:var(--sys-ink)]'
                                   }`}
                                 />
                               )}
@@ -1383,12 +1526,16 @@ export function WorkTableBoard({
                               {col.kind === 'updates' && (
                                 <button
                                   type="button"
-                                  onClick={() => setUpdatesFor((id) => (id === task.id ? null : task.id))}
-                                  className="text-[11px] font-semibold text-teal-800 hover:underline"
+                                  onClick={() => onSelect(task.id)}
+                                  className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold text-[color:var(--sys-muted)] hover:bg-[color:var(--sys-nav-hover)] hover:text-teal-300"
+                                  title={t('Open updates', 'Abrir actualizaciones', 'Abrir atualizações')}
                                 >
-                                  {(task._count?.comments || 0) > 0
-                                    ? `${task._count?.comments} ${t('updates', 'act.', 'atu.')}`
-                                    : t('Write', 'Escribir', 'Escrever')}
+                                  <MessageSquare className="h-3.5 w-3.5" />
+                                  {(task._count?.comments || 0) > 0 ? (
+                                    <span className="tabular-nums">{task._count?.comments}</span>
+                                  ) : (
+                                    <span className="text-[color:var(--sys-faint)]">—</span>
+                                  )}
                                 </button>
                               )}
                               {(col.kind === 'text' || col.kind === 'number' || col.kind === 'date') && (
@@ -1413,13 +1560,6 @@ export function WorkTableBoard({
                             </td>
                           ))}
                         </tr>
-                        {updatesFor === task.id && (
-                          <tr>
-                            <td colSpan={colSpan}>
-                              <WorkUpdates taskId={task.id} users={users} onPosted={onCommentPosted} t={t} />
-                            </td>
-                          </tr>
-                        )}
                         {openSubs[task.id] && (subtasksOf?.(task.id) || []).map((sub) => (
                           <tr key={sub.id} className="border-b border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)]/40">
                             {onToggleSelect && <td />}
@@ -1546,6 +1686,7 @@ export function WorkTableBoard({
                         <div className="flex items-center gap-2">
                           <Plus className="h-3.5 w-3.5 text-slate-300" />
                           <input
+                            data-quick-add={section.key}
                             value={drafts[section.key] || ''}
                             onChange={(e) => setDrafts((d) => ({ ...d, [section.key]: e.target.value }))}
                             onKeyDown={(e) => {
@@ -1556,7 +1697,7 @@ export function WorkTableBoard({
                             }}
                             disabled={adding === section.key}
                             placeholder={t('+ Add task', '+ Añadir tarea', '+ Adicionar tarefa')}
-                            className="w-full bg-transparent py-1 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                            className="w-full bg-transparent py-1 text-sm text-[color:var(--sys-ink)] outline-none placeholder:text-[color:var(--sys-faint)]"
                           />
                         </div>
                       </td>

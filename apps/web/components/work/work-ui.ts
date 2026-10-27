@@ -42,14 +42,12 @@ export type WorkColumn = { id: string; kind: WorkColumnKind; label: string };
 
 export type WorkNotifyPrefs = { comment: boolean; assign: boolean; status: boolean; email: boolean };
 
+/** Slim daily-scan defaults: Task · Status · Executor · Priority · Due. Roles/updates via + Column or panel. */
 export const DEFAULT_WORK_COLUMNS: WorkColumn[] = [
   { id: 'status', kind: 'status', label: 'Status' },
   { id: 'person', kind: 'person', label: 'Executor' },
-  { id: 'responsible', kind: 'responsible', label: 'Owner' },
-  { id: 'reviewer', kind: 'reviewer', label: 'Supervisor' },
   { id: 'priority', kind: 'priority', label: 'Priority' },
   { id: 'due', kind: 'due', label: 'Due' },
-  { id: 'updates', kind: 'updates', label: 'Updates' },
 ];
 
 /** Templates opcionais — só se aplicam quando o utilizador escolhe. */
