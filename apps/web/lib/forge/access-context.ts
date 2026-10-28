@@ -24,8 +24,10 @@ export type ForgeJwtScope = {
 
 /**
  * Resolve âmbito FORGE para um userId (login mágico / refresh JWT).
- * Platform admin / User.role=ADMIN → organization (Hub completo, Lab, …).
- * Sem CompanyUser → course_only; com org → organization.
+ * Platform admin → organization.
+ * Com CompanyUser → organization.
+ * Só matrículas FORGE (sem empresa) → course_only.
+ * Sem empresa e sem matrícula → organization (não restringir; Work/Studio/workspace guards tratam o resto).
  */
 export async function resolveForgeJwtScope(userId: string): Promise<ForgeJwtScope> {
   const user = await prisma.user.findUnique({
@@ -59,6 +61,12 @@ export async function resolveForgeJwtScope(userId: string): Promise<ForgeJwtScop
   });
 
   const allowedCourseIds = enrollments.map((e) => e.courseId);
+  // Sem empresa e sem matrícula FORGE: convidados eTask/Studio (ou contas órfãs).
+  // Não forçar course_only — isso bloqueava /work/shared e APIs do eTask.
+  if (allowedCourseIds.length === 0) {
+    return { mode: 'organization', allowedCourseIds: [], homePath: '/hub' };
+  }
+
   const courses = enrollments.map((e) => ({
     id: e.course.id,
     title: '',
@@ -99,13 +107,12 @@ export async function getForgeAccessContext(): Promise<ForgeAccessContext | null
   });
 
   const isOrgMember = tenant.companyIds.length > 0;
-  const mode = isOrgMember ? 'organization' : 'course_only';
-
   const relevant = isOrgMember
     ? enrollments
     : enrollments.filter((e) => e.accessScope !== 'organization');
 
   const allowedCourseIds = isOrgMember ? [] : relevant.map((e) => e.courseId);
+  const mode = isOrgMember || allowedCourseIds.length === 0 ? 'organization' : 'course_only';
 
   const courses: ForgeAccessCourse[] = await Promise.all(
     relevant.map(async (e) => ({

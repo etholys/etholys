@@ -369,9 +369,13 @@ async function enforceCourseOnlyScope(
 ): Promise<NextResponse | null> {
   const pathname = req.nextUrl.pathname;
   if (pathname === '/api/internal/forge-scope') return null;
+  if (isPublicWorkSharePath(pathname) || isPublicStudioSharePath(pathname)) return null;
 
   if (!token?.sub && !token?.id) return null;
   if (token.forgeAccessMode === 'organization') return null;
+  // Convidados externos eTask/Studio não são alunos FORGE — não aplicar este jail.
+  if (token.workAccessMode === 'share_only') return null;
+  if (token.studioAccessMode === 'share_only') return null;
 
   const needsScopeCheck =
     token.forgeAccessMode === 'course_only' ||
@@ -386,6 +390,8 @@ async function enforceCourseOnlyScope(
 
   if (pathname.startsWith('/api/')) {
     if (isApiAllowedForCourseOnlyUser(pathname)) return null;
+    // Aceitar / consultar partilha eTask mesmo se o JWT ainda tiver course_only velho.
+    if (pathname.startsWith('/api/work-folders')) return null;
     return NextResponse.json(
       { error: 'Acceso restringido: solo el curso FORGE asignado.' },
       { status: 403 },
@@ -495,10 +501,15 @@ async function enforceApiLicense(
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
-  if (token.forgeAccessMode === 'course_only' || !token.forgeAccessMode) {
+  if (
+    token.workAccessMode !== 'share_only' &&
+    token.studioAccessMode !== 'share_only' &&
+    (token.forgeAccessMode === 'course_only' || !token.forgeAccessMode)
+  ) {
     const scope = await resolveForgeScope(req, token);
     if (scope?.mode === 'course_only') {
       if (isApiAllowedForCourseOnlyUser(pathname)) return null;
+      if (pathname.startsWith('/api/work-folders')) return null;
       return NextResponse.json(
         { error: 'Acceso restringido: solo el curso FORGE asignado.' },
         { status: 403 },
