@@ -154,7 +154,21 @@ cd /opt/jitsi-docker && docker compose stop
 cd /opt/jitsi-docker && docker compose up -d
 ```
 
-Script de emergência OOM: `scripts/recuperar-servidor-oom.sh` (para contentores Jitsi).
+Script de emergência OOM: `scripts/recuperar-servidor-oom.sh` (para contentores Jitsi e
+**volta a subir** `web` + `prosody` + `jicofo` + `jvb` — sem focus, todas as salas falham o join).
+
+### Sintoma: «Entrando a la sala…» / «no entró a tiempo» em *todas* as salas
+
+Isto é o timeout do Hub (`MeetConferenceFrame`, ~25s) quando o focus não está a correr.
+`external_api.js` e o websocket podem responder 200 e mesmo assim a sala nunca completa o join.
+
+```bash
+cd /opt/jitsi-docker && docker compose ps -a
+# Tem de existir jitsi-docker-jicofo-1 Up
+docker compose up -d jicofo
+docker logs --tail 30 jitsi-docker-jicofo-1   # "Registered" + bridge added
+docker logs jitsi-docker-prosody-1 2>&1 | grep 'Authenticated as focus' | tail -3
+```
 
 **TURN/Coturn** ainda não está neste piloto: redes corporativas/móveis simétricas podem continuar
 com ICE fraco. Abrir Coturn (3478/5349 + relay) é o próximo passo se o problema persistir

@@ -21,7 +21,7 @@ pkill -9 -f docker-buildx 2>/dev/null || true
 pkill -9 -f buildkit 2>/dev/null || true
 docker builder prune -af 2>/dev/null || true
 
-# Jitsi (Java) costuma estar em docker-jitsi-meet — parar para libertar RAM
+# Motor de vídeo CHORUS (Java) — parar para libertar RAM; voltamos a subir o núcleo abaixo.
 for c in $(docker ps -q 2>/dev/null); do
   name=$(docker inspect -f '{{.Name}}' "$c" 2>/dev/null || echo '')
   if echo "$name" | grep -qiE 'jitsi|java|prosody|jicofo|jvb'; then
@@ -32,15 +32,29 @@ done
 echo "=== Reiniciar SSH ==="
 systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
 
-if [ -d /opt/etholys/infra ]; then
-  cd /opt/etholys
-  git fetch origin 2>/dev/null || true
-  git reset --hard origin/main 2>/dev/null || true
-  echo "HEAD $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
-  cd infra
-  echo "=== Subir so Postgres + Web (sem build) ==="
-  docker compose -f docker-compose.prod-nginx.yml up -d --no-build postgres web 2>/dev/null || \
-    docker compose -f docker-compose.prod-nginx.yml up -d postgres web 2>/dev/null || true
+if [ -x /opt/etholys/scripts/recuperar-prod-sem-rebuild.sh ]; then
+  bash /opt/etholys/scripts/recuperar-prod-sem-rebuild.sh || true
+elif [ -d /opt/etholys/infra ]; then
+  cd /opt/etholys/infra
+  echo "=== Subir Postgres + Web + Caddy (sem build) ==="
+  docker compose -f docker-compose.prod.yml up -d --no-build postgres web caddy 2>/dev/null || \
+    docker compose -f docker-compose.prod-nginx.yml up -d --no-build postgres web 2>/dev/null || true
+fi
+
+# Sem o serviço de focus, TODAS as salas CHORUS ficam em "Entrando…" / timeout.
+# Nunca deixar o núcleo de vídeo parado após uma recuperação OOM.
+JITSI_DIR="${JITSI_DIR:-/opt/jitsi-docker}"
+if [ -f "${JITSI_DIR}/docker-compose.yml" ]; then
+  echo "=== Subir núcleo CHORUS (web + prosody + jicofo + jvb) ==="
+  (
+    cd "${JITSI_DIR}"
+    docker compose up -d web prosody jicofo jvb
+  ) || true
+  sleep 3
+  docker ps --filter name=jitsi-docker --format 'table {{.Names}}\t{{.Status}}' || true
+  if ! docker ps --format '{{.Names}}' | grep -qx 'jitsi-docker-jicofo-1'; then
+    echo "WARN: jitsi-docker-jicofo-1 nao esta a correr — salas CHORUS nao entram."
+  fi
 fi
 
 echo "=== Memoria apos recuperacao ==="
