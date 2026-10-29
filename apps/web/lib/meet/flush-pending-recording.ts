@@ -3,7 +3,7 @@ import {
   listPendingMeetRecordings,
   markPendingMeetRecordingError,
   type PendingMeetRecording,
-  removePendingMeetRecording,
+  removePendingMeetRecordingById,
   savePendingMeetRecording,
 } from '@/lib/meet/pending-recording-store';
 
@@ -16,8 +16,8 @@ export async function queueMeetRecordingUpload(opts: {
   locale: string;
   languageHint?: string;
   whisperEnabled: boolean;
-}): Promise<void> {
-  await savePendingMeetRecording({
+}): Promise<{ uploaded: boolean; transcribed: boolean; warning?: string }> {
+  const pending = await savePendingMeetRecording({
     sessionId: opts.sessionId,
     companyId: opts.companyId,
     fileName: opts.fileName,
@@ -38,29 +38,26 @@ export async function queueMeetRecordingUpload(opts: {
       languageHint: opts.languageHint,
       whisperEnabled: opts.whisperEnabled,
     });
-    // Gravação já na nuvem — pode limpar a fila mesmo se a transcrição falhou
-    await removePendingMeetRecording(opts.sessionId);
-    if (result.warning) {
-      throw new Error(result.warning);
-    }
+    await removePendingMeetRecordingById(pending.id);
+    return result;
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Upload falhou';
-    // Se a mensagem é só transcrição, a fila já foi limpa
-    const stillPending = await listPendingMeetRecordings().then((rows) =>
-      rows.some((r) => r.sessionId === opts.sessionId),
+    await markPendingMeetRecordingError(pending.id, msg);
+    throw new Error(
+      `${msg} A gravação ficou guardada neste browser — pode reenviar ou gravar outra sem perder esta.`,
     );
-    if (stillPending) {
-      await markPendingMeetRecordingError(opts.sessionId, msg);
-      throw new Error(
-        `${msg} A gravação ficou guardada neste browser — pode reenviar no resumo CHORUS.`,
-      );
-    }
-    throw err;
   }
 }
 
 export async function flushPendingMeetRecording(sessionId: string): Promise<void> {
-  const row = (await listPendingMeetRecordings()).find((r) => r.sessionId === sessionId);
+  const rows = (await listPendingMeetRecordings()).filter((r) => r.sessionId === sessionId);
+  for (const row of rows) {
+    await flushPendingRow(row);
+  }
+}
+
+export async function flushPendingMeetRecordingById(id: string): Promise<void> {
+  const row = (await listPendingMeetRecordings()).find((r) => r.id === id);
   if (!row) return;
   await flushPendingRow(row);
 }
@@ -91,14 +88,16 @@ async function flushPendingRow(row: PendingMeetRecording): Promise<void> {
     fileName: row.fileName,
     locale: row.locale,
     languageHint: row.languageHint,
-    whisperEnabled: row.whisperEnabled,
+    whisperEnabled: true,
   });
-  await removePendingMeetRecording(row.sessionId);
-  if (result.warning) throw new Error(result.warning);
+  await removePendingMeetRecordingById(row.id);
+  if (result.warning && !result.uploaded) throw new Error(result.warning);
 }
 
 export {
   listPendingMeetRecordings,
+  listPendingMeetRecordingsForSession,
   getPendingMeetRecording,
   pendingRecordingSizeMb,
+  type PendingMeetRecording,
 } from '@/lib/meet/pending-recording-store';

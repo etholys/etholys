@@ -19,7 +19,8 @@ export function meetEmbedUrl(
   try {
     const u = new URL(meetingUrl);
     const overrides = new URLSearchParams(u.hash.replace(/^#/, ''));
-    overrides.set('config.prejoinConfig.enabled', 'true');
+    overrides.set('config.prejoinConfig.enabled', 'false');
+    overrides.set('config.prejoinPageEnabled', 'false');
     overrides.set('config.disableDeepLinking', 'true');
     // Breakout rooms: botão visível para o host na barra (self-hosted).
     overrides.set('config.breakoutRooms.hideAddRoomButton', 'false');

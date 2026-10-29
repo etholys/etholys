@@ -157,12 +157,15 @@ export function MeetRoomClient({ sessionId }: Props) {
   const [joinPrefs, setJoinPrefs] = useState<MeetJoinSetupPrefs>(() => ({
     language: 'auto',
     enableCloudRecording: false,
-    enableLiveTranscript: false,
+    /** Preferência por omissão: só texto — vídeo só se o utilizador carregar em Gravar */
+    enableLiveTranscript: true,
   }));
   const joinPrefsRef = useRef(joinPrefs);
   useEffect(() => {
     joinPrefsRef.current = joinPrefs;
   }, [joinPrefs]);
+  /** Evita relançar a transcrição automática em cada remount */
+  const autoTranscriptStartedRef = useRef(false);
 
   useEffect(() => {
     setJoinPrefs((prev) => ({
@@ -272,7 +275,7 @@ export function MeetRoomClient({ sessionId }: Props) {
     return () => window.clearInterval(id);
   }, [locale]);
 
-  // Entra já na sala (Zoom): sem modal que bloqueia. Transcrição/gravação são botões à parte.
+  // Entra já na sala (Zoom): sem modal. Transcrição liga sozinha quando disponível; Gravar é explícito.
 
   useEffect(() => {
     if (!companyId) return;
@@ -281,6 +284,7 @@ export function MeetRoomClient({ sessionId }: Props) {
         .then((r) => r.json())
         .then((d) => {
           const liveOn = Boolean(d.liveTranscriptionEnabled);
+          const browserOk = browserLiveSttSupported();
           setFeatures({
             liveTranscriptionEnabled: liveOn,
             whisperTranscriptionEnabled: Boolean(d.whisperTranscriptionEnabled),
@@ -288,7 +292,8 @@ export function MeetRoomClient({ sessionId }: Props) {
           });
           setJoinPrefs((prev) => ({
             ...prev,
-            enableLiveTranscript: false,
+            // Texto ao vivo por omissão; nunca gravar vídeo sozinho ao entrar
+            enableLiveTranscript: liveOn || browserOk,
             enableCloudRecording: false,
           }));
         }),
@@ -437,11 +442,18 @@ export function MeetRoomClient({ sessionId }: Props) {
   }, []);
 
   useEffect(() => {
+    const markAway = () => {
+      lastHiddenAtRef.current = Date.now();
+    };
     const onVisibility = () => {
-      if (document.visibilityState === 'hidden') lastHiddenAtRef.current = Date.now();
+      if (document.visibilityState === 'hidden') markAway();
     };
     document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
+    window.addEventListener('blur', markAway);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('blur', markAway);
+    };
   }, []);
 
   useEffect(() => {
@@ -643,6 +655,22 @@ export function MeetRoomClient({ sessionId }: Props) {
     });
   }
 
+  function beginLiveTranscript(opts?: { openPanel?: boolean }) {
+    const browserOk = browserLiveSttSupported();
+    if (!features.liveTranscriptionEnabled && !browserOk) return false;
+    setJoinPrefs((p) => ({ ...p, enableLiveTranscript: true }));
+    if (opts?.openPanel !== false) setPanelOpen(true);
+    transcriptionWantedRef.current = true;
+    serverTranscriptSeenRef.current = false;
+    roomDialAttemptsRef.current = 0;
+    transcriptionStartedAtRef.current = Date.now();
+    setTranscriptionWaiting(true);
+    setTranscriptionOn(true);
+    if (features.liveTranscriptionEnabled) conferenceRef.current?.startTranscription();
+    startBrowserStt();
+    return true;
+  }
+
   function toggleTranscription() {
     setError(null);
     const browserOk = browserLiveSttSupported();
@@ -658,6 +686,7 @@ export function MeetRoomClient({ sessionId }: Props) {
     }
     if (transcriptionOn) {
       transcriptionWantedRef.current = false;
+      autoTranscriptStartedRef.current = false;
       serverTranscriptSeenRef.current = false;
       stopBrowserStt();
       conferenceRef.current?.stopTranscription();
@@ -666,16 +695,7 @@ export function MeetRoomClient({ sessionId }: Props) {
       setJoinPrefs((p) => ({ ...p, enableLiveTranscript: false }));
       return;
     }
-    setJoinPrefs((p) => ({ ...p, enableLiveTranscript: true }));
-    setPanelOpen(true);
-    transcriptionWantedRef.current = true;
-    serverTranscriptSeenRef.current = false;
-    roomDialAttemptsRef.current = 0;
-    transcriptionStartedAtRef.current = Date.now();
-    setTranscriptionWaiting(true);
-    setTranscriptionOn(true);
-    if (features.liveTranscriptionEnabled) conferenceRef.current?.startTranscription();
-    startBrowserStt();
+    beginLiveTranscript({ openPanel: true });
   }
 
   function startInRoomVideoRecording() {
@@ -717,9 +737,9 @@ export function MeetRoomClient({ sessionId }: Props) {
         setJoinPrefs((p) => ({ ...p, enableCloudRecording: true }));
         setError(
           t(
-            'A gravar. No diálogo escolhe esta aba do CHORUS (ou a janela do browser) e liga o áudio da aba. Ao sair, a gravação fica no CHORUS.',
-            'Grabando. En el diálogo elige esta pestaña de CHORUS (o la ventana del navegador) y activa el audio de la pestaña. Al salir, la grabación queda en CHORUS.',
-            'Recording. In the dialog pick this CHORUS tab (or the browser window) and share tab audio. When you leave, the file stays in CHORUS.',
+            'Gravação pelo browser (limitação actual): no diálogo escolhe esta aba do CHORUS e liga o áudio da aba. A transcrição ao vivo não precisa disto — usa Transcrever.',
+            'Grabación por el navegador (limitación actual): en el diálogo elige esta pestaña de CHORUS y activa el audio de la pestaña. La transcripción en vivo no necesita esto — usa Transcribir.',
+            'Browser capture (current limit): in the dialog pick this CHORUS tab and share tab audio. Live transcript does not need this — use Transcribe.',
           ),
         );
       } catch (err) {
@@ -728,9 +748,9 @@ export function MeetRoomClient({ sessionId }: Props) {
           err instanceof Error
             ? err.message
             : t(
-                'Não foi possível iniciar a gravação. No diálogo escolhe esta aba do CHORUS, uma janela ou o ecrã inteiro.',
-                'No se pudo iniciar la grabación. En el diálogo elige esta pestaña de CHORUS, una ventana o la pantalla completa.',
-                'Could not start recording. In the dialog pick this CHORUS tab, a window, or the entire screen.',
+                'Não foi possível gravar o vídeo. Para só texto, usa Transcrever — não precisas de gravar.',
+                'No se pudo grabar el vídeo. Para solo texto, usa Transcribir — no hace falta grabar.',
+                'Could not record video. For text only, use Transcribe — you do not need to record.',
               ),
         );
       } finally {
@@ -1280,6 +1300,21 @@ export function MeetRoomClient({ sessionId }: Props) {
                   locale={locale}
                   displayName={displayName}
                   transcriptionLanguage={meetingSpeechLang}
+                  onReady={() => {
+                    if (autoTranscriptStartedRef.current) return;
+                    if (!joinPrefsRef.current.enableLiveTranscript) return;
+                    if (transcriptionOn || transcriptionWantedRef.current) return;
+                    if (
+                      !features.liveTranscriptionEnabled &&
+                      !browserLiveSttSupported()
+                    ) {
+                      return;
+                    }
+                    autoTranscriptStartedRef.current = true;
+                    window.setTimeout(() => {
+                      beginLiveTranscript({ openPanel: false });
+                    }, 600);
+                  }}
                   onTranscriptionChunk={handleTranscriptionChunk}
                   onParticipantCountChange={setParticipantCount}
                   onDominantSpeakerChanged={(name) => {
@@ -1295,17 +1330,7 @@ export function MeetRoomClient({ sessionId }: Props) {
                         (features.liveTranscriptionEnabled || browserLiveSttSupported())
                       ) {
                         window.setTimeout(() => {
-                          transcriptionWantedRef.current = true;
-                          serverTranscriptSeenRef.current = false;
-                          roomDialAttemptsRef.current = 0;
-                          transcriptionStartedAtRef.current = Date.now();
-                          setTranscriptionWaiting(true);
-                          setTranscriptionOn(true);
-                          setJoinPrefs((p) => ({ ...p, enableLiveTranscript: true }));
-                          if (features.liveTranscriptionEnabled) {
-                            conferenceRef.current?.startTranscription();
-                          }
-                          startBrowserStt();
+                          beginLiveTranscript({ openPanel: false });
                         }, 0);
                       }
                       return next;
@@ -1316,9 +1341,12 @@ export function MeetRoomClient({ sessionId }: Props) {
                       leaveQuietRef.current = false;
                       return;
                     }
-                    // Desligar na barra = sair desta pessoa. Flutuar nunca encerra a chamada.
+                    // Falsos videoConferenceLeft ao mudar de aba / PiP / blur — não expulsar.
                     if (document.visibilityState === 'hidden') return;
-                    if (Date.now() - lastHiddenAtRef.current < 15_000) return;
+                    if (typeof document.hasFocus === 'function' && !document.hasFocus()) {
+                      if (Date.now() - lastHiddenAtRef.current < 45_000) return;
+                    }
+                    if (Date.now() - lastHiddenAtRef.current < 45_000) return;
                     void leaveToMeetHome();
                   }}
                   onRecordingStatus={(state) => {

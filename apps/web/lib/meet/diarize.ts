@@ -4,13 +4,16 @@ import { llmCompleteJsonText } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
 import type { WhisperTimedSegment } from '@/lib/meet/transcribe';
 import { resolveMeetSpeechLanguage } from '@/lib/meet/language';
+import { canUseMeetAiEnhancement } from '@/lib/meet/ai-gate';
+import { diarizeWhisperSegmentsClassic } from '@/lib/meet/diarize-classic';
+import {
+  formatDiarizedTranscript,
+  mergeAdjacentUtterances,
+  type DiarizedUtterance,
+} from '@/lib/meet/diarize-merge';
 
-export type DiarizedUtterance = {
-  speaker: string;
-  text: string;
-  startSec: number;
-  endSec: number;
-};
+export type { DiarizedUtterance };
+export { formatDiarizedTranscript, mergeAdjacentUtterances, diarizeWhisperSegmentsClassic };
 
 type PackedSegment = {
   id: number;
@@ -21,10 +24,42 @@ type PackedSegment = {
 
 const BATCH_SIZE = 90;
 
+function normalizeSpeakers(participants: string[]): string[] {
+  const speakers = [
+    ...new Set(participants.map((n) => n.trim()).filter(Boolean).slice(0, 24)),
+  ];
+  if (speakers.length === 0) speakers.push('Participante');
+  return speakers;
+}
+
 /**
- * Atribui segmentos Whisper aos nomes da reunião — SEM reescrever o texto (evita alucinações).
+ * Camada A sempre; Camada B (LLM) só se disponível — sem reescrever texto.
  */
 export async function diarizeWhisperSegments(opts: {
+  segments: WhisperTimedSegment[];
+  participants: string[];
+  liveHints?: Array<{ speaker: string; text: string }>;
+  locale?: string;
+  languageHint?: string;
+  companyId?: string;
+}): Promise<DiarizedUtterance[]> {
+  const classic = diarizeWhisperSegmentsClassic(opts);
+  if (classic.length === 0) return [];
+
+  const speakers = normalizeSpeakers(opts.participants);
+  if (speakers.length <= 1 || !canUseMeetAiEnhancement({ companyId: opts.companyId })) {
+    return classic;
+  }
+
+  try {
+    return await diarizeWhisperSegmentsWithLlm(opts);
+  } catch (err) {
+    console.error('[meet/diarize] AI layer skipped, using classic', err);
+    return classic;
+  }
+}
+
+async function diarizeWhisperSegmentsWithLlm(opts: {
   segments: WhisperTimedSegment[];
   participants: string[];
   liveHints?: Array<{ speaker: string; text: string }>;
@@ -43,15 +78,7 @@ export async function diarizeWhisperSegments(opts: {
 
   if (segments.length === 0) return [];
 
-  const speakers = [
-    ...new Set(
-      opts.participants
-        .map((n) => n.trim())
-        .filter(Boolean)
-        .slice(0, 24),
-    ),
-  ];
-  if (speakers.length === 0) speakers.push('Participante');
+  const speakers = normalizeSpeakers(opts.participants);
 
   const speechLang = resolveMeetSpeechLanguage({
     explicit: opts.languageHint,
@@ -169,31 +196,4 @@ Responde APENAS:
   }
 
   return out;
-}
-
-function mergeAdjacentUtterances(rows: DiarizedUtterance[]): DiarizedUtterance[] {
-  const merged: DiarizedUtterance[] = [];
-  for (const row of rows) {
-    const last = merged[merged.length - 1];
-    if (last && last.speaker === row.speaker && row.startSec - last.endSec < 8) {
-      last.text = `${last.text} ${row.text}`.replace(/\s+/g, ' ').trim();
-      last.endSec = Math.max(last.endSec, row.endSec);
-    } else {
-      merged.push({ ...row });
-    }
-  }
-  return merged;
-}
-
-export function formatDiarizedTranscript(utterances: DiarizedUtterance[]): string {
-  return utterances
-    .map((u) => {
-      const m = Math.floor(u.startSec / 60);
-      const s = Math.floor(u.startSec % 60)
-        .toString()
-        .padStart(2, '0');
-      return `[${m}:${s}] ${u.speaker}: ${u.text}`;
-    })
-    .join('\n')
-    .trim();
 }

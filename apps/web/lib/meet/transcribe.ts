@@ -1,7 +1,6 @@
 import 'server-only';
 
-import { downloadMeetRecordingBuffer } from '@/lib/meet/recording-storage';
-import { extractMeetAudioForTranscription } from '@/lib/meet/extract-audio';
+import { prepareMeetAudioForStt } from '@/lib/meet/extract-audio';
 
 export type WhisperTimedSegment = {
   id: number;
@@ -46,61 +45,6 @@ function getTranscribeConfig(): { apiKey: string; baseUrl: string; model: string
   return { apiKey, baseUrl, model };
 }
 
-function pickAudioExtension(contentType: string, urlHint: string): string {
-  const ct = contentType.toLowerCase();
-  if (ct.includes('webm')) return 'webm';
-  if (ct.includes('ogg')) return 'ogg';
-  if (ct.includes('wav')) return 'wav';
-  if (ct.includes('mpeg') || ct.includes('mp3')) return 'mp3';
-  if (ct.includes('mp4') || ct.includes('m4a')) return 'm4a';
-  const m = urlHint.match(/\.([a-z0-9]{2,4})(?:\?|$)/i);
-  if (m) return m[1]!.toLowerCase();
-  return 'mp4';
-}
-
-function maxTranscribeBytes(): number {
-  return Number(process.env.MEET_TRANSCRIBE_MAX_BYTES || 24 * 1024 * 1024);
-}
-
-/** Se o ficheiro for grande (vídeo), extrai áudio compacto para STT. */
-async function prepareBufferForStt(opts: {
-  buffer: Buffer;
-  contentType: string;
-  urlHint: string;
-}): Promise<{ buffer: Buffer; contentType: string; ext: string }> {
-  const maxBytes = maxTranscribeBytes();
-  let { buffer, contentType } = opts;
-  let ext = pickAudioExtension(contentType, opts.urlHint);
-
-  if (buffer.byteLength > maxBytes) {
-    const extracted = await extractMeetAudioForTranscription({
-      buffer,
-      contentType,
-      urlHint: opts.urlHint,
-    });
-    if (!extracted) {
-      const mb = Math.round(buffer.byteLength / 1024 / 1024);
-      const lim = Math.round(maxBytes / 1024 / 1024);
-      throw new Error(
-        `A gravação é demasiado grande (${mb} MB; limite ~${lim} MB após extrair áudio). Tente um ficheiro mais curto.`,
-      );
-    }
-    buffer = extracted.buffer;
-    contentType = extracted.contentType;
-    ext = extracted.ext;
-  }
-
-  if (buffer.byteLength > maxBytes) {
-    const mb = Math.round(buffer.byteLength / 1024 / 1024);
-    const lim = Math.round(maxBytes / 1024 / 1024);
-    throw new Error(
-      `O áudio extraído ainda é grande (${mb} MB; limite ~${lim} MB). Divida a reunião ou envie só o áudio.`,
-    );
-  }
-
-  return { buffer, contentType, ext };
-}
-
 export type MeetWhisperResult = {
   text: string;
   model: string;
@@ -109,6 +53,7 @@ export type MeetWhisperResult = {
 
 /**
  * Whisper/Gemini com timestamps — base para diarização CHORUS pós-chamada.
+ * Vídeos grandes: extrai áudio em disco (ffmpeg) antes do STT.
  */
 export async function transcribeMeetRecording(opts: {
   recordingUrlOrKey: string;
@@ -126,11 +71,8 @@ export async function transcribeMeetRecording(opts: {
   }
 
   const { apiKey, baseUrl, model } = getTranscribeConfig();
-  const downloaded = await downloadMeetRecordingBuffer(opts.recordingUrlOrKey);
-  const prepared = await prepareBufferForStt({
-    buffer: downloaded.buffer,
-    contentType: downloaded.contentType,
-    urlHint: opts.recordingUrlOrKey,
+  const prepared = await prepareMeetAudioForStt({
+    recordingUrlOrKey: opts.recordingUrlOrKey,
   });
 
   const form = new FormData();
@@ -209,18 +151,22 @@ async function transcribeWithGemini(opts: {
   )
     .trim()
     .replace(/^models\//, '');
-  const downloaded = await downloadMeetRecordingBuffer(opts.recordingUrlOrKey);
-  const prepared = await prepareBufferForStt({
-    buffer: downloaded.buffer,
-    contentType: downloaded.contentType,
-    urlHint: opts.recordingUrlOrKey,
+  const prepared = await prepareMeetAudioForStt({
+    recordingUrlOrKey: opts.recordingUrlOrKey,
   });
 
   const lang = (opts.languageHint || 'pt').slice(0, 8);
   const prompt = [
     `Transcreva este áudio de reunião em ${lang}.`,
-    'Devolva apenas o texto transcrito, sem comentários nem formatação extra.',
-    opts.promptHint?.trim() ? `Contexto: ${opts.promptHint.trim().slice(0, 400)}` : '',
+    'Produza um DIÁLOGO limpo e profissional (nível acta de reunião).',
+    'Separe turnos por interlocutor. Prefira NOMES reais se o contexto os indicar.',
+    'Formato obrigatório, uma fala por linha:',
+    '[m:ss] Nome: frase completa com pontuação.',
+    'Exemplo: [0:12] Thiago: Hola, ¿cómo estás?',
+    'Se não souber o nome, use Falante 1 / Falante 2 de forma consistente — mas prefira nomes do contexto.',
+    'Corrija pontuação; evite muletas vazias (eh, este este); não invente conteúdo.',
+    'Não acrescente comentários fora da transcrição.',
+    opts.promptHint?.trim() ? `Contexto (participantes/título): ${opts.promptHint.trim().slice(0, 500)}` : '',
   ]
     .filter(Boolean)
     .join(' ');

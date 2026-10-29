@@ -3,14 +3,15 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getUserCompanyIds } from '@/lib/tenant';
 import { getMeetSessionForCompany } from '@/lib/meet/create-session';
-import { generateMeetPostMeetingAi } from '@/lib/meet/post-meeting-ai';
+import { generateMeetPostMeeting } from '@/lib/meet/post-meeting';
 import { notifyMeetActionsPending } from '@/lib/meet/notify-pending-actions';
 import { prisma } from '@/lib/prisma';
 
 type Ctx = { params: Promise<{ id: string }> };
 
 /**
- * Encerra a reunião (opcional), guarda notas/transcrição e gera resumo + tarefas em rascunho (IA).
+ * Encerra a reunião (opcional), guarda notas/transcrição e gera resumo + tarefas.
+ * Camada A sempre; Camada B (IA) silenciosa se disponível.
  */
 export async function POST(req: Request, ctx: Ctx) {
   try {
@@ -56,12 +57,26 @@ export async function POST(req: Request, ctx: Ctx) {
       projectName = p?.name ?? null;
     }
 
-    const ai = await generateMeetPostMeetingAi({
+    const participants = await prisma.meetParticipant.findMany({
+      where: { sessionId: session.id },
+      select: {
+        displayName: true,
+        email: true,
+        user: { select: { name: true } },
+      },
+    });
+    const participantNames = participants
+      .map((p) => p.displayName || p.user?.name || p.email || '')
+      .filter(Boolean);
+
+    const post = await generateMeetPostMeeting({
       title: session.title,
       mirror: session.mirror,
       projectName,
       notes,
       locale: body.locale,
+      participants: participantNames,
+      companyId,
     });
 
     if (body.replaceDrafts !== false) {
@@ -72,7 +87,7 @@ export async function POST(req: Request, ctx: Ctx) {
 
     const createdActions = [];
     let sort = 0;
-    for (const item of ai.actionItems) {
+    for (const item of post.actionItems) {
       let dueHint: Date | null = null;
       if (item.dueHint) {
         const d = new Date(item.dueHint);
@@ -96,7 +111,7 @@ export async function POST(req: Request, ctx: Ctx) {
       where: { id: session.id },
       data: {
         transcriptText: notes.slice(0, 100_000),
-        summaryText: ai.summary.slice(0, 20_000),
+        summaryText: post.summary.slice(0, 20_000),
         ...(body.endMeeting !== false
           ? { status: 'ended', endedAt: session.endedAt ?? new Date() }
           : {}),
@@ -117,10 +132,11 @@ export async function POST(req: Request, ctx: Ctx) {
 
     return NextResponse.json({
       session: updated,
-      ai: {
-        decisions: ai.decisions,
-        nextSteps: ai.nextSteps,
+      post: {
+        decisions: post.decisions,
+        nextSteps: post.nextSteps,
         actionItemsCreated: createdActions.length,
+        enhanced: post.enhanced,
       },
     });
   } catch (error: unknown) {

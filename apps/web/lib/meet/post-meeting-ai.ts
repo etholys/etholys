@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { llmCompleteJsonText } from '@/lib/llm-client';
 import { extractFirstJsonObject } from '@/lib/extract-json-object';
+import { meetCompleteJsonText } from '@/lib/meet/meet-llm';
 
 export type MeetAiActionDraft = {
   title: string;
@@ -27,30 +27,32 @@ function buildPrompt(opts: {
   const lang =
     opts.locale === 'pt' ? 'português do Brasil' : opts.locale === 'en' ? 'English' : 'español';
 
-  return `És um assistente de pós-reunião do Etholys (gestão de projetos e capacitações).
+  return `És um editor de actas profissionais (nível Otter/Fireflies) do Etholys CHORUS.
 
 Reunião: "${opts.title}"
-Contexto: mirror=${opts.mirror}${opts.projectName ? `, projeto SIEP="${opts.projectName}"` : ''}
+Contexto: mirror=${opts.mirror}${opts.projectName ? `, projeto="${opts.projectName}"` : ''}
 
-Com base nas notas/transcrição abaixo, extrai:
-1) resumo executivo curto
-2) decisões tomadas
-3) próximos passos narrativos
-4) tarefas concretas (action items) para validação humana — NÃO inventes factos; só o que estiver implícito ou explícito nas notas
+Produz um RECAP limpo em ${lang} — SÍNTESE, nunca copies frases STT brutas nem "Falante N".
 
-Responde APENAS JSON válido (sem markdown), campos em ${lang}:
+Formato ouro (como acta executiva):
+1) "summary": 1 parágrafo curto (2–5 frases) com o contexto e eixos principais.
+2) "decisions": só acordos claros (frases curtas, sem citação).
+3) "nextSteps": próximos passos com dono quando for claro (ex. "Confirmar com Alex…").
+4) "actionItems": 3–8 tarefas imperativas ≤80 caracteres, com assigneeHint se o nome aparecer.
+
+Responde APENAS JSON:
 {
-  "summary": "string",
-  "decisions": ["..."],
-  "nextSteps": ["..."],
+  "summary": "parágrafo executivo…",
+  "decisions": ["…"],
+  "nextSteps": ["… (Nome)"],
   "actionItems": [
-    { "title": "tarefa curta e acionável", "notes": "opcional", "assigneeHint": "nome ou email se mencionado", "dueHint": "ISO date ou null" }
+    { "title": "tarefa curta", "notes": "opcional", "assigneeHint": "Nome", "dueHint": null }
   ]
 }
 
-Máximo 12 actionItems. Se as notas forem pobres, devolve poucas tarefas e um summary honesto.
+Lista vazia > lixo. Não inventes factos.
 
-NOTAS / TRANSCRIÇÃO:
+TRANSCRIÇÃO:
 ---
 ${opts.notes.slice(0, 24000)}
 ---`;
@@ -68,8 +70,8 @@ export async function generateMeetPostMeetingAi(opts: {
     throw new Error('Notas/transcrição demasiado curtas (mín. ~20 caracteres)');
   }
 
-  const raw = await llmCompleteJsonText(
-    'Devolves apenas JSON válido para pós-reunião Etholys Meet.',
+  const raw = await meetCompleteJsonText(
+    'Devolves apenas JSON válido para pós-reunião Etholys Meet / CHORUS.',
     buildPrompt({ ...opts, notes }),
     { maxOutputTokens: 4096 },
   );
@@ -107,10 +109,20 @@ export async function generateMeetPostMeetingAi(opts: {
     }
   }
 
+  const decH =
+    opts.locale === 'en' ? 'Decisions:' : opts.locale === 'pt' ? 'Decisões:' : 'Decisiones:';
+  const nextH =
+    opts.locale === 'en' ? 'Next steps:' : opts.locale === 'pt' ? 'Próximos passos:' : 'Próximos passos:';
+
+  const nextLines =
+    nextSteps.length > 0
+      ? nextSteps
+      : actionItems.map((a) => (a.assigneeHint ? `${a.title} (${a.assigneeHint})` : a.title));
+
   const composedSummary = [
     summary || '(Sem resumo)',
-    decisions.length ? `\nDecisões:\n- ${decisions.join('\n- ')}` : '',
-    nextSteps.length ? `\nPróximos passos:\n- ${nextSteps.join('\n- ')}` : '',
+    decisions.length ? `\n\n${decH}\n- ${decisions.join('\n- ')}` : '',
+    nextLines.length ? `\n\n${nextH}\n- ${nextLines.join('\n- ')}` : '',
   ]
     .join('')
     .trim();
@@ -118,7 +130,7 @@ export async function generateMeetPostMeetingAi(opts: {
   return {
     summary: composedSummary,
     decisions,
-    nextSteps,
+    nextSteps: nextLines,
     actionItems,
   };
 }

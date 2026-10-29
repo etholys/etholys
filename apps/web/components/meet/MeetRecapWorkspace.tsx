@@ -177,6 +177,37 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
     void flushAllPendingMeetRecordings().then(() => loadDetail());
   }, [companyId, sessionId, loadDetail]);
 
+  // Auto-transcrição: gravação na nuvem sem texto → corre STT sem botão manual
+  useEffect(() => {
+    if (!companyId || !sessionId || !detail) return;
+    if (transcribeBusy || uploadBusy) return;
+    const hasRecording = Boolean(detail.recordingUrl);
+    const hasTranscript = Boolean(detail.transcriptText?.trim());
+    if (!hasRecording || hasTranscript) return;
+
+    let wantAuto = false;
+    try {
+      wantAuto = new URLSearchParams(window.location.search).get('autoTranscribe') === '1';
+    } catch {
+      wantAuto = true;
+    }
+    if (!wantAuto && hasRecording && !hasTranscript) {
+      // Mesmo sem query: se há vídeo e não há texto, gera sozinho uma vez
+      wantAuto = true;
+    }
+    if (!wantAuto) return;
+
+    const key = `chorus-auto-stt:${sessionId}`;
+    try {
+      if (sessionStorage.getItem(key) === '1') return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      /* continua */
+    }
+    void runTranscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId, sessionId, detail?.recordingUrl, detail?.transcriptText]);
+
   function rowDateKey(row: RecapListRow): string | null {
     const raw = row.endedAt || row.scheduledAt || row.endsAt;
     if (!raw) return null;
@@ -292,7 +323,7 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
         if (!r.ok) throw new Error(d.error || 'Error');
         await loadDetail();
         await loadList();
-        setTab('transcript');
+        setTab('summary');
       } catch (trErr) {
         setError(
           trErr instanceof Error
@@ -332,9 +363,14 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
       });
       const d = (await r.json()) as { error?: string };
       if (!r.ok) throw new Error(d.error || 'Error');
+      try {
+        sessionStorage.removeItem(`chorus-auto-stt:${sessionId}`);
+      } catch {
+        /* ignore */
+      }
       await loadDetail();
       await loadList();
-      setTab('transcript');
+      setTab('summary');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
     } finally {
@@ -382,6 +418,18 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
     const a = document.createElement('a');
     a.href = url;
     a.download = `${detail.title.replace(/[^\w\-]+/g, '_').slice(0, 40)}-transcript.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadSummary() {
+    const text = detail?.summaryText?.trim();
+    if (!text || !detail) return;
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${detail.title.replace(/[^\w\-]+/g, '_').slice(0, 40)}-resumen.txt`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -623,9 +671,30 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                 {tab === 'summary' && (
                   <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     {detail.summaryText?.trim() ? (
-                      <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-800">
-                        {detail.summaryText}
-                      </pre>
+                      <>
+                        <div className="mb-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={downloadSummary}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            {t('Descarregar resumo .txt', 'Descargar resumen .txt', 'Download summary .txt')}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy || transcriptBody.trim().length < 20}
+                            onClick={() => void generateSummary()}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-900 hover:bg-teal-100 disabled:opacity-40"
+                          >
+                            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                            {t('Atualizar resumo', 'Actualizar resumen', 'Refresh summary')}
+                          </button>
+                        </div>
+                        <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-800">
+                          {detail.summaryText}
+                        </pre>
+                      </>
                     ) : (
                       <div className="text-center">
                         <Sparkles className="mx-auto h-8 w-8 text-slate-300" />
@@ -635,9 +704,9 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                         <p className="mt-1 text-xs text-slate-500">
                           {transcriptBody.trim().length >= 20
                             ? t(
-                                'Há transcrição. Gera o resumo com IA.',
-                                'Hay transcripción. Genera el resumen con IA.',
-                                'There is a transcript. Generate the AI summary.',
+                                'Há transcrição. Gere o resumo da reunião.',
+                                'Hay transcripción. Genere el resumen de la reunión.',
+                                'There is a transcript. Generate the meeting summary.',
                               )
                             : t(
                                 'Sem transcrição suficiente. Entra na reunião com o microfone ligado ou cola o texto na transcrição.',
@@ -806,9 +875,9 @@ export function MeetRecapWorkspace({ sessionId }: { sessionId?: string }) {
                         <ListTodo className="mx-auto h-8 w-8 text-slate-300" />
                         <p className="mt-2">
                           {t(
-                            'Ainda sem tarefas. Gera o resumo para a IA sugerir próximos passos.',
-                            'Aún sin tareas. Genera el resumen para que la IA sugiera próximos pasos.',
-                            'No tasks yet. Generate the summary so AI can suggest next steps.',
+                            'Ainda sem tarefas. Gere o resumo para extrair próximos passos explícitos.',
+                            'Aún sin tareas. Genere el resumen para extraer próximos pasos explícitos.',
+                            'No tasks yet. Generate the summary to extract explicit next steps.',
                           )}
                         </p>
                       </div>

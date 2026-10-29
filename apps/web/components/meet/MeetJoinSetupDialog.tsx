@@ -149,9 +149,9 @@ export function MeetJoinSetupDialog({
                         'Records the room on the server (people + shares), then can transcribe.',
                       )
                     : t(
-                        'Na sala, Gravar guarda o vídeo desta chamada. Transcrever mostra o texto enquanto se fala.',
-                        'En la sala, Grabar guarda el vídeo de esta llamada. Transcribir muestra el texto mientras se habla.',
-                        'In the room, Record saves this call’s video. Transcribe shows text while people speak.',
+                        'Gravação de vídeo da sala no servidor ainda não está activa. Usa «Transcrever» para texto sem vídeo; «Gravar» na sala usa captura do browser (com diálogo).',
+                        'La grabación de vídeo de la sala en el servidor aún no está activa. Usa «Transcribir» para texto sin vídeo; «Grabar» en la sala usa captura del navegador (con diálogo).',
+                        'Server-side call video recording is not active yet. Use “Transcribe” for text without video; in-room “Record” uses browser capture (with a dialog).',
                       )}
                 </span>
               </span>
