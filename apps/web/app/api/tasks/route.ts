@@ -64,7 +64,8 @@ export async function GET(req: Request) {
         'siep.activities.report',
       ]);
       if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
-    } else if (companyId && companyMemberIds.includes(companyId)) {
+    } else if (companyId && tenant.companyIds.includes(companyId)) {
+      // Inclui convidados eTask (companyIds via WorkFolderShare, sem CompanyUser).
       where.OR = [{ project: { companyId } }, { companyId }];
     } else if (companyMemberIds.length) {
       where.OR = [
@@ -74,6 +75,12 @@ export async function GET(req: Request) {
       ];
     } else if (guestProjectIds.length) {
       where.projectId = { in: guestProjectIds };
+    } else if (tenant.companyIds.length) {
+      // Só tableros partilhados — o folderVisibleTaskFilter corta o resto.
+      where.OR = [
+        { project: { companyId: { in: tenant.companyIds } } },
+        { companyId: { in: tenant.companyIds } },
+      ];
     } else {
       return NextResponse.json({ tasks: [] });
     }

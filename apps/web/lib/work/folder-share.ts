@@ -104,6 +104,56 @@ export async function findWorkShareByMagicToken(magic: string) {
   return share;
 }
 
+/** Login via o token do convite (URL /work/shared/[token]) — sobrevive após accept limpar/expirar magic. */
+export async function findWorkShareByInviteToken(inviteToken: string) {
+  const share = await prisma.workFolderShare.findFirst({
+    where: { token: inviteToken, status: 'active' },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          locale: true,
+          avatar: true,
+          image: true,
+          isActive: true,
+        },
+      },
+      folder: { select: { id: true, name: true, isActive: true } },
+    },
+  });
+  if (!share?.folder?.isActive) return null;
+  if (share.expiresAt && share.expiresAt.getTime() < Date.now()) return null;
+  return share;
+}
+
+/** Garante magic de login para convidados externos (reabrir o mesmo link do email). */
+async function ensureWorkShareMagic(shareId: string, current?: {
+  magicLoginToken: string | null;
+  magicLoginExpiresAt: Date | null;
+}): Promise<{ magicLoginToken: string; magicLoginExpiresAt: Date }> {
+  const now = Date.now();
+  if (
+    current?.magicLoginToken &&
+    current.magicLoginExpiresAt &&
+    current.magicLoginExpiresAt.getTime() > now
+  ) {
+    return {
+      magicLoginToken: current.magicLoginToken,
+      magicLoginExpiresAt: current.magicLoginExpiresAt,
+    };
+  }
+  const magicLoginToken = generateToken();
+  const magicLoginExpiresAt = expiresInDays(14);
+  await prisma.workFolderShare.update({
+    where: { id: shareId },
+    data: { magicLoginToken, magicLoginExpiresAt },
+  });
+  return { magicLoginToken, magicLoginExpiresAt };
+}
+
 export async function createWorkFolderShare(opts: {
   companyId: string;
   folderId: string;
@@ -232,13 +282,27 @@ export async function getWorkSharePreview(token: string) {
   });
   if (!share) return null;
   if (share.expiresAt && share.expiresAt.getTime() < Date.now()) return null;
-  const magicOk =
-    share.magicLoginToken &&
-    share.magicLoginExpiresAt &&
-    share.magicLoginExpiresAt.getTime() > Date.now();
+
+  // Convidados externos precisam de magic válido em cada abertura do link
+  // (accept antigo limpava o token → «No autorizado» ao reabrir o convite).
+  let magicLoginToken = share.magicLoginToken;
+  if (share.accessMode === 'external_guest') {
+    const ensured = await ensureWorkShareMagic(share.id, {
+      magicLoginToken: share.magicLoginToken,
+      magicLoginExpiresAt: share.magicLoginExpiresAt,
+    });
+    magicLoginToken = ensured.magicLoginToken;
+  } else {
+    const magicOk =
+      share.magicLoginToken &&
+      share.magicLoginExpiresAt &&
+      share.magicLoginExpiresAt.getTime() > Date.now();
+    magicLoginToken = magicOk ? share.magicLoginToken : null;
+  }
+
   return {
     ...share,
-    magicLoginToken: magicOk ? share.magicLoginToken : null,
+    magicLoginToken,
     companyName: share.company.shortName || share.company.name,
   };
 }
@@ -256,13 +320,19 @@ export async function acceptWorkFolderShare(token: string, userId: string) {
     throw new Error('Este convite não é para a sua conta');
   }
 
+  // Manter magic activo (como Studio) para o convidado reabrir o mesmo link sem password.
+  if (share.accessMode === 'external_guest') {
+    await ensureWorkShareMagic(share.id, {
+      magicLoginToken: share.magicLoginToken,
+      magicLoginExpiresAt: share.magicLoginExpiresAt,
+    });
+  }
+
   await prisma.workFolderShare.update({
     where: { id: share.id },
     data: {
       userId,
       acceptedAt: new Date(),
-      magicLoginToken: null,
-      magicLoginExpiresAt: null,
     },
   });
 

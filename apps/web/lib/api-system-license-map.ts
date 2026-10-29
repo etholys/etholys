@@ -118,10 +118,13 @@ export function isApiLicenseExempt(pathname: string): boolean {
     pathname.startsWith('/api/tasks') ||
     pathname.startsWith('/api/task-groups') ||
     pathname.startsWith('/api/work-folders') ||
+    pathname.startsWith('/api/work-board') ||
+    pathname.startsWith('/api/work-dashboard') ||
     pathname.startsWith('/api/task-approvals') ||
     pathname.startsWith('/api/task-templates') ||
     pathname.startsWith('/api/task-dependencies') ||
     pathname.startsWith('/api/time-entries') ||
+    pathname.startsWith('/api/departments') ||
     pathname.startsWith('/api/checklist') ||
     pathname.startsWith('/api/comments') ||
     pathname.startsWith('/api/users/me') ||

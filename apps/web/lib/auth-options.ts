@@ -58,6 +58,7 @@ export const authOptions: NextAuthOptions = {
           forgeMagicToken: { label: 'Forge Magic', type: 'text' },
           studioMagicToken: { label: 'Studio Magic', type: 'text' },
           workMagicToken: { label: 'Work Magic', type: 'text' },
+          workShareToken: { label: 'Work Share Invite', type: 'text' },
         },
         async authorize(credentials) {
         try {
@@ -84,6 +85,25 @@ export const authOptions: NextAuthOptions = {
           if (workMagic) {
             const { findWorkShareByMagicToken } = await import('@/lib/work/folder-share');
             const share = await findWorkShareByMagicToken(workMagic);
+            const user = share?.user;
+            if (!user?.isActive || !user.email) return null;
+            if (credentials?.email && user.email.toLowerCase() !== credentials.email.trim().toLowerCase()) {
+              return null;
+            }
+            return {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role,
+              locale: user.locale,
+              image: user.avatar || user.image,
+            } as any;
+          }
+
+          const workShareInvite = (credentials as { workShareToken?: string })?.workShareToken?.trim();
+          if (workShareInvite) {
+            const { findWorkShareByInviteToken } = await import('@/lib/work/folder-share');
+            const share = await findWorkShareByInviteToken(workShareInvite);
             const user = share?.user;
             if (!user?.isActive || !user.email) return null;
             if (credentials?.email && user.email.toLowerCase() !== credentials.email.trim().toLowerCase()) {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { signIn, useSession } from 'next-auth/react';
+import { getSession, signIn, useSession } from 'next-auth/react';
 import { CheckSquare, Loader2 } from 'lucide-react';
 
 export default function WorkSharedAcceptPage() {
@@ -51,13 +51,27 @@ export default function WorkSharedAcceptPage() {
     setBusy(true);
     setError(null);
     try {
-      if (status !== 'authenticated' && info.magicLoginToken && info.email) {
+      if (status !== 'authenticated') {
+        if (!info.email) throw new Error('Convite sem email associado');
+        const credentials = info.magicLoginToken
+          ? { email: info.email, workMagicToken: info.magicLoginToken }
+          : { email: info.email, workShareToken: token };
         const res = await signIn('credentials', {
           redirect: false,
-          email: info.email,
-          workMagicToken: info.magicLoginToken,
+          ...credentials,
         });
-        if (res?.error) throw new Error(res.error || 'Não foi possível iniciar sessão com o convite');
+        if (res?.error) {
+          throw new Error(
+            res.error === 'CredentialsSignin'
+              ? 'Não foi possível iniciar sessão com o convite'
+              : res.error,
+          );
+        }
+        // Garantir cookie de sessão antes do POST accept (evita «No autorizado»).
+        const session = await getSession();
+        if (!session?.user) {
+          throw new Error('Sessão não estabelecida. Tente novamente.');
+        }
       }
 
       const r = await fetch('/api/work-folders/shares/accept', {

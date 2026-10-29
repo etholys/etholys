@@ -85,6 +85,18 @@ export async function resolveWorkspaceJwtScope(userId: string): Promise<Workspac
         isSystemAdmin: false,
       };
     }
+    // Convidado eTask (tablero partilhado) — não mandar para /acesso.
+    const { resolveWorkJwtScope } = await import('@/lib/work/folder-share');
+    const work = await resolveWorkJwtScope(userId);
+    if (work.mode === 'share_only') {
+      return {
+        mode: 'none',
+        allowedSystems: [],
+        allowedTools: [],
+        homePath: work.homePath,
+        isSystemAdmin: false,
+      };
+    }
     return {
       mode: 'none',
       allowedSystems: [],

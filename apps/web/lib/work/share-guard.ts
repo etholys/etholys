@@ -10,9 +10,14 @@ export function isApiAllowedForWorkShareOnly(pathname: string): boolean {
   if (pathname.startsWith('/api/auth')) return true;
   if (pathname === '/api/internal/work-scope') return true;
   if (pathname.startsWith('/api/work-folders')) return true;
+  if (pathname.startsWith('/api/work-board')) return true;
+  if (pathname.startsWith('/api/work-dashboard')) return true;
   if (pathname.startsWith('/api/tasks')) return true;
   if (pathname.startsWith('/api/task-groups')) return true;
-  if (pathname === '/api/users') return true;
+  if (pathname.startsWith('/api/comments')) return true;
+  if (pathname.startsWith('/api/checklist')) return true;
+  if (pathname.startsWith('/api/departments')) return true;
+  if (pathname === '/api/users' || pathname.startsWith('/api/users/')) return true;
   if (pathname === '/api/companies' || pathname.startsWith('/api/companies')) return true;
   if (pathname.startsWith('/api/notifications')) return true;
   return false;
