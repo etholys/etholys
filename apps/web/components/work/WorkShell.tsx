@@ -544,6 +544,29 @@ export default function WorkShell() {
     }
   };
 
+  const moveFolder = async (id: string, parentId: string | null, order?: number) => {
+    const prev = folders;
+    setFolders((list) =>
+      list.map((f) =>
+        f.id === id
+          ? { ...f, parentId, ...(order !== undefined ? { order } : {}) }
+          : f,
+      ),
+    );
+    const body: Record<string, unknown> = { parentId };
+    if (order !== undefined) body.order = order;
+    const res = await fetch(`/api/work-folders/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      setFolders(prev);
+      return;
+    }
+    fetchFolders();
+  };
+
   const buildCreateBody = (title: string, dueDate?: string) => {
     const body: Record<string, unknown> = {
       title,
@@ -649,6 +672,7 @@ export default function WorkShell() {
         counts={counts}
         onCreateFolder={createFolder}
         onShareFolder={(f) => setShareFolder(f)}
+        onMoveFolder={moveFolder}
         t={t3}
       />
 

@@ -470,6 +470,37 @@ export default function TasksBoard({
     }
   };
 
+  const moveOrDuplicateSelected = async (opts: {
+    mode: 'move' | 'duplicate';
+    targetFolderId: string;
+  }) => {
+    if (bulkIds.size === 0 || !opts.targetFolderId) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch('/api/tasks/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          opts.mode === 'move'
+            ? { ids: [...bulkIds], patch: { folderId: opts.targetFolderId } }
+            : {
+                ids: [...bulkIds],
+                duplicate: true,
+                targetFolderId: opts.targetFolderId,
+                includeSubtasks: true,
+              },
+        ),
+      });
+      if (res.ok) {
+        setBulkIds(new Set());
+        fetchTasks({ silent: true });
+        notifyChanged();
+      }
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const body: any = {
@@ -1083,10 +1114,13 @@ export default function TasksBoard({
               <WorkBulkBar
                 count={bulkIds.size}
                 users={users}
+                boards={folders}
+                currentBoardId={folderFilter || initialFolderId || null}
                 busy={bulkBusy}
                 onClear={() => setBulkIds(new Set())}
                 onSelectAll={() => setBulkIds(new Set(filtered.map((t: any) => t.id)))}
                 onBulk={runBulk}
+                onMoveOrDuplicate={moveOrDuplicateSelected}
                 onArchive={() => void archiveSelected()}
                 onDelete={() => void deleteSelected()}
                 t={t3}

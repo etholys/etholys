@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -54,9 +54,32 @@ export type WorkFolderRow = {
   ownerId: string;
   kind?: string | null;
   parentId?: string | null;
+  order?: number | null;
   members?: { userId: string }[];
   _count?: { tasks?: number; members?: number };
 };
+
+export const WORK_FOLDER_DND_MIME = 'application/x-etholys-work-folder';
+
+export type WorkFolderDragPayload = {
+  id: string;
+  kind: 'FOLDER' | 'BOARD';
+};
+
+function parseWorkFolderDrag(raw: string): WorkFolderDragPayload | null {
+  try {
+    const o = JSON.parse(raw) as WorkFolderDragPayload;
+    if (!o?.id) return null;
+    return { id: String(o.id), kind: o.kind === 'FOLDER' ? 'FOLDER' : 'BOARD' };
+  } catch {
+    return null;
+  }
+}
+
+export function readWorkFolderDrag(dt: DataTransfer): WorkFolderDragPayload | null {
+  const raw = dt.getData(WORK_FOLDER_DND_MIME);
+  return raw ? parseWorkFolderDrag(raw) : null;
+}
 
 export type WorkCreateFolderInput = {
   name: string;
@@ -102,6 +125,9 @@ function buildTree(folders: WorkFolderRow[]): TreeNode[] {
       const ak = a.kind === 'FOLDER' ? 0 : 1;
       const bk = b.kind === 'FOLDER' ? 0 : 1;
       if (ak !== bk) return ak - bk;
+      const ao = a.order ?? 0;
+      const bo = b.order ?? 0;
+      if (ao !== bo) return ao - bo;
       return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     });
     for (const n of nodes) sortNodes(n.children);
@@ -124,6 +150,7 @@ export function WorkSidebar({
   counts,
   onCreateFolder,
   onShareFolder,
+  onMoveFolder,
   t,
 }: {
   nav: WorkNav;
@@ -147,6 +174,8 @@ export function WorkSidebar({
   };
   onCreateFolder: (input: WorkCreateFolderInput) => Promise<void>;
   onShareFolder?: (folder: { id: string; name: string }) => void;
+  /** Persist parent change (and optional order). Owners only in UI. */
+  onMoveFolder?: (id: string, parentId: string | null, order?: number) => Promise<void>;
   t: (en: string, es: string, pt: string) => string;
 }) {
   const [composer, setComposer] = useState<ComposerTarget | null>(null);
@@ -155,7 +184,11 @@ export function WorkSidebar({
   const [creating, setCreating] = useState(false);
   const [orgOpen, setOrgOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null | 'root'>(null);
+  const [moving, setMoving] = useState(false);
   const composerRef = useRef<HTMLDivElement>(null);
+  const dragPayloadRef = useRef<WorkFolderDragPayload | null>(null);
 
   const tree = useMemo(() => buildTree(folders), [folders]);
 
@@ -188,6 +221,74 @@ export function WorkSidebar({
   const go = (n: WorkNav) => {
     onNav(n);
     onMobileClose?.();
+  };
+
+  const byId = useMemo(() => {
+    const m = new Map<string, WorkFolderRow>();
+    for (const f of folders) m.set(f.id, f);
+    return m;
+  }, [folders]);
+
+  const isDescendantOf = (ancestorId: string, nodeId: string) => {
+    let cur = byId.get(nodeId);
+    while (cur?.parentId) {
+      if (cur.parentId === ancestorId) return true;
+      cur = byId.get(cur.parentId);
+    }
+    return false;
+  };
+
+  const canDropOnFolder = (drag: WorkFolderDragPayload, targetFolderId: string) => {
+    if (drag.id === targetFolderId) return false;
+    if (isDescendantOf(drag.id, targetFolderId)) return false;
+    const target = byId.get(targetFolderId);
+    if (!target || isBoard(target)) return false;
+    return true;
+  };
+
+  const finishDrop = async (parentId: string | null, order?: number) => {
+    const payload = dragPayloadRef.current;
+    setDropTarget(null);
+    setDragId(null);
+    dragPayloadRef.current = null;
+    if (!payload || !onMoveFolder || moving) return;
+    const current = byId.get(payload.id);
+    if (!current) return;
+    const nextParent = parentId;
+    if ((current.parentId || null) === nextParent && order === undefined) return;
+    if (nextParent) {
+      if (!canDropOnFolder(payload, nextParent)) return;
+    }
+    setMoving(true);
+    try {
+      await onMoveFolder(payload.id, nextParent, order);
+      if (nextParent) {
+        setExpanded((prev) => ({ ...prev, [nextParent]: true }));
+      }
+    } finally {
+      setMoving(false);
+    }
+  };
+
+  const startDrag = (e: DragEvent, node: WorkFolderRow) => {
+    if (!onMoveFolder || node.ownerId !== currentUserId || collapsed) {
+      e.preventDefault();
+      return;
+    }
+    const payload: WorkFolderDragPayload = {
+      id: node.id,
+      kind: isBoard(node) ? 'BOARD' : 'FOLDER',
+    };
+    dragPayloadRef.current = payload;
+    setDragId(node.id);
+    e.dataTransfer.setData(WORK_FOLDER_DND_MIME, JSON.stringify(payload));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const endDrag = () => {
+    setDragId(null);
+    setDropTarget(null);
+    dragPayloadRef.current = null;
   };
 
   const item = (
@@ -355,8 +456,11 @@ export function WorkSidebar({
     const folder = !isBoard(node);
     const shared = isSharedBoard(node);
     const isOwner = node.ownerId === currentUserId;
+    const canDrag = Boolean(onMoveFolder && isOwner && !collapsed);
     const open = expanded[node.id] ?? depth < 1;
     const indent = collapsed ? 0 : Math.min(depth, 6) * 12;
+    const isDropHighlight = dropTarget === node.id;
+    const isDragging = dragId === node.id;
 
     if (folder) {
       const chevron = (
@@ -408,13 +512,41 @@ export function WorkSidebar({
       return (
         <div key={node.id}>
           <div
+            draggable={canDrag}
+            onDragStart={(e) => startDrag(e, node)}
+            onDragEnd={endDrag}
+            onDragOver={(e) => {
+              if (!dragId || dragId === node.id) return;
+              const payload = dragPayloadRef.current;
+              if (!payload || !canDropOnFolder(payload, node.id)) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              if (dropTarget !== node.id) setDropTarget(node.id);
+            }}
+            onDragLeave={() => {
+              if (dropTarget === node.id) setDropTarget(null);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              void finishDrop(node.id);
+            }}
             className={cn(
               'group flex w-full items-center gap-0.5 rounded-lg transition',
-              nav.kind === 'folder' && nav.id === node.id
-                ? 'bg-teal-500/15'
-                : 'hover:bg-[color:var(--sys-nav-hover)]',
+              isDragging && 'opacity-40',
+              isDropHighlight
+                ? 'bg-teal-500/25 ring-1 ring-teal-400/60'
+                : nav.kind === 'folder' && nav.id === node.id
+                  ? 'bg-teal-500/15'
+                  : 'hover:bg-[color:var(--sys-nav-hover)]',
+              canDrag && 'cursor-grab active:cursor-grabbing',
             )}
             style={{ paddingLeft: indent }}
+            title={
+              canDrag
+                ? t('Drag to nest or reorder', 'Arrastra para anidar o reordenar', 'Arrasta para aninhar ou reordenar')
+                : undefined
+            }
           >
             {!collapsed && chevron}
             <button
@@ -476,8 +608,39 @@ export function WorkSidebar({
       </span>
     );
 
+    // Dropping onto a board moves the dragged item to the board's parent (sibling).
     return (
-      <div key={node.id}>
+      <div
+        key={node.id}
+        draggable={canDrag}
+        onDragStart={(e) => startDrag(e, node)}
+        onDragEnd={endDrag}
+        onDragOver={(e) => {
+          if (!dragId || dragId === node.id) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          if (dropTarget !== node.id) setDropTarget(node.id);
+        }}
+        onDragLeave={() => {
+          if (dropTarget === node.id) setDropTarget(null);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const siblingOrder = (node.order ?? 0) + 1;
+          void finishDrop(node.parentId || null, siblingOrder);
+        }}
+        className={cn(
+          isDragging && 'opacity-40',
+          isDropHighlight && 'rounded-lg bg-teal-500/20 ring-1 ring-teal-400/50',
+          canDrag && 'cursor-grab active:cursor-grabbing',
+        )}
+        title={
+          canDrag
+            ? t('Drag board into a folder', 'Arrastra el tablero a una carpeta', 'Arrasta o tablero para uma pasta')
+            : undefined
+        }
+      >
         {item(
           nav.kind === 'folder' && nav.id === node.id,
           () => go({ kind: 'folder', id: node.id, name: node.name }),
@@ -679,6 +842,30 @@ export function WorkSidebar({
                 t('All shared', 'Todo lo compartido', 'Tudo partilhado'),
                 counts.sharedOpen ?? 0,
               )}
+              {dragId && !collapsed && onMoveFolder ? (
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dropTarget !== 'root') setDropTarget('root');
+                  }}
+                  onDragLeave={() => {
+                    if (dropTarget === 'root') setDropTarget(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    void finishDrop(null);
+                  }}
+                  className={cn(
+                    'mx-1 mb-0.5 rounded-lg border border-dashed px-2.5 py-1.5 text-[11px] transition',
+                    dropTarget === 'root'
+                      ? 'border-teal-400 bg-teal-500/15 text-teal-200'
+                      : 'border-[color:var(--sys-line)] text-[color:var(--sys-faint)]',
+                  )}
+                >
+                  {t('Drop at root', 'Soltar en la raíz', 'Largar na raiz')}
+                </div>
+              ) : null}
               {tree.map((n) => renderNode(n, 0))}
             </div>
             {!collapsed && tree.length === 0 && (

@@ -12,6 +12,7 @@ import {
 } from '@/lib/work/folder-access';
 import { archiveTaskTree, restoreTaskTree } from '@/lib/work/task-archive';
 import { replaceTaskRolePeople } from '@/lib/work/task-people';
+import { ensureBoardDefaultGroup, getWritableBoard } from '@/lib/work/board-group';
 
 const PATCHABLE = new Set([
   'status',
@@ -51,6 +52,81 @@ async function assertEditable(
   return task;
 }
 
+async function duplicateTaskTree(
+  sourceId: string,
+  opts: {
+    tenant: { userId: string; companyIds: string[] };
+    targetFolderId: string;
+    targetGroupId: string | null;
+    companyId: string;
+    parentId?: string | null;
+    includeSubtasks: boolean;
+  },
+): Promise<string | null> {
+  const source = await prisma.task.findFirst({
+    where: { id: sourceId, isActive: true },
+    include: {
+      checklist: { orderBy: { order: 'asc' } },
+      subtasks: opts.includeSubtasks
+        ? { where: { isActive: true }, select: { id: true } }
+        : false,
+    },
+  });
+  if (!source) return null;
+
+  const created = await prisma.task.create({
+    data: {
+      title: source.title,
+      description: source.description,
+      projectId: source.projectId,
+      companyId: opts.companyId,
+      assigneeId: source.assigneeId,
+      responsibleId: source.responsibleId,
+      reviewerId: source.reviewerId,
+      creatorId: opts.tenant.userId,
+      parentId: opts.parentId ?? null,
+      status: source.status === 'DONE' ? 'TODO' : source.status,
+      priority: source.priority,
+      startDate: source.startDate,
+      dueDate: source.dueDate,
+      completedAt: null,
+      estimatedHours: source.estimatedHours,
+      order: source.order,
+      tags: source.tags,
+      customFields: source.customFields ?? undefined,
+      collaboratorIds: source.collaboratorIds ?? undefined,
+      roleMemberIds: source.roleMemberIds ?? undefined,
+      isRecurring: false,
+      recurrenceMonths: null,
+      recurrenceGroup: null,
+      departmentId: source.departmentId,
+      groupId: opts.parentId ? null : opts.targetGroupId,
+      folderId: opts.targetFolderId,
+      checklist: source.checklist.length
+        ? {
+            create: source.checklist.map((c) => ({
+              text: c.text,
+              completed: false,
+              order: c.order,
+            })),
+          }
+        : undefined,
+    },
+    select: { id: true },
+  });
+
+  if (opts.includeSubtasks && Array.isArray(source.subtasks)) {
+    for (const child of source.subtasks) {
+      await duplicateTaskTree(child.id, {
+        ...opts,
+        parentId: created.id,
+      });
+    }
+  }
+
+  return created.id;
+}
+
 /** Bulk update tasks — Monday/ClickUp-style multi-select actions. */
 export async function PUT(req: Request) {
   try {
@@ -63,8 +139,73 @@ export async function PUT(req: Request) {
     const remove = body.delete === true;
     const archive = body.archive === true;
     const restore = body.restore === true;
+    const duplicate = body.duplicate === true;
     if (!ids.length) return NextResponse.json({ error: 'ids required' }, { status: 400 });
     if (ids.length > 100) return NextResponse.json({ error: 'max 100 tasks' }, { status: 400 });
+
+    if (duplicate) {
+      const targetFolderId = String(body.targetFolderId || '');
+      if (!targetFolderId) {
+        return NextResponse.json({ error: 'targetFolderId required' }, { status: 400 });
+      }
+      const target = await getWritableBoard(targetFolderId, tenant.userId, tenant.companyIds);
+      if (!target) {
+        return NextResponse.json({ error: 'Tablero destino no encontrado' }, { status: 404 });
+      }
+      const includeSubtasks = body.includeSubtasks !== false;
+      let targetGroupId: string | null =
+        body.groupId !== undefined && body.groupId !== null && body.groupId !== ''
+          ? String(body.groupId)
+          : null;
+      if (!targetGroupId) {
+        targetGroupId = await ensureBoardDefaultGroup(target.folder.id, target.folder.companyId);
+      } else {
+        const g = await prisma.taskGroup.findFirst({
+          where: {
+            id: targetGroupId,
+            folderId: target.folder.id,
+            companyId: target.folder.companyId,
+            isActive: true,
+          },
+          select: { id: true },
+        });
+        if (!g) {
+          return NextResponse.json({ error: 'Grupo destino inválido' }, { status: 400 });
+        }
+      }
+
+      const idSet = new Set(ids);
+      const created: string[] = [];
+      const skipped: string[] = [];
+      for (const id of ids) {
+        const task = await assertEditable(id, tenant);
+        if (!task) {
+          skipped.push(id);
+          continue;
+        }
+        // Parent already in selection → child is copied with includeSubtasks.
+        if (task.parentId && idSet.has(task.parentId) && includeSubtasks) {
+          skipped.push(id);
+          continue;
+        }
+        const newId = await duplicateTaskTree(id, {
+          tenant,
+          targetFolderId: target.folder.id,
+          targetGroupId,
+          companyId: target.folder.companyId,
+          // Standalone subtask selection becomes a top-level task on the target.
+          parentId: null,
+          includeSubtasks,
+        });
+        if (newId) created.push(newId);
+        else skipped.push(id);
+      }
+      return NextResponse.json({
+        duplicated: created.length,
+        skipped: skipped.length,
+        ids: created,
+      });
+    }
 
     if (remove || archive || restore) {
       const updated: string[] = [];
@@ -106,6 +247,36 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'empty patch' }, { status: 400 });
     }
 
+    // Moving boards: remap group to a section on the target board.
+    let resolvedTargetGroupId: string | null | undefined;
+    if (data.folderId) {
+      const target = await getWritableBoard(String(data.folderId), tenant.userId, tenant.companyIds);
+      if (!target) {
+        return NextResponse.json({ error: 'Tablero destino no encontrado' }, { status: 404 });
+      }
+      data.folderId = target.folder.id;
+      if (data.groupId === undefined) {
+        resolvedTargetGroupId = await ensureBoardDefaultGroup(
+          target.folder.id,
+          target.folder.companyId,
+        );
+        data.groupId = resolvedTargetGroupId;
+      } else if (data.groupId) {
+        const g = await prisma.taskGroup.findFirst({
+          where: {
+            id: String(data.groupId),
+            folderId: target.folder.id,
+            companyId: target.folder.companyId,
+            isActive: true,
+          },
+          select: { id: true },
+        });
+        if (!g) {
+          return NextResponse.json({ error: 'Grupo destino inválido' }, { status: 400 });
+        }
+      }
+    }
+
     const updated: string[] = [];
     const skipped: string[] = [];
 
@@ -126,6 +297,18 @@ export async function PUT(req: Request) {
 
       const prevAssignee = task.assigneeId;
       await prisma.task.update({ where: { id }, data });
+
+      // Keep subtasks on the same board when moving a parent.
+      if (data.folderId && !task.parentId) {
+        await prisma.task.updateMany({
+          where: { parentId: id, isActive: true },
+          data: {
+            folderId: String(data.folderId),
+            groupId: null,
+          },
+        });
+      }
+
       if (data.assigneeId !== undefined) {
         await replaceTaskRolePeople({
           taskId: id,

@@ -109,6 +109,8 @@ Relatórios de campo / quilometragem / informes doador → **SIEP-only** (não W
 | Visibilidade | `PERSONAL` ou `SHARED`; **acesso = owner ∪ `WorkFolderMember`** (não company-wide) |
 | Roles | `viewer` (legado `member`), `editor`, `owner` |
 | Tarefas | Só em `BOARD`; pastas organizam a árvore na sidebar |
+| Sidebar DnD | Owner arrasta pastas/tableros: aninhar sob `FOLDER`, largar na raiz, ou sibling via drop noutro tablero (`parentId` / `order`). Não muda `PERSONAL`\|`SHARED` |
+| Mover / duplicar | Bulk bar: mover ou duplicar tarefas para outro tablero com escrita; move remapeia `groupId`; duplicate copia checklist (+ subtarefas) com novos ids |
 | Dashboard | `WorkDashboardLayout` por `userId` + `companyId` — cada utilizador escolhe tableros na síntese |
 | Filtros org. | Setores / projetos SIEP / Operaciones = **filtros**, não tableros |
 
