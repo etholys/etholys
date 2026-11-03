@@ -5,6 +5,11 @@ import {
   renderEtholysMailLayout,
   type EtholysMailLocale,
 } from '@/lib/email/etholys-mail-layout';
+import {
+  executorIdsFromTask,
+  responsibleIdsFromTask,
+  reviewerIdsFromTask,
+} from '@/lib/work/task-people';
 
 export type WorkNotifyKey = 'comment' | 'assign' | 'status';
 
@@ -22,34 +27,36 @@ export function wantsWorkEmail(json: unknown) {
   return notify.email !== false;
 }
 
+/** Deep-link into eTask opening a specific activity panel. */
+export function workTaskLink(taskId?: string | null, folderId?: string | null) {
+  if (taskId && folderId) {
+    return `/hub/work?nav=folder&id=${encodeURIComponent(folderId)}&view=table&task=${encodeURIComponent(taskId)}`;
+  }
+  if (taskId) return `/hub/work?task=${encodeURIComponent(taskId)}`;
+  return '/hub/work';
+}
+
+/** Anyone accompanying the activity in any role (executor, responsible, reviewer, creator, TaskPerson). */
 export function taskRoleUserIds(task: {
   assigneeId?: string | null;
   responsibleId?: string | null;
   reviewerId?: string | null;
   creatorId?: string | null;
   collaboratorIds?: unknown;
+  roleMemberIds?: unknown;
+  customFields?: unknown;
   assigneeIds?: string[] | null;
   responsibleIds?: string[] | null;
   reviewerIds?: string[] | null;
   people?: Array<{ userId: string; role: string }> | null;
 }) {
   const fromPeople = Array.isArray(task.people) ? task.people.map((p) => p.userId) : [];
-  const extra = Array.isArray(task.collaboratorIds)
-    ? task.collaboratorIds.map((id) => String(id))
-    : [];
-  const assignees = Array.isArray(task.assigneeIds) ? task.assigneeIds : [];
-  const responsible = Array.isArray(task.responsibleIds) ? task.responsibleIds : [];
-  const reviewers = Array.isArray(task.reviewerIds) ? task.reviewerIds : [];
   return [
-    task.assigneeId,
-    task.responsibleId,
-    task.reviewerId,
     task.creatorId,
-    ...assignees,
-    ...responsible,
-    ...reviewers,
+    ...executorIdsFromTask(task),
+    ...responsibleIdsFromTask(task),
+    ...reviewerIdsFromTask(task),
     ...fromPeople,
-    ...extra,
   ];
 }
 
@@ -230,20 +237,24 @@ export function notifyTaskWatchers(opts: {
   enabled: boolean;
   email?: boolean;
   link?: string;
+  companyId?: string | null;
+  taskId?: string | null;
   mail?: TaskMailFields;
 }) {
   if (!opts.enabled) return;
-  const link = opts.link || '/hub/work';
+  const link = opts.link || workTaskLink(opts.taskId);
   const seen = new Set<string>();
   for (const id of opts.userIds) {
     if (!id || id === opts.actorId || seen.has(id)) continue;
     seen.add(id);
-    createNotification({
+    void createNotification({
       userId: id,
       type: opts.type,
       title: opts.title,
       message: opts.message,
       link,
+      companyId: opts.companyId,
+      taskId: opts.taskId,
     });
     if (opts.email && opts.mail) {
       void notifyEmail({
@@ -278,21 +289,30 @@ export function notifyTaskAssigned(opts: {
   actorName?: string | null;
   where?: string;
   locale?: EtholysMailLocale;
+  companyId?: string | null;
+  taskId?: string | null;
+  folderId?: string | null;
 }) {
   if (!opts.assigneeId || opts.assigneeId === opts.actorId) return;
   if (opts.prevAssigneeId && opts.prevAssigneeId === opts.assigneeId) return;
-  const link = opts.projectId ? `/projects/${opts.projectId}` : '/hub/work';
+  const link = opts.taskId
+    ? workTaskLink(opts.taskId, opts.folderId)
+    : opts.projectId
+      ? `/projects/${opts.projectId}`
+      : '/hub/work';
   const role = opts.roleLabel || 'asignada';
   const who = opts.actorName?.trim() || 'Alguien';
   const where = opts.where || opts.title;
   const inAppTitle = 'Nueva tarea asignada';
   const inAppMessage = `Se te ${role}: ${opts.title}`;
-  createNotification({
+  void createNotification({
     userId: opts.assigneeId,
     type: 'task_assigned',
     title: inAppTitle,
     message: inAppMessage,
     link,
+    companyId: opts.companyId,
+    taskId: opts.taskId,
   });
   if (opts.email) {
     void notifyEmail({
@@ -322,9 +342,12 @@ export function notifyTaskAction(opts: {
   email?: boolean;
   link?: string;
   locale?: EtholysMailLocale;
+  companyId?: string | null;
+  taskId?: string | null;
+  folderId?: string | null;
 }) {
   if (!opts.recipientId || opts.recipientId === opts.actorId) return;
-  const link = opts.link || '/hub/work';
+  const link = opts.link || workTaskLink(opts.taskId, opts.folderId);
   const phrases = {
     review: {
       subject: 'Solicitud de revisión',
@@ -350,12 +373,14 @@ export function notifyTaskAction(opts: {
   } as const;
   const p = phrases[opts.action];
   const message = `${opts.actorName}: ${p.what}${opts.note ? ` — ${opts.note.slice(0, 100)}` : ''}`;
-  createNotification({
+  void createNotification({
     userId: opts.recipientId,
     type: p.type,
     title: p.inApp,
     message: `${opts.taskTitle} — ${message}`,
     link,
+    companyId: opts.companyId,
+    taskId: opts.taskId,
   });
   if (opts.email) {
     void notifyEmail({

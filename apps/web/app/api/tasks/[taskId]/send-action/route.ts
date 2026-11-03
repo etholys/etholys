@@ -7,6 +7,7 @@ import {
   buildTaskContextLine,
   notifyTaskAction,
   wantsWorkEmail,
+  workTaskLink,
 } from '@/lib/work/task-notify';
 import {
   replaceTaskRolePeople,
@@ -159,7 +160,10 @@ export async function POST(req: Request, { params }: { params: { taskId: string 
       where: whereLine,
       note,
       email: emailOn,
-      link: '/hub/work',
+      link: workTaskLink(task.id, task.folderId),
+      companyId: companyId || null,
+      taskId: task.id,
+      folderId: task.folderId,
     });
 
     return NextResponse.json({

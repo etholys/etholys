@@ -22,6 +22,7 @@ import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
 import { CompanyPicker } from '@/components/hub/CompanyPicker';
 import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
+import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { cn, getInitials } from '@/lib/utils';
 import { sysTheme, type SystemAccent } from '@/lib/system-shell';
@@ -230,6 +231,9 @@ export function ProductAppShell({
           </div>
 
           <div className={cn('shrink-0 border-t border-white/[0.07]', collapsed ? 'p-1.5' : 'p-3')}>
+            <div className={cn('mb-1 flex', collapsed ? 'justify-center' : 'justify-end px-1')}>
+              <NotificationsBell tone="dark" />
+            </div>
             <AppearanceToggle collapsed={collapsed} className="mb-1" />
             <button
               type="button"

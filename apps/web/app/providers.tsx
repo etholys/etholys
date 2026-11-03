@@ -6,6 +6,7 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import type { Locale } from '@/lib/i18n';
 import { normalizeLocale, t } from '@/lib/i18n';
 import { ActiveCompanyBootstrap } from '@/components/hub/ActiveCompanyBootstrap';
+import { NotificationToasts } from '@/components/notifications/NotificationToasts';
 import {
   applyAppearanceToDocument,
   normalizeAppearance,
@@ -127,6 +128,7 @@ export default function Providers({
         }}
       >
         <ActiveCompanyBootstrap />
+        <NotificationToasts />
         {children}
       </AppContext.Provider>
     </SessionProvider>

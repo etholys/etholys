@@ -324,12 +324,14 @@ export async function PUT(req: Request) {
         data.assigneeId !== prevAssignee &&
         data.assigneeId !== tenant.userId
       ) {
-        createNotification({
+        void createNotification({
           userId: String(data.assigneeId),
           type: 'task_assigned',
           title: 'Nueva tarea asignada',
           message: `Se te asignó: ${task.title}`,
-          link: task.projectId ? `/projects/${task.projectId}` : '/hub/work',
+          link: `/hub/work?task=${encodeURIComponent(id)}`,
+          companyId: task.companyId || null,
+          taskId: id,
         });
       }
     }

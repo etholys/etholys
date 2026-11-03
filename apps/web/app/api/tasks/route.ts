@@ -335,12 +335,14 @@ export async function POST(req: Request) {
         );
         created.push(enriched);
         if (tx.assigneeId && tx.assigneeId !== tenant.userId) {
-          createNotification({
+          void createNotification({
             userId: tx.assigneeId,
             type: 'task_assigned',
             title: 'Nueva tarea asignada',
-            message: `Se te asigno la tarea: ${tx.title}`,
-            link: tx.projectId ? `/projects/${tx.projectId}` : '/tasks',
+            message: `Se te asignó la tarea: ${tx.title}`,
+            link: `/hub/work?task=${encodeURIComponent(tx.id)}`,
+            companyId: (tx as { companyId?: string | null }).companyId || null,
+            taskId: tx.id,
           });
         }
       }
@@ -362,12 +364,14 @@ export async function POST(req: Request) {
     });
     // Notify assignee
     if (task.assigneeId && task.assigneeId !== tenant.userId) {
-      createNotification({
+      void createNotification({
         userId: task.assigneeId,
         type: 'task_assigned',
         title: 'Nueva tarea asignada',
-        message: `Se te asigno la tarea: ${task.title}`,
-        link: task.projectId ? `/projects/${task.projectId}` : '/tasks',
+        message: `Se te asignó la tarea: ${task.title}`,
+        link: `/hub/work?task=${encodeURIComponent(task.id)}`,
+        companyId: (task as { companyId?: string | null }).companyId || null,
+        taskId: task.id,
       });
     }
     return NextResponse.json({ task: refreshed ? withRoleIdArrays(refreshed) : withRoleIdArrays(task) });

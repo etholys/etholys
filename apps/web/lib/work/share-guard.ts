@@ -20,6 +20,7 @@ export function isApiAllowedForWorkShareOnly(pathname: string): boolean {
   if (pathname === '/api/users' || pathname.startsWith('/api/users/')) return true;
   if (pathname === '/api/companies' || pathname.startsWith('/api/companies')) return true;
   if (pathname.startsWith('/api/notifications')) return true;
+  if (pathname.startsWith('/api/push')) return true;
   return false;
 }
 

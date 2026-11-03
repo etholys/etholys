@@ -18,6 +18,7 @@ import {
   taskRoleUserIds,
   wantsWorkEmail,
   wantsWorkNotify,
+  workTaskLink,
 } from '@/lib/work/task-notify';
 import { archiveTaskTree, restoreTaskTree } from '@/lib/work/task-archive';
 import {
@@ -338,7 +339,7 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
       groupName: updated.group?.name,
       projectName: updated.project?.name,
     });
-    const taskLink = '/hub/work';
+    const taskLink = workTaskLink(updated.id, updated.folderId);
 
     if (wantsWorkNotify(company?.workBoardJson, 'assign')) {
       const nextExecutors = enriched.assigneeIds;
@@ -356,6 +357,9 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
           roleLabel: 'asignó como ejecutor',
           actorName,
           where: whereLine,
+          companyId,
+          taskId: updated.id,
+          folderId: updated.folderId,
         });
       }
       for (const id of nextResponsible) {
@@ -370,6 +374,9 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
           roleLabel: 'asignó como responsable',
           actorName,
           where: whereLine,
+          companyId,
+          taskId: updated.id,
+          folderId: updated.folderId,
         });
       }
       for (const id of nextReviewers) {
@@ -384,6 +391,9 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
           roleLabel: 'asignó como supervisor',
           actorName,
           where: whereLine,
+          companyId,
+          taskId: updated.id,
+          folderId: updated.folderId,
         });
       }
     }
@@ -399,6 +409,8 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
         enabled: wantsWorkNotify(company?.workBoardJson, 'status'),
         email: emailOn,
         link: taskLink,
+        companyId,
+        taskId: updated.id,
         mail: {
           subjectPhrase: 'Estado actualizado',
           headline: 'Estado actualizado',

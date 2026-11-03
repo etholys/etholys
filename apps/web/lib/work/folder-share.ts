@@ -351,6 +351,23 @@ export async function acceptWorkFolderShare(token: string, userId: string) {
     data: { visibility: 'SHARED' },
   });
 
+  if (share.invitedById && share.invitedById !== userId) {
+    const accepter = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true },
+    });
+    const who = accepter?.name || accepter?.email || 'Alguien';
+    const { createNotification } = await import('@/lib/notify');
+    void createNotification({
+      userId: share.invitedById,
+      type: 'work_share_accepted',
+      title: 'Convite de tablero aceptado',
+      message: `${who} aceptó el acceso a «${share.folder.name}»`,
+      link: `/hub/work?nav=folder&id=${encodeURIComponent(share.folderId)}&view=table`,
+      companyId: share.companyId,
+    });
+  }
+
   return {
     href: `/hub/work?nav=folder&id=${encodeURIComponent(share.folderId)}&view=table`,
     folderId: share.folderId,

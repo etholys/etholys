@@ -70,6 +70,7 @@ model User {
   labInvitesReceived            LabInvite[]                  @relation("LabInviteUser")
   museSuggestions               MuseSuggestion[]
   notifications                 Notification[]
+  pushSubscriptions             PushSubscription[]
   projectMembers                ProjectMember[]
   createdProposals              Proposal[]                   @relation("ProposalCreator")
   ownedFunds                    Fund[]                       @relation("FundOwner")
@@ -1169,15 +1170,38 @@ model Activity {
 }
 
 model Notification {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
+  companyId String?
+  taskId    String?
   type      String
   title     String
   message   String
   link      String?
-  read      Boolean  @default(false)
+  read      Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+  @@index([userId, createdAt])
+  @@index([companyId])
+  @@index([taskId])
+}
+
+/// Browser Web Push subscription (one row per endpoint; user may have several devices).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Invoice {

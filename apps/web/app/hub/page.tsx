@@ -23,6 +23,7 @@ import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { CompanyPicker } from '@/components/hub/CompanyPicker';
 import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
+import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 
 type HubEntry = {
   id: string;
@@ -456,6 +457,7 @@ export default function HubPage() {
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
+            <NotificationsBell tone="dark" />
             <AppearanceToggle collapsed />
             <button
               type="button"

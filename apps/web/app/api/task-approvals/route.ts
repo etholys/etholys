@@ -144,7 +144,9 @@ export async function POST(req: Request) {
       }),
       note,
       email: wantsWorkEmail(company?.workBoardJson),
-      link: '/hub/work',
+      companyId,
+      taskId,
+      folderId: taskFull?.folderId || null,
     });
 
     return NextResponse.json({ approval });

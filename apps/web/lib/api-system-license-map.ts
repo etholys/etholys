@@ -113,6 +113,7 @@ export function isApiLicenseExempt(pathname: string): boolean {
     pathname.startsWith('/api/workspace/entry-route') ||
     pathname.startsWith('/api/companies') ||
     pathname.startsWith('/api/notifications') ||
+    pathname.startsWith('/api/push') ||
     pathname.startsWith('/api/chat') ||
     pathname.startsWith('/api/studio') ||
     pathname.startsWith('/api/tasks') ||

@@ -39,6 +39,7 @@ export function isApiAllowedForCourseOnlyUser(pathname: string): boolean {
   if (pathname.startsWith('/api/work-folders')) return true;
   if (pathname === '/api/workspace/entry-route') return true;
   if (pathname.startsWith('/api/notifications')) return true;
+  if (pathname.startsWith('/api/push')) return true;
   if (pathname.startsWith('/api/upload') && pathname.includes('forge')) return true;
   return false;
 }

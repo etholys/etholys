@@ -15,6 +15,7 @@ import { WorkWorkload } from './WorkWorkload';
 import { WorkTaskPanel } from './WorkTaskPanel';
 import { WorkFolderShareDialog } from './WorkFolderShareDialog';
 import { WorkQuickAdd } from './WorkQuickAdd';
+import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 import {
   WORK_KANBAN,
   WORK_PRIORITIES,
@@ -293,6 +294,12 @@ export default function WorkShell() {
     setNav(n);
     setUrlReady(true);
   }, [searchParams, folders, departments, projects, urlReady]);
+
+  /** Deep-link from notification center: ?task=<id> opens the activity panel. */
+  useEffect(() => {
+    const taskId = searchParams.get('task');
+    if (taskId) setSelectedId(taskId);
+  }, [searchParams]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -690,6 +697,7 @@ export default function WorkShell() {
               {contextHint && <p className="mt-0.5 text-[11px] text-[color:var(--sys-faint)]">{contextHint}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <NotificationsBell tone="light" />
               {canManageActiveFolderShare && activeFolder && (
                 <button
                   type="button"

@@ -11,6 +11,7 @@ import {
   taskRoleUserIds,
   wantsWorkEmail,
   wantsWorkNotify,
+  workTaskLink,
 } from '@/lib/work/task-notify';
 
 async function assertTaskAccess(taskId: string, companyIds: string[]) {
@@ -77,7 +78,7 @@ export async function POST(req: Request) {
       include: { user: { select: { id: true, name: true, email: true } } },
     });
 
-    const link = `/hub/work`;
+    const link = workTaskLink(access.id, access.folderId);
     const authorName = comment.user?.name || 'Alguien';
     const company = access.resolvedCompanyId
       ? await prisma.company.findUnique({
@@ -102,6 +103,8 @@ export async function POST(req: Request) {
       enabled: wantsWorkNotify(company?.workBoardJson, 'comment'),
       email: emailOn,
       link,
+      companyId: access.resolvedCompanyId,
+      taskId: access.id,
       mail: {
         subjectPhrase: 'Nuevo comentario',
         headline: 'Nuevo comentario',
@@ -122,6 +125,8 @@ export async function POST(req: Request) {
       enabled: true,
       email: emailOn,
       link,
+      companyId: access.resolvedCompanyId,
+      taskId: access.id,
       mail: {
         subjectPhrase: 'Te mencionaron',
         headline: 'Te mencionaron',

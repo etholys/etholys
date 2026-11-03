@@ -7,6 +7,7 @@ import {
   buildTaskContextLine,
   notifyTaskWatchers,
   wantsWorkEmail,
+  workTaskLink,
 } from '@/lib/work/task-notify';
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
@@ -28,6 +29,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
           select: {
             id: true,
             title: true,
+            folderId: true,
             folder: { select: { name: true } },
             group: { select: { name: true } },
             project: { select: { name: true } },
@@ -72,6 +74,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     const what = approved
       ? 'Aprobó la entrega'
       : `Rechazó la entrega${decisionNote ? `: ${decisionNote}` : ''}`;
+    const link = workTaskLink(existing.taskId, existing.task.folderId);
     notifyTaskWatchers({
       actorId: tenant.userId,
       type: 'task_approval_decision',
@@ -80,7 +83,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       userIds: [existing.requesterId],
       enabled: true,
       email: wantsWorkEmail(existing.company?.workBoardJson),
-      link: '/hub/work',
+      link,
+      companyId: existing.companyId,
+      taskId: existing.taskId,
       mail: {
         subjectPhrase: approved ? 'Entrega aprobada' : 'Entrega rechazada',
         headline: approved ? 'Entrega aprobada' : 'Entrega rechazada',
@@ -93,7 +98,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         what,
         who: actorName,
         when: new Date(),
-        link: '/hub/work',
+        link,
         detail: decisionNote,
       },
     });
