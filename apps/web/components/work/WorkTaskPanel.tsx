@@ -16,6 +16,7 @@ const fieldControl =
 
 type UserOpt = { id: string; name: string | null; email?: string };
 type GroupOpt = { id: string; name: string; color: string | null };
+type PanelTab = 'detail' | 'work' | 'send' | 'updates';
 
 function membersFromCustom(customFields: unknown) {
   if (!customFields || typeof customFields !== 'object' || Array.isArray(customFields)) return {};
@@ -84,55 +85,63 @@ function panelRoleIds(
   return task.reviewerId ? [task.reviewerId] : [];
 }
 
-function RoleMultiPicker({
+function RoleChipRow({
+  label,
   ids,
   users,
   onChange,
   t,
-  emptyLabel,
 }: {
+  label: string;
   ids: string[];
   users: UserOpt[];
   onChange: (ids: string[]) => void;
   t: (en: string, es: string, pt: string) => string;
-  emptyLabel: string;
 }) {
-  const nameOf = (id: string) => users.find((u) => u.id === id)?.name || users.find((u) => u.id === id)?.email || id;
+  const nameOf = (id: string) =>
+    users.find((u) => u.id === id)?.name || users.find((u) => u.id === id)?.email || id;
+  const available = users.filter((u) => !ids.includes(u.id));
+
   return (
-    <div className="space-y-1.5">
-      <div className="flex min-h-[36px] flex-wrap items-center gap-1 rounded-lg border border-[color:var(--sys-line,#cbd5e1)] bg-[color:var(--sys-panel-soft,#f8fafc)] px-2 py-1.5">
-        {ids.length === 0 && (
-          <span className="text-[11px] text-[color:var(--sys-faint,#94a3b8)]">{emptyLabel}</span>
+    <div className="min-w-0 flex-1 space-y-1">
+      <span className={fieldLabel}>{label}</span>
+      <div className="flex min-h-[28px] flex-wrap items-center gap-1">
+        {ids.length === 0 ? (
+          <span className="text-[12px] text-[color:var(--sys-faint,#94a3b8)]">—</span>
+        ) : (
+          ids.map((id) => (
+            <button
+              key={id}
+              type="button"
+              title={t('Remove', 'Quitar', 'Remover')}
+              onClick={() => onChange(ids.filter((row) => row !== id))}
+              className="inline-flex h-6 max-w-full items-center gap-1 rounded-full bg-teal-500/15 px-2 text-[10px] font-semibold text-teal-700 dark:text-teal-200"
+            >
+              <span className="truncate">{nameOf(id)}</span>
+              <span aria-hidden>×</span>
+            </button>
+          ))
         )}
-        {ids.map((id) => (
-          <button
-            key={id}
-            type="button"
-            title={t('Remove', 'Quitar', 'Remover')}
-            onClick={() => onChange(ids.filter((row) => row !== id))}
-            className="inline-flex h-6 items-center gap-1 rounded-full bg-teal-500/15 px-2 text-[10px] font-semibold text-teal-700 dark:text-teal-200"
+        {available.length > 0 ? (
+          <select
+            value=""
+            aria-label={t('Add person', 'Añadir persona', 'Adicionar pessoa')}
+            onChange={(e) => {
+              const id = e.target.value;
+              if (!id || ids.includes(id)) return;
+              onChange([...ids, id]);
+            }}
+            className="h-6 max-w-[7.5rem] cursor-pointer appearance-none rounded-md border-0 bg-transparent px-1 text-[10px] font-medium text-[color:var(--sys-faint,#94a3b8)] outline-none hover:text-teal-300"
           >
-            {nameOf(id)}
-            <span aria-hidden>×</span>
-          </button>
-        ))}
+            <option value="">+</option>
+            {available.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name || u.email}
+              </option>
+            ))}
+          </select>
+        ) : null}
       </div>
-      <select
-        value=""
-        onChange={(e) => {
-          const id = e.target.value;
-          if (!id || ids.includes(id)) return;
-          onChange([...ids, id]);
-        }}
-        className={fieldControl}
-      >
-        <option value="">{t('+ Add person', '+ Añadir persona', '+ Adicionar pessoa')}</option>
-        {users.filter((u) => !ids.includes(u.id)).map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.name || u.email}
-          </option>
-        ))}
-      </select>
     </div>
   );
 }
@@ -228,6 +237,7 @@ export function WorkTaskPanel({
   const [sendNote, setSendNote] = useState('');
   const [sendingAction, setSendingAction] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState<PanelTab>('detail');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -251,6 +261,10 @@ export function WorkTaskPanel({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    setTab('detail');
+  }, [taskId]);
 
   const patch = async (body: Record<string, unknown>) => {
     setSaving(true);
@@ -425,9 +439,31 @@ export function WorkTaskPanel({
     );
   };
 
+  const tabs: Array<{ id: PanelTab; label: string; count?: number }> = [
+    { id: 'detail', label: t('Detail', 'Detalle', 'Detalhe') },
+    {
+      id: 'work',
+      label: t('Work', 'Trabajo', 'Trabalho'),
+      count:
+        (task?.checklist?.length || 0) +
+        (task?.subtasks?.length || 0) +
+        (task?.timeEntries?.length || 0) || undefined,
+    },
+    {
+      id: 'send',
+      label: t('Send', 'Enviar', 'Enviar'),
+      count: task?.approvalRequests?.length || undefined,
+    },
+    {
+      id: 'updates',
+      label: t('Updates', 'Actualizaciones', 'Atualizações'),
+      count: task?.comments?.length || undefined,
+    },
+  ];
+
   return (
     <aside className="flex h-full w-full max-w-[440px] shrink-0 flex-col border-l border-[color:var(--sys-line)] bg-[color:var(--sys-panel,#fff)] text-[color:var(--sys-ink)] shadow-[-12px_0_32px_rgba(15,23,42,0.18)]">
-      <div className="flex items-center justify-between border-b border-[color:var(--sys-line)] px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between border-b border-[color:var(--sys-line)] px-4 py-3">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-300">
           {t('Task', 'Tarea', 'Tarefa')}
         </p>
@@ -446,429 +482,498 @@ export function WorkTaskPanel({
       ) : !task ? (
         <div className="p-4 text-sm text-rose-600">{error || 'Not found'}</div>
       ) : (
-        <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
-          {error ? <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-600">{error}</p> : null}
+        <>
+          {/* Sticky identity: title · status · priority · due */}
+          <div className="shrink-0 space-y-3 border-b border-[color:var(--sys-line)] px-4 pb-3 pt-3">
+            {error ? (
+              <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-600">{error}</p>
+            ) : null}
 
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={() => {
-              if (title.trim() && title.trim() !== task.title) void saveCore();
-            }}
-            className="w-full border-0 border-b border-transparent bg-transparent pb-2 text-xl font-semibold tracking-tight text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
-          />
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={() => {
+                if (title.trim() && title.trim() !== task.title) void saveCore();
+              }}
+              className="w-full border-0 border-b border-transparent bg-transparent pb-1 text-xl font-semibold tracking-tight text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
+            />
 
-          <div className="grid grid-cols-2 gap-2">
-            <label className="space-y-1">
-              <span className={fieldLabel}>{t('Status', 'Estado', 'Status')}</span>
-              <select
-                value={task.status}
-                onChange={(e) => void patch({ status: e.target.value })}
-                className={`${fieldControl} font-semibold`}
-              >
-                {WORK_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {workStatusLabel(s, t)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className={fieldLabel}>{t('Priority', 'Prioridad', 'Prioridade')}</span>
-              <select
-                value={task.priority}
-                onChange={(e) => void patch({ priority: e.target.value })}
-                className={`${fieldControl} font-semibold`}
-              >
-                {WORK_PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {workPriorityLabel(p, t)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="space-y-1 sm:col-span-2">
-              <span className={fieldLabel}>{t('Executor', 'Ejecutor', 'Executor')}</span>
-              <RoleMultiPicker
+            <div className="grid grid-cols-3 gap-2">
+              <label className="space-y-1">
+                <span className={fieldLabel}>{t('Status', 'Estado', 'Status')}</span>
+                <select
+                  value={task.status}
+                  onChange={(e) => void patch({ status: e.target.value })}
+                  className={`${fieldControl} font-semibold`}
+                >
+                  {WORK_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {workStatusLabel(s, t)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className={fieldLabel}>{t('Priority', 'Prioridad', 'Prioridade')}</span>
+                <select
+                  value={task.priority}
+                  onChange={(e) => void patch({ priority: e.target.value })}
+                  className={`${fieldControl} font-semibold`}
+                >
+                  {WORK_PRIORITIES.map((p) => (
+                    <option key={p} value={p}>
+                      {workPriorityLabel(p, t)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className={fieldLabel}>{t('Due', 'Fecha', 'Prazo')}</span>
+                <input
+                  type="date"
+                  value={task.dueDate ? String(task.dueDate).slice(0, 10) : ''}
+                  onChange={(e) => void patch({ dueDate: e.target.value || null })}
+                  className={fieldControl}
+                />
+              </label>
+            </div>
+
+            {/* Compact people row */}
+            <div className="flex gap-3 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft,#f8fafc)] px-3 py-2">
+              <RoleChipRow
+                label={t('Executor', 'Ejecutor', 'Executor')}
                 ids={panelRoleIds(task, 'EXECUTOR')}
                 users={users}
                 onChange={(ids) => void patch({ assigneeIds: ids })}
                 t={t}
-                emptyLabel={t('Unassigned', 'Sin asignar', 'Sem executor')}
               />
-            </div>
-            <div className="space-y-1 sm:col-span-2">
-              <span className={fieldLabel}>{t('Owner', 'Responsable', 'Responsável')}</span>
-              <RoleMultiPicker
+              <div className="w-px self-stretch bg-[color:var(--sys-line)]" aria-hidden />
+              <RoleChipRow
+                label={t('Owner', 'Responsable', 'Responsável')}
                 ids={panelRoleIds(task, 'RESPONSIBLE')}
                 users={users}
                 onChange={(ids) => void patch({ responsibleIds: ids })}
                 t={t}
-                emptyLabel={t('None', 'Ninguno', 'Nenhum')}
               />
-            </div>
-            <div className="space-y-1 sm:col-span-2">
-              <span className={fieldLabel}>{t('Supervisor', 'Supervisor', 'Supervisor')}</span>
-              <RoleMultiPicker
+              <div className="w-px self-stretch bg-[color:var(--sys-line)]" aria-hidden />
+              <RoleChipRow
+                label={t('Supervisor', 'Supervisor', 'Supervisor')}
                 ids={panelRoleIds(task, 'REVIEWER')}
                 users={users}
                 onChange={(ids) => void patch({ reviewerIds: ids })}
                 t={t}
-                emptyLabel={t('None', 'Ninguno', 'Nenhum')}
               />
             </div>
-            <label className="space-y-1">
-              <span className={fieldLabel}>{t('Due', 'Fecha', 'Prazo')}</span>
-              <input
-                type="date"
-                value={task.dueDate ? String(task.dueDate).slice(0, 10) : ''}
-                onChange={(e) => void patch({ dueDate: e.target.value || null })}
-                className={fieldControl}
-              />
-            </label>
-            <label className="space-y-1">
-              <span className={fieldLabel}>{t('Start', 'Inicio', 'Início')}</span>
-              <input
-                type="date"
-                value={task.startDate ? String(task.startDate).slice(0, 10) : ''}
-                onChange={(e) => void patch({ startDate: e.target.value || null })}
-                className={fieldControl}
-              />
-            </label>
-            <label className="space-y-1">
-              <span className={fieldLabel}>{t('Estimate (h)', 'Estimación (h)', 'Estimativa (h)')}</span>
-              <input
-                type="number"
-                min="0"
-                step="0.25"
-                value={task.estimatedHours ?? ''}
-                onChange={(e) =>
-                  void patch({
-                    estimatedHours: e.target.value === '' ? null : parseFloat(e.target.value),
-                  })
-                }
-                className={fieldControl}
-                placeholder="0"
-              />
-            </label>
-            <label className="col-span-2 space-y-1">
-              <span className={fieldLabel}>{t('Group', 'Grupo', 'Grupo')}</span>
-              <select
-                value={task.groupId || ''}
-                onChange={(e) => void patch({ groupId: e.target.value || null })}
-                className={fieldControl}
-              >
-                <option value="">{t('No group', 'Sin grupo', 'Sem grupo')}</option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="col-span-2 space-y-1">
-              <span className={fieldLabel}>{t('Folder', 'Carpeta', 'Pasta')}</span>
-              <select
-                value={task.folderId || ''}
-                onChange={(e) => void patch({ folderId: e.target.value || null })}
-                className={fieldControl}
-              >
-                <option value="">{t('No folder', 'Sin carpeta', 'Sem pasta')}</option>
-                {folders.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
-            </label>
           </div>
 
-          <label className="block space-y-1">
-            <span className={fieldLabel}>{t('Description', 'Descripción', 'Descrição')}</span>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              onBlur={() => {
-                if ((description.trim() || null) !== (task.description || null)) void saveCore();
-              }}
-              rows={4}
-              className="etask-field w-full rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-3 py-2 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
-              placeholder={t('Add details…', 'Añadir detalles…', 'Adicionar detalhes…')}
-            />
-          </label>
-
-          <label className="block space-y-1">
-            <span className={fieldLabel}>Tags</span>
-            <input
-              value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
-              onBlur={() => void saveCore()}
-              className="etask-field w-full rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-3 py-2 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
-              placeholder="design, sprint"
-            />
-          </label>
-
-          <section>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sys-muted)]">
-                {t('Checklist', 'Checklist', 'Checklist')}
-              </p>
-              {(task.checklist || []).length > 0 && (
-                <span className="text-[10px] tabular-nums text-[color:var(--sys-muted)]">
-                  {(task.checklist || []).filter((c) => c.completed).length}/{(task.checklist || []).length}
-                </span>
-              )}
-            </div>
-            {(task.checklist || []).length > 0 && (
-              <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-[color:var(--sys-panel-soft)]">
-                <div
-                  className="h-full rounded-full bg-cyan-500 transition-all"
-                  style={{
-                    width: `${Math.round(
-                      ((task.checklist || []).filter((c) => c.completed).length /
-                        Math.max((task.checklist || []).length, 1)) *
-                        100,
-                    )}%`,
-                  }}
-                />
-              </div>
-            )}
-            <ul className="space-y-1.5">
-              {(task.checklist || []).map((s) => (
-                <li key={s.id} className="group flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-[color:var(--sys-panel-soft)]">
-                  <input
-                    type="checkbox"
-                    checked={s.completed}
-                    onChange={() => void toggleChecklist(s.id, s.completed)}
-                    className="h-4 w-4 rounded border-slate-300 text-cyan-600"
-                  />
-                  <span className={`min-w-0 flex-1 text-sm ${s.completed ? 'text-[color:var(--sys-muted)] line-through' : 'text-[color:var(--sys-ink)]'}`}>
-                    {s.text}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => void deleteChecklist(s.id)}
-                    className="text-[10px] font-medium text-slate-300 opacity-0 hover:text-rose-600 group-hover:opacity-100"
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-2 flex gap-2">
-              <input
-                value={checklistText}
-                onChange={(e) => setChecklistText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && void addChecklist()}
-                placeholder={t('Add item', 'Añadir ítem', 'Adicionar item')}
-                className="etask-field flex-1 rounded-lg border border-dashed border-[color:var(--sys-line)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
-              />
-              <button
-                type="button"
-                onClick={() => void addChecklist()}
-                className="rounded-lg bg-[color:var(--sys-panel-soft)] px-2.5 text-xs font-semibold text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
-              >
-                +
-              </button>
-            </div>
-          </section>
-
-          <section>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sys-muted)]">
-              {t('Subtasks', 'Subtareas', 'Subtarefas')}
-            </p>
-            <ul className="space-y-1.5">
-              {(task.subtasks || []).map((s) => (
-                <li key={s.id} className="flex items-center justify-between rounded-lg px-1 py-1 text-sm hover:bg-[color:var(--sys-panel-soft)]">
-                  <span className={s.status === 'DONE' ? 'text-[color:var(--sys-muted)] line-through' : 'text-[color:var(--sys-ink)]'}>
-                    {s.title}
-                  </span>
-                  <span className="text-[10px] text-[color:var(--sys-muted)]">{s.status.replace(/_/g, ' ')}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-2 flex gap-2">
-              <input
-                value={subtaskTitle}
-                onChange={(e) => setSubtaskTitle(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && void addSubtask()}
-                placeholder={t('Add subtask', 'Añadir subtarea', 'Adicionar subtarefa')}
-                className="etask-field flex-1 rounded-lg border border-dashed border-[color:var(--sys-line)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
-              />
-              <button
-                type="button"
-                onClick={() => void addSubtask()}
-                className="rounded-lg bg-[color:var(--sys-panel-soft)] px-2.5 text-xs font-semibold text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
-              >
-                +
-              </button>
-            </div>
-          </section>
-
-          <section>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sys-muted)]">
-              {t('Time tracking', 'Registro de horas', 'Registo de horas')}
-            </p>
-            <div className="mb-2 flex gap-2">
-              <input
-                type="number"
-                min="0"
-                step="0.25"
-                value={timeHours}
-                onChange={(e) => setTimeHours(e.target.value)}
-                placeholder="h"
-                className="etask-field w-16 rounded-lg border border-[color:var(--sys-line)] px-2 py-1.5 text-sm text-[color:var(--sys-ink)]"
-              />
-              <input
-                value={timeDesc}
-                onChange={(e) => setTimeDesc(e.target.value)}
-                placeholder={t('What did you do?', '¿Qué hiciste?', 'O que fizeste?')}
-                className="etask-field flex-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)]"
-              />
-              <button
-                type="button"
-                onClick={() => void addTime()}
-                className="rounded-lg bg-[color:var(--sys-panel-soft)] px-2.5 text-xs font-semibold text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
-              >
-                +
-              </button>
-            </div>
-            <ul className="space-y-1">
-              {(task.timeEntries || []).slice(0, 5).map((te) => (
-                <li key={te.id} className="flex justify-between text-xs text-[color:var(--sys-muted)]">
-                  <span>
-                    {te.hours}h {te.description ? `· ${te.description}` : ''}
-                  </span>
-                  <span>{te.user?.name || ''}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sys-muted)]">
-              {t('Send activity', 'Enviar actividad', 'Enviar atividade')}
-            </p>
-            <p className="mb-2 text-[11px] leading-snug text-[color:var(--sys-faint,#94a3b8)]">
-              {t(
-                'Ask for review, deliver work, or pass the baton — the other person gets a notification and email.',
-                'Pide revisión, entrega el trabajo o pasa el testigo — la otra persona recibe aviso y correo.',
-                'Peça revisão, entregue o trabalho ou passe o bastão — a outra pessoa recebe aviso e e-mail.',
-              )}
-            </p>
-            <div className="space-y-2">
-              <select
-                value={sendAction}
-                onChange={(e) => setSendAction(e.target.value as 'review' | 'delivery' | 'handoff')}
-                className={`${fieldControl}`}
-              >
-                <option value="review">
-                  {t('Request review', 'Pedir revisión', 'Pedir revisão')}
-                </option>
-                <option value="delivery">
-                  {t('Deliver / hand in', 'Entregar', 'Entregar')}
-                </option>
-                <option value="handoff">
-                  {t('Pass the baton', 'Pasar el testigo', 'Passar o bastão')}
-                </option>
-              </select>
-              <select
-                value={sendRecipientId}
-                onChange={(e) => setSendRecipientId(e.target.value)}
-                className={`${fieldControl}`}
-              >
-                <option value="">
-                  {t('Choose who…', 'Elegir a quién…', 'Escolher para quem…')}
-                </option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name || u.email}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={sendNote}
-                onChange={(e) => setSendNote(e.target.value)}
-                placeholder={t('Note (optional)', 'Nota (opcional)', 'Nota (opcional)')}
-                className={`${fieldControl}`}
-              />
-              <button
-                type="button"
-                onClick={() => void submitSendAction()}
-                disabled={!sendRecipientId || sendingAction}
-                className="rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-500 disabled:opacity-40"
-              >
-                {sendingAction
-                  ? t('Sending…', 'Enviando…', 'A enviar…')
-                  : t('Send activity', 'Enviar actividad', 'Enviar atividade')}
-              </button>
-            </div>
-            <ul className="mt-2 space-y-1">
-              {(task.approvalRequests || []).map((a) => (
-                <li
-                  key={a.id}
-                  className="rounded-lg bg-[color:var(--sys-panel-soft)] px-2 py-1.5 text-[11px] text-[color:var(--sys-muted)]"
+          {/* Tabs */}
+          <div
+            role="tablist"
+            className="flex shrink-0 gap-0.5 overflow-x-auto border-b border-[color:var(--sys-line)] px-2"
+          >
+            {tabs.map((item) => {
+              const active = tab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(item.id)}
+                  className={`relative shrink-0 px-3 py-2.5 text-[11px] font-semibold tracking-wide transition ${
+                    active
+                      ? 'text-teal-300'
+                      : 'text-[color:var(--sys-muted)] hover:text-[color:var(--sys-ink)]'
+                  }`}
                 >
-                  {a.status} → {a.approver?.name || '—'}
-                  {a.note ? ` · ${a.note}` : ''}
-                </li>
-              ))}
-            </ul>
-          </section>
+                  <span className="inline-flex items-center gap-1.5">
+                    {item.label}
+                    {item.count ? (
+                      <span
+                        className={`rounded-md px-1 py-px text-[9px] tabular-nums ${
+                          active
+                            ? 'bg-teal-500/20 text-teal-200'
+                            : 'bg-[color:var(--sys-panel-soft)] text-[color:var(--sys-faint)]'
+                        }`}
+                      >
+                        {item.count}
+                      </span>
+                    ) : null}
+                  </span>
+                  {active ? (
+                    <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-teal-400" />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
 
-          <section>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sys-muted)]">
-              {t('Updates', 'Actualizaciones', 'Atualizações')}
-            </p>
-            <div className="relative mb-2">
-              <div className="flex gap-2">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4">
+            {tab === 'detail' ? (
+              <div className="space-y-4">
+                <label className="block space-y-1">
+                  <span className={fieldLabel}>{t('Description', 'Descripción', 'Descrição')}</span>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    onBlur={() => {
+                      if ((description.trim() || null) !== (task.description || null)) void saveCore();
+                    }}
+                    rows={5}
+                    className="etask-field w-full rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-3 py-2 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
+                    placeholder={t('Add details…', 'Añadir detalles…', 'Adicionar detalhes…')}
+                  />
+                </label>
+
+                <label className="block space-y-1">
+                  <span className={fieldLabel}>Tags</span>
+                  <input
+                    value={tagsInput}
+                    onChange={(e) => setTagsInput(e.target.value)}
+                    onBlur={() => void saveCore()}
+                    className="etask-field w-full rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-3 py-2 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
+                    placeholder="design, sprint"
+                  />
+                </label>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="col-span-2 space-y-1">
+                    <span className={fieldLabel}>{t('Group', 'Grupo', 'Grupo')}</span>
+                    <select
+                      value={task.groupId || ''}
+                      onChange={(e) => void patch({ groupId: e.target.value || null })}
+                      className={fieldControl}
+                    >
+                      <option value="">{t('No group', 'Sin grupo', 'Sem grupo')}</option>
+                      {groups.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="col-span-2 space-y-1">
+                    <span className={fieldLabel}>{t('Folder', 'Carpeta', 'Pasta')}</span>
+                    <select
+                      value={task.folderId || ''}
+                      onChange={(e) => void patch({ folderId: e.target.value || null })}
+                      className={fieldControl}
+                    >
+                      <option value="">{t('No folder', 'Sin carpeta', 'Sem pasta')}</option>
+                      {folders.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-1">
+                    <span className={fieldLabel}>{t('Start', 'Inicio', 'Início')}</span>
+                    <input
+                      type="date"
+                      value={task.startDate ? String(task.startDate).slice(0, 10) : ''}
+                      onChange={(e) => void patch({ startDate: e.target.value || null })}
+                      className={fieldControl}
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className={fieldLabel}>{t('Estimate (h)', 'Estimación (h)', 'Estimativa (h)')}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.25"
+                      value={task.estimatedHours ?? ''}
+                      onChange={(e) =>
+                        void patch({
+                          estimatedHours: e.target.value === '' ? null : parseFloat(e.target.value),
+                        })
+                      }
+                      className={fieldControl}
+                      placeholder="0"
+                    />
+                  </label>
+                </div>
+              </div>
+            ) : null}
+
+            {tab === 'work' ? (
+              <div className="space-y-5">
+                <section>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className={fieldLabel}>{t('Checklist', 'Checklist', 'Checklist')}</p>
+                    {(task.checklist || []).length > 0 && (
+                      <span className="text-[10px] tabular-nums text-[color:var(--sys-muted)]">
+                        {(task.checklist || []).filter((c) => c.completed).length}/
+                        {(task.checklist || []).length}
+                      </span>
+                    )}
+                  </div>
+                  {(task.checklist || []).length > 0 && (
+                    <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-[color:var(--sys-panel-soft)]">
+                      <div
+                        className="h-full rounded-full bg-cyan-500 transition-all"
+                        style={{
+                          width: `${Math.round(
+                            ((task.checklist || []).filter((c) => c.completed).length /
+                              Math.max((task.checklist || []).length, 1)) *
+                              100,
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  )}
+                  <ul className="space-y-1.5">
+                    {(task.checklist || []).map((s) => (
+                      <li
+                        key={s.id}
+                        className="group flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-[color:var(--sys-panel-soft)]"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={s.completed}
+                          onChange={() => void toggleChecklist(s.id, s.completed)}
+                          className="h-4 w-4 rounded border-slate-300 text-cyan-600"
+                        />
+                        <span
+                          className={`min-w-0 flex-1 text-sm ${
+                            s.completed
+                              ? 'text-[color:var(--sys-muted)] line-through'
+                              : 'text-[color:var(--sys-ink)]'
+                          }`}
+                        >
+                          {s.text}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => void deleteChecklist(s.id)}
+                          className="text-[10px] font-medium text-slate-300 opacity-0 hover:text-rose-600 group-hover:opacity-100"
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={checklistText}
+                      onChange={(e) => setChecklistText(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && void addChecklist()}
+                      placeholder={t('Add item', 'Añadir ítem', 'Adicionar item')}
+                      className="etask-field flex-1 rounded-lg border border-dashed border-[color:var(--sys-line)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void addChecklist()}
+                      className="rounded-lg bg-[color:var(--sys-panel-soft)] px-2.5 text-xs font-semibold text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+                    >
+                      +
+                    </button>
+                  </div>
+                </section>
+
+                <section>
+                  <p className={`mb-2 ${fieldLabel}`}>{t('Subtasks', 'Subtareas', 'Subtarefas')}</p>
+                  <ul className="space-y-1.5">
+                    {(task.subtasks || []).map((s) => (
+                      <li
+                        key={s.id}
+                        className="flex items-center justify-between rounded-lg px-1 py-1 text-sm hover:bg-[color:var(--sys-panel-soft)]"
+                      >
+                        <span
+                          className={
+                            s.status === 'DONE'
+                              ? 'text-[color:var(--sys-muted)] line-through'
+                              : 'text-[color:var(--sys-ink)]'
+                          }
+                        >
+                          {s.title}
+                        </span>
+                        <span className="text-[10px] text-[color:var(--sys-muted)]">
+                          {s.status.replace(/_/g, ' ')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={subtaskTitle}
+                      onChange={(e) => setSubtaskTitle(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && void addSubtask()}
+                      placeholder={t('Add subtask', 'Añadir subtarea', 'Adicionar subtarefa')}
+                      className="etask-field flex-1 rounded-lg border border-dashed border-[color:var(--sys-line)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void addSubtask()}
+                      className="rounded-lg bg-[color:var(--sys-panel-soft)] px-2.5 text-xs font-semibold text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+                    >
+                      +
+                    </button>
+                  </div>
+                </section>
+
+                <section>
+                  <p className={`mb-2 ${fieldLabel}`}>
+                    {t('Time tracking', 'Registro de horas', 'Registo de horas')}
+                  </p>
+                  <div className="mb-2 flex gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.25"
+                      value={timeHours}
+                      onChange={(e) => setTimeHours(e.target.value)}
+                      placeholder="h"
+                      className="etask-field w-16 rounded-lg border border-[color:var(--sys-line)] px-2 py-1.5 text-sm text-[color:var(--sys-ink)]"
+                    />
+                    <input
+                      value={timeDesc}
+                      onChange={(e) => setTimeDesc(e.target.value)}
+                      placeholder={t('What did you do?', '¿Qué hiciste?', 'O que fizeste?')}
+                      className="etask-field flex-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void addTime()}
+                      className="rounded-lg bg-[color:var(--sys-panel-soft)] px-2.5 text-xs font-semibold text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <ul className="space-y-1">
+                    {(task.timeEntries || []).slice(0, 5).map((te) => (
+                      <li key={te.id} className="flex justify-between text-xs text-[color:var(--sys-muted)]">
+                        <span>
+                          {te.hours}h {te.description ? `· ${te.description}` : ''}
+                        </span>
+                        <span>{te.user?.name || ''}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              </div>
+            ) : null}
+
+            {tab === 'send' ? (
+              <div className="space-y-3">
+                <p className="text-[11px] leading-snug text-[color:var(--sys-faint,#94a3b8)]">
+                  {t(
+                    'Ask for review, deliver work, or pass the baton — the other person gets a notification and email.',
+                    'Pide revisión, entrega el trabajo o pasa el testigo — la otra persona recibe aviso y correo.',
+                    'Peça revisão, entregue o trabalho ou passe o bastão — a outra pessoa recebe aviso e e-mail.',
+                  )}
+                </p>
+                <select
+                  value={sendAction}
+                  onChange={(e) => setSendAction(e.target.value as 'review' | 'delivery' | 'handoff')}
+                  className={fieldControl}
+                >
+                  <option value="review">{t('Request review', 'Pedir revisión', 'Pedir revisão')}</option>
+                  <option value="delivery">{t('Deliver / hand in', 'Entregar', 'Entregar')}</option>
+                  <option value="handoff">{t('Pass the baton', 'Pasar el testigo', 'Passar o bastão')}</option>
+                </select>
+                <select
+                  value={sendRecipientId}
+                  onChange={(e) => setSendRecipientId(e.target.value)}
+                  className={fieldControl}
+                >
+                  <option value="">{t('Choose who…', 'Elegir a quién…', 'Escolher para quem…')}</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name || u.email}
+                    </option>
+                  ))}
+                </select>
                 <input
-                  value={comment}
-                  onChange={(e) => onCommentChange(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && void addComment()}
-                  placeholder={t('Write an update… @name', 'Escribe… @nombre', 'Escreve… @nome')}
-                  className="etask-field flex-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
+                  value={sendNote}
+                  onChange={(e) => setSendNote(e.target.value)}
+                  placeholder={t('Note (optional)', 'Nota (opcional)', 'Nota (opcional)')}
+                  className={fieldControl}
                 />
                 <button
                   type="button"
-                  onClick={() => void addComment()}
-                  className="rounded-lg bg-cyan-600 px-3 text-xs font-semibold text-white hover:bg-cyan-500"
+                  onClick={() => void submitSendAction()}
+                  disabled={!sendRecipientId || sendingAction}
+                  className="w-full rounded-lg bg-teal-600 px-3 py-2.5 text-xs font-semibold text-white hover:bg-teal-500 disabled:opacity-40"
                 >
-                  {t('Post', 'Publicar', 'Publicar')}
+                  {sendingAction
+                    ? t('Sending…', 'Enviando…', 'A enviar…')
+                    : t('Send activity', 'Enviar actividad', 'Enviar atividade')}
                 </button>
-              </div>
-              {mentionSuggestions.length > 0 && (
-                <ul className="absolute left-0 right-12 z-10 mt-1 overflow-hidden rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] shadow-lg">
-                  {mentionSuggestions.map((u) => (
-                    <li key={u.id}>
-                      <button
-                        type="button"
-                        onClick={() => pickMention(u)}
-                        className="w-full px-3 py-2 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
-                      >
-                        {u.name || u.email}
-                      </button>
+                <ul className="space-y-1 pt-1">
+                  {(task.approvalRequests || []).map((a) => (
+                    <li
+                      key={a.id}
+                      className="rounded-lg bg-[color:var(--sys-panel-soft)] px-2 py-1.5 text-[11px] text-[color:var(--sys-muted)]"
+                    >
+                      {a.status} → {a.approver?.name || '—'}
+                      {a.note ? ` · ${a.note}` : ''}
                     </li>
                   ))}
                 </ul>
-              )}
-            </div>
-            <ul className="space-y-2">
-              {(task.comments || []).map((c) => (
-                <li key={c.id} className="rounded-xl bg-[color:var(--sys-panel-soft)] px-3 py-2">
-                  <p className="text-[11px] font-semibold text-[color:var(--sys-muted)]">
-                    {c.user?.name || c.user?.email}
-                    <span className="ml-2 font-normal text-[color:var(--sys-muted)]">
-                      {new Date(c.createdAt).toLocaleString()}
-                    </span>
-                  </p>
-                  <p className="mt-0.5 text-sm text-[color:var(--sys-ink)]">{renderCommentBody(c.content)}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
+              </div>
+            ) : null}
 
-          <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+            {tab === 'updates' ? (
+              <div className="space-y-3">
+                <div className="relative">
+                  <div className="flex gap-2">
+                    <input
+                      value={comment}
+                      onChange={(e) => onCommentChange(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && void addComment()}
+                      placeholder={t('Write an update… @name', 'Escribe… @nombre', 'Escreve… @nome')}
+                      className="etask-field flex-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void addComment()}
+                      className="rounded-lg bg-cyan-600 px-3 text-xs font-semibold text-white hover:bg-cyan-500"
+                    >
+                      {t('Post', 'Publicar', 'Publicar')}
+                    </button>
+                  </div>
+                  {mentionSuggestions.length > 0 && (
+                    <ul className="absolute left-0 right-12 z-10 mt-1 overflow-hidden rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] shadow-lg">
+                      {mentionSuggestions.map((u) => (
+                        <li key={u.id}>
+                          <button
+                            type="button"
+                            onClick={() => pickMention(u)}
+                            className="w-full px-3 py-2 text-left text-sm text-[color:var(--sys-ink)] hover:bg-[color:var(--sys-nav-hover)]"
+                          >
+                            {u.name || u.email}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <ul className="space-y-2">
+                  {(task.comments || []).map((c) => (
+                    <li key={c.id} className="rounded-xl bg-[color:var(--sys-panel-soft)] px-3 py-2">
+                      <p className="text-[11px] font-semibold text-[color:var(--sys-muted)]">
+                        {c.user?.name || c.user?.email}
+                        <span className="ml-2 font-normal text-[color:var(--sys-muted)]">
+                          {new Date(c.createdAt).toLocaleString()}
+                        </span>
+                      </p>
+                      <p className="mt-0.5 text-sm text-[color:var(--sys-ink)]">
+                        {renderCommentBody(c.content)}
+                      </p>
+                    </li>
+                  ))}
+                  {(task.comments || []).length === 0 ? (
+                    <p className="py-6 text-center text-xs text-[color:var(--sys-faint)]">
+                      {t('No updates yet', 'Sin actualizaciones', 'Sem atualizações')}
+                    </p>
+                  ) : null}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex shrink-0 items-center justify-between border-t border-[color:var(--sys-line)] px-4 py-3">
             <p className="text-[11px] text-[color:var(--sys-muted)]">
               {saving
                 ? t('Saving…', 'Guardando…', 'A guardar…')
@@ -876,11 +981,15 @@ export function WorkTaskPanel({
                   ? `by ${task.creator.name || task.creator.email}`
                   : ''}
             </p>
-            <button type="button" onClick={() => void remove()} className="text-xs font-medium text-rose-600 hover:underline">
+            <button
+              type="button"
+              onClick={() => void remove()}
+              className="text-xs font-medium text-rose-600 hover:underline"
+            >
               {t('Delete', 'Eliminar', 'Excluir')}
             </button>
           </div>
-        </div>
+        </>
       )}
     </aside>
   );
