@@ -8,6 +8,7 @@ import {
   workPriorityLabel,
   workStatusLabel,
 } from './work-ui';
+import { firstHttpUrl, renderLinkedText, shortUrlLabel } from './work-linkify';
 
 const fieldLabel =
   'text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sys-muted,#475569)]';
@@ -366,11 +367,20 @@ export function WorkTaskPanel({
 
   const addComment = async () => {
     if (!comment.trim()) return;
-    await fetch('/api/comments', {
+    setError('');
+    const res = await fetch('/api/comments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ taskId, content: comment.trim() }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(
+        (data as { error?: string }).error ||
+          t('Could not post update', 'No se pudo publicar', 'Não foi possível publicar'),
+      );
+      return;
+    }
     setComment('');
     setMentionQuery(null);
     await load();
@@ -426,18 +436,12 @@ export function WorkTaskPanel({
     onClose();
   };
 
-  const renderCommentBody = (content: string) => {
-    const parts = String(content || '').split(/(@[^\s@][^@]*?)(?=\s|$|@)/g);
-    return parts.map((part, i) =>
-      part.startsWith('@') ? (
-        <span key={i} className="rounded bg-cyan-500/20 px-1 font-medium text-cyan-200">
-          {part}
-        </span>
-      ) : (
-        <span key={i}>{part}</span>
-      ),
-    );
-  };
+  const renderCommentBody = (content: string) =>
+    renderLinkedText(content, {
+      mentionClassName: 'rounded bg-cyan-500/20 px-1 font-medium text-cyan-200',
+      linkClassName:
+        'break-all font-medium text-teal-600 underline decoration-teal-500/40 underline-offset-2 hover:text-teal-500',
+    });
 
   const tabs: Array<{ id: PanelTab; label: string; count?: number }> = [
     { id: 'detail', label: t('Detail', 'Detalle', 'Detalhe') },
@@ -460,6 +464,8 @@ export function WorkTaskPanel({
       count: task?.comments?.length || undefined,
     },
   ];
+
+  const titleUrl = firstHttpUrl(title);
 
   return (
     <aside className="flex h-full w-full max-w-[440px] shrink-0 flex-col border-l border-[color:var(--sys-line)] bg-[color:var(--sys-panel,#fff)] text-[color:var(--sys-ink)] shadow-[-12px_0_32px_rgba(15,23,42,0.18)]">
@@ -497,6 +503,16 @@ export function WorkTaskPanel({
               }}
               className="w-full border-0 border-b border-transparent bg-transparent pb-1 text-xl font-semibold tracking-tight text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
             />
+            {titleUrl ? (
+              <a
+                href={titleUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex max-w-full items-center gap-1 truncate text-xs font-medium text-teal-600 hover:underline"
+              >
+                {t('Open link', 'Abrir enlace', 'Abrir link')}: {shortUrlLabel(titleUrl)}
+              </a>
+            ) : null}
 
             <div className="grid grid-cols-3 gap-2">
               <label className="space-y-1">
@@ -918,17 +934,27 @@ export function WorkTaskPanel({
               <div className="space-y-3">
                 <div className="relative">
                   <div className="flex gap-2">
-                    <input
+                    <textarea
                       value={comment}
                       onChange={(e) => onCommentChange(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && void addComment()}
-                      placeholder={t('Write an update… @name', 'Escribe… @nombre', 'Escreve… @nome')}
-                      className="etask-field flex-1 rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          void addComment();
+                        }
+                      }}
+                      rows={2}
+                      placeholder={t(
+                        'Write an update… paste links · @name',
+                        'Escribe… pega enlaces · @nombre',
+                        'Escreve… cola links · @nome',
+                      )}
+                      className="etask-field min-h-[2.5rem] flex-1 resize-y rounded-lg border border-[color:var(--sys-line)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
                     />
                     <button
                       type="button"
                       onClick={() => void addComment()}
-                      className="rounded-lg bg-cyan-600 px-3 text-xs font-semibold text-white hover:bg-cyan-500"
+                      className="self-end rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-500"
                     >
                       {t('Post', 'Publicar', 'Publicar')}
                     </button>
@@ -958,7 +984,7 @@ export function WorkTaskPanel({
                           {new Date(c.createdAt).toLocaleString()}
                         </span>
                       </p>
-                      <p className="mt-0.5 text-sm text-[color:var(--sys-ink)]">
+                      <p className="mt-0.5 whitespace-pre-wrap text-sm text-[color:var(--sys-ink)]">
                         {renderCommentBody(c.content)}
                       </p>
                     </li>

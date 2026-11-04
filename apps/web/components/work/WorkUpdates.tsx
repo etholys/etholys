@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { renderLinkedText } from './work-linkify';
 
 type Comment = {
   id: string;
@@ -25,6 +26,7 @@ export function WorkUpdates({
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -71,23 +73,18 @@ export function WorkUpdates({
     setMentionQuery(null);
   };
 
-  const renderBody = (content: string) => {
-    const parts = String(content || '').split(/(@[^\s@][^@]*?)(?=\s|$|@)/g);
-    return parts.map((part, i) =>
-      part.startsWith('@') ? (
-        <span key={i} className="rounded bg-teal-500/20 px-1 font-medium text-teal-700 dark:text-teal-200">
-          {part}
-        </span>
-      ) : (
-        <span key={i}>{part}</span>
-      ),
-    );
-  };
+  const renderBody = (content: string) =>
+    renderLinkedText(content, {
+      mentionClassName: 'rounded bg-teal-500/20 px-1 font-medium text-teal-700 dark:text-teal-200',
+      linkClassName:
+        'break-all font-medium text-teal-700 underline decoration-teal-500/40 underline-offset-2 hover:text-teal-600 dark:text-teal-300',
+    });
 
   const post = async () => {
     const content = text.trim();
     if (!content || busy) return;
     setBusy(true);
+    setError('');
     try {
       const res = await fetch('/api/comments', {
         method: 'POST',
@@ -99,6 +96,12 @@ export function WorkUpdates({
         setMentionQuery(null);
         await load();
         onPosted?.();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(
+          (data as { error?: string }).error ||
+            t('Could not post update', 'No se pudo publicar', 'Não foi possível publicar'),
+        );
       }
     } finally {
       setBusy(false);
@@ -113,6 +116,7 @@ export function WorkUpdates({
       <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--sys-muted)]">
         {t('Updates', 'Actualizaciones', 'Atualizações')}
       </p>
+      {error ? <p className="text-xs text-rose-600">{error}</p> : null}
       <ul className="max-h-40 space-y-2 overflow-y-auto">
         {comments.length === 0 && (
           <li className="text-xs text-[color:var(--sys-faint)]">
@@ -135,27 +139,28 @@ export function WorkUpdates({
       </ul>
       <div className="relative">
         <div className="flex gap-2">
-          <input
+          <textarea
             value={text}
             onChange={(e) => onTextChange(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 void post();
               }
             }}
+            rows={2}
             placeholder={t(
-              'Write an update… @name',
-              'Escribe una actualización… @nombre',
-              'Escreve uma atualização… @nome',
+              'Write an update… paste links · @name',
+              'Escribe una actualización… pega enlaces · @nombre',
+              'Escreve uma atualização… cola links · @nome',
             )}
-            className="etask-field min-w-0 flex-1 rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-500"
+            className="etask-field min-h-[2.5rem] min-w-0 flex-1 resize-y rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-500"
           />
           <button
             type="button"
             disabled={busy || !text.trim()}
             onClick={() => void post()}
-            className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-40"
+            className="self-end rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-40"
           >
             {t('Post', 'Publicar', 'Publicar')}
           </button>

@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
+  ExternalLink,
   GripVertical,
   MessageSquare,
   MoreHorizontal,
@@ -34,6 +35,7 @@ import {
   type WorkNotifyPrefs,
   type WorkSortDir,
 } from './work-ui';
+import { firstHttpUrl, isBareHttpUrl, shortUrlLabel } from './work-linkify';
 
 type UserOpt = { id: string; name: string | null; email?: string };
 type GroupOpt = { id: string; name: string; color: string | null };
@@ -1323,17 +1325,35 @@ export function WorkTableBoard({
                                   className="min-w-0 flex-1 rounded border border-teal-400 px-1.5 py-1 text-sm font-medium outline-none"
                                 />
                               ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => setTitleDraft({ id: task.id, value: task.title })}
-                                  className={`min-w-0 flex-1 truncate text-left text-sm font-medium ${
-                                    task.status === 'DONE'
-                                      ? 'text-[color:var(--sys-faint)] line-through'
-                                      : 'text-[color:var(--sys-ink)]'
-                                  }`}
-                                >
-                                  {task.title}
-                                </button>
+                                <div className="flex min-w-0 flex-1 items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setTitleDraft({ id: task.id, value: task.title })}
+                                    className={`min-w-0 flex-1 truncate text-left text-sm font-medium ${
+                                      task.status === 'DONE'
+                                        ? 'text-[color:var(--sys-faint)] line-through'
+                                        : 'text-[color:var(--sys-ink)]'
+                                    }`}
+                                    title={task.title}
+                                  >
+                                    {isBareHttpUrl(task.title)
+                                      ? shortUrlLabel(firstHttpUrl(task.title)!)
+                                      : task.title}
+                                  </button>
+                                  {firstHttpUrl(task.title) ? (
+                                    <a
+                                      href={firstHttpUrl(task.title)!}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="inline-flex shrink-0 rounded p-1 text-teal-600 hover:bg-teal-500/10 hover:text-teal-500"
+                                      title={t('Open link', 'Abrir enlace', 'Abrir link')}
+                                      aria-label={t('Open link', 'Abrir enlace', 'Abrir link')}
+                                    >
+                                      <ExternalLink className="h-3.5 w-3.5" />
+                                    </a>
+                                  ) : null}
+                                </div>
                               )}
                               {(subtasksOf?.(task.id).length || 0) > 0 && (
                                 <span className="shrink-0 text-[10px] tabular-nums text-[color:var(--sys-faint)]">
