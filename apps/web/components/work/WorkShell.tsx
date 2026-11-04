@@ -469,58 +469,6 @@ export default function WorkShell() {
     (activeFolder.visibility === 'SHARED' ||
       (activeFolder.members?.length ?? activeFolder._count?.members ?? 0) > 0);
 
-  const contextHint = (() => {
-    if (nav.kind === 'overdue') {
-      return t3('Open tasks past their due date', 'Tareas abiertas vencidas', 'Tarefas abertas fora do prazo');
-    }
-    if (nav.kind === 'archive') {
-      return t3(
-        'Your archive — shared archived tasks stay visible to people with board access',
-        'Tu archivo — las archivadas de tableros compartidos siguen visibles para quien tenga acceso',
-        'O teu arquivo — as arquivadas de quadros partilhados continuam visíveis para quem tiver acesso',
-      );
-    }
-    if (nav.kind === 'mine') {
-      return t3('Assigned to you', 'Asignadas a ti', 'Atribuídas a ti');
-    }
-    if (nav.kind === 'all') {
-      return t3(
-        'One list of every task on boards shared with you — not your private boards',
-        'Una sola lista de tareas en tableros compartidos contigo — no tus tableros privados',
-        'Uma só lista de tarefas nos quadros partilhados contigo — não os teus quadros privados',
-      );
-    }
-    if (nav.kind === 'folder') {
-      if (activeIsContainerFolder) {
-        return t3(
-          'Folder — open a board inside, or create a subfolder / board from the sidebar',
-          'Carpeta — abre un tablero dentro, o crea subcarpeta / tablero en la barra',
-          'Pasta — abre um tablero dentro, ou cria subpasta / tablero na barra',
-        );
-      }
-      if (activeFolderIsShared) {
-        return t3(
-          'Shared board — manage who can access it',
-          'Tablero compartido — gestiona quién tiene acceso',
-          'Quadro partilhado — gere quem tem acesso',
-        );
-      }
-      return t3(
-        'Private board — only you can see it until you share',
-        'Tablero privado — solo tú lo ves hasta que lo compartas',
-        'Quadro privado — só tu o vês até partilhares',
-      );
-    }
-    if (nav.kind === 'company') {
-      return t3(
-        'Open demands across the company — not tied to one person',
-        'Demandas abiertas de la empresa — no atadas a una persona',
-        'Demandas abertas da empresa — sem ficar presas a uma pessoa',
-      );
-    }
-    return null;
-  })();
-
   const createFolder = async (input: WorkCreateFolderInput) => {
     if (!activeCompanyId) return;
     const kind = input.kind === 'FOLDER' ? 'FOLDER' : 'BOARD';
@@ -694,7 +642,6 @@ export default function WorkShell() {
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <h2 className="truncate font-[family-name:var(--font-etholys-display)] text-lg font-bold tracking-tight text-[color:var(--sys-ink)]">{contextTitle}</h2>
-              {contextHint && <p className="mt-0.5 text-[11px] text-[color:var(--sys-faint)]">{contextHint}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <NotificationsBell tone="light" />
@@ -713,7 +660,11 @@ export default function WorkShell() {
                       ? 'border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100'
                       : 'border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] text-[color:var(--sys-ink)] hover:border-teal-400 hover:text-teal-800',
                   )}
-                  title={t3('Share & manage access', 'Compartir y gestionar acceso', 'Partilhar e gerir acesso')}
+                  title={
+                    activeFolderIsShared
+                      ? t3('Access', 'Acceso', 'Acesso')
+                      : t3('Share', 'Compartir', 'Partilhar')
+                  }
                 >
                   <Share2 className="h-4 w-4" />
                   <span>
@@ -819,13 +770,6 @@ export default function WorkShell() {
               )
             ) : activeIsContainerFolder ? (
               <div className="space-y-4 p-4 sm:p-6">
-                <p className="text-sm text-[color:var(--sys-muted)]">
-                  {t3(
-                    'This is a folder. Boards with tasks are listed below — create more from the sidebar (+).',
-                    'Esto es una carpeta. Los tableros con tareas están abajo — crea más desde la barra (+).',
-                    'Isto é uma pasta. Os tableros com tarefas estão abaixo — cria mais na barra (+).',
-                  )}
-                </p>
                 <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {folders
                     .filter(

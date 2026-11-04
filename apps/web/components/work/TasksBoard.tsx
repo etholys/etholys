@@ -1065,13 +1065,6 @@ export default function TasksBoard({
               <p className="text-sm font-medium text-slate-700">
                 {t3('This board is empty', 'Este tablero está vacío', 'Este quadro está vazio')}
               </p>
-              <p className="mt-1 text-sm text-slate-500">
-                {t3(
-                  'Create a task above, or start from a pack.',
-                  'Crea una tarea arriba, o empieza con un paquete.',
-                  'Cria uma tarefa acima, ou começa com um pack.',
-                )}
-              </p>
               <div className="mt-4 grid gap-2 sm:grid-cols-3">
                 {[
                   {

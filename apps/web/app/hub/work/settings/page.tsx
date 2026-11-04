@@ -180,13 +180,6 @@ export default function HubWorkSettingsPage() {
               <h1 className="font-[family-name:var(--font-etholys-display)] text-xl font-bold tracking-tight text-[color:var(--sys-ink)]">
                 {t('eTask settings', 'Ajustes de eTask', 'Definições eTask')}
               </h1>
-              <p className="mt-0.5 text-sm text-[color:var(--sys-faint)]">
-                {t(
-                  'Departments, board sections and links',
-                  'Sectores, secciones del tablero y atajos',
-                  'Setores, secções do quadro e atalhos',
-                )}
-              </p>
             </div>
           </div>
         </div>
@@ -211,17 +204,10 @@ export default function HubWorkSettingsPage() {
         ) : (
           <>
             <section className="rounded-2xl border border-cyan-100 bg-cyan-50/40 p-5 shadow-sm">
-              <h2 className="mb-1 text-sm font-semibold text-cyan-900">
+              <h2 className="mb-3 text-sm font-semibold text-cyan-900">
                 {t('Personal & team folders', 'Carpetas personales y de equipo', 'Pastas pessoais e de equipa')}
               </h2>
-              <p className="text-sm text-cyan-900/80">
-                {t(
-                  'Anyone can create a board from the eTask sidebar — only you, or shared. No admin required.',
-                  'Cualquiera crea un tablero desde la barra de eTask — solo tú, o compartido. Sin ser admin.',
-                  'Qualquer pessoa cria um quadro na barra do eTask — só tu, ou partilhado. Sem ser admin.',
-                )}
-              </p>
-              <Link href="/hub/work" className="mt-3 inline-flex text-sm font-semibold text-cyan-800 hover:underline">
+              <Link href="/hub/work" className="inline-flex text-sm font-semibold text-cyan-800 hover:underline">
                 {t('Open eTask →', 'Abrir eTask →', 'Abrir eTask →')}
               </Link>
             </section>
@@ -233,13 +219,6 @@ export default function HubWorkSettingsPage() {
                     <FolderKanban className="h-4 w-4 text-cyan-700" />
                     {t('Departments / sectors', 'Departamentos / sectores', 'Departamentos / setores')}
                   </h2>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {t(
-                      'Same company departments used across Etholys. They appear in the eTask sidebar.',
-                      'Los mismos sectores de la empresa en Etholys. Aparecen en la barra de eTask.',
-                      'Os mesmos setores da empresa no Etholys. Aparecem na barra do eTask.',
-                    )}
-                  </p>
                 </div>
                 <button
                   type="button"
@@ -256,9 +235,9 @@ export default function HubWorkSettingsPage() {
                 {departments.length === 0 && (
                   <li className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
                     {t(
-                      'No departments yet — create Finance, Ops, Programs…',
-                      'Sin sectores — crea Finanzas, Ops, Programas…',
-                      'Sem setores — cria Finanças, Ops, Programas…',
+                      'No departments yet',
+                      'Sin sectores',
+                      'Sem setores',
                     )}
                   </li>
                 )}
@@ -329,13 +308,6 @@ export default function HubWorkSettingsPage() {
                     <Layers className="h-4 w-4 text-cyan-700" />
                     {t('Board sections (groups)', 'Secciones del tablero', 'Secções do quadro')}
                   </h2>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {t(
-                      'Monday-style groups shared across the company board.',
-                      'Grupos estilo Monday compartidos en el tablero.',
-                      'Grupos estilo Monday partilhados no quadro.',
-                    )}
-                  </p>
                 </div>
                 {groups.length === 0 && (
                   <button
@@ -386,17 +358,10 @@ export default function HubWorkSettingsPage() {
             </section>
 
             <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-              <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-900">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <Building2 className="h-4 w-4 text-cyan-700" />
                 {t('Projects', 'Proyectos', 'Projetos')}
               </h2>
-              <p className="mb-4 text-xs text-slate-500">
-                {t(
-                  'Projects stay in SIEP. Create or edit them there; they show in the eTask sidebar.',
-                  'Los proyectos se gestionan en SIEP. Créalos allí; aparecen en la barra de eTask.',
-                  'Os projetos gerem-se no SIEP. Cria-os lá; aparecem na barra do eTask.',
-                )}
-              </p>
               <ul className="mb-4 space-y-1">
                 {projects.slice(0, 12).map((p) => (
                   <li key={p.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">

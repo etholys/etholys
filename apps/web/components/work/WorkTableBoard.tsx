@@ -1735,13 +1735,6 @@ export function WorkTableBoard({
           <p className="text-base font-semibold text-slate-800">
             {t('Start with a group', 'Empieza con un grupo', 'Começa com um grupo')}
           </p>
-          <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-            {t(
-              'Groups work like Monday sections — To do, This week, Waiting… then add tasks inside each.',
-              'Los grupos son como secciones de Monday — Por hacer, Esta semana… luego añade tareas.',
-              'Grupos são como secções do Monday — A fazer, Esta semana… depois adiciona tarefas.',
-            )}
-          </p>
           <button
             type="button"
             disabled={seedingStarter}

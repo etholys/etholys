@@ -104,13 +104,6 @@ export function WorkGantt({
         <h3 className="text-sm font-semibold text-slate-800">
           {t('Timeline', 'Cronograma', 'Cronograma')}
         </h3>
-        <p className="text-[11px] text-slate-400">
-          {t(
-            'Bars use start → due. Tasks without dates appear as a marker on today.',
-            'Barras usan inicio → plazo. Sin fechas = marcador en hoy.',
-            'Barras usam início → prazo. Sem datas = marcador no hoje.',
-          )}
-        </p>
       </div>
       <div className="flex" style={{ minHeight: Math.max(rows.length * 44 + 60, 200) }}>
         <div className="w-52 shrink-0 border-r border-slate-200 sm:w-60">

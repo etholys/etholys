@@ -45,13 +45,6 @@ export function WorkArchive({
         <p className="text-sm font-semibold text-[color:var(--sys-ink)]">
           {t('Archive is empty', 'El archivo está vacío', 'O arquivo está vazio')}
         </p>
-        <p className="mt-1 text-xs text-[color:var(--sys-muted)]">
-          {t(
-            'Archived tasks leave the active board. Shared board items stay visible here to people with access.',
-            'Las tareas archivadas salen del tablero activo. En tableros compartidos siguen visibles aquí para quien tenga acceso.',
-            'As tarefas arquivadas saem do quadro ativo. Em quadros partilhados continuam visíveis aqui para quem tiver acesso.',
-          )}
-        </p>
       </div>
     );
   }
@@ -59,13 +52,7 @@ export function WorkArchive({
   return (
     <div className="space-y-2 p-4">
       <p className="px-1 text-xs text-[color:var(--sys-muted)]">
-        {tasks.length}{' '}
-        {t('archived', 'archivadas', 'arquivadas')} ·{' '}
-        {t(
-          'Restore returns them to their board/group',
-          'Restaurar las devuelve al tablero/grupo',
-          'Restaurar devolve-as ao quadro/grupo',
-        )}
+        {tasks.length} {t('archived', 'archivadas', 'arquivadas')}
       </p>
       <ul className="divide-y divide-[color:var(--sys-line)] overflow-hidden rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel)]">
         {tasks.map((task) => {

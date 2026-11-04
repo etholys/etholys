@@ -86,9 +86,6 @@ export function WorkWorkload({
     return (
       <div className="px-6 py-16 text-center text-sm text-slate-500">
         <p>{t('No open work in this view', 'No hay trabajo abierto en esta vista', 'Não há trabalho aberto nesta vista')}</p>
-        <p className="mt-1 text-xs text-slate-400">
-          {t('Switch to the board to add a task', 'Pasa al tablero para crear una tarea', 'Passa ao quadro para criar uma tarefa')}
-        </p>
       </div>
     );
   }
@@ -97,13 +94,6 @@ export function WorkWorkload({
     <div>
       <div className="border-b border-slate-200 px-4 py-3">
         <h3 className="text-sm font-semibold text-slate-800">{t('Workload', 'Carga', 'Carga')}</h3>
-        <p className="text-xs text-slate-500">
-          {t(
-            'Capacity reading. Open a person to filter the board.',
-            'Lectura de capacidad. Abre una persona para filtrar el tablero.',
-            'Leitura de capacidade. Abre uma pessoa para filtrar o quadro.',
-          )}
-        </p>
       </div>
       <ul className="divide-y divide-slate-100">
         {rows.map((row) => (

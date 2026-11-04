@@ -420,26 +420,6 @@ export function WorkSidebar({
             />
           ))}
         </div>
-        {composer.mode === 'board' && (
-          <p className="mb-2 text-[10px] leading-snug text-[color:var(--sys-faint)]">
-            {composer.visibility === 'SHARED'
-              ? t(
-                  'You can invite people after creating it',
-                  'Podrás invitar personas después de crearlo',
-                  'Podes convidar pessoas depois de o criares',
-                )
-              : t('Only you can see it', 'Solo tú lo ves', 'Só tu o vês')}
-          </p>
-        )}
-        {composer.mode === 'folder' && (
-          <p className="mb-2 text-[10px] leading-snug text-[color:var(--sys-faint)]">
-            {t(
-              'Folders organize boards — tasks live on boards',
-              'Las carpetas organizan tableros — las tareas viven en tableros',
-              'As pastas organizam tableros — as tarefas ficam nos tableros',
-            )}
-          </p>
-        )}
         <button
           type="button"
           disabled={creating || !draft.trim()}
@@ -868,15 +848,6 @@ export function WorkSidebar({
               ) : null}
               {tree.map((n) => renderNode(n, 0))}
             </div>
-            {!collapsed && tree.length === 0 && (
-              <p className="px-2.5 py-1 text-[11px] leading-snug text-[color:var(--sys-faint)]">
-                {t(
-                  'Create folders and boards. Boards are personal or shared.',
-                  'Crea carpetas y tableros. Los tableros son personales o compartidos.',
-                  'Cria pastas e tableros. Os tableros são pessoais ou partilhados.',
-                )}
-              </p>
-            )}
           </div>
 
           {/* Org / SIEP filters — not boards */}
@@ -893,15 +864,6 @@ export function WorkSidebar({
             ) : null}
             {(collapsed || orgOpen) && (
               <div className="space-y-0.5">
-                {!collapsed && (
-                  <p className="px-2.5 pb-1 text-[10px] leading-snug text-[color:var(--sys-faint)]">
-                    {t(
-                      'Not boards — company, sectors and SIEP projects',
-                      'No son tableros — empresa, sectores y proyectos SIEP',
-                      'Não são tableros — empresa, setores e projetos SIEP',
-                    )}
-                  </p>
-                )}
                 {item(
                   nav.kind === 'company',
                   () => go({ kind: 'company' }),

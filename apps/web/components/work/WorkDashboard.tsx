@@ -48,7 +48,7 @@ export function WorkDashboard({
   tasks,
   folders,
   selectedBoardIds,
-  personalized,
+  personalized: _personalized,
   onSaveBoardIds,
   currentUserId,
   onOpenTask,
@@ -169,13 +169,6 @@ export function WorkDashboard({
             <h2 className="font-[family-name:var(--font-etholys-display)] text-xl font-bold tracking-tight text-[color:var(--sys-ink,#0f172a)]">
               {t('My home', 'Mi inicio', 'O meu início')}
             </h2>
-            <p className="mt-1 max-w-xl text-sm text-[color:var(--sys-muted,#475569)]">
-              {t(
-                'Your personal synthesis — pick which boards appear here. Other people keep their own layout.',
-                'Tu síntesis personal — elige qué tableros ves aquí. Cada persona tiene su propio panel.',
-                'A tua síntese pessoal — escolhe que tableros aparecem aqui. Cada pessoa tem o seu painel.',
-              )}
-            </p>
           </div>
           <button
             type="button"
@@ -186,19 +179,6 @@ export function WorkDashboard({
             {t('Customize', 'Personalizar', 'Personalizar')}
           </button>
         </div>
-        <p className="mt-2 text-[11px] text-[color:var(--sys-faint,#94a3b8)]">
-          {personalized
-            ? t(
-                `${selectedBoardIds.length} boards in your home`,
-                `${selectedBoardIds.length} tableros en tu inicio`,
-                `${selectedBoardIds.length} tableros no teu início`,
-              )
-            : t(
-                'Showing your boards by default — customize to save your layout',
-                'Mostrando tus tableros por defecto — personaliza para guardar tu panel',
-                'A mostrar os teus tableros por defeito — personaliza para guardar o painel',
-              )}
-        </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
@@ -219,19 +199,12 @@ export function WorkDashboard({
 
       {editing && (
         <section className="rounded-2xl border border-teal-200/80 bg-white p-4 shadow-sm">
-          <h3 className="mb-1 text-sm font-semibold text-slate-800">
+          <h3 className="mb-3 text-sm font-semibold text-slate-800">
             {t('Boards on my home', 'Tableros en mi inicio', 'Tableros no meu início')}
           </h3>
-          <p className="mb-3 text-[11px] text-slate-500">
-            {t(
-              'Only you see this selection. Sharing a board is separate (Acceso / Tipo).',
-              'Solo tú ves esta selección. Compartir un tablero es aparte (Acceso / Tipo).',
-              'Só tu vês esta seleção. Partilhar um tablero é aparte (Acesso / Tipo).',
-            )}
-          </p>
           {boards.length === 0 ? (
             <p className="text-sm text-slate-400">
-              {t('No boards yet — create one in the sidebar', 'Aún no hay tableros — créalo en la barra', 'Ainda sem tableros — cria na barra')}
+              {t('No boards yet', 'Aún no hay tableros', 'Ainda sem tableros')}
             </p>
           ) : (
             <ul className="mb-3 max-h-56 space-y-1 overflow-y-auto">

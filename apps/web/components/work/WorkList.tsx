@@ -84,9 +84,6 @@ export function WorkList({
         <p className="text-sm font-medium text-slate-500">
           {t('No tasks in this list', 'Sin tareas en esta lista', 'Sem tarefas nesta lista')}
         </p>
-        <p className="mt-1 text-xs text-slate-400">
-          {t('Use quick add above to create one', 'Usa el campo de arriba para crear', 'Usa a criação rápida acima')}
-        </p>
       </div>
     );
   }

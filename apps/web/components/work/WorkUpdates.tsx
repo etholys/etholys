@@ -121,9 +121,9 @@ export function WorkUpdates({
         {comments.length === 0 && (
           <li className="text-xs text-[color:var(--sys-faint)]">
             {t(
-              'No updates yet. Write @name to tag someone.',
-              'Aún no hay actualizaciones. Escribe @nombre para etiquetar.',
-              'Ainda não há atualizações. Escreve @nome para etiquetar.',
+              'No updates yet',
+              'Aún no hay actualizaciones',
+              'Ainda não há atualizações',
             )}
           </li>
         )}

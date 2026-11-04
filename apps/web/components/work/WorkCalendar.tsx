@@ -89,13 +89,6 @@ export function WorkCalendar({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
         <div>
           <h3 className="text-sm font-semibold capitalize text-slate-800">{monthLabel}</h3>
-          <p className="text-[11px] text-slate-400">
-            {t(
-              'Drag tasks to reschedule · + to add on a day',
-              'Arrastra tareas para reprogramar · + para añadir',
-              'Arrasta tarefas para remarcar · + para criar no dia',
-            )}
-          </p>
         </div>
         <div className="flex items-center gap-1">
           <button

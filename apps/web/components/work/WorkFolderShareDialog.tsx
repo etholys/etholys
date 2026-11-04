@@ -289,19 +289,6 @@ export function WorkFolderShareDialog({
               {t('Share board', 'Compartir tablero', 'Partilhar tablero')}
             </p>
             <h3 className="truncate text-base font-semibold text-slate-900">{folderName}</h3>
-            <p className="mt-0.5 text-[11px] text-slate-400">
-              {isShared
-                ? t(
-                    'People with access. Change board type or stop sharing entirely.',
-                    'Personas con acceso. Cambia el tipo de tablero o deja de compartir.',
-                    'Pessoas com acesso. Muda o tipo de quadro ou deixa de partilhar.',
-                  )
-                : t(
-                    'Choose board type, then invite people if you want.',
-                    'Elige el tipo de tablero y, si quieres, invita personas.',
-                    'Escolhe o tipo de quadro e, se quiseres, convida pessoas.',
-                  )}
-            </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
             <X className="h-4 w-4" />
@@ -349,19 +336,6 @@ export function WorkFolderShareDialog({
                     {t('Shared', 'Compartido', 'Partilhado')}
                   </button>
                 </div>
-                <p className="mt-2 text-[11px] leading-snug text-slate-500">
-                  {visibility === 'SHARED' || hasPeople
-                    ? t(
-                        'Shows under Shared. Invite below — access stays invite-only.',
-                        'Aparece en Compartidos. Invita abajo — el acceso sigue siendo solo por invitación.',
-                        'Aparece em Partilhados. Convida abaixo — o acesso continua só por convite.',
-                      )
-                    : t(
-                        'Private under Only me. Switch to Shared to move legacy boards into Shared.',
-                        'Privado en Solo yo. Cambia a Compartido para mover tableros antiguos a Compartidos.',
-                        'Privado em Só eu. Muda para Partilhado para mover quadros antigos para Partilhados.',
-                      )}
-                </p>
               </div>
 
               <div className="flex flex-wrap gap-2">
