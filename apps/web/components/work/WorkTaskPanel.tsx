@@ -104,9 +104,9 @@ function RoleChipRow({
   const available = users.filter((u) => !ids.includes(u.id));
 
   return (
-    <div className="min-w-0 flex-1 space-y-1">
+    <div className="min-w-0 flex-1 space-y-0.5">
       <span className={fieldLabel}>{label}</span>
-      <div className="flex min-h-[28px] flex-wrap items-center gap-1">
+      <div className="flex min-h-[24px] flex-wrap items-center gap-1">
         {ids.length === 0 ? (
           <span className="text-[12px] text-[color:var(--sys-faint,#94a3b8)]">—</span>
         ) : (
@@ -468,8 +468,8 @@ export function WorkTaskPanel({
   const titleUrl = firstHttpUrl(title);
 
   return (
-    <aside className="flex h-full w-full max-w-[440px] shrink-0 flex-col border-l border-[color:var(--sys-line)] bg-[color:var(--sys-panel,#fff)] text-[color:var(--sys-ink)] shadow-[-12px_0_32px_rgba(15,23,42,0.18)]">
-      <div className="flex shrink-0 items-center justify-between border-b border-[color:var(--sys-line)] px-4 py-3">
+    <aside className="flex h-full min-h-0 w-full max-w-[440px] shrink-0 flex-col self-stretch overflow-hidden border-l border-[color:var(--sys-line)] bg-[color:var(--sys-panel,#fff)] text-[color:var(--sys-ink)] shadow-[-12px_0_32px_rgba(15,23,42,0.18)]">
+      <div className="flex shrink-0 items-center justify-between border-b border-[color:var(--sys-line)] px-4 py-2">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-300">
           {t('Task', 'Tarea', 'Tarefa')}
         </p>
@@ -484,13 +484,13 @@ export function WorkTaskPanel({
       </div>
 
       {loading ? (
-        <div className="flex flex-1 items-center justify-center text-sm text-[color:var(--sys-muted)]">…</div>
+        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-[color:var(--sys-muted)]">…</div>
       ) : !task ? (
         <div className="p-4 text-sm text-rose-600">{error || 'Not found'}</div>
       ) : (
-        <>
-          {/* Sticky identity: title · status · priority · due */}
-          <div className="shrink-0 space-y-3 border-b border-[color:var(--sys-line)] px-4 pb-3 pt-3">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {/* Sticky identity: title · status · priority · due · people */}
+          <div className="shrink-0 space-y-2 border-b border-[color:var(--sys-line)] px-4 pb-2.5 pt-2.5">
             {error ? (
               <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-600">{error}</p>
             ) : null}
@@ -501,7 +501,7 @@ export function WorkTaskPanel({
               onBlur={() => {
                 if (title.trim() && title.trim() !== task.title) void saveCore();
               }}
-              className="w-full border-0 border-b border-transparent bg-transparent pb-1 text-xl font-semibold tracking-tight text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
+              className="w-full border-0 border-b border-transparent bg-transparent pb-0.5 text-lg font-semibold tracking-tight text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
             />
             {titleUrl ? (
               <a
@@ -514,13 +514,13 @@ export function WorkTaskPanel({
               </a>
             ) : null}
 
-            <div className="grid grid-cols-3 gap-2">
-              <label className="space-y-1">
+            <div className="grid grid-cols-3 gap-1.5">
+              <label className="space-y-0.5">
                 <span className={fieldLabel}>{t('Status', 'Estado', 'Status')}</span>
                 <select
                   value={task.status}
                   onChange={(e) => void patch({ status: e.target.value })}
-                  className={`${fieldControl} font-semibold`}
+                  className={`${fieldControl} py-1.5 font-semibold`}
                 >
                   {WORK_STATUSES.map((s) => (
                     <option key={s} value={s}>
@@ -529,12 +529,12 @@ export function WorkTaskPanel({
                   ))}
                 </select>
               </label>
-              <label className="space-y-1">
+              <label className="space-y-0.5">
                 <span className={fieldLabel}>{t('Priority', 'Prioridad', 'Prioridade')}</span>
                 <select
                   value={task.priority}
                   onChange={(e) => void patch({ priority: e.target.value })}
-                  className={`${fieldControl} font-semibold`}
+                  className={`${fieldControl} py-1.5 font-semibold`}
                 >
                   {WORK_PRIORITIES.map((p) => (
                     <option key={p} value={p}>
@@ -543,19 +543,19 @@ export function WorkTaskPanel({
                   ))}
                 </select>
               </label>
-              <label className="space-y-1">
+              <label className="space-y-0.5">
                 <span className={fieldLabel}>{t('Due', 'Fecha', 'Prazo')}</span>
                 <input
                   type="date"
                   value={task.dueDate ? String(task.dueDate).slice(0, 10) : ''}
                   onChange={(e) => void patch({ dueDate: e.target.value || null })}
-                  className={fieldControl}
+                  className={`${fieldControl} py-1.5`}
                 />
               </label>
             </div>
 
             {/* Compact people row */}
-            <div className="flex gap-3 rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft,#f8fafc)] px-3 py-2">
+            <div className="flex gap-2.5 rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft,#f8fafc)] px-2.5 py-1.5">
               <RoleChipRow
                 label={t('Executor', 'Ejecutor', 'Executor')}
                 ids={panelRoleIds(task, 'EXECUTOR')}
@@ -582,7 +582,7 @@ export function WorkTaskPanel({
             </div>
           </div>
 
-          {/* Tabs */}
+          {/* Tabs — stay fixed above the scrollable body */}
           <div
             role="tablist"
             className="flex shrink-0 gap-0.5 overflow-x-auto border-b border-[color:var(--sys-line)] px-2"
@@ -596,7 +596,7 @@ export function WorkTaskPanel({
                   role="tab"
                   aria-selected={active}
                   onClick={() => setTab(item.id)}
-                  className={`relative shrink-0 px-3 py-2.5 text-[11px] font-semibold tracking-wide transition ${
+                  className={`relative shrink-0 px-3 py-2 text-[11px] font-semibold tracking-wide transition ${
                     active
                       ? 'text-teal-300'
                       : 'text-[color:var(--sys-muted)] hover:text-[color:var(--sys-ink)]'
@@ -624,10 +624,11 @@ export function WorkTaskPanel({
             })}
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4">
+          {/* Only the active tab body scrolls */}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
             {tab === 'detail' ? (
-              <div className="space-y-4">
-                <label className="block space-y-1">
+              <div className="space-y-2.5">
+                <label className="block space-y-0.5">
                   <span className={fieldLabel}>{t('Description', 'Descripción', 'Descrição')}</span>
                   <textarea
                     value={description}
@@ -635,30 +636,30 @@ export function WorkTaskPanel({
                     onBlur={() => {
                       if ((description.trim() || null) !== (task.description || null)) void saveCore();
                     }}
-                    rows={5}
-                    className="etask-field w-full rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-3 py-2 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
+                    rows={3}
+                    className="etask-field w-full resize-y rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-2.5 py-1.5 text-sm leading-snug text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
                     placeholder={t('Add details…', 'Añadir detalles…', 'Adicionar detalhes…')}
                   />
                 </label>
 
-                <label className="block space-y-1">
+                <label className="block space-y-0.5">
                   <span className={fieldLabel}>Tags</span>
                   <input
                     value={tagsInput}
                     onChange={(e) => setTagsInput(e.target.value)}
                     onBlur={() => void saveCore()}
-                    className="etask-field w-full rounded-xl border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-3 py-2 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
+                    className="etask-field w-full rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft)] px-2.5 py-1.5 text-sm text-[color:var(--sys-ink)] outline-none focus:border-teal-400"
                     placeholder="design, sprint"
                   />
                 </label>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <label className="col-span-2 space-y-1">
+                  <label className="col-span-2 space-y-0.5">
                     <span className={fieldLabel}>{t('Group', 'Grupo', 'Grupo')}</span>
                     <select
                       value={task.groupId || ''}
                       onChange={(e) => void patch({ groupId: e.target.value || null })}
-                      className={fieldControl}
+                      className={`${fieldControl} py-1.5`}
                     >
                       <option value="">{t('No group', 'Sin grupo', 'Sem grupo')}</option>
                       {groups.map((g) => (
@@ -668,12 +669,12 @@ export function WorkTaskPanel({
                       ))}
                     </select>
                   </label>
-                  <label className="col-span-2 space-y-1">
+                  <label className="col-span-2 space-y-0.5">
                     <span className={fieldLabel}>{t('Folder', 'Carpeta', 'Pasta')}</span>
                     <select
                       value={task.folderId || ''}
                       onChange={(e) => void patch({ folderId: e.target.value || null })}
-                      className={fieldControl}
+                      className={`${fieldControl} py-1.5`}
                     >
                       <option value="">{t('No folder', 'Sin carpeta', 'Sem pasta')}</option>
                       {folders.map((f) => (
@@ -683,16 +684,16 @@ export function WorkTaskPanel({
                       ))}
                     </select>
                   </label>
-                  <label className="space-y-1">
+                  <label className="space-y-0.5">
                     <span className={fieldLabel}>{t('Start', 'Inicio', 'Início')}</span>
                     <input
                       type="date"
                       value={task.startDate ? String(task.startDate).slice(0, 10) : ''}
                       onChange={(e) => void patch({ startDate: e.target.value || null })}
-                      className={fieldControl}
+                      className={`${fieldControl} py-1.5`}
                     />
                   </label>
-                  <label className="space-y-1">
+                  <label className="space-y-0.5">
                     <span className={fieldLabel}>{t('Estimate (h)', 'Estimación (h)', 'Estimativa (h)')}</span>
                     <input
                       type="number"
@@ -704,7 +705,7 @@ export function WorkTaskPanel({
                           estimatedHours: e.target.value === '' ? null : parseFloat(e.target.value),
                         })
                       }
-                      className={fieldControl}
+                      className={`${fieldControl} py-1.5`}
                       placeholder="0"
                     />
                   </label>
@@ -713,9 +714,9 @@ export function WorkTaskPanel({
             ) : null}
 
             {tab === 'work' ? (
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <section>
-                  <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
                     <p className={fieldLabel}>{t('Checklist', 'Checklist', 'Checklist')}</p>
                     {(task.checklist || []).length > 0 && (
                       <span className="text-[10px] tabular-nums text-[color:var(--sys-muted)]">
@@ -871,14 +872,7 @@ export function WorkTaskPanel({
             ) : null}
 
             {tab === 'send' ? (
-              <div className="space-y-3">
-                <p className="text-[11px] leading-snug text-[color:var(--sys-faint,#94a3b8)]">
-                  {t(
-                    'Ask for review, deliver work, or pass the baton — the other person gets a notification and email.',
-                    'Pide revisión, entrega el trabajo o pasa el testigo — la otra persona recibe aviso y correo.',
-                    'Peça revisão, entregue o trabalho ou passe o bastão — a outra pessoa recebe aviso e e-mail.',
-                  )}
-                </p>
+              <div className="space-y-2.5">
                 <select
                   value={sendAction}
                   onChange={(e) => setSendAction(e.target.value as 'review' | 'delivery' | 'handoff')}
@@ -931,7 +925,7 @@ export function WorkTaskPanel({
             ) : null}
 
             {tab === 'updates' ? (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <div className="relative">
                   <div className="flex gap-2">
                     <textarea
@@ -999,7 +993,7 @@ export function WorkTaskPanel({
             ) : null}
           </div>
 
-          <div className="flex shrink-0 items-center justify-between border-t border-[color:var(--sys-line)] px-4 py-3">
+          <div className="flex shrink-0 items-center justify-between border-t border-[color:var(--sys-line)] px-4 py-2.5">
             <p className="text-[11px] text-[color:var(--sys-muted)]">
               {saving
                 ? t('Saving…', 'Guardando…', 'A guardar…')
@@ -1015,7 +1009,7 @@ export function WorkTaskPanel({
               {t('Delete', 'Eliminar', 'Excluir')}
             </button>
           </div>
-        </>
+        </div>
       )}
     </aside>
   );

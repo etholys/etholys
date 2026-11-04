@@ -685,7 +685,7 @@ export default function WorkShell() {
 
       <div
         className={cn(
-          'relative z-10 flex min-h-screen min-w-0 flex-1 flex-col transition-all',
+          'relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-all',
           collapsed ? 'lg:ml-16' : 'lg:ml-60',
         )}
       >
@@ -797,8 +797,8 @@ export default function WorkShell() {
           )}
         </div>
 
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+        <div className="flex min-h-0 flex-1 items-stretch overflow-hidden">
+          <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
             {nav.kind === 'dashboard' ? (
               loadingDash ? (
                 <div className="flex justify-center py-16">

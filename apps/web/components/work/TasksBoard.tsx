@@ -1054,8 +1054,8 @@ export default function TasksBoard({
         )}
       </div>}
 
-      <div className={cn('flex min-h-0 flex-1 gap-0 overflow-hidden', embedded ? '' : 'rounded-2xl border border-slate-200/80 bg-slate-50/50')}>
-        <div className="min-w-0 flex-1 overflow-y-auto p-3 sm:p-4">
+      <div className={cn('flex min-h-0 flex-1 items-stretch gap-0 overflow-hidden', embedded ? '' : 'rounded-2xl border border-slate-200/80 bg-slate-50/50')}>
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-3 sm:p-4">
           {loading ? (
             <div className="flex justify-center py-16">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-600/30 border-t-cyan-600" />
