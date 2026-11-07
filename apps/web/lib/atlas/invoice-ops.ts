@@ -12,6 +12,38 @@ export function roundMoney(n: number): number {
   return Math.round((Number(n) || 0) * 100) / 100;
 }
 
+/** AR/AP outstanding: exclude paid and cancelled. Overdue still counts. */
+export function isOutstandingInvoiceStatus(status?: string | null): boolean {
+  const s = String(status || '').toUpperCase();
+  return s !== 'PAID' && s !== 'CANCELLED';
+}
+
+export type InvoiceKpiRow = {
+  type?: string | null;
+  status?: string | null;
+  total?: number | null;
+};
+
+/** KPI totals for invoice cards. "Por cobrar" / "Por pagar" are outstanding only. */
+export function summarizeInvoiceKpis(invoices: InvoiceKpiRow[]) {
+  let totalReceivable = 0;
+  let totalPayable = 0;
+  let overdue = 0;
+  let paid = 0;
+  const rows = invoices ?? [];
+  for (const inv of rows) {
+    const total = Number(inv?.total) || 0;
+    const type = String(inv?.type || '');
+    const status = String(inv?.status || '').toUpperCase();
+    if (status === 'OVERDUE') overdue += 1;
+    if (status === 'PAID') paid += total;
+    if (!isOutstandingInvoiceStatus(status)) continue;
+    if (type === 'RECEIVABLE') totalReceivable += total;
+    else if (type === 'PAYABLE') totalPayable += total;
+  }
+  return { totalReceivable, totalPayable, overdue, paid, total: rows.length };
+}
+
 export function addCalendarMonths(raw: unknown, months: number): string {
   const d = parseDateOnlyToUtc(raw);
   if (!d) return dateOnlyIso(raw);

@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserCompanyIds } from '@/lib/tenant';
+import { summarizeInvoiceKpis } from '@/lib/atlas/invoice-ops';
 
 export async function GET(req: Request) {
   try {
@@ -63,10 +64,11 @@ export async function GET(req: Request) {
       ngo: (clients ?? []).filter((c: any) => c?.type === 'ngo').length,
     };
 
-    // Invoice stats
-    const totalReceivable = (invoices ?? []).filter((i: any) => i?.type === 'RECEIVABLE' && i?.status !== 'CANCELLED').reduce((s: number, i: any) => s + (i?.total ?? 0), 0);
-    const totalPayable = (invoices ?? []).filter((i: any) => i?.type === 'PAYABLE' && i?.status !== 'CANCELLED').reduce((s: number, i: any) => s + (i?.total ?? 0), 0);
-    const overdueInvoices = (invoices ?? []).filter((i: any) => i?.status === 'OVERDUE').length;
+    // Invoice stats: Por cobrar / Por pagar are outstanding only (not PAID, not CANCELLED)
+    const invoiceKpis = summarizeInvoiceKpis(invoices ?? []);
+    const totalReceivable = invoiceKpis.totalReceivable;
+    const totalPayable = invoiceKpis.totalPayable;
+    const overdueInvoices = invoiceKpis.overdue;
 
     // Leave stats
     const pendingLeaves = (leaveRequests ?? []).filter((l: any) => l?.status === 'pending').length;

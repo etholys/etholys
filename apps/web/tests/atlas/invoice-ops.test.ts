@@ -12,6 +12,7 @@ import {
   nextInvoiceNumber,
   planInvoiceDuplicates,
   shiftPeriodLabels,
+  summarizeInvoiceKpis,
 } from '../../lib/atlas/invoice-ops';
 import {
   allocateInvoiceNumbers,
@@ -25,6 +26,22 @@ import { RURAL_COMMERCE_INVOICE_THEME } from '../../lib/atlas/invoice-theme';
 test('calendar months clamp end-of-month', () => {
   assert.equal(addCalendarMonths('2026-01-31', 1), '2026-02-28');
   assert.equal(addCalendarMonths('2026-10-01', 1), '2026-11-01');
+});
+
+test('invoice KPIs exclude paid and cancelled from outstanding AR/AP', () => {
+  const kpis = summarizeInvoiceKpis([
+    { type: 'RECEIVABLE', status: 'PAID', total: 1060.64 },
+    { type: 'RECEIVABLE', status: 'SENT', total: 200 },
+    { type: 'RECEIVABLE', status: 'OVERDUE', total: 50 },
+    { type: 'RECEIVABLE', status: 'CANCELLED', total: 999 },
+    { type: 'PAYABLE', status: 'PAID', total: 80 },
+    { type: 'PAYABLE', status: 'DRAFT', total: 30 },
+    { type: 'PAYABLE', status: 'CANCELLED', total: 40 },
+  ]);
+  assert.equal(kpis.totalReceivable, 250);
+  assert.equal(kpis.totalPayable, 30);
+  assert.equal(kpis.overdue, 1);
+  assert.equal(kpis.paid, 1140.64);
 });
 
 test('period labels advance in English and Spanish', () => {

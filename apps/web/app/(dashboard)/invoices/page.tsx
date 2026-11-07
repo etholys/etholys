@@ -11,7 +11,7 @@ import {
   RotateCcw, FilePlus2, Copy, CalendarPlus, FileSearch
 } from 'lucide-react';
 import { dateOnlyIso } from '@/lib/atlas/date-only';
-import { clientToInvoiceParty, convertAmount, INVOICE_CURRENCIES, invoicePdfUserError } from '@/lib/atlas/invoice-ops';
+import { clientToInvoiceParty, convertAmount, INVOICE_CURRENCIES, invoicePdfUserError, summarizeInvoiceKpis } from '@/lib/atlas/invoice-ops';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   DRAFT: { label: 'Borrador', color: 'text-gray-600', bg: 'bg-gray-100' },
@@ -139,15 +139,7 @@ export default function InvoicesPage() {
     });
   }, [invoices, filterType, filterStatus, searchText]);
 
-  const stats = useMemo(() => {
-    const receivable = invoices.filter(i => i.type === 'RECEIVABLE' && i.status !== 'CANCELLED');
-    const payable = invoices.filter(i => i.type === 'PAYABLE' && i.status !== 'CANCELLED');
-    const totalReceivable = receivable.reduce((s, i) => s + i.total, 0);
-    const totalPayable = payable.reduce((s, i) => s + i.total, 0);
-    const overdue = invoices.filter(i => i.status === 'OVERDUE').length;
-    const paid = invoices.filter(i => i.status === 'PAID').reduce((s, i) => s + i.total, 0);
-    return { totalReceivable, totalPayable, overdue, paid, total: invoices.length };
-  }, [invoices]);
+  const stats = useMemo(() => summarizeInvoiceKpis(invoices), [invoices]);
 
   const openNew = () => {
     setEditingId(null);
