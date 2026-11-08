@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/app/providers';
+import { ui } from '@/lib/i18n';
 import { isLikelyDbId } from '@/lib/utils';
 import {
   ArrowLeft,
@@ -192,7 +193,11 @@ export default function ProposalsPage() {
           } catch (e) {
             openedRef.current = false;
             setOpeningKnown(false);
-            setError(e instanceof Error ? e.message : 'Não foi possível abrir a proposta.');
+            setError(
+              e instanceof Error
+                ? e.message
+                : ui(locale, 'No se pudo abrir la propuesta.', 'Não foi possível abrir a proposta.', 'Could not open the proposal.'),
+            );
           }
           return;
         }
@@ -226,7 +231,7 @@ export default function ProposalsPage() {
         const f = asFundSeed(d?.fund);
         if (!f) {
           setOpeningKnown(false);
-          setError('Fundo não encontrado.');
+          setError(ui(locale, 'Fondo no encontrado.', 'Fundo não encontrado.', 'Fund not found.'));
           return;
         }
         setFund(f);
@@ -242,7 +247,11 @@ export default function ProposalsPage() {
           } catch (e) {
             openedRef.current = false;
             setOpeningKnown(false);
-            setError(e instanceof Error ? e.message : 'Não foi possível abrir a proposta.');
+            setError(
+              e instanceof Error
+                ? e.message
+                : ui(locale, 'No se pudo abrir la propuesta.', 'Não foi possível abrir a proposta.', 'Could not open the proposal.'),
+            );
           }
           return;
         }
@@ -253,58 +262,80 @@ export default function ProposalsPage() {
       .catch(() => {
         if (!cancelled) {
           setOpeningKnown(false);
-          setError('Não foi possível carregar o fundo.');
+          setError(ui(locale, 'No se pudo cargar el fondo.', 'Não foi possível carregar o fundo.', 'Could not load the fund.'));
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [companyId, draftsReady, fundIdParam, fromCandidate, openWorkspace]);
+  }, [companyId, draftsReady, fundIdParam, fromCandidate, openWorkspace, locale]);
 
-  const addFiles = useCallback((incoming: FileList | File[]) => {
-    const list = Array.from(incoming);
-    if (!list.length) return;
+  const addFiles = useCallback(
+    (incoming: FileList | File[]) => {
+      const list = Array.from(incoming);
+      if (!list.length) return;
 
-    setSelectedFiles((prev) => {
-      const next = [...prev];
-      const errors: string[] = [];
-      let skippedFormat = 0;
-      let skippedSize = 0;
+      setSelectedFiles((prev) => {
+        const next = [...prev];
+        const errors: string[] = [];
+        let skippedFormat = 0;
+        let skippedSize = 0;
 
-      for (const file of list) {
-        if (next.length >= MAX_FILES) {
-          errors.push(`Máximo de ${MAX_FILES} arquivos por proposta.`);
-          break;
+        for (const file of list) {
+          if (next.length >= MAX_FILES) {
+            errors.push(
+              ui(
+                locale,
+                `Máximo de ${MAX_FILES} archivos por propuesta.`,
+                `Máximo de ${MAX_FILES} arquivos por proposta.`,
+                `Maximum of ${MAX_FILES} files per proposal.`,
+              ),
+            );
+            break;
+          }
+          if (!ACCEPTED_EXT.test(file.name)) {
+            skippedFormat += 1;
+            continue;
+          }
+          if (file.size > MAX_FILE_BYTES) {
+            skippedSize += 1;
+            continue;
+          }
+          const duplicate = next.some(
+            (f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified,
+          );
+          if (duplicate) continue;
+          next.push(file);
         }
-        if (!ACCEPTED_EXT.test(file.name)) {
-          skippedFormat += 1;
-          continue;
-        }
-        if (file.size > MAX_FILE_BYTES) {
-          skippedSize += 1;
-          continue;
-        }
-        const duplicate = next.some(
-          (f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified,
-        );
-        if (duplicate) continue;
-        next.push(file);
-      }
 
-      if (skippedFormat) {
-        errors.push(
-          `${skippedFormat} arquivo(s) ignorado(s): formato não suportado. Use PDF, Word, Excel, PowerPoint, imagens, ZIP, TXT, etc.`,
-        );
-      }
-      if (skippedSize) {
-        errors.push(`${skippedSize} arquivo(s) ignorado(s): cada um deve ter menos de 25MB.`);
-      }
+        if (skippedFormat) {
+          errors.push(
+            ui(
+              locale,
+              `${skippedFormat} archivo(s) ignorado(s): formato no soportado. Usá PDF, Word, Excel, PowerPoint, imágenes, ZIP, TXT, etc.`,
+              `${skippedFormat} arquivo(s) ignorado(s): formato não suportado. Use PDF, Word, Excel, PowerPoint, imagens, ZIP, TXT, etc.`,
+              `${skippedFormat} file(s) skipped: unsupported format. Use PDF, Word, Excel, PowerPoint, images, ZIP, TXT, etc.`,
+            ),
+          );
+        }
+        if (skippedSize) {
+          errors.push(
+            ui(
+              locale,
+              `${skippedSize} archivo(s) ignorado(s): cada uno debe pesar menos de 25MB.`,
+              `${skippedSize} arquivo(s) ignorado(s): cada um deve ter menos de 25MB.`,
+              `${skippedSize} file(s) skipped: each must be under 25MB.`,
+            ),
+          );
+        }
 
-      setError(errors.length ? errors.join(' ') : null);
-      return next;
-    });
-  }, []);
+        setError(errors.length ? errors.join(' ') : null);
+        return next;
+      });
+    },
+    [locale],
+  );
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -329,7 +360,14 @@ export default function ProposalsPage() {
     }
 
     if (!editalLink.trim() && selectedFiles.length === 0) {
-      setError('Cole um link do edital ou selecione pelo menos um arquivo');
+      setError(
+        ui(
+          locale,
+          'Pegá el enlace del edital o seleccioná al menos un archivo',
+          'Cole um link do edital ou selecione pelo menos um arquivo',
+          'Paste a call link or select at least one file',
+        ),
+      );
       return;
     }
 
@@ -339,8 +377,10 @@ export default function ProposalsPage() {
     try {
       let resolvedFund: FundSummary = fund ?? {
         id: `adhoc-${Date.now()}`,
-        name: selectedFiles[0]?.name?.replace(/\.[^.]+$/, '') || 'Proposta avulsa',
-        institution: locale === 'en' ? 'No fund linked' : locale === 'pt' ? 'Sem fundo vinculado' : 'Sin fondo vinculado',
+        name:
+          selectedFiles[0]?.name?.replace(/\.[^.]+$/, '') ||
+          ui(locale, 'Propuesta independiente', 'Proposta avulsa', 'Standalone proposal'),
+        institution: ui(locale, 'Sin fondo vinculado', 'Sem fundo vinculado', 'No fund linked'),
         description: intakeNotes,
         linkOficial: editalLink.trim() || undefined,
       };
@@ -410,7 +450,12 @@ export default function ProposalsPage() {
         persistProposalIntake(intake);
       } catch {
         throw new Error(
-          'Não foi possível guardar os anexos no browser (armazenamento cheio). Remova alguns ficheiros ou limpe o cache e tente de novo.',
+          ui(
+            locale,
+            'No se pudieron guardar los anexos en el navegador (almacenamiento lleno). Quitá algunos archivos o limpiá la caché e intentá de nuevo.',
+            'Não foi possível guardar os anexos no browser (armazenamento cheio). Remova alguns ficheiros ou limpe o cache e tente de novo.',
+            'Could not save attachments in the browser (storage full). Remove some files or clear the cache and try again.',
+          ),
         );
       }
 
@@ -442,7 +487,11 @@ export default function ProposalsPage() {
 
       router.push(editorHref(workspaceId, resolvedFund.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao abrir workspace');
+      setError(
+        err instanceof Error
+          ? err.message
+          : ui(locale, 'Error al abrir el espacio de trabajo', 'Erro ao abrir workspace', 'Error opening workspace'),
+      );
       setIsLoading(false);
     }
   }, [fund, editalLink, selectedFiles, intakeNotes, router, openWorkspace, companyId, locale]);
@@ -462,11 +511,20 @@ export default function ProposalsPage() {
     [router],
   );
 
+  const dateLocale = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
+
   if (openingKnown) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-amber-600" />
-        <p className="text-sm text-gray-600">A abrir a proposta com os dados do fundo…</p>
+        <p className="text-sm text-gray-600">
+          {ui(
+            locale,
+            'Abriendo la propuesta con los datos del fondo…',
+            'A abrir a proposta com os dados do fundo…',
+            'Opening the proposal with the fund data…',
+          )}
+        </p>
       </div>
     );
   }
@@ -478,8 +536,12 @@ export default function ProposalsPage() {
           <ArrowLeft className="h-4 w-4" />
           FundHub
         </Link>
-        <h1 className="mt-3 text-3xl font-bold text-gray-900">Propostas</h1>
-        <p className="mt-1 text-gray-600">Escrever e acompanhar candidaturas.</p>
+        <h1 className="mt-3 text-3xl font-bold text-gray-900">
+          {ui(locale, 'Propuestas', 'Propostas', 'Proposals')}
+        </h1>
+        <p className="mt-1 text-gray-600">
+          {ui(locale, 'Escribir y seguir candidaturas.', 'Escrever e acompanhar candidaturas.', 'Write and track applications.')}
+        </p>
       </header>
 
       <div>
@@ -487,7 +549,7 @@ export default function ProposalsPage() {
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
             <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-medium text-red-900">Erro</h3>
+              <h3 className="font-medium text-red-900">{ui(locale, 'Error', 'Erro', 'Error')}</h3>
               <p className="text-sm text-red-700">{error}</p>
             </div>
           </div>
@@ -505,7 +567,7 @@ export default function ProposalsPage() {
             >
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
-                Rascunhos ({drafts.length})
+                {ui(locale, 'Borradores', 'Rascunhos', 'Drafts')} ({drafts.length})
               </div>
             </button>
             <button
@@ -518,7 +580,7 @@ export default function ProposalsPage() {
             >
               <div className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
-                Avulsa
+                {ui(locale, 'Independiente', 'Avulsa', 'Standalone')}
               </div>
             </button>
           </div>
@@ -529,14 +591,23 @@ export default function ProposalsPage() {
             {drafts.length === 0 ? (
               <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-12 text-center">
                 <FileText className="mx-auto h-12 w-12 text-gray-300" />
-                <h3 className="mt-4 text-lg font-medium text-gray-900">Nenhuma proposta em rascunho</h3>
-                <p className="mt-2 text-gray-600">Abra um fundo em Em curso, ou comece uma avulsa.</p>
+                <h3 className="mt-4 text-lg font-medium text-gray-900">
+                  {ui(locale, 'Ninguna propuesta en borrador', 'Nenhuma proposta em rascunho', 'No draft proposals')}
+                </h3>
+                <p className="mt-2 text-gray-600">
+                  {ui(
+                    locale,
+                    'Abrí un fondo en En curso, o empezá una independiente.',
+                    'Abra um fundo em Em curso, ou comece uma avulsa.',
+                    'Open a fund in In progress, or start a standalone one.',
+                  )}
+                </p>
                 <button
                   onClick={() => setActiveTab('new')}
                   className="mt-6 inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition"
                 >
                   <Plus className="h-4 w-4" />
-                  Proposta avulsa
+                  {ui(locale, 'Propuesta independiente', 'Proposta avulsa', 'Standalone proposal')}
                 </button>
               </div>
             ) : (
@@ -560,16 +631,26 @@ export default function ProposalsPage() {
                               : 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        {draft.status === 'draft' ? 'Rascunho' : draft.status === 'submitted' ? 'Enviado' : 'Arquivado'}
+                        {draft.status === 'draft'
+                          ? ui(locale, 'Borrador', 'Rascunho', 'Draft')
+                          : draft.status === 'submitted'
+                            ? ui(locale, 'Enviado', 'Enviado', 'Submitted')
+                            : ui(locale, 'Archivado', 'Arquivado', 'Archived')}
                       </span>
                     </div>
                     <div className="mb-4 space-y-2 border-t border-gray-100 pt-4">
                       <p className="line-clamp-2 text-sm text-gray-600">
-                        {draft.editalLink || draft.fundInstitution || 'Sem link'}
+                        {draft.editalLink ||
+                          draft.fundInstitution ||
+                          ui(locale, 'Sin enlace', 'Sem link', 'No link')}
                       </p>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <Calendar className="h-3.5 w-3.5" />
-                        {new Date(draft.updatedAt).toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        {new Date(draft.updatedAt).toLocaleDateString(dateLocale, {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -577,12 +658,12 @@ export default function ProposalsPage() {
                         onClick={() => handleContinueDraft(draft.workspaceId)}
                         className="flex-1 rounded-lg bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 hover:bg-amber-100 transition"
                       >
-                        Continuar
+                        {ui(locale, 'Continuar', 'Continuar', 'Continue')}
                       </button>
                       <button
                         onClick={() => handleDeleteDraft(draft.workspaceId)}
                         className="rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-100 transition"
-                        title="Deletar proposta"
+                        title={ui(locale, 'Eliminar propuesta', 'Eliminar proposta', 'Delete proposal')}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -598,23 +679,34 @@ export default function ProposalsPage() {
           <div className="max-w-2xl">
             {coalitionCount > 0 && (
               <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                Coalizão com <strong>{coalitionCount}</strong> organização(ões).{' '}
+                {ui(locale, 'Coalición con', 'Coalizão com', 'Coalition with')}{' '}
+                <strong>{coalitionCount}</strong>{' '}
+                {ui(locale, 'organización(es).', 'organização(ões).', 'organization(s).')}{' '}
                 <Link href="/hub/fundhub/coalition" className="font-medium underline">
-                  Gerir
+                  {ui(locale, 'Gestionar', 'Gerir', 'Manage')}
                 </Link>
               </div>
             )}
             <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
               <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Proposta avulsa</h2>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {ui(locale, 'Propuesta independiente', 'Proposta avulsa', 'Standalone proposal')}
+                </h2>
                 <p className="mt-2 text-gray-600">
-                  Sem fundo guardado — cole o link oficial. A IA lê a página e os anexos antes de qualquer postulação.
+                  {ui(
+                    locale,
+                    'Sin fondo guardado — pegá el enlace oficial. La IA lee la página y los anexos antes de cualquier postulación.',
+                    'Sem fundo guardado — cole o link oficial. A IA lê a página e os anexos antes de qualquer postulação.',
+                    'No saved fund — paste the official link. AI reads the page and attachments before any application.',
+                  )}
                 </p>
               </div>
 
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Link do edital</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    {ui(locale, 'Enlace del edital', 'Link do edital', 'Call link')}
+                  </label>
                   <input
                     type="url"
                     placeholder="https://…"
@@ -626,7 +718,7 @@ export default function ProposalsPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    Ficheiros
+                    {ui(locale, 'Archivos', 'Ficheiros', 'Files')}
                     {selectedFiles.length > 0 && (
                       <span className="ml-2 font-normal text-gray-500">
                         ({selectedFiles.length}/{MAX_FILES})
@@ -650,10 +742,15 @@ export default function ProposalsPage() {
                       <div className="text-center">
                         <UploadCloud className="mx-auto h-12 w-12 text-gray-400" />
                         <p className="mt-2 text-sm font-medium text-gray-900">
-                          Clique ou arraste
+                          {ui(locale, 'Hacé clic o arrastrá', 'Clique ou arraste', 'Click or drag')}
                         </p>
                         <p className="text-xs text-gray-500">
-                          PDF, Word, Excel… — até 25MB · máx. {MAX_FILES}
+                          {ui(
+                            locale,
+                            `PDF, Word, Excel… — hasta 25MB · máx. ${MAX_FILES}`,
+                            `PDF, Word, Excel… — até 25MB · máx. ${MAX_FILES}`,
+                            `PDF, Word, Excel… — up to 25MB · max ${MAX_FILES}`,
+                          )}
                         </p>
                       </div>
                       <input
@@ -684,7 +781,7 @@ export default function ProposalsPage() {
                             type="button"
                             onClick={() => handleRemoveFile(index)}
                             className="rounded-md p-1.5 text-red-600 hover:bg-red-50"
-                            title="Remover arquivo"
+                            title={ui(locale, 'Quitar archivo', 'Remover arquivo', 'Remove file')}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -695,11 +792,18 @@ export default function ProposalsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Notas</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    {ui(locale, 'Notas', 'Notas', 'Notes')}
+                  </label>
                   <textarea
                     value={intakeNotes}
                     onChange={(e) => setIntakeNotes(e.target.value)}
-                    placeholder="Pontos do edital, se quiser…"
+                    placeholder={ui(
+                      locale,
+                      'Puntos del edital, si querés…',
+                      'Pontos do edital, se quiser…',
+                      'Call notes, if you want…',
+                    )}
                     rows={3}
                     className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition"
                   />
@@ -721,12 +825,14 @@ export default function ProposalsPage() {
                   {isLoading ? (
                     <>
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      {editalLink.trim() ? 'A ler o edital oficial…' : 'A abrir…'}
+                      {editalLink.trim()
+                        ? ui(locale, 'Leyendo el edital oficial…', 'A ler o edital oficial…', 'Reading the official call…')
+                        : ui(locale, 'Abriendo…', 'A abrir…', 'Opening…')}
                     </>
                   ) : (
                     <>
                       <Plus className="h-5 w-5" />
-                      Ler o edital
+                      {ui(locale, 'Leer el edital', 'Ler o edital', 'Read the call')}
                     </>
                   )}
                 </button>

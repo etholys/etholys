@@ -295,7 +295,7 @@ export function CandidateDetailSheet({
         }),
       });
       const d = (await r.json()) as { reply?: string; error?: string };
-      if (!r.ok) throw new Error(d.error || 'Erro');
+      if (!r.ok) throw new Error(d.error || t('Erro', 'Error', 'Error'));
       if (asBrief) {
         setBrief(d.reply ?? '');
       } else {
@@ -307,7 +307,7 @@ export function CandidateDetailSheet({
         setInput('');
       }
     } catch (e) {
-      const err = e instanceof Error ? e.message : 'Erro';
+      const err = e instanceof Error ? e.message : t('Erro', 'Error', 'Error');
       if (asBrief) setBrief(err);
       else setChat((prev) => [...prev, { role: 'user', content: message }, { role: 'assistant', content: err }]);
     } finally {
