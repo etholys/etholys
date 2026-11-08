@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useApp } from '@/app/providers';
 import { isLikelyDbId } from '@/lib/utils';
 import { Loader2, MessageCircle, Paperclip, Send, Sparkles, X } from 'lucide-react';
@@ -20,7 +21,11 @@ type SuggestedShortcut = {
   classifications: Array<'direct' | 'client_bridge' | 'joint'>;
 };
 
+/** Proposal editor already has full chat — FAB must not cover Enviar. */
+const HIDDEN_PREFIXES = ['/hub/fundhub/proposals/editor'];
+
 export function FundHubAssistantDock() {
+  const pathname = usePathname() || '';
   const { locale, activeCompanyId } = useApp();
   const companyId = useMemo(() => {
     const s = String(activeCompanyId ?? '').trim();
@@ -28,6 +33,8 @@ export function FundHubAssistantDock() {
   }, [activeCompanyId]);
   const t = (pt: string, es: string, en: string) =>
     locale === 'pt' ? pt : locale === 'es' ? es : en;
+
+  const hidden = HIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -168,7 +175,7 @@ export function FundHubAssistantDock() {
     }
   };
 
-  if (!companyId) return null;
+  if (!companyId || hidden) return null;
 
   return (
     <>
