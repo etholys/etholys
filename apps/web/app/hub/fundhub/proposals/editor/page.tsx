@@ -41,9 +41,11 @@ import {
   formatProposalFileContext,
   hasEditalFormOutline,
   hydrateProposalAttachedFiles,
+  looksLikeUnderstandBriefing,
   mergeDraftIntoMarkdown,
   persistableProposalFiles,
   resolveCanvasEditTarget,
+  sanitizeProposalCanvasContent,
   seedDocumentMarkdown,
   seedUnderstandMarkdown,
   sectionsFromMarkdown,
@@ -80,6 +82,8 @@ interface ChatMessage {
   createdAt: string;
   /** Reply was merged into the canvas (Redactar). */
   applied?: boolean;
+  /** Understand briefing stays in chat — do not offer Insert into the document. */
+  kind?: 'understand' | 'system';
 }
 
 type AttachedFile = ProposalAttachedFile;
@@ -547,13 +551,19 @@ export default function FundHubProposalEditorPage() {
       const answer = stripUnsolicitedBrainstorm(String(data.answer));
       const seed = fund || { id: fundId || 'adhoc', name: 'Proposta', institution: '' };
       const replaceBriefing = !chatMessages.some((m) => m.role === 'user');
+      // Briefing stays in chat only — never dump the model answer into the living document.
       const nextDoc =
         !replaceBriefing && documentMarkdown.trim()
           ? documentMarkdown
-          : seedUnderstandMarkdown(seed, answer, locale);
+          : seedUnderstandMarkdown(seed, undefined, locale);
       const nextChat: ChatMessage[] = [
         ...chatMessages,
-        { role: 'assistant', content: answer, createdAt: new Date().toISOString() },
+        {
+          role: 'assistant',
+          content: answer,
+          createdAt: new Date().toISOString(),
+          kind: 'understand',
+        },
       ];
       setDocumentMarkdown(nextDoc);
       setChatMessages(nextChat);
@@ -643,6 +653,7 @@ export default function FundHubProposalEditorPage() {
           role: 'assistant',
           content: structureNote,
           createdAt: new Date().toISOString(),
+          kind: 'system',
         },
       ];
       persistDraft({ documentMarkdown: nextDoc, chat: next, stage: 'write' });
@@ -938,11 +949,12 @@ export default function FundHubProposalEditorPage() {
 
   const insertIntoDocument = useCallback(
     (text: string) => {
-      const block = text.trim();
+      const block = sanitizeProposalCanvasContent(text.trim());
       if (!block) return;
+      if (looksLikeUnderstandBriefing(block)) return;
       setDocumentMarkdown((prev) => {
         const next = mergeDraftIntoMarkdown(
-          prev || seedDocumentMarkdown(fund || { id: 'adhoc', name: 'Proposta' }, block, locale),
+          prev || seedDocumentMarkdown(fund || { id: 'adhoc', name: 'Proposta' }, undefined, locale),
           block,
         );
         persistDraft({ documentMarkdown: next });
@@ -1814,7 +1826,10 @@ export default function FundHubProposalEditorPage() {
                       : ui(locale, 'Tú', 'Você', 'You')}
                   </p>
                   <StudioMarkdown text={message.content} />
-                  {message.role === 'assistant' && (
+                  {message.role === 'assistant' &&
+                    message.kind !== 'understand' &&
+                    message.kind !== 'system' &&
+                    !looksLikeUnderstandBriefing(message.content) && (
                     <button
                       type="button"
                       onClick={() => {

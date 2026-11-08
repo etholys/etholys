@@ -4,7 +4,17 @@ import type { Locale } from '@/lib/i18n';
 
 const DOC_HEAD: Record<
   Locale,
-  { read: string; idea: string; draft: string; elig: string; bases: string; waitingRead: string; waitingIdea: string }
+  {
+    read: string;
+    idea: string;
+    draft: string;
+    elig: string;
+    bases: string;
+    waitingRead: string;
+    waitingIdea: string;
+    /** After understand: full briefing stays in chat; canvas waits for Write. */
+    readInChat: string;
+  }
 > = {
   es: {
     read: 'Lectura de la convocatoria',
@@ -14,6 +24,8 @@ const DOC_HEAD: Record<
     bases: 'Bases oficiales (citar; no inventar)',
     waitingRead: 'La IA está leyendo la convocatoria oficial. La postulación empieza solo después de esta lectura.',
     waitingIdea: 'La IA está preparando una idea general para este fondo y el perfil de la organización.',
+    readInChat:
+      'La lectura completa está en el chat. Este documento se llena solo al pasar a la postulación (Redactar).',
   },
   pt: {
     read: 'Leitura do edital',
@@ -23,6 +35,8 @@ const DOC_HEAD: Record<
     bases: 'Bases oficiais (citar; não inventar)',
     waitingRead: 'A IA está a ler a convocatória oficial. A postulação começa só depois desta leitura.',
     waitingIdea: 'A IA está a preparar uma ideia geral para este fundo e o perfil da organização.',
+    readInChat:
+      'A leitura completa está no chat. Este documento só se preenche ao passar à postulação (Redigir).',
   },
   en: {
     read: 'Call reading',
@@ -32,6 +46,8 @@ const DOC_HEAD: Record<
     bases: 'Official guidelines (quote; do not invent)',
     waitingRead: 'The AI is reading the official call. Writing starts only after this briefing.',
     waitingIdea: 'The AI is preparing a general idea for this fund and the organisation profile.',
+    readInChat:
+      'The full briefing is in the chat. This document fills only when you start writing.',
   },
 };
 
@@ -318,21 +334,68 @@ export function sectionsFromMarkdown(md: string): Array<{ id: string; title: str
   return sections;
 }
 
+/**
+ * Strip tool/agent junk before any canvas merge or seed.
+ * Chat may still show the raw assistant reply; the living document must not.
+ */
+export function sanitizeProposalCanvasContent(text: string): string {
+  let t = String(text || '').replace(/\r\n/g, '\n');
+  if (!t.trim()) return '';
+
+  // Fenced dumps (JSON / code) from ingest or tool paths
+  t = t.replace(/```(?:json|javascript|js|ts|typescript|html|xml)?\s*\n[\s\S]*?```/gi, '\n');
+  t = t.replace(/```\s*\n\s*\{[\s\S]*?\}\s*\n```/g, '\n');
+
+  const scratchLine =
+    /^(?:#{1,3}\s*)?(?:\*\*)?(?:let me\b|based on my research\b|here is the verified\b|transparency notice\b|i must be honest\b|i'?ll search\b|i will search\b|searching for\b|the linkedin\b|linkedin activity\b|looking at the\b|from my (?:search|research)\b|as an ai\b|tool (?:call|result)\b|web[\s-]?search\b|verified json\b|raw json\b|i found that\b|let me dig\b)/i;
+  const scratchInline =
+    /\b(let me search|based on my research|here is the verified|transparency notice|i must be honest|didn'?t surface|search more specifically|linkedin activity id|urn:li:)\b/i;
+
+  const kept: string[] = [];
+  for (const line of t.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      kept.push(line);
+      continue;
+    }
+    if (scratchLine.test(trimmed) || scratchInline.test(trimmed)) continue;
+    if (/urn:li:[a-z0-9:_-]+/i.test(trimmed)) continue;
+    // Lone JSON object / array lines from ingest
+    if (/^[\{\[]/.test(trimmed) && /[\}\]]$/.test(trimmed) && /"[a-z_]+"\s*:/i.test(trimmed)) continue;
+    kept.push(line);
+  }
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** True when chat text is an understand / convocatoria briefing — not draft for the note. */
+export function looksLikeUnderstandBriefing(text: string): boolean {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  if (/```(?:json)?/i.test(t) && /transparency notice|let me search|verified json/i.test(t)) return true;
+  const signals = [
+    /situaci[oó]n de partida/i,
+    /qu[eé] es este fondo/i,
+    /qui[eé]n (?:puede )?postula/i,
+    /lectura de la convocatoria/i,
+    /leitura do edital/i,
+    /call reading|what (?:is|this) (?:fund|call)/i,
+    /\b(?:3|tres|três)\s+punt(?:os?|os?)\s+a\s+confirm/i,
+    /janela|plazo|deadline|montante|monto\b/i,
+  ];
+  const hits = signals.filter((re) => re.test(t)).length;
+  return hits >= 2 || (hits >= 1 && t.length > 900);
+}
+
+/**
+ * Understand stage: title + short Lectura placeholder only.
+ * The AI briefing stays in chat — never dump analysis / JSON / bases into the canvas.
+ * `briefing` is ignored (kept for call-site compatibility).
+ */
 export function seedUnderstandMarkdown(seed: ProposalFundSeed, briefing?: string, locale?: string | null): string {
   const h = docHead(locale);
   const title = seed.name?.trim() || 'Proposta';
-  const brief = briefing?.trim() ? briefing.trim() : h.waitingRead;
-  const eligibility = [seed.whoCanApply, seed.eligibility || seed.eligibilityCriteria, seed.requirements, seed.howToApply]
-    .filter((s) => Boolean(String(s ?? '').trim()))
-    .join('\n\n');
-  const bases = String(seed.basesText || seed.sourceExcerpt || '').trim();
-  const parts = [`# ${title}`, `## ${h.read}\n\n${brief}`];
-  if (eligibility) parts.push(`## ${h.elig}\n\n${eligibility}`);
-  if (bases) {
-    const clip = bases.length > 4500 ? `${bases.slice(0, 4500).trim()}…` : bases;
-    parts.push(`## ${h.bases}\n\n${clip}`);
-  }
-  return parts.join('\n\n');
+  void briefing;
+  return `# ${title}\n\n## ${h.read}\n\n${h.readInChat}\n`;
 }
 
 export function appendWriteSections(md: string, locale?: string | null): string {
@@ -511,13 +574,15 @@ export function mergeDraftIntoMarkdown(
   draft: string,
   opts?: { preferredTitle?: string | null },
 ): string {
-  let incoming = draft
-    .trim()
-    .replace(
-      /^(?:Escrito en el documento\.|Escrito no documento\.|Written into the document\.)\s*/i,
-      '',
-    )
-    .trim();
+  let incoming = sanitizeProposalCanvasContent(
+    draft
+      .trim()
+      .replace(
+        /^(?:Escrito en el documento\.|Escrito no documento\.|Written into the document\.)\s*/i,
+        '',
+      )
+      .trim(),
+  );
   if (!incoming) return existing;
 
   const preferred = opts?.preferredTitle?.trim();

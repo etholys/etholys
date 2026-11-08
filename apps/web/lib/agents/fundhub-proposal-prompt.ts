@@ -1,6 +1,6 @@
 import { INSTITUTIONAL_PROSE_RULE } from '@/lib/agents/prose-rules';
 
-const PROMPT_VERSION = 'fundhub-proposal-v11';
+const PROMPT_VERSION = 'fundhub-proposal-v12';
 
 export type FundhubProposalMode = 'chat' | 'structure' | 'draft_section' | 'brainstorm' | 'understand';
 export type FundhubLocale = 'es' | 'pt' | 'en';
@@ -172,12 +172,16 @@ O DOCUMENTO NO CANVAS é a verdade. A mensagem do utilizador é uma INSTRUÇÃO 
     return `${rules}
 
 ## TRABALHO (entender o edital)
-Primeiro passo: briefing factual da convocatória. PROIBIDO nesta resposta:
+Primeiro passo: briefing factual da convocatória — resposta SÓ para o chat do utilizador.
+PROIBIDO nesta resposta:
 - chuva de ideias / brainstorm / «4–7 ideias» / como enquadrar a proposta
 - rascunho de candidatura ou secções a preencher
 - pedir ao utilizador para «gerar ideias» no fim
+- JSON, blocos \`\`\`json, dumps de ferramentas / web-search / LinkedIn / urn:li:
+- monólogo de investigação em inglês («Let me search», «Based on my research», «Here is the verified JSON», «Transparency Notice», «I must be honest»…)
+- dizer ao sistema ou ao utilizador para colar este briefing no canvas / documento — o canvas NÃO recebe esta leitura
 
-Inclui APENAS:
+Inclui APENAS (texto limpo, idioma da interface do Hub):
 - O que é o fundo (1 parágrafo).
 - Quem pode candidatar e onde.
 - Janela, montante, tipo (grant/crédito).
@@ -185,7 +189,7 @@ Inclui APENAS:
 - Formato / secções que o edital exige, se estiverem no texto.
 - 3 pontos a confirmar na postulação (factos, não ideias criativas).
 
-Tom de briefing institucional. Sem tabelas markdown partidas. Sem pedir o edital outra vez se o texto já veio no contexto.`;
+Tom de briefing institucional. Sem tabelas markdown partidas. Sem pedir o edital outra vez se o texto já veio no contexto. Sem rasto de ferramentas.`;
   }
 
   if (mode === 'brainstorm') {
@@ -241,7 +245,7 @@ ${userMessage.trim()}`;
   if (mode === 'understand') {
     return `${block}
 
-Pedido: briefing do edital — o que a convocatória diz de facto. Sem postulação ainda. Resposta no idioma da interface (${fundhubLanguageName(normalizeFundhubLocale(ctx.locale))}).`;
+Pedido: briefing do edital — o que a convocatória diz de facto. Sem postulação ainda. Só chat (não canvas). Sem JSON nem rasto de ferramentas. Resposta no idioma da interface (${fundhubLanguageName(normalizeFundhubLocale(ctx.locale))}).`;
   }
   if (mode === 'brainstorm') {
     return `${block}

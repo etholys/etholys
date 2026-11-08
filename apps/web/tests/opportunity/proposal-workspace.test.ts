@@ -10,8 +10,10 @@ import {
   hasEditalFormOutline,
   hydrateProposalAttachedFiles,
   persistableProposalFiles,
+  looksLikeUnderstandBriefing,
   mergeDraftIntoMarkdown,
   resolveCanvasEditTarget,
+  sanitizeProposalCanvasContent,
   seedDocumentMarkdown,
   seedUnderstandMarkdown,
   sectionsFromMarkdown,
@@ -168,14 +170,46 @@ test('brainstorm prompt asks for chuva de ideias and forbids FUNDHUB leftovers',
   assert.match(sys, /Não menciones nomes internos de produto/);
 });
 
-test('understand seed has leitura, write appends rascunho', () => {
-  const md = seedUnderstandMarkdown(richFund, 'GO 123 aceita ONG australianas.', 'pt');
+test('understand seed keeps briefing out of the canvas', () => {
+  const md = seedUnderstandMarkdown(richFund, 'GO 123 aceita ONG australianas.\n\n## Qué es este fondo\n\nDump longo.', 'pt');
   assert.match(md, /## Leitura do edital/);
-  assert.match(md, /ONG australianas/);
+  assert.match(md, /leitura completa está no chat/i);
+  assert.equal(md.includes('ONG australianas'), false);
+  assert.equal(md.includes('Qué es este fondo'), false);
+  assert.equal(/^##\s+Bases/im.test(md), false);
   assert.equal(/^##\s+Ideia geral/im.test(md), false);
   const next = appendWriteSections(md, 'pt');
   assert.match(next, /## Ideia geral/);
   assert.match(next, /## Rascunho/);
+});
+
+test('sanitizeProposalCanvasContent strips JSON and English tool narration', () => {
+  const junk = [
+    'Let me search more specifically for the Central Sahel.',
+    'Based on my research, here is a dump.',
+    '```json',
+    '{"fund":"IFAD Central Sahel","wrong":true}',
+    '```',
+    'Transparency Notice: I must be honest about LinkedIn urn:li:activity:123.',
+    '',
+    '## c) Objetivo',
+    '',
+    'Frutalcoop acopia frutas en Los Santos.',
+  ].join('\n');
+  const clean = sanitizeProposalCanvasContent(junk);
+  assert.equal(clean.includes('Let me search'), false);
+  assert.equal(clean.includes('```json'), false);
+  assert.equal(clean.includes('IFAD Central Sahel'), false);
+  assert.equal(clean.includes('Transparency Notice'), false);
+  assert.match(clean, /## c\) Objetivo/);
+  assert.match(clean, /Frutalcoop/);
+  assert.equal(
+    looksLikeUnderstandBriefing(
+      '## Situación de partida\n\n## Qué es este fondo\n\nGrant regional.\n\n## Quién postula\n\nONG locales.',
+    ),
+    true,
+  );
+  assert.equal(looksLikeUnderstandBriefing('## c) Objetivo\n\nFrutalcoop acopia frutas.'), false);
 });
 
 test('mergeDraftIntoMarkdown replaces matching headings and appends new ones', () => {
@@ -244,9 +278,21 @@ test('merge without ## still replaces the preferred canvas section', () => {
 test('understand seed follows Spanish hub locale', () => {
   const md = seedUnderstandMarkdown(richFund, 'GO 123 admite ONG australianas.', 'es');
   assert.match(md, /## Lectura de la convocatoria/);
+  assert.match(md, /lectura completa está en el chat/i);
+  assert.equal(md.includes('ONG australianas'), false);
   const next = appendWriteSections(md, 'es');
   assert.match(next, /## Idea general/);
   assert.match(next, /## Borrador/);
+});
+
+test('understand prompt forbids JSON tool traces and canvas dump', () => {
+  const sys = buildFundhubProposalSystemPrompt('understand', 'es');
+  assert.match(sys, /SÓ para o chat/i);
+  assert.match(sys, /JSON|```json|rasto de ferramentas/i);
+  assert.match(sys, /Let me search|Transparency Notice/i);
+  assert.match(sys, /canvas NÃO recebe/i);
+  const user = buildFundhubProposalUserPrompt('understand', { locale: 'es' }, '');
+  assert.match(user, /Só chat|não canvas/i);
 });
 
 test('proposal file roles stay labeled and turn files are not persisted', () => {
