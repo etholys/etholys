@@ -1509,8 +1509,8 @@ export default function FundHubProposalEditorPage() {
   }, [fund, locale]);
 
   return (
-    <div className="flex h-[calc(100dvh-5.5rem)] flex-col gap-3 overflow-hidden">
-      <header className="flex shrink-0 flex-wrap items-start justify-between gap-3">
+    <div className="flex h-[calc(100dvh-5.5rem)] min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden lg:h-auto">
+      <header className="flex shrink-0 flex-wrap items-start justify-between gap-3 px-3 pt-3 md:px-4 md:pt-4">
         <div className="min-w-0">
           <Link
             href="/hub/fundhub/proposals"
@@ -1631,14 +1631,14 @@ export default function FundHubProposalEditorPage() {
       </header>
 
       {error && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <div className="mx-3 mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 md:mx-4">
           <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {versionsOpen && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+        <div className="mx-3 mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 md:mx-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold text-amber-950">
               {ui(locale, 'Historial de versiones', 'Histórico de versões', 'Version history')}
@@ -1692,13 +1692,23 @@ export default function FundHubProposalEditorPage() {
       )}
 
       {loading ? (
-        <div className="flex flex-1 items-center justify-center rounded-2xl border border-gray-200 bg-white">
+        <div className="mt-3 flex min-h-0 flex-1 items-center justify-center border-t border-white/10 bg-white">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-amber-600" />
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 gap-3 overflow-hidden">
-          <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white">
-            <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
+        <div className="relative mt-3 flex min-h-0 flex-1 overflow-hidden border-t border-white/10">
+          {/* Mobile backdrop when document/review drawer is open */}
+          {!rightRailCollapsed && (
+            <button
+              type="button"
+              aria-label={ui(locale, 'Cerrar panel', 'Fechar painel', 'Close panel')}
+              className="absolute inset-0 z-20 bg-black/50 lg:hidden"
+              onClick={() => setRightRailCollapsed(true)}
+            />
+          )}
+
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
+            <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5 sm:px-5 lg:px-6">
               <p className="text-sm font-semibold text-gray-900">
                 {stage === 'understand'
                   ? ui(locale, 'Lectura del edital', 'Leitura do edital', 'Call reading')
@@ -1758,7 +1768,7 @@ export default function FundHubProposalEditorPage() {
                 </span>
               )}
             </div>
-            <div className="fh-pane-scroll min-h-0 flex-1 basis-0 space-y-3 overflow-y-auto px-4 py-3">
+            <div className="fh-pane-scroll min-h-0 flex-1 basis-0 space-y-3 overflow-y-auto px-4 py-3 sm:px-5 lg:px-6">
               {rfpChecklist.length > 0 && stage === 'understand' && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-900/80">
@@ -1859,7 +1869,7 @@ export default function FundHubProposalEditorPage() {
               <div ref={chatEndRef} />
             </div>
             <form
-              className="border-t border-gray-100 p-3"
+              className="border-t border-gray-100 p-3 sm:px-5 lg:px-6"
               onSubmit={(e) => {
                 e.preventDefault();
                 void handleSendChat();
@@ -2055,17 +2065,20 @@ export default function FundHubProposalEditorPage() {
 
           <aside
             className={cn(
-              'flex min-h-0 flex-shrink-0 flex-col overflow-hidden border border-white/10 bg-[color:var(--sys-aside-bg,rgba(7,17,26,0.92))] text-[color:var(--sys-ink,#E8EEF2)] shadow-[0_24px_80px_-48px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all',
-              'rounded-2xl',
+              'fh-proposal-doc-rail flex min-h-0 flex-shrink-0 flex-col overflow-hidden bg-[color:var(--sys-aside-bg,rgba(7,17,26,0.96))] text-[color:var(--sys-ink,#E8EEF2)] backdrop-blur-md transition-[width,transform,box-shadow] duration-300 ease-out',
+              // Desktop: docked right sidebar with left border (like Hub nav, mirrored)
+              'lg:relative lg:z-auto lg:translate-x-0 lg:border-l lg:border-white/10 lg:shadow-none',
+              // Mobile: overlay drawer from the right
+              'max-lg:fixed max-lg:inset-y-0 max-lg:right-0 max-lg:z-30 max-lg:border-l max-lg:border-white/10 max-lg:shadow-[-24px_0_64px_-32px_rgba(0,0,0,0.75)]',
               rightRailCollapsed
-                ? 'w-16'
+                ? 'w-11 max-lg:pointer-events-none max-lg:translate-x-full lg:w-11'
                 : rightRailTab === 'document'
-                  ? 'w-full max-w-xl lg:w-[min(42vw,34rem)]'
-                  : 'w-full max-w-sm lg:w-80',
+                  ? 'w-[min(100vw,28rem)] min-w-[min(100%,20rem)] max-lg:w-[min(100vw,28rem)] lg:w-[clamp(26rem,44vw,50%)] lg:min-w-[26rem] lg:max-w-[50vw]'
+                  : 'w-[min(100vw,22rem)] max-lg:w-[min(100vw,22rem)] lg:w-80 lg:min-w-[18rem] lg:max-w-sm',
             )}
           >
             {rightRailCollapsed ? (
-              <div className="flex h-full flex-col items-center gap-0.5 p-1.5">
+              <div className="hidden h-full flex-col items-center gap-0.5 border-l border-white/10 py-2 lg:flex">
                 <button
                   type="button"
                   onClick={() => setRightRailCollapsed(false)}
@@ -2324,6 +2337,19 @@ export default function FundHubProposalEditorPage() {
               </>
             )}
           </aside>
+
+          {/* Mobile: reopen handle when the document drawer is closed */}
+          {rightRailCollapsed && (
+            <button
+              type="button"
+              onClick={() => setRightRailCollapsed(false)}
+              className="absolute right-0 top-1/2 z-10 flex -translate-y-1/2 flex-col items-center gap-1 rounded-l-lg border border-r-0 border-white/15 bg-[#0C1822]/95 px-1.5 py-3 text-white/75 shadow-lg backdrop-blur-md transition hover:bg-[#0C1822] hover:text-white lg:hidden"
+              title={ui(locale, 'Abrir documento', 'Abrir documento', 'Open document')}
+            >
+              <PanelRightOpen className="h-4 w-4" />
+              <FileText className="h-3.5 w-3.5 text-amber-300" />
+            </button>
+          )}
         </div>
       )}
     </div>

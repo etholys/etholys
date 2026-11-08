@@ -516,8 +516,21 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
           )}
         </div>
 
-        <main className={cn('fh-canvas min-w-0 flex-1 overflow-auto', pathname?.includes('/fundhub/proposals/editor') ? 'p-3 md:p-4' : 'p-4 md:p-6')}>
-          <div className={cn('mx-auto', pathname?.includes('/fundhub/proposals/editor') ? 'max-w-[1400px]' : 'max-w-6xl')}>
+        <main
+          className={cn(
+            'fh-canvas min-w-0 flex-1',
+            pathname?.includes('/fundhub/proposals/editor')
+              ? 'flex flex-col overflow-hidden p-0'
+              : 'overflow-auto p-4 md:p-6',
+          )}
+        >
+          <div
+            className={cn(
+              pathname?.includes('/fundhub/proposals/editor')
+                ? 'flex min-h-0 w-full max-w-none flex-1 flex-col'
+                : 'mx-auto max-w-6xl',
+            )}
+          >
             <SystemLicenseGate system="FUNDHUB">
               {children}
               <FundHubAssistantDock />
