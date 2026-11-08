@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useApp } from '@/app/providers';
 import { ui } from '@/lib/i18n';
 import Link from 'next/link';
@@ -25,6 +25,7 @@ import {
   Network,
   UsersRound,
   Building2,
+  FileText,
 } from 'lucide-react';
 import { cn, getInitials, isLikelyDbId } from '@/lib/utils';
 import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
@@ -32,11 +33,22 @@ import { FundHubAssistantDock } from '@/components/fundhub/FundHubAssistantDock'
 import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 import { sysTheme } from '@/lib/system-shell';
+import { editorHref } from '@/lib/opportunity/proposal-workspace';
+
+type SidebarProposal = {
+  workspaceId: string;
+  fundId?: string | null;
+  title?: string | null;
+  fundName?: string | null;
+  status?: string;
+  updatedAt?: string;
+};
 
 export default function FundHubLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { tr, locale, setLocale, activeCompanyId, setActiveCompanyId } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -47,6 +59,15 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
   const [chatUnread, setChatUnread] = useState(0);
   const [whitelabelActive, setWhitelabelActive] = useState(false);
+  const [proposalHistory, setProposalHistory] = useState<SidebarProposal[]>([]);
+  const [proposalsExpanded, setProposalsExpanded] = useState(false);
+
+  const isProposalEditor = Boolean(pathname?.includes('/fundhub/proposals/editor'));
+  const activeWorkspaceId = searchParams?.get('workspace') || searchParams?.get('workspaceId') || '';
+  const companyId = useMemo(() => {
+    const s = String(activeCompanyId ?? '').trim();
+    return isLikelyDbId(s) ? s : '';
+  }, [activeCompanyId]);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/login');
@@ -102,6 +123,30 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
       cancelled = true;
     };
   }, [status, activeCompanyId]);
+
+  useEffect(() => {
+    if (isProposalEditor) setProposalsExpanded(true);
+  }, [isProposalEditor]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !companyId) {
+      setProposalHistory([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/fundhub/proposals?companyId=${encodeURIComponent(companyId)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { proposals?: SidebarProposal[] } | null) => {
+        if (cancelled) return;
+        setProposalHistory(Array.isArray(d?.proposals) ? d!.proposals! : []);
+      })
+      .catch(() => {
+        if (!cancelled) setProposalHistory([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [status, companyId, isProposalEditor]);
 
   if (status === 'loading') {
     return (
@@ -306,10 +351,85 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
           </div>
 
           {workItems.map((item) => {
+            const isProposals = item.href === '/hub/fundhub/proposals';
             const isActive =
               item.href === '/hub/fundhub/crm'
                 ? Boolean(pathname?.startsWith('/hub/fundhub/crm'))
                 : pathname === item.href || Boolean(pathname?.startsWith(item.href + '/'));
+            if (isProposals && !collapsed) {
+              const showTree = proposalsExpanded || isActive;
+              return (
+                <div key={item.href} className="space-y-0.5">
+                  <div className="flex items-center gap-0.5">
+                    <Link
+                      href={item.href}
+                      onClick={() => setSidebarOpen(false)}
+                      className={cn(navClass(isActive, false), 'min-w-0 flex-1')}
+                    >
+                      <item.icon className="h-5 w-5 flex-shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setProposalsExpanded((v) => !v)}
+                      className="rounded-lg p-2 text-white/55 transition hover:bg-white/[0.05] hover:text-white"
+                      aria-expanded={showTree}
+                      title={item.label}
+                    >
+                      <ChevronDown
+                        className={cn('h-3.5 w-3.5 transition', showTree && 'rotate-180')}
+                      />
+                    </button>
+                  </div>
+                  {showTree && (
+                    <div className="ml-3 space-y-0.5 border-l border-white/10 pl-2">
+                      {proposalHistory.length === 0 ? (
+                        <p className="px-2 py-1.5 text-[11px] text-white/40">
+                          {locale === 'es'
+                            ? 'Sin propuestas aún'
+                            : locale === 'pt'
+                              ? 'Ainda sem propostas'
+                              : 'No proposals yet'}
+                        </p>
+                      ) : (
+                        proposalHistory.slice(0, 24).map((p) => {
+                          const label = String(p.title || p.fundName || '').trim() || item.label;
+                          const active = Boolean(activeWorkspaceId && p.workspaceId === activeWorkspaceId);
+                          return (
+                            <Link
+                              key={p.workspaceId}
+                              href={editorHref(p.workspaceId, p.fundId)}
+                              onClick={() => setSidebarOpen(false)}
+                              title={label}
+                              className={cn(
+                                'flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] transition',
+                                active
+                                  ? 'bg-amber-500/15 text-amber-100'
+                                  : 'text-white/60 hover:bg-white/[0.05] hover:text-white',
+                              )}
+                            >
+                              <FileText className="h-3 w-3 flex-shrink-0 opacity-70" />
+                              <span className="min-w-0 truncate">{label}</span>
+                            </Link>
+                          );
+                        })
+                      )}
+                      <Link
+                        href="/hub/fundhub/proposals"
+                        onClick={() => setSidebarOpen(false)}
+                        className="block px-2 py-1 text-[10px] font-medium text-amber-200/80 hover:text-amber-100"
+                      >
+                        {locale === 'es'
+                          ? 'Ver todas'
+                          : locale === 'pt'
+                            ? 'Ver todas'
+                            : 'View all'}
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              );
+            }
             return (
               <Link
                 key={item.href}
@@ -500,8 +620,14 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} aria-hidden />
       )}
 
-      <div className={cn('relative z-10 flex min-h-screen min-w-0 flex-1 flex-col transition-all', collapsed ? 'lg:ml-16' : 'lg:ml-64')}>
-        <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 bg-[#07111A]/70 px-4 py-3 backdrop-blur-md lg:hidden">
+      <div
+        className={cn(
+          'relative z-10 flex min-w-0 flex-1 flex-col transition-all',
+          isProposalEditor ? 'h-dvh max-h-dvh overflow-hidden' : 'min-h-screen',
+          collapsed ? 'lg:ml-16' : 'lg:ml-64',
+        )}
+      >
+        <div className="sticky top-0 z-30 flex shrink-0 items-center gap-3 border-b border-white/10 bg-[#07111A]/70 px-4 py-3 backdrop-blur-md lg:hidden">
           <button type="button" onClick={() => setSidebarOpen(true)} className="text-white/70 hover:text-white">
             <Menu className="h-5 w-5" />
           </button>
@@ -519,21 +645,21 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
         <main
           className={cn(
             'fh-canvas min-w-0 flex-1',
-            pathname?.includes('/fundhub/proposals/editor')
-              ? 'flex flex-col overflow-hidden p-0'
+            isProposalEditor
+              ? 'flex min-h-0 flex-col overflow-hidden p-0'
               : 'overflow-auto p-4 md:p-6',
           )}
         >
           <div
             className={cn(
-              pathname?.includes('/fundhub/proposals/editor')
-                ? 'flex min-h-0 w-full max-w-none flex-1 flex-col'
+              isProposalEditor
+                ? 'flex h-full min-h-0 w-full max-w-none flex-1 flex-col'
                 : 'mx-auto max-w-6xl',
             )}
           >
             <SystemLicenseGate system="FUNDHUB">
               {children}
-              <FundHubAssistantDock />
+              {!isProposalEditor && <FundHubAssistantDock />}
             </SystemLicenseGate>
           </div>
         </main>

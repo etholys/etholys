@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/app/providers';
 import { ui } from '@/lib/i18n';
@@ -143,6 +144,7 @@ export default function FundHubProposalEditorPage() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [actionsMenuPos, setActionsMenuPos] = useState<{ top: number; left: number } | null>(null);
   /** Default Write: document is the draft; chat edits it (Gemini/ChatGPT canvas). */
   const [composerMode, setComposerMode] = useState<'talk' | 'write'>('talk');
   const [showChatAttachMenu, setShowChatAttachMenu] = useState(false);
@@ -158,6 +160,8 @@ export default function FundHubProposalEditorPage() {
   const fileBlobsRef = useRef<Map<string, File>>(new Map());
   const mediaChunksRef = useRef<Blob[]>([]);
   const chatFileInputRef = useRef<HTMLInputElement | null>(null);
+  const actionsBtnRef = useRef<HTMLButtonElement | null>(null);
+  const actionsMenuRef = useRef<HTMLDivElement | null>(null);
   const [coalitionPool, setCoalitionPool] = useState<Array<{ id: string; orgName: string; role: string }>>([]);
   const [coalition, setCoalition] = useState<Array<{ id: string; orgName: string; role: string; budgetPct?: number }>>([]);
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -191,6 +195,43 @@ export default function FundHubProposalEditorPage() {
       /* ignore */
     }
   }, [rightRailCollapsed, rightRailTab]);
+
+  const placeActionsMenu = useCallback(() => {
+    const btn = actionsBtnRef.current;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const menuW = 224;
+    const left = Math.min(Math.max(8, r.right - menuW), window.innerWidth - menuW - 8);
+    const top = Math.min(r.bottom + 6, window.innerHeight - 8);
+    setActionsMenuPos({ top, left });
+  }, []);
+
+  useEffect(() => {
+    if (!showActionsMenu) {
+      setActionsMenuPos(null);
+      return;
+    }
+    placeActionsMenu();
+    const onReposition = () => placeActionsMenu();
+    const onPointerDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (actionsBtnRef.current?.contains(t) || actionsMenuRef.current?.contains(t)) return;
+      setShowActionsMenu(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowActionsMenu(false);
+    };
+    window.addEventListener('resize', onReposition);
+    window.addEventListener('scroll', onReposition, true);
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('resize', onReposition);
+      window.removeEventListener('scroll', onReposition, true);
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [showActionsMenu, placeActionsMenu]);
 
   const rfpChecklist = useMemo(
     () =>
@@ -1508,149 +1549,137 @@ export default function FundHubProposalEditorPage() {
     return bits.join(' · ');
   }, [fund, locale]);
 
-  return (
-    <div className="flex h-[calc(100dvh-5.5rem)] min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden lg:h-auto">
-      <header className="flex shrink-0 flex-wrap items-start justify-between gap-3 px-3 pt-3 md:px-4 md:pt-4">
-        <div className="min-w-0">
-          <Link
-            href="/hub/fundhub/proposals"
-            className="inline-flex items-center gap-2 text-sm text-white/65 transition hover:text-amber-200"
+  const proposalTitle = fund?.name || ui(locale, 'Propuesta', 'Proposta', 'Proposal');
+
+  const actionsMenu =
+    showActionsMenu &&
+    actionsMenuPos &&
+    typeof document !== 'undefined' &&
+    createPortal(
+      <div
+        ref={actionsMenuRef}
+        role="menu"
+        className="fixed z-[80] w-56 overflow-hidden rounded-xl border border-white/10 bg-[#0C1822] py-1 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.9)]"
+        style={{ top: actionsMenuPos.top, left: actionsMenuPos.left }}
+      >
+        {officialUrl ? (
+          <a
+            href={officialUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setShowActionsMenu(false)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white"
           >
-            <ArrowLeft className="h-4 w-4" /> {ui(locale, 'Propuestas', 'Propostas', 'Proposals')}
-          </Link>
-          <h1 className="mt-2 truncate text-2xl font-bold text-white">
-            {fund?.name || ui(locale, 'Propuesta', 'Proposta', 'Proposal')}
-          </h1>
-          {headerMeta && <p className="text-sm text-white/55">{headerMeta}</p>}
-        </div>
-        <div className="relative flex flex-shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => persistDraft()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2 text-xs font-medium text-white/90 transition hover:bg-white/[0.1]"
-            title={ui(locale, 'Guardar', 'Guardar', 'Save')}
-          >
-            <Save className="h-3.5 w-3.5" />
-            {draftSaved
-              ? ui(locale, 'Guardado', 'Guardado', 'Saved')
-              : ui(locale, 'Guardar', 'Guardar', 'Save')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowActionsMenu((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2 text-xs font-medium text-white/90 transition hover:bg-white/[0.1]"
-            aria-expanded={showActionsMenu}
-          >
-            {ui(locale, 'Acciones', 'Ações', 'Actions')}
-            <ChevronDown className={cn('h-3.5 w-3.5 opacity-70 transition', showActionsMenu && 'rotate-180')} />
-          </button>
-          {showActionsMenu && (
-            <div className="absolute right-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#0C1822] py-1 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.9)]">
-              {officialUrl ? (
-                <a
-                  href={officialUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setShowActionsMenu(false)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white"
-                >
-                  <ExternalLink className="h-3.5 w-3.5 text-amber-300" />
-                  {ui(locale, 'Edital / convocatoria', 'Edital / convocatória', 'Call notice')}
-                </a>
-              ) : null}
-              <button
-                type="button"
-                disabled={versionsBusy}
-                onClick={() => {
-                  setShowActionsMenu(false);
-                  setVersionsOpen(true);
-                  void loadVersions();
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white disabled:opacity-50"
-              >
-                <History className="h-3.5 w-3.5 text-amber-300" />
-                {ui(locale, 'Versiones', 'Versões', 'Versions')}
-              </button>
-              <div className="my-1 border-t border-white/10" />
-              <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/35">
-                {ui(locale, 'Exportar', 'Exportar', 'Export')}
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  downloadProposal('markdown');
-                  setShowActionsMenu(false);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white"
-              >
-                Markdown
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  downloadProposal('json');
-                  setShowActionsMenu(false);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white"
-              >
-                JSON
-              </button>
-              <div className="my-1 border-t border-white/10" />
-              <button
-                type="button"
-                disabled={openingStudio || !documentMarkdown.trim()}
-                onClick={() => {
-                  setShowActionsMenu(false);
-                  void openInStudio();
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-violet-200 hover:bg-white/5 disabled:opacity-50"
-              >
-                {openingStudio ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <PenLine className="h-3.5 w-3.5" />
-                )}
-                Studio
-              </button>
-              <button
-                type="button"
-                disabled={isSubmitting || !documentMarkdown.trim()}
-                onClick={() => {
-                  setShowActionsMenu(false);
-                  void submitProposal();
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-emerald-300 hover:bg-white/5 disabled:opacity-50"
-              >
-                {isSubmitting
-                  ? ui(locale, 'Enviando…', 'A enviar…', 'Submitting…')
-                  : ui(locale, 'Marcar como enviada', 'Marcar como enviada', 'Mark as submitted')}
-              </button>
-            </div>
+            <ExternalLink className="h-3.5 w-3.5 text-amber-300" />
+            {ui(locale, 'Edital / convocatoria', 'Edital / convocatória', 'Call notice')}
+          </a>
+        ) : null}
+        <button
+          type="button"
+          disabled={versionsBusy}
+          onClick={() => {
+            setShowActionsMenu(false);
+            setVersionsOpen(true);
+            void loadVersions();
+          }}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white disabled:opacity-50"
+        >
+          <History className="h-3.5 w-3.5 text-amber-300" />
+          {ui(locale, 'Versiones', 'Versões', 'Versions')}
+        </button>
+        <div className="my-1 border-t border-white/10" />
+        <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/35">
+          {ui(locale, 'Exportar', 'Exportar', 'Export')}
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            downloadProposal('markdown');
+            setShowActionsMenu(false);
+          }}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white"
+        >
+          Markdown
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            downloadProposal('json');
+            setShowActionsMenu(false);
+          }}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white"
+        >
+          JSON
+        </button>
+        <div className="my-1 border-t border-white/10" />
+        <button
+          type="button"
+          disabled={openingStudio || !documentMarkdown.trim()}
+          onClick={() => {
+            setShowActionsMenu(false);
+            void openInStudio();
+          }}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-violet-200 hover:bg-white/5 disabled:opacity-50"
+        >
+          {openingStudio ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <PenLine className="h-3.5 w-3.5" />
           )}
-        </div>
-      </header>
+          Studio
+        </button>
+        <button
+          type="button"
+          disabled={isSubmitting || !documentMarkdown.trim()}
+          onClick={() => {
+            setShowActionsMenu(false);
+            void submitProposal();
+          }}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-emerald-300 hover:bg-white/5 disabled:opacity-50"
+        >
+          {isSubmitting
+            ? ui(locale, 'Enviando…', 'A enviar…', 'Submitting…')
+            : ui(locale, 'Marcar como enviada', 'Marcar como enviada', 'Mark as submitted')}
+        </button>
+      </div>,
+      document.body,
+    );
+
+  return (
+    <div className="flex h-full min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden">
+      {actionsMenu}
 
       {error && (
-        <div className="mx-3 mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 md:mx-4">
+        <div className="mx-3 mt-2 flex shrink-0 items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 md:mx-4">
           <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {versionsOpen && (
-        <div className="mx-3 mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 md:mx-4">
+        <div className="mx-3 mt-2 shrink-0 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 md:mx-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold text-amber-950">
               {ui(locale, 'Historial de versiones', 'Histórico de versões', 'Version history')}
             </p>
-            <button
-              type="button"
-              disabled={versionsBusy || !documentMarkdown.trim()}
-              onClick={() => void saveVersion()}
-              className="rounded-lg bg-amber-800 px-2.5 py-1 text-[11px] font-medium text-white disabled:opacity-50"
-            >
-              {ui(locale, 'Guardar versión ahora', 'Guardar versão agora', 'Save version now')}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={versionsBusy || !documentMarkdown.trim()}
+                onClick={() => void saveVersion()}
+                className="rounded-lg bg-amber-800 px-2.5 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+              >
+                {ui(locale, 'Guardar versión ahora', 'Guardar versão agora', 'Save version now')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setVersionsOpen(false)}
+                className="rounded-lg p-1 text-amber-900/70 hover:bg-amber-100"
+                aria-label={ui(locale, 'Cerrar', 'Fechar', 'Close')}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
           {versionsBusy && versions.length === 0 ? (
             <p className="mt-2 text-xs text-amber-800/80">…</p>
@@ -1692,11 +1721,11 @@ export default function FundHubProposalEditorPage() {
       )}
 
       {loading ? (
-        <div className="mt-3 flex min-h-0 flex-1 items-center justify-center border-t border-white/10 bg-white">
+        <div className="flex min-h-0 flex-1 items-center justify-center bg-white">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-amber-600" />
         </div>
       ) : (
-        <div className="relative mt-3 flex min-h-0 flex-1 overflow-hidden border-t border-white/10">
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
           {/* Mobile backdrop when document/review drawer is open */}
           {!rightRailCollapsed && (
             <button
@@ -1708,65 +1737,108 @@ export default function FundHubProposalEditorPage() {
           )}
 
           <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
-            <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5 sm:px-5 lg:px-6">
-              <p className="text-sm font-semibold text-gray-900">
-                {stage === 'understand'
-                  ? ui(locale, 'Lectura del edital', 'Leitura do edital', 'Call reading')
-                  : ui(locale, 'Chat', 'Chat', 'Chat')}
-              </p>
-              {stage === 'write' ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="mr-1 inline-flex rounded-lg border border-gray-200 p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setComposerMode('talk')}
-                      className={cn(
-                        'rounded-md px-2 py-1 text-[11px] font-medium',
-                        composerMode === 'talk'
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-600 hover:bg-gray-50',
-                      )}
-                    >
-                      {ui(locale, 'Conversar', 'Conversar', 'Talk')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setComposerMode('write')}
-                      className={cn(
-                        'rounded-md px-2 py-1 text-[11px] font-medium',
-                        composerMode === 'write'
-                          ? 'bg-amber-700 text-white'
-                          : 'text-gray-600 hover:bg-gray-50',
-                      )}
-                    >
-                      {ui(locale, 'Redactar', 'Redigir', 'Write')}
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleGenerateStructure()}
-                    disabled={chatLoading}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 hover:underline disabled:opacity-50"
-                  >
-                    <Lightbulb className="h-3.5 w-3.5" />
-                    {ui(locale, 'Estructura', 'Estrutura', 'Structure')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleBrainstorm()}
-                    disabled={chatLoading}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 hover:underline disabled:opacity-50"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    {ui(locale, 'Ideas', 'Ideias', 'Ideas')}
-                  </button>
+            <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-gray-100 px-3 py-1.5 sm:px-4 lg:px-5">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <Link
+                  href="/hub/fundhub/proposals"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-gray-500 transition hover:bg-gray-50 hover:text-gray-800"
+                  title={ui(locale, 'Propuestas', 'Propostas', 'Proposals')}
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{ui(locale, 'Propuestas', 'Propostas', 'Proposals')}</span>
+                </Link>
+                <span className="hidden h-3 w-px shrink-0 bg-gray-200 sm:block" aria-hidden />
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-medium text-gray-800" title={proposalTitle}>
+                    {proposalTitle}
+                  </p>
+                  {headerMeta ? (
+                    <p className="truncate text-[10px] text-gray-400" title={headerMeta}>
+                      {headerMeta}
+                    </p>
+                  ) : null}
                 </div>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800">
-                  <BookOpen className="h-3.5 w-3.5" />
-                  1 / 2 · {ui(locale, 'Entender', 'Entender', 'Understand')}
-                </span>
-              )}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {stage === 'write' ? (
+                  <>
+                    <div className="inline-flex rounded-md border border-gray-200 p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setComposerMode('talk')}
+                        className={cn(
+                          'rounded px-2 py-0.5 text-[10px] font-medium',
+                          composerMode === 'talk'
+                            ? 'bg-gray-900 text-white'
+                            : 'text-gray-600 hover:bg-gray-50',
+                        )}
+                      >
+                        {ui(locale, 'Conversar', 'Conversar', 'Talk')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setComposerMode('write')}
+                        className={cn(
+                          'rounded px-2 py-0.5 text-[10px] font-medium',
+                          composerMode === 'write'
+                            ? 'bg-amber-700 text-white'
+                            : 'text-gray-600 hover:bg-gray-50',
+                        )}
+                      >
+                        {ui(locale, 'Redactar', 'Redigir', 'Write')}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleGenerateStructure()}
+                      disabled={chatLoading}
+                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                    >
+                      <Lightbulb className="h-3 w-3" />
+                      {ui(locale, 'Estructura', 'Estrutura', 'Structure')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleBrainstorm()}
+                      disabled={chatLoading}
+                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      {ui(locale, 'Ideas', 'Ideias', 'Ideas')}
+                    </button>
+                  </>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-800">
+                    <BookOpen className="h-3 w-3" />
+                    1 / 2 · {ui(locale, 'Entender', 'Entender', 'Understand')}
+                  </span>
+                )}
+                <span className="mx-0.5 hidden h-3 w-px bg-gray-200 sm:block" aria-hidden />
+                <button
+                  type="button"
+                  onClick={() => persistDraft()}
+                  className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-[10px] font-medium text-gray-700 transition hover:bg-gray-50"
+                  title={ui(locale, 'Guardar', 'Guardar', 'Save')}
+                >
+                  <Save className="h-3 w-3" />
+                  {draftSaved
+                    ? ui(locale, 'Guardado', 'Guardado', 'Saved')
+                    : ui(locale, 'Guardar', 'Guardar', 'Save')}
+                </button>
+                <button
+                  ref={actionsBtnRef}
+                  type="button"
+                  onClick={() => setShowActionsMenu((v) => !v)}
+                  className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-[10px] font-medium text-gray-700 transition hover:bg-gray-50"
+                  aria-expanded={showActionsMenu}
+                  aria-haspopup="menu"
+                >
+                  {ui(locale, 'Acciones', 'Ações', 'Actions')}
+                  <ChevronDown
+                    className={cn('h-3 w-3 opacity-70 transition', showActionsMenu && 'rotate-180')}
+                  />
+                </button>
+              </div>
             </div>
             <div className="fh-pane-scroll min-h-0 flex-1 basis-0 space-y-3 overflow-y-auto px-4 py-3 sm:px-5 lg:px-6">
               {rfpChecklist.length > 0 && stage === 'understand' && (
