@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useApp } from '@/app/providers';
@@ -44,7 +44,7 @@ type SidebarProposal = {
   updatedAt?: string;
 };
 
-export default function FundHubLayout({ children }: { children: React.ReactNode }) {
+function FundHubShellInner({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
@@ -665,5 +665,19 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
         </main>
       </div>
     </div>
+  );
+}
+
+export default function FundHubLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#07111A]">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-400/25 border-t-amber-400" />
+        </div>
+      }
+    >
+      <FundHubShellInner>{children}</FundHubShellInner>
+    </Suspense>
   );
 }
