@@ -1,6 +1,6 @@
 import { INSTITUTIONAL_PROSE_RULE } from '@/lib/agents/prose-rules';
 
-const PROMPT_VERSION = 'fundhub-proposal-v12';
+const PROMPT_VERSION = 'fundhub-proposal-v13';
 
 export type FundhubProposalMode = 'chat' | 'structure' | 'draft_section' | 'brainstorm' | 'understand';
 export type FundhubLocale = 'es' | 'pt' | 'en';
@@ -206,11 +206,16 @@ Ideia geral do que desenvolver NESTE fundo para ESTA organização.
 
   return `${rules}
 
-## TRABALHO (chat — conversar, não regenerar o dossiê)
+## TRABALHO (chat — conversar, propor; não regenerar o dossiê)
 Este modo é diálogo de trabalho. O utilizador pode querer só falar da ideia, decidir e SÓ DEPOIS pedir a nota / o canvas.
+- POSTURA POR DEFEITO: **propõe**, não entrevistas. Quando o utilizador descreve um modelo / diz «propón», «deja de preguntar», «empecemos la idea», «no hagas preguntas», «propõe» — responde com um **bloco concreto de proposta** (como a ideia funciona na prática para a nota conceptual depois). Um scaffold claro, não um questionário.
+- No máximo **uma** pergunta de esclarecimento no fim, e SÓ se um único facto em falta bloquear o próximo passo da proposta. Preferência: **zero perguntas**.
+- PROIBIDO terminar quase todas as respostas com pergunta («¿Qué has probado…?», «¿Alguna de estas tres resuena…?», «¿Qué te parece…?»).
+- PROIBIDO desviar para um único sub-problema (ex. só «vinculación / retención de productores», só um risco) quando pediram a ideia geral na prática. Mantém o quadro completo.
+- Foco do scaffold: modelo operativo → camadas → o que se constrói com o fundo → como se conta numa nota conceptual. Sem regenerar o briefing da convocatoria.
 - PROIBIDO em cada resposta: reimprimir o briefing completo («Qué es este fondo», «Quién postula», «Monto», listas longas de [FALTA], «Briefing actualizado»).
-- Se o histórico já cobriu o fundo / o post / o modelo: responde em delta — 1 parágrafo do que mudou + o passo seguinte. Máximo ~250 palavras salvo pedirem detalhe.
-- Se pedirem trabalhar a ideia na prática («idea real», «dejemos de dar vueltas», «empecemos»): co-desenha o modelo com o que já disseram; 1 decisão de cada vez; sem re-briefing.
+- Se o histórico já cobriu o fundo / o post / o modelo: responde em delta — 1 parágrafo do que mudou + o passo seguinte (proposta), não uma ronda de perguntas. Máximo ~250 palavras salvo pedirem detalhe.
+- Se pedirem trabalhar a ideia na prática («idea real», «dejemos de dar vueltas», «empecemos»): co-desenha o modelo com o que já disseram; propõe o quadro; sem re-briefing e sem entrevista.
 - Se pedirem só conversar / decidir / esclarecer: NÃO escrevas a nota conceptual nem secções ## para o documento. Espera o comando explícito («redacta», «nota conceptual», «escribe el punto…», modo Redigir).
 - Se pedirem completar o formulário / «ítem por ítem» / redigir a nota: aí sim entrega texto de candidatura (pronto a colar), sem entrevista prévia.
 - Não abras com «antes de escribir necesito confirmar…» quando pedirem redigir. Redige já; lacunas viram [FALTA: …].
@@ -258,6 +263,7 @@ ${userMessage.trim() ? `Nota: ${userMessage.trim()}` : ''}`.trim();
 
 Hub UI language for this reply: ${fundhubLanguageName(normalizeFundhubLocale(ctx.locale))} (${normalizeFundhubLocale(ctx.locale)}). Answer entirely in that language.
 Se o histórico já tem briefing ou o modelo da ideia, NÃO o repitas. Cumpre o pedido desta mensagem (conversar / decidir / corrigir / só então redigir se pedirem).
+Si el usuario pide proponer / dejar de preguntar: propone. Cero o una pregunta máximo.
 
 Mensagem do utilizador:
 ${userMessage.trim()}`;

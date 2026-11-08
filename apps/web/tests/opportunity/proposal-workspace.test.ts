@@ -330,7 +330,7 @@ test('chat prompt distinguishes file roles', () => {
 test('chat mode forbids re-briefing and idea talk is not an explicit write', () => {
   const sys = buildFundhubProposalSystemPrompt('chat', 'es');
   assert.match(sys, /NÃO REPETIR|PROIBIDO regenerar|Briefing de la convocatoria/i);
-  assert.match(sys, /conversar, não regenerar/i);
+  assert.match(sys, /conversar, propor|não regenerar/i);
   assert.equal(
     looksLikeExplicitWriteCommand(
       'dejemos de dar vueltas y empecemos a trabajar en la idea real del modelo diversificado',
@@ -341,6 +341,24 @@ test('chat mode forbids re-briefing and idea talk is not an explicit write', () 
   assert.equal(looksLikeExplicitWriteCommand('redacta el punto c)'), true);
   const user = buildFundhubProposalUserPrompt('chat', { locale: 'es' }, 'no más briefing, armamos la idea');
   assert.match(user, /NÃO o repitas|Cumpre o pedido/i);
+});
+
+test('chat mode proposes instead of interviewing (max one question)', () => {
+  const sys = buildFundhubProposalSystemPrompt('chat', 'es');
+  assert.match(sys, /propõe|propone|\*\*propõe\*\*/i);
+  assert.match(sys, /não entrevistas|no entrevistas/i);
+  assert.match(sys, /No máximo \*\*uma\*\* pergunta|máximo \*\*uma\*\* pergunta|Cero o una pregunta/i);
+  assert.match(sys, /PROIBIDO terminar quase todas as respostas com pergunta/i);
+  assert.match(sys, /PROIBIDO desviar para um único sub-problema/i);
+  assert.match(sys, /modelo operativo/i);
+  assert.match(sys, /fundhub-proposal-v13/);
+  const user = buildFundhubProposalUserPrompt(
+    'chat',
+    { locale: 'es' },
+    'deja de hacer preguntas y propón el modelo',
+  );
+  assert.match(user, /Si el usuario pide proponer \/ dejar de preguntar: propone/i);
+  assert.match(user, /Cero o una pregunta máximo/i);
 });
 
 test('call questions stay factual and are not treated as a draft', () => {

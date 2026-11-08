@@ -82,8 +82,8 @@ interface ChatMessage {
   createdAt: string;
   /** Reply was merged into the canvas (Redactar). */
   applied?: boolean;
-  /** Understand briefing stays in chat — do not offer Insert into the document. */
-  kind?: 'understand' | 'system';
+  /** Understand/chat stay in chat — Insert only for draft_section / applied writes. */
+  kind?: 'understand' | 'system' | 'chat' | 'draft_section';
 }
 
 type AttachedFile = ProposalAttachedFile;
@@ -789,10 +789,10 @@ export default function FundHubProposalEditorPage() {
           ? `\n\n[EDIÇÃO DO CANVAS] O documento é o rascunho vivo. A primeira linha TEM de ser ## ${editTarget?.title || '{título exacto do canvas}'}. Edita SÓ essa secção. A postulante da mensagem manda sobre a empresa do Hub.`
           : `\n\n[EDICIÓN DEL CANVAS] El documento es el borrador vivo. La primera línea DEBE ser ## ${editTarget?.title || '{título exacto del canvas}'}. Edita SOLO esa sección. La postulante del mensaje manda sobre la empresa del Hub.`
       : locale === 'en'
-        ? '\n\n[TALK ONLY] Do not rewrite a full call briefing. Do not fill the document. Advance only what is new in this message; follow the user command.'
+        ? '\n\n[TALK ONLY] Do not rewrite a full call briefing. Do not fill the document. Propose from what the user already said. Do not end with a question unless one is essential. Advance only what is new in this message; follow the user command.'
         : locale === 'pt'
-          ? '\n\n[SÓ CONVERSAR] Não regeneres o briefing completo da convocatória. Não enchases o documento. Avança só o que é novo nesta mensagem; cumpre o comando.'
-          : '\n\n[SOLO CONVERSAR] No regeneres el briefing completo de la convocatoria. No llenes el documento. Avanzá solo lo nuevo de este mensaje; cumplí el comando.';
+          ? '\n\n[SÓ CONVERSAR] Não regeneres o briefing completo da convocatória. Não enchases o documento. Propõe a partir do que o utilizador já disse. Não termines com pergunta salvo uma imprescindível. Avança só o que é novo nesta mensagem; cumpre o comando.'
+          : '\n\n[SOLO CONVERSAR] No regeneres el briefing completo de la convocatoria. No llenes el documento. Propón a partir de lo que el usuario ya dijo. No termines con pregunta salvo una imprescindible. Avanzá solo lo nuevo de este mensaje; cumplí el comando.';
 
     let reviseAnchor = '';
     if (editTarget?.content?.trim()) {
@@ -908,6 +908,7 @@ export default function FundHubProposalEditorPage() {
           : answer,
         createdAt: new Date().toISOString(),
         applied,
+        kind: isWrite ? 'draft_section' : 'chat',
       };
       setChatMessages((prev) => {
         const next = [...prev, reply];
@@ -1829,7 +1830,10 @@ export default function FundHubProposalEditorPage() {
                   {message.role === 'assistant' &&
                     message.kind !== 'understand' &&
                     message.kind !== 'system' &&
-                    !looksLikeUnderstandBriefing(message.content) && (
+                    message.kind !== 'chat' &&
+                    (message.applied || message.kind === 'draft_section') &&
+                    !looksLikeUnderstandBriefing(message.content) &&
+                    !(composerMode === 'talk' && !message.applied) && (
                     <button
                       type="button"
                       onClick={() => {
