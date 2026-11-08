@@ -33,16 +33,17 @@ import { FundHubAssistantDock } from '@/components/fundhub/FundHubAssistantDock'
 import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
 import { sysTheme } from '@/lib/system-shell';
-import { editorHref } from '@/lib/opportunity/proposal-workspace';
+import {
+  editorHref,
+  mergeProposalDraftIndexes,
+  readLocalProposalDrafts,
+  type ProposalDraftIndex,
+} from '@/lib/opportunity/proposal-workspace';
 
-type SidebarProposal = {
-  workspaceId: string;
-  fundId?: string | null;
-  title?: string | null;
-  fundName?: string | null;
-  status?: string;
-  updatedAt?: string;
-};
+type SidebarProposal = Pick<
+  ProposalDraftIndex,
+  'workspaceId' | 'fundId' | 'title' | 'fundName' | 'status' | 'updatedAt'
+>;
 
 function FundHubShellInner({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -129,8 +130,15 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
   }, [isProposalEditor]);
 
   useEffect(() => {
-    if (status !== 'authenticated' || !companyId) {
+    if (status !== 'authenticated') {
       setProposalHistory([]);
+      return;
+    }
+    const applyMerged = (server: SidebarProposal[]) => {
+      setProposalHistory(mergeProposalDraftIndexes(server as ProposalDraftIndex[], readLocalProposalDrafts()));
+    };
+    if (!companyId) {
+      applyMerged([]);
       return;
     }
     let cancelled = false;
@@ -138,15 +146,15 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { proposals?: SidebarProposal[] } | null) => {
         if (cancelled) return;
-        setProposalHistory(Array.isArray(d?.proposals) ? d!.proposals! : []);
+        applyMerged(Array.isArray(d?.proposals) ? d!.proposals! : []);
       })
       .catch(() => {
-        if (!cancelled) setProposalHistory([]);
+        if (!cancelled) applyMerged([]);
       });
     return () => {
       cancelled = true;
     };
-  }, [status, companyId, isProposalEditor]);
+  }, [status, companyId, isProposalEditor, pathname]);
 
   if (status === 'loading') {
     return (
@@ -385,11 +393,7 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
                     <div className="ml-3 space-y-0.5 border-l border-white/10 pl-2">
                       {proposalHistory.length === 0 ? (
                         <p className="px-2 py-1.5 text-[11px] text-white/40">
-                          {locale === 'es'
-                            ? 'Sin propuestas aún'
-                            : locale === 'pt'
-                              ? 'Ainda sem propostas'
-                              : 'No proposals yet'}
+                          {ui(locale, 'Sin propuestas aún', 'Ainda sem propostas', 'No proposals yet')}
                         </p>
                       ) : (
                         proposalHistory.slice(0, 24).map((p) => {
@@ -419,11 +423,7 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2 py-1 text-[10px] font-medium text-amber-200/80 hover:text-amber-100"
                       >
-                        {locale === 'es'
-                          ? 'Ver todas'
-                          : locale === 'pt'
-                            ? 'Ver todas'
-                            : 'View all'}
+                        {ui(locale, 'Ver todas', 'Ver todas', 'View all')}
                       </Link>
                     </div>
                   )}

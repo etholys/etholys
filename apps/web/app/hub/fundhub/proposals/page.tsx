@@ -22,7 +22,9 @@ import {
   createProposalWorkspaceId,
   editorHref,
   findReusableDraft,
+  mergeProposalDraftIndexes,
   persistProposalIntake,
+  readLocalProposalDrafts,
   seedFromCandidate,
   shouldSkipProposalIntake,
   type ProposalDraftIndex,
@@ -144,16 +146,7 @@ export default function ProposalsPage() {
   );
 
   useEffect(() => {
-    let local: ProposalDraft[] = [];
-    const stored = localStorage.getItem('proposalDrafts');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as ProposalDraft[];
-        if (Array.isArray(parsed)) local = parsed;
-      } catch {
-        /* ignore */
-      }
-    }
+    const local = readLocalProposalDrafts();
     if (!companyId) {
       setDrafts(local);
       setDraftsReady(true);
@@ -163,8 +156,7 @@ export default function ProposalsPage() {
       .then((r) => r.json())
       .then((d: { proposals?: ProposalDraft[] }) => {
         const server = Array.isArray(d.proposals) ? d.proposals : [];
-        const seen = new Set(server.map((p) => p.workspaceId));
-        setDrafts([...server, ...local.filter((p) => p.workspaceId && !seen.has(p.workspaceId))]);
+        setDrafts(mergeProposalDraftIndexes(server, local));
       })
       .catch(() => setDrafts(local))
       .finally(() => setDraftsReady(true));

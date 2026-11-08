@@ -116,6 +116,54 @@ export type ProposalDraftIndex = {
   status: 'draft' | 'submitted' | 'archived';
 };
 
+/** Browser index used by the proposals list and FundHub sidebar history. */
+export function readLocalProposalDrafts(): ProposalDraftIndex[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem('proposalDrafts');
+    if (!stored) return [];
+    const parsed = JSON.parse(stored) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const out: ProposalDraftIndex[] = [];
+    for (const row of parsed) {
+      if (!row || typeof row !== 'object') continue;
+      const p = row as Record<string, unknown>;
+      const workspaceId = String(p.workspaceId ?? '').trim();
+      if (!workspaceId) continue;
+      const status =
+        p.status === 'submitted' || p.status === 'archived' || p.status === 'draft'
+          ? p.status
+          : 'draft';
+      out.push({
+        workspaceId,
+        fundId: String(p.fundId ?? '').trim(),
+        title: typeof p.title === 'string' ? p.title : undefined,
+        fundName: typeof p.fundName === 'string' ? p.fundName : '',
+        fundInstitution: typeof p.fundInstitution === 'string' ? p.fundInstitution : '',
+        editalLink: typeof p.editalLink === 'string' ? p.editalLink : '',
+        editalSummary: typeof p.editalSummary === 'string' ? p.editalSummary : '',
+        createdAt: typeof p.createdAt === 'string' ? p.createdAt : '',
+        updatedAt: typeof p.updatedAt === 'string' ? p.updatedAt : '',
+        status,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** Server rows win; keep local-only drafts (candidate / unsynced fundIds). */
+export function mergeProposalDraftIndexes(
+  server: ProposalDraftIndex[],
+  local: ProposalDraftIndex[] = readLocalProposalDrafts(),
+): ProposalDraftIndex[] {
+  const seen = new Set(server.map((p) => p.workspaceId));
+  const merged = [...server, ...local.filter((p) => p.workspaceId && !seen.has(p.workspaceId))];
+  merged.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  return merged;
+}
+
 /** How a file is used — mixing these in one unlabeled pile confuses the model. */
 export type ProposalFileRole = 'bases' | 'reference' | 'turn';
 
