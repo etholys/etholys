@@ -1,6 +1,6 @@
 import { INSTITUTIONAL_PROSE_RULE } from '@/lib/agents/prose-rules';
 
-const PROMPT_VERSION = 'fundhub-proposal-v10';
+const PROMPT_VERSION = 'fundhub-proposal-v11';
 
 export type FundhubProposalMode = 'chat' | 'structure' | 'draft_section' | 'brainstorm' | 'understand';
 export type FundhubLocale = 'es' | 'pt' | 'en';
@@ -111,6 +111,8 @@ ${INSTITUTIONAL_PROSE_RULE}
 - Se o utilizador cola texto sobre uma cooperativa/ONG/empresa e pede um ponto do formulário sobre «organización proponente / postulante / applicant», ESSA entidade é a postulante. Não substituas pela empresa do Hub nem a relegues a «aliada / facilitadora».
 - Se o utilizador corrige o nome da postulante, REESCREVE só a secção/ponto pedido com essa entidade. Não saltes para outras secções do canvas.
 - CONTINUIDADE DO CHAT: o histórico de mensagens faz parte do pedido. Se pedirem melhorar / reescrever / corrigir «a resposta anterior» ou um ponto já redigido, PARTE desse texto (histórico ou ## no canvas). PROIBIDO inventar outro tema ou outra secção.
+- NÃO REPETIR: se o histórico já tem briefing, modelo, quem postula, montante ou o que o utilizador acabou de explicar, NÃO voltes a colar esse bloco. Avança só com o que é novo ou com a decisão pedida. PROIBIDO regenerar «Briefing de la convocatoria / Qué es este fondo / Quién postula» em cada turno.
+- Cumpre o comando literal: se pedirem «dejar de dar vueltas», «empecemos la idea real», «no briefings» — PARA o dossiê e trabalha a ideia. Se pedirem só conversar / decidir, NÃO redijas a nota nem enchases o canvas.
 - Não inventes factos, números, nomes de org, locais ou actividades que não estejam no CONTEXTO, no histórico ou na mensagem actual. Se não houver base, [FALTA: …] — não improvises.
 - PERGUNTA SOBRE AS BASES (documentos a enviar, anexos, requisitos, prazos): responde SÓ com o que está escrito no texto das bases / PDF no CONTEXTO. Se esse texto não estiver no CONTEXTO, diz claramente que não tens o texto e pede o PDF. PROIBIDO listar o que «geralmente», «típicamente» ou «o padrão PPD/GEF» pede. Isso é invenção.
 - Não faças diagnóstico de negócio NEXUS, informes SIEP, layout Studio nem prioridades do Workspace Advisor.
@@ -200,13 +202,15 @@ Ideia geral do que desenvolver NESTE fundo para ESTA organização.
 
   return `${rules}
 
-## TRABALHO (chat)
-Ajuda a preparar a proposta: requisitos, riscos, enquadramento, linguagem do doador, rascunhos.
-- Respostas objetivas; listas quando ajudarem.
-- Se pedirem completar o formulário / postulação / «ítem por ítem»: prioridade absoluta é TEXTO DE CANDIDATURA alinhado ao formato do edital (plantilla / campos oficiais no CONTEXTO), não entrevista.
+## TRABALHO (chat — conversar, não regenerar o dossiê)
+Este modo é diálogo de trabalho. O utilizador pode querer só falar da ideia, decidir e SÓ DEPOIS pedir a nota / o canvas.
+- PROIBIDO em cada resposta: reimprimir o briefing completo («Qué es este fondo», «Quién postula», «Monto», listas longas de [FALTA], «Briefing actualizado»).
+- Se o histórico já cobriu o fundo / o post / o modelo: responde em delta — 1 parágrafo do que mudou + o passo seguinte. Máximo ~250 palavras salvo pedirem detalhe.
+- Se pedirem trabalhar a ideia na prática («idea real», «dejemos de dar vueltas», «empecemos»): co-desenha o modelo com o que já disseram; 1 decisão de cada vez; sem re-briefing.
+- Se pedirem só conversar / decidir / esclarecer: NÃO escrevas a nota conceptual nem secções ## para o documento. Espera o comando explícito («redacta», «nota conceptual», «escribe el punto…», modo Redigir).
+- Se pedirem completar o formulário / «ítem por ítem» / redigir a nota: aí sim entrega texto de candidatura (pronto a colar), sem entrevista prévia.
 - Não abras com «antes de escribir necesito confirmar…» quando pedirem redigir. Redige já; lacunas viram [FALTA: …].
-- Quando pedirem texto de secção, entrega o rascunho completo dessa secção (pronto a colar) e pergunta só se querem o seguinte ítem.
-- Não lances chuva de ideias espontânea — só se o utilizador pedir ideias / brainstorm / enquadramento.
+- Não lances chuva de ideias espontânea — só se pedirem ideias / brainstorm.
 - Quando o edital for vago, distingue o que está escrito vs. o que é boa prática.`;
 }
 
@@ -249,6 +253,7 @@ ${userMessage.trim() ? `Nota: ${userMessage.trim()}` : ''}`.trim();
   return `${block}
 
 Hub UI language for this reply: ${fundhubLanguageName(normalizeFundhubLocale(ctx.locale))} (${normalizeFundhubLocale(ctx.locale)}). Answer entirely in that language.
+Se o histórico já tem briefing ou o modelo da ideia, NÃO o repitas. Cumpre o pedido desta mensagem (conversar / decidir / corrigir / só então redigir se pedirem).
 
 Mensagem do utilizador:
 ${userMessage.trim()}`;
@@ -288,6 +293,22 @@ export function sanitizeFundhubChatHistory(raw: unknown, limit = 14): FundhubCha
 export function looksLikeRevisionRequest(message: string): boolean {
   return /\b(mejor(?:a|ar|e)?|melhor(?:a|ar)?|improve|revis(?:a|ar|e)?|reescri[bv]\w*|reescrev\w*|reescrit\w*|corrig\w*|ajust\w*|rehaz|refaz|más\s+corto|mais\s+curto|anterior|última\s+respuesta|ultima\s+resposta|previous\s+(?:answer|reply|draft))\b/i.test(
     message,
+  );
+}
+
+/** Explicit ask to write into the canvas / note — not mere idea talk («desarrollamos», «empecemos la idea»). */
+export function looksLikeExplicitWriteCommand(message: string): boolean {
+  return (
+    /^\s*\/(redactar|escribir|write|redige)\b/i.test(message) ||
+    /\b(item\s*por\s*item|ítem\s*por\s*ítem)\b/i.test(message) ||
+    /\b(redact(?:a|ar|e|á)|escrib(?:e|í|ir)|escrev\w*|write)\b[\s\S]{0,40}\b(nota\s+conceptual|concept\s+note|punto\s+[a-z0-9]|ítem\s*\d|documento|canvas|formulari|secci[oó]n)\b/i.test(
+      message,
+    ) ||
+    /\b(nota\s+conceptual|concept\s+note)\b[\s\S]{0,40}\b(redact|escrib|escrev|write|completa|genera|haz|faz)\b/i.test(
+      message,
+    ) ||
+    /\b(pon(?:er|é|e)|mete|insert(?:a|ar)?|coloca)\b[\s\S]{0,30}\b(documento|canvas|doc)\b/i.test(message) ||
+    /\b(punto\s+[a-z0-9]\)|ítem\s*\d)\b/i.test(message)
   );
 }
 

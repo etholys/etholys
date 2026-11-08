@@ -51,7 +51,11 @@ import {
   type ProposalFileRole,
   type ProposalFundSeed,
 } from '@/lib/opportunity/proposal-workspace';
-import { looksLikeCallQuestion, looksLikeRevisionRequest } from '@/lib/agents/fundhub-proposal-prompt';
+import {
+  looksLikeCallQuestion,
+  looksLikeExplicitWriteCommand,
+  looksLikeRevisionRequest,
+} from '@/lib/agents/fundhub-proposal-prompt';
 import {
   checklistFromCandidateFields,
   appendChecklistSections,
@@ -136,7 +140,7 @@ export default function FundHubProposalEditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   /** Default Write: document is the draft; chat edits it (Gemini/ChatGPT canvas). */
-  const [composerMode, setComposerMode] = useState<'talk' | 'write'>('write');
+  const [composerMode, setComposerMode] = useState<'talk' | 'write'>('talk');
   const [showChatAttachMenu, setShowChatAttachMenu] = useState(false);
   const [attachAsRole, setAttachAsRole] = useState<ProposalFileRole>('turn');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -609,7 +613,8 @@ export default function FundHubProposalEditorPage() {
 
   const passToWrite = useCallback(() => {
     setStage('write');
-    setComposerMode('write');
+    // Default talk: decide the idea first; Redactar / explicit command writes the canvas.
+    setComposerMode('talk');
     const nextDoc = seedWriteCanvas(documentMarkdown);
     const appliedTitles = sectionsFromMarkdown(nextDoc).filter(
       (s) =>
@@ -622,15 +627,15 @@ export default function FundHubProposalEditorPage() {
     const structureNote =
       appliedTitles > 0
         ? locale === 'en'
-          ? `Applied ${appliedTitles} sections from the official call form into the document on the right. Ask to write a specific point (e.g. «write c)»).`
+          ? `Applied ${appliedTitles} sections from the official form on the right. Use «Talk» to decide the idea; switch to «Write» (or say «write the concept note / point c)») when you want text in the document.`
           : locale === 'pt'
-            ? `Apliquei ${appliedTitles} secções do formulário oficial no documento à direita. Pede para redigir um ponto (ex.: «escreve o c)»).`
-            : `Apliqué ${appliedTitles} secciones del formulario oficial en el documento a la derecha. Pedí redactar un punto (ej.: «escribe el c)»).`
+            ? `Apliquei ${appliedTitles} secções do formulário oficial à direita. Usa «Conversar» para decidir a ideia; passa a «Redigir» (ou diz «escreve a nota conceptual / o ponto c)») quando quiseres texto no documento.`
+            : `Apliqué ${appliedTitles} secciones del formulario oficial a la derecha. Usá «Conversar» para decidir la idea; pasá a «Redactar» (o decí «escribe la nota conceptual / el punto c)») cuando quieras texto en el documento.`
         : locale === 'en'
-          ? 'The document on the right is the draft. If the call form is not listed yet, attach the bases PDF or press Structure. Chat edits that canvas.'
+          ? 'Use «Talk» to shape the idea without filling the document. Switch to «Write» when you want the canvas updated. Attach bases or press Structure if the form outline is missing.'
           : locale === 'pt'
-            ? 'O documento à direita é o rascunho. Se o formulário do edital ainda não aparecer, anexa o PDF das bases ou usa Estrutura. O chat edita esse canvas.'
-            : 'El documento a la derecha es el borrador. Si aún no aparece el formulario del edital, adjuntá el PDF de bases o usá Estructura. El chat edita ese canvas.';
+            ? 'Usa «Conversar» para moldar a ideia sem encher o documento. Passa a «Redigir» quando quiseres actualizar o canvas. Anexa as bases ou usa Estrutura se faltar o formulário.'
+            : 'Usá «Conversar» para moldear la idea sin llenar el documento. Pasá a «Redactar» cuando quieras actualizar el canvas. Adjuntá las bases o usá Estructura si falta el formulario.';
     setChatMessages((prev) => {
       const next: ChatMessage[] = [
         ...prev,
@@ -673,10 +678,6 @@ export default function FundHubProposalEditorPage() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ block: 'end' });
   }, [chatMessages, chatLoading, understanding]);
-
-  useEffect(() => {
-    if (stage === 'write') setComposerMode('write');
-  }, [stage]);
 
   const handleSendChat = useCallback(async () => {
     let message = chatInput.trim();
@@ -748,32 +749,24 @@ export default function FundHubProposalEditorPage() {
 
     // Seed the canvas BEFORE the request so the model and merge see the same living draft.
     let canvasMd = documentMarkdown;
-    const forceWriteProbe =
+    const editTarget =
+      stage === 'write' && !callQuestion ? resolveCanvasEditTarget(canvasMd, message) : null;
+    // Talk = decide the idea. Only write the canvas on Redactar mode or an explicit write command.
+    const forceWrite =
       !callQuestion &&
       (slashWrite ||
-        looksLikeRevisionRequest(message) ||
-        /\b(item\s*por\s*item|desarroll|redact|complet[ae]|formulari|postulaci[oó]n|escribir|escrev|preench|vamos\s+item|empez|arran[ck]|punto\s+[a-z0-9]|ítem\s*\d)/i.test(
-          message,
-        ));
-    const willWrite =
-      stage === 'write' &&
-      !callQuestion &&
-      (composerMode === 'write' ||
-        forceWriteProbe ||
-        Boolean(resolveCanvasEditTarget(canvasMd, message)));
-    if (willWrite && !hasEditalFormOutline(canvasMd)) {
+        looksLikeExplicitWriteCommand(message) ||
+        (composerMode === 'write' && (looksLikeRevisionRequest(message) || Boolean(editTarget))));
+    const isWrite = stage === 'write' && !callQuestion && (composerMode === 'write' || forceWrite);
+    if (isWrite && composerMode !== 'write') setComposerMode('write');
+
+    if (isWrite && !hasEditalFormOutline(canvasMd)) {
       canvasMd = seedWriteCanvas(canvasMd);
       setDocumentMarkdown(canvasMd);
       persistDraft({ documentMarkdown: canvasMd });
       setRightRailCollapsed(false);
       setRightRailTab('document');
     }
-
-    const editTarget =
-      stage === 'write' && !callQuestion ? resolveCanvasEditTarget(canvasMd, message) : null;
-    const forceWrite = forceWriteProbe || Boolean(editTarget);
-    const isWrite = stage === 'write' && !callQuestion && (composerMode === 'write' || forceWrite);
-    if (isWrite && composerMode !== 'write') setComposerMode('write');
 
     const turnFiles = sourceFiles.filter((f) => f.role === 'turn');
     const attachBlock = formatProposalFileContext(turnFiles);
@@ -784,7 +777,11 @@ export default function FundHubProposalEditorPage() {
         : locale === 'pt'
           ? `\n\n[EDIÇÃO DO CANVAS] O documento é o rascunho vivo. A primeira linha TEM de ser ## ${editTarget?.title || '{título exacto do canvas}'}. Edita SÓ essa secção. A postulante da mensagem manda sobre a empresa do Hub.`
           : `\n\n[EDICIÓN DEL CANVAS] El documento es el borrador vivo. La primera línea DEBE ser ## ${editTarget?.title || '{título exacto del canvas}'}. Edita SOLO esa sección. La postulante del mensaje manda sobre la empresa del Hub.`
-      : '';
+      : locale === 'en'
+        ? '\n\n[TALK ONLY] Do not rewrite a full call briefing. Do not fill the document. Advance only what is new in this message; follow the user command.'
+        : locale === 'pt'
+          ? '\n\n[SÓ CONVERSAR] Não regeneres o briefing completo da convocatória. Não enchases o documento. Avança só o que é novo nesta mensagem; cumpre o comando.'
+          : '\n\n[SOLO CONVERSAR] No regeneres el briefing completo de la convocatoria. No llenes el documento. Avanzá solo lo nuevo de este mensaje; cumplí el comando.';
 
     let reviseAnchor = '';
     if (editTarget?.content?.trim()) {

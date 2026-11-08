@@ -25,6 +25,7 @@ import {
   buildFundhubProposalSystemPrompt,
   buildFundhubProposalUserPrompt,
   looksLikeCallQuestion,
+  looksLikeExplicitWriteCommand,
   looksLikeRevisionRequest,
   sanitizeFundhubChatHistory,
 } from '../../lib/agents/fundhub-proposal-prompt';
@@ -278,6 +279,22 @@ test('chat prompt distinguishes file roles', () => {
   assert.match(sys, /BASES/);
   assert.match(sys, /REFERÊNCIA/);
   assert.match(sys, /DESTA MENSAGEM/);
+});
+
+test('chat mode forbids re-briefing and idea talk is not an explicit write', () => {
+  const sys = buildFundhubProposalSystemPrompt('chat', 'es');
+  assert.match(sys, /NÃO REPETIR|PROIBIDO regenerar|Briefing de la convocatoria/i);
+  assert.match(sys, /conversar, não regenerar/i);
+  assert.equal(
+    looksLikeExplicitWriteCommand(
+      'dejemos de dar vueltas y empecemos a trabajar en la idea real del modelo diversificado',
+    ),
+    false,
+  );
+  assert.equal(looksLikeExplicitWriteCommand('escribe la nota conceptual con lo acordado'), true);
+  assert.equal(looksLikeExplicitWriteCommand('redacta el punto c)'), true);
+  const user = buildFundhubProposalUserPrompt('chat', { locale: 'es' }, 'no más briefing, armamos la idea');
+  assert.match(user, /NÃO o repitas|Cumpre o pedido/i);
 });
 
 test('call questions stay factual and are not treated as a draft', () => {
