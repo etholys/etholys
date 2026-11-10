@@ -14,11 +14,14 @@ export type CropVisualFamily =
 export type DeviceVisualFamily = 'dehydrator' | 'valve' | 'gateway' | 'probe' | 'generic_machine';
 
 const CROP_RULES: Array<{ family: CropVisualFamily; keys: string[] }> = [
-  { family: 'lettuce_bed', keys: ['lechuga', 'lettuce', 'alface', 'salad', 'folha', 'crespa'] },
+  {
+    family: 'lettuce_bed',
+    keys: ['lechuga', 'lettuce', 'alface', 'salad', 'folha', 'crespa', 'rúcula', 'rucula', 'couve', 'kale', 'acelga'],
+  },
   { family: 'fruit_tree', keys: ['manzana', 'maçã', 'maca', 'apple', 'árvore', 'arvore', 'tree', 'fruta', 'citrico', 'cítrico'] },
   { family: 'maize', keys: ['maíz', 'maiz', 'milho', 'corn', 'choclo', 'zea'] },
   { family: 'vine_squash', keys: ['zapallo', 'abóbora', 'abobora', 'pumpkin', 'squash', 'cabutia', 'melon', 'melão'] },
-  { family: 'tomato_stake', keys: ['tomate', 'tomato', 'perita', 'cherry'] },
+  { family: 'tomato_stake', keys: ['tomate', 'tomato', 'perita', 'cherry', 'sweet 100'] },
 ];
 
 export function cropVisualFamily(cropName: string | null | undefined, variety?: string | null): CropVisualFamily {

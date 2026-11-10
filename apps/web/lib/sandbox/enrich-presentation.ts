@@ -2031,10 +2031,11 @@ async function seedAuroraAndRadar(
 }
 
 async function seedRadarFarm(prisma: PrismaClient, companyId: string, ownerId: string, summary: string[]) {
-  // Chácaras Abreu / Formosa (GO) — rural chácaras & open fields, not Brasília asphalt (Praça do Buriti).
-  // Verified via OSM reverse: suburb "Chácaras Abreu", Formosa, Goiás — believable finca escuela pin.
-  const DEMO_LAT = -15.5515;
-  const DEMO_LNG = -47.3558;
+  // Fazenda Castelo farmland — Rio Verde (GO). OSM landuse=farmland (way/relation "Fazenda Castelo").
+  // Previous Formosa pin (-15.5515,-47.3558) sat ~800 m from Aeroporto de Formosa (runway/asphalt look).
+  // Verified via Nominatim search: class=landuse type=farmland, display_name "Fazenda Castelo, Rio Verde, Goiás".
+  const DEMO_LAT = -18.1617;
+  const DEMO_LNG = -50.3849;
   const PROPERTY_NAME = 'Finca escuela';
   const DEMO_SITE_SIDE_M = Math.round(Math.sqrt(7.5 * 10000) * 10) / 10; // ~273.9 m
 
@@ -2935,50 +2936,83 @@ async function seedRadarFarm(prisma: PrismaClient, companyId: string, ownerId: s
       },
     });
   }
-  let clientUnit = await prisma.nexusOpsUnit.findFirst({
-    where: { companyId, propertyId: clientProp.id, name: 'Linha cherry 1' },
-  });
-  if (!clientUnit) {
-    clientUnit = await prisma.nexusOpsUnit.create({
-      data: {
-        companyId,
-        propertyId: clientProp.id,
-        name: 'Linha cherry 1',
-        kind: 'parcel',
-        sectorId: 'agriculture',
-        crop: 'Tomate cherry',
-        areaHa: 0.4,
-        isActive: true,
-      },
+  const cherryLines = [
+    { name: 'Linha cherry 1', crop: 'Tomate cherry', areaHa: 0.35, x: 12, y: 22, w: 32, h: 24, rotation: 6 },
+    { name: 'Linha cherry 2', crop: 'Tomate cherry', areaHa: 0.35, x: 50, y: 20, w: 30, h: 26, rotation: -4 },
+    { name: 'Linha cherry 3', crop: 'Tomate cherry', areaHa: 0.3, x: 28, y: 55, w: 34, h: 22, rotation: 10 },
+  ];
+  const cherryUnitIds: string[] = [];
+  for (const line of cherryLines) {
+    const existing = await prisma.nexusOpsUnit.findFirst({
+      where: { companyId, propertyId: clientProp.id, name: line.name },
     });
-  } else {
-    clientUnit = await prisma.nexusOpsUnit.update({
-      where: { id: clientUnit.id },
-      data: { crop: 'Tomate cherry', areaHa: 0.4, isActive: true },
-    });
+    const row = existing
+      ? await prisma.nexusOpsUnit.update({
+          where: { id: existing.id },
+          data: {
+            crop: line.crop,
+            areaHa: line.areaHa,
+            kind: 'parcel',
+            sectorId: 'agriculture',
+            isActive: true,
+          },
+        })
+      : await prisma.nexusOpsUnit.create({
+          data: {
+            companyId,
+            propertyId: clientProp.id,
+            name: line.name,
+            kind: 'parcel',
+            sectorId: 'agriculture',
+            crop: line.crop,
+            areaHa: line.areaHa,
+            notes: 'Parcela demostrativa Sierra Norte — linhas de tomate cherry.',
+            isActive: true,
+          },
+        });
+    cherryUnitIds.push(row.id);
   }
   await prisma.radarProperty.update({
     where: { id: clientProp.id },
     data: {
       layoutJson: {
         version: 1,
-        spaces: [
-          {
-            id: clientUnit.id,
-            x: 30,
-            y: 35,
-            w: 40,
-            h: 28,
-            rotation: 6,
-            placed: true,
-          },
-        ],
+        siteSideM: Math.round(Math.sqrt(1.1 * 10000) * 10) / 10,
+        spaces: cherryLines.map((line, i) => ({
+          id: cherryUnitIds[i],
+          x: line.x,
+          y: line.y,
+          w: line.w,
+          h: line.h,
+          rotation: line.rotation,
+          placed: true,
+        })),
         sensors: [],
         crops: [{ id: 'crop_cherry', name: 'Tomate cherry', variety: 'Sweet 100', season: 'Verano' }],
         devices: [],
         commands: [],
-        structures: [],
-        irrigation: [],
+        structures: [
+          {
+            id: 'st_cherry_shed',
+            kind: 'shed',
+            x: 8,
+            y: 72,
+            w: 12,
+            h: 10,
+            label: 'Abrigo de colheita',
+          },
+        ],
+        irrigation: [
+          {
+            id: 'irr_cherry',
+            label: 'Goteo cherry',
+            points: [
+              { x: 18, y: 34 },
+              { x: 40, y: 36 },
+              { x: 58, y: 32 },
+            ],
+          },
+        ],
       } as object,
     },
   });
@@ -2998,7 +3032,7 @@ async function seedRadarFarm(prisma: PrismaClient, companyId: string, ownerId: s
   });
 
   summary.push(
-    'RADAR: Finca escuela (rural Formosa/GO OSM) · Horta comunitária · cliente Sierra Norte · 4+ espaços · estruturas/irrigação · cultivos · sondas · Caderno · tarefas · WhatsApp · lotes · regras automação',
+    'RADAR: Finca escuela (Fazenda Castelo farmland, Rio Verde/GO OSM) · Horta comunitária · cliente Sierra Norte · 4+ espaços · estruturas/irrigação · cultivos · sondas · Caderno · tarefas · WhatsApp · lotes · regras automação',
   );
 }
 

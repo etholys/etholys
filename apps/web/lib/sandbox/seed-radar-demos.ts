@@ -31,7 +31,7 @@ export const RADAR_DEMO_LOGINS = {
     company: PRESENTATION_COMPANY_NAME,
     shortName: PRESENTATION_SHORT_NAME,
     shows:
-      'Filled farm: Finca escuela + Horta comunitária + client Sierra Norte; rural Formosa/GO OSM pin (Chácaras Abreu); spaces placed/rotated; structures/irrigation; crops; sensors; Caderno; tasks; lots; automation rules.',
+      'Filled farm: Finca escuela + Horta comunitária + client Sierra Norte; Fazenda Castelo farmland (Rio Verde/GO OSM); spaces placed/rotated; crop/machine 3D meshes; structures/irrigation; crops; sensors; Caderno; tasks; lots; automation rules.',
   },
   empty: {
     email: RADAR_EMPTY_EMAIL,

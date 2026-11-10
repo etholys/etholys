@@ -29,7 +29,7 @@ type Props = {
 
 /**
  * Mundo 3D da exploração.
- * Com pin geo: MapLibre com pitch (mapa real inclinável) + extrusões dos espaços.
+ * Com pin geo: MapLibre + pads + malhas Three.js (cultivos/máquinas).
  * Sem pin: planta local three.js (sem plano OSM — esse era a névoa azul).
  */
 export function RadarSpatialTwin({
@@ -133,6 +133,7 @@ export function RadarSpatialTwin({
         structures={structures}
         irrigation={irrigation}
         fill={fill}
+        moduleId={moduleId}
       />
     );
   }

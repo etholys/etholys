@@ -12,6 +12,11 @@ import {
 import { radarLoc, radarT } from '@/lib/radar/i18n';
 import type { RadarIrrigationPath, RadarSiteStructure, RadarSpaceRect } from '@/lib/radar/site-layout';
 import type { WorldParcel } from '@/components/radar/radar-world-scene';
+import {
+  createRadarMapLibreThreeLayer,
+  RADAR_THREE_LAYER_ID,
+  type ThreeTwinPayload,
+} from '@/components/radar/radar-maplibre-three-layer';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -28,6 +33,7 @@ type Props = {
   structures?: RadarSiteStructure[];
   irrigation?: RadarIrrigationPath[];
   fill?: boolean;
+  moduleId?: string | null;
 };
 
 type OverlayData = {
@@ -39,20 +45,16 @@ type OverlayData = {
   sideM: number;
   lat: number;
   lng: number;
+  moduleId: string | null;
 };
 
-function toneColor(p: WorldParcel, focused: boolean): string {
-  if (focused) return '#ffffff';
-  if (p.nextAction === 'irrigate' || p.nextAction === 'hold_harvest' || p.harvestBlocked) return '#e11d48';
-  if (p.nextAction === 'scout' || p.nextAction === 'await_signal') return '#f59e0b';
-  if (p.moisture != null && p.moisture < 25) return '#f59e0b';
-  return '#2dd4bf';
-}
-
-function extrusionHeight(p: WorldParcel): number {
-  if (p.harvestBlocked || p.nextAction === 'irrigate') return 6;
-  if (p.crop) return 4;
-  return 2.5;
+/** Flat pad under crop meshes — silhouette comes from the Three.js custom layer. */
+function padColor(p: WorldParcel, focused: boolean): string {
+  if (focused) return '#e0f2fe';
+  if (p.nextAction === 'irrigate' || p.nextAction === 'hold_harvest' || p.harvestBlocked) return '#fecdd3';
+  if (p.nextAction === 'scout' || p.nextAction === 'await_signal') return '#fde68a';
+  if (p.moisture != null && p.moisture < 25) return '#fde68a';
+  return '#86efac';
 }
 
 function emptyFc(): GeoJSON.FeatureCollection {
@@ -66,26 +68,27 @@ function ensureOverlayLayers(map: MapLibreMap) {
       id: 'radar-site-fill',
       type: 'fill',
       source: 'radar-site',
-      paint: { 'fill-color': '#14b8a6', 'fill-opacity': 0.12 },
+      paint: { 'fill-color': '#4d7c0f', 'fill-opacity': 0.18 },
     });
     map.addLayer({
       id: 'radar-site-line',
       type: 'line',
       source: 'radar-site',
-      paint: { 'line-color': '#5eead4', 'line-width': 2.5, 'line-dasharray': [2, 1.5] },
+      paint: { 'line-color': '#86efac', 'line-width': 2.5, 'line-dasharray': [2, 1.5] },
     });
   }
   if (!map.getSource('radar-spaces')) {
     map.addSource('radar-spaces', { type: 'geojson', data: emptyFc() });
+    // Low pad for hit-testing + footprint; crops/machines are Three.js meshes above.
     map.addLayer({
       id: 'radar-spaces-fill',
       type: 'fill-extrusion',
       source: 'radar-spaces',
       paint: {
         'fill-extrusion-color': ['get', 'color'],
-        'fill-extrusion-height': ['get', 'height'],
+        'fill-extrusion-height': 0.12,
         'fill-extrusion-base': 0,
-        'fill-extrusion-opacity': 0.86,
+        'fill-extrusion-opacity': 0.35,
       },
     });
   }
@@ -169,8 +172,7 @@ function syncOverlays(map: MapLibreMap, data: OverlayData) {
       type: 'Feature',
       properties: {
         id: parcel.id,
-        color: toneColor(parcel, focused),
-        height: extrusionHeight(parcel) * (focused ? 1.25 : 1),
+        color: padColor(parcel, focused),
       },
       geometry: { type: 'Polygon', coordinates: [ring] },
     });
@@ -183,7 +185,7 @@ function syncOverlays(map: MapLibreMap, data: OverlayData) {
       geometry: { type: 'Point', coordinates: [cx, cy] },
     });
   }
-  // If layout spaces missing but parcels carry % layout, still extrude (avoids empty navy twin).
+  // If layout spaces missing but parcels carry % layout, still draw pads (avoids empty twin).
   if (spaceFeatures.length === 0) {
     for (const parcel of parcels) {
       if (typeof parcel.x !== 'number' || typeof parcel.y !== 'number') continue;
@@ -202,8 +204,7 @@ function syncOverlays(map: MapLibreMap, data: OverlayData) {
         type: 'Feature',
         properties: {
           id: parcel.id,
-          color: toneColor(parcel, focused),
-          height: extrusionHeight(parcel) * (focused ? 1.25 : 1),
+          color: padColor(parcel, focused),
         },
         geometry: { type: 'Polygon', coordinates: [ring] },
       });
@@ -304,8 +305,8 @@ function waitForSize(el: HTMLElement, timeoutMs = 8000): Promise<boolean> {
 }
 
 /**
- * Real pitched 3D map (MapLibre + OSM). Spaces render as fill-extrusions on the basemap —
- * not a three.js ground plane that can fail into a foggy slab.
+ * Real pitched 3D map (MapLibre + OSM/MapTiler). Flat pads for hit-test +
+ * Three.js custom layer for crop/machine silhouettes (not generic cuboids).
  */
 export function RadarMapLibreTwin({
   locale,
@@ -320,16 +321,17 @@ export function RadarMapLibreTwin({
   structures = [],
   irrigation = [],
   fill = false,
+  moduleId = null,
 }: Props) {
   const loc = radarLoc(locale);
   const hostRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const onFocusRef = useRef(onFocus);
   onFocusRef.current = onFocus;
-  const [basemap, setBasemap] = useState<RadarMapBasemap>('streets');
+  const satOk = radarSatelliteAvailable();
+  const [basemap, setBasemap] = useState<RadarMapBasemap>(() => (satOk ? 'satellite' : 'streets'));
   const [ready, setReady] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
-  const satOk = radarSatelliteAvailable();
 
   const sideM =
     siteSideM && siteSideM > 0
@@ -345,8 +347,20 @@ export function RadarMapLibreTwin({
     sideM,
     lat,
     lng,
+    moduleId,
   });
-  dataRef.current = { parcels, spaces, focusedId, structures, irrigation, sideM, lat, lng };
+  dataRef.current = { parcels, spaces, focusedId, structures, irrigation, sideM, lat, lng, moduleId };
+
+  const threeDataRef = useRef<ThreeTwinPayload>({
+    parcels,
+    spaces,
+    focusedId,
+    sideM,
+    lat,
+    lng,
+    moduleId,
+  });
+  threeDataRef.current = { parcels, spaces, focusedId, sideM, lat, lng, moduleId };
 
   useEffect(() => {
     const host = hostRef.current;
@@ -399,6 +413,11 @@ export function RadarMapLibreTwin({
         bumpResize();
         ensureOverlayLayers(map);
         syncOverlays(map, dataRef.current);
+        if (!map.getLayer(RADAR_THREE_LAYER_ID)) {
+          map.addLayer(
+            createRadarMapLibreThreeLayer(RADAR_THREE_LAYER_ID, () => threeDataRef.current),
+          );
+        }
         fitSite(map, dataRef.current.lat, dataRef.current.lng, dataRef.current.sideM);
         bumpResize();
         setReady(true);
@@ -454,6 +473,7 @@ export function RadarMapLibreTwin({
   const overlayKey = [
     sideM,
     focusedId,
+    moduleId || '',
     spaces.map((s) => `${s.id}:${s.x}:${s.y}:${s.w}:${s.h}:${s.rotation ?? 0}:${s.placed ? 1 : 0}`).join('|'),
     parcels.map((p) => `${p.id}:${p.moisture ?? ''}:${p.nextAction ?? ''}:${p.crop ?? ''}:${p.x ?? ''}:${p.y ?? ''}`).join('|'),
     structures.map((s) => `${s.id}:${s.x}:${s.y}:${s.w}:${s.h}`).join(','),
@@ -467,6 +487,10 @@ export function RadarMapLibreTwin({
       map.resize();
       ensureOverlayLayers(map);
       syncOverlays(map, dataRef.current);
+      if (!map.getLayer(RADAR_THREE_LAYER_ID)) {
+        map.addLayer(createRadarMapLibreThreeLayer(RADAR_THREE_LAYER_ID, () => threeDataRef.current));
+      }
+      map.triggerRepaint();
     };
     if (map.isStyleLoaded()) apply();
     else map.once('idle', apply);

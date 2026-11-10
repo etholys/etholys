@@ -211,7 +211,7 @@ Dois tenants re-runnable (upsert). Senha partilhada: env `SANDBOX_PASSWORD` ou d
 | Conta | Empresa | O que mostra |
 |-------|---------|--------------|
 | `demo.campo.novo@etholys.com` | Campo Novo (`CampoNovo`) | First-run: sem propriedade, mapa/Caderno vazios, funil + **tutorial in-app** (coach-marks) |
-| `master.horizonte@etholys.com` | Horizonte Verde (`Horizonte`) | Avançado: Finca escuela + Horta comunitária + cliente Sierra Norte; pin rural Formosa/GO (Chácaras Abreu, não asfalto de Brasília); OSM; espaços colocados/rodados; estruturas/irrigação; cultivos; sondas; Caderno; tarefas; lotes; regras de automatização; alertas |
+| `master.horizonte@etholys.com` | Horizonte Verde (`Horizonte`) | Avançado: Finca escuela + Horta comunitária + cliente Sierra Norte; pin OSM farmland Fazenda Castelo (Rio Verde/GO — não Aeroporto de Formosa); malhas 3D de cultivos; espaços colocados/rodados; estruturas/irrigação; cultivos; sondas; Caderno; tarefas; lotes; regras de automatização; alertas |
 
 ### Tutorial in-app (coach-marks)
 
