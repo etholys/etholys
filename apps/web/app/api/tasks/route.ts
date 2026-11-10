@@ -340,7 +340,7 @@ export async function POST(req: Request) {
             type: 'task_assigned',
             title: 'Nueva tarea asignada',
             message: `Se te asignó la tarea: ${tx.title}`,
-            link: `/hub/work?task=${encodeURIComponent(tx.id)}`,
+            link: `/hub/work?task=${encodeURIComponent(tx.id)}&focus=people`,
             companyId: (tx as { companyId?: string | null }).companyId || null,
             taskId: tx.id,
           });
@@ -369,7 +369,7 @@ export async function POST(req: Request) {
         type: 'task_assigned',
         title: 'Nueva tarea asignada',
         message: `Se te asignó la tarea: ${task.title}`,
-        link: `/hub/work?task=${encodeURIComponent(task.id)}`,
+        link: `/hub/work?task=${encodeURIComponent(task.id)}&focus=people`,
         companyId: (task as { companyId?: string | null }).companyId || null,
         taskId: task.id,
       });

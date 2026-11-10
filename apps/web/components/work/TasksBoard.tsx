@@ -43,6 +43,8 @@ export type TasksBoardProps = {
   onTasksChanged?: () => void;
   externalSelectedId?: string | null;
   onExternalSelect?: (id: string | null) => void;
+  /** Deep-link section from ?focus= (comments|status|people|approvals). */
+  panelFocus?: 'comments' | 'status' | 'people' | 'approvals' | null;
   /** Tasks already loaded by the shell. When set, the board does not wait on a second fetch. */
   presetTasks?: any[] | null;
 };
@@ -84,6 +86,7 @@ export default function TasksBoard({
   onTasksChanged,
   externalSelectedId,
   onExternalSelect,
+  panelFocus = null,
   presetTasks = null,
 }: TasksBoardProps) {
   const { tr, activeCompanyId, locale } = useApp();
@@ -1264,6 +1267,7 @@ export default function TasksBoard({
             groups={groups}
             folders={folders}
             activeCompanyId={activeCompanyId}
+            focus={panelFocus}
             onClose={() => setSelectedId(null)}
             onChanged={() => {
               fetchTasks({ silent: true });

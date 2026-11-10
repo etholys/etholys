@@ -6,10 +6,21 @@ import {
   type EtholysMailLocale,
 } from '@/lib/email/etholys-mail-layout';
 import {
+  focusFromNotificationType,
+  workTaskLink,
+} from '@/lib/work/task-focus';
+import {
   executorIdsFromTask,
   responsibleIdsFromTask,
   reviewerIdsFromTask,
 } from '@/lib/work/task-people';
+
+export type { WorkTaskFocus } from '@/lib/work/task-focus';
+export {
+  focusFromNotificationType,
+  normalizeWorkTaskFocus,
+  workTaskLink,
+} from '@/lib/work/task-focus';
 
 export type WorkNotifyKey = 'comment' | 'assign' | 'status';
 
@@ -25,15 +36,6 @@ export function wantsWorkEmail(json: unknown) {
   const notify = (json as { notify?: { email?: boolean } }).notify;
   if (!notify || notify.email === undefined) return true;
   return notify.email !== false;
-}
-
-/** Deep-link into eTask opening a specific activity panel. */
-export function workTaskLink(taskId?: string | null, folderId?: string | null) {
-  if (taskId && folderId) {
-    return `/hub/work?nav=folder&id=${encodeURIComponent(folderId)}&view=table&task=${encodeURIComponent(taskId)}`;
-  }
-  if (taskId) return `/hub/work?task=${encodeURIComponent(taskId)}`;
-  return '/hub/work';
 }
 
 /** Anyone accompanying the activity in any role (executor, responsible, reviewer, creator, TaskPerson). */
@@ -242,7 +244,8 @@ export function notifyTaskWatchers(opts: {
   mail?: TaskMailFields;
 }) {
   if (!opts.enabled) return;
-  const link = opts.link || workTaskLink(opts.taskId);
+  const focus = focusFromNotificationType(opts.type);
+  const link = opts.link || workTaskLink(opts.taskId, null, focus);
   const seen = new Set<string>();
   for (const id of opts.userIds) {
     if (!id || id === opts.actorId || seen.has(id)) continue;
@@ -296,7 +299,7 @@ export function notifyTaskAssigned(opts: {
   if (!opts.assigneeId || opts.assigneeId === opts.actorId) return;
   if (opts.prevAssigneeId && opts.prevAssigneeId === opts.assigneeId) return;
   const link = opts.taskId
-    ? workTaskLink(opts.taskId, opts.folderId)
+    ? workTaskLink(opts.taskId, opts.folderId, 'people')
     : opts.projectId
       ? `/projects/${opts.projectId}`
       : '/hub/work';
@@ -347,7 +350,7 @@ export function notifyTaskAction(opts: {
   folderId?: string | null;
 }) {
   if (!opts.recipientId || opts.recipientId === opts.actorId) return;
-  const link = opts.link || workTaskLink(opts.taskId, opts.folderId);
+  const link = opts.link || workTaskLink(opts.taskId, opts.folderId, 'approvals');
   const phrases = {
     review: {
       subject: 'Solicitud de revisión',

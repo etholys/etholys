@@ -74,7 +74,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     const what = approved
       ? 'Aprobó la entrega'
       : `Rechazó la entrega${decisionNote ? `: ${decisionNote}` : ''}`;
-    const link = workTaskLink(existing.taskId, existing.task.folderId);
+    const link = workTaskLink(existing.taskId, existing.task.folderId, 'approvals');
     notifyTaskWatchers({
       actorId: tenant.userId,
       type: 'task_approval_decision',

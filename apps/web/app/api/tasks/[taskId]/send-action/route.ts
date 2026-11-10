@@ -160,7 +160,7 @@ export async function POST(req: Request, { params }: { params: { taskId: string 
       where: whereLine,
       note,
       email: emailOn,
-      link: workTaskLink(task.id, task.folderId),
+      link: workTaskLink(task.id, task.folderId, 'approvals'),
       companyId: companyId || null,
       taskId: task.id,
       folderId: task.folderId,

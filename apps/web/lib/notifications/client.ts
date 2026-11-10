@@ -1,5 +1,11 @@
 /** Client helpers for Hub notification center + Web Push. */
 
+import {
+  focusFromNotificationType,
+  workTaskLink,
+  type WorkTaskFocus,
+} from '@/lib/work/task-focus';
+
 export type AppNotification = {
   id: string;
   title: string;
@@ -10,6 +16,40 @@ export type AppNotification = {
   type?: string;
   taskId?: string | null;
 };
+
+export { focusFromNotificationType };
+export type { WorkTaskFocus };
+
+/**
+ * Resolve where a notification click should go.
+ * Prefers stored link; appends `focus` from type when missing (covers older rows).
+ */
+export function resolveNotificationHref(n: Pick<AppNotification, 'link' | 'type' | 'taskId'>): string | null {
+  const focus = focusFromNotificationType(n.type);
+  const raw = (n.link || '').trim();
+  if (raw) {
+    try {
+      const abs = raw.startsWith('http://') || raw.startsWith('https://');
+      const url = abs ? new URL(raw) : new URL(raw, 'https://app.etholys.com');
+      const isWork = url.pathname.includes('/hub/work');
+      if (isWork) {
+        if (!url.searchParams.get('task') && n.taskId) {
+          url.searchParams.set('task', n.taskId);
+        }
+        if (!url.searchParams.get('focus') && focus && url.searchParams.get('task')) {
+          url.searchParams.set('focus', focus);
+        }
+        if (abs) return url.toString();
+        return `${url.pathname}${url.search}${url.hash}`;
+      }
+    } catch {
+      /* keep raw */
+    }
+    return raw;
+  }
+  if (n.taskId) return workTaskLink(n.taskId, null, focus);
+  return null;
+}
 
 export function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);

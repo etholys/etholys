@@ -4,7 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { X } from 'lucide-react';
-import { fetchNotifications, markNotificationRead, type AppNotification } from '@/lib/notifications/client';
+import {
+  fetchNotifications,
+  markNotificationRead,
+  resolveNotificationHref,
+  type AppNotification,
+} from '@/lib/notifications/client';
 
 type Toast = AppNotification & { dismissAt: number };
 
@@ -81,7 +86,8 @@ export function NotificationToasts() {
               onClick={() => {
                 void markNotificationRead(n.id);
                 setToasts((prev) => prev.filter((x) => x.id !== n.id));
-                if (n.link) router.push(n.link);
+                const href = resolveNotificationHref(n);
+                if (href) router.push(href);
               }}
             >
               <p className="text-sm font-semibold text-white">{n.title}</p>

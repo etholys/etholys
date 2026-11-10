@@ -329,7 +329,7 @@ export async function PUT(req: Request) {
           type: 'task_assigned',
           title: 'Nueva tarea asignada',
           message: `Se te asignó: ${task.title}`,
-          link: `/hub/work?task=${encodeURIComponent(id)}`,
+          link: `/hub/work?task=${encodeURIComponent(id)}&focus=people`,
           companyId: task.companyId || null,
           taskId: id,
         });

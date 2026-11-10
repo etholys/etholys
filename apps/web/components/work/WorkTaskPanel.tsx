@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { normalizeWorkTaskFocus, type WorkTaskFocus } from '@/lib/work/task-focus';
 import {
   WORK_PRIORITIES,
   WORK_STATUSES,
@@ -202,12 +203,16 @@ type Detail = {
   }>;
 };
 
+const focusPulseClass =
+  'ring-2 ring-teal-400/80 ring-offset-2 ring-offset-[color:var(--sys-panel,#fff)] transition shadow-[0_0_0_4px_rgba(45,212,191,0.12)]';
+
 export function WorkTaskPanel({
   taskId,
   users,
   groups,
   folders = [],
   activeCompanyId,
+  focus = null,
   onClose,
   onChanged,
   t,
@@ -217,6 +222,8 @@ export function WorkTaskPanel({
   groups: GroupOpt[];
   folders?: GroupOpt[];
   activeCompanyId?: string | null;
+  /** Section to open/highlight from notification deep-link. */
+  focus?: WorkTaskFocus | string | null;
   onClose: () => void;
   onChanged: () => void;
   t: (en: string, es: string, pt: string) => string;
@@ -239,6 +246,8 @@ export function WorkTaskPanel({
   const [sendingAction, setSendingAction] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<PanelTab>('detail');
+  const [pulseFocus, setPulseFocus] = useState<WorkTaskFocus | null>(null);
+  const resolvedFocus = normalizeWorkTaskFocus(focus);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -264,8 +273,24 @@ export function WorkTaskPanel({
   }, [load]);
 
   useEffect(() => {
-    setTab('detail');
-  }, [taskId]);
+    if (resolvedFocus === 'comments') setTab('updates');
+    else if (resolvedFocus === 'approvals') setTab('send');
+    else setTab('detail');
+  }, [taskId, resolvedFocus]);
+
+  useEffect(() => {
+    if (!resolvedFocus || loading || !task) return;
+    setPulseFocus(resolvedFocus);
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(`[data-work-focus="${resolvedFocus}"]`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 80);
+    const clear = window.setTimeout(() => setPulseFocus(null), 2400);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearTimeout(clear);
+    };
+  }, [resolvedFocus, loading, task?.id, tab]);
 
   const patch = async (body: Record<string, unknown>) => {
     setSaving(true);
@@ -514,7 +539,10 @@ export function WorkTaskPanel({
               </a>
             ) : null}
 
-            <div className="grid grid-cols-3 gap-1.5">
+            <div
+              data-work-focus="status"
+              className={`grid grid-cols-3 gap-1.5 rounded-lg ${pulseFocus === 'status' ? focusPulseClass : ''}`}
+            >
               <label className="space-y-0.5">
                 <span className={fieldLabel}>{t('Status', 'Estado', 'Status')}</span>
                 <select
@@ -555,7 +583,12 @@ export function WorkTaskPanel({
             </div>
 
             {/* Compact people row */}
-            <div className="flex gap-2.5 rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft,#f8fafc)] px-2.5 py-1.5">
+            <div
+              data-work-focus="people"
+              className={`flex gap-2.5 rounded-lg border border-[color:var(--sys-line)] bg-[color:var(--sys-panel-soft,#f8fafc)] px-2.5 py-1.5 ${
+                pulseFocus === 'people' ? focusPulseClass : ''
+              }`}
+            >
               <RoleChipRow
                 label={t('Executor', 'Ejecutor', 'Executor')}
                 ids={panelRoleIds(task, 'EXECUTOR')}
@@ -872,7 +905,10 @@ export function WorkTaskPanel({
             ) : null}
 
             {tab === 'send' ? (
-              <div className="space-y-2.5">
+              <div
+                data-work-focus="approvals"
+                className={`space-y-2.5 rounded-lg ${pulseFocus === 'approvals' ? focusPulseClass : ''}`}
+              >
                 <select
                   value={sendAction}
                   onChange={(e) => setSendAction(e.target.value as 'review' | 'delivery' | 'handoff')}
@@ -925,7 +961,10 @@ export function WorkTaskPanel({
             ) : null}
 
             {tab === 'updates' ? (
-              <div className="space-y-2.5">
+              <div
+                data-work-focus="comments"
+                className={`space-y-2.5 rounded-lg ${pulseFocus === 'comments' ? focusPulseClass : ''}`}
+              >
                 <div className="relative">
                   <div className="flex gap-2">
                     <textarea

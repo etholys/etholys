@@ -16,6 +16,7 @@ import { WorkTaskPanel } from './WorkTaskPanel';
 import { WorkFolderShareDialog } from './WorkFolderShareDialog';
 import { WorkQuickAdd } from './WorkQuickAdd';
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
+import { normalizeWorkTaskFocus, type WorkTaskFocus } from '@/lib/work/task-focus';
 import {
   WORK_KANBAN,
   WORK_PRIORITIES,
@@ -135,6 +136,7 @@ export default function WorkShell() {
   const [users, setUsers] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [panelFocus, setPanelFocus] = useState<WorkTaskFocus | null>(null);
   const [loadingDash, setLoadingDash] = useState(true);
   const [loadingArchive, setLoadingArchive] = useState(false);
   const [shareFolder, setShareFolder] = useState<{ id: string; name: string } | null>(null);
@@ -295,10 +297,14 @@ export default function WorkShell() {
     setUrlReady(true);
   }, [searchParams, folders, departments, projects, urlReady]);
 
-  /** Deep-link from notification center: ?task=<id> opens the activity panel. */
+  /** Deep-link from notification center: ?task=<id>&focus=… opens the activity panel. */
   useEffect(() => {
     const taskId = searchParams.get('task');
-    if (taskId) setSelectedId(taskId);
+    const focus = normalizeWorkTaskFocus(searchParams.get('focus'));
+    if (taskId) {
+      setSelectedId(taskId);
+      setPanelFocus(focus);
+    }
   }, [searchParams]);
 
   useEffect(() => {
@@ -307,11 +313,13 @@ export default function WorkShell() {
       const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
       if (e.key === 'Escape') {
         setSelectedId(null);
+        setPanelFocus(null);
         return;
       }
       if (!typing && (e.key === 'x' || e.key === 'X') && selectedId) {
         e.preventDefault();
         setSelectedId(null);
+        setPanelFocus(null);
         return;
       }
       if (!typing && e.key === '/' && nav.kind !== 'dashboard') {
@@ -915,7 +923,11 @@ export default function WorkShell() {
                   fetchArchivedTasks({ silent: true });
                 }}
                 externalSelectedId={selectedId}
-                onExternalSelect={setSelectedId}
+                onExternalSelect={(id) => {
+                  setSelectedId(id);
+                  if (!id) setPanelFocus(null);
+                }}
+                panelFocus={panelFocus}
               />
             )}
           </div>
@@ -927,7 +939,11 @@ export default function WorkShell() {
               groups={groups}
               folders={folders}
               activeCompanyId={activeCompanyId}
-              onClose={() => setSelectedId(null)}
+              focus={panelFocus}
+              onClose={() => {
+                setSelectedId(null);
+                setPanelFocus(null);
+              }}
               onChanged={() => fetchAllTasks({ silent: true })}
               t={t3}
             />

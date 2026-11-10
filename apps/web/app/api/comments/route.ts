@@ -78,7 +78,7 @@ export async function POST(req: Request) {
       include: { user: { select: { id: true, name: true, email: true } } },
     });
 
-    const link = workTaskLink(access.id, access.folderId);
+    const link = workTaskLink(access.id, access.folderId, 'comments');
     const authorName = comment.user?.name || 'Alguien';
     const company = access.resolvedCompanyId
       ? await prisma.company.findUnique({

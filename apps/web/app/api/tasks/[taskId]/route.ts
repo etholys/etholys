@@ -339,7 +339,7 @@ export async function PUT(req: Request, { params }: { params: { taskId: string }
       groupName: updated.group?.name,
       projectName: updated.project?.name,
     });
-    const taskLink = workTaskLink(updated.id, updated.folderId);
+    const taskLink = workTaskLink(updated.id, updated.folderId, 'status');
 
     if (wantsWorkNotify(company?.workBoardJson, 'assign')) {
       const nextExecutors = enriched.assigneeIds;

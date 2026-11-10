@@ -10,6 +10,7 @@ import {
   fetchNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  resolveNotificationHref,
   type AppNotification,
 } from '@/lib/notifications/client';
 
@@ -200,7 +201,8 @@ export function NotificationsBell({
                           setCount((c) => Math.max(0, c - 1));
                         }
                         setOpen(false);
-                        if (n.link) router.push(n.link);
+                        const href = resolveNotificationHref(n);
+                        if (href) router.push(href);
                       }}
                     >
                       <div className="flex items-start justify-between gap-2">
