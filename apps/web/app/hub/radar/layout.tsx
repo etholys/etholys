@@ -2,6 +2,16 @@
 
 import { Suspense, useCallback, useMemo, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
+import {
+  BookOpen,
+  CheckSquare,
+  LayoutDashboard,
+  Plane,
+  QrCode,
+  Sparkles,
+  Users,
+  Workflow,
+} from 'lucide-react';
 import { ProductAppShell } from '@/components/etholys/ProductAppShell';
 import { useApp } from '@/app/providers';
 import {
@@ -12,14 +22,13 @@ import { RadarClientPicker } from '@/components/radar/RadarClientPicker';
 import { RadarCreatePanel } from '@/components/radar/RadarCreatePanel';
 import { RadarGuidedTour } from '@/components/radar/RadarGuidedTour';
 import { RadarOpsBar } from '@/components/radar/RadarOpsBar';
+import { radarLoc, radarT } from '@/lib/radar/i18n';
 
 function RadarShellInner({ children }: { children: ReactNode }) {
   const pathname = usePathname() || '';
   const { locale, activeCompanyId } = useApp();
   const { companyId, engagementId, scope } = useRadarClientScope();
-  const es = locale === 'es';
-  const en = locale === 'en';
-  const loc = es || en ? locale : 'pt';
+  const loc = radarLoc(locale);
   const cid = companyId || activeCompanyId || '';
   /** Property map is Maps-like: icon rail + edge-to-edge canvas. */
   const onPropertyMap = pathname.includes('/radar/properties/');
@@ -33,68 +42,109 @@ function RadarShellInner({ children }: { children: ReactNode }) {
     return s ? `?${s}` : '';
   }, [cid, engagementId, scope]);
 
-  const fazer = es ? 'Hacer' : en ? 'Do' : 'Fazer';
-  const ver = es ? 'Ver' : en ? 'See' : 'Ver';
+  const fazer = radarT(loc, 'Fazer', 'Hacer', 'Do');
+  const ver = radarT(loc, 'Ver', 'Ver', 'See');
   const nav = useMemo(
     () => [
       {
         href: '/hub/radar',
-        label: es ? 'Panel' : en ? 'Dashboard' : 'Painel',
+        label: radarT(loc, 'Painel', 'Panel', 'Dashboard'),
+        detail: radarT(
+          loc,
+          'Visão geral dos lugares e alertas',
+          'Vista general de lugares y alertas',
+          'Overview of places and alerts',
+        ),
+        icon: LayoutDashboard,
         group: ver,
       },
       {
         href: '/hub/radar/cadeia',
-        label: es ? 'Rastreo del lote' : en ? 'Lot trace' : 'Rastreio do lote',
+        label: radarT(loc, 'Rastreio do lote', 'Rastreo del lote', 'Lot trace'),
+        detail: radarT(
+          loc,
+          'Seguir o lote da produção ao destino',
+          'Seguir el lote de la producción al destino',
+          'Follow the lot from production to destination',
+        ),
+        icon: QrCode,
         group: ver,
       },
       {
         href: '/hub/radar/drone',
-        label: es ? 'Drone' : en ? 'Drone' : 'Drone',
+        label: radarT(loc, 'Drone', 'Drone', 'Drone'),
         group: fazer,
-        detail: es
-          ? 'Mapeo aéreo asistido'
-          : en
-            ? 'Assisted aerial mapping'
-            : 'Mapeamento aéreo assistido',
+        detail: radarT(
+          loc,
+          'Mapeamento aéreo assistido',
+          'Mapeo aéreo asistido',
+          'Assisted aerial mapping',
+        ),
+        icon: Plane,
       },
       {
         href: '/hub/radar/caderno',
-        label: es ? 'Cuaderno' : en ? 'Notebook' : 'Caderno',
+        label: radarT(loc, 'Caderno', 'Cuaderno', 'Notebook'),
+        detail: radarT(
+          loc,
+          'Registos de campo e observações',
+          'Registros de campo y observaciones',
+          'Field logs and observations',
+        ),
+        icon: BookOpen,
         group: fazer,
       },
       {
         href: '/hub/radar/tarefas',
-        label: es ? 'Tareas' : en ? 'Tasks' : 'Tarefas',
+        label: radarT(loc, 'Tarefas', 'Tareas', 'Tasks'),
+        detail: radarT(
+          loc,
+          'Trabalho do dia no terreno',
+          'Trabajo del día en el terreno',
+          'Day-to-day field work',
+        ),
+        icon: CheckSquare,
         group: fazer,
       },
       {
         href: '/hub/radar/assistente',
-        label: es ? 'Asistente' : en ? 'Assistant' : 'Assistente',
+        label: radarT(loc, 'Assistente', 'Asistente', 'Assistant'),
         group: fazer,
         dataTour: 'assistant',
-        detail: es
-          ? 'Consejo técnico y recordatorios'
-          : en
-            ? 'Technical advice and reminders'
-            : 'Conselho técnico e lembretes',
+        detail: radarT(
+          loc,
+          'Conselho técnico e lembretes',
+          'Consejo técnico y recordatorios',
+          'Technical advice and reminders',
+        ),
+        icon: Sparkles,
       },
       {
         href: '/hub/radar/automatizacao',
-        label: es ? 'Automatización' : en ? 'Automation' : 'Automatização',
+        label: radarT(loc, 'Automatização', 'Automatización', 'Automation'),
         group: fazer,
         dataTour: 'automation',
-        detail: es
-          ? 'Vincular sensores y reglas'
-          : en
-            ? 'Bind sensors and rules'
-            : 'Ligar sensores e regras',
+        detail: radarT(
+          loc,
+          'Ligar sensores e regras',
+          'Vincular sensores y reglas',
+          'Bind sensors and rules',
+        ),
+        icon: Workflow,
       },
       {
         href: '/hub/radar/equipa',
-        label: es ? 'Equipo y clientes' : en ? 'Team and clients' : 'Equipa e clientes',
+        label: radarT(loc, 'Equipa e clientes', 'Equipo y clientes', 'Team and clients'),
+        detail: radarT(
+          loc,
+          'Técnicos e clientes atendidos',
+          'Técnicos y clientes atendidos',
+          'Technicians and served clients',
+        ),
+        icon: Users,
       },
     ],
-    [es, en, fazer, ver],
+    [loc, fazer, ver],
   );
 
   const resolveNavHref = useCallback((item: { href: string }) => `${item.href}${qs}`, [qs]);

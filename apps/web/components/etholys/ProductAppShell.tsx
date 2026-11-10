@@ -16,6 +16,7 @@ import {
   Sunrise,
   X,
   LogOut,
+  type LucideIcon,
 } from 'lucide-react';
 import { useApp } from '@/app/providers';
 import { SystemAtmosphere } from '@/components/hub/SystemAtmosphere';
@@ -23,6 +24,7 @@ import { SystemLicenseGate } from '@/components/hub/SystemLicenseGate';
 import { CompanyPicker } from '@/components/hub/CompanyPicker';
 import { AppearanceToggle } from '@/components/hub/AppearanceToggle';
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEnsureActiveCompany } from '@/hooks/useEnsureActiveCompany';
 import { cn, getInitials } from '@/lib/utils';
 import { sysTheme, type SystemAccent } from '@/lib/system-shell';
@@ -34,6 +36,8 @@ type Nav = {
   label: string;
   /** Uma linha que diz para que serve, por baixo do nome. */
   detail?: string;
+  /** Ícone do rail colapsado (lucide). */
+  icon?: LucideIcon;
   /** Agrupa itens seguidos com o mesmo nome. */
   group?: string;
   requiresAttended?: boolean;
@@ -194,27 +198,20 @@ export function ProductAppShell({
               </div>
             )}
 
-            <nav className="space-y-0.5 pb-3">
-              {nav.map((item, index) => {
-                const href = resolveNavHref ? resolveNavHref(item) : item.href;
-                const active = match?.href === item.href;
-                const showGroup = !collapsed && item.group && item.group !== nav[index - 1]?.group;
-                return (
-                  <div key={item.href}>
-                    {showGroup && (
-                      <p
-                        className={cn(
-                          'px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30',
-                          index > 0 && 'pt-3',
-                        )}
-                      >
-                        {item.group}
-                      </p>
-                    )}
+            <TooltipProvider delayDuration={200}>
+              <nav className="space-y-0.5 pb-3">
+                {nav.map((item, index) => {
+                  const href = resolveNavHref ? resolveNavHref(item) : item.href;
+                  const active = match?.href === item.href;
+                  const showGroup = !collapsed && item.group && item.group !== nav[index - 1]?.group;
+                  const tip = item.detail ? `${item.label} — ${item.detail}` : item.label;
+                  const ItemIcon = item.icon;
+                  const link = (
                     <Link
                       href={href}
                       onClick={() => setSidebarOpen(false)}
-                      title={collapsed ? item.label : item.detail || item.label}
+                      title={tip}
+                      aria-label={tip}
                       data-radar-tour={item.dataTour || undefined}
                       className={cn(
                         'flex rounded-lg text-sm font-medium transition',
@@ -223,14 +220,48 @@ export function ProductAppShell({
                       )}
                     >
                       {!collapsed && <span className="truncate">{item.label}</span>}
-                      {collapsed && (
+                      {collapsed && ItemIcon && (
+                        <ItemIcon className="h-5 w-5 flex-shrink-0" strokeWidth={1.75} aria-hidden />
+                      )}
+                      {collapsed && !ItemIcon && (
                         <span className="text-[10px] font-semibold uppercase">{item.label.slice(0, 2)}</span>
                       )}
                     </Link>
-                  </div>
-                );
-              })}
-            </nav>
+                  );
+                  return (
+                    <div key={item.href}>
+                      {showGroup && (
+                        <p
+                          className={cn(
+                            'px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30',
+                            index > 0 && 'pt-3',
+                          )}
+                        >
+                          {item.group}
+                        </p>
+                      )}
+                      {collapsed ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>{link}</TooltipTrigger>
+                          <TooltipContent
+                            side="right"
+                            sideOffset={8}
+                            className="max-w-[220px] border-white/10 bg-[#0B1822] px-3 py-2 text-white shadow-lg"
+                          >
+                            <p className="text-sm font-medium leading-tight">{item.label}</p>
+                            {item.detail ? (
+                              <p className="mt-0.5 text-xs font-normal leading-snug text-white/65">{item.detail}</p>
+                            ) : null}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        link
+                      )}
+                    </div>
+                  );
+                })}
+              </nav>
+            </TooltipProvider>
           </div>
 
           <div className={cn('shrink-0 border-t border-white/[0.07]', collapsed ? 'p-1.5' : 'p-3')}>
