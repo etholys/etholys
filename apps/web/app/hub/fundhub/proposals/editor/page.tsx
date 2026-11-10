@@ -28,6 +28,7 @@ import {
   FileText,
   ClipboardCheck,
   ChevronDown,
+  MoreHorizontal,
   X,
   Library,
   Image as ImageIcon,
@@ -1581,13 +1582,16 @@ export default function FundHubProposalEditorPage() {
 
   const headerMeta = useMemo(() => {
     const rawInst = String(fund?.institution ?? '').trim();
-    const inst =
-      !rawInst || /^(sem fundo vinculado|sin fondo vinculado|no fund linked)$/i.test(rawInst)
-        ? ui(locale, 'Sin fondo vinculado', 'Sem fundo vinculado', 'No fund linked')
-        : rawInst;
-    const bits = [inst, fund?.countries].filter(Boolean);
+    const unlinked =
+      !rawInst || /^(sem fundo vinculado|sin fondo vinculado|no fund linked)$/i.test(rawInst);
+    // Skip noisy "Sin fondo…" chrome — doc rail already shows it.
+    if (unlinked) {
+      const countries = String(fund?.countries ?? '').trim();
+      return countries || '';
+    }
+    const bits = [rawInst, fund?.countries].filter(Boolean);
     return bits.join(' · ');
-  }, [fund, locale]);
+  }, [fund]);
 
   const displayTitle =
     proposalTitle.trim() ||
@@ -1844,8 +1848,9 @@ export default function FundHubProposalEditorPage() {
           )}
 
           <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
-            <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-gray-100 px-3 py-1.5 sm:px-4 lg:px-5">
-              <div className="flex min-w-0 flex-1 items-center gap-2">
+            <header className="shrink-0 border-b border-gray-100">
+              {/* Row 1 — identity + primary status */}
+              <div className="flex items-center gap-2 px-3 pt-2.5 sm:px-4 lg:px-5">
                 <Link
                   href="/hub/fundhub/proposals"
                   className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-gray-500 transition hover:bg-gray-50 hover:text-gray-800"
@@ -1854,10 +1859,10 @@ export default function FundHubProposalEditorPage() {
                   <ArrowLeft className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">{ui(locale, 'Propuestas', 'Propostas', 'Proposals')}</span>
                 </Link>
-                <span className="hidden h-3 w-px shrink-0 bg-gray-200 sm:block" aria-hidden />
-                <div className="min-w-0">
+                <span className="hidden h-3.5 w-px shrink-0 bg-gray-200 sm:block" aria-hidden />
+                <div className="min-w-0 flex-1">
                   {renamingTitle ? (
-                    <div className="flex max-w-md items-center gap-1">
+                    <div className="flex max-w-lg items-center gap-1">
                       <input
                         ref={titleInputRef}
                         value={titleDraft}
@@ -1874,7 +1879,7 @@ export default function FundHubProposalEditorPage() {
                         disabled={titleBusy}
                         maxLength={300}
                         aria-label={ui(locale, 'Nombre de la propuesta', 'Nome da proposta', 'Proposal name')}
-                        className="min-w-0 flex-1 rounded border border-teal-300 bg-white px-1.5 py-0.5 text-xs font-medium text-gray-800 outline-none focus:ring-2 focus:ring-teal-200"
+                        className="min-w-0 flex-1 rounded border border-teal-300 bg-white px-1.5 py-0.5 text-sm font-medium text-gray-800 outline-none focus:ring-2 focus:ring-teal-200"
                       />
                       <button
                         type="button"
@@ -1883,7 +1888,7 @@ export default function FundHubProposalEditorPage() {
                         className="rounded p-1 text-teal-800 hover:bg-teal-50 disabled:opacity-50"
                         title={ui(locale, 'Guardar nombre', 'Guardar nome', 'Save name')}
                       >
-                        <Check className="h-3 w-3" />
+                        <Check className="h-3.5 w-3.5" />
                       </button>
                       <button
                         type="button"
@@ -1892,30 +1897,30 @@ export default function FundHubProposalEditorPage() {
                         className="rounded p-1 text-gray-400 hover:bg-gray-50 disabled:opacity-50"
                         title={ui(locale, 'Cancelar', 'Cancelar', 'Cancel')}
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   ) : (
                     <button
                       type="button"
                       onClick={beginRenameTitle}
-                      className="group/title flex max-w-full items-center gap-1 rounded px-0.5 text-left hover:bg-gray-50"
+                      className="group/title flex max-w-full items-center gap-1.5 rounded px-0.5 text-left hover:bg-gray-50"
                       title={ui(locale, 'Renombrar', 'Renomear', 'Rename')}
                     >
-                      <p className="truncate text-xs font-medium text-gray-800" title={displayTitle}>
+                      <p className="truncate text-sm font-medium text-gray-800" title={displayTitle}>
                         {displayTitle}
                       </p>
                       <Pencil className="h-3 w-3 shrink-0 text-gray-400 opacity-0 transition group-hover/title:opacity-100" />
                     </button>
                   )}
                   {headerMeta ? (
-                    <p className="truncate text-[10px] text-gray-400" title={headerMeta}>
+                    <p className="truncate pl-0.5 text-[11px] text-gray-400" title={headerMeta}>
                       {headerMeta}
                     </p>
                   ) : null}
                 </div>
                 <span
-                  className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${proposalStatusBadgeClass(proposalStatus, 'light')}`}
+                  className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-medium ${proposalStatusBadgeClass(proposalStatus, 'light')}`}
                   title={
                     statusChangedAt
                       ? new Date(statusChangedAt).toLocaleString(
@@ -1927,87 +1932,112 @@ export default function FundHubProposalEditorPage() {
                   {proposalStatusLabel(proposalStatus, locale)}
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-1">
+
+              {/* Row 2 — mode switch + quiet secondary actions */}
+              <div className="flex items-center gap-2 px-3 pb-2 pt-1.5 sm:px-4 lg:px-5">
                 {stage === 'write' ? (
-                  <>
-                    <div className="inline-flex rounded-md border border-gray-200 bg-gray-100 p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setComposerMode('talk')}
-                        className={cn(
-                          'rounded px-2 py-0.5 text-[10px] font-medium transition',
-                          composerMode === 'talk'
-                            ? 'bg-white text-gray-800 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-800',
-                        )}
-                      >
-                        {ui(locale, 'Conversar', 'Conversar', 'Talk')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setComposerMode('write')}
-                        className={cn(
-                          'rounded px-2 py-0.5 text-[10px] font-medium transition',
-                          composerMode === 'write'
-                            ? 'bg-white text-gray-800 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-800',
-                        )}
-                      >
-                        {ui(locale, 'Redactar', 'Redigir', 'Write')}
-                      </button>
-                    </div>
+                  <div
+                    className="inline-flex shrink-0 rounded-lg border border-gray-200 bg-gray-100 p-0.5"
+                    role="group"
+                    aria-label={ui(locale, 'Modo del chat', 'Modo do chat', 'Chat mode')}
+                  >
                     <button
                       type="button"
-                      onClick={() => void handleGenerateStructure()}
-                      disabled={chatLoading}
-                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50"
+                      onClick={() => setComposerMode('talk')}
+                      className={cn(
+                        'rounded-md px-3 py-1.5 text-[11px] font-semibold tracking-wide transition',
+                        composerMode === 'talk'
+                          ? 'bg-teal-700 text-white shadow-sm'
+                          : 'text-gray-700 hover:bg-white/60 hover:text-gray-900',
+                      )}
                     >
-                      <Lightbulb className="h-3 w-3 text-gray-400" />
-                      {ui(locale, 'Estructura', 'Estrutura', 'Structure')}
+                      {ui(locale, 'Conversar', 'Conversar', 'Talk')}
                     </button>
                     <button
                       type="button"
-                      onClick={() => void handleBrainstorm()}
-                      disabled={chatLoading}
-                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50"
+                      onClick={() => setComposerMode('write')}
+                      className={cn(
+                        'rounded-md px-3 py-1.5 text-[11px] font-semibold tracking-wide transition',
+                        composerMode === 'write'
+                          ? 'bg-teal-700 text-white shadow-sm'
+                          : 'text-gray-700 hover:bg-white/60 hover:text-gray-900',
+                      )}
                     >
-                      <Sparkles className="h-3 w-3 text-gray-400" />
-                      {ui(locale, 'Ideas', 'Ideias', 'Ideas')}
+                      {ui(locale, 'Redactar', 'Redigir', 'Write')}
                     </button>
-                  </>
+                  </div>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-gray-500">
-                    <BookOpen className="h-3 w-3 text-gray-400" />
+                  <span className="inline-flex items-center gap-1.5 rounded-md px-1 text-[11px] font-medium text-gray-500">
+                    <BookOpen className="h-3.5 w-3.5 text-gray-400" />
                     1 / 2 · {ui(locale, 'Entender', 'Entender', 'Understand')}
                   </span>
                 )}
-                <span className="mx-0.5 hidden h-3 w-px bg-gray-200/80 sm:block" aria-hidden />
-                <button
-                  type="button"
-                  onClick={() => persistDraft()}
-                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-gray-500 transition hover:bg-gray-50 hover:text-gray-800"
-                  title={ui(locale, 'Guardar', 'Guardar', 'Save')}
-                >
-                  <Save className="h-3 w-3" />
-                  {draftSaved
-                    ? ui(locale, 'Guardado', 'Guardado', 'Saved')
-                    : ui(locale, 'Guardar', 'Guardar', 'Save')}
-                </button>
-                <button
-                  ref={actionsBtnRef}
-                  type="button"
-                  onClick={() => setShowActionsMenu((v) => !v)}
-                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-gray-500 transition hover:bg-gray-50 hover:text-gray-800"
-                  aria-expanded={showActionsMenu}
-                  aria-haspopup="menu"
-                >
-                  {ui(locale, 'Acciones', 'Ações', 'Actions')}
-                  <ChevronDown
-                    className={cn('h-3 w-3 opacity-70 transition', showActionsMenu && 'rotate-180')}
-                  />
-                </button>
+
+                <div className="ml-auto flex min-w-0 items-center gap-0.5">
+                  {stage === 'write' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void handleGenerateStructure()}
+                        disabled={chatLoading}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-gray-500 transition hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50"
+                        title={ui(locale, 'Estructura', 'Estrutura', 'Structure')}
+                      >
+                        <Lightbulb className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                        <span className="hidden md:inline">{ui(locale, 'Estructura', 'Estrutura', 'Structure')}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleBrainstorm()}
+                        disabled={chatLoading}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-gray-500 transition hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50"
+                        title={ui(locale, 'Ideas', 'Ideias', 'Ideas')}
+                      >
+                        <Sparkles className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                        <span className="hidden md:inline">{ui(locale, 'Ideas', 'Ideias', 'Ideas')}</span>
+                      </button>
+                      <span className="mx-0.5 hidden h-3.5 w-px bg-gray-200/80 sm:block" aria-hidden />
+                    </>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => persistDraft()}
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-gray-500 transition hover:bg-gray-50 hover:text-gray-800"
+                    title={
+                      draftSaved
+                        ? ui(locale, 'Guardado', 'Guardado', 'Saved')
+                        : ui(locale, 'Guardar', 'Guardar', 'Save')
+                    }
+                  >
+                    <Save className="h-3.5 w-3.5 shrink-0" />
+                    <span className="hidden sm:inline">
+                      {draftSaved
+                        ? ui(locale, 'Guardado', 'Guardado', 'Saved')
+                        : ui(locale, 'Guardar', 'Guardar', 'Save')}
+                    </span>
+                  </button>
+                  <button
+                    ref={actionsBtnRef}
+                    type="button"
+                    onClick={() => setShowActionsMenu((v) => !v)}
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-gray-500 transition hover:bg-gray-50 hover:text-gray-800"
+                    aria-expanded={showActionsMenu}
+                    aria-haspopup="menu"
+                    aria-label={ui(locale, 'Acciones', 'Ações', 'Actions')}
+                    title={ui(locale, 'Acciones', 'Ações', 'Actions')}
+                  >
+                    <MoreHorizontal className="h-3.5 w-3.5 shrink-0" />
+                    <span className="hidden lg:inline">{ui(locale, 'Acciones', 'Ações', 'Actions')}</span>
+                    <ChevronDown
+                      className={cn(
+                        'hidden h-3 w-3 opacity-70 transition lg:inline',
+                        showActionsMenu && 'rotate-180',
+                      )}
+                    />
+                  </button>
+                </div>
               </div>
-            </div>
+            </header>
             <div className="fh-pane-scroll min-h-0 flex-1 basis-0 space-y-3 overflow-y-auto px-4 py-3 sm:px-5 lg:px-6">
               {rfpChecklist.length > 0 && stage === 'understand' && (
                 <div className="rounded-xl border border-teal-200 bg-teal-50/80 px-3 py-3">
