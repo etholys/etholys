@@ -101,6 +101,34 @@ export function proposalMatchesStatusFilter(
   return status === 'rejected' || status === 'withdrawn';
 }
 
+/** Sidebar lifecycle: work-in-progress vs terminal outcomes. */
+export const PROPOSAL_ACTIVE_STATUSES: readonly ProposalStatus[] = [
+  'draft',
+  'submitted',
+  'revision_requested',
+  'resubmitted',
+];
+
+export const PROPOSAL_CLOSED_STATUSES: readonly ProposalStatus[] = [
+  'approved',
+  'rejected',
+  'withdrawn',
+];
+
+export function isProposalLifecycleActive(status: ProposalStatus): boolean {
+  return (PROPOSAL_ACTIVE_STATUSES as readonly string[]).includes(status);
+}
+
+export function proposalLifecycleBucketLabel(
+  bucket: 'active' | 'closed',
+  locale: string | null | undefined,
+): string {
+  if (bucket === 'active') {
+    return ui(locale, 'Activas', 'Ativas', 'Active');
+  }
+  return ui(locale, 'Cerradas', 'Fechadas', 'Closed');
+}
+
 /** Classes Tailwind para badge (lista clara / chrome editor). */
 export function proposalStatusBadgeClass(status: ProposalStatus, tone: 'light' | 'dark' = 'light'): string {
   if (tone === 'dark') {

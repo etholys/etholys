@@ -41,7 +41,9 @@ import {
   type ProposalDraftIndex,
 } from '@/lib/opportunity/proposal-workspace';
 import {
+  isProposalLifecycleActive,
   parseProposalStatus,
+  proposalLifecycleBucketLabel,
   proposalStatusBadgeClass,
   proposalStatusLabel,
 } from '@/lib/opportunity/proposal-status';
@@ -68,6 +70,8 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
   const [whitelabelActive, setWhitelabelActive] = useState(false);
   const [proposalHistory, setProposalHistory] = useState<SidebarProposal[]>([]);
   const [proposalsExpanded, setProposalsExpanded] = useState(false);
+  const [activasExpanded, setActivasExpanded] = useState(true);
+  const [cerradasExpanded, setCerradasExpanded] = useState(false);
 
   const isProposalEditor = Boolean(pathname?.includes('/fundhub/proposals/editor'));
   const activeWorkspaceId = searchParams?.get('workspace') || searchParams?.get('workspaceId') || '';
@@ -75,6 +79,16 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
     const s = String(activeCompanyId ?? '').trim();
     return isLikelyDbId(s) ? s : '';
   }, [activeCompanyId]);
+  const proposalSidebarBuckets = useMemo(() => {
+    const recent = proposalHistory.slice(0, 24);
+    const activas: SidebarProposal[] = [];
+    const cerradas: SidebarProposal[] = [];
+    for (const p of recent) {
+      if (isProposalLifecycleActive(parseProposalStatus(p.status))) activas.push(p);
+      else cerradas.push(p);
+    }
+    return { activas, cerradas };
+  }, [proposalHistory]);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/login');
@@ -409,43 +423,98 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
                     </button>
                   </div>
                   {showTree && (
-                    <div className="ml-3 space-y-0.5 border-l border-white/10 pl-2">
+                    <div className="ml-3 space-y-1 border-l border-white/10 pl-2">
                       {proposalHistory.length === 0 ? (
                         <p className="px-2 py-1.5 text-[11px] text-white/40">
                           {ui(locale, 'Sin propuestas aún', 'Ainda sem propostas', 'No proposals yet')}
                         </p>
                       ) : (
-                        proposalHistory.slice(0, 24).map((p) => {
-                          const label = String(p.title || p.fundName || '').trim() || item.label;
-                          const active = Boolean(activeWorkspaceId && p.workspaceId === activeWorkspaceId);
-                          const status = parseProposalStatus(p.status);
-                          const statusLabel = proposalStatusLabel(status, locale);
-                          return (
-                            <Link
-                              key={p.workspaceId}
-                              href={editorHref(p.workspaceId, p.fundId)}
-                              onClick={() => setSidebarOpen(false)}
-                              title={`${label} · ${statusLabel}`}
-                              className={cn(
-                                'flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] transition',
-                                active
-                                  ? 'bg-teal-500/15 text-teal-100'
-                                  : 'text-white/60 hover:bg-white/[0.05] hover:text-white',
-                              )}
-                            >
-                              <FileText className="h-3 w-3 flex-shrink-0 opacity-70" />
-                              <span className="min-w-0 flex-1 truncate">{label}</span>
-                              <span
-                                className={cn(
-                                  'max-w-[4.5rem] shrink-0 truncate rounded px-1 py-0.5 text-[9px] font-medium leading-none',
-                                  proposalStatusBadgeClass(status, 'dark'),
-                                )}
+                        <>
+                          {(
+                            [
+                              {
+                                key: 'active' as const,
+                                items: proposalSidebarBuckets.activas,
+                                open: activasExpanded,
+                                setOpen: setActivasExpanded,
+                                empty: ui(locale, 'Ninguna activa', 'Nenhuma ativa', 'None active'),
+                              },
+                              {
+                                key: 'closed' as const,
+                                items: proposalSidebarBuckets.cerradas,
+                                open: cerradasExpanded,
+                                setOpen: setCerradasExpanded,
+                                empty: ui(
+                                  locale,
+                                  'Ninguna cerrada',
+                                  'Nenhuma fechada',
+                                  'None closed',
+                                ),
+                              },
+                            ] as const
+                          ).map((bucket) => (
+                            <div key={bucket.key} className="space-y-0.5">
+                              <button
+                                type="button"
+                                onClick={() => bucket.setOpen((v) => !v)}
+                                className="flex w-full items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-white/45 transition hover:bg-white/[0.04] hover:text-white/70"
+                                aria-expanded={bucket.open}
                               >
-                                {statusLabel}
-                              </span>
-                            </Link>
-                          );
-                        })
+                                <ChevronDown
+                                  className={cn(
+                                    'h-3 w-3 shrink-0 transition',
+                                    bucket.open && 'rotate-180',
+                                  )}
+                                />
+                                <span className="truncate">
+                                  {proposalLifecycleBucketLabel(bucket.key, locale)}
+                                </span>
+                                <span className="ml-auto tabular-nums text-white/30">
+                                  {bucket.items.length}
+                                </span>
+                              </button>
+                              {bucket.open &&
+                                (bucket.items.length === 0 ? (
+                                  <p className="px-2 py-1 text-[10px] text-white/35">{bucket.empty}</p>
+                                ) : (
+                                  bucket.items.map((p) => {
+                                    const label =
+                                      String(p.title || p.fundName || '').trim() || item.label;
+                                    const active = Boolean(
+                                      activeWorkspaceId && p.workspaceId === activeWorkspaceId,
+                                    );
+                                    const status = parseProposalStatus(p.status);
+                                    const statusLabel = proposalStatusLabel(status, locale);
+                                    return (
+                                      <Link
+                                        key={p.workspaceId}
+                                        href={editorHref(p.workspaceId, p.fundId)}
+                                        onClick={() => setSidebarOpen(false)}
+                                        title={`${label} · ${statusLabel}`}
+                                        className={cn(
+                                          'flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] transition',
+                                          active
+                                            ? 'bg-teal-500/15 text-teal-100'
+                                            : 'text-white/60 hover:bg-white/[0.05] hover:text-white',
+                                        )}
+                                      >
+                                        <FileText className="h-3 w-3 flex-shrink-0 opacity-70" />
+                                        <span className="min-w-0 flex-1 truncate">{label}</span>
+                                        <span
+                                          className={cn(
+                                            'max-w-[4.5rem] shrink-0 truncate rounded px-1 py-0.5 text-[9px] font-medium leading-none',
+                                            proposalStatusBadgeClass(status, 'dark'),
+                                          )}
+                                        >
+                                          {statusLabel}
+                                        </span>
+                                      </Link>
+                                    );
+                                  })
+                                ))}
+                            </div>
+                          ))}
+                        </>
                       )}
                       <Link
                         href="/hub/fundhub/proposals"
