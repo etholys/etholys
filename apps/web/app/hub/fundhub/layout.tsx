@@ -39,6 +39,11 @@ import {
   readLocalProposalDrafts,
   type ProposalDraftIndex,
 } from '@/lib/opportunity/proposal-workspace';
+import {
+  parseProposalStatus,
+  proposalStatusBadgeClass,
+  proposalStatusLabel,
+} from '@/lib/opportunity/proposal-status';
 
 type SidebarProposal = Pick<
   ProposalDraftIndex,
@@ -399,12 +404,14 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
                         proposalHistory.slice(0, 24).map((p) => {
                           const label = String(p.title || p.fundName || '').trim() || item.label;
                           const active = Boolean(activeWorkspaceId && p.workspaceId === activeWorkspaceId);
+                          const status = parseProposalStatus(p.status);
+                          const statusLabel = proposalStatusLabel(status, locale);
                           return (
                             <Link
                               key={p.workspaceId}
                               href={editorHref(p.workspaceId, p.fundId)}
                               onClick={() => setSidebarOpen(false)}
-                              title={label}
+                              title={`${label} · ${statusLabel}`}
                               className={cn(
                                 'flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] transition',
                                 active
@@ -413,7 +420,15 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
                               )}
                             >
                               <FileText className="h-3 w-3 flex-shrink-0 opacity-70" />
-                              <span className="min-w-0 truncate">{label}</span>
+                              <span className="min-w-0 flex-1 truncate">{label}</span>
+                              <span
+                                className={cn(
+                                  'max-w-[4.5rem] shrink-0 truncate rounded px-1 py-0.5 text-[9px] font-medium leading-none',
+                                  proposalStatusBadgeClass(status, 'dark'),
+                                )}
+                              >
+                                {statusLabel}
+                              </span>
                             </Link>
                           );
                         })

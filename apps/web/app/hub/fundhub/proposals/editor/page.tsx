@@ -70,6 +70,13 @@ import {
   reviewStatusLabel,
   type ProposalReviewStatus,
 } from '@/lib/opportunity/proposal-review';
+import {
+  nextProposalStatuses,
+  parseProposalStatus,
+  proposalStatusBadgeClass,
+  proposalStatusLabel,
+  type ProposalStatus,
+} from '@/lib/opportunity/proposal-status';
 
 interface Fund extends ProposalFundSeed {
   id: string;
@@ -150,6 +157,8 @@ export default function FundHubProposalEditorPage() {
   const [showChatAttachMenu, setShowChatAttachMenu] = useState(false);
   const [attachAsRole, setAttachAsRole] = useState<ProposalFileRole>('turn');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [proposalStatus, setProposalStatus] = useState<ProposalStatus>('draft');
+  const [statusChangedAt, setStatusChangedAt] = useState<string | null>(null);
   const [openingStudio, setOpeningStudio] = useState(false);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -256,6 +265,8 @@ export default function FundHubProposalEditorPage() {
       coalition?: typeof coalition;
       stage?: 'understand' | 'write';
       reviewStatus?: ProposalReviewStatus;
+      status?: ProposalStatus;
+      statusChangedAt?: string | null;
     }) => {
       if (!workspaceId || typeof window === 'undefined') return;
       const md = patch?.documentMarkdown ?? documentMarkdown;
@@ -263,6 +274,9 @@ export default function FundHubProposalEditorPage() {
       const chats = patch?.chat ?? chatMessages;
       const nextStage = patch?.stage ?? stage;
       const nextReview = patch?.reviewStatus ?? reviewStatus;
+      const nextStatus = patch?.status ?? proposalStatus;
+      const nextStatusAt =
+        patch?.statusChangedAt !== undefined ? patch.statusChangedAt : statusChangedAt;
       if (patch?.reviewStatus) setReviewStatus(patch.reviewStatus);
       const draftKey = `proposalDraft:${workspaceId}`;
       const listRaw = localStorage.getItem('proposalDrafts') || '[]';
@@ -280,7 +294,8 @@ export default function FundHubProposalEditorPage() {
         fundInstitution: fund?.institution || '',
         editalLink,
         editalSummary: notes,
-        status: 'draft' as const,
+        status: nextStatus,
+        statusChangedAt: nextStatusAt || undefined,
         reviewStatus: nextReview,
         createdAt: idx >= 0 ? drafts[idx]!.createdAt : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -330,7 +345,8 @@ export default function FundHubProposalEditorPage() {
               title: fund?.name || 'Proposta',
               editalLink,
               editalSummary: notes,
-              status: 'draft',
+              status: nextStatus,
+              statusChangedAt: nextStatusAt || undefined,
               documentMarkdown: md,
               chatMessages: chats,
               stage: nextStage,
@@ -357,6 +373,8 @@ export default function FundHubProposalEditorPage() {
       coalition,
       stage,
       reviewStatus,
+      proposalStatus,
+      statusChangedAt,
     ],
   );
 
@@ -444,10 +462,24 @@ export default function FundHubProposalEditorPage() {
         if (Array.isArray(draft.attachedFiles) && draft.attachedFiles.length) {
           setAttachedFiles(hydrateProposalAttachedFiles(draft.attachedFiles));
         }
+        if (draft.status != null) setProposalStatus(parseProposalStatus(draft.status));
+        if (typeof draft.statusChangedAt === 'string') setStatusChangedAt(draft.statusChangedAt);
         setDraftSaved(true);
       } catch {
         /* ignore */
       }
+    }
+
+    try {
+      const listRaw = localStorage.getItem('proposalDrafts') || '[]';
+      const list = JSON.parse(listRaw) as Array<Record<string, unknown>>;
+      const row = Array.isArray(list)
+        ? list.find((d) => d.workspaceId === workspaceId)
+        : null;
+      if (row?.status != null) setProposalStatus(parseProposalStatus(row.status));
+      if (typeof row?.statusChangedAt === 'string') setStatusChangedAt(row.statusChangedAt);
+    } catch {
+      /* ignore */
     }
 
     if (seededFund) setFund(seededFund);
@@ -488,11 +520,14 @@ export default function FundHubProposalEditorPage() {
   useEffect(() => {
     if (!workspaceId || !companyId) return;
     const draftKey = `proposalDraft:${workspaceId}`;
+    let hasLocalBody = false;
     const saved = window.localStorage.getItem(draftKey);
     if (saved) {
       try {
         const draft = JSON.parse(saved);
-        if (draft.documentMarkdown || (Array.isArray(draft.sections) && draft.sections.length)) return;
+        hasLocalBody = Boolean(
+          draft.documentMarkdown || (Array.isArray(draft.sections) && draft.sections.length),
+        );
       } catch {
         /* load server */
       }
@@ -505,6 +540,13 @@ export default function FundHubProposalEditorPage() {
       .then((d) => {
         const p = d?.proposal;
         if (!p) return;
+        // Status is authoritative on the server when present.
+        if (p.status != null) setProposalStatus(parseProposalStatus(p.status));
+        if (typeof p.statusChangedAt === 'string') setStatusChangedAt(p.statusChangedAt);
+        if (hasLocalBody) {
+          setDraftSaved(true);
+          return;
+        }
         if (p.editalLink) setEditalLink(p.editalLink);
         if (p.editalSummary) setIntakeNotes(p.editalSummary);
         if (typeof p.documentMarkdown === 'string' && p.documentMarkdown.trim() && !documentMarkdown) {
@@ -1460,82 +1502,50 @@ export default function FundHubProposalEditorPage() {
     }
   }, [documentMarkdown, fund, router, locale]);
 
-  const submitProposal = useCallback(async () => {
-    if (!documentMarkdown.trim()) {
-      setError(
-        ui(
-          locale,
-          'Escriba la propuesta antes de marcarla como enviada.',
-          'Escreva a proposta antes de marcar como enviada.',
-          'Write the proposal before marking it as submitted.',
-        ),
-      );
-      return;
-    }
-    if (!workspaceId) {
-      setError(
-        ui(locale, 'Workspace no identificado.', 'Workspace não identificado.', 'Workspace not identified.'),
-      );
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      persistDraft();
-      const proposalDrafts = localStorage.getItem('proposalDrafts') || '[]';
-      const drafts = JSON.parse(proposalDrafts);
-      const draftIndex = drafts.findIndex((d: { workspaceId?: string }) => d.workspaceId === workspaceId);
-      if (draftIndex >= 0) {
-        drafts[draftIndex].status = 'submitted';
-        localStorage.setItem('proposalDrafts', JSON.stringify(drafts));
-      }
-      const resolvedFundId = String(fund?.id || fundId || '').trim();
-      if (companyId && resolvedFundId && isLikelyDbId(resolvedFundId)) {
-        const r = await fetch(
-          `/api/fundhub/proposals?companyId=${encodeURIComponent(companyId)}`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              workspaceId,
-              fundId: resolvedFundId,
-              title: fund?.name || ui(locale, 'Propuesta', 'Proposta', 'Proposal'),
-              editalLink,
-              editalSummary: intakeNotes,
-              status: 'submitted',
-              documentMarkdown,
-              chatMessages,
-              stage,
-              coalition,
-              sections: sectionsFromMarkdown(documentMarkdown),
-            }),
-          },
+  const applyProposalStatus = useCallback(
+    async (next: ProposalStatus) => {
+      if (!workspaceId) {
+        setError(
+          ui(locale, 'Workspace no identificado.', 'Workspace não identificado.', 'Workspace not identified.'),
         );
-        if (!r.ok) {
-          throw new Error(
-            ui(locale, 'No se pudo guardar en el servidor', 'Falha ao gravar no servidor', 'Failed to save on server'),
-          );
-        }
+        return;
       }
-      setError(null);
-    } catch {
-      setError(ui(locale, 'Error al enviar la propuesta.', 'Erro ao enviar proposta.', 'Error submitting proposal.'));
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [
-    documentMarkdown,
-    workspaceId,
-    persistDraft,
-    companyId,
-    fund,
-    fundId,
-    editalLink,
-    intakeNotes,
-    chatMessages,
-    stage,
-    coalition,
-    locale,
-  ]);
+      if (
+        (next === 'submitted' || next === 'resubmitted') &&
+        !documentMarkdown.trim()
+      ) {
+        setError(
+          ui(
+            locale,
+            'Escriba la propuesta antes de marcarla como enviada.',
+            'Escreva a proposta antes de marcar como enviada.',
+            'Write the proposal before marking it as submitted.',
+          ),
+        );
+        return;
+      }
+      setIsSubmitting(true);
+      try {
+        const changedAt = new Date().toISOString();
+        setProposalStatus(next);
+        setStatusChangedAt(changedAt);
+        persistDraft({ status: next, statusChangedAt: changedAt });
+        setError(null);
+      } catch {
+        setError(
+          ui(
+            locale,
+            'No se pudo actualizar el estado.',
+            'Não foi possível atualizar o estado.',
+            'Could not update status.',
+          ),
+        );
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [workspaceId, documentMarkdown, persistDraft, locale],
+  );
 
   const officialUrl = editalLink || fund?.linkOficial || '';
 
@@ -1628,19 +1638,34 @@ export default function FundHubProposalEditorPage() {
           )}
           Studio
         </button>
-        <button
-          type="button"
-          disabled={isSubmitting || !documentMarkdown.trim()}
-          onClick={() => {
-            setShowActionsMenu(false);
-            void submitProposal();
-          }}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-emerald-300 hover:bg-white/5 disabled:opacity-50"
-        >
-          {isSubmitting
-            ? ui(locale, 'Enviando…', 'A enviar…', 'Submitting…')
-            : ui(locale, 'Marcar como enviada', 'Marcar como enviada', 'Mark as submitted')}
-        </button>
+        <div className="my-1 border-t border-white/10" />
+        <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/35">
+          {ui(locale, 'Estado', 'Estado', 'Status')}
+        </p>
+        <div className="px-3 pb-1.5 pt-0.5">
+          <span
+            className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${proposalStatusBadgeClass(proposalStatus, 'dark')}`}
+          >
+            {proposalStatusLabel(proposalStatus, locale)}
+          </span>
+        </div>
+        {nextProposalStatuses(proposalStatus).map((next) => (
+          <button
+            key={next}
+            type="button"
+            disabled={isSubmitting}
+            onClick={() => {
+              setShowActionsMenu(false);
+              void applyProposalStatus(next);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-amber-100/90 hover:bg-white/5 disabled:opacity-50"
+          >
+            {isSubmitting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-300" />
+            ) : null}
+            {proposalStatusLabel(next, locale)}
+          </button>
+        ))}
       </div>,
       document.body,
     );
@@ -1758,6 +1783,18 @@ export default function FundHubProposalEditorPage() {
                     </p>
                   ) : null}
                 </div>
+                <span
+                  className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${proposalStatusBadgeClass(proposalStatus, 'light')}`}
+                  title={
+                    statusChangedAt
+                      ? new Date(statusChangedAt).toLocaleString(
+                          locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES',
+                        )
+                      : undefined
+                  }
+                >
+                  {proposalStatusLabel(proposalStatus, locale)}
+                </span>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 {stage === 'write' ? (

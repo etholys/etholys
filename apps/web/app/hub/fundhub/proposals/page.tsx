@@ -30,6 +30,15 @@ import {
   type ProposalDraftIndex,
   type ProposalFundSeed,
 } from '@/lib/opportunity/proposal-workspace';
+import {
+  PROPOSAL_STATUS_FILTERS,
+  parseProposalStatus,
+  proposalMatchesStatusFilter,
+  proposalStatusBadgeClass,
+  proposalStatusFilterLabel,
+  proposalStatusLabel,
+  type ProposalStatusFilter,
+} from '@/lib/opportunity/proposal-status';
 
 interface FundSummary extends ProposalFundSeed {
   id: string;
@@ -111,6 +120,7 @@ export default function ProposalsPage() {
 
   const [coalitionCount, setCoalitionCount] = useState(0);
   const [activeTab, setActiveTab] = useState<'drafts' | 'new'>('drafts');
+  const [statusFilter, setStatusFilter] = useState<ProposalStatusFilter>('all');
   const [fund, setFund] = useState<FundSummary | null>(null);
   const [editalLink, setEditalLink] = useState('');
   const [intakeNotes, setIntakeNotes] = useState('');
@@ -505,6 +515,14 @@ export default function ProposalsPage() {
 
   const dateLocale = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
 
+  const filteredDrafts = useMemo(
+    () =>
+      drafts.filter((d) =>
+        proposalMatchesStatusFilter(parseProposalStatus(d.status), statusFilter),
+      ),
+    [drafts, statusFilter],
+  );
+
   if (openingKnown) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
@@ -559,7 +577,7 @@ export default function ProposalsPage() {
             >
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
-                {ui(locale, 'Borradores', 'Rascunhos', 'Drafts')} ({drafts.length})
+                {ui(locale, 'Propuestas', 'Propostas', 'Proposals')} ({drafts.length})
               </div>
             </button>
             <button
@@ -580,11 +598,41 @@ export default function ProposalsPage() {
 
         {activeTab === 'drafts' && (
           <div>
+            {drafts.length > 0 ? (
+              <div className="mb-4 flex flex-wrap gap-1.5">
+                {PROPOSAL_STATUS_FILTERS.map((key) => {
+                  const count =
+                    key === 'all'
+                      ? drafts.length
+                      : drafts.filter((d) =>
+                          proposalMatchesStatusFilter(parseProposalStatus(d.status), key),
+                        ).length;
+                  const active = statusFilter === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setStatusFilter(key)}
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                        active
+                          ? 'bg-amber-700 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {proposalStatusFilterLabel(key, locale)}
+                      <span className={`ml-1 ${active ? 'text-amber-100' : 'text-gray-500'}`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
             {drafts.length === 0 ? (
               <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-12 text-center">
                 <FileText className="mx-auto h-12 w-12 text-gray-300" />
                 <h3 className="mt-4 text-lg font-medium text-gray-900">
-                  {ui(locale, 'Ninguna propuesta en borrador', 'Nenhuma proposta em rascunho', 'No draft proposals')}
+                  {ui(locale, 'Ninguna propuesta aún', 'Nenhuma proposta ainda', 'No proposals yet')}
                 </h3>
                 <p className="mt-2 text-gray-600">
                   {ui(
@@ -602,11 +650,24 @@ export default function ProposalsPage() {
                   {ui(locale, 'Propuesta independiente', 'Proposta avulsa', 'Standalone proposal')}
                 </button>
               </div>
+            ) : filteredDrafts.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
+                <p className="text-sm text-gray-600">
+                  {ui(
+                    locale,
+                    'Ninguna propuesta en este filtro.',
+                    'Nenhuma proposta neste filtro.',
+                    'No proposals in this filter.',
+                  )}
+                </p>
+              </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {drafts.map((draft) => (
+                {filteredDrafts.map((draft) => {
+                  const status = parseProposalStatus(draft.status);
+                  return (
                   <div key={draft.workspaceId} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition">
-                    <div className="mb-4 flex items-start justify-between">
+                    <div className="mb-4 flex items-start justify-between gap-2">
                       <div>
                         <h3 className="font-semibold text-gray-900">{draft.title || draft.fundName}</h3>
                         <p className="text-xs text-gray-500">
@@ -615,19 +676,9 @@ export default function ProposalsPage() {
                         </p>
                       </div>
                       <span
-                        className={`inline-block px-2.5 py-1 text-xs font-medium rounded-full ${
-                          draft.status === 'draft'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : draft.status === 'submitted'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                        }`}
+                        className={`inline-block shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${proposalStatusBadgeClass(status, 'light')}`}
                       >
-                        {draft.status === 'draft'
-                          ? ui(locale, 'Borrador', 'Rascunho', 'Draft')
-                          : draft.status === 'submitted'
-                            ? ui(locale, 'Enviado', 'Enviado', 'Submitted')
-                            : ui(locale, 'Archivado', 'Arquivado', 'Archived')}
+                        {proposalStatusLabel(status, locale)}
                       </span>
                     </div>
                     <div className="mb-4 space-y-2 border-t border-gray-100 pt-4">
@@ -661,7 +712,8 @@ export default function ProposalsPage() {
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

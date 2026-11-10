@@ -11,6 +11,13 @@ import {
   parseReviewStatus,
   type ProposalReviewStatus,
 } from '@/lib/opportunity/proposal-review';
+import {
+  isProposalStatus,
+  parseProposalStatus,
+  parseStatusMeta,
+  proposalStatusToPipeline,
+  type ProposalStatus,
+} from '@/lib/opportunity/proposal-status';
 
 type DraftPayload = {
   workspaceId?: string;
@@ -18,7 +25,9 @@ type DraftPayload = {
   title?: string;
   editalLink?: string;
   editalSummary?: string;
-  status?: 'draft' | 'submitted' | 'archived';
+  status?: ProposalStatus | 'archived' | 'won';
+  statusNote?: string;
+  statusChangedAt?: string;
   documentMarkdown?: string;
   chatMessages?: unknown[];
   intake?: unknown;
@@ -47,12 +56,15 @@ export async function GET(req: NextRequest) {
       proposal.draftJson && typeof proposal.draftJson === 'object'
         ? (proposal.draftJson as Record<string, unknown>)
         : {};
+    const statusMeta = parseStatusMeta(draft);
     return NextResponse.json({
       proposal: {
         workspaceId: proposal.workspaceId,
         fundId: proposal.fundId,
         title: proposal.title,
-        status: proposal.status,
+        status: parseProposalStatus(proposal.status),
+        statusNote: statusMeta.statusNote ?? null,
+        statusChangedAt: statusMeta.statusChangedAt ?? proposal.submittedAt?.toISOString() ?? null,
         editalLink: proposal.editalLink || proposal.fund.linkOficial || '',
         editalSummary: proposal.editalSummary || '',
         fundName: proposal.fund.name,
@@ -91,6 +103,7 @@ export async function GET(req: NextRequest) {
         p.draftJson && typeof p.draftJson === 'object'
           ? (p.draftJson as Record<string, unknown>)
           : {};
+      const statusMeta = parseStatusMeta(draft);
       return {
         workspaceId: p.workspaceId,
         fundId: p.fundId,
@@ -101,7 +114,9 @@ export async function GET(req: NextRequest) {
         editalSummary: p.editalSummary || '',
         createdAt: p.createdAt.toISOString(),
         updatedAt: p.updatedAt.toISOString(),
-        status: p.status === 'submitted' || p.status === 'archived' || p.status === 'won' ? p.status : 'draft',
+        status: parseProposalStatus(p.status),
+        statusNote: statusMeta.statusNote ?? null,
+        statusChangedAt: statusMeta.statusChangedAt ?? p.submittedAt?.toISOString() ?? null,
         reviewStatus: parseReviewStatus(draft.reviewStatus),
       };
     }),
@@ -130,12 +145,9 @@ export async function PUT(req: NextRequest) {
   });
   if (!fund) return NextResponse.json({ error: 'Fundo não encontrado' }, { status: 404 });
 
-  const status =
-    body.status === 'submitted' || body.status === 'archived' ? body.status : 'draft';
-  const title = (body.title || fund.name || 'Proposta').slice(0, 300);
   const existing = await prisma.proposal.findFirst({
     where: { companyId: ctx.companyId, workspaceId, deletedAt: null },
-    select: { id: true, draftJson: true },
+    select: { id: true, draftJson: true, status: true },
   });
 
   const prevDraft =
@@ -143,6 +155,29 @@ export async function PUT(req: NextRequest) {
       ? (existing.draftJson as Record<string, unknown>)
       : {};
   const prevReview = parseReviewStatus(prevDraft.reviewStatus);
+  const prevStatus = parseProposalStatus(existing?.status);
+  const prevMeta = parseStatusMeta(prevDraft);
+
+  const status: ProposalStatus =
+    body.status != null && (isProposalStatus(body.status) || body.status === 'archived' || body.status === 'won')
+      ? parseProposalStatus(body.status)
+      : prevStatus;
+
+  const statusChanged = !existing || status !== prevStatus;
+  const statusNote =
+    typeof body.statusNote === 'string'
+      ? body.statusNote.trim().slice(0, 500)
+      : statusChanged
+        ? undefined
+        : prevMeta.statusNote;
+  const statusChangedAt =
+    typeof body.statusChangedAt === 'string' && body.statusChangedAt
+      ? body.statusChangedAt
+      : statusChanged
+        ? new Date().toISOString()
+        : prevMeta.statusChangedAt;
+
+  const title = (body.title || fund.name || 'Proposta').slice(0, 300);
 
   const draftJson = {
     documentMarkdown: body.documentMarkdown ?? '',
@@ -153,6 +188,8 @@ export async function PUT(req: NextRequest) {
     editalLink: body.editalLink ?? '',
     editalSummary: body.editalSummary ?? '',
     reviewStatus: isProposalReviewStatus(body.reviewStatus) ? body.reviewStatus : prevReview,
+    ...(statusNote ? { statusNote } : {}),
+    ...(statusChangedAt ? { statusChangedAt } : {}),
   };
 
   const user = await prisma.user.findUnique({
@@ -174,7 +211,10 @@ export async function PUT(req: NextRequest) {
         editalSummary: body.editalSummary?.slice(0, 8000) || null,
         status,
         draftJson,
-        submittedAt: status === 'submitted' ? new Date() : undefined,
+        submittedAt:
+          status === 'submitted' || status === 'resubmitted'
+            ? new Date()
+            : undefined,
       },
     });
     proposalId = existing.id;
@@ -190,10 +230,27 @@ export async function PUT(req: NextRequest) {
         status,
         draftJson,
         createdBy: user?.id,
-        submittedAt: status === 'submitted' ? new Date() : null,
+        submittedAt:
+          status === 'submitted' || status === 'resubmitted' ? new Date() : null,
       },
     });
     proposalId = created.id;
+  }
+
+  // Sync leve com Em curso — só quando o status mapeia para o pipeline do Fund.
+  const pipeline = proposalStatusToPipeline(status);
+  if (pipeline && statusChanged) {
+    await prisma.fund
+      .update({
+        where: { id: fund.id },
+        data: {
+          pipelineStatus: pipeline,
+          ...(pipeline === 'won' || pipeline === 'lost'
+            ? { decisionOutcome: pipeline }
+            : {}),
+        },
+      })
+      .catch(() => {});
   }
 
   // Snapshot de versão quando o markdown muda de forma relevante
@@ -267,7 +324,7 @@ export async function DELETE(req: NextRequest) {
 
   await prisma.proposal.update({
     where: { id: proposal.id },
-    data: { deletedAt: new Date(), status: 'archived' },
+    data: { deletedAt: new Date(), status: 'withdrawn' },
   });
   return NextResponse.json({ ok: true });
 }

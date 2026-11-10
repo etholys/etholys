@@ -1,6 +1,7 @@
 /** Client-safe helpers to open a FundHub proposal from a known fund or a manual edital. */
 
 import type { Locale } from '@/lib/i18n';
+import { parseProposalStatus, type ProposalStatus } from '@/lib/opportunity/proposal-status';
 
 const DOC_HEAD: Record<
   Locale,
@@ -113,7 +114,9 @@ export type ProposalDraftIndex = {
   editalSummary: string;
   createdAt: string;
   updatedAt: string;
-  status: 'draft' | 'submitted' | 'archived';
+  status: ProposalStatus;
+  statusNote?: string;
+  statusChangedAt?: string;
 };
 
 /** Browser index used by the proposals list and FundHub sidebar history. */
@@ -130,10 +133,7 @@ export function readLocalProposalDrafts(): ProposalDraftIndex[] {
       const p = row as Record<string, unknown>;
       const workspaceId = String(p.workspaceId ?? '').trim();
       if (!workspaceId) continue;
-      const status =
-        p.status === 'submitted' || p.status === 'archived' || p.status === 'draft'
-          ? p.status
-          : 'draft';
+      const status = parseProposalStatus(p.status);
       out.push({
         workspaceId,
         fundId: String(p.fundId ?? '').trim(),
@@ -145,6 +145,8 @@ export function readLocalProposalDrafts(): ProposalDraftIndex[] {
         createdAt: typeof p.createdAt === 'string' ? p.createdAt : '',
         updatedAt: typeof p.updatedAt === 'string' ? p.updatedAt : '',
         status,
+        statusNote: typeof p.statusNote === 'string' ? p.statusNote : undefined,
+        statusChangedAt: typeof p.statusChangedAt === 'string' ? p.statusChangedAt : undefined,
       });
     }
     return out;
