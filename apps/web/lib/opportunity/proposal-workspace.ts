@@ -155,15 +155,100 @@ export function readLocalProposalDrafts(): ProposalDraftIndex[] {
   }
 }
 
-/** Server rows win; keep local-only drafts (candidate / unsynced fundIds). */
+/**
+ * Merge server + local indexes.
+ * Same workspaceId: newer `updatedAt` wins (so a just-renamed local title sticks
+ * until the server refresh catches up). Local-only drafts are appended.
+ */
 export function mergeProposalDraftIndexes(
   server: ProposalDraftIndex[],
   local: ProposalDraftIndex[] = readLocalProposalDrafts(),
 ): ProposalDraftIndex[] {
-  const seen = new Set(server.map((p) => p.workspaceId));
-  const merged = [...server, ...local.filter((p) => p.workspaceId && !seen.has(p.workspaceId))];
+  const byId = new Map<string, ProposalDraftIndex>();
+  for (const row of server) {
+    if (row.workspaceId) byId.set(row.workspaceId, row);
+  }
+  for (const row of local) {
+    if (!row.workspaceId) continue;
+    const prev = byId.get(row.workspaceId);
+    if (!prev) {
+      byId.set(row.workspaceId, row);
+      continue;
+    }
+    const localNewer =
+      String(row.updatedAt || '').localeCompare(String(prev.updatedAt || '')) >= 0;
+    byId.set(row.workspaceId, localNewer ? { ...prev, ...row } : { ...row, ...prev });
+  }
+  const merged = Array.from(byId.values());
   merged.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
   return merged;
+}
+
+/** Same-tab signal so FundHub sidebar / list can refresh after local index edits. */
+export const PROPOSALS_INDEX_CHANGED_EVENT = 'fundhub:proposals-index-changed';
+
+export function notifyProposalsIndexChanged(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(PROPOSALS_INDEX_CHANGED_EVENT));
+}
+
+export function normalizeProposalTitle(raw: string, fallback = 'Proposta'): string {
+  const t = String(raw ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 300);
+  return t || fallback;
+}
+
+/**
+ * Persist the canonical proposal display title into the local draft index
+ * (+ full draft blob when present). Does not change fundName.
+ */
+export function updateLocalProposalTitle(
+  workspaceId: string,
+  title: string,
+  base?: Partial<ProposalDraftIndex>,
+): ProposalDraftIndex[] {
+  if (typeof window === 'undefined') return [];
+  const id = String(workspaceId ?? '').trim();
+  if (!id) return readLocalProposalDrafts();
+  const nextTitle = normalizeProposalTitle(title);
+  const updatedAt = new Date().toISOString();
+  const drafts = readLocalProposalDrafts();
+  const idx = drafts.findIndex((d) => d.workspaceId === id);
+  if (idx >= 0) {
+    drafts[idx] = { ...drafts[idx]!, title: nextTitle, updatedAt };
+  } else {
+    drafts.unshift({
+      workspaceId: id,
+      fundId: String(base?.fundId ?? '').trim(),
+      title: nextTitle,
+      fundName: typeof base?.fundName === 'string' ? base.fundName : '',
+      fundInstitution: typeof base?.fundInstitution === 'string' ? base.fundInstitution : '',
+      editalLink: typeof base?.editalLink === 'string' ? base.editalLink : '',
+      editalSummary: typeof base?.editalSummary === 'string' ? base.editalSummary : '',
+      createdAt: typeof base?.createdAt === 'string' && base.createdAt ? base.createdAt : updatedAt,
+      updatedAt,
+      status: parseProposalStatus(base?.status),
+      statusNote: typeof base?.statusNote === 'string' ? base.statusNote : undefined,
+      statusChangedAt: typeof base?.statusChangedAt === 'string' ? base.statusChangedAt : undefined,
+    });
+  }
+  localStorage.setItem('proposalDrafts', JSON.stringify(drafts));
+  try {
+    const draftKey = `proposalDraft:${id}`;
+    const raw = localStorage.getItem(draftKey);
+    if (raw) {
+      const draft = JSON.parse(raw) as Record<string, unknown>;
+      draft.title = nextTitle;
+      draft.updatedAt = updatedAt;
+      localStorage.setItem(draftKey, JSON.stringify(draft));
+    }
+  } catch {
+    /* ignore */
+  }
+  notifyProposalsIndexChanged();
+  return drafts;
 }
 
 /** How a file is used — mixing these in one unlabeled pile confuses the model. */

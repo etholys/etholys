@@ -14,6 +14,9 @@ import {
   FileText,
   Calendar,
   AlertCircle,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react';
 import {
   PROPOSAL_CANDIDATE_KEY,
@@ -23,10 +26,12 @@ import {
   editorHref,
   findReusableDraft,
   mergeProposalDraftIndexes,
+  normalizeProposalTitle,
   persistProposalIntake,
   readLocalProposalDrafts,
   seedFromCandidate,
   shouldSkipProposalIntake,
+  updateLocalProposalTitle,
   type ProposalDraftIndex,
   type ProposalFundSeed,
 } from '@/lib/opportunity/proposal-workspace';
@@ -130,7 +135,11 @@ export default function ProposalsPage() {
   const [drafts, setDrafts] = useState<ProposalDraft[]>([]);
   const [draftsReady, setDraftsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameBusy, setRenameBusy] = useState(false);
   const openedRef = useRef(false);
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
 
   const openWorkspace = useCallback(
     (seed: ProposalFundSeed, source: 'fund' | 'candidate' | 'manual', extras?: { notes?: string }) => {
@@ -513,6 +522,90 @@ export default function ProposalsPage() {
     [router],
   );
 
+  const beginRename = useCallback((draft: ProposalDraft) => {
+    setRenamingId(draft.workspaceId);
+    setRenameValue(String(draft.title || draft.fundName || '').trim());
+    setError(null);
+  }, []);
+
+  const cancelRename = useCallback(() => {
+    setRenamingId(null);
+    setRenameValue('');
+    setRenameBusy(false);
+  }, []);
+
+  useEffect(() => {
+    if (!renamingId) return;
+    const t = window.setTimeout(() => renameInputRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [renamingId]);
+
+  const commitRename = useCallback(
+    async (workspaceId: string) => {
+      const draft = drafts.find((d) => d.workspaceId === workspaceId);
+      if (!draft) {
+        cancelRename();
+        return;
+      }
+      const nextTitle = normalizeProposalTitle(
+        renameValue,
+        draft.fundName || ui(locale, 'Propuesta', 'Proposta', 'Proposal'),
+      );
+      const current = String(draft.title || draft.fundName || '').trim();
+      if (nextTitle === current) {
+        cancelRename();
+        return;
+      }
+      setRenameBusy(true);
+      try {
+        updateLocalProposalTitle(workspaceId, nextTitle, draft);
+        setDrafts((prev) =>
+          prev.map((d) =>
+            d.workspaceId === workspaceId ? { ...d, title: nextTitle, updatedAt: new Date().toISOString() } : d,
+          ),
+        );
+        if (companyId && isLikelyDbId(draft.fundId)) {
+          const r = await fetch(
+            `/api/fundhub/proposals?companyId=${encodeURIComponent(companyId)}`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                workspaceId,
+                fundId: draft.fundId,
+                title: nextTitle,
+              }),
+            },
+          );
+          if (!r.ok) {
+            throw new Error(
+              ui(
+                locale,
+                'No se pudo guardar el nombre.',
+                'Não foi possível guardar o nome.',
+                'Could not save the name.',
+              ),
+            );
+          }
+        }
+        cancelRename();
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : ui(
+                locale,
+                'No se pudo renombrar la propuesta.',
+                'Não foi possível renomear a proposta.',
+                'Could not rename the proposal.',
+              ),
+        );
+        setRenameBusy(false);
+      }
+    },
+    [drafts, renameValue, companyId, locale, cancelRename],
+  );
+
   const dateLocale = locale === 'pt' ? 'pt-BR' : locale === 'en' ? 'en-US' : 'es-ES';
 
   const filteredDrafts = useMemo(
@@ -615,12 +708,12 @@ export default function ProposalsPage() {
                       onClick={() => setStatusFilter(key)}
                       className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
                         active
-                          ? 'bg-amber-700 text-white'
+                          ? 'bg-amber-50 text-amber-800 ring-1 ring-amber-600/30'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
                       {proposalStatusFilterLabel(key, locale)}
-                      <span className={`ml-1 ${active ? 'text-amber-100' : 'text-gray-500'}`}>
+                      <span className={`ml-1 ${active ? 'text-amber-700/80' : 'text-gray-500'}`}>
                         {count}
                       </span>
                     </button>
@@ -665,12 +758,75 @@ export default function ProposalsPage() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredDrafts.map((draft) => {
                   const status = parseProposalStatus(draft.status);
+                  const displayTitle = draft.title || draft.fundName;
+                  const isRenaming = renamingId === draft.workspaceId;
                   return (
-                  <div key={draft.workspaceId} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition">
-                    <div className="mb-4 flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{draft.title || draft.fundName}</h3>
-                        <p className="text-xs text-gray-500">
+                  <div key={draft.workspaceId} className="flex h-full flex-col rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition hover:border-gray-300">
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        {isRenaming ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              ref={renameInputRef}
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  void commitRename(draft.workspaceId);
+                                } else if (e.key === 'Escape') {
+                                  e.preventDefault();
+                                  cancelRename();
+                                }
+                              }}
+                              disabled={renameBusy}
+                              maxLength={300}
+                              aria-label={ui(locale, 'Nombre de la propuesta', 'Nome da proposta', 'Proposal name')}
+                              className="min-w-0 flex-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-sm font-semibold text-gray-900 outline-none focus:ring-2 focus:ring-amber-200"
+                            />
+                            <button
+                              type="button"
+                              disabled={renameBusy}
+                              onClick={() => void commitRename(draft.workspaceId)}
+                              className="rounded-md bg-amber-50 p-1.5 text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                              title={ui(locale, 'Guardar nombre', 'Guardar nome', 'Save name')}
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={renameBusy}
+                              onClick={cancelRename}
+                              className="rounded-md bg-gray-50 p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-50"
+                              title={ui(locale, 'Cancelar', 'Cancelar', 'Cancel')}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="group/title flex items-start gap-1">
+                            <button
+                              type="button"
+                              onClick={() => beginRename(draft)}
+                              className="min-w-0 flex-1 text-left"
+                              title={ui(locale, 'Renombrar', 'Renomear', 'Rename')}
+                            >
+                              <h3 className="font-semibold text-gray-900 line-clamp-3 group-hover/title:text-amber-900">
+                                {displayTitle}
+                              </h3>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => beginRename(draft)}
+                              className="mt-0.5 shrink-0 rounded-md p-1 text-gray-400 opacity-0 transition hover:bg-amber-50 hover:text-amber-800 group-hover/title:opacity-100 focus:opacity-100"
+                              title={ui(locale, 'Renombrar', 'Renomear', 'Rename')}
+                              aria-label={ui(locale, 'Renombrar', 'Renomear', 'Rename')}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500">
                           {draft.fundName}
                           {draft.fundInstitution ? ` · ${draft.fundInstitution}` : ''}
                         </p>
@@ -681,7 +837,7 @@ export default function ProposalsPage() {
                         {proposalStatusLabel(status, locale)}
                       </span>
                     </div>
-                    <div className="mb-4 space-y-2 border-t border-gray-100 pt-4">
+                    <div className="mb-4 flex-1 space-y-2 border-t border-gray-100 pt-3">
                       <p className="line-clamp-2 text-sm text-gray-600">
                         {draft.editalLink ||
                           draft.fundInstitution ||
@@ -696,16 +852,16 @@ export default function ProposalsPage() {
                         })}
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="mt-auto flex gap-2">
                       <button
                         onClick={() => handleContinueDraft(draft.workspaceId)}
-                        className="flex-1 rounded-lg bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 hover:bg-amber-100 transition"
+                        className="flex-1 rounded-lg border border-amber-200 bg-transparent px-4 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-50"
                       >
                         {ui(locale, 'Continuar', 'Continuar', 'Continue')}
                       </button>
                       <button
                         onClick={() => handleDeleteDraft(draft.workspaceId)}
-                        className="rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-100 transition"
+                        className="rounded-lg border border-transparent px-3 py-2 text-sm font-medium text-red-600/80 transition hover:border-red-200 hover:bg-red-50"
                         title={ui(locale, 'Eliminar propuesta', 'Eliminar proposta', 'Delete proposal')}
                       >
                         <Trash2 className="h-4 w-4" />

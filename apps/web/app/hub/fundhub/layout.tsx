@@ -36,6 +36,7 @@ import { sysTheme } from '@/lib/system-shell';
 import {
   editorHref,
   mergeProposalDraftIndexes,
+  PROPOSALS_INDEX_CHANGED_EVENT,
   readLocalProposalDrafts,
   type ProposalDraftIndex,
 } from '@/lib/opportunity/proposal-workspace';
@@ -139,25 +140,38 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
       setProposalHistory([]);
       return;
     }
+    let cancelled = false;
+    let serverCache: SidebarProposal[] = [];
     const applyMerged = (server: SidebarProposal[]) => {
+      serverCache = server;
       setProposalHistory(mergeProposalDraftIndexes(server as ProposalDraftIndex[], readLocalProposalDrafts()));
     };
-    if (!companyId) {
-      applyMerged([]);
-      return;
-    }
-    let cancelled = false;
-    fetch(`/api/fundhub/proposals?companyId=${encodeURIComponent(companyId)}`, { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { proposals?: SidebarProposal[] } | null) => {
-        if (cancelled) return;
-        applyMerged(Array.isArray(d?.proposals) ? d!.proposals! : []);
-      })
-      .catch(() => {
-        if (!cancelled) applyMerged([]);
-      });
+    const refreshFromLocal = () => {
+      if (cancelled) return;
+      setProposalHistory(
+        mergeProposalDraftIndexes(serverCache as ProposalDraftIndex[], readLocalProposalDrafts()),
+      );
+    };
+    const loadServer = () => {
+      if (!companyId) {
+        applyMerged([]);
+        return;
+      }
+      fetch(`/api/fundhub/proposals?companyId=${encodeURIComponent(companyId)}`, { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: { proposals?: SidebarProposal[] } | null) => {
+          if (cancelled) return;
+          applyMerged(Array.isArray(d?.proposals) ? d!.proposals! : []);
+        })
+        .catch(() => {
+          if (!cancelled) applyMerged(serverCache);
+        });
+    };
+    loadServer();
+    window.addEventListener(PROPOSALS_INDEX_CHANGED_EVENT, refreshFromLocal);
     return () => {
       cancelled = true;
+      window.removeEventListener(PROPOSALS_INDEX_CHANGED_EVENT, refreshFromLocal);
     };
   }, [status, companyId, isProposalEditor, pathname]);
 
@@ -228,8 +242,8 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
       'flex items-center rounded-lg text-sm font-medium transition',
       collapsedNav ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
       active
-        ? 'bg-amber-500/15 text-amber-100'
-        : 'text-white/75 hover:bg-white/[0.05] hover:text-white',
+        ? 'bg-amber-500/10 text-amber-100/90'
+        : 'text-white/65 hover:bg-white/[0.05] hover:text-white',
     );
 
   return (
@@ -246,8 +260,8 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
         <div className={cn('flex-shrink-0 border-b border-white/10', collapsed ? 'p-2' : 'p-4')}>
           <div className="flex items-center justify-between">
             <Link href="/hub/fundhub" className="flex min-w-0 items-center gap-2">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-amber-400/30 bg-amber-500/15">
-                <HandCoins className="h-4 w-4 text-amber-300" strokeWidth={1.75} />
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-amber-400/20 bg-amber-500/10">
+                <HandCoins className="h-4 w-4 text-amber-200/90" strokeWidth={1.75} />
               </div>
               {!collapsed && (
                 <span className="truncate font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-wide text-white">

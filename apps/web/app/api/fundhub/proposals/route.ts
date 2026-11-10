@@ -147,7 +147,7 @@ export async function PUT(req: NextRequest) {
 
   const existing = await prisma.proposal.findFirst({
     where: { companyId: ctx.companyId, workspaceId, deletedAt: null },
-    select: { id: true, draftJson: true, status: true },
+    select: { id: true, draftJson: true, status: true, title: true, editalLink: true, editalSummary: true },
   });
 
   const prevDraft =
@@ -177,16 +177,47 @@ export async function PUT(req: NextRequest) {
         ? new Date().toISOString()
         : prevMeta.statusChangedAt;
 
-  const title = (body.title || fund.name || 'Proposta').slice(0, 300);
+  // Title-only renames must not fall back to fund.name and wipe a custom title.
+  const title = (
+    typeof body.title === 'string' && body.title.trim()
+      ? body.title.trim()
+      : existing?.title || fund.name || 'Proposta'
+  ).slice(0, 300);
 
+  // Preserve draft blob on partial PUTs (e.g. rename-only from the list).
   const draftJson = {
-    documentMarkdown: body.documentMarkdown ?? '',
-    chatMessages: body.chatMessages ?? [],
-    intake: body.intake ?? null,
-    coalition: body.coalition ?? null,
-    stage: body.stage ?? 'write',
-    editalLink: body.editalLink ?? '',
-    editalSummary: body.editalSummary ?? '',
+    documentMarkdown:
+      body.documentMarkdown !== undefined
+        ? body.documentMarkdown
+        : typeof prevDraft.documentMarkdown === 'string'
+          ? prevDraft.documentMarkdown
+          : '',
+    chatMessages:
+      body.chatMessages !== undefined
+        ? body.chatMessages
+        : Array.isArray(prevDraft.chatMessages)
+          ? prevDraft.chatMessages
+          : [],
+    intake: body.intake !== undefined ? body.intake : (prevDraft.intake ?? null),
+    coalition: body.coalition !== undefined ? body.coalition : (prevDraft.coalition ?? null),
+    stage:
+      body.stage !== undefined
+        ? body.stage
+        : typeof prevDraft.stage === 'string'
+          ? prevDraft.stage
+          : 'write',
+    editalLink:
+      body.editalLink !== undefined
+        ? body.editalLink
+        : typeof prevDraft.editalLink === 'string'
+          ? prevDraft.editalLink
+          : '',
+    editalSummary:
+      body.editalSummary !== undefined
+        ? body.editalSummary
+        : typeof prevDraft.editalSummary === 'string'
+          ? prevDraft.editalSummary
+          : '',
     reviewStatus: isProposalReviewStatus(body.reviewStatus) ? body.reviewStatus : prevReview,
     ...(statusNote ? { statusNote } : {}),
     ...(statusChangedAt ? { statusChangedAt } : {}),
@@ -207,8 +238,14 @@ export async function PUT(req: NextRequest) {
       data: {
         title,
         fundId: fund.id,
-        editalLink: body.editalLink?.slice(0, 800) || null,
-        editalSummary: body.editalSummary?.slice(0, 8000) || null,
+        editalLink:
+          body.editalLink !== undefined
+            ? body.editalLink?.slice(0, 800) || null
+            : existing.editalLink,
+        editalSummary:
+          body.editalSummary !== undefined
+            ? body.editalSummary?.slice(0, 8000) || null
+            : existing.editalSummary,
         status,
         draftJson,
         submittedAt:

@@ -12,6 +12,8 @@ import {
   persistableProposalFiles,
   looksLikeUnderstandBriefing,
   mergeDraftIntoMarkdown,
+  mergeProposalDraftIndexes,
+  normalizeProposalTitle,
   resolveCanvasEditTarget,
   sanitizeProposalCanvasContent,
   seedDocumentMarkdown,
@@ -262,6 +264,39 @@ Sección D — Anexos obligatorios: lista de documentos
   assert.equal(hasEditalFormOutline(seeded), true);
   assert.match(seeded, /## a\)/);
   assert.match(seeded, /## b\)/);
+});
+
+test('normalizeProposalTitle trims and caps length', () => {
+  assert.equal(normalizeProposalTitle('  Central Sahel  '), 'Central Sahel');
+  assert.equal(normalizeProposalTitle('   ', 'Fallback'), 'Fallback');
+  assert.equal(normalizeProposalTitle('x'.repeat(400)).length, 300);
+});
+
+test('mergeProposalDraftIndexes prefers newer local title on rename', () => {
+  const server: ProposalDraftIndex[] = [
+    {
+      workspaceId: 'ws-1',
+      fundId: 'fund-1',
+      title: 'Old LinkedIn snippet…',
+      fundName: 'Old LinkedIn snippet…',
+      fundInstitution: '',
+      editalLink: '',
+      editalSummary: '',
+      createdAt: '2026-11-01T00:00:00.000Z',
+      updatedAt: '2026-11-01T00:00:00.000Z',
+      status: 'draft',
+    },
+  ];
+  const local: ProposalDraftIndex[] = [
+    {
+      ...server[0]!,
+      title: 'Central Sahel food systems',
+      updatedAt: '2026-11-10T12:00:00.000Z',
+    },
+  ];
+  const merged = mergeProposalDraftIndexes(server, local);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0]!.title, 'Central Sahel food systems');
 });
 
 test('merge without ## still replaces the preferred canvas section', () => {

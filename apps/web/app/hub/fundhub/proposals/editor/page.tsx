@@ -32,6 +32,8 @@ import {
   Library,
   Image as ImageIcon,
   ScrollText,
+  Pencil,
+  Check,
 } from 'lucide-react';
 import { StudioMarkdown } from '@/lib/studio/markdown-lite';
 import { RichTextPane } from '@/components/etholys/RichTextPane';
@@ -50,6 +52,8 @@ import {
   seedDocumentMarkdown,
   seedUnderstandMarkdown,
   sectionsFromMarkdown,
+  normalizeProposalTitle,
+  notifyProposalsIndexChanged,
   type ProposalAttachedFile,
   type ProposalFileRole,
   type ProposalFundSeed,
@@ -159,6 +163,10 @@ export default function FundHubProposalEditorPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [proposalStatus, setProposalStatus] = useState<ProposalStatus>('draft');
   const [statusChangedAt, setStatusChangedAt] = useState<string | null>(null);
+  const [proposalTitle, setProposalTitle] = useState('');
+  const [renamingTitle, setRenamingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [titleBusy, setTitleBusy] = useState(false);
   const [openingStudio, setOpeningStudio] = useState(false);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -171,6 +179,7 @@ export default function FundHubProposalEditorPage() {
   const chatFileInputRef = useRef<HTMLInputElement | null>(null);
   const actionsBtnRef = useRef<HTMLButtonElement | null>(null);
   const actionsMenuRef = useRef<HTMLDivElement | null>(null);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
   const [coalitionPool, setCoalitionPool] = useState<Array<{ id: string; orgName: string; role: string }>>([]);
   const [coalition, setCoalition] = useState<Array<{ id: string; orgName: string; role: string; budgetPct?: number }>>([]);
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -267,6 +276,7 @@ export default function FundHubProposalEditorPage() {
       reviewStatus?: ProposalReviewStatus;
       status?: ProposalStatus;
       statusChangedAt?: string | null;
+      title?: string;
     }) => {
       if (!workspaceId || typeof window === 'undefined') return;
       const md = patch?.documentMarkdown ?? documentMarkdown;
@@ -277,6 +287,11 @@ export default function FundHubProposalEditorPage() {
       const nextStatus = patch?.status ?? proposalStatus;
       const nextStatusAt =
         patch?.statusChangedAt !== undefined ? patch.statusChangedAt : statusChangedAt;
+      const nextTitle = normalizeProposalTitle(
+        (patch?.title ?? proposalTitle) || fund?.name || '',
+        fund?.name || ui(locale, 'Propuesta', 'Proposta', 'Proposal'),
+      );
+      if (patch?.title != null) setProposalTitle(nextTitle);
       if (patch?.reviewStatus) setReviewStatus(patch.reviewStatus);
       const draftKey = `proposalDraft:${workspaceId}`;
       const listRaw = localStorage.getItem('proposalDrafts') || '[]';
@@ -299,7 +314,7 @@ export default function FundHubProposalEditorPage() {
         reviewStatus: nextReview,
         createdAt: idx >= 0 ? drafts[idx]!.createdAt : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        title: fund?.name,
+        title: nextTitle,
         coalition: patch?.coalition ?? coalition,
       };
       if (idx >= 0) drafts[idx] = draftData;
@@ -331,6 +346,7 @@ export default function FundHubProposalEditorPage() {
         }),
       );
       setDraftSaved(true);
+      if (patch?.title != null) notifyProposalsIndexChanged();
 
       const resolvedFundId = String(fund?.id || fundId || '').trim();
       if (companyId && resolvedFundId && isLikelyDbId(resolvedFundId)) {
@@ -342,7 +358,7 @@ export default function FundHubProposalEditorPage() {
             body: JSON.stringify({
               workspaceId,
               fundId: resolvedFundId,
-              title: fund?.name || 'Proposta',
+              title: nextTitle,
               editalLink,
               editalSummary: notes,
               status: nextStatus,
@@ -375,6 +391,8 @@ export default function FundHubProposalEditorPage() {
       reviewStatus,
       proposalStatus,
       statusChangedAt,
+      proposalTitle,
+      locale,
     ],
   );
 
@@ -464,6 +482,9 @@ export default function FundHubProposalEditorPage() {
         }
         if (draft.status != null) setProposalStatus(parseProposalStatus(draft.status));
         if (typeof draft.statusChangedAt === 'string') setStatusChangedAt(draft.statusChangedAt);
+        if (typeof draft.title === 'string' && draft.title.trim()) {
+          setProposalTitle(draft.title.trim());
+        }
         setDraftSaved(true);
       } catch {
         /* ignore */
@@ -478,11 +499,17 @@ export default function FundHubProposalEditorPage() {
         : null;
       if (row?.status != null) setProposalStatus(parseProposalStatus(row.status));
       if (typeof row?.statusChangedAt === 'string') setStatusChangedAt(row.statusChangedAt);
+      if (typeof row?.title === 'string' && row.title.trim()) {
+        setProposalTitle(String(row.title).trim());
+      }
     } catch {
       /* ignore */
     }
 
-    if (seededFund) setFund(seededFund);
+    if (seededFund) {
+      setFund(seededFund);
+      setProposalTitle((prev) => prev.trim() || seededFund.name || '');
+    }
     setEditalLink(link);
     setIntakeNotes(notes);
     setDocumentMarkdown(md);
@@ -543,6 +570,9 @@ export default function FundHubProposalEditorPage() {
         // Status is authoritative on the server when present.
         if (p.status != null) setProposalStatus(parseProposalStatus(p.status));
         if (typeof p.statusChangedAt === 'string') setStatusChangedAt(p.statusChangedAt);
+        if (typeof p.title === 'string' && p.title.trim()) {
+          setProposalTitle((prev) => prev.trim() || String(p.title).trim());
+        }
         if (hasLocalBody) {
           setDraftSaved(true);
           return;
@@ -1559,7 +1589,51 @@ export default function FundHubProposalEditorPage() {
     return bits.join(' · ');
   }, [fund, locale]);
 
-  const proposalTitle = fund?.name || ui(locale, 'Propuesta', 'Proposta', 'Proposal');
+  const displayTitle =
+    proposalTitle.trim() ||
+    fund?.name ||
+    ui(locale, 'Propuesta', 'Proposta', 'Proposal');
+
+  const beginRenameTitle = useCallback(() => {
+    setTitleDraft(displayTitle);
+    setRenamingTitle(true);
+    setShowActionsMenu(false);
+    setError(null);
+  }, [displayTitle]);
+
+  useEffect(() => {
+    if (!renamingTitle) return;
+    const t = window.setTimeout(() => titleInputRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [renamingTitle]);
+
+  const commitRenameTitle = useCallback(() => {
+    const next = normalizeProposalTitle(
+      titleDraft,
+      fund?.name || ui(locale, 'Propuesta', 'Proposta', 'Proposal'),
+    );
+    if (next === displayTitle) {
+      setRenamingTitle(false);
+      return;
+    }
+    setTitleBusy(true);
+    try {
+      setProposalTitle(next);
+      persistDraft({ title: next });
+      setRenamingTitle(false);
+    } catch {
+      setError(
+        ui(
+          locale,
+          'No se pudo renombrar la propuesta.',
+          'Não foi possível renomear a proposta.',
+          'Could not rename the proposal.',
+        ),
+      );
+    } finally {
+      setTitleBusy(false);
+    }
+  }, [titleDraft, displayTitle, fund?.name, locale, persistDraft]);
 
   const actionsMenu =
     showActionsMenu &&
@@ -1572,6 +1646,14 @@ export default function FundHubProposalEditorPage() {
         className="fixed z-[80] w-56 overflow-hidden rounded-xl border border-white/10 bg-[#0C1822] py-1 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.9)]"
         style={{ top: actionsMenuPos.top, left: actionsMenuPos.left }}
       >
+        <button
+          type="button"
+          onClick={beginRenameTitle}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white"
+        >
+          <Pencil className="h-3.5 w-3.5 text-amber-300" />
+          {ui(locale, 'Renombrar', 'Renomear', 'Rename')}
+        </button>
         {officialUrl ? (
           <a
             href={officialUrl}
@@ -1774,9 +1856,58 @@ export default function FundHubProposalEditorPage() {
                 </Link>
                 <span className="hidden h-3 w-px shrink-0 bg-gray-200 sm:block" aria-hidden />
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-medium text-gray-800" title={proposalTitle}>
-                    {proposalTitle}
-                  </p>
+                  {renamingTitle ? (
+                    <div className="flex max-w-md items-center gap-1">
+                      <input
+                        ref={titleInputRef}
+                        value={titleDraft}
+                        onChange={(e) => setTitleDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            commitRenameTitle();
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            setRenamingTitle(false);
+                          }
+                        }}
+                        disabled={titleBusy}
+                        maxLength={300}
+                        aria-label={ui(locale, 'Nombre de la propuesta', 'Nome da proposta', 'Proposal name')}
+                        className="min-w-0 flex-1 rounded border border-amber-300 bg-white px-1.5 py-0.5 text-xs font-medium text-gray-800 outline-none focus:ring-2 focus:ring-amber-200"
+                      />
+                      <button
+                        type="button"
+                        disabled={titleBusy}
+                        onClick={commitRenameTitle}
+                        className="rounded p-1 text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                        title={ui(locale, 'Guardar nombre', 'Guardar nome', 'Save name')}
+                      >
+                        <Check className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={titleBusy}
+                        onClick={() => setRenamingTitle(false)}
+                        className="rounded p-1 text-gray-400 hover:bg-gray-50 disabled:opacity-50"
+                        title={ui(locale, 'Cancelar', 'Cancelar', 'Cancel')}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={beginRenameTitle}
+                      className="group/title flex max-w-full items-center gap-1 rounded px-0.5 text-left hover:bg-gray-50"
+                      title={ui(locale, 'Renombrar', 'Renomear', 'Rename')}
+                    >
+                      <p className="truncate text-xs font-medium text-gray-800" title={displayTitle}>
+                        {displayTitle}
+                      </p>
+                      <Pencil className="h-3 w-3 shrink-0 text-gray-400 opacity-0 transition group-hover/title:opacity-100" />
+                    </button>
+                  )}
                   {headerMeta ? (
                     <p className="truncate text-[10px] text-gray-400" title={headerMeta}>
                       {headerMeta}
@@ -1799,15 +1930,15 @@ export default function FundHubProposalEditorPage() {
               <div className="flex flex-wrap items-center gap-1.5">
                 {stage === 'write' ? (
                   <>
-                    <div className="inline-flex rounded-md border border-gray-200 p-0.5">
+                    <div className="inline-flex rounded-md border border-gray-200/80 p-0.5">
                       <button
                         type="button"
                         onClick={() => setComposerMode('talk')}
                         className={cn(
-                          'rounded px-2 py-0.5 text-[10px] font-medium',
+                          'rounded px-2 py-0.5 text-[10px] font-medium transition',
                           composerMode === 'talk'
-                            ? 'bg-gray-900 text-white'
-                            : 'text-gray-600 hover:bg-gray-50',
+                            ? 'bg-amber-50 text-amber-800'
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700',
                         )}
                       >
                         {ui(locale, 'Conversar', 'Conversar', 'Talk')}
@@ -1816,10 +1947,10 @@ export default function FundHubProposalEditorPage() {
                         type="button"
                         onClick={() => setComposerMode('write')}
                         className={cn(
-                          'rounded px-2 py-0.5 text-[10px] font-medium',
+                          'rounded px-2 py-0.5 text-[10px] font-medium transition',
                           composerMode === 'write'
-                            ? 'bg-amber-700 text-white'
-                            : 'text-gray-600 hover:bg-gray-50',
+                            ? 'bg-amber-50 text-amber-800'
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700',
                         )}
                       >
                         {ui(locale, 'Redactar', 'Redigir', 'Write')}
@@ -1829,24 +1960,24 @@ export default function FundHubProposalEditorPage() {
                       type="button"
                       onClick={() => void handleGenerateStructure()}
                       disabled={chatLoading}
-                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50"
                     >
-                      <Lightbulb className="h-3 w-3" />
+                      <Lightbulb className="h-3 w-3 text-amber-700/80" />
                       {ui(locale, 'Estructura', 'Estrutura', 'Structure')}
                     </button>
                     <button
                       type="button"
                       onClick={() => void handleBrainstorm()}
                       disabled={chatLoading}
-                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50"
                     >
-                      <Sparkles className="h-3 w-3" />
+                      <Sparkles className="h-3 w-3 text-amber-700/80" />
                       {ui(locale, 'Ideas', 'Ideias', 'Ideas')}
                     </button>
                   </>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-800">
-                    <BookOpen className="h-3 w-3" />
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-gray-600">
+                    <BookOpen className="h-3 w-3 text-amber-700/80" />
                     1 / 2 · {ui(locale, 'Entender', 'Entender', 'Understand')}
                   </span>
                 )}
@@ -2163,7 +2294,7 @@ export default function FundHubProposalEditorPage() {
                     (!chatInput.trim() &&
                       !attachedFiles.some((f) => f.textExcerpt || (f.role === 'turn' && f.dataBase64)))
                   }
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
                 >
                   <Send className="h-3.5 w-3.5" />
                   {ui(locale, 'Enviar', 'Enviar', 'Send')}
