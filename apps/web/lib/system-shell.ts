@@ -5,7 +5,7 @@ const GLOW: Record<SystemAccent, string> = {
   indigo:
     'bg-[radial-gradient(120%_80%_at_78%_8%,rgba(99,102,241,0.24),transparent_52%),radial-gradient(90%_70%_at_8%_92%,rgba(15,23,42,0.9),transparent_50%),linear-gradient(165deg,#041018_0%,#0B1C24_42%,#07111A_100%)]',
   amber:
-    'bg-[radial-gradient(120%_80%_at_78%_8%,rgba(217,119,6,0.22),transparent_52%),radial-gradient(90%_70%_at_8%_92%,rgba(15,23,42,0.9),transparent_50%),linear-gradient(165deg,#041018_0%,#0B1C24_42%,#07111A_100%)]',
+    'bg-[radial-gradient(120%_80%_at_78%_8%,rgba(180,140,70,0.1),transparent_52%),radial-gradient(90%_70%_at_8%_92%,rgba(15,23,42,0.9),transparent_50%),linear-gradient(165deg,#041018_0%,#0B1C24_42%,#07111A_100%)]',
   violet:
     'bg-[radial-gradient(120%_80%_at_78%_8%,rgba(124,58,237,0.24),transparent_52%),radial-gradient(90%_70%_at_8%_92%,rgba(15,23,42,0.9),transparent_50%),linear-gradient(165deg,#041018_0%,#0B1C24_42%,#07111A_100%)]',
 };
@@ -26,13 +26,13 @@ export const sysTheme = {
   icon: {
     teal: 'border-teal-400/30 bg-teal-500/15 text-teal-300',
     indigo: 'border-indigo-400/30 bg-indigo-500/15 text-indigo-300',
-    amber: 'border-amber-400/30 bg-amber-500/15 text-amber-300',
+    amber: 'border-amber-400/20 bg-amber-500/10 text-amber-200/90',
     violet: 'border-violet-400/30 bg-violet-500/15 text-violet-300',
   } as Record<SystemAccent, string>,
   active: {
     teal: 'bg-teal-500/15 text-teal-100',
     indigo: 'bg-indigo-500/15 text-indigo-100',
-    amber: 'bg-amber-500/15 text-amber-100',
+    amber: 'bg-amber-500/10 text-amber-100/90',
     violet: 'bg-violet-500/15 text-violet-100',
   } as Record<SystemAccent, string>,
   muted: {

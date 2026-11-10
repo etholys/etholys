@@ -106,38 +106,38 @@ export function proposalStatusBadgeClass(status: ProposalStatus, tone: 'light' |
   if (tone === 'dark') {
     switch (status) {
       case 'draft':
-        return 'bg-amber-500/15 text-amber-200';
+        return 'bg-white/[0.06] text-amber-200/90 ring-1 ring-amber-400/20';
       case 'submitted':
       case 'resubmitted':
-        return 'bg-sky-500/15 text-sky-200';
+        return 'bg-white/[0.06] text-sky-200/85 ring-1 ring-sky-400/20';
       case 'revision_requested':
-        return 'bg-orange-500/15 text-orange-200';
+        return 'bg-white/[0.06] text-orange-200/85 ring-1 ring-orange-400/20';
       case 'approved':
-        return 'bg-emerald-500/15 text-emerald-200';
+        return 'bg-white/[0.06] text-emerald-200/85 ring-1 ring-emerald-400/20';
       case 'rejected':
-        return 'bg-red-500/15 text-red-200';
+        return 'bg-white/[0.06] text-red-200/80 ring-1 ring-red-400/20';
       case 'withdrawn':
-        return 'bg-white/10 text-white/55';
+        return 'bg-white/[0.04] text-white/50 ring-1 ring-white/10';
       default:
-        return 'bg-white/10 text-white/55';
+        return 'bg-white/[0.04] text-white/50 ring-1 ring-white/10';
     }
   }
   switch (status) {
     case 'draft':
-      return 'bg-amber-100 text-amber-900';
+      return 'bg-amber-50 text-amber-800 ring-1 ring-amber-200/80';
     case 'submitted':
     case 'resubmitted':
-      return 'bg-sky-100 text-sky-900';
+      return 'bg-sky-50 text-sky-800 ring-1 ring-sky-200/80';
     case 'revision_requested':
-      return 'bg-orange-100 text-orange-900';
+      return 'bg-orange-50 text-orange-800 ring-1 ring-orange-200/80';
     case 'approved':
-      return 'bg-emerald-100 text-emerald-900';
+      return 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80';
     case 'rejected':
-      return 'bg-red-100 text-red-900';
+      return 'bg-red-50 text-red-800 ring-1 ring-red-200/80';
     case 'withdrawn':
-      return 'bg-gray-100 text-gray-700';
+      return 'bg-gray-50 text-gray-600 ring-1 ring-gray-200';
     default:
-      return 'bg-gray-100 text-gray-700';
+      return 'bg-gray-50 text-gray-600 ring-1 ring-gray-200';
   }
 }
 
