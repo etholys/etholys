@@ -39,7 +39,7 @@ export function availabilityBadgeClass(status: AvailabilityStatus | undefined): 
     case 'rolling':
       return 'bg-sky-100 text-sky-800';
     case 'seasonal':
-      return 'bg-amber-100 text-amber-900';
+      return 'bg-teal-100 text-teal-900';
     case 'closed':
       return 'bg-gray-100 text-gray-600';
     case 'reference':

@@ -123,15 +123,15 @@ export default function FundHubCrmDashboardPage() {
               <Link
                 key={p.href}
                 href={p.href}
-                className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 transition hover:border-amber-500/40"
+                className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 transition hover:border-teal-500/40"
               >
                 <div className="flex items-center gap-2 text-sm font-medium text-gray-300">
-                  <p.icon className="h-4 w-4 text-amber-400" />
+                  <p.icon className="h-4 w-4 text-teal-400" />
                   {p.title}
                 </div>
                 <p className="mt-2 text-2xl font-semibold text-white">{p.value}</p>
                 <p className="mt-1 text-xs text-gray-500">{p.sub}</p>
-                <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-amber-300">
+                <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-teal-300">
                   {t('Abrir', 'Abrir', 'Open')}
                   <ArrowRight className="h-3 w-3" />
                 </span>
@@ -140,7 +140,7 @@ export default function FundHubCrmDashboardPage() {
           </section>
 
           <section className="rounded-2xl border border-white/10 bg-slate-900/40 p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-200/90">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-teal-200/90">
               {t('Como se comunicam', 'Cómo se comunican', 'How they connect')}
             </h2>
             <ul className="mt-3 space-y-3">

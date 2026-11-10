@@ -171,13 +171,13 @@ export default function DemandBoardPage() {
                 </div>
                 <div className="text-right text-xs text-gray-500">
                   {h.deadline ? new Date(h.deadline).toLocaleDateString() : '—'}
-                  {h.matchScore != null && <p className="text-amber-700">match {h.matchScore}</p>}
+                  {h.matchScore != null && <p className="text-teal-700">match {h.matchScore}</p>}
                 </div>
               </li>
             ))
           )}
         </ul>
-        <Link href="/hub/fundhub/discover" className="mt-4 inline-flex text-sm font-medium text-amber-700 hover:underline">
+        <Link href="/hub/fundhub/discover" className="mt-4 inline-flex text-sm font-medium text-teal-700 hover:underline">
           {t('Explorar fundos →', 'Explorar fondos →', 'Explore funds →')}
         </Link>
       </section>

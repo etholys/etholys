@@ -72,7 +72,7 @@ export default function FundHubPage() {
   return (
     <div className="space-y-6">
       <section className="etholys-site-rise overflow-hidden rounded-2xl border border-white/10 bg-[#0C1822]/80 p-6 md:p-8">
-            <p className="text-xs font-semibold tracking-[0.18em] text-amber-400/90">FundHub</p>
+            <p className="text-xs font-semibold tracking-[0.18em] text-teal-400/90">FundHub</p>
         <h1 className="mt-3 font-[family-name:var(--font-etholys-display)] text-3xl font-semibold tracking-tight text-white md:text-4xl">
           {t('Buscar. Decidir. Candidatar.', 'Buscar. Decidir. Postular.', 'Search. Decide. Apply.')}
         </h1>
@@ -80,7 +80,7 @@ export default function FundHubPage() {
           <DeadlineAlertsPanel variant="inline" />
           <Link
             href="/hub/fundhub/discover"
-            className="inline-flex items-center gap-2 rounded-md bg-amber-500 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-amber-400"
+            className="inline-flex items-center gap-2 rounded-md bg-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-teal-400"
           >
             <Search className="h-4 w-4" />
             {t('Começar a buscar', 'Empezar a buscar', 'Start searching')}
@@ -95,24 +95,24 @@ export default function FundHubPage() {
             <Link
               key={step.href}
               href={step.href}
-              className="group rounded-2xl border border-white/10 bg-[#0C1822]/70 p-5 transition hover:border-amber-400/30 hover:bg-white/[0.03]"
+              className="group rounded-2xl border border-white/10 bg-[#0C1822]/70 p-5 transition hover:border-teal-400/30 hover:bg-white/[0.03]"
             >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-white/75">{step.n}</span>
                 {step.meta && (
-                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-200">
+                  <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[11px] font-semibold text-teal-200">
                     {step.meta}
                   </span>
                 )}
               </div>
-              <div className="mt-3 flex items-center gap-2 text-amber-300">
+              <div className="mt-3 flex items-center gap-2 text-teal-300">
                 <Icon className="h-4 w-4" />
                 <h2 className="font-[family-name:var(--font-etholys-display)] text-lg font-semibold text-white">
                   {step.title}
                 </h2>
               </div>
               <p className="mt-2 text-sm text-white/75">{step.detail}</p>
-              <p className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-white/70 group-hover:text-amber-300">
+              <p className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-white/70 group-hover:text-teal-300">
                 {t('Abrir', 'Abrir', 'Open')}
                 <ArrowRight className="h-3 w-3" />
               </p>

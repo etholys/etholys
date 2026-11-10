@@ -1651,7 +1651,7 @@ export default function FundHubProposalEditorPage() {
           onClick={beginRenameTitle}
           className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white"
         >
-          <Pencil className="h-3.5 w-3.5 text-amber-300" />
+          <Pencil className="h-3.5 w-3.5 text-white/45" />
           {ui(locale, 'Renombrar', 'Renomear', 'Rename')}
         </button>
         {officialUrl ? (
@@ -1662,7 +1662,7 @@ export default function FundHubProposalEditorPage() {
             onClick={() => setShowActionsMenu(false)}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white"
           >
-            <ExternalLink className="h-3.5 w-3.5 text-amber-300" />
+            <ExternalLink className="h-3.5 w-3.5 text-white/45" />
             {ui(locale, 'Edital / convocatoria', 'Edital / convocatória', 'Call notice')}
           </a>
         ) : null}
@@ -1676,7 +1676,7 @@ export default function FundHubProposalEditorPage() {
           }}
           className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-white/80 hover:bg-white/5 hover:text-white disabled:opacity-50"
         >
-          <History className="h-3.5 w-3.5 text-amber-300" />
+          <History className="h-3.5 w-3.5 text-white/45" />
           {ui(locale, 'Versiones', 'Versões', 'Versions')}
         </button>
         <div className="my-1 border-t border-white/10" />
@@ -1740,10 +1740,10 @@ export default function FundHubProposalEditorPage() {
               setShowActionsMenu(false);
               void applyProposalStatus(next);
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-amber-100/90 hover:bg-white/5 disabled:opacity-50"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-teal-100/90 hover:bg-white/5 disabled:opacity-50"
           >
             {isSubmitting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-300" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-white/50" />
             ) : null}
             {proposalStatusLabel(next, locale)}
           </button>
@@ -1764,9 +1764,9 @@ export default function FundHubProposalEditorPage() {
       )}
 
       {versionsOpen && (
-        <div className="mx-3 mt-2 shrink-0 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 md:mx-4">
+        <div className="mx-3 mt-2 shrink-0 rounded-xl border border-teal-200 bg-teal-50/60 px-4 py-3 md:mx-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-amber-950">
+            <p className="text-xs font-semibold text-teal-950">
               {ui(locale, 'Historial de versiones', 'Histórico de versões', 'Version history')}
             </p>
             <div className="flex items-center gap-2">
@@ -1774,14 +1774,14 @@ export default function FundHubProposalEditorPage() {
                 type="button"
                 disabled={versionsBusy || !documentMarkdown.trim()}
                 onClick={() => void saveVersion()}
-                className="rounded-lg bg-amber-800 px-2.5 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+                className="rounded-lg bg-teal-800 px-2.5 py-1 text-[11px] font-medium text-white disabled:opacity-50"
               >
                 {ui(locale, 'Guardar versión ahora', 'Guardar versão agora', 'Save version now')}
               </button>
               <button
                 type="button"
                 onClick={() => setVersionsOpen(false)}
-                className="rounded-lg p-1 text-amber-900/70 hover:bg-amber-100"
+                className="rounded-lg p-1 text-teal-900/70 hover:bg-teal-100"
                 aria-label={ui(locale, 'Cerrar', 'Fechar', 'Close')}
               >
                 <X className="h-3.5 w-3.5" />
@@ -1789,9 +1789,9 @@ export default function FundHubProposalEditorPage() {
             </div>
           </div>
           {versionsBusy && versions.length === 0 ? (
-            <p className="mt-2 text-xs text-amber-800/80">…</p>
+            <p className="mt-2 text-xs text-teal-800/80">…</p>
           ) : versions.length === 0 ? (
-            <p className="mt-2 text-xs text-amber-800/80">
+            <p className="mt-2 text-xs text-teal-800/80">
               {ui(
                 locale,
                 'Aún sin versiones — guarde una o edite y grabe la propuesta.',
@@ -1816,7 +1816,7 @@ export default function FundHubProposalEditorPage() {
                     type="button"
                     disabled={versionsBusy}
                     onClick={() => void restoreVersion(v.versionNum)}
-                    className="text-amber-900 underline disabled:opacity-50"
+                    className="text-teal-900 underline disabled:opacity-50"
                   >
                     {ui(locale, 'Restaurar', 'Restaurar', 'Restore')}
                   </button>
@@ -1829,7 +1829,7 @@ export default function FundHubProposalEditorPage() {
 
       {loading ? (
         <div className="flex min-h-0 flex-1 items-center justify-center bg-white">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-amber-600" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-teal-600" />
         </div>
       ) : (
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
@@ -1874,13 +1874,13 @@ export default function FundHubProposalEditorPage() {
                         disabled={titleBusy}
                         maxLength={300}
                         aria-label={ui(locale, 'Nombre de la propuesta', 'Nome da proposta', 'Proposal name')}
-                        className="min-w-0 flex-1 rounded border border-amber-300 bg-white px-1.5 py-0.5 text-xs font-medium text-gray-800 outline-none focus:ring-2 focus:ring-amber-200"
+                        className="min-w-0 flex-1 rounded border border-teal-300 bg-white px-1.5 py-0.5 text-xs font-medium text-gray-800 outline-none focus:ring-2 focus:ring-teal-200"
                       />
                       <button
                         type="button"
                         disabled={titleBusy}
                         onClick={commitRenameTitle}
-                        className="rounded p-1 text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                        className="rounded p-1 text-teal-800 hover:bg-teal-50 disabled:opacity-50"
                         title={ui(locale, 'Guardar nombre', 'Guardar nome', 'Save name')}
                       >
                         <Check className="h-3 w-3" />
@@ -1927,18 +1927,18 @@ export default function FundHubProposalEditorPage() {
                   {proposalStatusLabel(proposalStatus, locale)}
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1">
                 {stage === 'write' ? (
                   <>
-                    <div className="inline-flex rounded-md border border-gray-200/80 p-0.5">
+                    <div className="inline-flex rounded-md bg-gray-100/80 p-0.5">
                       <button
                         type="button"
                         onClick={() => setComposerMode('talk')}
                         className={cn(
                           'rounded px-2 py-0.5 text-[10px] font-medium transition',
                           composerMode === 'talk'
-                            ? 'bg-amber-50 text-amber-800'
-                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700',
+                            ? 'bg-white text-gray-800 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700',
                         )}
                       >
                         {ui(locale, 'Conversar', 'Conversar', 'Talk')}
@@ -1949,8 +1949,8 @@ export default function FundHubProposalEditorPage() {
                         className={cn(
                           'rounded px-2 py-0.5 text-[10px] font-medium transition',
                           composerMode === 'write'
-                            ? 'bg-amber-50 text-amber-800'
-                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700',
+                            ? 'bg-white text-gray-800 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700',
                         )}
                       >
                         {ui(locale, 'Redactar', 'Redigir', 'Write')}
@@ -1960,32 +1960,32 @@ export default function FundHubProposalEditorPage() {
                       type="button"
                       onClick={() => void handleGenerateStructure()}
                       disabled={chatLoading}
-                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50"
+                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50"
                     >
-                      <Lightbulb className="h-3 w-3 text-amber-700/80" />
+                      <Lightbulb className="h-3 w-3 text-gray-400" />
                       {ui(locale, 'Estructura', 'Estrutura', 'Structure')}
                     </button>
                     <button
                       type="button"
                       onClick={() => void handleBrainstorm()}
                       disabled={chatLoading}
-                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50"
+                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50"
                     >
-                      <Sparkles className="h-3 w-3 text-amber-700/80" />
+                      <Sparkles className="h-3 w-3 text-gray-400" />
                       {ui(locale, 'Ideas', 'Ideias', 'Ideas')}
                     </button>
                   </>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-gray-600">
-                    <BookOpen className="h-3 w-3 text-amber-700/80" />
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-gray-500">
+                    <BookOpen className="h-3 w-3 text-gray-400" />
                     1 / 2 · {ui(locale, 'Entender', 'Entender', 'Understand')}
                   </span>
                 )}
-                <span className="mx-0.5 hidden h-3 w-px bg-gray-200 sm:block" aria-hidden />
+                <span className="mx-0.5 hidden h-3 w-px bg-gray-200/80 sm:block" aria-hidden />
                 <button
                   type="button"
                   onClick={() => persistDraft()}
-                  className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-[10px] font-medium text-gray-700 transition hover:bg-gray-50"
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-gray-500 transition hover:bg-gray-50 hover:text-gray-800"
                   title={ui(locale, 'Guardar', 'Guardar', 'Save')}
                 >
                   <Save className="h-3 w-3" />
@@ -1997,7 +1997,7 @@ export default function FundHubProposalEditorPage() {
                   ref={actionsBtnRef}
                   type="button"
                   onClick={() => setShowActionsMenu((v) => !v)}
-                  className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-[10px] font-medium text-gray-700 transition hover:bg-gray-50"
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-gray-500 transition hover:bg-gray-50 hover:text-gray-800"
                   aria-expanded={showActionsMenu}
                   aria-haspopup="menu"
                 >
@@ -2010,13 +2010,13 @@ export default function FundHubProposalEditorPage() {
             </div>
             <div className="fh-pane-scroll min-h-0 flex-1 basis-0 space-y-3 overflow-y-auto px-4 py-3 sm:px-5 lg:px-6">
               {rfpChecklist.length > 0 && stage === 'understand' && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-900/80">
+                <div className="rounded-xl border border-teal-200 bg-teal-50/80 px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-teal-900/80">
                     {ui(locale, 'Checklist de la convocatoria', 'Checklist do edital', 'RFP checklist')}
                   </p>
                   <ul className="mt-2 space-y-1">
                     {rfpChecklist.map((item) => (
-                      <li key={item.id} className="text-xs text-amber-950">
+                      <li key={item.id} className="text-xs text-teal-950">
                         · {item.label}
                       </li>
                     ))}
@@ -2024,9 +2024,9 @@ export default function FundHubProposalEditorPage() {
                 </div>
               )}
               {understanding && chatMessages.length === 0 && (
-                <div className="rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-950">
+                <div className="rounded-xl bg-teal-50 px-3 py-3 text-sm text-teal-950">
                   <p className="flex items-center gap-2 font-medium">
-                    <Loader2 className="h-4 w-4 animate-spin text-amber-700" />
+                    <Loader2 className="h-4 w-4 animate-spin text-teal-700" />
                     {ui(
                       locale,
                       'Leyendo la convocatoria oficial…',
@@ -2034,7 +2034,7 @@ export default function FundHubProposalEditorPage() {
                       'Reading the official call…',
                     )}
                   </p>
-                  <p className="mt-1 text-xs text-amber-800/80">
+                  <p className="mt-1 text-xs text-teal-800/80">
                     {ui(
                       locale,
                       'Página, anexos y bases — aún sin lluvia de ideas ni borrador.',
@@ -2045,8 +2045,8 @@ export default function FundHubProposalEditorPage() {
                 </div>
               )}
               {stage === 'understand' && chatMessages.some((m) => m.role === 'assistant') && !understanding && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
-                  <p className="text-xs text-amber-950">
+                <div className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-3">
+                  <p className="text-xs text-teal-950">
                     {ui(
                       locale,
                       'Confirme la lectura. Solo después avance a escribir la candidatura.',
@@ -2068,7 +2068,7 @@ export default function FundHubProposalEditorPage() {
                 <div
                   key={`${message.createdAt}-${index}`}
                   className={`rounded-xl px-3 py-2.5 text-sm ${
-                    message.role === 'assistant' ? 'bg-gray-50 text-gray-800' : 'bg-amber-50 text-gray-900'
+                    message.role === 'assistant' ? 'bg-gray-50 text-gray-800' : 'bg-teal-50 text-gray-900'
                   }`}
                 >
                   <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
@@ -2091,7 +2091,7 @@ export default function FundHubProposalEditorPage() {
                         setRightRailCollapsed(false);
                         setRightRailTab('document');
                       }}
-                      className="mt-2 text-xs font-medium text-amber-800 hover:underline"
+                      className="mt-2 text-xs font-medium text-teal-800 hover:underline"
                     >
                       {message.applied
                         ? ui(locale, 'Ya está en el documento', 'Já está no documento', 'Already in the document')
@@ -2147,7 +2147,7 @@ export default function FundHubProposalEditorPage() {
                           'Call Q&A only. To write/edit the document, use Write.',
                         )
                 }
-                className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
               />
               <input
                 ref={chatFileInputRef}
@@ -2165,9 +2165,9 @@ export default function FundHubProposalEditorPage() {
                       key={`${file.role}-${file.name}-${index}`}
                       className={cn(
                         'inline-flex max-w-[14rem] items-center gap-1 rounded-full py-0.5 pl-2 pr-1 text-[10px]',
-                        file.role === 'bases' && 'bg-amber-50 text-amber-950',
-                        file.role === 'reference' && 'bg-sky-50 text-sky-950',
-                        file.role === 'turn' && 'bg-emerald-50 text-emerald-950',
+                        file.role === 'bases' && 'bg-teal-50/80 text-teal-950 ring-1 ring-teal-200/60',
+                        file.role === 'reference' && 'bg-slate-100 text-slate-800 ring-1 ring-slate-200/70',
+                        file.role === 'turn' && 'bg-slate-100 text-slate-800 ring-1 ring-slate-200/70',
                       )}
                       title={`${fileRoleLabel(locale, file.role)} · ${file.name}`}
                     >
@@ -2202,13 +2202,13 @@ export default function FundHubProposalEditorPage() {
                     onClick={() => setShowChatAttachMenu((v) => !v)}
                     className={cn(
                       'relative inline-flex items-center justify-center rounded-lg p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-                      attachedFiles.length && 'text-amber-800',
+                      attachedFiles.length && 'text-teal-800',
                     )}
                     title={ui(locale, 'Adjuntar archivo', 'Anexar ficheiro', 'Attach file')}
                   >
                     <Paperclip className="h-4 w-4" />
                     {attachedFiles.length > 0 && (
-                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-600 px-1 text-[9px] font-semibold text-white">
+                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-teal-600 px-1 text-[9px] font-semibold text-white">
                         {attachedFiles.length}
                       </span>
                     )}
@@ -2237,7 +2237,7 @@ export default function FundHubProposalEditorPage() {
                             attachAsRole === role ? 'font-medium text-gray-900' : 'text-gray-600',
                           )}
                         >
-                          <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-800" />
+                          <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-teal-800" />
                           <span>
                             {label}
                             <span className="mt-0.5 block font-normal text-gray-400">
@@ -2294,7 +2294,7 @@ export default function FundHubProposalEditorPage() {
                     (!chatInput.trim() &&
                       !attachedFiles.some((f) => f.textExcerpt || (f.role === 'turn' && f.dataBase64)))
                   }
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-800 transition hover:bg-teal-100 disabled:opacity-50"
                 >
                   <Send className="h-3.5 w-3.5" />
                   {ui(locale, 'Enviar', 'Enviar', 'Send')}
@@ -2336,7 +2336,7 @@ export default function FundHubProposalEditorPage() {
                   className={cn(
                     'rounded-lg p-2.5 transition',
                     rightRailTab === 'review'
-                      ? 'bg-amber-500/15 text-amber-100'
+                      ? 'bg-teal-500/15 text-teal-100'
                       : 'text-white/55 hover:bg-white/5 hover:text-white',
                   )}
                   title={ui(locale, 'Revisión', 'Revisão', 'Review')}
@@ -2352,7 +2352,7 @@ export default function FundHubProposalEditorPage() {
                   className={cn(
                     'rounded-lg p-2.5 transition',
                     rightRailTab === 'document'
-                      ? 'bg-amber-500/15 text-amber-100'
+                      ? 'bg-teal-500/15 text-teal-100'
                       : 'text-white/55 hover:bg-white/5 hover:text-white',
                   )}
                   title={ui(locale, 'Documento', 'Documento', 'Document')}
@@ -2372,9 +2372,9 @@ export default function FundHubProposalEditorPage() {
                       >
                         <span className="flex min-w-0 items-center gap-2">
                           {rightRailTab === 'review' ? (
-                            <MessageSquare className="h-4 w-4 flex-shrink-0 text-amber-300" />
+                            <MessageSquare className="h-4 w-4 flex-shrink-0 text-white/55" />
                           ) : (
-                            <FileText className="h-4 w-4 flex-shrink-0 text-amber-300" />
+                            <FileText className="h-4 w-4 flex-shrink-0 text-white/55" />
                           )}
                           <span className="truncate font-medium">
                             {rightRailTab === 'review'
@@ -2407,7 +2407,7 @@ export default function FundHubProposalEditorPage() {
                               className={cn(
                                 'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/5',
                                 rightRailTab === key
-                                  ? 'font-medium text-amber-200'
+                                  ? 'font-medium text-teal-200'
                                   : 'text-white/70',
                               )}
                             >
@@ -2448,7 +2448,7 @@ export default function FundHubProposalEditorPage() {
                         {ui(locale, 'Revisión', 'Revisão', 'Review')}:
                       </span>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-100">
+                        <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-xs font-medium text-teal-100">
                           {reviewStatusLabel(reviewStatus, locale)}
                         </span>
                         {(
@@ -2587,7 +2587,7 @@ export default function FundHubProposalEditorPage() {
               title={ui(locale, 'Abrir documento', 'Abrir documento', 'Open document')}
             >
               <PanelRightOpen className="h-4 w-4" />
-              <FileText className="h-3.5 w-3.5 text-amber-300" />
+              <FileText className="h-3.5 w-3.5 text-white/55" />
             </button>
           )}
         </div>

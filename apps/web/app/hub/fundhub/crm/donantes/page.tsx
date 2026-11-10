@@ -32,7 +32,7 @@ export default function CrmDonantesPage() {
         </p>
         <Link
           href="/hub/fundhub/my-funds"
-          className="mt-2 inline-block text-sm font-medium text-amber-300 hover:underline"
+          className="mt-2 inline-block text-sm font-medium text-teal-300 hover:underline"
         >
           {t('Abrir Em curso →', 'Abrir En curso →', 'Open In progress →')}
         </Link>

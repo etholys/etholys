@@ -430,8 +430,8 @@ export default function InstitutionalProfilePage() {
         ) : (
           <>
             <div className="flex flex-wrap items-start gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-amber-100">
-                <Building2 className="h-7 w-7 text-amber-700" />
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-teal-100">
+                <Building2 className="h-7 w-7 text-teal-700" />
               </div>
               <div className="min-w-0 flex-1">
                 <h2 className="text-xl font-bold text-gray-900">{data.company.name}</h2>
@@ -471,7 +471,7 @@ export default function InstitutionalProfilePage() {
                   {t('Interesses de captação', 'Intereses de captación', 'Funding interests')}
                 </span>
                 {data.captureProfile.themes.map((theme) => (
-                  <span key={theme} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900">
+                  <span key={theme} className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-900">
                     {theme}
                   </span>
                 ))}
@@ -496,17 +496,17 @@ export default function InstitutionalProfilePage() {
                 `${completedCount}/${PROFILE_ITEMS.length} profile areas`,
               )}
             </p>
-            <span className="text-sm font-semibold text-amber-700">{score}%</span>
+            <span className="text-sm font-semibold text-teal-700">{score}%</span>
           </div>
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-gray-100">
-            <div className="h-full rounded-full bg-amber-500" style={{ width: `${score}%` }} />
+            <div className="h-full rounded-full bg-teal-500" style={{ width: `${score}%` }} />
           </div>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
             {missingItems.map((item) => (
               <Link
                 key={item.key}
                 href={item.href}
-                className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:underline"
+                className="inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:underline"
               >
                 <Circle className="h-3 w-3" />
                 {t(item.actionPt, item.actionEs, item.actionEn)}
@@ -548,7 +548,7 @@ export default function InstitutionalProfilePage() {
             <Link
               key={stat.label}
               href={stat.href}
-              className="no-print rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-amber-200 hover:bg-amber-50/30"
+              className="no-print rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-teal-200 hover:bg-teal-50/30"
             >
               <div className="flex items-center gap-2 text-gray-500">
                 <Icon className="h-4 w-4" />
@@ -563,7 +563,7 @@ export default function InstitutionalProfilePage() {
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
           <h3 className="flex items-center gap-2 font-semibold text-gray-900">
-            <HandCoins className="h-5 w-5 text-amber-600" />
+            <HandCoins className="h-5 w-5 text-teal-600" />
             {t('Candidaturas em curso', 'Candidaturas en curso', 'Applications in progress')}
           </h3>
           {data.recentProposals.length === 0 ? (
@@ -588,7 +588,7 @@ export default function InstitutionalProfilePage() {
           )}
           <Link
             href="/hub/fundhub/proposals"
-            className="no-print mt-4 inline-flex items-center gap-1 text-sm font-medium text-amber-700 hover:underline"
+            className="no-print mt-4 inline-flex items-center gap-1 text-sm font-medium text-teal-700 hover:underline"
           >
             {t('Ir para propostas', 'Ir a propuestas', 'Go to proposals')}
             <ArrowRight className="h-3.5 w-3.5" />
@@ -637,13 +637,13 @@ export default function InstitutionalProfilePage() {
           )}
 
           <div className="no-print mt-4 flex flex-wrap gap-3">
-            <Link href="/hub/fundhub/partners" className="text-sm font-medium text-amber-700 hover:underline">
+            <Link href="/hub/fundhub/partners" className="text-sm font-medium text-teal-700 hover:underline">
               {t('Parceiros', 'Socios', 'Partners')}
             </Link>
-            <Link href="/hub/fundhub/compliance" className="text-sm font-medium text-amber-700 hover:underline">
+            <Link href="/hub/fundhub/compliance" className="text-sm font-medium text-teal-700 hover:underline">
               Compliance
             </Link>
-            <Link href="/hub/fundhub/coalition" className="text-sm font-medium text-amber-700 hover:underline">
+            <Link href="/hub/fundhub/coalition" className="text-sm font-medium text-teal-700 hover:underline">
               {t('Coalizão', 'Coalición', 'Coalition')}
             </Link>
           </div>

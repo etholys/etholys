@@ -28,7 +28,7 @@ export function CrmSubnav({ active }: { active: 'dashboard' | 'aliados' | 'donan
           href="/hub/fundhub/crm"
           className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
             active === 'dashboard'
-              ? 'border-amber-400 text-amber-100'
+              ? 'border-teal-400 text-teal-100'
               : 'border-transparent text-gray-400 hover:text-gray-200'
           }`}
         >
@@ -40,7 +40,7 @@ export function CrmSubnav({ active }: { active: 'dashboard' | 'aliados' | 'donan
             href={s.href}
             className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
               active === s.href.split('/').pop()
-                ? 'border-amber-400 text-amber-100'
+                ? 'border-teal-400 text-teal-100'
                 : 'border-transparent text-gray-400 hover:text-gray-200'
             }`}
           >

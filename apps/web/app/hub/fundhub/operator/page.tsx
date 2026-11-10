@@ -103,7 +103,7 @@ export default function FundHubOperatorPage() {
           <Loader2 className="h-4 w-4 animate-spin" /> …
         </div>
       ) : !operator ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950">
+        <div className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-4 text-sm text-teal-950">
           {t(
             'Esta empresa não tem SKU white-label activo. O modo operador fica bloqueado.',
             'Esta empresa no tiene SKU white-label activo. El modo operador queda bloqueado.',
@@ -116,15 +116,15 @@ export default function FundHubOperatorPage() {
             <section
               key={c.companyId}
               className={`rounded-xl border bg-white p-4 shadow-sm ${
-                c.primary ? 'border-amber-300' : 'border-gray-200'
+                c.primary ? 'border-teal-300' : 'border-gray-200'
               }`}
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-amber-700" />
+                  <Building2 className="h-4 w-4 text-teal-700" />
                   <h2 className="text-sm font-semibold text-gray-900">{c.companyName}</h2>
                   {c.primary && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">
+                    <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-medium text-teal-900">
                       {t('Actual', 'Actual', 'Current')}
                     </span>
                   )}
@@ -133,7 +133,7 @@ export default function FundHubOperatorPage() {
                   <button
                     type="button"
                     onClick={() => setActiveCompanyId(c.companyId)}
-                    className="text-xs font-medium text-amber-800 underline"
+                    className="text-xs font-medium text-teal-800 underline"
                   >
                     {t('Mudar para esta org', 'Cambiar a esta org', 'Switch to this org')}
                   </button>

@@ -76,7 +76,7 @@ export default function FundDetailPage() {
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-amber-600" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-teal-600" />
       </div>
     );
   }
@@ -87,7 +87,7 @@ export default function FundDetailPage() {
         <p className="mb-4 text-gray-600">
           {ui(locale, 'Fondo no encontrado', 'Fundo não encontrado', 'Fund not found')}
         </p>
-        <Link href="/hub/fundhub/my-funds" className="text-amber-600 hover:text-amber-700">
+        <Link href="/hub/fundhub/my-funds" className="text-teal-600 hover:text-teal-700">
           ← {ui(locale, 'En curso', 'Em curso', 'In progress')}
         </Link>
       </div>
@@ -144,7 +144,7 @@ export default function FundDetailPage() {
             </button>
             <Link
               href={`/hub/fundhub/proposals?fundId=${fund.id}`}
-              className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+              className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-700"
             >
               <FileText className="h-4 w-4" />
               {ui(locale, 'Propuesta', 'Proposta', 'Proposal')}
@@ -154,14 +154,14 @@ export default function FundDetailPage() {
 
         <dl className="mt-6 grid gap-4 sm:grid-cols-3">
           <div className="flex items-start gap-2">
-            <DollarSign className="mt-0.5 h-4 w-4 text-amber-600" />
+            <DollarSign className="mt-0.5 h-4 w-4 text-teal-600" />
             <div>
               <dt className="text-xs text-gray-500">{ui(locale, 'Monto', 'Montante', 'Amount')}</dt>
               <dd className="text-sm font-semibold text-gray-900">{amountLabel}</dd>
             </div>
           </div>
           <div className="flex items-start gap-2">
-            <Calendar className="mt-0.5 h-4 w-4 text-amber-600" />
+            <Calendar className="mt-0.5 h-4 w-4 text-teal-600" />
             <div>
               <dt className="text-xs text-gray-500">{ui(locale, 'Plazo', 'Prazo', 'Deadline')}</dt>
               <dd className="text-sm font-semibold text-gray-900">
@@ -170,7 +170,7 @@ export default function FundDetailPage() {
             </div>
           </div>
           <div className="flex items-start gap-2">
-            <MapPin className="mt-0.5 h-4 w-4 text-amber-600" />
+            <MapPin className="mt-0.5 h-4 w-4 text-teal-600" />
             <div>
               <dt className="text-xs text-gray-500">{ui(locale, 'Países', 'Países', 'Countries')}</dt>
               <dd className="text-sm font-semibold text-gray-900">{fund.countries || '—'}</dd>
@@ -193,7 +193,7 @@ export default function FundDetailPage() {
           href={fund.linkOficial}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-sm font-medium text-amber-700 hover:underline"
+          className="inline-flex items-center gap-2 text-sm font-medium text-teal-700 hover:underline"
         >
           <ExternalLink className="h-4 w-4" />
           {ui(locale, 'Sitio oficial', 'Site oficial', 'Official site')}

@@ -96,7 +96,7 @@ export function FunderImportPanel({ companyId: companyIdProp }: { companyId?: st
   return (
     <section className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
       <div className="flex items-center gap-2">
-        <Upload className="h-5 w-5 text-amber-400" />
+        <Upload className="h-5 w-5 text-teal-400" />
         <h2 className="text-base font-semibold text-white">
           {t('Importar financiadores', 'Importar financiadores', 'Import funders')}
         </h2>
@@ -108,8 +108,8 @@ export function FunderImportPanel({ companyId: companyIdProp }: { companyId?: st
           'Upload a spreadsheet (.xlsx / .csv) or paste text. Preview, fix, and confirm.',
         )}
       </p>
-      <label className="mt-3 flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-amber-500/40 bg-amber-950/20 px-4 py-6 text-center hover:bg-amber-950/40">
-        <Upload className="mb-2 h-6 w-6 text-amber-400" />
+      <label className="mt-3 flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-teal-500/40 bg-teal-950/20 px-4 py-6 text-center hover:bg-teal-950/40">
+        <Upload className="mb-2 h-6 w-6 text-teal-400" />
         <span className="text-sm font-medium text-gray-100">
           {fileName
             ? fileName
@@ -150,14 +150,14 @@ export function FunderImportPanel({ companyId: companyIdProp }: { companyId?: st
             type="button"
             disabled={busy || !rows.some((r) => r.ok)}
             onClick={() => void confirm()}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             <Check className="h-4 w-4" />
             {t('Confirmar importação', 'Confirmar importación', 'Confirm import')}
           </button>
         )}
       </div>
-      {msg && <p className="mt-2 text-sm text-amber-200/90">{msg}</p>}
+      {msg && <p className="mt-2 text-sm text-teal-200/90">{msg}</p>}
 
       {rows && (
         <div className="mt-4 overflow-x-auto">
@@ -220,7 +220,7 @@ export function FunderImportPanel({ companyId: companyIdProp }: { companyId?: st
                     {row.ok ? (
                       <span className="text-emerald-400">{t('OK', 'OK', 'OK')}</span>
                     ) : (
-                      <span className="text-amber-400">{row.issues.join(', ')}</span>
+                      <span className="text-teal-400">{row.issues.join(', ')}</span>
                     )}
                   </td>
                 </tr>

@@ -619,7 +619,7 @@ export default function ProposalsPage() {
   if (openingKnown) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-amber-600" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-teal-600" />
         <p className="text-sm text-gray-600">
           {ui(
             locale,
@@ -664,7 +664,7 @@ export default function ProposalsPage() {
               onClick={() => setActiveTab('drafts')}
               className={`border-b-2 px-1 py-3 text-sm font-medium transition ${
                 activeTab === 'drafts'
-                  ? 'border-amber-600 text-amber-700'
+                  ? 'border-teal-600 text-teal-700'
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -677,7 +677,7 @@ export default function ProposalsPage() {
               onClick={() => setActiveTab('new')}
               className={`border-b-2 px-1 py-3 text-sm font-medium transition ${
                 activeTab === 'new'
-                  ? 'border-amber-600 text-amber-700'
+                  ? 'border-teal-600 text-teal-700'
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -708,12 +708,12 @@ export default function ProposalsPage() {
                       onClick={() => setStatusFilter(key)}
                       className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
                         active
-                          ? 'bg-amber-50 text-amber-800 ring-1 ring-amber-600/30'
+                          ? 'bg-teal-50 text-teal-800 ring-1 ring-teal-600/30'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
                       {proposalStatusFilterLabel(key, locale)}
-                      <span className={`ml-1 ${active ? 'text-amber-700/80' : 'text-gray-500'}`}>
+                      <span className={`ml-1 ${active ? 'text-teal-700/80' : 'text-gray-500'}`}>
                         {count}
                       </span>
                     </button>
@@ -782,13 +782,13 @@ export default function ProposalsPage() {
                               disabled={renameBusy}
                               maxLength={300}
                               aria-label={ui(locale, 'Nombre de la propuesta', 'Nome da proposta', 'Proposal name')}
-                              className="min-w-0 flex-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-sm font-semibold text-gray-900 outline-none focus:ring-2 focus:ring-amber-200"
+                              className="min-w-0 flex-1 rounded-md border border-teal-300 bg-white px-2 py-1 text-sm font-semibold text-gray-900 outline-none focus:ring-2 focus:ring-teal-200"
                             />
                             <button
                               type="button"
                               disabled={renameBusy}
                               onClick={() => void commitRename(draft.workspaceId)}
-                              className="rounded-md bg-amber-50 p-1.5 text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                              className="rounded-md bg-teal-50 p-1.5 text-teal-800 hover:bg-teal-100 disabled:opacity-50"
                               title={ui(locale, 'Guardar nombre', 'Guardar nome', 'Save name')}
                             >
                               <Check className="h-3.5 w-3.5" />
@@ -811,14 +811,14 @@ export default function ProposalsPage() {
                               className="min-w-0 flex-1 text-left"
                               title={ui(locale, 'Renombrar', 'Renomear', 'Rename')}
                             >
-                              <h3 className="font-semibold text-gray-900 line-clamp-3 group-hover/title:text-amber-900">
+                              <h3 className="font-semibold text-gray-900 line-clamp-3 group-hover/title:text-teal-900">
                                 {displayTitle}
                               </h3>
                             </button>
                             <button
                               type="button"
                               onClick={() => beginRename(draft)}
-                              className="mt-0.5 shrink-0 rounded-md p-1 text-gray-400 opacity-0 transition hover:bg-amber-50 hover:text-amber-800 group-hover/title:opacity-100 focus:opacity-100"
+                              className="mt-0.5 shrink-0 rounded-md p-1 text-gray-400 opacity-0 transition hover:bg-teal-50 hover:text-teal-800 group-hover/title:opacity-100 focus:opacity-100"
                               title={ui(locale, 'Renombrar', 'Renomear', 'Rename')}
                               aria-label={ui(locale, 'Renombrar', 'Renomear', 'Rename')}
                             >
@@ -855,7 +855,7 @@ export default function ProposalsPage() {
                     <div className="mt-auto flex gap-2">
                       <button
                         onClick={() => handleContinueDraft(draft.workspaceId)}
-                        className="flex-1 rounded-lg border border-amber-200 bg-transparent px-4 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-50"
+                        className="flex-1 rounded-lg border border-teal-200 bg-transparent px-4 py-2 text-sm font-medium text-teal-800 transition hover:bg-teal-50"
                       >
                         {ui(locale, 'Continuar', 'Continuar', 'Continue')}
                       </button>
@@ -912,7 +912,7 @@ export default function ProposalsPage() {
                     placeholder="https://…"
                     value={editalLink}
                     onChange={(e) => setEditalLink(e.target.value)}
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition"
+                    className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 placeholder-gray-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition"
                   />
                 </div>
 
@@ -928,7 +928,7 @@ export default function ProposalsPage() {
                   <div className="mt-2">
                     <label
                       htmlFor="file-upload"
-                      className="flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 px-6 py-10 transition hover:border-amber-400 hover:bg-amber-50"
+                      className="flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 px-6 py-10 transition hover:border-teal-400 hover:bg-teal-50"
                       onDragOver={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -971,7 +971,7 @@ export default function ProposalsPage() {
                           className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
                         >
                           <div className="flex min-w-0 items-center gap-2">
-                            <FileText className="h-4 w-4 flex-shrink-0 text-amber-700" />
+                            <FileText className="h-4 w-4 flex-shrink-0 text-teal-700" />
                             <div className="min-w-0">
                               <p className="truncate text-sm font-medium text-gray-900">{file.name}</p>
                               <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
@@ -1005,12 +1005,12 @@ export default function ProposalsPage() {
                       'Call notes, if you want…',
                     )}
                     rows={3}
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition"
+                    className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition"
                   />
                 </div>
 
                 {fund && !fund.id.startsWith('adhoc-') && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-gray-800">
+                  <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm text-gray-800">
                     <p className="font-medium text-gray-900">{fund.name}</p>
                     <p className="text-gray-600">{fund.institution}</p>
                   </div>

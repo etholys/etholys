@@ -87,7 +87,7 @@ function CandidatePreviewInner() {
             ? t('Candidato não encontrado nesta varredura.', 'Candidato no encontrado.', 'Candidate not found.')
             : error || t('Erro', 'Error', 'Error')}
         </p>
-        <Link href="/hub/fundhub/discover" className="text-sm font-medium text-amber-700 hover:underline">
+        <Link href="/hub/fundhub/discover" className="text-sm font-medium text-teal-700 hover:underline">
           ← {t('Voltar a Buscar', 'Volver a Buscar', 'Back to Search')}
         </Link>
       </div>

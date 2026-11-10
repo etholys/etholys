@@ -88,7 +88,7 @@ export function KnownFundsPanel({ onAdded }: { onAdded?: () => void }) {
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-4">
       <div className="flex items-center gap-2">
-        <BookMarked className="h-4 w-4 text-amber-600" />
+        <BookMarked className="h-4 w-4 text-teal-600" />
         <h3 className="text-sm font-semibold text-gray-900">
           {t('Fundos que já conheço', 'Fondos que ya conozco', 'Funds I already know')}
         </h3>
@@ -100,7 +100,7 @@ export function KnownFundsPanel({ onAdded }: { onAdded?: () => void }) {
       <button
         type="button"
         onClick={() => setShowBulk((v) => !v)}
-        className="mt-2 text-xs font-medium text-amber-700 hover:underline"
+        className="mt-2 text-xs font-medium text-teal-700 hover:underline"
       >
         {showBulk
           ? t('← Formulário simples', '← Formulario simple', '← Simple form')

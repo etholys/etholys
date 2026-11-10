@@ -69,7 +69,7 @@ function urgencyDot(deadline?: string | null): { title: string; className: strin
   if (kind === 'none') return null;
   if (kind === 'overdue') return { title: 'Prazo passou', className: 'bg-gray-400' };
   if (kind === 'today' || kind === 'soon') return { title: 'Vence já', className: 'bg-red-500' };
-  return { title: 'Vence em 14 dias', className: 'bg-amber-500' };
+  return { title: 'Vence em 14 dias', className: 'bg-teal-500' };
 }
 
 export default function OpportunitiesPage() {
@@ -396,14 +396,14 @@ export default function OpportunitiesPage() {
         <div className="flex flex-wrap items-center gap-3">
           <DeadlineAlertsPanel variant="inline" />
           <div className="text-right">
-            <p className="text-3xl font-bold text-amber-700">{total}</p>
+            <p className="text-3xl font-bold text-teal-700">{total}</p>
             <p className="text-xs text-gray-500">{t('em curso', 'en curso', 'in progress')}</p>
           </div>
         </div>
       </div>
 
       {flash && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-950">
           <span>{flash}</span>
           <button type="button" onClick={() => setFlash(null)} className="text-xs underline">
             OK
@@ -425,7 +425,7 @@ export default function OpportunitiesPage() {
             type="button"
             onClick={() => setDrawer(key)}
             className={`rounded-full px-3 py-1 text-xs font-medium ${
-              drawer === key ? 'bg-amber-700 text-white' : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+              drawer === key ? 'bg-teal-700 text-white' : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
             {label}
@@ -525,7 +525,7 @@ export default function OpportunitiesPage() {
         </button>
         <Link
           href="/hub/fundhub/discover"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700"
         >
           <Radar className="h-4 w-4" />
           {t('Buscar novas', 'Buscar nuevas', 'Search new')}
@@ -549,7 +549,7 @@ export default function OpportunitiesPage() {
           </p>
           <Link
             href="/hub/fundhub/discover"
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
           >
             <Radar className="h-4 w-4" />
             {t('Ir a Buscar', 'Ir a Buscar', 'Go to Search')}
@@ -596,7 +596,7 @@ export default function OpportunitiesPage() {
                           <p className="text-sm font-medium text-gray-900 line-clamp-2">{f.name}</p>
                           <p className="mt-0.5 text-xs text-gray-500">{f.institution}</p>
                           {f.deadline && (
-                            <p className="mt-1 text-[11px] text-amber-800">
+                            <p className="mt-1 text-[11px] text-teal-800">
                               {new Date(f.deadline).toLocaleDateString(locale === 'en' ? 'en' : locale === 'pt' ? 'pt' : 'es')}
                             </p>
                           )}
@@ -651,7 +651,7 @@ export default function OpportunitiesPage() {
                   const urgency = urgencyDot(f.deadline);
                   const origin = formatOriginLine(f.origin, locale);
                   return (
-                    <tr key={f.id} className="border-t border-gray-100 hover:bg-amber-50/40">
+                    <tr key={f.id} className="border-t border-gray-100 hover:bg-teal-50/40">
                       <td className="px-3 py-2">
                         {urgency ? (
                           <span title={urgency.title} className={`inline-block h-2.5 w-2.5 rounded-full ${urgency.className}`} />
@@ -849,7 +849,7 @@ export default function OpportunitiesPage() {
                   type="button"
                   onClick={() => setFicheTab(key)}
                   className={`rounded-full px-3 py-1 text-xs font-medium ${
-                    ficheTab === key ? 'bg-amber-700 text-white' : 'border border-gray-200 text-gray-700'
+                    ficheTab === key ? 'bg-teal-700 text-white' : 'border border-gray-200 text-gray-700'
                   }`}
                 >
                   {label}
@@ -926,7 +926,7 @@ export default function OpportunitiesPage() {
                           {task.title}
                         </p>
                         {task.dueAt && (
-                          <p className="text-[11px] text-amber-800">{task.dueAt.slice(0, 10)}</p>
+                          <p className="text-[11px] text-teal-800">{task.dueAt.slice(0, 10)}</p>
                         )}
                       </div>
                     </li>
@@ -959,7 +959,7 @@ export default function OpportunitiesPage() {
                       setTaskDraft('');
                       void patchFund(donorFund.id, { tasks: next });
                     }}
-                    className="inline-flex items-center gap-1 rounded-lg bg-amber-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                    className="inline-flex items-center gap-1 rounded-lg bg-teal-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
                   >
                     <CheckSquare className="h-3.5 w-3.5" />
                     {t('Add', 'Add', 'Add')}
@@ -968,7 +968,7 @@ export default function OpportunitiesPage() {
                 {!(donorFund.tasks ?? []).length && (
                   <button
                     type="button"
-                    className="text-xs font-medium text-amber-800 underline"
+                    className="text-xs font-medium text-teal-800 underline"
                     onClick={() =>
                       void patchFund(donorFund.id, {
                         tasks: defaultMilestones(locale, donorFund.deadline),

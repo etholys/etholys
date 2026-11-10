@@ -365,7 +365,7 @@ export default function FundHubCompliancePage() {
                 )}
               </p>
               {fundId && (
-                <p className="mt-3 text-sm text-amber-600">
+                <p className="mt-3 text-sm text-teal-600">
                   {ui(locale, 'Foco en el fondo seleccionado:', 'Foco no fundo selecionado:', 'Focus on selected fund:')}{' '}
                   {fundId}
                 </p>
@@ -375,7 +375,7 @@ export default function FundHubCompliancePage() {
               <p className="text-sm uppercase tracking-[0.25em] text-gray-500">
                 {ui(locale, 'Progreso general', 'Progresso geral', 'Overall progress')}
               </p>
-              <p className="mt-3 text-5xl font-bold text-amber-600">{overallProgress}%</p>
+              <p className="mt-3 text-5xl font-bold text-teal-600">{overallProgress}%</p>
               <p className="mt-1 text-sm text-gray-600">
                 {completedItems} / {totalItems}{' '}
                 {ui(locale, 'ítems concluidos', 'itens concluídos', 'items completed')}
@@ -419,12 +419,12 @@ export default function FundHubCompliancePage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-3xl font-bold text-amber-600">{progress}%</div>
+                        <div className="text-3xl font-bold text-teal-600">{progress}%</div>
                       </div>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
                       <div
-                        className="h-full bg-amber-600 transition-all duration-300"
+                        className="h-full bg-teal-600 transition-all duration-300"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
@@ -471,7 +471,7 @@ export default function FundHubCompliancePage() {
             <div className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm">
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.26em] text-amber-600">
+                  <p className="text-xs font-semibold uppercase tracking-[0.26em] text-teal-600">
                     {ui(locale, 'Notas de cumplimiento', 'Notas de compliance', 'Compliance notes')}
                   </p>
                   <p className="text-sm text-gray-600">
@@ -495,7 +495,7 @@ export default function FundHubCompliancePage() {
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 rows={12}
-                className="w-full rounded-3xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                className="w-full rounded-3xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
                 placeholder={ui(
                   locale,
                   'Anota riesgos, documentos a actualizar o próximas acciones…',

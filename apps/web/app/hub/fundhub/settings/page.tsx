@@ -129,7 +129,7 @@ function SectionView({
 
   return (
     <div className="mt-4 space-y-4">
-      <Link href="/hub/fundhub/settings" className="text-sm text-amber-300 hover:underline">
+      <Link href="/hub/fundhub/settings" className="text-sm text-teal-300 hover:underline">
         {t('← Ajustes', '← Ajustes', '← Settings')}
       </Link>
       <h1 className="text-2xl font-bold text-white">{title}</h1>
@@ -155,7 +155,7 @@ function IndexRow({
   return (
     <li>
       <Link href={href} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04]">
-        <Icon className="h-4 w-4 shrink-0 text-amber-300/80" />
+        <Icon className="h-4 w-4 shrink-0 text-teal-300/80" />
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium text-white">{title}</span>
           <span className="block truncate text-xs text-gray-400">{hint}</span>
@@ -210,7 +210,7 @@ function CompanySummary({
         </span>
         <span className="block text-xs text-gray-400">{bits.join(' · ') || '—'}</span>
       </span>
-      <span className="shrink-0 text-xs font-medium text-amber-300">
+      <span className="shrink-0 text-xs font-medium text-teal-300">
         {t('Editar na administração', 'Editar en la administración', 'Edit in administration')}
       </span>
     </Link>

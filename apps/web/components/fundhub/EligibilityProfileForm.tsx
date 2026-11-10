@@ -86,7 +86,7 @@ export function EligibilityProfileForm() {
   }
 
   return (
-    <section className="rounded-2xl border border-amber-500/30 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-teal-500/30 bg-white p-5 shadow-sm">
       <h2 className="text-base font-semibold text-gray-900">
         {t('Elegibilidade institucional', 'Elegibilidad institucional', 'Institutional eligibility')}
       </h2>
@@ -245,7 +245,7 @@ export function EligibilityProfileForm() {
                 onClick={() => setBriefing({ ...briefing, hasAuditLast5Years: opt.v })}
                 className={`rounded-full px-3 py-1.5 ring-1 ${
                   briefing.hasAuditLast5Years === opt.v
-                    ? 'bg-amber-600 text-white ring-amber-600'
+                    ? 'bg-teal-600 text-white ring-teal-600'
                     : 'bg-gray-100 text-gray-700 ring-gray-200'
                 }`}
               >
@@ -269,7 +269,7 @@ export function EligibilityProfileForm() {
           type="button"
           onClick={() => void save()}
           disabled={saving}
-          className="inline-flex items-center gap-2 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-60"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {t('Guardar elegibilidade', 'Guardar elegibilidad', 'Save eligibility')}

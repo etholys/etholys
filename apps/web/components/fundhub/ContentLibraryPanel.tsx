@@ -90,7 +90,7 @@ export function ContentLibraryPanel() {
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-2">
-        <BookOpen className="h-5 w-5 text-amber-700" />
+        <BookOpen className="h-5 w-5 text-teal-700" />
         <h2 className="text-base font-semibold text-gray-900">
           {t('Biblioteca de conteúdo', 'Biblioteca de contenido', 'Content library')}
         </h2>
@@ -139,7 +139,7 @@ export function ContentLibraryPanel() {
             type="button"
             disabled={saving || !title.trim() || !body.trim()}
             onClick={add}
-            className="mt-2 inline-flex items-center gap-1 rounded-lg bg-amber-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+            className="mt-2 inline-flex items-center gap-1 rounded-lg bg-teal-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
           >
             <Plus className="h-3.5 w-3.5" />
             {t('Adicionar', 'Añadir', 'Add')}
@@ -152,7 +152,7 @@ export function ContentLibraryPanel() {
                 className="flex items-start justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
               >
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-amber-800">{s.kind}</p>
+                  <p className="text-xs font-medium text-teal-800">{s.kind}</p>
                   <p className="text-sm font-semibold text-gray-900">{s.title}</p>
                   <p className="mt-0.5 line-clamp-2 text-xs text-gray-600">{s.body}</p>
                 </div>

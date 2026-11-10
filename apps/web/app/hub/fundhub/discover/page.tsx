@@ -723,7 +723,7 @@ export default function OpportunityDiscoverPage() {
                 className={`rounded-full px-2.5 py-1 font-medium ${
                   selectedView === 'all'
                     ? 'bg-slate-100 text-slate-700'
-                    : 'bg-amber-50 text-amber-900'
+                    : 'bg-teal-50 text-teal-900'
                 }`}
               >
                 {selectedView === 'all'
@@ -982,7 +982,7 @@ export default function OpportunityDiscoverPage() {
                 onClick={() => setDueSoonOnly((v) => !v)}
                 className={`rounded-full px-3 py-1.5 text-xs font-medium ${
                   dueSoonOnly
-                    ? 'bg-amber-100 text-amber-900'
+                    ? 'bg-teal-100 text-teal-900'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
@@ -1188,7 +1188,7 @@ export default function OpportunityDiscoverPage() {
                       }))
                     }
                     className={`rounded-full px-3 py-1 text-xs font-medium ${
-                      on ? 'bg-amber-100 text-amber-900' : 'bg-gray-100 text-gray-600'
+                      on ? 'bg-teal-100 text-teal-900' : 'bg-gray-100 text-gray-600'
                     }`}
                   >
                     {locale === 'pt' ? k.pt : k.es}
@@ -1272,7 +1272,7 @@ function CandidateCard({
               ? 'bg-gray-100 text-gray-600'
               : urgencyKind === 'today' || urgencyKind === 'soon'
                 ? 'bg-red-50 text-red-800'
-                : 'bg-amber-50 text-amber-900',
+                : 'bg-teal-50 text-teal-900',
         };
   const host = (() => {
     if (!c.linkOficial) return null;
@@ -1312,7 +1312,7 @@ function CandidateCard({
               {normalizeInstrumentType(c.type)}
             </span>
             {c.category && (
-              <span className="max-w-[14rem] truncate rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-900">
+              <span className="max-w-[14rem] truncate rounded-full bg-teal-50 px-1.5 py-0.5 text-[10px] text-teal-900">
                 {c.category}
               </span>
             )}
@@ -1368,7 +1368,7 @@ function CandidateCard({
                     ? 'bg-emerald-50 text-emerald-800'
                     : evLine.tone === 'bad'
                       ? 'bg-red-50 text-red-800'
-                      : 'bg-amber-50 text-amber-900'
+                      : 'bg-teal-50 text-teal-900'
                 }`}
               >
                 {evLine.label}

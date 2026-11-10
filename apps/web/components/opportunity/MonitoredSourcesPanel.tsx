@@ -119,7 +119,7 @@ export function MonitoredSourcesPanel({ compact }: { compact?: boolean }) {
   return (
     <div className={compact ? 'mt-4 border-t border-gray-100 pt-4' : 'rounded-xl border border-gray-200 bg-white p-5'}>
       <div className="flex items-center gap-2">
-        <Link2 className="h-4 w-4 text-amber-600" />
+        <Link2 className="h-4 w-4 text-teal-600" />
         <h3 className="text-sm font-semibold text-gray-900">
           {t('Portais oficiais', 'Portales oficiales', 'Official portals')}
         </h3>
@@ -205,7 +205,7 @@ export function MonitoredSourcesPanel({ compact }: { compact?: boolean }) {
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="truncate text-xs text-amber-700 hover:underline"
+                    className="truncate text-xs text-teal-700 hover:underline"
                   >
                     {s.url}
                   </a>

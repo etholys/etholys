@@ -85,11 +85,11 @@ export function CompanyIdentityForm({ showSignals = true }: { showSignals?: bool
   ].filter(Boolean);
 
   return (
-    <section className="rounded-2xl border border-amber-500/30 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-teal-500/30 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
-            <Building2 className="h-4 w-4 text-amber-700" />
+            <Building2 className="h-4 w-4 text-teal-700" />
             {identity.company.name}
           </h2>
           <p className="mt-1 text-sm text-gray-600">
@@ -100,7 +100,7 @@ export function CompanyIdentityForm({ showSignals = true }: { showSignals?: bool
             )}
           </p>
         </div>
-        <Link href="/hub/admin?s=org-profile" className="text-xs font-medium text-amber-700 hover:underline">
+        <Link href="/hub/admin?s=org-profile" className="text-xs font-medium text-teal-700 hover:underline">
           {t('Administração Etholys', 'Administración Etholys', 'Etholys administration')}
         </Link>
       </div>
@@ -149,7 +149,7 @@ export function CompanyIdentityForm({ showSignals = true }: { showSignals?: bool
           type="button"
           onClick={() => void save()}
           disabled={saving}
-          className="inline-flex items-center gap-2 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-60"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {t('Guardar perfil', 'Guardar perfil', 'Save profile')}
@@ -178,7 +178,7 @@ export function CompanyIdentityForm({ showSignals = true }: { showSignals?: bool
             <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">SIEP</p>
-                <Link href="/siep" className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:underline">
+                <Link href="/siep" className="inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:underline">
                   {t('Abrir', 'Abrir', 'Open')}
                   <ArrowRight className="h-3 w-3" />
                 </Link>
@@ -217,7 +217,7 @@ export function CompanyIdentityForm({ showSignals = true }: { showSignals?: bool
             <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">ATLAS</p>
-                <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:underline">
+                <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:underline">
                   {t('Abrir', 'Abrir', 'Open')}
                   <ArrowRight className="h-3 w-3" />
                 </Link>

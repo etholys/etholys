@@ -85,7 +85,7 @@ export function ProposalReviewPanel({
       )}
     >
       <div className="flex items-center gap-2">
-        <MessageSquare className={cn('h-4 w-4', shell ? 'text-amber-300' : 'text-amber-700')} />
+        <MessageSquare className={cn('h-4 w-4', shell ? 'text-teal-300' : 'text-teal-700')} />
         <p className={cn('text-xs font-semibold', shell ? 'text-white' : 'text-gray-900')}>
           {t('Revisão / comentários', 'Revisión / comentarios', 'Review / comments')}
         </p>
@@ -101,7 +101,7 @@ export function ProposalReviewPanel({
           className={cn(
             'min-w-0 flex-1 rounded-lg px-3 py-1.5 text-xs outline-none',
             shell
-              ? 'border border-white/10 bg-white/[0.04] text-white placeholder:text-white/40 focus:border-amber-400/40'
+              ? 'border border-white/10 bg-white/[0.04] text-white placeholder:text-white/40 focus:border-teal-400/40'
               : 'border border-gray-200',
           )}
         />
@@ -112,7 +112,7 @@ export function ProposalReviewPanel({
           className={cn(
             'inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium disabled:opacity-50',
             shell
-              ? 'bg-amber-500/20 text-amber-100 hover:bg-amber-500/30'
+              ? 'bg-teal-500/20 text-teal-100 hover:bg-teal-500/30'
               : 'bg-gray-900 text-white',
           )}
         >
@@ -136,7 +136,7 @@ export function ProposalReviewPanel({
                   shell ? 'bg-white/[0.06]' : 'bg-gray-50',
                 )}
               >
-                <p className={cn('font-medium', shell ? 'text-amber-100' : 'text-gray-800')}>{c.author}</p>
+                <p className={cn('font-medium', shell ? 'text-teal-100' : 'text-gray-800')}>{c.author}</p>
                 <p className={cn('whitespace-pre-wrap', shell ? 'text-white/80' : 'text-gray-700')}>
                   {c.content}
                 </p>

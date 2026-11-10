@@ -103,7 +103,7 @@ export function FundDeskCalendar({
               key={c.key}
               className={`min-h-[72px] rounded-lg border p-1 ${
                 c.day ? 'border-gray-100 bg-gray-50/50' : 'border-transparent'
-              } ${isToday ? 'ring-1 ring-amber-400' : ''}`}
+              } ${isToday ? 'ring-1 ring-teal-400' : ''}`}
             >
               {c.day != null && (
                 <>
@@ -114,7 +114,7 @@ export function FundDeskCalendar({
                         <button
                           type="button"
                           onClick={() => onSelect?.(f.id)}
-                          className="w-full truncate rounded bg-amber-100 px-1 py-0.5 text-left text-[10px] font-medium text-amber-950 hover:bg-amber-200"
+                          className="w-full truncate rounded bg-teal-100 px-1 py-0.5 text-left text-[10px] font-medium text-teal-950 hover:bg-teal-200"
                           title={`${f.name} · ${f.institution}`}
                         >
                           {f.name}

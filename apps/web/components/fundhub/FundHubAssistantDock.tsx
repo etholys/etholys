@@ -183,7 +183,7 @@ export function FundHubAssistantDock() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-amber-700 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-amber-800"
+          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-teal-700 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-teal-800"
         >
           <MessageCircle className="h-4 w-4" />
           {t('Assistente', 'Asistente', 'Assistant')}
@@ -224,7 +224,7 @@ export function FundHubAssistantDock() {
                 key={q}
                 type="button"
                 onClick={() => void send(q)}
-                className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-900 ring-1 ring-amber-200"
+                className="rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-medium text-teal-900 ring-1 ring-teal-200"
               >
                 {q}
               </button>
@@ -236,20 +236,20 @@ export function FundHubAssistantDock() {
               <div
                 key={`${i}-${m.role}`}
                 className={`rounded-xl px-3 py-2 whitespace-pre-wrap ${
-                  m.role === 'user' ? 'ml-8 bg-amber-100 text-amber-950' : 'mr-4 bg-slate-50 text-slate-800'
+                  m.role === 'user' ? 'ml-8 bg-teal-100 text-teal-950' : 'mr-4 bg-slate-50 text-slate-800'
                 }`}
               >
                 {m.content}
               </div>
             ))}
             {suggested && (
-              <div className="mr-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2.5 text-xs text-amber-950">
+              <div className="mr-2 rounded-xl border border-teal-200 bg-teal-50/90 px-3 py-2.5 text-xs text-teal-950">
                 <p className="flex items-center gap-1.5 font-semibold">
-                  <Sparkles className="h-3.5 w-3.5 text-amber-700" />
+                  <Sparkles className="h-3.5 w-3.5 text-teal-700" />
                   {t('Perfil sugerido', 'Perfil sugerido', 'Suggested profile')}
                 </p>
                 <p className="mt-1 font-medium">{suggested.name}</p>
-                <p className="mt-1 max-h-28 overflow-y-auto whitespace-pre-wrap text-amber-900/90">
+                <p className="mt-1 max-h-28 overflow-y-auto whitespace-pre-wrap text-teal-900/90">
                   {suggested.orientationText}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -257,7 +257,7 @@ export function FundHubAssistantDock() {
                     type="button"
                     disabled={savingShortcut}
                     onClick={() => void createShortcut()}
-                    className="rounded-lg bg-amber-800 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-amber-900 disabled:opacity-50"
+                    className="rounded-lg bg-teal-800 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-teal-900 disabled:opacity-50"
                   >
                     {savingShortcut
                       ? '…'
@@ -266,7 +266,7 @@ export function FundHubAssistantDock() {
                   <button
                     type="button"
                     onClick={() => setSuggested(null)}
-                    className="text-[11px] text-amber-800/80 underline"
+                    className="text-[11px] text-teal-800/80 underline"
                   >
                     {t('Descartar', 'Descartar', 'Dismiss')}
                   </button>
@@ -344,7 +344,7 @@ export function FundHubAssistantDock() {
             <button
               type="submit"
               disabled={busy || (!input.trim() && attachments.length === 0)}
-              className="rounded-lg bg-amber-700 p-2 text-white disabled:opacity-50"
+              className="rounded-lg bg-teal-700 p-2 text-white disabled:opacity-50"
             >
               <Send className="h-4 w-4" />
             </button>

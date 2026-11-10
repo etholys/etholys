@@ -99,7 +99,7 @@ export default function CrmAliadosPage() {
         <button
           type="button"
           onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500"
+          className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-500"
         >
           <Plus className="h-4 w-4" />
           {t('Novo aliado', 'Nuevo aliado', 'New ally')}
@@ -171,7 +171,7 @@ export default function CrmAliadosPage() {
                   <h3 className="mt-1 text-lg font-semibold text-white">{partner.name}</h3>
                   {partner.role && <p className="mt-1 text-sm text-gray-400">{partner.role}</p>}
                 </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/15 px-4 py-2 text-sm font-semibold text-amber-200">
+                <div className="inline-flex items-center gap-2 rounded-full bg-teal-500/15 px-4 py-2 text-sm font-semibold text-teal-200">
                   <Handshake className="h-4 w-4" />
                   {partner.website ? (
                     <a href={partner.website} target="_blank" rel="noreferrer" className="hover:underline">

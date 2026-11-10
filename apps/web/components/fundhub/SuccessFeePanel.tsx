@@ -81,7 +81,7 @@ export function SuccessFeePanel() {
     <section className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <HandCoins className="h-5 w-5 text-amber-400" />
+          <HandCoins className="h-5 w-5 text-teal-400" />
           <h2 className="text-base font-semibold text-white">
             {t('Success fee', 'Success fee', 'Success fee')}
           </h2>
@@ -107,7 +107,7 @@ export function SuccessFeePanel() {
       {loading ? (
         <p className="mt-3 text-sm text-gray-500">…</p>
       ) : !allowed ? (
-        <p className="mt-3 rounded-lg bg-amber-950/40 px-3 py-2 text-sm text-amber-100">
+        <p className="mt-3 rounded-lg bg-teal-950/40 px-3 py-2 text-sm text-teal-100">
           {blockedReason}
         </p>
       ) : (

@@ -86,8 +86,8 @@ export function DeadlineAlertsPanel({ variant = 'button', className }: Props) {
 
   const btnClass =
     variant === 'inline'
-      ? 'inline-flex items-center gap-1.5 rounded-md border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-100 hover:bg-amber-500/20'
-      : 'inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-100 hover:bg-amber-500/20';
+      ? 'inline-flex items-center gap-1.5 rounded-md border border-teal-400/30 bg-teal-500/10 px-3 py-2 text-sm font-medium text-teal-100 hover:bg-teal-500/20'
+      : 'inline-flex items-center gap-1.5 rounded-full border border-teal-400/30 bg-teal-500/10 px-2.5 py-1 text-xs font-medium text-teal-100 hover:bg-teal-500/20';
 
   return (
     <>
@@ -215,7 +215,7 @@ export function DeadlineAlertsPanel({ variant = 'button', className }: Props) {
               <Link
                 href="/hub/fundhub/my-funds"
                 onClick={() => setOpen(false)}
-                className="text-xs font-medium text-amber-700 hover:underline"
+                className="text-xs font-medium text-teal-700 hover:underline"
               >
                 {t('Ver todas as oportunidades →', 'Ver todas →', 'View all opportunities →')}
               </Link>
@@ -268,7 +268,7 @@ function TaskRow({
         onClick={onNavigate}
         className="group flex items-start gap-2.5 rounded-lg px-2 py-2.5 transition hover:bg-gray-50"
       >
-        <Circle className="mt-0.5 h-4 w-4 shrink-0 text-gray-300 group-hover:text-amber-500" />
+        <Circle className="mt-0.5 h-4 w-4 shrink-0 text-gray-300 group-hover:text-teal-500" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-gray-900 line-clamp-2">{name}</p>
           <p className="text-xs text-gray-500">{institution}</p>

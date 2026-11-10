@@ -178,7 +178,7 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
   if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#07111A]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-400/25 border-t-amber-400" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-400/25 border-t-teal-400" />
       </div>
     );
   }
@@ -242,13 +242,13 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
       'flex items-center rounded-lg text-sm font-medium transition',
       collapsedNav ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
       active
-        ? 'bg-amber-500/10 text-amber-100/90'
+        ? 'bg-teal-500/10 text-teal-100/90'
         : 'text-white/65 hover:bg-white/[0.05] hover:text-white',
     );
 
   return (
     <div className="etholys-fundhub etholys-hub relative isolate flex min-h-screen overflow-hidden bg-[color:var(--sys-canvas-bg,#07111A)] text-[color:var(--sys-ink,#E8EEF2)]">
-      <SystemAtmosphere accent="amber" />
+      <SystemAtmosphere accent="teal" />
 
       <aside
         className={cn(
@@ -260,8 +260,8 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
         <div className={cn('flex-shrink-0 border-b border-white/10', collapsed ? 'p-2' : 'p-4')}>
           <div className="flex items-center justify-between">
             <Link href="/hub/fundhub" className="flex min-w-0 items-center gap-2">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-amber-400/20 bg-amber-500/10">
-                <HandCoins className="h-4 w-4 text-amber-200/90" strokeWidth={1.75} />
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-teal-400/20 bg-teal-500/10">
+                <HandCoins className="h-4 w-4 text-teal-200/90" strokeWidth={1.75} />
               </div>
               {!collapsed && (
                 <span className="truncate font-[family-name:var(--font-etholys-display)] text-sm font-bold tracking-wide text-white">
@@ -290,7 +290,7 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
           {!collapsed && (
             <Link
               href="/hub"
-              className="mt-2 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-white/70 transition hover:bg-white/5 hover:text-amber-200"
+              className="mt-2 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-white/70 transition hover:bg-white/5 hover:text-teal-200"
             >
               <ChevronDown className="h-3 w-3 rotate-90" />
               {locale === 'es' ? 'Volver al Hub' : locale === 'pt' ? 'Voltar ao Hub' : 'Back to Hub'}
@@ -324,7 +324,7 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
                     }}
                     className={cn(
                       'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/5',
-                      !activeCompanyId ? 'font-medium text-amber-200' : 'text-white/70',
+                      !activeCompanyId ? 'font-medium text-teal-200' : 'text-white/70',
                     )}
                   >
                     <div className="h-3 w-3 rounded-full bg-white/30" />
@@ -340,7 +340,7 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
                       }}
                       className={cn(
                         'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/5',
-                        activeCompanyId === c?.id ? 'font-medium text-amber-200' : 'text-white/70',
+                        activeCompanyId === c?.id ? 'font-medium text-teal-200' : 'text-white/70',
                       )}
                     >
                       <div
@@ -429,7 +429,7 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
                               className={cn(
                                 'flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] transition',
                                 active
-                                  ? 'bg-amber-500/15 text-amber-100'
+                                  ? 'bg-teal-500/15 text-teal-100'
                                   : 'text-white/60 hover:bg-white/[0.05] hover:text-white',
                               )}
                             >
@@ -450,7 +450,7 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
                       <Link
                         href="/hub/fundhub/proposals"
                         onClick={() => setSidebarOpen(false)}
-                        className="block px-2 py-1 text-[10px] font-medium text-amber-200/80 hover:text-amber-100"
+                        className="block px-2 py-1 text-[10px] font-medium text-teal-200/80 hover:text-teal-100"
                       >
                         {ui(locale, 'Ver todas', 'Ver todas', 'View all')}
                       </Link>
@@ -507,7 +507,7 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
                 <div className="relative">
                   <item.icon className="h-5 w-5" />
                   {(item as { badge?: number }).badge != null && (item as { badge?: number }).badge! > 0 && (
-                    <div className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-slate-950">
+                    <div className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-teal-500 px-1 text-[10px] font-bold text-slate-950">
                       {(item as { badge?: number }).badge! > 9 ? '9+' : (item as { badge?: number }).badge}
                     </div>
                   )}
@@ -541,7 +541,7 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
               >
                 <Bell className="h-3.5 w-3.5" />
                 {notifCount > 0 && (
-                  <div className="absolute right-0.5 top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-amber-500 px-0.5 text-[9px] font-bold text-slate-950">
+                  <div className="absolute right-0.5 top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-teal-500 px-0.5 text-[9px] font-bold text-slate-950">
                     {notifCount > 9 ? '9+' : notifCount}
                   </div>
                 )}
@@ -553,7 +553,7 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
                       {locale === 'es' ? 'Notificaciones' : locale === 'pt' ? 'Notificações' : 'Notifications'}
                     </span>
                     {notifCount > 0 && (
-                      <button type="button" onClick={markAllNotifRead} className="text-xs text-amber-200 hover:underline">
+                      <button type="button" onClick={markAllNotifRead} className="text-xs text-teal-200 hover:underline">
                         {locale === 'es' ? 'Marcar leídas' : locale === 'pt' ? 'Marcar lidas' : 'Mark all read'}
                       </button>
                     )}
@@ -596,7 +596,7 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
                           }}
                           className={cn(
                             'cursor-pointer px-4 py-3 transition hover:bg-white/[0.04]',
-                            !n.read && 'bg-amber-500/10',
+                            !n.read && 'bg-teal-500/10',
                           )}
                         >
                           <p className="text-sm font-medium text-white">{n.title}</p>
@@ -615,7 +615,7 @@ function FundHubShellInner({ children }: { children: React.ReactNode }) {
 
           {!collapsed && (
             <div className="mt-1 flex items-center gap-3 px-3 py-2">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-xs font-bold text-amber-100">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-xs font-bold text-teal-100">
                 {getInitials(session?.user?.name)}
               </div>
               <div className="min-w-0 flex-1">
@@ -702,7 +702,7 @@ export default function FundHubLayout({ children }: { children: React.ReactNode 
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-[#07111A]">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-400/25 border-t-amber-400" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-400/25 border-t-teal-400" />
         </div>
       }
     >

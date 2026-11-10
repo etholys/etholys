@@ -106,12 +106,12 @@ export function proposalStatusBadgeClass(status: ProposalStatus, tone: 'light' |
   if (tone === 'dark') {
     switch (status) {
       case 'draft':
-        return 'bg-white/[0.06] text-amber-200/90 ring-1 ring-amber-400/20';
+        return 'bg-white/[0.05] text-slate-300/85 ring-1 ring-white/12';
       case 'submitted':
       case 'resubmitted':
         return 'bg-white/[0.06] text-sky-200/85 ring-1 ring-sky-400/20';
       case 'revision_requested':
-        return 'bg-white/[0.06] text-orange-200/85 ring-1 ring-orange-400/20';
+        return 'bg-white/[0.06] text-rose-200/80 ring-1 ring-rose-400/20';
       case 'approved':
         return 'bg-white/[0.06] text-emerald-200/85 ring-1 ring-emerald-400/20';
       case 'rejected':
@@ -124,12 +124,12 @@ export function proposalStatusBadgeClass(status: ProposalStatus, tone: 'light' |
   }
   switch (status) {
     case 'draft':
-      return 'bg-amber-50 text-amber-800 ring-1 ring-amber-200/80';
+      return 'bg-slate-100 text-slate-600 ring-1 ring-slate-200/90';
     case 'submitted':
     case 'resubmitted':
       return 'bg-sky-50 text-sky-800 ring-1 ring-sky-200/80';
     case 'revision_requested':
-      return 'bg-orange-50 text-orange-800 ring-1 ring-orange-200/80';
+      return 'bg-rose-50 text-rose-800 ring-1 ring-rose-200/80';
     case 'approved':
       return 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80';
     case 'rejected':

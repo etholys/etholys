@@ -143,7 +143,7 @@ export function PassportSharePanel() {
                 <button
                   type="button"
                   onClick={() => void copy()}
-                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700"
+                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-teal-600 px-3 py-2 text-xs font-medium text-white hover:bg-teal-700"
                 >
                   <Copy className="h-3.5 w-3.5" />
                   {t('Copiar link', 'Copiar enlace', 'Copy link')}
