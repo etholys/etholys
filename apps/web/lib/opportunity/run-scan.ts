@@ -15,6 +15,7 @@ import {
   withLlmUsageTracking,
   type LlmUsageTotals,
 } from '@/lib/llm-usage';
+import { readScanProfile } from '@/lib/opportunity/scan-profiles';
 import type { OpportunityBriefing, ScanCandidate, ScanFocus } from '@/lib/opportunity/scan-types';
 
 function uniqueNameInstitution(
@@ -62,6 +63,8 @@ export async function runOpportunityScan(opts: {
   userId: string;
   briefing?: OpportunityBriefing;
   scanFocus?: ScanFocus;
+  /** Perfil de busca (atalho) — associa resultados/histórico a esta vista. */
+  scanProfileId?: string | null;
   /** Hub UI locale — discovery narratives. */
   locale?: unknown;
   /** Se já criado pelo POST async. */
@@ -79,6 +82,12 @@ export async function runOpportunityScan(opts: {
   const scanFocus = opts.scanFocus ?? 'open_now';
   const started = Date.now();
   const briefing = opts.briefing ?? (await readOpportunityBriefing(opts.companyId));
+  const scanProfileId = opts.scanProfileId?.trim() || null;
+  const scanProfile = scanProfileId
+    ? await readScanProfile(opts.companyId, scanProfileId)
+    : null;
+  const scanProfileName =
+    scanProfile?.name?.trim() || briefing.scanName?.trim() || undefined;
 
   const [existingFunds, learningContext, portalSources, inbox] = await Promise.all([
     prisma.fund.findMany({
@@ -180,7 +189,8 @@ export async function runOpportunityScan(opts: {
         discoveryMode: discovery.discoveryMode,
         searchQueries: discovery.searchQueries,
         scanFocus,
-        scanProfileName: briefing.scanName,
+        scanProfileId: scanProfileId ?? undefined,
+        scanProfileName,
       },
       `discovery:${opts.userId}`,
     );
@@ -201,7 +211,8 @@ export async function runOpportunityScan(opts: {
           searchQueries: discovery.searchQueries,
           mode: discovery.discoveryMode,
           scanFocus,
-          scanName: briefing.scanName ?? null,
+          scanName: scanProfileName ?? briefing.scanName ?? null,
+          scanProfileId: scanProfileId,
           fallbackReason: discovery.fallbackReason ?? null,
           budgetMeta: discovery.budgetMeta ?? null,
           aiCost: llmUsageForPersistence(usage),

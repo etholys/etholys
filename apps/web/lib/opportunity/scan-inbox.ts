@@ -190,3 +190,15 @@ export function splitInboxByFocus(
   if (focus !== 'open_now') return focused;
   return focused.filter((c) => isOpenNowCandidate(c));
 }
+
+/** Match a scan payload to a search profile (id first; legacy name fallback). */
+export function payloadMatchesProfile(
+  payload: Pick<ScanResultsPayload, 'scanProfileId' | 'scanProfileName'>,
+  profile: { id: string; name: string },
+): boolean {
+  const id = payload.scanProfileId?.trim();
+  if (id) return id === profile.id;
+  const name = payload.scanProfileName?.trim().toLowerCase();
+  if (!name) return false;
+  return name === profile.name.trim().toLowerCase();
+}

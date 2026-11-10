@@ -6,7 +6,15 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { readOpportunityBriefing, writeOpportunityBriefing } from '@/lib/opportunity/briefing';
-import { pendingCandidates, readCompanyScanInbox, readScanResults } from '@/lib/opportunity/candidate-store';
+import {
+  pendingCandidates,
+  readCompanyScanInbox,
+  readScanResults,
+  parseScanResults,
+  SCAN_MEMORY_CATEGORY,
+} from '@/lib/opportunity/candidate-store';
+import { payloadMatchesProfile } from '@/lib/opportunity/scan-inbox';
+import { readScanProfile } from '@/lib/opportunity/scan-profiles';
 import { resolveOpportunityCompanyId } from '@/lib/opportunity/resolve-company';
 import { runOpportunityScan } from '@/lib/opportunity/run-scan';
 import { isDiscoveryRunStale } from '@/lib/opportunity/scan-run-liveness';
@@ -95,7 +103,13 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const [latest, recentRuns, inbox] = await Promise.all([
+  const profileIdParam = req.nextUrl.searchParams.get('profileId')?.trim() || null;
+  const scopeProfileId = profileIdParam && profileIdParam !== 'all' ? profileIdParam : null;
+  const scopeProfile = scopeProfileId
+    ? await readScanProfile(ctx.companyId, scopeProfileId)
+    : null;
+
+  const [latest, recentRunsRaw, inbox] = await Promise.all([
     prisma.fundhubDiscoveryRun.findFirst({
       where: { companyId: ctx.companyId },
       orderBy: { startedAt: 'desc' },
@@ -103,7 +117,7 @@ export async function GET(req: NextRequest) {
     prisma.fundhubDiscoveryRun.findMany({
       where: { companyId: ctx.companyId },
       orderBy: { startedAt: 'desc' },
-      take: 8,
+      take: scopeProfileId ? 24 : 8,
       select: {
         id: true,
         status: true,
@@ -118,14 +132,47 @@ export async function GET(req: NextRequest) {
         webSearchRequests: true,
       },
     }),
-    readCompanyScanInbox(ctx.companyId),
+    readCompanyScanInbox(ctx.companyId, { profileId: scopeProfileId }),
   ]);
 
-  const safeRecent = recentRuns.map((r) => stripRunCostsForClient(r, allowInternalCosts));
+  const recentMemory = await prisma.aiCompanyMemory.findMany({
+    where: {
+      companyId: ctx.companyId,
+      category: SCAN_MEMORY_CATEGORY,
+      key: { in: recentRunsRaw.map((r) => `run_${r.id}`) },
+    },
+    select: { key: true, value: true },
+  });
+  const memoryByKey = new Map(recentMemory.map((r) => [r.key, r.value]));
+
+  const recentEnriched = recentRunsRaw.map((r) => {
+    const payload = parseScanResults(memoryByKey.get(`run_${r.id}`), r.id);
+    return {
+      ...r,
+      scanFocus: payload.scanFocus ?? null,
+      scanProfileId: payload.scanProfileId ?? null,
+      scanProfileName: payload.scanProfileName ?? null,
+    };
+  });
+
+  const recentFiltered =
+    scopeProfile != null
+      ? recentEnriched.filter((r) =>
+          payloadMatchesProfile(
+            { scanProfileId: r.scanProfileId ?? undefined, scanProfileName: r.scanProfileName ?? undefined },
+            scopeProfile,
+          ),
+        )
+      : recentEnriched;
+
+  const safeRecent = recentFiltered
+    .slice(0, 8)
+    .map((r) => stripRunCostsForClient(r, allowInternalCosts));
 
   if (!latest) {
     return NextResponse.json({
       companyId: ctx.companyId,
+      profileId: scopeProfileId,
       latest: null,
       pending: [],
       pendingOpen: [],
@@ -136,28 +183,42 @@ export async function GET(req: NextRequest) {
   }
 
   const results = await readScanResults(ctx.companyId, latest.id);
+  const latestInScope =
+    !scopeProfile ||
+    payloadMatchesProfile(
+      {
+        scanProfileId: results.scanProfileId,
+        scanProfileName: results.scanProfileName,
+      },
+      scopeProfile,
+    );
+
   return NextResponse.json({
     companyId: ctx.companyId,
-    latest: stripRunCostsForClient(
-      {
-        id: latest.id,
-        status: latest.status,
-        startedAt: latest.startedAt,
-        finishedAt: latest.finishedAt,
-        scanned: latest.scanned,
-        created: latest.created,
-        errorCount: latest.errorCount,
-        estimatedCostUsd: latest.estimatedCostUsd,
-        inputTokens: latest.inputTokens,
-        outputTokens: latest.outputTokens,
-        webSearchRequests: latest.webSearchRequests,
-        discoveryMode: results.discoveryMode ?? null,
-        searchQueries: results.searchQueries ?? [],
-        scanFocus: results.scanFocus ?? null,
-        scanProfileName: results.scanProfileName ?? null,
-      },
-      allowInternalCosts,
-    ),
+    profileId: scopeProfileId,
+    latest: latestInScope
+      ? stripRunCostsForClient(
+          {
+            id: latest.id,
+            status: latest.status,
+            startedAt: latest.startedAt,
+            finishedAt: latest.finishedAt,
+            scanned: latest.scanned,
+            created: latest.created,
+            errorCount: latest.errorCount,
+            estimatedCostUsd: latest.estimatedCostUsd,
+            inputTokens: latest.inputTokens,
+            outputTokens: latest.outputTokens,
+            webSearchRequests: latest.webSearchRequests,
+            discoveryMode: results.discoveryMode ?? null,
+            searchQueries: results.searchQueries ?? [],
+            scanFocus: results.scanFocus ?? null,
+            scanProfileId: results.scanProfileId ?? null,
+            scanProfileName: results.scanProfileName ?? null,
+          },
+          allowInternalCosts,
+        )
+      : null,
     pending: inbox.pending,
     pendingOpen: inbox.pendingOpen,
     pendingReference: inbox.pendingReference,
@@ -200,6 +261,7 @@ export async function POST(req: NextRequest) {
   let briefing: OpportunityBriefing | undefined;
   let scanFocus: ScanFocus = 'open_now';
   let locale: unknown;
+  let scanProfileId: string | null = null;
   try {
     const body = await req.json();
     if (body?.briefing) briefing = body.briefing as OpportunityBriefing;
@@ -207,6 +269,9 @@ export async function POST(req: NextRequest) {
       scanFocus = body.scanFocus;
     }
     if (body?.locale != null) locale = body.locale;
+    if (typeof body?.scanProfileId === 'string' && body.scanProfileId.trim()) {
+      scanProfileId = body.scanProfileId.trim();
+    }
   } catch {
     // body opcional
   }
@@ -217,19 +282,39 @@ export async function POST(req: NextRequest) {
     await writeOpportunityBriefing(ctx.companyId, briefing);
   }
 
+  if (scanProfileId) {
+    const profile = await readScanProfile(ctx.companyId, scanProfileId);
+    if (!profile) {
+      return NextResponse.json({ error: 'Perfil de busca não encontrado' }, { status: 404 });
+    }
+    briefing = {
+      ...briefing,
+      ...profile.briefing,
+      scanName: profile.name,
+      classifications: profile.classifications?.length
+        ? profile.classifications
+        : briefing.classifications,
+    };
+  }
+
   const run = await prisma.fundhubDiscoveryRun.create({
     data: {
       companyId: ctx.companyId,
       initiatedByUserId: ctx.userId,
       source: scanFocus === 'open_now' ? 'opportunity_open_now' : 'opportunity_reference',
       status: 'running',
-      errorsJson: JSON.stringify({ progressPct: 5, phase: 'queued' }),
+      errorsJson: JSON.stringify({
+        progressPct: 5,
+        phase: 'queued',
+        scanProfileId,
+      }),
     },
   });
 
   const briefingSnapshot = briefing;
   const companyId = ctx.companyId;
   const userId = ctx.userId;
+  const profileIdSnapshot = scanProfileId;
 
   // Não await — responde JSON imediato; cliente faz poll
   void runOpportunityScan({
@@ -237,6 +322,7 @@ export async function POST(req: NextRequest) {
     userId,
     briefing: briefingSnapshot,
     scanFocus,
+    scanProfileId: profileIdSnapshot,
     locale,
     existingRunId: run.id,
   }).catch((e) => {
@@ -249,6 +335,7 @@ export async function POST(req: NextRequest) {
     runId: run.id,
     status: 'running',
     scanFocus,
+    scanProfileId: profileIdSnapshot,
     message: 'Varredura iniciada — aguarde.',
   });
 }

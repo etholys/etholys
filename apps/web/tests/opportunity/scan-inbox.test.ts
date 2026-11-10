@@ -5,6 +5,7 @@ import {
   deadlineUrgency,
   daysUntilClose,
   filterInboxCandidates,
+  payloadMatchesProfile,
   sortCandidatesByDeadline,
 } from '../../lib/opportunity/scan-inbox';
 import type { ScanCandidate, ScanResultsPayload } from '../../lib/opportunity/scan-types';
@@ -117,4 +118,32 @@ test('urgency buckets and due-soon filter', () => {
   );
   assert.equal(filtered.length, 1);
   assert.equal(filtered[0]?.name, 'Rural BID');
+});
+
+test('payloadMatchesProfile prefers id then legacy name', () => {
+  assert.equal(
+    payloadMatchesProfile(
+      { scanProfileId: 'rural_uy', scanProfileName: 'Other' },
+      { id: 'rural_uy', name: 'Rural Uruguay' },
+    ),
+    true,
+  );
+  assert.equal(
+    payloadMatchesProfile(
+      { scanProfileName: 'Rural Uruguay' },
+      { id: 'rural_uy', name: 'Rural Uruguay' },
+    ),
+    true,
+  );
+  assert.equal(
+    payloadMatchesProfile(
+      { scanProfileName: 'Other' },
+      { id: 'rural_uy', name: 'Rural Uruguay' },
+    ),
+    false,
+  );
+  assert.equal(
+    payloadMatchesProfile({}, { id: 'rural_uy', name: 'Rural Uruguay' }),
+    false,
+  );
 });

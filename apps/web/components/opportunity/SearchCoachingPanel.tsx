@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApp } from '@/app/providers';
+import { ui } from '@/lib/i18n';
 import { isLikelyDbId } from '@/lib/utils';
 import { ScanProgressRing } from '@/components/opportunity/ScanProgressRing';
 import {
+  FolderOpen,
+  Layers,
   Pencil,
   Plus,
   Radar,
-  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
@@ -34,11 +36,13 @@ type Profile = {
   classifications: OpportunityClassification[];
 };
 
-const CLASS_OPTS: { id: OpportunityClassification; pt: string; es: string; en: string }[] = [
-  { id: 'direct', pt: 'Directo (nós)', es: 'Directo (nosotros)', en: 'Direct (us)' },
-  { id: 'client_bridge', pt: 'Ponte clientes', es: 'Puente clientes', en: 'Client bridge' },
-  { id: 'joint', pt: 'Conjunto', es: 'Conjunto', en: 'Joint' },
+const CLASS_OPTS: { id: OpportunityClassification; es: string; pt: string; en: string }[] = [
+  { id: 'direct', es: 'Directo (nosotros)', pt: 'Directo (nós)', en: 'Direct (us)' },
+  { id: 'client_bridge', es: 'Puente clientes', pt: 'Ponte clientes', en: 'Client bridge' },
+  { id: 'joint', es: 'Conjunto', pt: 'Conjunto', en: 'Joint' },
 ];
+
+export type SearchViewId = 'all' | string;
 
 export function SearchCoachingPanel({
   briefing,
@@ -46,6 +50,8 @@ export function SearchCoachingPanel({
   scanPercent = 0,
   scanUi = 'idle',
   scanningShortcutId = null,
+  selectedView,
+  onSelectView,
   onRetryScan,
   onSaved,
   onRunShortcut,
@@ -54,11 +60,13 @@ export function SearchCoachingPanel({
   scanning?: boolean;
   scanPercent?: number;
   scanUi?: 'idle' | 'running' | 'error' | 'done';
-  /** Only this shortcut card shows the ring; page-level scans leave cards idle. */
+  /** Only this profile card shows the ring; page-level scans leave cards idle. */
   scanningShortcutId?: string | null;
+  selectedView: SearchViewId;
+  onSelectView: (view: SearchViewId, briefing?: Briefing) => void;
   onRetryScan?: () => void;
   onSaved?: (next: Briefing) => void;
-  /** Activa o atalho e dispara a varredura. */
+  /** Activa o perfil e dispara a varredura. */
   onRunShortcut?: (briefing: Briefing, focus: ScanFocus, profileId: string) => void;
 }) {
   const { locale, activeCompanyId } = useApp();
@@ -67,8 +75,7 @@ export function SearchCoachingPanel({
     return isLikelyDbId(s) ? s : '';
   }, [activeCompanyId]);
 
-  const t = (pt: string, es: string, en: string) =>
-    locale === 'pt' ? pt : locale === 'es' ? es : en;
+  const t = (es: string, pt: string, en: string) => ui(locale, es, pt, en);
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -84,12 +91,19 @@ export function SearchCoachingPanel({
     `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
 
   const loadProfiles = useCallback(async () => {
-    if (!companyId) return;
+    if (!companyId) {
+      return null as {
+        profiles: Profile[];
+        activeProfileId: string | null;
+      } | null;
+    }
     const r = await fetch(q('/api/opportunity/profiles'), { cache: 'no-store' });
-    if (!r.ok) return;
+    if (!r.ok) return null;
     const d = (await r.json()) as { profiles?: Profile[]; activeProfileId?: string | null };
-    setProfiles(d.profiles ?? []);
+    const list = d.profiles ?? [];
+    setProfiles(list);
     setActiveId(d.activeProfileId ?? null);
+    return { profiles: list, activeProfileId: d.activeProfileId ?? null };
   }, [companyId]);
 
   useEffect(() => {
@@ -114,12 +128,38 @@ export function SearchCoachingPanel({
     setEditorOpen(true);
   };
 
+  const selectAll = () => {
+    onSelectView('all');
+  };
+
+  const selectProfile = async (p: Profile) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await fetch(q('/api/opportunity/profiles'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId: p.id }),
+      });
+      const d = (await r.json()) as { briefing?: Briefing; error?: string };
+      if (!r.ok) throw new Error(d.error || 'Erro');
+      const next = d.briefing ?? { ...p.briefing, scanName: p.name, classifications: p.classifications };
+      onSaved?.(next);
+      setActiveId(p.id);
+      onSelectView(p.id, next);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const save = async () => {
     if (!companyId || !feedback.trim()) return;
     setBusy(true);
     setMsg(null);
     try {
-      const name = scanName.trim() || t('Varredura sem nome', 'Barrido sin nombre', 'Untitled scan');
+      const name = scanName.trim() || t('Perfil sin nombre', 'Perfil sem nome', 'Untitled profile');
       const r = await fetch(q('/api/opportunity/profiles'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -141,18 +181,21 @@ export function SearchCoachingPanel({
       try {
         d = JSON.parse(text) as typeof d;
       } catch {
-        throw new Error(t('Resposta inválida do servidor.', 'Respuesta inválida.', 'Invalid server response.'));
+        throw new Error(t('Respuesta inválida.', 'Resposta inválida do servidor.', 'Invalid server response.'));
       }
       if (!r.ok) throw new Error(d.error || 'Erro');
       if (d.briefing) onSaved?.(d.briefing);
-      if (d.profile) setActiveId(d.profile.id);
+      if (d.profile) {
+        setActiveId(d.profile.id);
+        onSelectView(d.profile.id, d.briefing ?? { ...d.profile.briefing, scanName: d.profile.name });
+      }
       await loadProfiles();
       setEditorOpen(false);
       setMsg(
         t(
-          `Atalho «${name}» pronto — clique em Buscar no cartão.`,
-          `Atajo «${name}» listo — pulse Buscar en la tarjeta.`,
-          `Shortcut «${name}» ready — click Search on the card.`,
+          `Perfil «${name}» listo — busque desde esta vista.`,
+          `Perfil «${name}» pronto — busque a partir desta vista.`,
+          `Profile «${name}» ready — search from this view.`,
         ),
       );
     } catch (e) {
@@ -176,6 +219,7 @@ export function SearchCoachingPanel({
       const next = d.briefing ?? { ...p.briefing, scanName: p.name, classifications: p.classifications };
       onSaved?.(next);
       setActiveId(p.id);
+      onSelectView(p.id, next);
       onRunShortcut?.(next, focus, p.id);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'Erro');
@@ -185,7 +229,11 @@ export function SearchCoachingPanel({
   };
 
   const remove = async (p: Profile) => {
-    if (!confirm(t(`Apagar atalho «${p.name}»?`, `¿Borrar atajo «${p.name}»?`, `Delete shortcut «${p.name}»?`))) {
+    if (
+      !confirm(
+        t(`¿Borrar perfil «${p.name}»?`, `Apagar perfil «${p.name}»?`, `Delete profile «${p.name}»?`),
+      )
+    ) {
       return;
     }
     setBusy(true);
@@ -194,8 +242,16 @@ export function SearchCoachingPanel({
         method: 'DELETE',
       });
       if (editingId === p.id) setEditorOpen(false);
-      await loadProfiles();
-      setMsg(t('Atalho apagado.', 'Atajo borrado.', 'Shortcut deleted.'));
+      const d = await loadProfiles();
+      if (selectedView === p.id) {
+        const next = d?.profiles[0];
+        if (next) {
+          onSelectView(next.id, { ...next.briefing, scanName: next.name, classifications: next.classifications });
+        } else {
+          onSelectView('all');
+        }
+      }
+      setMsg(t('Perfil borrado.', 'Perfil apagado.', 'Profile deleted.'));
     } finally {
       setBusy(false);
     }
@@ -204,120 +260,140 @@ export function SearchCoachingPanel({
   if (!companyId) return null;
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
+    <section className="flex h-full min-h-[28rem] flex-col rounded-2xl border border-amber-900/20 bg-gradient-to-b from-zinc-950 to-zinc-900 p-3 text-amber-50 shadow-sm">
+      <div className="flex items-center justify-between gap-2 px-1">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-amber-600" />
-          <h3 className="text-sm font-semibold text-gray-900">
-            {t('Atalhos de busca', 'Atajos de búsqueda', 'Search shortcuts')}
+          <FolderOpen className="h-4 w-4 text-amber-400" />
+          <h3 className="text-sm font-semibold text-amber-50">
+            {t('Perfiles de búsqueda', 'Perfis de busca', 'Search profiles')}
           </h3>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-gray-800"
+          className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1.5 text-[11px] font-semibold text-zinc-950 hover:bg-amber-400"
         >
           <Plus className="h-3.5 w-3.5" />
-          {t('Novo', 'Nuevo', 'New')}
+          {t('Nuevo', 'Novo', 'New')}
         </button>
       </div>
-      <p className="mt-1 text-xs text-gray-600">
+      <p className="mt-1 px-1 text-[11px] leading-relaxed text-amber-100/60">
         {t(
-          'Um atalho = um tipo de busca. Clique em Buscar.',
-          'Un atajo = un tipo de búsqueda. Pulse Buscar.',
-          'One shortcut = one search type. Click Search.',
+          'Cada perfil guarda filtros y su propia bandeja de resultados.',
+          'Cada perfil guarda filtros e a sua própria bandeja de resultados.',
+          'Each profile keeps filters and its own results inbox.',
         )}
       </p>
 
-      {msg && <p className="mt-2 text-xs text-gray-700">{msg}</p>}
+      {msg && <p className="mt-2 px-1 text-xs text-amber-100/80">{msg}</p>}
 
-      {profiles.length === 0 && !editorOpen && (
-        <button
-          type="button"
-          onClick={openCreate}
-          className="mt-3 w-full rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-4 text-center text-xs text-gray-700 hover:bg-white"
-        >
-          {t(
-            'Criar o primeiro atalho — ex. «Rura Commerce interno FP»',
-            'Crear el primer atajo — ej. «Rura Commerce interno FP»',
-            'Create your first shortcut — e.g. «Rura Commerce interno FP»',
-          )}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={selectAll}
+        className={`mt-3 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs transition ${
+          selectedView === 'all'
+            ? 'bg-amber-500/20 ring-1 ring-amber-400/40 text-amber-50'
+            : 'text-amber-100/70 hover:bg-white/5'
+        }`}
+      >
+        <Layers className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+        <span className="min-w-0">
+          <span className="block font-semibold">
+            {t('Todas las búsquedas', 'Todas as buscas', 'All searches')}
+          </span>
+          <span className="block text-[10px] text-amber-100/50">
+            {t('Vista mixta (opcional)', 'Vista mista (opcional)', 'Mixed view (optional)')}
+          </span>
+        </span>
+      </button>
 
-      <ul className="mt-3 space-y-2">
+      <ul className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5">
+        {profiles.length === 0 && !editorOpen && (
+          <li>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="w-full rounded-xl border border-dashed border-amber-500/30 bg-white/5 px-3 py-4 text-center text-xs text-amber-100/70 hover:bg-white/10"
+            >
+              {t(
+                'Crear el primer perfil — ej. «Rural Uruguay abiertos»',
+                'Criar o primeiro perfil — ex. «Rural Uruguay abertos»',
+                'Create your first profile — e.g. «Rural Uruguay open»',
+              )}
+            </button>
+          </li>
+        )}
+
         {profiles.map((p) => {
-          const isActive = activeId === p.id || briefing.scanName === p.name;
+          const isSelected = selectedView === p.id;
+          const isActive = activeId === p.id;
           const cardScanning = Boolean(scanning && scanningShortcutId === p.id);
           return (
-            <li
-              key={p.id}
-              className={`rounded-xl border bg-white p-3 ${
-                isActive ? 'border-gray-900 ring-1 ring-gray-200' : 'border-gray-200'
-              }`}
-            >
-              <p className="text-sm font-semibold text-gray-900">{p.name}</p>
-              <p className="mt-0.5 line-clamp-2 text-[11px] text-gray-500">
-                {p.briefing.searchFeedback ||
-                  p.briefing.themes?.join(', ') ||
-                  t('Sem orientação', 'Sin orientación', 'No guidance')}
-              </p>
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {(p.classifications ?? []).map((c) => {
-                  const opt = CLASS_OPTS.find((o) => o.id === c);
-                  return (
-                    <span
-                      key={c}
-                      className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-700"
-                    >
-                      {opt ? (locale === 'pt' ? opt.pt : locale === 'es' ? opt.es : opt.en) : c}
-                    </span>
-                  );
-                })}
-                {p.briefing.amountMax != null && (
-                  <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-900">
-                    ≤ {p.briefing.amountMax.toLocaleString()} USD
-                  </span>
-                )}
-              </div>
-              <div className="mt-2.5 flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  disabled={busy || cardScanning}
-                  onClick={() => void runShortcut(p, 'open_now')}
-                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-gray-900 px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
-                >
-                  {cardScanning ? (
-                    <ScanProgressRing
-                      percent={scanPercent}
-                      state={scanUi === 'done' ? 'done' : 'running'}
-                      size={18}
-                      tone="onDark"
-                    />
-                  ) : (
-                    <Radar className="h-3.5 w-3.5" />
-                  )}
-                  {t('Buscar', 'Buscar', 'Search')}
-                </button>
+            <li key={p.id}>
+              <div
+                className={`rounded-xl px-2.5 py-2 transition ${
+                  isSelected
+                    ? 'bg-amber-500/15 ring-1 ring-amber-400/35'
+                    : 'hover:bg-white/5'
+                }`}
+              >
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => openEdit(p)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
-                  title={t('Editar atalho', 'Editar atajo', 'Edit shortcut')}
+                  onClick={() => void selectProfile(p)}
+                  className="w-full text-left"
                 >
-                  <Pencil className="h-3.5 w-3.5" />
-                  {t('Editar', 'Editar', 'Edit')}
+                  <p className="truncate text-sm font-semibold text-amber-50">
+                    {p.name}
+                    {isActive && selectedView === 'all' ? (
+                      <span className="ml-1 text-[9px] font-medium text-amber-400/80">●</span>
+                    ) : null}
+                  </p>
+                  <p className="mt-0.5 line-clamp-2 text-[10px] text-amber-100/45">
+                    {p.briefing.searchFeedback ||
+                      p.briefing.themes?.join(', ') ||
+                      t('Sin orientación', 'Sem orientação', 'No guidance')}
+                  </p>
                 </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void remove(p)}
-                  className="inline-flex items-center rounded-lg border border-red-100 px-2 py-1.5 text-red-700 hover:bg-red-50"
-                  title={t('Apagar', 'Borrar', 'Delete')}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    disabled={busy || cardScanning}
+                    onClick={() => void runShortcut(p, 'open_now')}
+                    className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-amber-500 px-2 py-1.5 text-[10px] font-semibold text-zinc-950 hover:bg-amber-400 disabled:opacity-50"
+                  >
+                    {cardScanning ? (
+                      <ScanProgressRing
+                        percent={scanPercent}
+                        state={scanUi === 'done' ? 'done' : 'running'}
+                        size={16}
+                        tone="onDark"
+                        onRetry={scanUi === 'error' ? onRetryScan : undefined}
+                      />
+                    ) : (
+                      <Radar className="h-3 w-3" />
+                    )}
+                    {t('Buscar', 'Buscar', 'Search')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => openEdit(p)}
+                    className="inline-flex items-center rounded-lg border border-amber-500/25 px-2 py-1.5 text-amber-100/80 hover:bg-white/5"
+                    title={t('Renombrar / editar', 'Renomear / editar', 'Rename / edit')}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void remove(p)}
+                    className="inline-flex items-center rounded-lg border border-red-400/20 px-2 py-1.5 text-red-300/90 hover:bg-red-500/10"
+                    title={t('Borrar', 'Apagar', 'Delete')}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
             </li>
           );
@@ -325,30 +401,30 @@ export function SearchCoachingPanel({
       </ul>
 
       {editorOpen && (
-        <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+        <div className="mt-2 rounded-xl border border-amber-500/25 bg-zinc-950/80 p-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-gray-900">
+            <p className="text-xs font-semibold text-amber-50">
               {editingId
-                ? t('Editar atalho', 'Editar atajo', 'Edit shortcut')
-                : t('Novo atalho', 'Nuevo atajo', 'New shortcut')}
+                ? t('Editar perfil', 'Editar perfil', 'Edit profile')
+                : t('Nuevo perfil', 'Novo perfil', 'New profile')}
             </p>
-            <button type="button" onClick={() => setEditorOpen(false)} className="text-gray-400 hover:text-gray-600">
+            <button type="button" onClick={() => setEditorOpen(false)} className="text-amber-100/50 hover:text-amber-50">
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          <label className="mt-2 block text-[10px] font-semibold uppercase text-gray-500">
-            {t('Nome do atalho', 'Nombre del atajo', 'Shortcut name')}
+          <label className="mt-2 block text-[10px] font-semibold uppercase tracking-wide text-amber-100/45">
+            {t('Nombre', 'Nome', 'Name')}
           </label>
           <input
             value={scanName}
             onChange={(e) => setScanName(e.target.value)}
-            placeholder="Rura Commerce interno FP"
-            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+            placeholder="Rural Uruguay abiertos"
+            className="mt-1 w-full rounded-lg border border-amber-500/20 bg-zinc-900 px-3 py-2 text-sm text-amber-50 placeholder:text-amber-100/30"
           />
 
-          <p className="mt-2 text-[10px] font-semibold uppercase text-gray-500">
-            {t('Classificações', 'Clasificaciones', 'Classifications')}
+          <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-amber-100/45">
+            {t('Clasificaciones', 'Classificações', 'Classifications')}
           </p>
           <div className="mt-1 flex flex-wrap gap-1.5">
             {CLASS_OPTS.map((c) => {
@@ -363,27 +439,27 @@ export function SearchCoachingPanel({
                     )
                   }
                   className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                    on ? 'bg-gray-900 text-white' : 'border border-gray-200 text-gray-700'
+                    on ? 'bg-amber-500 text-zinc-950' : 'border border-amber-500/25 text-amber-100/70'
                   }`}
                 >
-                  {locale === 'pt' ? c.pt : locale === 'es' ? c.es : c.en}
+                  {t(c.es, c.pt, c.en)}
                 </button>
               );
             })}
           </div>
 
-          <label className="mt-2 block text-[10px] font-semibold uppercase text-gray-500">
-            {t('Orientação / comando', 'Orientación / comando', 'Guidance / command')}
+          <label className="mt-2 block text-[10px] font-semibold uppercase tracking-wide text-amber-100/45">
+            {t('Orientación / filtros', 'Orientação / filtros', 'Guidance / filters')}
           </label>
           <textarea
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            rows={7}
-            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+            rows={6}
+            className="mt-1 w-full rounded-lg border border-amber-500/20 bg-zinc-900 px-3 py-2 text-sm text-amber-50"
             placeholder={t(
-              'Cole aqui a orientação completa da varredura…',
-              'Pegue aquí la orientación completa…',
-              'Paste the full scan guidance here…',
+              'País, tema, donante, tipo, exclusiones…',
+              'País, tema, doador, tipo, exclusões…',
+              'Country, theme, donor, type, exclusions…',
             )}
           />
 
@@ -392,20 +468,20 @@ export function SearchCoachingPanel({
               type="button"
               disabled={busy || !feedback.trim()}
               onClick={() => void save()}
-              className="flex-1 rounded-lg bg-gray-900 py-2 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-amber-500 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-400 disabled:opacity-50"
             >
               {busy ? (
                 <ScanProgressRing percent={40} state="running" size={16} tone="onDark" />
               ) : editingId ? (
-                t('Guardar alterações', 'Guardar cambios', 'Save changes')
+                t('Guardar', 'Guardar', 'Save')
               ) : (
-                t('Criar atalho', 'Crear atajo', 'Create shortcut')
+                t('Crear perfil', 'Criar perfil', 'Create profile')
               )}
             </button>
             <button
               type="button"
               onClick={() => setEditorOpen(false)}
-              className="rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600"
+              className="rounded-lg border border-amber-500/25 px-3 py-2 text-xs text-amber-100/70"
             >
               {t('Cancelar', 'Cancelar', 'Cancel')}
             </button>

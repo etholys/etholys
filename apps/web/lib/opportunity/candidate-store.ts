@@ -8,9 +8,11 @@ import { coerceOpenAvailability } from '@/lib/opportunity/scan-filters';
 import { sanitizeFundingLinks } from '@/lib/opportunity/official-url';
 import {
   buildScanInbox,
+  payloadMatchesProfile,
   splitInboxByFocus,
   type InboxCandidate,
 } from '@/lib/opportunity/scan-inbox';
+import { readScanProfile } from '@/lib/opportunity/scan-profiles';
 import {
   buildCallEvidence,
   looksInventedWithoutEvidence,
@@ -231,7 +233,10 @@ export function pendingCandidates(payload: ScanResultsPayload, focus?: ScanFocus
 
 const INBOX_RUN_LIMIT = 40;
 
-export async function readCompanyScanInbox(companyId: string): Promise<{
+export async function readCompanyScanInbox(
+  companyId: string,
+  opts?: { profileId?: string | null },
+): Promise<{
   pending: InboxCandidate[];
   pendingOpen: InboxCandidate[];
   pendingReference: InboxCandidate[];
@@ -255,12 +260,22 @@ export async function readCompanyScanInbox(companyId: string): Promise<{
     },
   });
   const byKey = new Map(rows.map((r) => [r.key, r.value]));
-  const inbox = buildScanInbox(
-    runs.map((r) => ({
-      runId: r.id,
-      payload: parseScanResults(byKey.get(runKey(r.id)), r.id),
-    })),
-  );
+  let runPayloads = runs.map((r) => ({
+    runId: r.id,
+    payload: parseScanResults(byKey.get(runKey(r.id)), r.id),
+  }));
+
+  const profileId = opts?.profileId?.trim();
+  if (profileId) {
+    const profile = await readScanProfile(companyId, profileId);
+    if (profile) {
+      runPayloads = runPayloads.filter(({ payload }) => payloadMatchesProfile(payload, profile));
+    } else {
+      runPayloads = runPayloads.filter(({ payload }) => payload.scanProfileId === profileId);
+    }
+  }
+
+  const inbox = buildScanInbox(runPayloads);
 
   return {
     pending: inbox.pending,

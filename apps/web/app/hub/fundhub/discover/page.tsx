@@ -15,8 +15,12 @@ import {
   estimateScanPercent,
   ScanProgressRing,
 } from '@/components/opportunity/ScanProgressRing';
-import { SearchCoachingPanel } from '@/components/opportunity/SearchCoachingPanel';
+import {
+  SearchCoachingPanel,
+  type SearchViewId,
+} from '@/components/opportunity/SearchCoachingPanel';
 import { YieldStatsPanel } from '@/components/fundhub/YieldStatsPanel';
+import { ui } from '@/lib/i18n';
 import { buildYieldSnapshot } from '@/lib/opportunity/yield-stats';
 import {
   availabilityBadgeClass,
@@ -112,6 +116,8 @@ type ScanMeta = {
   discoveryMode?: 'web' | 'knowledge' | null;
   searchQueries?: string[];
   scanFocus?: ScanFocus | null;
+  scanProfileId?: string | null;
+  scanProfileName?: string | null;
 };
 
 const KIND_OPTIONS: { id: OpportunityKind; pt: string; es: string }[] = [
@@ -133,11 +139,12 @@ export default function OpportunityDiscoverPage() {
     return isLikelyDbId(s) ? s : '';
   }, [activeCompanyId]);
 
-  const t = (pt: string, es: string, en: string) =>
-    locale === 'pt' ? pt : locale === 'es' ? es : en;
+  const t = (pt: string, es: string, en: string) => ui(locale, es, pt, en);
 
   const [tab, setTab] = useState<'new' | 'later'>('new');
   const [discoveryFocus, setDiscoveryFocus] = useState<ScanFocus>('open_now');
+  const [selectedView, setSelectedView] = useState<SearchViewId>('all');
+  const [viewBooted, setViewBooted] = useState(false);
   const [briefing, setBriefing] = useState<Briefing>({
     themes: [],
     countries: [],
@@ -147,6 +154,8 @@ export default function OpportunityDiscoverPage() {
   const [themesInput, setThemesInput] = useState('');
   const [countriesInput, setCountriesInput] = useState('');
   const [notesInput, setNotesInput] = useState('');
+
+  const scopedProfileId = selectedView === 'all' ? null : selectedView;
 
   const [latest, setLatest] = useState<ScanMeta | null>(null);
   const [recentRuns, setRecentRuns] = useState<ScanMeta[]>([]);
@@ -199,7 +208,10 @@ export default function OpportunityDiscoverPage() {
   }, [companyId]);
 
   const loadScan = useCallback(async () => {
-    const r = await fetch(q('/api/opportunity/scans'), { cache: 'no-store' });
+    const path = scopedProfileId
+      ? `/api/opportunity/scans?profileId=${encodeURIComponent(scopedProfileId)}`
+      : '/api/opportunity/scans';
+    const r = await fetch(q(path), { cache: 'no-store' });
     if (!r.ok) return;
     const d = (await r.json()) as {
       latest?: ScanMeta | null;
@@ -233,7 +245,7 @@ export default function OpportunityDiscoverPage() {
         );
       })
       .catch(() => setOperatorHint(null));
-  }, [companyId]);
+  }, [companyId, scopedProfileId, locale]);
 
   const pendingForFocus = discoveryFocus === 'open_now' ? pendingOpen : pendingReference;
   const listSource = tab === 'later' ? later : pendingForFocus;
@@ -271,13 +283,87 @@ export default function OpportunityDiscoverPage() {
       return;
     }
     setLoading(true);
-    await Promise.all([loadBriefing(), loadScan(), loadCatalog()]);
+    await Promise.all([loadBriefing(), loadCatalog()]);
     setLoading(false);
-  }, [companyId, loadBriefing, loadScan, loadCatalog]);
+  }, [companyId, loadBriefing, loadCatalog]);
+
+  const applyBriefing = useCallback((next: Briefing) => {
+    setBriefing({
+      themes: next.themes ?? [],
+      countries: next.countries ?? [],
+      kinds: (next.kinds as OpportunityKind[]) ?? ['grant'],
+      notes: next.notes,
+      searchFeedback: next.searchFeedback,
+      scanName: next.scanName,
+      classifications: next.classifications,
+      amountMax: next.amountMax,
+      privateEligible: next.privateEligible,
+      reimbursable: next.reimbursable,
+    });
+    setThemesInput((next.themes ?? []).join(', '));
+    setCountriesInput((next.countries ?? []).join(', '));
+    setNotesInput(next.notes ?? '');
+  }, []);
+
+  const handleSelectView = useCallback(
+    (view: SearchViewId, nextBriefing?: Briefing) => {
+      setSelectedView(view);
+      if (nextBriefing) applyBriefing(nextBriefing);
+      setHistoryOpen(false);
+    },
+    [applyBriefing],
+  );
 
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    void loadScan();
+  }, [companyId, loadScan]);
+
+  useEffect(() => {
+    setViewBooted(false);
+    setSelectedView('all');
+  }, [companyId]);
+
+  useEffect(() => {
+    if (!companyId || viewBooted) return;
+    void (async () => {
+      const r = await fetch(
+        `/api/opportunity/profiles?companyId=${encodeURIComponent(companyId)}`,
+        { cache: 'no-store' },
+      );
+      setViewBooted(true);
+      if (!r.ok) return;
+      const d = (await r.json()) as {
+        profiles?: Array<{
+          id: string;
+          name: string;
+          briefing: Briefing;
+          classifications?: Briefing['classifications'];
+        }>;
+        activeProfileId?: string | null;
+      };
+      const list = d.profiles ?? [];
+      if (list.length === 0) return;
+      const prefer =
+        d.activeProfileId && list.some((p) => p.id === d.activeProfileId)
+          ? d.activeProfileId
+          : list[0]?.id;
+      if (!prefer) return;
+      const p = list.find((x) => x.id === prefer);
+      setSelectedView(prefer);
+      if (p) {
+        applyBriefing({
+          ...p.briefing,
+          scanName: p.name,
+          classifications: p.briefing.classifications ?? p.classifications,
+        });
+      }
+    })();
+  }, [companyId, viewBooted, applyBriefing]);
 
   const watchRun = useCallback(
     async (runId: string, focus: ScanFocus, startedAt: number) => {
@@ -438,8 +524,9 @@ export default function OpportunityDiscoverPage() {
     briefingOverride?: Briefing,
     shortcutId: string | null = null,
   ) => {
+    const profileIdForScan = shortcutId ?? scopedProfileId;
     setScanning(true);
-    setScanningShortcutId(shortcutId);
+    setScanningShortcutId(profileIdForScan);
     setScanUi('running');
     setScanPercent(3);
     setMsg(null);
@@ -450,13 +537,18 @@ export default function OpportunityDiscoverPage() {
       countries: countriesInput.split(',').map((s) => s.trim()).filter(Boolean),
       notes: notesInput.trim() || briefing.notes,
     };
-    setLastScanArgs({ focus, briefing: briefingToUse, shortcutId });
+    setLastScanArgs({ focus, briefing: briefingToUse, shortcutId: profileIdForScan });
     setLongScan(false);
     try {
       const r = await fetch(q('/api/opportunity/scans'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ briefing: briefingToUse, scanFocus: focus, locale }),
+        body: JSON.stringify({
+          briefing: briefingToUse,
+          scanFocus: focus,
+          locale,
+          scanProfileId: profileIdForScan || undefined,
+        }),
       });
       const raw = await r.text();
       let d: {
@@ -627,12 +719,20 @@ export default function OpportunityDiscoverPage() {
               )}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-              {briefing.scanName && (
-                <span className="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-900">
-                  {briefing.scanName}
-                  {briefing.amountMax != null ? ` · ≤ ${briefing.amountMax.toLocaleString()} USD` : ''}
-                </span>
-              )}
+              <span
+                className={`rounded-full px-2.5 py-1 font-medium ${
+                  selectedView === 'all'
+                    ? 'bg-slate-100 text-slate-700'
+                    : 'bg-amber-50 text-amber-900'
+                }`}
+              >
+                {selectedView === 'all'
+                  ? t('Todas as buscas', 'Todas las búsquedas', 'All searches')
+                  : briefing.scanName || t('Perfil', 'Perfil', 'Profile')}
+                {selectedView !== 'all' && briefing.amountMax != null
+                  ? ` · ≤ ${briefing.amountMax.toLocaleString()} USD`
+                  : ''}
+              </span>
               {lastScanLabel && (
                 <span>
                   {t('Última busca', 'Última búsqueda', 'Last search')} {lastScanLabel}
@@ -747,12 +847,32 @@ export default function OpportunityDiscoverPage() {
       )}
 
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
-        <div className="min-w-0 space-y-4">
+      <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)_280px]">
+        <aside className="order-2 lg:order-1 lg:sticky lg:top-4 lg:self-start">
+          <SearchCoachingPanel
+            briefing={briefing}
+            scanning={scanning}
+            scanPercent={scanPercent}
+            scanUi={scanUi}
+            scanningShortcutId={scanningShortcutId}
+            selectedView={selectedView}
+            onSelectView={handleSelectView}
+            onRetryScan={retryLastScan}
+            onSaved={applyBriefing}
+            onRunShortcut={(next, focus, profileId) => {
+              applyBriefing(next);
+              void startScan(focus, next, profileId);
+            }}
+          />
+        </aside>
+
+        <div className="order-1 min-w-0 space-y-4 lg:order-2">
           {historyOpen && recentRuns.length > 0 && (
             <div className="rounded-xl border border-gray-200 bg-white p-4">
               <h3 className="text-sm font-semibold text-gray-900">
-                {t('Buscas recentes', 'Búsquedas recientes', 'Recent searches')}
+                {selectedView === 'all'
+                  ? t('Buscas recentes (todas)', 'Búsquedas recientes (todas)', 'Recent searches (all)')
+                  : t('Histórico deste perfil', 'Historial de este perfil', 'History for this profile')}
               </h3>
               <ul className="mt-2 space-y-1.5">
                 {recentRuns.map((run) => (
@@ -761,6 +881,9 @@ export default function OpportunityDiscoverPage() {
                       {new Date(run.finishedAt || run.startedAt).toLocaleString(
                         locale === 'pt' ? 'pt-PT' : locale === 'es' ? 'es-ES' : 'en-US',
                       )}
+                      {selectedView === 'all' && run.scanProfileName
+                        ? ` · ${run.scanProfileName}`
+                        : ''}
                     </span>
                     <span>
                       +{run.created} {t('candidatos', 'candidatos', 'candidates')}
@@ -993,45 +1116,7 @@ export default function OpportunityDiscoverPage() {
 
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-          <SearchCoachingPanel
-            briefing={briefing}
-            scanning={scanning}
-            scanPercent={scanPercent}
-            scanUi={scanUi}
-            scanningShortcutId={scanningShortcutId}
-            onRetryScan={retryLastScan}
-            onSaved={(next) =>
-              setBriefing({
-                themes: next.themes ?? [],
-                countries: next.countries ?? [],
-                kinds: (next.kinds as OpportunityKind[]) ?? ['grant'],
-                notes: next.notes,
-                searchFeedback: next.searchFeedback,
-                scanName: next.scanName,
-                classifications: next.classifications,
-                amountMax: next.amountMax,
-                privateEligible: next.privateEligible,
-                reimbursable: next.reimbursable,
-              })
-            }
-            onRunShortcut={(next, focus, profileId) => {
-              const mapped: Briefing = {
-                themes: next.themes ?? [],
-                countries: next.countries ?? [],
-                kinds: (next.kinds as OpportunityKind[]) ?? ['grant'],
-                notes: next.notes,
-                searchFeedback: next.searchFeedback,
-                scanName: next.scanName,
-                classifications: next.classifications,
-                amountMax: next.amountMax,
-                privateEligible: next.privateEligible,
-                reimbursable: next.reimbursable,
-              };
-              setBriefing(mapped);
-              void startScan(focus, mapped, profileId);
-            }}
-          />
+        <aside className="order-3 space-y-4 lg:sticky lg:top-4 lg:self-start">
           <KnownFundsPanel onAdded={() => void loadCatalog()} />
           <MonitoredSourcesPanel compact />
         </aside>

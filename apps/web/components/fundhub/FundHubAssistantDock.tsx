@@ -162,9 +162,9 @@ export function FundHubAssistantDock() {
       if (!r.ok) throw new Error(d.error || 'Error');
       setShortcutMsg(
         t(
-          `Atalho «${suggested.name}» criado — abra Buscar para o usar.`,
-          `Atajo «${suggested.name}» creado — abra Buscar para usarlo.`,
-          `Shortcut «${suggested.name}» created — open Search to use it.`,
+          `Perfil «${suggested.name}» criado — abra Buscar para a sua vista.`,
+          `Perfil «${suggested.name}» creado — abra Buscar para su vista.`,
+          `Profile «${suggested.name}» created — open Search for its view.`,
         ),
       );
       setSuggested(null);
@@ -246,7 +246,7 @@ export function FundHubAssistantDock() {
               <div className="mr-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2.5 text-xs text-amber-950">
                 <p className="flex items-center gap-1.5 font-semibold">
                   <Sparkles className="h-3.5 w-3.5 text-amber-700" />
-                  {t('Atalho sugerido', 'Atajo sugerido', 'Suggested shortcut')}
+                  {t('Perfil sugerido', 'Perfil sugerido', 'Suggested profile')}
                 </p>
                 <p className="mt-1 font-medium">{suggested.name}</p>
                 <p className="mt-1 max-h-28 overflow-y-auto whitespace-pre-wrap text-amber-900/90">
@@ -261,7 +261,7 @@ export function FundHubAssistantDock() {
                   >
                     {savingShortcut
                       ? '…'
-                      : t('Criar atalho', 'Crear atajo', 'Create shortcut')}
+                      : t('Criar perfil', 'Crear perfil', 'Create profile')}
                   </button>
                   <button
                     type="button"
