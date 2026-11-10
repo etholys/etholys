@@ -66,13 +66,13 @@ function ensureOverlayLayers(map: MapLibreMap) {
       id: 'radar-site-fill',
       type: 'fill',
       source: 'radar-site',
-      paint: { 'fill-color': '#14b8a6', 'fill-opacity': 0.08 },
+      paint: { 'fill-color': '#14b8a6', 'fill-opacity': 0.12 },
     });
     map.addLayer({
       id: 'radar-site-line',
       type: 'line',
       source: 'radar-site',
-      paint: { 'line-color': '#5eead4', 'line-width': 2, 'line-dasharray': [2, 1.5] },
+      paint: { 'line-color': '#5eead4', 'line-width': 2.5, 'line-dasharray': [2, 1.5] },
     });
   }
   if (!map.getSource('radar-spaces')) {
@@ -85,7 +85,7 @@ function ensureOverlayLayers(map: MapLibreMap) {
         'fill-extrusion-color': ['get', 'color'],
         'fill-extrusion-height': ['get', 'height'],
         'fill-extrusion-base': 0,
-        'fill-extrusion-opacity': 0.78,
+        'fill-extrusion-opacity': 0.86,
       },
     });
   }
@@ -99,7 +99,7 @@ function ensureOverlayLayers(map: MapLibreMap) {
         'fill-extrusion-color': ['get', 'color'],
         'fill-extrusion-height': ['get', 'height'],
         'fill-extrusion-base': 0,
-        'fill-extrusion-opacity': 0.65,
+        'fill-extrusion-opacity': 0.72,
       },
     });
   }
@@ -109,7 +109,7 @@ function ensureOverlayLayers(map: MapLibreMap) {
       id: 'radar-irrigation-line',
       type: 'line',
       source: 'radar-irrigation',
-      paint: { 'line-color': '#38bdf8', 'line-width': 3 },
+      paint: { 'line-color': '#38bdf8', 'line-width': 3.5 },
     });
   }
   if (!map.getSource('radar-labels')) {
@@ -134,6 +134,14 @@ function ensureOverlayLayers(map: MapLibreMap) {
   }
 }
 
+/** Space is drawable on the geo twin when placed on the map, or when it has a footprint (demo/local plant). */
+function spaceDrawable(rect: RadarSpaceRect): boolean {
+  if (!(rect.w > 0 && rect.h > 0)) return false;
+  if (rect.placed === true) return true;
+  // Fallback: layout % present (seed / legacy) — still show extrusion on the OSM pin.
+  return typeof rect.x === 'number' && typeof rect.y === 'number';
+}
+
 function syncOverlays(map: MapLibreMap, data: OverlayData) {
   const { parcels, spaces, focusedId, structures, irrigation, sideM, lat, lng } = data;
   const parcelById = new Map(parcels.map((p) => [p.id, p]));
@@ -152,7 +160,7 @@ function syncOverlays(map: MapLibreMap, data: OverlayData) {
   const spaceFeatures: GeoJSON.Feature[] = [];
   const labelFeatures: GeoJSON.Feature[] = [];
   for (const rect of spaces) {
-    if (rect.placed !== true) continue;
+    if (!spaceDrawable(rect)) continue;
     const parcel = parcelById.get(rect.id);
     if (!parcel) continue;
     const focused = focusedId === parcel.id;
@@ -174,6 +182,40 @@ function syncOverlays(map: MapLibreMap, data: OverlayData) {
       properties: { label: `${parcel.name}${parcel.crop ? ` · ${parcel.crop}` : ''}` },
       geometry: { type: 'Point', coordinates: [cx, cy] },
     });
+  }
+  // If layout spaces missing but parcels carry % layout, still extrude (avoids empty navy twin).
+  if (spaceFeatures.length === 0) {
+    for (const parcel of parcels) {
+      if (typeof parcel.x !== 'number' || typeof parcel.y !== 'number') continue;
+      const rect: RadarSpaceRect = {
+        id: parcel.id,
+        x: parcel.x,
+        y: parcel.y,
+        w: parcel.w ?? 18,
+        h: parcel.h ?? 14,
+        rotation: parcel.rotation ?? 0,
+        placed: true,
+      };
+      const focused = focusedId === parcel.id;
+      const ring = spaceRingLngLat(lat, lng, sideM, rect);
+      spaceFeatures.push({
+        type: 'Feature',
+        properties: {
+          id: parcel.id,
+          color: toneColor(parcel, focused),
+          height: extrusionHeight(parcel) * (focused ? 1.25 : 1),
+        },
+        geometry: { type: 'Polygon', coordinates: [ring] },
+      });
+      const n = Math.max(1, ring.length - 1);
+      const cx = ring.slice(0, n).reduce((s, c) => s + c[0], 0) / n;
+      const cy = ring.slice(0, n).reduce((s, c) => s + c[1], 0) / n;
+      labelFeatures.push({
+        type: 'Feature',
+        properties: { label: `${parcel.name}${parcel.crop ? ` · ${parcel.crop}` : ''}` },
+        geometry: { type: 'Point', coordinates: [cx, cy] },
+      });
+    }
   }
   (map.getSource('radar-spaces') as GeoJSONSource | undefined)?.setData({
     type: 'FeatureCollection',
@@ -242,6 +284,25 @@ function fitSite(map: MapLibreMap, lat: number, lng: number, sideM: number) {
   );
 }
 
+function waitForSize(el: HTMLElement, timeoutMs = 8000): Promise<boolean> {
+  if (el.clientWidth > 2 && el.clientHeight > 2) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      ro.disconnect();
+      window.clearTimeout(timer);
+      resolve(ok);
+    };
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth > 2 && el.clientHeight > 2) finish(true);
+    });
+    ro.observe(el);
+    const timer = window.setTimeout(() => finish(el.clientWidth > 2 && el.clientHeight > 2), timeoutMs);
+  });
+}
+
 /**
  * Real pitched 3D map (MapLibre + OSM). Spaces render as fill-extrusions on the basemap —
  * not a three.js ground plane that can fail into a foggy slab.
@@ -267,6 +328,7 @@ export function RadarMapLibreTwin({
   onFocusRef.current = onFocus;
   const [basemap, setBasemap] = useState<RadarMapBasemap>('streets');
   const [ready, setReady] = useState(false);
+  const [bootError, setBootError] = useState<string | null>(null);
   const satOk = radarSatelliteAvailable();
 
   const sideM =
@@ -292,30 +354,74 @@ export function RadarMapLibreTwin({
     let cancelled = false;
     let map: MapLibreMap | null = null;
     let ro: ResizeObserver | null = null;
+    const resizeTimers: number[] = [];
 
     void (async () => {
+      setBootError(null);
+      setReady(false);
+      const sized = await waitForSize(host);
+      if (cancelled || !hostRef.current) return;
+      if (!sized) {
+        setBootError('map-size');
+        return;
+      }
+
       const maplibregl = await import('maplibre-gl');
       if (cancelled || !hostRef.current) return;
 
-      map = new maplibregl.Map({
-        container: hostRef.current,
-        style: radarMapLibreStyle(basemap) as StyleSpecification,
-        center: [lng, lat],
-        zoom: 17,
-        pitch: 58,
-        bearing: -28,
-        maxPitch: 70,
-        attributionControl: { compact: true },
-      });
+      try {
+        map = new maplibregl.Map({
+          container: hostRef.current,
+          style: radarMapLibreStyle(basemap) as StyleSpecification,
+          center: [lng, lat],
+          zoom: 16.5,
+          pitch: 58,
+          bearing: -28,
+          maxPitch: 70,
+          attributionControl: { compact: true },
+          // Do not attach custom tile headers — they force CORS preflight and blank OSM tiles.
+        });
+      } catch {
+        if (!cancelled) setBootError('webgl');
+        return;
+      }
+
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
       map.addControl(new maplibregl.ScaleControl({ maxWidth: 100 }), 'bottom-left');
 
+      const bumpResize = () => {
+        if (!map || cancelled) return;
+        map.resize();
+      };
+
       map.on('load', () => {
         if (cancelled || !map) return;
+        bumpResize();
         ensureOverlayLayers(map);
         syncOverlays(map, dataRef.current);
         fitSite(map, dataRef.current.lat, dataRef.current.lng, dataRef.current.sideM);
+        bumpResize();
         setReady(true);
+        // Frame becomes fixed-size after first paint; re-fit once layout settles.
+        resizeTimers.push(
+          window.setTimeout(() => {
+            if (cancelled || !map) return;
+            bumpResize();
+            syncOverlays(map, dataRef.current);
+            fitSite(map, dataRef.current.lat, dataRef.current.lng, dataRef.current.sideM);
+          }, 120),
+        );
+        resizeTimers.push(
+          window.setTimeout(() => {
+            if (cancelled || !map) return;
+            bumpResize();
+          }, 400),
+        );
+      });
+
+      map.on('error', (e) => {
+        // Tile/style errors should not blank the twin forever — keep overlays if load already ran.
+        console.warn('[radar-maplibre]', e?.error || e);
       });
 
       map.on('click', 'radar-spaces-fill', (e) => {
@@ -330,13 +436,14 @@ export function RadarMapLibreTwin({
       });
 
       mapRef.current = map;
-      ro = new ResizeObserver(() => map?.resize());
+      ro = new ResizeObserver(() => bumpResize());
       ro.observe(hostRef.current);
     })();
 
     return () => {
       cancelled = true;
       ro?.disconnect();
+      for (const t of resizeTimers) window.clearTimeout(t);
       map?.remove();
       mapRef.current = null;
       setReady(false);
@@ -348,7 +455,7 @@ export function RadarMapLibreTwin({
     sideM,
     focusedId,
     spaces.map((s) => `${s.id}:${s.x}:${s.y}:${s.w}:${s.h}:${s.rotation ?? 0}:${s.placed ? 1 : 0}`).join('|'),
-    parcels.map((p) => `${p.id}:${p.moisture ?? ''}:${p.nextAction ?? ''}:${p.crop ?? ''}`).join('|'),
+    parcels.map((p) => `${p.id}:${p.moisture ?? ''}:${p.nextAction ?? ''}:${p.crop ?? ''}:${p.x ?? ''}:${p.y ?? ''}`).join('|'),
     structures.map((s) => `${s.id}:${s.x}:${s.y}:${s.w}:${s.h}`).join(','),
     irrigation.map((i) => i.id).join(','),
   ].join('::');
@@ -357,6 +464,7 @@ export function RadarMapLibreTwin({
     const map = mapRef.current;
     if (!map || !ready) return;
     const apply = () => {
+      map.resize();
       ensureOverlayLayers(map);
       syncOverlays(map, dataRef.current);
     };
@@ -365,10 +473,13 @@ export function RadarMapLibreTwin({
   }, [overlayKey, ready]);
 
   const tall = fill ? 'absolute inset-0 h-full min-h-0' : 'relative min-h-[280px] sm:min-h-[380px]';
+  const placedCount = spaces.filter(spaceDrawable).length || parcels.filter((p) => typeof p.x === 'number').length;
 
   return (
-    <div className={fill ? 'absolute inset-0 overflow-hidden' : `relative overflow-hidden rounded-xl ${tall}`}>
-      <div ref={hostRef} className="absolute inset-0" />
+    <div
+      className={fill ? 'absolute inset-0 overflow-hidden bg-[#c5d4b8]' : `relative overflow-hidden rounded-xl bg-[#c5d4b8] ${tall}`}
+    >
+      <div ref={hostRef} className="absolute inset-0 h-full w-full" />
       {satOk && (
         <div className="pointer-events-auto absolute left-1/2 top-3 z-[2] flex -translate-x-1/2 rounded-full bg-[#07111A]/95 p-1 shadow-lg ring-1 ring-white/25">
           <button
@@ -391,14 +502,37 @@ export function RadarMapLibreTwin({
           </button>
         </div>
       )}
-      <p className="pointer-events-none absolute bottom-2 left-3 z-[2] max-w-[70%] text-[10px] font-medium text-white/85 drop-shadow">
+      {bootError && (
+        <p className="pointer-events-none absolute left-1/2 top-1/2 z-[3] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-[#07111A]/92 px-4 py-3 text-center text-sm text-white/85 ring-1 ring-white/20">
+          {bootError === 'webgl'
+            ? radarT(
+                loc,
+                'O mapa 3D precisa de WebGL neste browser.',
+                'El mapa 3D necesita WebGL en este navegador.',
+                'The 3D map needs WebGL in this browser.',
+              )
+            : radarT(
+                loc,
+                'A vista 3D ainda não tem área útil — tenta 2D ou redimensiona a janela.',
+                'La vista 3D aún no tiene área útil — prueba 2D o redimensiona la ventana.',
+                '3D view has no usable area yet — try 2D or resize the window.',
+              )}
+        </p>
+      )}
+      {!bootError && !ready && (
+        <p className="pointer-events-none absolute left-1/2 top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2 text-sm font-medium text-slate-700/80">
+          {radarT(loc, 'A carregar mapa 3D…', 'Cargando mapa 3D…', 'Loading 3D map…')}
+        </p>
+      )}
+      <p className="pointer-events-none absolute bottom-2 left-16 z-[2] max-w-[70%] text-[10px] font-medium text-slate-900/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)] sm:left-3 sm:text-white/90 sm:drop-shadow">
         {radarT(
           loc,
-          'Mapa 3D · arrasta para orbitar · © OpenStreetMap',
-          'Mapa 3D · arrastra para orbitar · © OpenStreetMap',
-          '3D map · drag to orbit · © OpenStreetMap',
+          'arrasta para orbitar · © OpenStreetMap',
+          'arrastra para orbitar · © OpenStreetMap',
+          'drag to orbit · © OpenStreetMap',
         )}
         {basemap === 'satellite' ? ' · © MapTiler' : ''}
+        {ready && placedCount > 0 ? ` · ${placedCount} ${radarT(loc, 'espaços', 'espacios', 'spaces')}` : ''}
       </p>
     </div>
   );

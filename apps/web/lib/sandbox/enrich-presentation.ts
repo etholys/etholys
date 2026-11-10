@@ -2031,10 +2031,12 @@ async function seedAuroraAndRadar(
 }
 
 async function seedRadarFarm(prisma: PrismaClient, companyId: string, ownerId: string, summary: string[]) {
-  // Praça do Buriti (Brasília) — pin OSM for client walkthroughs of Ver/Seguir/Fazer/Quem.
-  const DEMO_LAT = -15.7995;
-  const DEMO_LNG = -47.9139;
+  // Chácaras Abreu / Formosa (GO) — rural chácaras & open fields, not Brasília asphalt (Praça do Buriti).
+  // Verified via OSM reverse: suburb "Chácaras Abreu", Formosa, Goiás — believable finca escuela pin.
+  const DEMO_LAT = -15.5515;
+  const DEMO_LNG = -47.3558;
   const PROPERTY_NAME = 'Finca escuela';
+  const DEMO_SITE_SIDE_M = Math.round(Math.sqrt(7.5 * 10000) * 10) / 10; // ~273.9 m
 
   let property = await prisma.radarProperty.findFirst({
     where: { companyId, name: PROPERTY_NAME },
@@ -2111,6 +2113,7 @@ async function seedRadarFarm(prisma: PrismaClient, companyId: string, ownerId: s
   ];
   const layoutJson: {
     version: 1;
+    siteSideM: number;
     spaces: Array<{
       id: string;
       x: number;
@@ -2137,6 +2140,7 @@ async function seedRadarFarm(prisma: PrismaClient, companyId: string, ownerId: s
     irrigation: Array<{ id: string; points: Array<{ x: number; y: number }>; label?: string | null }>;
   } = {
     version: 1,
+    siteSideM: DEMO_SITE_SIDE_M,
     spaces: parcels.map((p) => ({
       id: unitIds.get(p.key)!,
       x: p.x,
@@ -2994,7 +2998,7 @@ async function seedRadarFarm(prisma: PrismaClient, companyId: string, ownerId: s
   });
 
   summary.push(
-    'RADAR: Finca escuela (OSM) · Horta comunitária · cliente Sierra Norte · 4+ espaços · estruturas/irrigação · cultivos · sondas · Caderno · tarefas · WhatsApp · lotes · regras automação',
+    'RADAR: Finca escuela (rural Formosa/GO OSM) · Horta comunitária · cliente Sierra Norte · 4+ espaços · estruturas/irrigação · cultivos · sondas · Caderno · tarefas · WhatsApp · lotes · regras automação',
   );
 }
 

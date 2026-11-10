@@ -40,7 +40,15 @@ function osmStreetsStyle(): StyleSpec {
         maxzoom: 19,
       },
     },
-    layers: [{ id: 'osm', type: 'raster', source: 'osm', minzoom: 0, maxzoom: 22 }],
+    // Soft field tint under tiles — avoids a navy void when WebGL canvas clears before OSM arrives.
+    layers: [
+      {
+        id: 'radar-bg',
+        type: 'background',
+        paint: { 'background-color': '#c5d4b8' },
+      },
+      { id: 'osm', type: 'raster', source: 'osm', minzoom: 0, maxzoom: 22 },
+    ],
     glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
   };
 }
@@ -58,7 +66,14 @@ function mapTilerSatelliteStyle(key: string): StyleSpec {
         maxzoom: 20,
       },
     },
-    layers: [{ id: 'sat', type: 'raster', source: 'sat', minzoom: 0, maxzoom: 22 }],
+    layers: [
+      {
+        id: 'radar-bg',
+        type: 'background',
+        paint: { 'background-color': '#1a2a22' },
+      },
+      { id: 'sat', type: 'raster', source: 'sat', minzoom: 0, maxzoom: 22 },
+    ],
     glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
   };
 }

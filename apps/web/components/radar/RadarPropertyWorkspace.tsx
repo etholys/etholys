@@ -6,9 +6,11 @@ import {
   AlertTriangle,
   ArrowLeft,
   BookOpen,
+  Box,
   Layers,
   List,
   Loader2,
+  Map as MapIcon,
   MapPinned,
   Maximize2,
   Package,
@@ -500,7 +502,7 @@ export function RadarPropertyWorkspace({
   };
 
   return (
-    <div ref={frameRef} className="relative isolate overflow-hidden bg-[#07111A]">
+    <div ref={frameRef} className="relative isolate min-h-[70vh] overflow-hidden bg-[#07111A]">
       {/*
         Leaflet panes/controls use z-index 200–1000. Without a stacking context on the map
         layer, those values compete with sibling overlays (z-10) and bury all map chrome.
@@ -771,24 +773,48 @@ export function RadarPropertyWorkspace({
                       {radarT(loc, 'Camadas', 'Capas', 'Layers')}
                     </span>
                   </div>
-                  <div className="flex p-1">
+                  <div className="flex gap-0.5 p-1">
                     <button
                       type="button"
                       onClick={() => setView('2d')}
-                      className={`rounded-xl px-3.5 py-2 text-sm font-semibold ${
+                      title={radarT(loc, 'Vista 2D (mapa)', 'Vista 2D (mapa)', '2D map view')}
+                      aria-label={radarT(loc, 'Vista 2D', 'Vista 2D', '2D view')}
+                      aria-pressed={view === '2d'}
+                      className={`group relative flex h-10 w-10 items-center justify-center rounded-xl ${
                         view === '2d' ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:bg-white/10'
                       }`}
                     >
-                      2D
+                      <MapIcon className="h-4 w-4" />
+                      {railTip(
+                        radarT(loc, 'Vista 2D', 'Vista 2D', '2D view'),
+                        radarT(
+                          loc,
+                          'Mapa plano para colocar e editar espaços.',
+                          'Mapa plano para colocar y editar espacios.',
+                          'Flat map to place and edit spaces.',
+                        ),
+                      )}
                     </button>
                     <button
                       type="button"
                       onClick={() => setView('3d')}
-                      className={`rounded-xl px-3.5 py-2 text-sm font-semibold ${
+                      title={radarT(loc, 'Vista 3D (gémeo)', 'Vista 3D (gemelo)', '3D twin view')}
+                      aria-label={radarT(loc, 'Vista 3D', 'Vista 3D', '3D view')}
+                      aria-pressed={view === '3d'}
+                      className={`group relative flex h-10 w-10 items-center justify-center rounded-xl ${
                         view === '3d' ? 'bg-teal-300 text-slate-950' : 'text-white/85 hover:bg-white/10'
                       }`}
                     >
-                      3D
+                      <Box className="h-4 w-4" />
+                      {railTip(
+                        radarT(loc, 'Vista 3D', 'Vista 3D', '3D view'),
+                        radarT(
+                          loc,
+                          'Mapa inclinado com extrusão dos espaços.',
+                          'Mapa inclinado con extrusión de los espacios.',
+                          'Pitched map with extruded spaces.',
+                        ),
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1639,7 +1665,11 @@ export function RadarPropertyWorkspace({
           </div>
         )}
 
-        {!cardOpen && !detailOpen && !focusedId && data.units.length > 0 && (
+        {!cardOpen &&
+          !detailOpen &&
+          !focusedId &&
+          data.units.length > 0 &&
+          layout.spaces.some((s) => s.placed === true) && (
           <p className="pointer-events-none absolute bottom-5 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#07111A]/90 px-4 py-2 text-xs text-white/70 shadow-lg ring-1 ring-white/15">
             {radarT(
               loc,
