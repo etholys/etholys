@@ -19,6 +19,7 @@ import type { PropertyStepState } from '@/lib/radar/property-progress';
 import { RadarEntityActions } from '@/components/radar/RadarEntityActions';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
 import { spaceKindMeta } from '@/lib/radar/space';
+import { dispatchTourControl, readTourProgress } from '@/lib/radar/tour';
 import { cn } from '@/lib/utils';
 
 type PropRow = {
@@ -126,6 +127,16 @@ export function RadarHome({
     void load();
   }, [load, listRevision]);
 
+  // First visit to empty Campo Novo / own operation — start home coach once.
+  useEffect(() => {
+    if (loading || selectedClientId || !companyId) return;
+    if (!(isOwn && properties.length === 0)) return;
+    const progress = readTourProgress(companyId);
+    if (progress?.done) return;
+    if (progress && !progress.done) return;
+    dispatchTourControl({ action: 'start', mode: 'home' });
+  }, [companyId, isOwn, loading, properties.length, selectedClientId]);
+
   const companyQ = useMemo(() => {
     const q = new URLSearchParams({ company: companyId });
     if (engagementId) q.set('engagement', engagementId);
@@ -221,6 +232,7 @@ export function RadarHome({
           )}
           <button
             type="button"
+            data-radar-tour="home-create"
             onClick={() => setCreateOpen?.('property')}
             className={cn(
               'inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold',
@@ -233,6 +245,13 @@ export function RadarHome({
             {radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
           </button>
         </div>
+        <button
+          type="button"
+          onClick={() => dispatchTourControl({ action: 'restart' })}
+          className="relative mt-6 text-xs font-medium text-white/40 underline-offset-2 hover:text-white/70 hover:underline"
+        >
+          {radarT(loc, 'Reiniciar tutorial', 'Reiniciar tutorial', 'Restart tutorial')}
+        </button>
       </div>
     );
   }
@@ -302,16 +321,26 @@ export function RadarHome({
             </p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => setCreateOpen?.(isAll ? 'client' : 'property')}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#04110c] shadow-[0_0_24px_-6px_rgba(16,185,129,0.55)] transition hover:bg-emerald-400"
-        >
-          <Plus className="h-4 w-4" />
-          {isAll
-            ? radarT(loc, 'Novo cliente', 'Nuevo cliente', 'New client')
-            : radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
-        </button>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <button
+            type="button"
+            data-radar-tour="home-create"
+            onClick={() => setCreateOpen?.(isAll ? 'client' : 'property')}
+            className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#04110c] shadow-[0_0_24px_-6px_rgba(16,185,129,0.55)] transition hover:bg-emerald-400"
+          >
+            <Plus className="h-4 w-4" />
+            {isAll
+              ? radarT(loc, 'Novo cliente', 'Nuevo cliente', 'New client')
+              : radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
+          </button>
+          <button
+            type="button"
+            onClick={() => dispatchTourControl({ action: 'restart' })}
+            className="text-[11px] font-medium text-white/40 underline-offset-2 hover:text-white/70 hover:underline"
+          >
+            {radarT(loc, 'Tutorial', 'Tutorial', 'Tutorial')}
+          </button>
+        </div>
       </header>
 
       {/* Composition: places + attention */}

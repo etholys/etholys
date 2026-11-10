@@ -31,7 +31,7 @@ export const RADAR_DEMO_LOGINS = {
     company: PRESENTATION_COMPANY_NAME,
     shortName: PRESENTATION_SHORT_NAME,
     shows:
-      'Filled farm: Finca escuela pinned near Praça do Buriti, 4 spaces placed/rotated, crops, sensors, Caderno lines, lots, tasks.',
+      'Filled farm: Finca escuela + Horta comunitária + client Sierra Norte; OSM pins; spaces placed/rotated; structures/irrigation; crops; sensors; Caderno; tasks; lots; automation rules.',
   },
   empty: {
     email: RADAR_EMPTY_EMAIL,

@@ -10,6 +10,7 @@ import {
 } from '@/components/radar/RadarClientScopeContext';
 import { RadarClientPicker } from '@/components/radar/RadarClientPicker';
 import { RadarCreatePanel } from '@/components/radar/RadarCreatePanel';
+import { RadarGuidedTour } from '@/components/radar/RadarGuidedTour';
 import { RadarOpsBar } from '@/components/radar/RadarOpsBar';
 
 function RadarShellInner({ children }: { children: ReactNode }) {
@@ -70,6 +71,7 @@ function RadarShellInner({ children }: { children: ReactNode }) {
         href: '/hub/radar/assistente',
         label: es ? 'Asistente' : en ? 'Assistant' : 'Assistente',
         group: fazer,
+        dataTour: 'assistant',
         detail: es
           ? 'Consejo técnico y recordatorios'
           : en
@@ -80,6 +82,7 @@ function RadarShellInner({ children }: { children: ReactNode }) {
         href: '/hub/radar/automatizacao',
         label: es ? 'Automatización' : en ? 'Automation' : 'Automatização',
         group: fazer,
+        dataTour: 'automation',
         detail: es
           ? 'Vincular sensores y reglas'
           : en
@@ -108,6 +111,7 @@ function RadarShellInner({ children }: { children: ReactNode }) {
     >
       <RadarOpsBar locale={loc} companyId={cid} engagementId={engagementId} tarefasHref={`/hub/radar/tarefas${qs}`} />
       <RadarCreatePanel locale={loc} />
+      {cid ? <RadarGuidedTour companyId={cid} locale={loc} /> : null}
       {children}
     </ProductAppShell>
   );

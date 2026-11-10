@@ -37,6 +37,8 @@ type Nav = {
   /** Agrupa itens seguidos com o mesmo nome. */
   group?: string;
   requiresAttended?: boolean;
+  /** Optional coach-mark hook (`data-radar-tour` / product tours). */
+  dataTour?: string;
 };
 
 const PRODUCT_ICON = {
@@ -213,6 +215,7 @@ export function ProductAppShell({
                       href={href}
                       onClick={() => setSidebarOpen(false)}
                       title={collapsed ? item.label : item.detail || item.label}
+                      data-radar-tour={item.dataTour || undefined}
                       className={cn(
                         'flex rounded-lg text-sm font-medium transition',
                         collapsed ? 'justify-center px-2 py-2.5' : 'items-center px-2.5 py-2',

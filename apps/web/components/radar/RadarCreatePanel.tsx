@@ -6,6 +6,7 @@ import { Loader2, X } from 'lucide-react';
 import { useRadarClientScope } from '@/components/radar/RadarClientScopeContext';
 import { RADAR_SCOPE_OWN } from '@/lib/radar/client-scope';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
+import { dispatchTourControl } from '@/lib/radar/tour';
 
 const MODULES = [
   { id: 'agriculture', label: { pt: 'Agricultura', es: 'Agricultura', en: 'Agriculture' } },
@@ -125,6 +126,7 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
       bumpListRevision();
       close();
       setScope(d.client.id);
+      dispatchTourControl({ action: 'start', mode: 'home' });
       window.setTimeout(() => setCreateOpen('property'), 80);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erro');
@@ -158,6 +160,7 @@ export function RadarCreatePanel({ locale = 'es' }: { locale?: string }) {
       close();
       const q = companyQs();
       q.set('client', effectiveClientId || RADAR_SCOPE_OWN);
+      q.set('tour', '1');
       router.push(`/hub/radar/properties/${d.property.id}?${q}`);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erro');

@@ -2109,8 +2109,34 @@ async function seedRadarFarm(prisma: PrismaClient, companyId: string, ownerId: s
     { id: 'crop_zapallo', name: 'Zapallo', variety: 'Cabutia', season: 'Otoño' },
     { id: 'crop_maiz', name: 'Maíz', variety: 'Choclo', season: 'Verano' },
   ];
-  const layoutJson = {
-    version: 1 as const,
+  const layoutJson: {
+    version: 1;
+    spaces: Array<{
+      id: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      rotation: number;
+      placed: boolean;
+    }>;
+    sensors: Array<{ id: string; spaceId: string | null; x: number; y: number }>;
+    crops: typeof crops;
+    devices: Array<{ sensorId: string; sku: string; devEui: string | null; unitId: string | null }>;
+    commands: unknown[];
+    structures: Array<{
+      id: string;
+      kind: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      rotation?: number;
+      label?: string | null;
+    }>;
+    irrigation: Array<{ id: string; points: Array<{ x: number; y: number }>; label?: string | null }>;
+  } = {
+    version: 1,
     spaces: parcels.map((p) => ({
       id: unitIds.get(p.key)!,
       x: p.x,
@@ -2120,10 +2146,65 @@ async function seedRadarFarm(prisma: PrismaClient, companyId: string, ownerId: s
       rotation: p.rotation,
       placed: true,
     })),
-    sensors: [] as Array<{ id: string; spaceId: string | null; x: number; y: number }>,
+    sensors: [],
     crops,
-    devices: [] as Array<{ sensorId: string; sku: string; devEui: string | null; unitId: string | null }>,
-    commands: [] as unknown[],
+    devices: [],
+    commands: [],
+    structures: [
+      {
+        id: 'st_galpon_escuela',
+        kind: 'shed',
+        x: 8,
+        y: 8,
+        w: 10,
+        h: 8,
+        rotation: 0,
+        label: 'Galpón escuela',
+      },
+      {
+        id: 'st_invernadero_norte',
+        kind: 'greenhouse',
+        x: 38,
+        y: 8,
+        w: 14,
+        h: 10,
+        rotation: -4,
+        label: 'Invernadero Norte',
+      },
+      {
+        id: 'st_camino_central',
+        kind: 'path',
+        x: 42,
+        y: 18,
+        w: 4,
+        h: 55,
+        rotation: 0,
+        label: 'Camino central',
+      },
+    ],
+    irrigation: [
+      {
+        id: 'irr_sur_linea',
+        label: 'Línea goteo Cantero Sur',
+        points: [
+          { x: 48, y: 58 },
+          { x: 58, y: 58 },
+          { x: 66, y: 62 },
+          { x: 66, y: 70 },
+        ],
+      },
+      {
+        id: 'irr_norte_anillo',
+        label: 'Anillo Cantero Norte',
+        points: [
+          { x: 20, y: 28 },
+          { x: 36, y: 28 },
+          { x: 36, y: 38 },
+          { x: 20, y: 38 },
+          { x: 20, y: 28 },
+        ],
+      },
+    ],
   };
 
   const lines: Array<{
@@ -2274,6 +2355,18 @@ async function seedRadarFarm(prisma: PrismaClient, companyId: string, ownerId: s
       payload: {
         note: 'Última percorrida: milho em grão leitoso. Há mais de duas semanas sem anotação.',
         demoKey: 'bajo-obs',
+      },
+    },
+    {
+      key: 'norte-visit',
+      unit: 'norte',
+      kind: 'visit',
+      daysAgo: 0,
+      channel: 'app',
+      payload: {
+        note: 'Visita técnica: revisar carência do cobre e planear colheita da próxima semana.',
+        visitor: 'Ing. Campos',
+        demoKey: 'norte-visit',
       },
     },
   ];
@@ -2525,6 +2618,367 @@ async function seedRadarFarm(prisma: PrismaClient, companyId: string, ownerId: s
     }
   }
 
+  const bajoId = unitIds.get('bajo');
+  const demoTasks: Array<{
+    sourceKey: string;
+    title: string;
+    description: string;
+    status: string;
+    severity: string;
+    unitId: string | null;
+    dueDays: number | null;
+    progress: Array<{ id: string; at: string; note: string }>;
+  }> = [
+    {
+      sourceKey: `demo:${property.id}:irrigate:sur`,
+      title: 'Regar — Cantero Sur',
+      description: 'Humedad al 18%. Abrir riego o registrar lámina en el Caderno.',
+      status: 'todo',
+      severity: 'critical',
+      unitId: surId || null,
+      dueDays: 0,
+      progress: [],
+    },
+    {
+      sourceKey: `demo:${property.id}:hold:norte`,
+      title: 'No cosechar — Cantero Norte',
+      description: 'Carencia de cobre activa. Esperar el PHI antes de la feria.',
+      status: 'doing',
+      severity: 'warning',
+      unitId: norteId || null,
+      dueDays: 10,
+      progress: [
+        {
+          id: 'p1',
+          at: daysAgo(1).toISOString(),
+          note: 'Señalizado en el cantero. Equipo avisado por WhatsApp.',
+        },
+      ],
+    },
+    {
+      sourceKey: `demo:${property.id}:scout:bajo`,
+      title: 'Recorrer — Bajo del monte',
+      description: 'Caderno parado más de dos semanas. Visita y anotar estado del maíz.',
+      status: 'todo',
+      severity: 'warning',
+      unitId: bajoId || null,
+      dueDays: 2,
+      progress: [],
+    },
+    {
+      sourceKey: `demo:${property.id}:harvest:loma`,
+      title: 'Segunda pasada — Loma Este',
+      description: 'Primera cosecha hecha. Planear segunda pasada de zapallo.',
+      status: 'done',
+      severity: 'info',
+      unitId: unitIds.get('loma') || null,
+      dueDays: null,
+      progress: [
+        {
+          id: 'p1',
+          at: daysAgo(5).toISOString(),
+          note: '18 cajas cosechadas. Lote HV-LOMA-01 abierto.',
+        },
+        {
+          id: 'p2',
+          at: daysAgo(4).toISOString(),
+          note: 'Cerrado en Tareas — restante queda para la próxima semana.',
+        },
+      ],
+    },
+  ];
+  for (const task of demoTasks) {
+    await prisma.radarTask.upsert({
+      where: { companyId_sourceKey: { companyId, sourceKey: task.sourceKey } },
+      create: {
+        companyId,
+        propertyId: property.id,
+        unitId: task.unitId,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        severity: task.severity,
+        sourceKey: task.sourceKey,
+        dueAt: task.dueDays != null ? daysFromNow(task.dueDays) : null,
+        progressJson: task.progress,
+      },
+      update: {
+        propertyId: property.id,
+        unitId: task.unitId,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        severity: task.severity,
+        dueAt: task.dueDays != null ? daysFromNow(task.dueDays) : null,
+        progressJson: task.progress,
+        archivedAt: null,
+      },
+    });
+  }
+
+  // Second own place — contrast with the full finca (still agriculture, lighter).
+  const HORTA_NAME = 'Horta comunitária';
+  let horta = await prisma.radarProperty.findFirst({
+    where: { companyId, name: HORTA_NAME, clientId: null },
+  });
+  if (!horta) {
+    horta = await prisma.radarProperty.create({
+      data: {
+        companyId,
+        name: HORTA_NAME,
+        moduleId: 'agriculture',
+        crop: 'Hortalizas de hoja',
+        areaHa: 0.6,
+        lat: DEMO_LAT + 0.0042,
+        lng: DEMO_LNG + 0.0031,
+      },
+    });
+  } else {
+    horta = await prisma.radarProperty.update({
+      where: { id: horta.id },
+      data: {
+        moduleId: 'agriculture',
+        crop: 'Hortalizas de hoja',
+        areaHa: 0.6,
+        lat: DEMO_LAT + 0.0042,
+        lng: DEMO_LNG + 0.0031,
+        archivedAt: null,
+      },
+    });
+  }
+  const hortaBeds = [
+    { name: 'Canteiro A — Rúcula', crop: 'Rúcula', areaHa: 0.2, x: 20, y: 30, w: 28, h: 22 },
+    { name: 'Canteiro B — Couve', crop: 'Couve', areaHa: 0.25, x: 55, y: 40, w: 26, h: 24 },
+  ];
+  const hortaUnitIds: string[] = [];
+  for (const bed of hortaBeds) {
+    const existing = await prisma.nexusOpsUnit.findFirst({
+      where: { companyId, name: bed.name, OR: [{ propertyId: horta.id }, { propertyId: null }] },
+    });
+    const row = existing
+      ? await prisma.nexusOpsUnit.update({
+          where: { id: existing.id },
+          data: {
+            propertyId: horta.id,
+            kind: 'parcel',
+            sectorId: 'agriculture',
+            crop: bed.crop,
+            areaHa: bed.areaHa,
+            isActive: true,
+          },
+        })
+      : await prisma.nexusOpsUnit.create({
+          data: {
+            companyId,
+            propertyId: horta.id,
+            name: bed.name,
+            kind: 'parcel',
+            sectorId: 'agriculture',
+            crop: bed.crop,
+            areaHa: bed.areaHa,
+            notes: 'Horta comunitária Horizonte — demonstração leve.',
+            isActive: true,
+          },
+        });
+    hortaUnitIds.push(row.id);
+  }
+  await prisma.radarProperty.update({
+    where: { id: horta.id },
+    data: {
+      layoutJson: {
+        version: 1,
+        spaces: hortaBeds.map((b, i) => ({
+          id: hortaUnitIds[i],
+          x: b.x,
+          y: b.y,
+          w: b.w,
+          h: b.h,
+          rotation: i === 0 ? 4 : -3,
+          placed: true,
+        })),
+        sensors: [],
+        crops: [
+          { id: 'crop_rucula', name: 'Rúcula', variety: 'Folha larga', season: 'Todo o ano' },
+          { id: 'crop_couve', name: 'Couve', variety: 'Manteiga', season: 'Inverno' },
+        ],
+        devices: [],
+        commands: [],
+        structures: [
+          {
+            id: 'st_horta_caixa',
+            kind: 'shed',
+            x: 8,
+            y: 70,
+            w: 12,
+            h: 10,
+            label: 'Caixa de ferramentas',
+          },
+        ],
+        irrigation: [
+          {
+            id: 'irr_horta',
+            label: 'Mangueira A→B',
+            points: [
+              { x: 24, y: 42 },
+              { x: 48, y: 48 },
+              { x: 62, y: 52 },
+            ],
+          },
+        ],
+      } as object,
+    },
+  });
+  if (hortaUnitIds[0]) {
+    const plantKey = 'horta-a-plant';
+    const existingEntry = await prisma.nexusFieldEntry.findFirst({
+      where: { companyId, payloadJson: { path: ['demoKey'], equals: plantKey } },
+    });
+    const plantData = {
+      unitId: hortaUnitIds[0],
+      kind: 'planting',
+      occurredAt: daysAgo(7),
+      payloadJson: {
+        note: 'Sementeira directa de rúcula na horta comunitária.',
+        cultivar: 'Rúcula folha larga',
+        plantsCount: 800,
+        areaHa: 0.2,
+        demoKey: plantKey,
+      },
+      channel: 'app',
+      authorUserId: ownerId,
+    };
+    if (existingEntry) await prisma.nexusFieldEntry.update({ where: { id: existingEntry.id }, data: plantData });
+    else await prisma.nexusFieldEntry.create({ data: { companyId, ...plantData } });
+
+    const moistAt = new Date(Date.now() - 5 * 60 * 60 * 1000);
+    const existingRead = await prisma.nexusReading.findFirst({
+      where: { companyId, unitId: hortaUnitIds[0], metric: 'soil_moisture', source: 'manual' },
+      orderBy: { recordedAt: 'desc' },
+    });
+    if (existingRead) {
+      await prisma.nexusReading.update({
+        where: { id: existingRead.id },
+        data: { value: 44, unit: '%', recordedAt: moistAt },
+      });
+    } else {
+      await prisma.nexusReading.create({
+        data: {
+          companyId,
+          unitId: hortaUnitIds[0],
+          metric: 'soil_moisture',
+          value: 44,
+          unit: '%',
+          source: 'manual',
+          recordedAt: moistAt,
+        },
+      });
+    }
+  }
+
+  // Portfolio client — company dashboard / Empresas scope has something to open.
+  let client = await prisma.radarClient.findFirst({
+    where: { providerCompanyId: companyId, name: 'Cooperativa Sierra Norte' },
+  });
+  if (!client) {
+    client = await prisma.radarClient.create({
+      data: {
+        providerCompanyId: companyId,
+        name: 'Cooperativa Sierra Norte',
+        contactName: 'María Ríos',
+        contactPhone: '+59899111222',
+        contactEmail: 'maria@sierranorte.demo',
+        notes: 'Cliente demo — acompanhamento técnico semanal.',
+      },
+    });
+  } else {
+    client = await prisma.radarClient.update({
+      where: { id: client.id },
+      data: {
+        contactName: 'María Ríos',
+        contactPhone: '+59899111222',
+        contactEmail: 'maria@sierranorte.demo',
+        archivedAt: null,
+      },
+    });
+  }
+  const CLIENT_PROP = 'Parcela demostrativa';
+  let clientProp = await prisma.radarProperty.findFirst({
+    where: { companyId, clientId: client.id, name: CLIENT_PROP },
+  });
+  if (!clientProp) {
+    clientProp = await prisma.radarProperty.create({
+      data: {
+        companyId,
+        clientId: client.id,
+        name: CLIENT_PROP,
+        moduleId: 'agriculture',
+        crop: 'Tomate cherry',
+        areaHa: 1.1,
+        lat: DEMO_LAT - 0.006,
+        lng: DEMO_LNG + 0.008,
+      },
+    });
+  } else {
+    clientProp = await prisma.radarProperty.update({
+      where: { id: clientProp.id },
+      data: {
+        moduleId: 'agriculture',
+        crop: 'Tomate cherry',
+        areaHa: 1.1,
+        lat: DEMO_LAT - 0.006,
+        lng: DEMO_LNG + 0.008,
+        archivedAt: null,
+      },
+    });
+  }
+  let clientUnit = await prisma.nexusOpsUnit.findFirst({
+    where: { companyId, propertyId: clientProp.id, name: 'Linha cherry 1' },
+  });
+  if (!clientUnit) {
+    clientUnit = await prisma.nexusOpsUnit.create({
+      data: {
+        companyId,
+        propertyId: clientProp.id,
+        name: 'Linha cherry 1',
+        kind: 'parcel',
+        sectorId: 'agriculture',
+        crop: 'Tomate cherry',
+        areaHa: 0.4,
+        isActive: true,
+      },
+    });
+  } else {
+    clientUnit = await prisma.nexusOpsUnit.update({
+      where: { id: clientUnit.id },
+      data: { crop: 'Tomate cherry', areaHa: 0.4, isActive: true },
+    });
+  }
+  await prisma.radarProperty.update({
+    where: { id: clientProp.id },
+    data: {
+      layoutJson: {
+        version: 1,
+        spaces: [
+          {
+            id: clientUnit.id,
+            x: 30,
+            y: 35,
+            w: 40,
+            h: 28,
+            rotation: 6,
+            placed: true,
+          },
+        ],
+        sensors: [],
+        crops: [{ id: 'crop_cherry', name: 'Tomate cherry', variety: 'Sweet 100', season: 'Verano' }],
+        devices: [],
+        commands: [],
+        structures: [],
+        irrigation: [],
+      } as object,
+    },
+  });
+
   await prisma.businessDossier.upsert({
     where: { companyId },
     create: {
@@ -2540,7 +2994,7 @@ async function seedRadarFarm(prisma: PrismaClient, companyId: string, ownerId: s
   });
 
   summary.push(
-    'RADAR: Finca escuela (OSM Brasília) · 4 espaços colocados · cultivos · sondas · Caderno · WhatsApp · 4 lotes',
+    'RADAR: Finca escuela (OSM) · Horta comunitária · cliente Sierra Norte · 4+ espaços · estruturas/irrigação · cultivos · sondas · Caderno · tarefas · WhatsApp · lotes · regras automação',
   );
 }
 

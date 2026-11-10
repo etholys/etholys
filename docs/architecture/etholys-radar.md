@@ -210,8 +210,14 @@ Dois tenants re-runnable (upsert). Senha partilhada: env `SANDBOX_PASSWORD` ou d
 
 | Conta | Empresa | O que mostra |
 |-------|---------|--------------|
-| `demo.campo.novo@etholys.com` | Campo Novo (`CampoNovo`) | First-run: sem propriedade, mapa/Caderno vazios, funil Caracterizar → Desenhar → Geolocalizar → Sensores |
-| `master.horizonte@etholys.com` | Horizonte Verde (`Horizonte`) | Avançado: Finca escuela pin OSM (Praça do Buriti), 4 espaços colocados/rodados, cultivos, sondas, Caderno, lotes, alertas |
+| `demo.campo.novo@etholys.com` | Campo Novo (`CampoNovo`) | First-run: sem propriedade, mapa/Caderno vazios, funil + **tutorial in-app** (coach-marks) |
+| `master.horizonte@etholys.com` | Horizonte Verde (`Horizonte`) | Avançado: Finca escuela + Horta comunitária + cliente Sierra Norte; OSM; espaços colocados/rodados; estruturas/irrigação; cultivos; sondas; Caderno; tarefas; lotes; regras de automatização; alertas |
+
+### Tutorial in-app (coach-marks)
+
+Componente `RadarGuidedTour` + `lib/radar/tour.ts`. Progresso em `localStorage` (`radar.tour.v1.<user>.<companyId>`).
+
+Dispara após **Novo cliente** / **Novo espaço** (`?tour=1`), first-run vazio (Campo Novo) e propriedade vazia. Reinício: Painel → «Tutorial» / Definições do lugar → «Reiniciar tutorial» / `?tour=restart`.
 
 Refresh após updates de produto (local ou Contabo, com `DATABASE_URL` da BD alvo):
 

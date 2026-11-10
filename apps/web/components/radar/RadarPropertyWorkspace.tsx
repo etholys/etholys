@@ -23,6 +23,7 @@ import { RADAR_MODULES, type RadarModuleId } from '@/lib/etholys-products';
 import { isRadarModuleId, spaceKindMeta } from '@/lib/radar/space';
 import { radarLoc, radarT } from '@/lib/radar/i18n';
 import { type PropertyStepId, type PropertyStepState } from '@/lib/radar/property-progress';
+import { dispatchTourControl, readTourProgress } from '@/lib/radar/tour';
 import { RadarGeoPin } from '@/components/radar/RadarGeoPin';
 import { RadarSiteMap } from '@/components/radar/RadarSiteMap';
 import { RadarSpatialTwin } from '@/components/radar/RadarSpatialTwin';
@@ -187,6 +188,44 @@ export function RadarPropertyWorkspace({
     setTool(null);
     // Do not force 2D — user stays in whatever view they had; edit tools use map when needed.
   }, [initialSettingsOpen, data]);
+
+  // Coach-mark tour asks the workspace to open the matching panel/tool.
+  useEffect(() => {
+    const onOpen = (ev: Event) => {
+      const open = (ev as CustomEvent<{ open?: string | null }>).detail?.open;
+      if (!open) return;
+      setRailOpen(false);
+      setSearchOpen(false);
+      setLayersOpen(false);
+      if (open === 'space' || open === 'crops') {
+        setPanel(null);
+        setTool(open);
+        return;
+      }
+      if (open === 'characterize' || open === 'geolocate' || open === 'sensors') {
+        setTool(null);
+        setPanel(open);
+      }
+    };
+    window.addEventListener('radar-tour:open-step', onOpen);
+    return () => window.removeEventListener('radar-tour:open-step', onOpen);
+  }, []);
+
+  // Empty new property → start property tour once (unless already done/skipped).
+  useEffect(() => {
+    if (!companyId || !data) return;
+    const emptyish =
+      data.units.length === 0 &&
+      (data.lat == null || data.lng == null) &&
+      !(data.layout && Array.isArray(data.layout.spaces) && data.layout.spaces.some((s) => s.placed));
+    if (!emptyish) return;
+    const progress = readTourProgress(companyId);
+    if (progress?.done) return;
+    if (progress && !progress.done) return; // already running / restored by GuidedTour
+    const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    if (q?.get('tour') === '1' || q?.get('tour') === 'start') return; // GuidedTour handles URL
+    dispatchTourControl({ action: 'start', mode: 'property' });
+  }, [companyId, data]);
 
   useEffect(() => {
     const el = frameRef.current;
@@ -645,6 +684,7 @@ export function RadarPropertyWorkspace({
 
             <button
               type="button"
+              data-radar-tour="new-space"
               onClick={() => openToolPanel('space')}
               className={railBtn(tool === 'space')}
               aria-label={radarT(loc, 'Novo espaço', 'Nuevo espacio', 'New space')}
@@ -660,6 +700,7 @@ export function RadarPropertyWorkspace({
             {data.moduleId === 'agriculture' && (
               <button
                 type="button"
+                data-radar-tour="crops"
                 onClick={() => openToolPanel('crops')}
                 className={railBtn(tool === 'crops')}
                 aria-label={radarT(loc, 'Cultivos', 'Cultivos', 'Crops')}
@@ -675,6 +716,7 @@ export function RadarPropertyWorkspace({
 
             <button
               type="button"
+              data-radar-tour="sensors"
               onClick={() => openStep('sensors')}
               className={railBtn(panel === 'sensors')}
               aria-label={radarT(loc, 'Sensores', 'Sensores', 'Sensors')}
@@ -684,6 +726,26 @@ export function RadarPropertyWorkspace({
               {railTip(
                 radarT(loc, 'Sensores', 'Sensores', 'Sensors'),
                 radarT(loc, 'Ligar e gerir sensores no sítio.', 'Conectar y gestionar sensores en el sitio.', 'Connect and manage site sensors.'),
+              )}
+            </button>
+
+            <button
+              type="button"
+              data-radar-tour="geolocate"
+              onClick={() => openStep('geolocate')}
+              className={railBtn(panel === 'geolocate')}
+              aria-label={radarT(loc, 'Marcar no mapa', 'Marcar en el mapa', 'Pin on map')}
+              aria-pressed={panel === 'geolocate'}
+            >
+              <MapPinned className="h-4 w-4" />
+              {railTip(
+                radarT(loc, 'Marcar no mapa', 'Marcar en el mapa', 'Pin on map'),
+                radarT(
+                  loc,
+                  'Geolocalizar o sítio no mapa (OSM).',
+                  'Geolocalizar el sitio en el mapa (OSM).',
+                  'Geolocate this site on the map (OSM).',
+                ),
               )}
             </button>
 
@@ -765,6 +827,7 @@ export function RadarPropertyWorkspace({
 
             <Link
               href={cadernoHref}
+              data-radar-tour="caderno"
               className={railBtn(false)}
               aria-label={radarT(loc, 'Caderno', 'Cuaderno', 'Notebook')}
             >
@@ -778,6 +841,7 @@ export function RadarPropertyWorkspace({
             <div className="mt-auto flex w-full flex-col items-center border-t border-white/10 pt-1">
               <button
                 type="button"
+                data-radar-tour="settings"
                 onClick={() => {
                   openStep('characterize');
                   setEditMode('none');
@@ -894,6 +958,13 @@ export function RadarPropertyWorkspace({
                       'Name, type/module, area — and move or resize the property on the map.',
                     )}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => dispatchTourControl({ action: 'restart' })}
+                    className="mt-3 text-xs font-semibold text-emerald-300/90 underline-offset-2 hover:underline"
+                  >
+                    {radarT(loc, 'Reiniciar tutorial', 'Reiniciar tutorial', 'Restart tutorial')}
+                  </button>
                 </div>
                 <div className="rounded-xl border border-amber-400/30 bg-[#0c1a24] px-3 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-200/80">
@@ -1450,6 +1521,7 @@ export function RadarPropertyWorkspace({
                 {!focusedPlaced ? (
                   <button
                     type="button"
+                    data-radar-tour="place-space"
                     disabled={data.lat == null || data.lng == null}
                     onClick={() => {
                       setPanel(null);
