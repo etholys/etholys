@@ -39,10 +39,23 @@ config.enableWelcomePage = false;
 config.disableDeepLinking = true;
 config.deeplinking = config.deeplinking || {};
 config.deeplinking.disabled = true;
+config.deeplinking.desktop = config.deeplinking.desktop || {};
+config.deeplinking.desktop.disabled = true;
+config.deeplinking.android = config.deeplinking.android || {};
+config.deeplinking.android.disabled = true;
+config.deeplinking.ios = config.deeplinking.ios || {};
+config.deeplinking.ios.disabled = true;
 config.hideConferenceSubject = true;
 config.hideConferenceTimer = false;
 config.prejoinConfig = config.prejoinConfig || {};
 config.prejoinConfig.enabled = true;
+// Receber áudio remoto no telemóvel: não entrar em modo silencioso / áudio-only.
+config.startSilent = false;
+config.startWithAudioMuted = false;
+config.startWithVideoMuted = false;
+config.disableInitialGUM = false;
+config.enableNoAudioDetection = true;
+// Autoplay: browsers móveis bloqueiam play() sem gesto — warmAudio abaixo resolve.
 
 config.breakoutRooms = config.breakoutRooms || {};
 config.breakoutRooms.hideAddRoomButton = false;
@@ -169,6 +182,22 @@ config.toolbarButtons = [
   }
 
   var audioCtx = null;
+  function unlockRemoteMedia() {
+    try {
+      document.querySelectorAll('audio,video').forEach(function (el) {
+        try {
+          el.muted = false;
+          if (typeof el.volume === 'number' && el.volume < 0.05) el.volume = 1;
+          var p = el.play && el.play();
+          if (p && typeof p.catch === 'function') p.catch(function () { /* autoplay policy */ });
+        } catch (err) {
+          /* ignore */
+        }
+      });
+    } catch (err) {
+      /* ignore */
+    }
+  }
   function warmAudio() {
     try {
       var Ctor = window.AudioContext || window.webkitAudioContext;
@@ -178,9 +207,42 @@ config.toolbarButtons = [
     } catch (err) {
       /* ignore */
     }
+    unlockRemoteMedia();
   }
   document.addEventListener('pointerdown', warmAudio, true);
+  document.addEventListener('touchstart', warmAudio, true);
   document.addEventListener('keydown', warmAudio, true);
+  // Após join: desbloquear tracks remotas (Safari/Chrome móvel).
+  function hookConferenceAudio() {
+    try {
+      if (!window.APP || !APP.conference || !APP.conference._room) return false;
+      var room = APP.conference._room;
+      if (room.__etholysAudioHooked) return true;
+      room.__etholysAudioHooked = true;
+      room.on('trackAdded', function (track) {
+        try {
+          if (!track || (track.getType && track.getType() !== 'audio')) return;
+          if (track.isLocal && track.isLocal()) return;
+          if (track.isMuted && track.isMuted()) return;
+          unlockRemoteMedia();
+          warmAudio();
+        } catch (err) {
+          /* ignore */
+        }
+      });
+      unlockRemoteMedia();
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+  var audioHookTries = 0;
+  var audioHookTimer = window.setInterval(function () {
+    audioHookTries += 1;
+    if (hookConferenceAudio() || audioHookTries > 60) {
+      window.clearInterval(audioHookTimer);
+    }
+  }, 1000);
 
   function addStream(found, seen, stream) {
     if (!stream || !stream.getAudioTracks) return;
@@ -473,7 +535,11 @@ config.toolbarButtons = [
     var data = event.data || {};
     if (data.source !== 'etholys-chorus') return;
     if (data.action === 'ping') reply(event.origin, { action: 'pong' });
-    else if (data.action === 'start-transcription') startTranscription(event.origin);
+    else if (data.action === 'unlock-audio') {
+      warmAudio();
+      unlockRemoteMedia();
+      reply(event.origin, { action: 'audio-unlocked', ok: true });
+    } else if (data.action === 'start-transcription') startTranscription(event.origin);
     else if (data.action === 'stop-transcription') stopTranscription(event.origin);
     else if (data.action === 'start-recording') startRecording(event.origin, data.requestId);
     else if (data.action === 'stop-recording') stopRecording(event.origin, data.requestId);

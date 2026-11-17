@@ -1,4 +1,4 @@
-/* CHORUS · Etholys — interface (sem branding Jitsi / sem eco Google Meet) */
+/* CHORUS · Etholys — interface (sem branding do motor OSS / sem eco Google Meet) */
 interfaceConfig.APP_NAME = 'CHORUS';
 interfaceConfig.NATIVE_APP_NAME = 'CHORUS';
 interfaceConfig.PROVIDER_NAME = 'Etholys';
@@ -13,6 +13,17 @@ interfaceConfig.GENERATE_ROOMNAMES_ON_WELCOME_PAGE = false;
 interfaceConfig.HIDE_DEEP_LINKING_LOGO = true;
 interfaceConfig.HIDE_INVITE_MORE_HEADER = true;
 interfaceConfig.DISABLE_JOIN_LEAVE_NOTIFICATIONS = true;
+interfaceConfig.OPTIN_BANNER_PLACEHOLDER = false;
+// Tab title / PWA name — força CHORUS mesmo se o bundle capturar o default cedo.
+try {
+  if (typeof document !== 'undefined') {
+    document.title = 'CHORUS';
+    var iconHref = 'https://app.etholys.com/meet-brand/etholys-mark.svg';
+    document.querySelectorAll('link[rel*="icon"], link[rel="apple-touch-icon"]').forEach(function (el) {
+      el.setAttribute('href', iconHref);
+    });
+  }
+} catch (e) { /* ignore */ }
 interfaceConfig.VERTICAL_FILMSTRIP = true;
 interfaceConfig.FILM_STRIP_MAX_HEIGHT = 140;
 interfaceConfig.TILE_VIEW_MAX_COLUMNS = 7;

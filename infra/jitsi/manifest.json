@@ -1,25 +1,27 @@
 {
   "prefer_related_applications": false,
   "related_applications": [],
-  "short_name": "Etholys Meet",
-  "name": "Etholys Meet",
-  "description": "Videoconferência Etholys Meet",
+  "short_name": "CHORUS",
+  "name": "CHORUS · Etholys",
+  "description": "CHORUS — conversas que ficam. Videoconferência Etholys com memória.",
   "icons": [
     {
-      "src": "static/pwa/icons/icon192.png",
-      "type": "image/png",
-      "sizes": "192x192"
+      "src": "https://app.etholys.com/meet-brand/etholys-mark.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
     },
     {
-      "src": "static/pwa/icons/icon512.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "src": "https://app.etholys.com/meet-brand/etholys-mark.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
-      "src": "static/pwa/icons/iconMask.png",
+      "src": "https://app.etholys.com/meet-brand/etholys-mark.svg",
+      "type": "image/svg+xml",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
   "start_url": "/",

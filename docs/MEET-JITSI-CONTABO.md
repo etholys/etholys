@@ -171,8 +171,14 @@ docker logs jitsi-docker-prosody-1 2>&1 | grep 'Authenticated as focus' | tail -
 ```
 
 **TURN/Coturn** ainda não está neste piloto: redes corporativas/móveis simétricas podem continuar
-com ICE fraco. Abrir Coturn (3478/5349 + relay) é o próximo passo se o problema persistir
-depois do controlo de RAM.
+com ICE fraco (sintoma clássico: áudio só num sentido no telemóvel — outros ouvem-te, tu não
+ouves os outros). Abrir Coturn (3478/5349 + relay) é o próximo passo de infra; o cliente já
+tenta desbloquear autoplay/`play()` de tracks remotas após gesto e no join (Hub +
+`custom-config.js`).
+
+**Caddy em `meet.*`:** não usar `encode gzip` global no bloco do vídeo — comprimir o upgrade
+`/xmpp-websocket` provoca «Connection error» no browser. Preferir `encode` só em estáticos
+(ver `infra/Caddyfile`).
 
 ---
 

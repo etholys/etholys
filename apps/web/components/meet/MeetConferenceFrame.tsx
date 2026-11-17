@@ -571,6 +571,25 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
       let joinTimer: number | undefined;
       let countTimer: number | undefined;
       let resizeObserver: ResizeObserver | null = null;
+      let audioUnlockBound = false;
+      const onPointerUnlock = () => {
+        try {
+          const current = apiRef.current;
+          if (!current) return;
+          let origin = '';
+          try {
+            origin = new URL(meetingUrl).origin;
+          } catch {
+            return;
+          }
+          current.getIFrame().contentWindow?.postMessage(
+            { source: 'etholys-chorus', action: 'unlock-audio' },
+            origin,
+          );
+        } catch {
+          /* ignore */
+        }
+      };
       joinedRef.current = false;
       setLoading(true);
       setJoinError(null);
@@ -834,6 +853,14 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             }
           };
 
+          const unlockRoomAudio = () => {
+            try {
+              postToRoom({ action: 'unlock-audio' });
+            } catch {
+              /* ignore */
+            }
+          };
+
           const markJoined = () => {
             if (disposed || joinedRef.current) return;
             joinedRef.current = true;
@@ -844,14 +871,24 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
             // Roster pode atrasar — reforçar contagem local.
             window.setTimeout(emitCount, 400);
             window.setTimeout(emitCount, 1500);
+            // Telemóvel: autoplay bloqueia tracks remotas até gesto / resume AudioContext.
+            unlockRoomAudio();
+            window.setTimeout(unlockRoomAudio, 500);
+            window.setTimeout(unlockRoomAudio, 2000);
             callbacksRef.current.onReady?.();
             countTimer = window.setInterval(emitCount, 4000);
           };
 
           api.addListener('videoConferenceJoined', markJoined);
+          api.addListener('audioAvailabilityChanged', unlockRoomAudio);
           api.addListener('videoAvailabilityChanged', () => {
             if (joinedRef.current) emitCount();
           });
+          if (!audioUnlockBound) {
+            audioUnlockBound = true;
+            window.addEventListener('pointerdown', onPointerUnlock, true);
+            window.addEventListener('touchstart', onPointerUnlock, true);
+          }
 
           const emitTranscript = (raw: unknown) => {
             const chunk = normalizeChorusLiveTranscript(raw);
@@ -950,6 +987,10 @@ export const MeetConferenceFrame = forwardRef<MeetConferenceHandle, Props>(
         if (joinTimer) window.clearTimeout(joinTimer);
         if (countTimer) window.clearInterval(countTimer);
         resizeObserver?.disconnect();
+        if (audioUnlockBound) {
+          window.removeEventListener('pointerdown', onPointerUnlock, true);
+          window.removeEventListener('touchstart', onPointerUnlock, true);
+        }
         const current = apiRef.current;
         apiRef.current = null;
         try {

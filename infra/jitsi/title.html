@@ -1,4 +1,4 @@
-<title>CHORUS · Etholys</title>
+<title>CHORUS</title>
 <meta property="og:title" content="CHORUS · Etholys"/>
 <meta property="og:image" content="https://app.etholys.com/meet-brand/etholys-mark.svg"/>
 <meta property="og:description" content="CHORUS — conversas que ficam. Videoconferência Etholys com memória."/>
@@ -6,5 +6,21 @@
 <meta itemprop="name" content="CHORUS"/>
 <meta itemprop="description" content="CHORUS — conversas que ficam"/>
 <meta itemprop="image" content="https://app.etholys.com/meet-brand/etholys-mark.svg"/>
-<link rel="icon" href="https://app.etholys.com/meet-brand/etholys-mark.svg">
+<link rel="icon" href="https://app.etholys.com/meet-brand/etholys-mark.svg" type="image/svg+xml">
+<link rel="shortcut icon" href="https://app.etholys.com/meet-brand/etholys-mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://app.etholys.com/meet-brand/etholys-mark.svg">
 <link rel="stylesheet" href="css/etholys-meet.css">
+<script>
+(function () {
+  try {
+    document.title = 'CHORUS';
+    var icons = document.querySelectorAll('link[rel*="icon"], link[rel="apple-touch-icon"]');
+    for (var i = 0; i < icons.length; i += 1) {
+      var rel = (icons[i].getAttribute('rel') || '').toLowerCase();
+      if (rel.indexOf('apple') !== -1 || rel.indexOf('icon') !== -1) {
+        icons[i].setAttribute('href', 'https://app.etholys.com/meet-brand/etholys-mark.svg');
+      }
+    }
+  } catch (err) { /* ignore */ }
+})();
+</script>
