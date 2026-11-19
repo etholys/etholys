@@ -23,9 +23,6 @@ export function meetEmbedUrl(
     overrides.set('config.prejoinPageEnabled', 'false');
     overrides.set('config.disableDeepLinking', 'true');
     overrides.set('config.deeplinking.disabled', 'true');
-    overrides.set('config.startSilent', 'false');
-    overrides.set('config.startWithAudioMuted', 'false');
-    overrides.set('config.startWithVideoMuted', 'false');
     // Breakout rooms: botão visível para o host na barra (self-hosted).
     overrides.set('config.breakoutRooms.hideAddRoomButton', 'false');
     overrides.set(
@@ -49,6 +46,9 @@ export function meetEmbedUrl(
     if (title) {
       // Sem isto, o motor de vídeo transforma o slug técnico num título feio.
       overrides.set('config.subject', JSON.stringify(title.slice(0, 200)));
+    }
+    if (opts?.host) {
+      overrides.set('config.startWithAudioMuted', 'false');
     }
     u.hash = overrides.toString();
     return u.toString();
