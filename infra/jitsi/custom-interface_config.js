@@ -13,6 +13,8 @@ interfaceConfig.GENERATE_ROOMNAMES_ON_WELCOME_PAGE = false;
 interfaceConfig.HIDE_DEEP_LINKING_LOGO = true;
 interfaceConfig.HIDE_INVITE_MORE_HEADER = true;
 interfaceConfig.DISABLE_JOIN_LEAVE_NOTIFICATIONS = true;
+// Sem secção «Sons» — ringtone/dial já desligados em custom-config.js.
+interfaceConfig.SETTINGS_SECTIONS = ['devices', 'language', 'moderator', 'profile', 'calendar', 'more'];
 interfaceConfig.OPTIN_BANNER_PLACEHOLDER = false;
 // Tab title / PWA name — força CHORUS mesmo se o bundle capturar o default cedo.
 try {

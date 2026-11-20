@@ -23,6 +23,39 @@ export function meetEmbedUrl(
     overrides.set('config.prejoinPageEnabled', 'false');
     overrides.set('config.disableDeepLinking', 'true');
     overrides.set('config.deeplinking.disabled', 'true');
+    // Sem ringtone / dial / join sounds (outgoingRinging.mp3).
+    overrides.set('config.disableJoinLeaveSounds', 'true');
+    overrides.set('config.disableIncomingMessageSound', 'true');
+    overrides.set('config.disableRecordAudioNotification', 'true');
+    overrides.set(
+      'config.disabledSounds',
+      JSON.stringify([
+        'ASKED_TO_UNMUTE_SOUND',
+        'E2EE_OFF_SOUND',
+        'E2EE_ON_SOUND',
+        'INCOMING_MSG_SOUND',
+        'KNOCKING_PARTICIPANT_SOUND',
+        'LIVE_STREAMING_OFF_SOUND',
+        'LIVE_STREAMING_ON_SOUND',
+        'NOISY_AUDIO_INPUT_SOUND',
+        'NO_AUDIO_SIGNAL_SOUND',
+        'OUTGOING_CALL_EXPIRED_SOUND',
+        'OUTGOING_CALL_REJECTED_SOUND',
+        'OUTGOING_CALL_RINGING_SOUND',
+        'OUTGOING_CALL_START_SOUND',
+        'PARTICIPANT_JOINED_SOUND',
+        'PARTICIPANT_LEFT_SOUND',
+        'RAISE_HAND_SOUND',
+        'REACTION_SOUND',
+        'RECORDING_AND_TRANSCRIPTION_OFF_SOUND',
+        'RECORDING_AND_TRANSCRIPTION_ON_SOUND',
+        'RECORDING_OFF_SOUND',
+        'RECORDING_ON_SOUND',
+        'TALK_WHILE_MUTED_SOUND',
+        'TRANSCRIPTION_OFF_SOUND',
+        'TRANSCRIPTION_ON_SOUND',
+      ]),
+    );
     // Breakout rooms: botão visível para o host na barra (self-hosted).
     overrides.set('config.breakoutRooms.hideAddRoomButton', 'false');
     overrides.set(
